@@ -33,7 +33,7 @@ test('MEM-040 AC01: When the launcher dir is not on PATH, every memev hint in th
 });
 
 test('MEM-040 AC01: hints are rewritten only for real commands, in the console output of init and onboarding', async () => {
-  const L = '/home/x/.config/memev/bin/memev';
+  const L = '/home/you/.config/memev/bin/memev';
   assert.equal(fullPathHints('run memev doctor, then memev github setup (two minutes)', L), `run ${L} doctor, then ${L} github setup (two minutes)`);
   assert.equal(fullPathHints('Memev is running; your memev vault', L), 'Memev is running; your memev vault');
   assert.equal(fullPathHints('see (memev bus operator <seat>)', L), `see (${L} bus operator <seat>)`);
