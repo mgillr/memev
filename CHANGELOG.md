@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The Tailscale provider now uses `tailscale serve` (tailnet only) instead of `tailscale funnel`, so a joined computer reaches the vault over the tailnet and the address is never opened to the public internet.
 - When GitHub is signed in, `memev init` looks for a private backup whose README is a Memev vault and offers to join that vault before it creates a new one. With no GitHub CLI, or signed out, init makes no GitHub call.
 - `memev init` ends with "Finish: restart these apps" and one line for each app it connected, saying how to make that app load Memev (a new session or chat, a restart, or a window reload). Apps load MCP servers and hooks when a session starts, so the session that ran init does not have Memev yet.
 - A relay gives a vault one address that stays the same after restarts: the protocol (docs/RELAY.md), a client (`memev cloud relay on|off|status|address`, off by default) and a relay for development and tests. The relay only forwards, so it cannot read tokens.
