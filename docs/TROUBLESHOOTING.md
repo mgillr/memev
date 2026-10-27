@@ -12,6 +12,7 @@ The same checks are available to an AI session as the `memev_doctor` MCP tool.
 
 | Symptom | Fix |
 |---|---|
+| `memev init` stops and says git, Node.js, the port or a folder is the problem | nothing was written. `memev preflight` runs the same four checks and prints the fix for your system (macOS `xcode-select --install`, Windows `winget install Git.Git`, Debian or Ubuntu `sudo apt install git`); fix it, then run `memev init` again |
 | "daemon not running" | `memev start`; if it stops again, read `~/memev/.memev/daemon.log` |
 | An app does not see Memev | `memev clients`; `memev connect <app>`; restart the app |
 | Codex hooks do nothing | open `/hooks` in Codex and trust the Memev hooks |
