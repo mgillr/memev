@@ -1,20 +1,25 @@
 # Tiers: how each one is set up
 
-> **DRAFT.** Packages and services on these pages are proposals, not offers. A licence sets one
-> thing, how many computers can join a vault ([CHARTER.md](../../CHARTER.md)). Free is free;
-> Business, Enterprise and every service are priced on your requirements: contact us. See
-> [PRICING.md](../PRICING.md).
+> **DRAFT.** Packages and services on these pages are proposals, not offers. Tiers are sold by
+> person; a licence sets one thing, how many computers can join a vault
+> ([CHARTER.md](../../CHARTER.md)). Free is free and Personal has a set price. Team is contact us
+> until member keys ship. Business, Enterprise and every service are priced on your requirements:
+> contact us. See [PRICING.md](../PRICING.md).
 
-| | [Free](free.md) | [Business](sme.md) | [Enterprise](enterprise.md) |
-|---|---|---|---|
-| For | one person | a company with 10 to 20 computers | larger or regulated organisations |
-| Where Memev runs | your computer | a server in your office or your cloud account | your data centre or private cloud, more than one server |
-| Who can see what | you | departments and roles from your org chart (planned) | the same, plus your identity provider's groups (planned) |
-| AI models | whatever your apps use | cloud models, plus a local model for sensitive departments | the same, or local models only (air-gapped) |
-| Price | free | contact us | contact us |
-| Setup | you, in minutes | remote, 2 to 4 weeks | remote or onsite, 6 to 12 weeks |
-| Support | GitHub issues | business hours by priority (support plan quoted with the tier) | named or embedded engineer |
-| Status | built | planned (the shared vault over a secure link works today) | planned |
+| | [Free](free.md) | [Personal](free.md#personal-draft) | [Team](team.md) | [Business](sme.md) | [Enterprise](enterprise.md) |
+|---|---|---|---|---|---|
+| For | one person, one computer | one person, up to 3 computers | 2 to 20 people | from 10 people | organisations with compliance needs |
+| How it is counted | one computer | 3 computers | per person: 3 computers and 10 cloud AI connectors each, pooled | per person: 3 computers each, pooled | on your requirements |
+| Where Memev runs | your computer | your computers | one shared vault, on a computer or server you choose | a server in your office or your cloud account | your data centre or private cloud, more than one server |
+| Who can see what | you | you | the team; a key for each person is planned | departments and roles from your org chart (planned) | the same, plus your identity provider's groups (planned) |
+| AI models | whatever your apps use | whatever your apps use | whatever your apps use | cloud models, plus a local model for sensitive departments | the same, or local models only (air-gapped) |
+| Price | free | $15/month or $144/year, early-supporter price | contact us until member keys ship | contact us | contact us |
+| Setup | you, in minutes | you, in minutes on each computer | you, or a short onboarding | remote, 2 to 4 weeks | remote or onsite, 6 to 12 weeks |
+| Support | GitHub issues | priority support | priority support | business hours by priority (support plan quoted with the tier) | named or embedded engineer |
+| Status | built | built; hosted sync, backup and relay planned | the shared vault over a secure link works today; member keys planned | planned (the shared vault over a secure link works today) | planned |
+
+Team and Business overlap at 10 to 20 people on purpose: choose by what you need (a company hub,
+sign-in, departments and roles), not by size.
 
 Services, remote and onsite work, travel and response times are in [services.md](services.md).
 
@@ -32,6 +37,9 @@ Services, remote and onsite work, travel and response times are in [services.md]
 | Comms bus between AI apps: seats, automatic join, heartbeats, roster, comms checks, tasks and holds | built | every tier; stored in the vault and its own git backup ([BUS.md](../BUS.md)) |
 | Offline licence and computer limit | built | each added computer has its own key; the vault refuses computers past the licensed number. One computer needs no licence |
 | End-to-end encrypted sync between one person's computers | planned | |
+| Hosted encrypted backup | planned | the backup to your own GitHub repository is built |
+| Hosted relay with a stable address | planned | the relay protocol and the `memev cloud relay` client are built; the hosted relay is not |
+| Member keys: one key per person, covering that person's computers | planned | today each computer has its own key |
 | Company hub with user accounts | planned | |
 | Sign-in with Google Workspace or Microsoft Entra ID, SCIM | planned | |
 | Departments, roles and path grants from an org chart | planned | |
