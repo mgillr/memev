@@ -17,10 +17,8 @@ flowchart LR
     end
     github[("Your private GitHub repository<br/>backup and history")]
     cloud["AI on the web<br/>ChatGPT, claude.ai"]
-    grok["Grok Build<br/>(coming soon)"]
     vault -- "backup every few minutes" --> github
     cloud -. "optional secure link,<br/>you can switch it off" .-> vault
-    grok -.-> vault
 ```
 
 ## What happens when you chat
