@@ -1,0 +1,119 @@
+// SPDX-License-Identifier: Apache-2.0
+// The memev command.
+import fs from 'node:fs';
+import path from 'node:path';
+import { PKG, parseArgs, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, out } from './common.mjs';
+import { ensureDaemon, startDaemon, stopDaemon, healthy } from './daemon.mjs';
+import { initVault, isVault, VERSION } from '../engine/vault.mjs';
+import { TokenStore } from '../engine/tokens.mjs';
+import { writeAtomic, configDir } from '../engine/util.mjs';
+import { renderCard } from '../engine/card.mjs';
+
+const HELP = `memev ${VERSION}: one memory shared by every AI session you run
+
+Setup
+  memev init [--root DIR] [--local-only] [--no-connect] [--port N]   create the vault, start it, connect your AI apps
+  memev connect [client|all]       register Memev in an AI app (MCP, hooks, instructions); backs up first
+  memev disconnect [client|all]    remove it again, restoring the app's config
+  memev uninstall [--purge]        disconnect everything and stop; --purge also removes the service files
+  memev status | doctor [--fix] [--bundle]
+  memev cloud on|off|status        reach this vault from cloud AI apps through a private tunnel (on by default)
+  memev github setup               back the vault up to your own private GitHub repository
+  memev service install|remove     start Memev at login (systemd or launchd)
+
+Daily
+  memev recall <query>  |  memev remember <text> [--kind decision]  |  memev card [--project P]
+  memev checkpoint --project P [--task T] [--done a,b] [--doing x] [--next c,d]
+  memev claims [--status fact]  |  memev contract new|sign|verify|list|close
+  memev token issue|list|revoke|rotate
+  memev start | stop | restart | serve
+
+Integration (called by AI apps)
+  memev mcp --client NAME           MCP over stdio
+  memev hook session-start|prompt|pre-compact|stop --client NAME
+
+Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
+
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './service.mjs', contract: './contracts-cli.mjs', onboarding: './onboarding.mjs', tournament: './tournament-cli.mjs' };
+
+/** Copy the package to a stable place so client configs never point into a temporary npx cache. */
+export function installRuntime(env = process.env) {
+  const dir = path.join(configDir(env), 'runtime', VERSION);
+  if (path.resolve(PKG) !== path.resolve(dir)) {
+    for (const d of ['bin', 'src', 'templates', 'vendor']) if (fs.existsSync(path.join(PKG, d))) fs.cpSync(path.join(PKG, d), path.join(dir, d), { recursive: true, force: true });
+    for (const f of ['package.json', 'LICENSE', 'NOTICE']) if (fs.existsSync(path.join(PKG, f))) fs.copyFileSync(path.join(PKG, f), path.join(dir, f));
+  }
+  const bin = path.join(configDir(env), 'bin');
+  fs.mkdirSync(bin, { recursive: true });
+  const target = path.join(dir, 'bin', 'memev.mjs');
+  if (process.platform === 'win32') fs.writeFileSync(path.join(bin, 'memev.cmd'), `@"${process.execPath}" "${target}" %*\r\n`);
+  else writeAtomic(path.join(bin, 'memev'), `#!/bin/sh\nexec "${process.execPath}" "${target}" "$@"\n`, 0o755);
+  return { dir, launcher: path.join(bin, process.platform === 'win32' ? 'memev.cmd' : 'memev') };
+}
+
+export async function main(argv, env = process.env) {
+  const [cmd = 'help', ...rest] = argv;
+  const { flags, pos } = parseArgs(rest, ['yes', 'json', 'local-only', 'no-connect', 'fix', 'bundle', 'purge', 'dry-run', 'force']);
+  const root = resolveRoot(flags.root, env);
+  const need = () => { if (!isVault(root)) throw new Error(`no vault at ${root}; run memev init`); };
+  const json = (o) => console.log(JSON.stringify(o, null, 2));
+
+  if (OPTIONAL[cmd]) { const m = await import(OPTIONAL[cmd]); return m.command(cmd, pos, flags, { root, env }); }
+  switch (cmd) {
+    case 'help': case '--help': case '-h': console.log(HELP); return 0;
+    case 'version': case '--version': case '-v': console.log(VERSION); return 0;
+    case 'init': {
+      const fresh = !isVault(root);
+      const r = initVault(root, { template: path.join(PKG, 'templates', 'vault'), port: flags.port ? Number(flags.port) : null });
+      fs.mkdirSync(path.dirname(defaultVaultFile(env)), { recursive: true });
+      fs.writeFileSync(defaultVaultFile(env), `${root}\n`);
+      if (flags['local-only']) { const c = config(root); c.remote = { ...c.remote, enabled: false }; fs.writeFileSync(path.join(root, '.memev', 'config.json'), `${JSON.stringify(c, null, 2)}\n`, { mode: 0o600 }); }
+      const rt = installRuntime(env);
+      console.log(`${fresh ? 'Created' : 'Found'} your vault at ${root}`);
+      if (r.admin) console.log(`  Admin token saved to ${path.join(root, '.memev', 'admin.json')} (only this user can read it)`);
+      const up = await startDaemon(root, { quiet: true });
+      up ? out.ok(`Memev is running on http://127.0.0.1:${daemonInfo(root)?.port}`) : out.bad('Memev did not start: run memev doctor');
+      const onboarding = await import('./onboarding.mjs').catch(() => null);
+      if (onboarding) return onboarding.firstRun({ root, env, flags, launcher: rt.launcher, daemonUp: up });
+      return up ? 0 : 1;
+    }
+    case 'start': need(); return (await ensureDaemon(root)) ? 0 : 1;
+    case 'serve': need(); await import('../server/main.mjs'); return new Promise(() => {});
+    case 'stop': need(); console.log((await stopDaemon(root)) ? 'Stopped.' : 'Not running.'); return 0;
+    case 'restart': need(); await stopDaemon(root); return (await startDaemon(root)) ? 0 : 1;
+    case 'status': {
+      need(); const up = await healthy(root);
+      if (!up) { console.log(`Vault ${root}: daemon not running (memev start)`); return 1; }
+      const s = await api(root, '/v1/status', { method: 'GET', token: clientToken(root, 'cli') });
+      if (flags.json) json(s.json); else { const j = s.json; console.log(`Memev ${j.version} · ${root}\n  log: ${j.oplog.seq} ops in ${j.oplog.segments} segment(s) · index: ${j.index.notes} notes / ${j.index.sections} sections · graph: ${j.graph.entities} entities, ${j.graph.claims} claims · heap ${j.memory.heap_mb} MB`); }
+      return 0;
+    }
+    case 'mcp': { need(); const { runStdio } = await import('./mcp-stdio.mjs'); await runStdio(root, String(flags.client || 'mcp')); return 0; }
+    case 'hook': { const { runHook } = await import('./hooks.mjs'); return runHook(pos[0], flags, env); }
+    case 'recall': case 'remember': case 'checkpoint': case 'card': {
+      need(); if (!(await ensureDaemon(root, { quiet: true }))) throw new Error('the daemon is not running');
+      const token = clientToken(root, 'cli'); const list = (v) => (v ? String(v).split(',').map((s) => s.trim()).filter(Boolean) : []);
+      const call = async (route, body) => { const r = await api(root, `/v1/${route}`, { body, token }); if (!r.ok) throw new Error(r.json?.error_description || r.text); return r.json; };
+      if (cmd === 'recall') { const r = await call('recall', { query: pos.join(' '), limit: Number(flags.limit || 6), project: flags.project }); flags.json ? json(r.hits) : console.log(r.text || 'Nothing found.'); }
+      if (cmd === 'remember') json(await call('remember', { text: pos.join(' '), kind: flags.kind, project: flags.project, why: flags.why }));
+      if (cmd === 'checkpoint') json(await call('checkpoint', { project: flags.project, task: flags.task, done: list(flags.done), doing: flags.doing, next: list(flags.next), files: list(flags.files), source: 'cli' }));
+      if (cmd === 'card') { const r = await call('session-start', { project: flags.project, task: flags.task || pos.join(' ') || null }); console.log(flags.json ? JSON.stringify(r.card, null, 2) : renderCard(r.card)); }
+      return 0;
+    }
+    case 'claims': {
+      need(); const { Vault } = await import('../engine/vault.mjs');
+      if (await healthy(root)) { const r = await fetch(`http://127.0.0.1:${daemonInfo(root).port}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${clientToken(root, 'cli')}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'memev_claims', arguments: { status: flags.status, subject: flags.subject } } }) }); console.log((await r.json()).result.content[0].text); return 0; }
+      const v = new Vault(root, { git: false }).open(); try { json(v.claims({ agent: 'cli', scopes: ['read'], paths: ['**'] }, { status: flags.status, subject: flags.subject })); } finally { v.close(); } return 0;
+    }
+    case 'token': {
+      need(); const ts = new TokenStore(path.join(root, '.memev', 'tokens.json')); const sub = pos[0] || 'list';
+      if (sub === 'list') { for (const t of ts.list()) console.log(`${t.id}  ${t.agent.padEnd(16)} ${t.scopes.join('+').padEnd(16)} ${t.remote ? 'remote' : 'local '} ${t.revoked ? 'REVOKED' : t.expires ? `expires ${t.expires.slice(0, 10)}` : 'no expiry'}  ${t.paths.join(',')}`); return 0; }
+      if (sub === 'issue') { const t = ts.issue({ agent: flags.agent || pos[1] || 'agent', scopes: String(flags.scopes || 'read,write').split(','), paths: String(flags.paths || '**').split(','), ttlDays: Number(flags.ttl ?? 180), remote: !!flags.remote, note: flags.note || '' }); console.log(`Token for ${flags.agent || pos[1] || 'agent'} (shown once):\n${t.token}`); return 0; }
+      if (sub === 'revoke') { if (!pos[1]) throw new Error('memev token revoke <id>'); console.log(ts.revoke(pos[1]) ? `Revoked ${pos[1]}.` : `No token ${pos[1]}.`); return 0; }
+      if (sub === 'rotate') { if (!pos[1]) throw new Error('memev token rotate <id>'); const t = ts.rotate(pos[1]); const f = path.join(root, '.memev', 'clients.json'); try { const all = JSON.parse(fs.readFileSync(f, 'utf8')); for (const k of Object.keys(all)) if (all[k].startsWith(`mv_${pos[1]}_`)) all[k] = t.token; fs.writeFileSync(f, JSON.stringify(all, null, 2), { mode: 0o600 }); } catch {} console.log(`Rotated ${pos[1]}; the old secret no longer works. New token (shown once):\n${t.token}`); return 0; }
+      throw new Error('memev token list|issue|revoke|rotate');
+    }
+    case 'admin-token': need(); console.log(adminToken(root) || '(none)'); return 0;
+    default: console.error(`unknown command: ${cmd}\n`); console.log(HELP); return 2;
+  }
+}
