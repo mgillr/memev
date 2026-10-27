@@ -68,13 +68,12 @@ test('when the user edited a file after connect, disconnect removes only Memev e
   assert.ok(md.includes('New rule added later.')); assert.ok(!md.includes('memev:start'));
 });
 
-test('a config with comments is never rewritten; it is reported for a manual step', () => {
+test('a config with comments is edited in place and keeps its comment', () => {
   const { env, files } = fixtureHome();
   fs.writeFileSync(files.cursorMcp, '// my servers\n{"mcpServers":{}}\n');
-  const before = fs.readFileSync(files.cursorMcp);
   const r = connect('cursor', { env, launcher: '/x/memev' });
-  assert.equal(r.status, 'needs-manual');
-  assert.deepEqual(fs.readFileSync(files.cursorMcp), before);
+  assert.equal(r.status, 'added');
+  assert.match(fs.readFileSync(files.cursorMcp, 'utf8'), /^\/\/ my servers\n\{"mcpServers":\{\n  "memev": \{/);
 });
 
 test('re-detection connects a newly installed app but not one the user disconnected', () => {

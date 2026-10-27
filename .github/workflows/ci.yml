@@ -13,6 +13,7 @@ on:
       - 'test/**'
       - 'scripts/**'
       - 'package.json'
+      - 'CHANGELOG.md'
       - 'Dockerfile'
       - '.github/workflows/**'
 permissions:
@@ -33,6 +34,8 @@ jobs:
           node-version: 22
       - run: git config --global user.name ci && git config --global user.email ci@example.invalid
       - run: npm test
+      - name: CHANGELOG.md changes only at a release (notes go in changelog.d/)
+        run: node scripts/changelog-assemble.mjs --guard "origin/${{ github.base_ref }}"
       - name: Leak scan (files and every commit message)
         run: node scripts/leak-scan.mjs --history
       - name: gitleaks (pinned release, checksum verified)
