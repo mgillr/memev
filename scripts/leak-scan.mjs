@@ -18,9 +18,9 @@ if (process.env.LEAK_DENYLIST) for (const w of fs.readFileSync(process.env.LEAK_
 const EXEMPT = [/^vendor\/[^/]+\/(NOTICE|LICENSE)$/, /^NOTICE$/];
 const ALLOW_LINE = [{ file: /^docs\/READINESS-REVIEW\.md$/, line: /^Approved-By: \S+ \(\d{4}-\d{2}-\d{2}\)$/ }];
 const SELF = new Set(['scripts/leak-denylist.json']);
-const OK_EMAIL = /@(example\.(com|org|net)|[a-z0-9-]+\.invalid|localhost|users\.noreply\.github\.com)$/i;
+const OK_EMAIL = /(@(example\.(com|org|net)|[a-z0-9-]+\.invalid|localhost|users\.noreply\.github\.com)|^git@github\.com)$/i; // git@github.com is an SSH remote, not an address
 const OK_IP = (ip) => /^(127\.|0\.0\.0\.0$|10\.|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.|255\.)/.test(ip) || ip.split('.').some((x) => Number(x) > 255);
-const OK_HOME = new Set(['you', 'me', 'user', 'username', 'name', 'runner', 'example', 'alice', 'bob', 'node', '<name>', '<user>', 'ubuntu', 'shared']);
+const OK_HOME = new Set(['you', 'me', 'user', 'username', 'name', 'runner', 'example', 'alice', 'bob', 'node', '<name>', '<user>', 'ubuntu', 'shared', 'memev']);
 
 const ROOT_HOME = new RegExp(`(^|[\\s"'(])/${'root'}/`);
 const findings = [];

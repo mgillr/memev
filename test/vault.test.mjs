@@ -117,3 +117,14 @@ test('every write lands in git', async () => {
   assert.match(git(root, ['log', '-1', '--format=%B']).out, /Memev-Client: test-client/);
   v.close();
 });
+
+test('incremental indexing of appends gives the same recall as a full rebuild', () => {
+  const { v } = newVault();
+  for (let i = 0; i < 60; i++) v.journal(OWNER, { session: 'long-session', client: 'c', role: i % 2 ? 'assistant' : 'user', text: `turn ${i}: ${['the deploy pipeline', 'database migrations', 'the cache layer', 'login errors'][i % 4]} detail ${i * 13}` });
+  const q = (x) => v.recall(OWNER, { query: x, log: false, limit: 5 }).map((h) => `${h.path}#${h.heading}|${h.score}`);
+  const before = ['cache layer detail', 'login errors', 'migrations 351'].map(q);
+  v.index.reset();
+  v.reindexAll();
+  assert.deepEqual(['cache layer detail', 'login errors', 'migrations 351'].map(q), before);
+  v.close();
+});

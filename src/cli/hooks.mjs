@@ -32,6 +32,11 @@ function emit(format, event, context) {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: name, additionalContext: context } }));
 }
 
+// A request to build something: the session is reminded to turn it into a signed contract first.
+const BUILD_RE = /\b(i have a (new )?project|build (me|us)\b|(build|make|create|write|implement|develop|set up) (me |us )?(an? |the )?[\w -]{0,40}\b(app|application|tool|cli|api|service|site|website|bot|library|script|feature|game|dashboard|server|extension|plugin|pipeline))/i;
+export const isBuildRequest = (p) => BUILD_RE.test(String(p || ''));
+const BUILD_NUDGE = '[Memev] This is a build request. Before writing code: infer the requirements, call memev_contract_from_request (each requirement with a local check), then memev_contract_sign, and say in one line what you signed. If an open contract already covers it, use memev_contract_status instead.';
+
 export async function runHook(event, flags, env = process.env) {
   const format = flags.format || 'claude';
   let input = {}; try { input = JSON.parse(readStdin() || '{}'); } catch {}
@@ -64,7 +69,7 @@ export async function runHook(event, flags, env = process.env) {
         if (!st.task) st.task = prompt.slice(0, 200);
         const r = await call('recall', { query: prompt.slice(0, 1000), limit: 4 });
         await call('journal', { role: 'user', text: prompt });
-        emit(format, 'UserPromptSubmit', r.text);
+        emit(format, 'UserPromptSubmit', [r.text, isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
       }
     } else if (event === 'pre-compact') {
       await saveCheckpoint('pre-compact');
@@ -73,6 +78,10 @@ export async function runHook(event, flags, env = process.env) {
       const reply = input.last_assistant_message || input.prompt_response || tr?.lastAssistant;
       if (reply) await call('journal', { role: 'assistant', text: reply });
       await saveCheckpoint('auto');
+      if (format === 'claude' && !input.stop_hook_active) {
+        const g = await call('contract-gate', {});
+        if (g.open?.length) process.stdout.write(JSON.stringify({ decision: 'block', reason: `You signed ${g.open.map((c) => `${c.id} (${c.title})`).join(', ')} and it is not verified yet. Finish the remaining criteria and run memev_contract_verify, or report exactly what blocks you.` }));
+      }
     }
     if (tr) st.offset = tr.offset;
     writePrivateJson(stateFile, st);

@@ -5,9 +5,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
+import crypto from 'node:crypto';
 import { sha256, readJson, writeJson, writePrivateJson, exists, now, stamp, slug, truncate, randomToken } from './util.mjs';
 import { OpLog } from './oplog.mjs';
-import { RecallIndex, tokenize } from './index.mjs';
+import { RecallIndex, tokenize, sections } from './index.mjs';
 import { TokenStore, allowed } from './tokens.mjs';
 import { CommitQueue, git } from './git.mjs';
 import { lineSplice, applySplice } from './diff.mjs';
@@ -15,6 +16,7 @@ import { findSecrets, redactSecrets } from './secrets.mjs';
 import { Graph } from './graph.mjs';
 import { Tournament, ROUNDS } from './tournament.mjs';
 import { loadTuning } from './tuning.mjs';
+import { attach as attachContracts, installVaultHooks } from './contracts.mjs';
 
 export const VERSION = '0.1.0';
 export const STATE = '.memev';
@@ -41,10 +43,12 @@ export class Vault extends EventEmitter {
     this.config = { ...DEFAULT_CONFIG, ...readJson(path.join(this.state, 'config.json'), {}) };
     this.tokens = new TokenStore(path.join(this.state, 'tokens.json'));
     this.log = new OpLog(path.join(this.state, 'oplog'), { segmentBytes: this.opts.segmentBytes, snapshotEvery: this.opts.snapshotEvery, fsync: this.opts.fsync ?? true }).open();
-    this.index = new RecallIndex(path.join(this.state, 'index.json'));
+    this.index = new RecallIndex(path.join(this.state, 'index.jsonl'));
     this.graph = new Graph();
     this.tournament = new Tournament();
     this.feedback = new Map();
+    this.contractSessions = new Map();
+    this.contractResults = new Map();
     this.commits = new CommitQueue(this.root, { enabled: this.opts.git !== false, delayMs: this.opts.commitDelayMs ?? 400 });
     this.recover();
     const loaded = this.index.load();
@@ -93,9 +97,33 @@ export class Vault extends EventEmitter {
     const rec = this.log.append({ type: 'put', path: p, agent: 'external', client: source, data: { content: body, ch: sha256(body), external: true } });
     return rec;
   }
+  // Per-note cache (size, mtime, content hash state, line count) so an append costs what it appends,
+  // not the size of the note. A stat that does not match means the file changed outside Memev.
+  _ncSet(p, body) {
+    const nc = this._nc || (this._nc = new Map());
+    let st; try { st = fs.statSync(this.abs(p)); } catch { nc.delete(p); return; }
+    const hasher = crypto.createHash('sha256').update(body);
+    nc.delete(p); nc.set(p, { size: st.size, mtimeMs: st.mtimeMs, hasher, ch: hasher.copy().digest('hex'), lines: (body.match(/\n/g) || []).length, endsNL: body.endsWith('\n'), empty: body.length === 0 });
+    if (nc.size > 256) nc.delete(nc.keys().next().value);
+  }
+  _ncGet(p) {
+    const c = this._nc?.get(p); if (!c) return null;
+    let st; try { st = fs.statSync(this.abs(p)); } catch { this._nc.delete(p); return null; }
+    return st.size === c.size && st.mtimeMs === c.mtimeMs ? c : null;
+  }
+  _ncAppend(p, t) {
+    const c = this._nc?.get(p); if (!c) return;
+    c.hasher.update(t); c.ch = c.hasher.copy().digest('hex'); c.lines += (t.match(/\n/g) || []).length; c.endsNL = t.endsWith('\n'); c.empty = false;
+    try { const st = fs.statSync(this.abs(p)); c.size = st.size; c.mtimeMs = st.mtimeMs; } catch { this._nc.delete(p); }
+  }
+
   /** A note changed on disk outside Memev (an editor, git pull): log it before touching it. */
   syncFromDisk(p, source = 'external') {
-    const cur = this._read(p); const h = this.log.heads.get(p);
+    const h = this.log.heads.get(p);
+    const known = this._ncGet(p);
+    if (known && h && !h.deleted && known.ch === h.ch) return null;
+    const cur = this._read(p);
+    if (cur !== null) this._ncSet(p, cur);
     if (cur === null) { if (h && !h.deleted) { const rec = this.log.append({ type: 'delete', path: p, agent: 'external', client: source, data: { external: true } }); this.index.remove(p); this.graph.removeNote(p); return rec; } return null; }
     if (h && !h.deleted && h.ch === sha256(cur)) return null;
     const rec = this._importExternal(p, cur, source);
@@ -139,14 +167,20 @@ export class Vault extends EventEmitter {
     if (!internal && PROTECTED.some((re) => re.test(p))) throw new VaultError('immutable', `${p} is signed and immutable; amend it with a new contract (memev contract amend)`);
     if (!allowSecrets) { const hits = findSecrets(text); if (hits.length) throw new VaultError('secret', `refused: the text looks like a credential (${hits.join(', ')}); never store secrets in memory`); }
   }
-  _after(p, rec, client) {
-    const body = this._read(p);
-    this.index.update(p, body ?? '', { mtime: rec.ts }); this.graph.indexNote(p, body ?? '');
+  _after(p, rec, client, appended = null) {
+    if (appended) {
+      // an append that starts new sections: index only those (the cost follows the new text, not the note)
+      this.index.appendSections(p, appended.text, { lineOffset: appended.lineOffset, mtime: rec.ts });
+      this.graph.indexSections(p, sections(appended.text));
+    } else {
+      const body = this._read(p);
+      this.index.update(p, body ?? '', { mtime: rec.ts }); this.graph.indexNote(p, body ?? '');
+    }
     this.commits.add(p, client);
     this._indexSaveSoon();
     this.emit('change', { path: p, type: rec.type, seq: rec.seq, client });
   }
-  _indexSaveSoon() { clearTimeout(this._ist); this._ist = setTimeout(() => { this.index.save(); this._saveGraph(); }, 1000); this._ist.unref?.(); }
+  _indexSaveSoon() { clearTimeout(this._ist); this._ist = setTimeout(() => { this.index.save(); this._saveGraph(); }, 3000); this._ist.unref?.(); }
 
   // ---- note operations
   get(identity, p) { p = checkPath(p); this._need(identity, 'read', p); const b = this._read(p); if (b === null) throw new VaultError('not_found', `no note ${p}`); return { path: p, body: b }; }
@@ -169,6 +203,7 @@ export class Vault extends EventEmitter {
     }
     fs.mkdirSync(path.dirname(this.abs(p)), { recursive: true });
     const tmp = `${this.abs(p)}.${randomToken(4)}.tmp`; fs.writeFileSync(tmp, body); fs.renameSync(tmp, this.abs(p));
+    this._ncSet(p, body);
     this._after(p, rec, client);
     return { path: p, seq: rec.seq, op: rec.type, bytes: Buffer.byteLength(body) };
   }
@@ -176,13 +211,18 @@ export class Vault extends EventEmitter {
   append(identity, { path: p, text, client = null, allow_secrets = false, internal = false }) {
     p = checkPath(p); this._need(identity, 'write', p);
     this.syncFromDisk(p);
-    const old = this._read(p) ?? '';
-    let t = String(text ?? ''); if (old && !old.endsWith('\n')) t = `\n${t}`; if (!t.endsWith('\n')) t += '\n';
+    let ns = this._ncGet(p);
+    if (!ns) { const cur = this._read(p); if (cur !== null) { this._ncSet(p, cur); ns = this._ncGet(p); } }
+    let t = String(text ?? ''); if (ns && !ns.empty && !ns.endsNL) t = `\n${t}`; if (!t.endsWith('\n')) t += '\n';
     this._guard(p, t, allow_secrets, internal);
-    const rec = this.log.append({ type: 'append', path: p, agent: identity.agent, client, data: { text: t, ch: sha256(old + t) } });
+    const h2 = ns ? ns.hasher.copy() : crypto.createHash('sha256'); h2.update(t);
+    const rec = this.log.append({ type: 'append', path: p, agent: identity.agent, client, data: { text: t, ch: h2.digest('hex') } });
     fs.mkdirSync(path.dirname(this.abs(p)), { recursive: true });
     fs.appendFileSync(this.abs(p), t);
-    this._after(p, rec, client);
+    const lead = t.replace(/^\n+/, '');
+    const incremental = ns && !ns.empty && ns.endsNL && this.index.byPath.has(p) && /^#{1,6}\s/.test(lead) ? { text: t, lineOffset: ns.lines } : null;
+    if (ns) this._ncAppend(p, t); else this._ncSet(p, t);
+    this._after(p, rec, client, incremental);
     return { path: p, seq: rec.seq, op: 'append', bytes: Buffer.byteLength(t) };
   }
 
@@ -190,7 +230,7 @@ export class Vault extends EventEmitter {
     p = checkPath(p); this._need(identity, 'write', p); this._guard(p, '', true, false);
     if (this._read(p) === null) throw new VaultError('not_found', `no note ${p}`);
     const rec = this.log.append({ type: 'delete', path: p, agent: identity.agent, client, data: {} });
-    fs.rmSync(this.abs(p)); this.index.remove(p); this.graph.removeNote(p); this.commits.add(p, client); this._indexSaveSoon();
+    fs.rmSync(this.abs(p)); this._nc?.delete(p); this.index.remove(p); this.graph.removeNote(p); this.commits.add(p, client); this._indexSaveSoon();
     return { path: p, seq: rec.seq, op: 'delete', note: 'the content stays in the operation log and in git history' };
   }
 
@@ -295,12 +335,7 @@ export class Vault extends EventEmitter {
     }
     return null;
   }
-  _openContracts() {
-    const dir = this.abs('contracts/signed'); let names = [];
-    try { names = fs.readdirSync(dir).filter((n) => n.endsWith('.json') && !n.endsWith('.sig.json')); } catch { return []; }
-    const closed = new Set(); try { for (const n of fs.readdirSync(this.abs('contracts/closed'))) closed.add(n.replace(/\.json$/, '')); } catch {}
-    return names.map((n) => readJson(path.join(dir, n), null)).filter((c) => c && !closed.has(c.id)).map((c) => ({ id: c.id, title: c.title, criteria: (c.criteria || []).length }));
-  }
+  _openContracts() { return this.contractStatus({ agent: 'memev', scopes: ['read'], paths: ['**'] }, {}).slice(0, 5).map(({ id, title, project, version, passed, total, remaining, last_verified }) => ({ id, title, project, version, passed, total, last_verified, remaining: remaining.map((t) => `${t.id} ${t.title} (${t.status})`) })); }
 
   // ---- graph operations (logged)
   link(identity, { from, to, type = 'related', why = null, client = null }) {
@@ -361,21 +396,25 @@ export class Vault extends EventEmitter {
   }
   _applyMisc(rec) {
     if (rec.type === 'tournament.match') this.tournament.applyOp(rec);
+    else if (rec.type === 'contract.signed') { if (rec.data.session) this.contractSessions.set(rec.data.id, rec.data.session); }
+    else if (rec.type === 'contract.verified') { if (rec.data.tasks) this.contractResults.set(rec.data.id, { at: rec.ts, ok: rec.data.ok, tasks: rec.data.tasks }); }
     else if (rec.type === 'feedback') for (const it of rec.data.items) { const f = this.feedback.get(it) || { up: 0, down: 0 }; rec.data.useful ? f.up++ : f.down++; this.feedback.set(it, f); }
   }
 
   _replayGraph() {
     const f = path.join(this.state, 'graph.json'); const snap = readJson(f, null); let from = 1;
-    if (snap?.version === 2) { for (const e of snap.edges) this.graph.edges.push(e); for (const c of snap.claims) this.graph.claims.set(c.id, c); for (const [k, u] of snap.usage) this.graph.usage.set(k, u); this.tournament.load(snap.tournament); this.feedback = new Map(snap.feedback || []); from = snap.seq + 1; }
-    for (const rec of this.log.iterate({ fromSeq: from })) { if (/^(graph\.|claim|usage)/.test(rec.type)) this.graph.applyOp(rec); else if (rec.type === 'tournament.match' || rec.type === 'feedback') this._applyMisc(rec); }
+    if (snap?.version === 2) { for (const e of snap.edges) this.graph.edges.push(e); for (const c of snap.claims) this.graph.claims.set(c.id, c); for (const [k, u] of snap.usage) this.graph.usage.set(k, u); this.tournament.load(snap.tournament); this.feedback = new Map(snap.feedback || []); this.contractSessions = new Map(snap.contract_sessions || []); this.contractResults = new Map(snap.contract_results || []); from = snap.seq + 1; }
+    for (const rec of this.log.iterate({ fromSeq: from })) { if (/^(graph\.|claim|usage)/.test(rec.type)) this.graph.applyOp(rec); else if (rec.type === 'tournament.match' || rec.type === 'feedback' || rec.type === 'contract.signed' || rec.type === 'contract.verified') this._applyMisc(rec); }
   }
-  _saveGraph() { writePrivateJson(path.join(this.state, 'graph.json'), { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()] }); }
+  _saveGraph() { writePrivateJson(path.join(this.state, 'graph.json'), { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()], contract_sessions: [...this.contractSessions.entries()], contract_results: [...this.contractResults.entries()] }); }
 
   status() {
     const mu = process.memoryUsage();
     return { version: VERSION, vault: this.root, started: this.started, oplog: this.log.stats(), index: this.index.stats(), graph: this.graph.stats(), memory: { rss_mb: Math.round(mu.rss / 1048576), heap_mb: Math.round(mu.heapUsed / 1048576) }, recovered: this.recovered?.length || 0, imported: this.imported?.length || 0 };
   }
 }
+
+attachContracts(Vault);
 
 function jaccard(a, b) { const A = new Set(tokenize(a)), B = new Set(tokenize(b)); if (!A.size || !B.size) return 0; let i = 0; for (const x of A) if (B.has(x)) i++; return i / (A.size + B.size - i); }
 
@@ -396,6 +435,7 @@ export function initVault(root, { template, port = null } = {}) {
     if (!git(root, ['config', 'user.email']).out) { git(root, ['config', 'user.name', 'Memev']); git(root, ['config', 'user.email', 'memev@localhost']); }
     git(root, ['add', '-A']); git(root, ['commit', '-q', '-m', 'memev: a new vault']);
   }
+  installVaultHooks(root);
   const ts = new TokenStore(path.join(root, STATE, 'tokens.json'));
   let admin = null;
   if (!ts.list().some((t) => t.scopes.includes('admin') && !t.revoked)) { admin = ts.issue({ agent: 'owner', scopes: ['read', 'write', 'admin'], ttlDays: 0, note: 'admin token, minted by init' }); writePrivateJson(path.join(root, STATE, 'admin.json'), { token: admin.token, id: admin.id }); }

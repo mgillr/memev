@@ -27,6 +27,6 @@ test('the product code does not phone home', () => {
   const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
   for (const f of walk(path.join(PKG, 'src'))) {
     const s = fs.readFileSync(f, 'utf8');
-    for (const m of s.matchAll(/https?:\/\/([a-z0-9.-]+)/gi)) assert.ok(/^(127\.0\.0\.1|localhost|github\.com|api\.github\.com|pkgs\.tailscale\.com|tailscale\.com|developers\.cloudflare\.com|www\.apple\.com)$/.test(m[1]) || m[1].includes('${'), `${path.relative(PKG, f)} names ${m[1]}`);
+    for (const m of s.matchAll(/https?:\/\/([a-z0-9.-]+)/gi)) assert.ok(/^(127\.0\.0\.1|localhost|github\.com|api\.github\.com|pkgs\.tailscale\.com|tailscale\.com|developers\.cloudflare\.com|www\.apple\.com|cli\.github\.com)$/.test(m[1]) || m[1].includes('${'), `${path.relative(PKG, f)} names ${m[1]}`);
   }
 });
