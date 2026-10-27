@@ -77,8 +77,50 @@ export function report(items) {
   return bad.length;
 }
 
+// What a sandbox leaves in the environment of the programs it runs: Codex sets CODEX_SANDBOX (seatbelt on macOS)
+// and, when the sandbox has no network, CODEX_SANDBOX_NETWORK_DISABLED. A value of 0 or false means not set.
+const MARKERS = ['CODEX_SANDBOX', 'CODEX_SANDBOX_NETWORK_DISABLED'];
+
+/** The sandbox marker in this environment, as NAME=value, or null. */
+export function sandboxMarker(env = process.env) {
+  for (const k of MARKERS) { const v = String(env[k] ?? '').trim(); if (v && !/^(0|false|no)$/i.test(v)) return `${k}=${v}`; }
+  return null;
+}
+
+/** The init command to run in the person's own terminal: the same one, with the options they gave. */
+export function initCommand(flags = {}) {
+  const parts = ['memev', 'init'];
+  for (const k of ['root', 'port', 'lead']) if (typeof flags[k] === 'string' && /^[\w./:@~+-]+$/.test(flags[k])) parts.push(`--${k} ${flags[k]}`);
+  for (const k of ['local-only', 'org', 'no-connect']) if (flags[k] === true) parts.push(`--${k}`);
+  return parts.join(' ');
+}
+
+/** Inside a sandbox init cannot write the vault or the apps' config: it stops before anything is written. */
+export function sandboxStop({ env = process.env, flags = {} } = {}) {
+  const marker = sandboxMarker(env);
+  if (!marker) return null;
+  return [
+    `This session runs inside a sandbox (${marker}), which keeps init from writing your vault and your apps' settings, so init stopped before it wrote anything.`,
+    'Run this in your own terminal, outside the sandbox:',
+    '',
+    `    ${initCommand(flags)}`,
+    '',
+    'Or, in Codex, approve the request to run it outside the sandbox when it asks.',
+  ].join('\n');
+}
+
+/** Print the sandbox stop and say so (true), or do nothing (false). */
+export function stopInSandbox({ env = process.env, flags = {} } = {}) {
+  const text = sandboxStop({ env, flags });
+  if (!text) return false;
+  const [first, ...rest] = text.split('\n');
+  out.bad(first); console.log(rest.join('\n'));
+  return true;
+}
+
 /** What init does before it writes anything: false (after printing why) when it must stop. */
 export async function gate({ root, env = process.env, flags = {}, ...inject }) {
+  if (stopInSandbox({ env, flags })) return false;
   const items = await checkEnvironment({ env, root, port: flags.port, ...inject });
   const failed = report(items);
   if (failed) console.log(`\nMemev did not set anything up. Fix ${failed === 1 ? 'this' : 'these'} and run memev init again.`);

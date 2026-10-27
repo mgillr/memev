@@ -14,7 +14,8 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   const add = (status, step, detail = '') => items.push({ status, step, detail });
   add('succeeded', 'Vault', root);
   if (daemonUp === null) { const { healthy } = await import('./daemon.mjs'); daemonUp = await healthy(root); }
-  add(daemonUp ? 'succeeded' : 'failed', 'Memev running', daemonUp ? 'on this machine (127.0.0.1)' : 'run memev doctor');
+  const why = daemonUp ? null : await (await import('./daemon.mjs')).whyNotRunning(root); // the listen error, if any
+  add(daemonUp ? 'succeeded' : 'failed', 'Memev running', daemonUp ? 'on this machine (127.0.0.1)' : why ? `${why} (memev doctor)` : 'run memev doctor');
   // apps
   const clients = await import('./clients.mjs');
   if (firstRun && !flags['no-connect']) clients.connectAll({ env, launcher });
@@ -54,6 +55,10 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   const { git } = await import('../engine/git.mjs');
   const remote = git(root, ['remote']).out;
   add(remote ? 'ready' : 'needs-manual', 'Backup to your own private GitHub repository', remote ? `remote ${remote}` : 'memev github setup (two minutes, one browser sign-in)');
+  // the memev command itself: a source install leaves the launcher off PATH
+  const { launcherDir, onPath, commandName } = await import('./pathsetup.mjs');
+  if (onPath(launcherDir(env), env)) add('ready', 'memev command', 'on your PATH');
+  else add('needs-manual', 'memev command', `not on your PATH yet: memev path add puts it there (until then use ${commandName(env)})`);
   // self-test
   if (daemonUp) {
     const { fileChecks } = await import('./doctor.mjs');
@@ -78,7 +83,7 @@ export function print(items) {
   console.log(manual.length ? `\n${manual.length} step(s) need you; run memev onboarding to check again after doing them.` : '\nEverything is set up.');
 }
 
-export async function firstRun(o) { const items = await checklist({ ...o, firstRun: true }); print(items); return items.some((i) => i.status === 'failed') ? 1 : 0; }
+export async function firstRun(o) { const items = await checklist({ ...o, firstRun: true }); print(items); await (await import('./pathsetup.mjs')).offer({ env: o.env }); return items.some((i) => i.status === 'failed') ? 1 : 0; }
 // ---- the opt-in anonymous milestone report. Off by default; nothing is sent until it is on AND an address is set.
 export const reportFile = (env = process.env) => path.join(configDir(env), 'report.json');
 /** { enabled, asked, id, sent }. A fresh install: off, never asked, no id. */
