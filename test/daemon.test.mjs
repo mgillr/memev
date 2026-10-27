@@ -20,10 +20,15 @@ test('a vault started on a port another vault already uses is reported as not st
   try {
     assert.equal(a.run(['init', '--port', String(a.port), '--local-only', '--no-connect']).code, 0);
     const first = JSON.parse(fs.readFileSync(daemonFile(a), 'utf8'));
-    // the second vault asks for the port the first vault's daemon is listening on
-    const init = b.run(['init', '--port', String(a.port), '--local-only', '--no-connect']);
-    assert.match(init.out + init.err, /did not start/);
-    assert.doesNotMatch(init.out, /Memev is running/);
+    // the second vault is set to the port the first vault's daemon is listening on, then started
+    assert.equal(b.run(['init', '--port', String(b.port), '--local-only', '--no-connect']).code, 0);
+    assert.equal(b.run(['stop']).code, 0);
+    const cfg = path.join(b.root, '.memev', 'config.json');
+    fs.writeFileSync(cfg, JSON.stringify({ ...JSON.parse(fs.readFileSync(cfg, 'utf8')), port: a.port }, null, 2));
+    const start = b.run(['start']);
+    assert.equal(start.code, 1, start.out + start.err);
+    assert.match(start.out + start.err, /did not start/);
+    assert.doesNotMatch(start.out, /Memev is running/);
     assert.equal(fs.existsSync(daemonFile(b)), false, 'the second vault has no daemon');
     // and the first vault's daemon is untouched: same pid, still serving its own vault
     assert.equal(JSON.parse(fs.readFileSync(daemonFile(a), 'utf8')).pid, first.pid);
