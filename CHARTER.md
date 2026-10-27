@@ -29,6 +29,5 @@ vault's own computer keeps reading and writing (point 4). Cloud AI connectors ar
 limited.
 
 The code is in `src/engine/entitlements.mjs`, `src/engine/devices.mjs` and
-`src/engine/license.mjs`. Because it is open, anyone can patch the check out. It is there to keep
-licensing honest, not to lock anyone in. `test/seats.test.mjs` checks the limit and checks that one
-computer with no licence gets everything.
+`src/engine/license.mjs`. `test/seats.test.mjs` checks the limit and checks that one computer with
+no licence gets everything.

@@ -4,8 +4,8 @@
 // and nothing on that computer is ever capped. A licence only decides how many other computers can
 // be added to the vault, and whether those computers may still write after it lapses.
 //
-// The check runs on the vault's own machine, against a signed file the customer installed. The code
-// is open, so it can be patched out; it is there to keep licensing honest.
+// The check runs on the vault's own machine, against a signed file the customer installed, with no
+// call home.
 
 /** Computers are counted and capped at the vault. Connectors and local apps are reported only. */
 export const ENFORCEMENT = 'computers';

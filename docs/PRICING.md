@@ -59,13 +59,10 @@ response times are in [tiers/services.md](tiers/services.md).
   Remove one with `memev devices remove <id>` or contact us for more." `memev devices` lists every
   device and `memev license status` shows how many of how many are in use.
 - A cloud connector URL is for a cloud AI app. Pasted into a coding app on a computer it is refused,
-  as long as the app says what it is in its user agent; see the limits below.
+  with a pointer to enrolling that computer with its own key.
 - Apps on the vault's own computer and cloud AI connectors are not capped.
 
-What this does not stop, because the code is open and runs on your machine: someone can patch the
-check out, fake a cloud app's user agent to use a connector URL from a computer, or forward the
-vault's port over SSH so that requests look local. The check is there to keep licensing honest. It
-is not DRM.
+Each computer is registered with its own key, and the plan sets how many computers can join.
 
 ## Licences (draft)
 
