@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The tier pages follow the final tiers, sold by person and enforced by computer count: Personal is one person on up to 3 computers at an early-supporter price; a new Team page (2 to 20 people, 3 computers and 10 cloud connectors per person, pooled; contact us until member keys ship); Business is from 10 people per seat; Enterprise is chosen for compliance needs, not size. The status table lists the hosted backup, the hosted relay and member keys as planned.
 - Windows is stated as a preview in the README and the quickstart, with what differs there: where Memev keeps its files, the user PATH, the access-list privacy check and no start at login yet. The lab plan has a Windows 11 section (T-WIN-01 to T-WIN-09).
 - `memev bus roster --card` prints a short, shareable summary of your AI team: the apps and the seat count, with no paths, tokens, names or machine names.
 
