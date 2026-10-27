@@ -38,7 +38,7 @@ async function measure() {
   try {
     const repo = path.resolve(args.repo || REPO);
     const at_ = (ref) => { const sha = H.revParse(repo, `${ref}^{commit}`); const dir = H.extract(repo, sha); temp.push(dir); return H.loadCode(dir, sha); };
-    const code = args['repo-sha'] ? await at_(args['repo-sha']) : await H.loadCode(REPO, H.revParse(REPO, 'HEAD'));
+    const code = args['repo-sha'] ? await at_(args['repo-sha']) : await H.loadCode(REPO, (() => { try { return H.revParse(REPO, 'HEAD'); } catch { return 'unknown'; } })()); // a plain export has no git
     const queries = readJson(QUERIES);
     const base = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-bench-'));
     temp.push(base);
