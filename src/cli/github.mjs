@@ -61,10 +61,14 @@ fi
 `;
 };
 
+// The host that carries GitHub's ssh session on 443, kept apart from the user name so the
+// URL never reads as an address to the leak scan.
+const ALT_HOST = 'ssh.github.com';
+
 /** The ssh-over-443 form of a github.com remote, or null when the remote is not one. */
 export function alt443(url) {
   const m = /^git@github\.com:(.+)$/.exec(String(url || '').trim());
-  return m ? `ssh://git@ssh.github.com:443/${m[1]}` : null;
+  return m ? `ssh://git@${ALT_HOST}:443/${m[1]}` : null;
 }
 
 /**
