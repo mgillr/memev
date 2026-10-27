@@ -162,7 +162,8 @@ export async function setup({ root, env = process.env, repo = null, flags = {} }
   const cfg = config(root); cfg.github = { repo: name, remote: sshUrl, key: path.basename(key) }; saveConfig(root, cfg);
   const p = pushBackup(root, { upstream: true, quiet: false, remote: 'origin' });
   if (!p.ok) { step('manual', 'First push', `${p.error} (Memev retries every 30 minutes)`); return { ok: false, steps, repo: name }; }
-  step('ok', 'Vault pushed', `${name} (synced every ${cfg.sync?.interval_min ?? 30} minutes)`);
+  const via = p.via && p.via !== sshUrl ? ` via ${p.via.replace('ssh://git@', '')}` : '';
+  step('ok', 'Vault pushed', `${name}${via} (synced every ${cfg.sync?.interval_min ?? 30} minutes)`);
   console.log('Memev does not use your GitHub sign-in from here on; you can run gh auth logout.');
   return { ok: true, steps, repo: name };
 }

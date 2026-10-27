@@ -47,6 +47,7 @@ esac
     assert.match(calls, /-p 443 git@ssh\.github\.com git-receive-pack/, 'the retry went through ssh.github.com:443');
     assert.ok(execFileSync('git', ['--git-dir', bare, 'log', '--oneline']).toString().trim().length > 0, 'the 443 push landed');
     assert.match(fs.readFileSync(path.join(sb.root, '.git', 'hooks', 'pre-push'), 'utf8'), /ssh\.github\.com:443/, 'the push guard accepts the 443 form');
+    assert.match(r.out, /Vault pushed.*via ssh\.github\.com:443/, 'the setup output says the push went through 443');
   } finally { sb.stop(); }
 });
 
