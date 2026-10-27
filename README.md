@@ -1,8 +1,8 @@
 # Memev
 
-One memory for every AI app you use.
+Memory and recall stack for all of the AI apps you use, local system and cloud.
 
-Tell Claude Code about a decision on Monday and Cursor knows it on Tuesday. Memev keeps what your AI
+Run project dev on Claude code and Cursor knows about the context on Tuesday. Memev keeps what your AI
 apps learn in a folder of plain notes on your own computer, hands the right notes to whichever app
 you open next, and backs everything up to a private GitHub repository that you own.
 
@@ -45,6 +45,11 @@ worth reading.
 
 You need Node 22 or newer and git. Every path below sets up the same thing: it creates your notes
 folder, starts Memev, connects the AI apps it finds on your computer and runs a self-test.
+
+Memev runs on macOS and Linux. **Windows (preview):** setup, app connections, hooks and the doctor
+have Windows code paths and tests, but Windows has not had a full lab run yet, and Memev does not
+start at login there (run `memev start` after you sign in).
+[docs/QUICKSTART.md](docs/QUICKSTART.md#windows-preview) says what differs.
 
 | Path | Who it's for | What happens on its own |
 |---|---|---|

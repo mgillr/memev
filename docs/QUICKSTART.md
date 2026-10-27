@@ -57,6 +57,22 @@ memev github setup                 # back the vault up to a private GitHub repo
 
 Everything is Markdown. Edit it in any editor: Memev notices and records the change in its log.
 
+## Windows (preview)
+
+Windows has its own code paths and tests but has not had a full lab run yet. Install Node 22 from
+nodejs.org and Git for Windows, then run the same command in PowerShell or Windows Terminal. What
+differs:
+
+- Settings and the `memev.cmd` launcher live in `%APPDATA%\memev`; the vault is `%USERPROFILE%\memev`.
+- On a terminal, init offers to add the launcher folder to your user PATH. Open a new terminal
+  afterwards. `memev path remove` takes it off again; `memev uninstall` does not.
+- The privacy check reads each private file's access list (`icacls`): you, SYSTEM and
+  Administrators may have access, no one else.
+- Memev does not start at login on Windows yet. Run `memev start` after you sign in.
+
+If something breaks, `memev doctor` shows what and how to fix it; include its output when you
+report a problem.
+
 ## Removing Memev
 
 ```sh
