@@ -23,8 +23,9 @@ Setup
                                    for personal installs, off for --org installs)
   memev github setup               back the vault up to your own private GitHub repository
   memev service install|remove     start Memev at login (systemd or launchd)
-  memev devices [enroll|revoke|rotate|rename|keygen]   computers and apps using this vault, each with its own credential
-  memev license status             licence and seat report (report only: the free tier is never limited)
+  memev devices [enroll|remove|rotate|rename|keygen]   computers and apps using this vault, each with its own credential
+  memev join <url> --token T       use a vault on another computer from this one (after memev devices keygen)
+  memev license status|install <file>|remove   the licence: how many computers may use this vault
 
 Daily
   memev recall <query> [--project P] [--all-projects]  |  memev card [--project P]
@@ -71,6 +72,7 @@ export async function main(argv, env = process.env) {
   if (OPTIONAL[cmd]) { const m = await import(OPTIONAL[cmd]); return m.command(cmd, pos, flags, { root, env }); }
   switch (cmd) {
     case 'help': case '--help': case '-h': console.log(HELP); return 0;
+    case 'join': { const { join } = await import('./remote.mjs'); return join(pos, flags, { env }); }
     case 'version': case '--version': case '-v': console.log(VERSION); return 0;
     case 'init': {
       const fresh = !isVault(root);
@@ -122,7 +124,9 @@ export async function main(argv, env = process.env) {
       if (flags.json) json(s.json); else { const j = s.json; console.log(`Memev ${j.version} · ${root}\n  log: ${j.oplog.seq} ops in ${j.oplog.segments} segment(s) · index: ${j.index.notes} notes / ${j.index.sections} sections · graph: ${j.graph.entities} entities, ${j.graph.claims} claims · heap ${j.memory.heap_mb} MB`); }
       return 0;
     }
-    case 'mcp': { need(); const { runStdio } = await import('./mcp-stdio.mjs'); await runStdio(root, String(flags.client || 'mcp')); return 0; }
+    case 'mcp': {
+      if (!isVault(root)) { const rm = await import('./remote.mjs'); const remote = rm.loadRemote(env); if (remote) { await rm.runRemoteStdio(remote, String(flags.client || 'mcp'), env); return 0; } }
+      need(); const { runStdio } = await import('./mcp-stdio.mjs'); await runStdio(root, String(flags.client || 'mcp')); return 0; }
     case 'hook': { const { runHook } = await import('./hooks.mjs'); return runHook(pos[0], flags, env); }
     case 'recall': case 'remember': case 'checkpoint': case 'card': {
       need(); if (!(await ensureDaemon(root, { quiet: true }))) throw new Error('the daemon is not running');

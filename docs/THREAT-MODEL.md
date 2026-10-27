@@ -7,7 +7,7 @@
 | Another user on the machine reads the vault or tokens | `.memev/`, the config dir and keys are mode 0600/0700; daemon on loopback |
 | A web page calls the local API (DNS rebinding, CSRF) | bearer token on every route; a request with a non-local Host header or proxy headers is treated as remote; no cookies |
 | Someone finds the tunnel address | a per-device remote token is required (optionally with a device-key signature), or the secret connector URL; rate limits; audit log; `memev cloud off` |
-| A credential is copied to another machine | each device has its own; use from two networks within minutes is flagged; `memev devices rotate` or `revoke` cuts off one device |
+| A credential is copied to another machine | each added computer signs every request with its own key, which never leaves it, so the copy is refused; replays are refused by a one-time nonce; `memev devices rotate` or `remove` cuts off one device. Not covered: an SSH port forward makes requests look local, and the code is open, so the check can be patched out |
 | A leaked token | expiry, `memev token revoke`/`rotate`, path and scope limits |
 | A prompt-injected session writes junk or deletes memory | the log is append-only; every change can be seen and undone from it and from git; deletes are records, not erasures |
 | A session pastes a secret into memory | the secret scanner refuses the write |

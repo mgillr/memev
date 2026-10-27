@@ -5,8 +5,13 @@
 // Remote requests need: remote access switched on, a token minted for remote use, and either the
 // X-Memev-Key header (the tunnel key) or a connector URL (/c/<token>/mcp). Remote requests are rate
 // limited and audited. The only unauthenticated route is GET /healthz, which says {"ok":true}.
+// Another computer must sign every request with its own device key; a cloud connector credential
+// must not be used from a computer. Computers over the licence's seat count, or on a lapsed
+// licence, can read but not write (src/engine/entitlements.mjs).
 import http from 'node:http';
-import { verifyProof } from '../engine/devices.mjs';
+import { verifyProof, NonceCache, computerSide } from '../engine/devices.mjs';
+import { loadLicense, LICENSE_KEYS } from '../engine/license.mjs';
+import { seatPolicy, readOnlyReason } from '../engine/entitlements.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { handle } from './mcp.mjs';
@@ -46,13 +51,18 @@ function readBody(req, limit = 2 * 1024 * 1024) {
   });
 }
 
-export function createServer(vault, { tunnelKey = () => null } = {}) {
+export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICENSE_KEYS, env = process.env } = {}) {
   const limiter = new Buckets(vault.config.remote?.rate_per_min || 120);
+  const nonces = new NonceCache();
+  // the licence file is read again at most every few seconds, so an install takes effect at once
+  let lic = null; let licAt = 0;
+  const policy = () => { if (Date.now() - licAt > 3000) { lic = loadLicense({ env, keys: licenseKeys }); licAt = Date.now(); } return seatPolicy({ license: lic, devices: vault.devices.list() }); };
   const audit = path.join(vault.state, 'access.jsonl');
   const server = http.createServer(async (req, res) => {
     const send = (code, body, headers = {}) => { if (res.headersSent) return; const s = typeof body === 'string' ? body : JSON.stringify(body); res.writeHead(code, { 'content-type': typeof body === 'string' ? 'text/plain; charset=utf-8' : 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...headers }); res.end(s); };
     const url = new URL(req.url, 'http://localhost');
     const local = isDirectLocal(req);
+    let raw = null; const getBody = async () => (raw ??= await readBody(req));
     try {
       if (req.method === 'GET' && url.pathname === '/healthz') return send(200, local ? { ok: true, name: 'memev', version: VERSION } : { ok: true });
       let token = null; let route = url.pathname;
@@ -68,7 +78,7 @@ export function createServer(vault, { tunnelKey = () => null } = {}) {
       const identity = vault.tokens.verify(token);
       if (!identity) return send(401, { error: 'unauthorized', error_description: 'a valid bearer token is required' }, { 'www-authenticate': 'Bearer' });
       if (!local) {
-        if (!identity.remote) return send(403, { error: 'local_token', error_description: 'this token is for this machine only; mint a cloud token: memev connect cloud' });
+        if (!identity.remote) return send(403, { error: 'local_token', error_description: 'this token is for this machine only; for a cloud AI app use the connector URL from memev cloud url, and add another computer with memev devices enroll' });
         // Each remote client has its own credential (its token, registered as a device). The old
         // shared tunnel key is no longer needed; apps set up before still send it, and a wrong one
         // is still refused so a half-changed configuration fails loudly instead of silently.
@@ -76,27 +86,44 @@ export function createServer(vault, { tunnelKey = () => null } = {}) {
         if (sent !== undefined && !(key && timingSafeEqualHex(String(sent), key))) return send(401, { error: 'tunnel_key', error_description: 'the X-Memev-Key header does not match; it is no longer needed, so remove it' });
       }
       vault.tokens.touch(identity.id);
-      // report only: which device this is, what kind of client, and whether its credential looks shared
+      vault.devices.fresh();
+      let dev = vault.devices.get(vault.devices.byToken.get(identity.id) || '');
+      let proof = null;
+      if (!local && dev?.kind === 'remote-computer') {
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) await getBody();
+        proof = dev.pubkey ? verifyProof(dev.pubkey, { method: req.method, path: url.pathname, ts: req.headers['x-memev-ts'], nonce: req.headers['x-memev-nonce'], sig: req.headers['x-memev-sig'], body: raw || '' }) : { ok: false, reason: 'this computer was added without a device key' };
+        if (proof.ok && !nonces.use(`${dev.id}:${req.headers['x-memev-nonce']}`)) proof = { ok: false, reason: 'this signed request was already used' };
+      }
+      // which device this is, what kind of client, and whether its credential looks shared
+      let seen = null;
       try {
-        const dev = vault.devices.get(vault.devices.byToken.get(identity.id) || '');
-        const proof = dev?.pubkey && req.headers['x-memev-sig'] ? verifyProof(dev.pubkey, { method: req.method, path: url.pathname, ts: req.headers['x-memev-ts'], sig: req.headers['x-memev-sig'] }) : null;
-        const seen = vault.devices.observe({ tokenId: identity.id, identity, local, ip: req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress, userAgent: req.headers['user-agent'], connectorUrl: !!cm, proof });
+        seen = vault.devices.observe({ tokenId: identity.id, identity, local, ip: req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress, userAgent: req.headers['user-agent'], connectorUrl: !!cm, proof });
         if (!local && seen) fs.appendFile(audit, `${JSON.stringify({ ts: now(), device: seen.device, class: seen.class, route: route.slice(0, 64) })}\n`, () => {});
       } catch {}
+      dev ||= seen ? vault.devices.get(seen.device) : null;
+      if (!local && dev?.kind === 'remote-computer') {
+        if (!proof) proof = { ok: false, reason: 'this computer was added without a device key' };
+        if (!proof.ok) return send(401, { error: 'device_key', error_description: `Refused: ${proof.reason}. A computer's connection details only work on the computer that holds its device key. To add this computer, run memev devices keygen on it and enroll it on the vault: memev devices enroll --kind remote-computer --pubkey <key>.` });
+        const why = readOnlyReason(policy(), dev);
+        if (why) identity.read_only = why;
+      }
+      if (!local && dev?.kind === 'cloud-connector' && computerSide({ userAgent: req.headers['user-agent'], memevClient: req.headers['x-memev-client'] })) {
+        return send(403, { error: 'connector_on_computer', error_description: 'This connector URL is for a cloud AI app. To use this vault from another computer, enroll that computer with its own device key: memev devices keygen there, then memev devices enroll --kind remote-computer --pubkey <key> on the vault.' });
+      }
       const client = String(req.headers['x-memev-client'] || identity.agent).slice(0, 40);
       const session = req.headers['x-memev-session'] ? String(req.headers['x-memev-session']).slice(0, 64) : null;
       const ctx = { identity, client, session, local };
 
       if (route === '/mcp') {
         if (req.method !== 'POST') return send(405, { error: 'method_not_allowed' }, { allow: 'POST' });
-        let msg; try { msg = JSON.parse(await readBody(req)); } catch { return send(400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'parse error' } }); }
+        let msg; try { msg = JSON.parse(await getBody()); } catch { return send(400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'parse error' } }); }
         if (Array.isArray(msg)) { const out = (await Promise.all(msg.map((m) => handle(vault, m, ctx)))).filter(Boolean); return out.length ? send(200, out) : send(202, ''); }
         const out = await handle(vault, msg, ctx);
         return out ? send(200, out) : send(202, '');
       }
       // hook routes: what the session hooks call (local, Claude Code and friends)
       if (req.method === 'POST' && route.startsWith('/v1/')) {
-        const body = JSON.parse((await readBody(req)) || '{}');
+        const body = JSON.parse((await getBody()) || '{}');
         if (route === '/v1/session-start') { const card = vault.sessionStart(identity, { ...body, client }); return send(200, { card, text: renderCard(card), protocol: PROTOCOL }); }
         if (route === '/v1/recall') { const own = body.session ? `-${slug(String(body.session), 16)}.md` : null; const hits = vault.recall(identity, { ...body, client, limit: body.limit || 4 }).filter((h) => h.score >= (vault.config.recall?.min_score ?? 1) && !(own && h.path.startsWith('work/sessions/') && h.path.endsWith(own))); return send(200, { hits, text: renderRecall(hits, { maxChars: vault.config.recall?.max_chars || 1500 }) }); }
         if (route === '/v1/checkpoint') return send(200, vault.checkpoint(identity, { ...body, client }));
@@ -110,7 +137,7 @@ export function createServer(vault, { tunnelKey = () => null } = {}) {
       if (nm) {
         const p = decodeURIComponent(nm[1]);
         if (req.method === 'GET') return send(200, vault.get(identity, p));
-        const body = JSON.parse((await readBody(req)) || '{}');
+        const body = JSON.parse((await getBody()) || '{}');
         if (req.method === 'PUT') return send(200, vault.write(identity, { path: p, body: body.body, client }));
         if (req.method === 'PATCH') return send(200, vault.append(identity, { path: p, text: body.text, client }));
         if (req.method === 'DELETE') return send(200, vault.delete(identity, { path: p, client }));

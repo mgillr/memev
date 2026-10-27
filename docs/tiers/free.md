@@ -30,8 +30,9 @@ flowchart LR
 
 ## Limits
 
-- One computer per vault. Several computers can share a vault through the secure link, with a
-  credential each, but there is no sync between copies.
+- One computer per vault, with no licence and no network needed. Adding a second computer to the
+  vault needs a licence: the vault refuses it with "This vault is licensed for 1 computer". Cloud AI
+  apps through the secure link are not computers and are not refused.
 - No user accounts: whoever has a token reaches what that token allows.
 - Recall is keyword search. Paraphrases with no shared words are missed; optional local
   embeddings are planned.

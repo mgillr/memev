@@ -1,4 +1,5 @@
-// Licensing groundwork: report only. The free tier must behave exactly as before.
+// Licensing: offline licence files, the device registry and seat counting. The free tier (this
+// computer, everything on it) must behave exactly as before. The seat cap itself is in seats.test.mjs.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -8,7 +9,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { newVault, cleanup, tmpdir, OWNER, PKG } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
 import { verifyLicense, signLicense, loadLicense, LICENSE_KEYS, canonical } from '../src/engine/license.mjs';
-import { can, report, PAID_FEATURES, CORE_FEATURES, ENFORCEMENT } from '../src/engine/entitlements.mjs';
+import { can, report, seatPolicy, PAID_FEATURES, CORE_FEATURES, ENFORCEMENT } from '../src/engine/entitlements.mjs';
 import { DeviceRegistry, coarseOrigin, deviceKeygen, signRequest, verifyProof } from '../src/engine/devices.mjs';
 import * as OP from '../src/engine/oplog.mjs';
 const { OpLog, compareRecords, parseHlc } = OP;
@@ -21,17 +22,16 @@ const kp = () => { const { privateKey, publicKey } = crypto.generateKeyPairSync(
 const base = { v: 1, lid: 'lic_test0001', tier: 'personal', services: ['sync', 'backup', 'relay'], seats: 4, connectors: 10, iat: '2026-11-01', exp: '2027-11-15', grace_days: 14 };
 const DAY = 86400e3;
 
-test('entitlements: free-tier behaviour always, enforcement off, reports never block', () => {
+test('entitlements: core features are free, computers are capped, connectors are only reported', () => {
   for (const f of CORE_FEATURES) assert.equal(can(f), true, f);
   for (const f of PAID_FEATURES) assert.equal(can(f), false, f);
   assert.throws(() => can('nonsense'));
-  assert.equal(ENFORCEMENT, 'off');
-  const r = report({ license: null, seats: { computers: 3, connectors: 7, local_clients: 12 } });
-  assert.equal(r.blocked, false); assert.equal(r.effective_tier, 'free');
-  assert.equal(r.notes.length, 2); assert.match(r.notes[0], /report only/);
-  // even a valid paid licence does not change behaviour yet
+  assert.equal(ENFORCEMENT, 'computers');
+  const r = report({ license: null, seats: { computers: 1, connectors: 7, local_clients: 12 } });
+  assert.equal(r.blocked, false); assert.equal(r.effective_tier, 'free'); assert.equal(r.seats_licensed, 1);
+  assert.equal(r.notes.length, 1); assert.match(r.notes[0], /reported, not limited/);
   const r2 = report({ license: { state: 'valid', tier: 'personal', seats: 4, connectors: 10 }, seats: { computers: 3, connectors: 2, local_clients: 1 } });
-  assert.equal(r2.effective_tier, 'free'); assert.equal(r2.licensed_tier, 'personal'); assert.deepEqual(r2.notes, []);
+  assert.equal(r2.effective_tier, 'personal'); assert.equal(r2.seats_licensed, 4); assert.equal(r2.can_enroll, true); assert.deepEqual(r2.notes, []);
 });
 
 test('licence: offline Ed25519 verification, expiry, grace, skew, tampering and unknown keys', () => {
@@ -52,9 +52,9 @@ test('licence: offline Ed25519 verification, expiry, grace, skew, tampering and 
   assert.equal(verifyLicense(founder, { keys, now: Date.parse('2040-01-01') }).state, 'valid');
   // canonical bytes do not depend on key order
   assert.equal(canonical({ b: 1, a: { d: 2, c: 3 } }).toString(), canonical({ a: { c: 3, d: 2 }, b: 1 }).toString());
-  // the embedded placeholder key cannot be used: no licence verifies against it
+  // a licence signed with any other key does not verify against the embedded vendor key
   assert.equal(verifyLicense(lic).state, 'invalid');
-  assert.deepEqual(Object.keys(LICENSE_KEYS), ['placeholder-2026-10']);
+  assert.deepEqual(Object.keys(LICENSE_KEYS), ['memev-2026-10']);
   // the loader: no file is the normal free case
   const dir = tmpdir();
   assert.equal(loadLicense({ file: path.join(dir, 'none.json') }).state, 'none');
@@ -83,7 +83,9 @@ test('devices: enroll, migrate, classify, seats, reuse flag, revoke, rotate, pro
   assert.equal(reg.get(v.host.id).kind, 'host');
   const legacy = v.tokens.issue({ agent: 'old-cloud', remote: true, note: 'cloud connector' });
   assert.equal(reg.migrate(v.tokens).find((d) => d.token_id === legacy.id).kind, 'cloud-connector', 'existing tokens become devices');
-  const laptop = reg.enroll(v.tokens, { kind: 'remote-computer', label: 'laptop' });
+  const policy = seatPolicy({ license: { state: 'valid', tier: 'team', seats: 10 }, devices: reg.list() });
+  const lk = deviceKeygen();
+  const laptop = reg.enroll(v.tokens, { kind: 'remote-computer', label: 'laptop', pubkey: lk.publicKey, policy });
   assert.ok(v.tokens.verify(laptop.token).remote);
   // classification
   assert.equal(reg.classify({ local: true }), 'local-client');
@@ -102,53 +104,56 @@ test('devices: enroll, migrate, classify, seats, reuse flag, revoke, rotate, pro
   assert.equal(reg.countSeats().flagged.length, 1);
   assert.equal(coarseOrigin('198.51.100.20'), coarseOrigin('198.51.100.99'), 'same /24');
   assert.doesNotMatch(fs.readFileSync(path.join(v.state, 'devices.json'), 'utf8') + JSON.stringify(reg.data), /198\.51|192\.0\.2|203\.0/, 'no address is stored');
-  // rotate: new secret, old one dead, flag cleared
+  // rotate: new secret, old one dead, reuse flag cleared
   const rot = reg.rotate(v.tokens, laptop.device.id);
   assert.equal(v.tokens.verify(laptop.token), null); assert.ok(v.tokens.verify(rot.token));
-  assert.equal(reg.get(laptop.device.id).flags.length, 0);
+  assert.equal(reg.get(laptop.device.id).flags.some((f) => f.type === 'reuse'), false);
   // revoke frees the seat at once
   reg.revoke(v.tokens, laptop.device.id);
   assert.equal(v.tokens.verify(rot.token), null);
   assert.equal(reg.countSeats().computers, 1);
   assert.throws(() => reg.revoke(v.tokens, v.host.id), /host/);
   // seats count only the last 30 days
-  const c = reg.enroll(v.tokens, { kind: 'remote-computer', label: 'old box' });
+  const c = reg.enroll(v.tokens, { kind: 'remote-computer', label: 'old box', pubkey: deviceKeygen().publicKey, policy });
   reg.observe({ tokenId: c.device.token_id, local: false, ip: '198.51.100.30', userAgent: 'node' });
   assert.equal(reg.countSeats({ at: Date.now() + 31 * DAY }).computers, 1);
   // proof of possession
   const key = deviceKeygen();
-  const signed = reg.enroll(v.tokens, { kind: 'remote-computer', label: 'keyed', pubkey: key.publicKey });
-  const h = signRequest(key.privateKeyPem, { method: 'POST', path: '/mcp' });
-  assert.equal(verifyProof(key.publicKey, { method: 'POST', path: '/mcp', ts: h['x-memev-ts'], sig: h['x-memev-sig'] }).ok, true);
-  assert.equal(verifyProof(key.publicKey, { method: 'POST', path: '/v1/recall', ts: h['x-memev-ts'], sig: h['x-memev-sig'] }).ok, false);
-  assert.equal(verifyProof(deviceKeygen().publicKey, { method: 'POST', path: '/mcp', ts: h['x-memev-ts'], sig: h['x-memev-sig'] }).ok, false);
-  assert.equal(verifyProof(key.publicKey, { method: 'POST', path: '/mcp', ts: h['x-memev-ts'], sig: h['x-memev-sig'] }, { at: Date.now() + 10 * 60e3 }).ok, false);
+  const signed = reg.enroll(v.tokens, { kind: 'remote-computer', label: 'keyed', pubkey: key.publicKey, policy });
+  const h = signRequest(key.privateKeyPem, { method: 'POST', path: '/mcp', body: '{"a":1}' });
+  const pr = (o = {}) => ({ method: 'POST', path: '/mcp', ts: h['x-memev-ts'], nonce: h['x-memev-nonce'], sig: h['x-memev-sig'], body: '{"a":1}', ...o });
+  assert.equal(verifyProof(key.publicKey, pr()).ok, true);
+  assert.equal(verifyProof(key.publicKey, pr({ path: '/v1/recall' })).ok, false, 'another path');
+  assert.equal(verifyProof(key.publicKey, pr({ body: '{"a":2}' })).ok, false, 'a changed body');
+  assert.equal(verifyProof(deviceKeygen().publicKey, pr()).ok, false, 'another key');
+  assert.equal(verifyProof(key.publicKey, pr(), { at: Date.now() + 10 * 60e3 }).ok, false, 'too old');
   reg.observe({ tokenId: signed.device.token_id, local: false, ip: '198.51.100.40', userAgent: 'node' });
   assert.ok(reg.get(signed.device.id).flags.some((f) => f.type === 'unsigned'));
-  assert.throws(() => reg.enroll(v.tokens, { kind: 'remote-computer', label: 'bad', pubkey: 'AAAA' }));
+  assert.throws(() => reg.enroll(v.tokens, { kind: 'remote-computer', label: 'bad', pubkey: 'AAAA', policy }));
+  assert.throws(() => reg.enroll(v.tokens, { kind: 'remote-computer', label: 'no key', policy }), /device key/);
   v.close();
 });
 
-test('HTTP: every request resolves to a device; three computers and a reused credential are reported, never refused', async () => {
+test('HTTP: every request resolves to a device; signed computers are served, unsigned ones are not', async () => {
   const { v } = newVault();
   const server = createServer(v, { tunnelKey: () => null });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const url = `http://127.0.0.1:${server.address().port}`;
   const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
-  const call = (token, ip, ua = 'node', extra = {}) => fetch(`${url}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'x-forwarded-for': ip, 'user-agent': ua, ...extra }, body }).then((r) => r.status);
-  const comps = ['a', 'b', 'c'].map((l) => v.devices.enroll(v.tokens, { kind: 'remote-computer', label: l }));
-  for (const [i, c] of comps.entries()) assert.equal(await call(c.token, `198.51.100.${i + 1}`), 200, 'over the free count, still served');
-  assert.equal(await call(comps[0].token, '192.0.2.9'), 200, 'a reused credential is still served');
-  const key = deviceKeygen(); const k = v.devices.enroll(v.tokens, { kind: 'remote-computer', label: 'k', pubkey: key.publicKey });
-  assert.equal(await call(k.token, '198.51.100.50', 'node', signRequest(key.privateKeyPem, { method: 'POST', path: '/mcp' })), 200);
-  assert.equal(await call(k.token, '198.51.100.50', 'node', { 'x-memev-ts': String(Date.now()), 'x-memev-sig': 'AAAA' }), 200, 'a bad proof is reported, not refused');
+  const call = (token, ip, extra = {}, ua = 'node') => fetch(`${url}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'x-forwarded-for': ip, 'user-agent': ua, ...extra }, body }).then((r) => r.status);
+  const policy = seatPolicy({ license: { state: 'valid', tier: 'team', seats: 5 }, devices: v.devices.list() });
+  const comps = ['a', 'b', 'c'].map((l) => { const k = deviceKeygen(); return { k, ...v.devices.enroll(v.tokens, { kind: 'remote-computer', label: l, pubkey: k.publicKey, policy }) }; });
+  const sign = (c) => signRequest(c.k.privateKeyPem, { method: 'POST', path: '/mcp', body });
+  for (const [i, c] of comps.entries()) assert.equal(await call(c.token, `198.51.100.${i + 1}`, sign(c)), 200);
+  assert.equal(await call(comps[0].token, '192.0.2.9', sign(comps[0])), 200, 'the same computer on another network, with its key');
+  assert.equal(await call(comps[0].token, '192.0.2.9'), 401, 'its token without the key');
+  assert.equal(await call(comps[0].token, '192.0.2.9', { 'x-memev-ts': String(Date.now()), 'x-memev-nonce': 'ab'.repeat(8), 'x-memev-sig': 'AAAA' }), 401, 'a bad signature');
   const local = v.tokens.issue({ agent: 'claude-code' }).token;
-  assert.equal((await fetch(`${url}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${local}`, 'content-type': 'application/json' }, body })).status, 200);
+  assert.equal((await fetch(`${url}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${local}`, 'content-type': 'application/json' }, body })).status, 200, 'apps on this computer need no key');
   const s = v.devices.countSeats();
-  assert.equal(s.computers, 5); assert.equal(s.local_clients >= 1, true);
-  assert.equal(v.devices.get(k.device.id).proof, 'ok'); assert.ok(v.devices.get(k.device.id).flags.some((f) => f.type === 'proof'));
-  assert.ok(v.devices.get(comps[0].device.id).flags.some((f) => f.type === 'reuse'));
-  assert.equal(report({ license: null, seats: s }).blocked, false);
+  assert.equal(s.computers, 4); assert.equal(s.local_clients >= 1, true);
+  assert.equal(v.devices.get(comps[0].device.id).proof, 'ok');
+  assert.ok(v.devices.get(comps[0].device.id).flags.some((f) => f.type === 'proof'), 'the refused attempts are recorded');
   server.close(); v.close();
 });
 
@@ -208,14 +213,16 @@ test('CLI: memev license status and memev devices; the doctor reports seats with
   try {
     assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
     const st = sb.run(['license', 'status']);
-    assert.equal(st.code, 0, st.err); assert.match(st.out, /free tier needs none/); assert.match(st.out, /Enforcement: off/);
-    const e = sb.run(['devices', 'enroll', '--kind', 'remote-computer', '--label', 'office-pc']);
+    assert.equal(st.code, 0, st.err); assert.match(st.out, /free tier needs none/); assert.match(st.out, /Computers: 1 of 1 enrolled/);
+    const nokey = sb.run(['devices', 'enroll', '--kind', 'remote-computer', '--label', 'office-pc']);
+    assert.equal(nokey.code, 1); assert.match(nokey.out, /device key/);
+    const e = sb.run(['devices', 'enroll', '--kind', 'cloud-connector', '--label', 'chatgpt']);
     assert.equal(e.code, 0, e.err); assert.match(e.out, /mv_[0-9a-f]{8}_/);
     const l = sb.run(['devices']);
-    assert.match(l.out, /office-pc/); assert.match(l.out, /host/); assert.match(l.out, /Computers: 1/);
-    const id = /(dev_[0-9a-f]+)\s+remote-computer/.exec(l.out)[1];
+    assert.match(l.out, /chatgpt/); assert.match(l.out, /host/); assert.match(l.out, /Computers: 1/);
+    const id = /(dev_[0-9a-f]+)\s+cloud-connector/.exec(l.out)[1];
     assert.equal(sb.run(['devices', 'rotate', id]).code, 0);
-    assert.equal(sb.run(['devices', 'revoke', id]).code, 0);
+    assert.equal(sb.run(['devices', 'remove', id]).code, 0);
     assert.match(sb.run(['devices']).out, new RegExp(`x ${id}`));
     const j = JSON.parse(sb.run(['license', 'status', '--json']).out);
     assert.equal(j.blocked, false); assert.equal(j.license.state, 'none');

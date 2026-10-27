@@ -115,6 +115,8 @@ one. Hardware is yours; see above.
 ## Limits
 
 - 10 to 20 computers is the design point. Beyond about 50, see [Enterprise](enterprise.md).
+- The licence sets how many computers can join the vault. Each one has its own device key, and IT
+  frees a seat with `memev devices remove <id>`. Past the count the vault refuses the next one.
 - One hub server. If it is down, each computer keeps working on its own notes and catches up after;
   a second hub for failover is Enterprise.
 - The hub decrypts notes to index them, so whoever runs the server can read them.

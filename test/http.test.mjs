@@ -13,7 +13,7 @@ before(async () => {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${server.address().port}`;
   local = v.tokens.issue({ agent: 'local' }).token;
-  remoteTok = v.tokens.issue({ agent: 'cloud', remote: true, paths: ['memory/**', 'work/**'] }).token;
+  remoteTok = v.tokens.issue({ agent: 'cloud', remote: true, paths: ['memory/**', 'work/**'], note: 'cloud connector' }).token; // what memev cloud url issues
   readTok = v.tokens.issue({ agent: 'reader', scopes: ['read'] }).token;
 });
 after(() => { server.close(); v.close(); cleanup(); });

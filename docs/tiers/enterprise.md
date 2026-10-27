@@ -48,6 +48,8 @@ flowchart TB
 
 ## Limits
 
+- The number of computers comes from your licence, checked offline with no call home. Air-gapped
+  installs work the same way.
 - Everything above is planned. An offer for any of it will carry a delivery date and acceptance
   checks.
 - The hub decrypts notes to index them. Admins of the hub servers can read them; separate duties and

@@ -24,14 +24,25 @@ Every app and computer has its own credential; there is no shared key. `memev de
 
 ```sh
 memev devices                                    # computers, connectors and local apps, with last use
-memev devices enroll --kind remote-computer --label laptop    # a token for another computer
 memev devices enroll --kind cloud-connector --label chatgpt   # a token for a cloud AI app
-memev devices rotate <id>   |   memev devices revoke <id>     # replace or cut off one credential
+memev devices rotate <id>   |   memev devices remove <id>     # replace or cut off one credential
 ```
 
-A remote computer can also prove who it is with its own key: run `memev devices keygen` on it and
-enroll it with `--pubkey`. A copied configuration is then useless without that key. Apps set up
-before per-device credentials still send `X-Memev-Key`; it keeps working, but is no longer needed.
+Another computer joins with its own key, made on that computer:
+
+```sh
+memev devices keygen                                          # on the laptop: prints its public key
+memev devices enroll --kind remote-computer --label laptop --pubkey <key>   # on the vault
+memev join https://<address> --token <token>                  # on the laptop
+```
+
+`memev join` checks the vault answers, saves the address, and connects the AI apps on the laptop.
+From then on every request from the laptop is signed with its key, and the token alone does not
+work on another machine. The vault refuses to enroll more computers than its licence covers; with
+no licence that is one, the vault's own computer. `memev devices remove <id>` frees a seat. A
+connector URL pasted into a coding app on a computer is refused with a pointer to these steps.
+Apps set up before per-device credentials still send `X-Memev-Key`; it keeps working, but is no
+longer needed.
 
 Remote requests always need a token issued for remote use, are rate limited (120 a minute by
 default) and are logged to `.memev/access.jsonl`. Contract signing and admin routes are local only.

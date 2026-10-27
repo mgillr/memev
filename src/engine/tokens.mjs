@@ -35,7 +35,7 @@ export class TokenStore {
     if (!rec || rec.revoked) return null;
     if (!timingSafeEqualHex(rec.hash, sha256(m[2]))) return null;
     if (rec.expires && Date.parse(rec.expires) < Date.now()) return null;
-    return { id: rec.id, agent: rec.agent, scopes: rec.scopes, paths: rec.paths, remote: !!rec.remote, expires: rec.expires };
+    return { id: rec.id, agent: rec.agent, scopes: rec.scopes, paths: rec.paths, remote: !!rec.remote, expires: rec.expires, note: rec.note || '' };
   }
 
   touch(id) { const r = this.data.tokens[id]; if (r) { r.last_used = now(); } }

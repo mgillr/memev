@@ -3,14 +3,20 @@
 // credential. It replaces the single shared tunnel key: a remote client is known by its own token
 // (and optionally its own Ed25519 key), can be revoked or rotated alone, and is counted.
 //
-// REPORT ONLY. The registry classifies and counts; it never refuses a request. Seat counts and
-// "this token is used from two places" are shown by `memev devices` and `memev doctor`, nothing more.
-// The registry lives in .memev/devices.json on this machine and is never sent anywhere.
+// Another computer joins with its own Ed25519 key, made on that computer; the private half never
+// leaves it. Enrolment is capped by the licence (entitlements.seatPolicy) and every request from
+// that computer must be signed with its key (src/server/http.mjs), so copying its connection
+// details to a second machine does not work. Cloud connectors and local apps are counted, not
+// capped. The registry lives in .memev/devices.json on this machine and is never sent anywhere.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { readJson, writePrivateJson, randomToken, now, sha256 } from './util.mjs';
+import { seatPolicy } from './entitlements.mjs';
+
+/** Refused enrolment: the message is meant for the person running the command. */
+export class SeatError extends Error { constructor(m) { super(m); this.code = 'seats'; } }
 
 
 export const KINDS = ['host', 'local-client', 'cloud-connector', 'remote-computer'];
@@ -62,9 +68,18 @@ export class DeviceRegistry {
     return this.data.devices[id];
   }
 
-  /** Enroll a device: it gets its own token (remote ones are scoped like cloud tokens). */
-  enroll(tokens, { kind, label, pubkey = null, ttlDays = 365 }) {
+  /**
+   * Enroll a device: it gets its own token (remote ones are scoped like cloud tokens). Another
+   * computer needs its device public key and a free seat under `policy` (the free tier when none is
+   * given: no other computer).
+   */
+  enroll(tokens, { kind, label, pubkey = null, ttlDays = 365, policy = null }) {
     if (pubkey) publicKeyFrom(pubkey); // throws if it is not an Ed25519 public key
+    if (kind === 'remote-computer') {
+      if (!pubkey) throw new SeatError('A computer joins with its own device key. Run `memev devices keygen` on that computer, then `memev devices enroll --kind remote-computer --pubkey <key>` here.');
+      const p = policy || seatPolicy({ devices: this.list() });
+      if (!p.can_enroll) throw new SeatError(p.reason);
+    }
     const remote = kind !== 'local-client';
     const t = tokens.issue({ agent: String(label || kind).slice(0, 40), scopes: ['read', 'write'], paths: remote ? ['memory/**', 'work/**', 'contracts/**'] : ['**'], ttlDays, remote, note: `device ${kind}` });
     const d = this._add({ kind, label, tokenId: t.id, pubkey });
@@ -82,6 +97,9 @@ export class DeviceRegistry {
     d.status = 'revoked'; d.revoked = now(); this.byToken.delete(d.token_id); this.save();
     return d;
   }
+
+  /** Remove a device: its credential stops working at once and its seat is free. */
+  remove(tokens, id) { return this.revoke(tokens, id); }
 
   rotate(tokens, id) {
     const d = this.get(id); if (!d || d.status !== 'active' || !d.token_id) throw new Error(`no active device ${id} with a token`);
@@ -124,15 +142,17 @@ export class DeviceRegistry {
   observe({ tokenId, identity = null, local, ip = null, userAgent = '', connectorUrl = false, proof = null }) {
     this.fresh();
     let id = this.byToken.get(tokenId);
-    if (!id) { // a token made outside the registry (memev token issue): register it now
+    if (!id) { // a token made outside the registry (memev token issue, memev cloud url): register it now
       if (!identity) return null;
-      id = this._add({ kind: local ? 'local-client' : 'remote-computer', label: identity.agent, tokenId, inferred: true }).id;
+      const kind = local ? 'local-client' : /cloud connector/.test(identity.note || '') ? 'cloud-connector' : 'remote-computer';
+      id = this._add({ kind, label: identity.agent, tokenId, inferred: true }).id;
     }
     const d = this.data.devices[id]; const t = now();
     d.first_seen ||= t; d.last_seen = t;
     const cls = this.classify({ local, connectorUrl, userAgent, device: d });
     d.last_class = cls;
-    if (d.inferred && !local && cls !== d.kind) { d.kind = cls; }
+    // a token issued by hand that a cloud AI app uses is a connector; the other way round only flags
+    if (d.inferred && !local && d.kind === 'remote-computer' && cls === 'cloud-connector') d.kind = cls;
     if (d.kind === 'cloud-connector' && cls === 'remote-computer') this._flag(d, 'connector-used-by-computer', 'a connector credential was used by something that is not a cloud AI app; it is counted as a computer');
     if (proof) { if (proof.ok) d.proof = 'ok'; else this._flag(d, 'proof', proof.reason); }
     else if (d.pubkey && !local) this._flag(d, 'unsigned', 'this device has a key but sent an unsigned request');
@@ -150,6 +170,9 @@ export class DeviceRegistry {
   }
 
   _flag(d, type, detail) { const f = d.flags.find((x) => x.type === type); if (f) { f.last = now(); f.count = (f.count || 1) + 1; } else d.flags.push({ type, detail, first: now(), last: now(), count: 1 }); }
+
+  /** Computers enrolled now: this one plus every active remote computer (what the seat cap counts). */
+  enrolledComputers() { return 1 + Object.values(this.data.devices).filter((d) => d.kind === 'remote-computer' && d.status === 'active').length; }
 
   /** Computers (this one plus active remote computers), connectors and local clients seen recently. */
   countSeats({ activeDays = ACTIVE_DAYS, at = Date.now() } = {}) {
@@ -171,18 +194,36 @@ export function publicKeyFrom(pub) {
   if (k.asymmetricKeyType !== 'ed25519') throw new Error('device keys are Ed25519');
   return k;
 }
-// The signature covers the method, the path and a timestamp (five minutes either way), so a copied
-// configuration file is useless without the device's private key.
-export const proofPayload = ({ method, path: p, ts }) => Buffer.from(`memev-device-v1\n${method}\n${p}\n${ts}`, 'utf8');
-export function signRequest(privateKeyPem, { method, path: p }) {
-  const ts = String(Date.now());
-  return { 'x-memev-ts': ts, 'x-memev-sig': crypto.sign(null, proofPayload({ method, path: p, ts }), crypto.createPrivateKey(privateKeyPem)).toString('base64') };
+// Each request from another computer is signed with its key. The signature covers the method, the
+// path, a timestamp (five minutes either way), a one-time nonce and a hash of the body, so a copied
+// configuration is useless without the device's private key and a captured request can't be
+// replayed or changed.
+export const proofPayload = ({ method, path: p, ts, nonce, bodyHash }) => Buffer.from(`memev-device-v2\n${method}\n${p}\n${ts}\n${nonce}\n${bodyHash}`, 'utf8');
+const bodySha = (body) => crypto.createHash('sha256').update(body ? Buffer.from(body) : Buffer.alloc(0)).digest('hex');
+export function signRequest(privateKeyPem, { method, path: p, body = '' }) {
+  const ts = String(Date.now()); const nonce = crypto.randomBytes(12).toString('hex');
+  const sig = crypto.sign(null, proofPayload({ method, path: p, ts, nonce, bodyHash: bodySha(body) }), crypto.createPrivateKey(privateKeyPem)).toString('base64');
+  return { 'x-memev-ts': ts, 'x-memev-nonce': nonce, 'x-memev-sig': sig };
 }
-export function verifyProof(pubkey, { method, path: p, ts, sig }, { at = Date.now(), skewMs = 5 * 60e3 } = {}) {
-  if (!ts || !sig) return { ok: false, reason: 'no signature' };
-  if (Math.abs(at - Number(ts)) > skewMs) return { ok: false, reason: 'signature timestamp too far from now' };
-  try { return crypto.verify(null, proofPayload({ method, path: p, ts }), publicKeyFrom(pubkey), Buffer.from(String(sig), 'base64')) ? { ok: true } : { ok: false, reason: 'bad signature' }; } catch (e) { return { ok: false, reason: e.message }; }
+export function verifyProof(pubkey, { method, path: p, ts, nonce, sig, body = '' }, { at = Date.now(), skewMs = 5 * 60e3 } = {}) {
+  if (!ts || !sig || !nonce) return { ok: false, reason: 'no device signature' };
+  if (!/^[0-9a-f]{16,64}$/.test(String(nonce))) return { ok: false, reason: 'bad nonce' };
+  if (!(Math.abs(at - Number(ts)) <= skewMs)) return { ok: false, reason: 'signature timestamp too far from now' };
+  try { return crypto.verify(null, proofPayload({ method, path: p, ts, nonce, bodyHash: bodySha(body) }), publicKeyFrom(pubkey), Buffer.from(String(sig), 'base64')) ? { ok: true } : { ok: false, reason: 'bad signature' }; } catch (e) { return { ok: false, reason: e.message }; }
 }
+/** Nonces seen in the last few minutes, so a signed request can be used once. */
+export class NonceCache {
+  constructor(ttlMs = 10 * 60e3) { this.ttl = ttlMs; this.m = new Map(); }
+  use(nonce, at = Date.now()) {
+    if (this.m.size > 50000) for (const [k, t] of this.m) if (at - t > this.ttl) this.m.delete(k);
+    if (this.m.has(nonce) && at - this.m.get(nonce) <= this.ttl) return false;
+    this.m.set(nonce, at); return true;
+  }
+}
+// AI apps and tools that run on a computer. A cloud connector credential used by one of these was
+// copied onto a computer, which must enroll with its own key instead.
+const COMPUTER_UA = /\b(claude-code|claude-cli|cursor|codex|gemini-cli|windsurf|zed|vscode|visual studio code|curl|wget|memev)\b/i;
+export const computerSide = ({ userAgent = '', memevClient = null } = {}) => !!memevClient || COMPUTER_UA.test(String(userAgent || ''));
 export function deviceKeygen() {
   const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519');
   return { privateKeyPem: privateKey.export({ type: 'pkcs8', format: 'pem' }), publicKey: publicKey.export({ type: 'spki', format: 'der' }).toString('base64') };
