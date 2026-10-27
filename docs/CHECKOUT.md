@@ -1,7 +1,7 @@
 # Checkout
 
 > **DRAFT. Not an offer and not in force.** Self-serve checkout is Stripe, in test mode only.
-> Nothing is live. Product ids, prices, and the computer cap come from config.
+> Nothing is live. Stripe sells Personal only. Product ids, prices, and the computer cap come from config.
 > The licence email From address comes from deployment config (`MEMEV_LICENCE_FROM`).
 > The licence endpoint URL comes from config. This repository contains no address, host, or IP.
 
