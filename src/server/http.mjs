@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { handle } from './mcp.mjs';
 import { VaultError, VERSION } from '../engine/vault.mjs';
-import { timingSafeEqualHex, sha256, now } from '../engine/util.mjs';
+import { timingSafeEqualHex, sha256, now, slug } from '../engine/util.mjs';
 import { renderCard, renderRecall, PROTOCOL } from '../engine/card.mjs';
 
 const PROXY_HEADERS = ['x-forwarded-for', 'x-forwarded-host', 'forwarded', 'x-real-ip', 'cf-connecting-ip', 'cf-ray', 'tailscale-user-login', 'x-original-forwarded-for'];
@@ -83,7 +83,7 @@ export function createServer(vault, { tunnelKey = () => null } = {}) {
       if (req.method === 'POST' && route.startsWith('/v1/')) {
         const body = JSON.parse((await readBody(req)) || '{}');
         if (route === '/v1/session-start') { const card = vault.sessionStart(identity, { ...body, client }); return send(200, { card, text: renderCard(card), protocol: PROTOCOL }); }
-        if (route === '/v1/recall') { const hits = vault.recall(identity, { ...body, client, limit: body.limit || 4 }).filter((h) => h.score >= (vault.config.recall?.min_score ?? 1)); return send(200, { hits, text: renderRecall(hits, { maxChars: vault.config.recall?.max_chars || 1500 }) }); }
+        if (route === '/v1/recall') { const own = body.session ? `-${slug(String(body.session), 16)}.md` : null; const hits = vault.recall(identity, { ...body, client, limit: body.limit || 4 }).filter((h) => h.score >= (vault.config.recall?.min_score ?? 1) && !(own && h.path.startsWith('work/sessions/') && h.path.endsWith(own))); return send(200, { hits, text: renderRecall(hits, { maxChars: vault.config.recall?.max_chars || 1500 }) }); }
         if (route === '/v1/checkpoint') return send(200, vault.checkpoint(identity, { ...body, client }));
         if (route === '/v1/journal') return send(200, vault.journal(identity, { ...body, client }));
         if (route === '/v1/remember') return send(200, vault.remember(identity, { ...body, client }));

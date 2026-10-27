@@ -53,7 +53,7 @@ export function installRuntime(env = process.env) {
 
 export async function main(argv, env = process.env) {
   const [cmd = 'help', ...rest] = argv;
-  const { flags, pos } = parseArgs(rest, ['yes', 'json', 'local-only', 'no-connect', 'fix', 'bundle', 'purge', 'dry-run', 'force']);
+  const { flags, pos } = parseArgs(rest, ['yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets']);
   const root = resolveRoot(flags.root, env);
   const need = () => { if (!isVault(root)) throw new Error(`no vault at ${root}; run memev init`); };
   const json = (o) => console.log(JSON.stringify(o, null, 2));

@@ -21,10 +21,15 @@ export function projectOf(cwd) {
   return slug(path.basename(r.status === 0 && r.stdout.trim() ? r.stdout.trim() : cwd));
 }
 
+// Output shapes: Claude Code and Codex share one; Gemini CLI uses it with its own event names;
+// Cursor takes { additional_context } at session start only.
+const GEMINI = { SessionStart: 'SessionStart', UserPromptSubmit: 'BeforeAgent' };
 function emit(format, event, context) {
   if (!context) return;
   if (format === 'plain') { process.stdout.write(`${context}\n`); return; }
-  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: context } }));
+  if (format === 'cursor') { if (event === 'SessionStart') process.stdout.write(JSON.stringify({ additional_context: context })); return; }
+  const name = format === 'gemini' ? GEMINI[event] || event : event;
+  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: name, additionalContext: context } }));
 }
 
 export async function runHook(event, flags, env = process.env) {
@@ -57,15 +62,16 @@ export async function runHook(event, flags, env = process.env) {
       const prompt = String(input.prompt || input.user_prompt || '').trim();
       if (prompt) {
         if (!st.task) st.task = prompt.slice(0, 200);
-        await call('journal', { role: 'user', text: prompt });
         const r = await call('recall', { query: prompt.slice(0, 1000), limit: 4 });
+        await call('journal', { role: 'user', text: prompt });
         emit(format, 'UserPromptSubmit', r.text);
       }
     } else if (event === 'pre-compact') {
       await saveCheckpoint('pre-compact');
       if (tr?.lastAssistant) await call('journal', { role: 'assistant', text: tr.lastAssistant });
     } else if (event === 'stop') {
-      if (tr?.lastAssistant) await call('journal', { role: 'assistant', text: tr.lastAssistant });
+      const reply = input.last_assistant_message || input.prompt_response || tr?.lastAssistant;
+      if (reply) await call('journal', { role: 'assistant', text: reply });
       await saveCheckpoint('auto');
     }
     if (tr) st.offset = tr.offset;
