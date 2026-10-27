@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
+import { DeviceRegistry, hostDevice } from './devices.mjs';
 import crypto from 'node:crypto';
 import { sha256, readJson, writeJson, writePrivateJson, exists, now, stamp, slug, truncate, randomToken } from './util.mjs';
 import { OpLog } from './oplog.mjs';
@@ -42,7 +43,11 @@ export class Vault extends EventEmitter {
     if (!isVault(this.root)) throw new VaultError('not_a_vault', `${this.root} is not a Memev vault (memev init)`);
     this.config = { ...DEFAULT_CONFIG, ...readJson(path.join(this.state, 'config.json'), {}) };
     this.tokens = new TokenStore(path.join(this.state, 'tokens.json'));
-    this.log = new OpLog(path.join(this.state, 'oplog'), { segmentBytes: this.opts.segmentBytes, snapshotEvery: this.opts.snapshotEvery, fsync: this.opts.fsync ?? true }).open();
+    this.host = hostDevice(this.root);
+    this.log = new OpLog(path.join(this.state, 'oplog'), { segmentBytes: this.opts.segmentBytes, snapshotEvery: this.opts.snapshotEvery, fsync: this.opts.fsync ?? true, deviceId: this.host.id }).open();
+    this.devices = new DeviceRegistry(path.join(this.state, 'devices.json'));
+    this.devices.ensureHost(this.host);
+    this.devices.migrate(this.tokens); // existing installs: every token becomes its own device entry
     this.index = new RecallIndex(path.join(this.state, 'index.jsonl'));
     this.graph = new Graph();
     this.tournament = new Tournament();
@@ -59,7 +64,7 @@ export class Vault extends EventEmitter {
     return this;
   }
 
-  close() { this.commits.flush(); this.index.save(); this._saveGraph(); this.log.close(); }
+  close() { this.commits.flush(); this.index.save(); this._saveGraph(); this.devices?.saveSoon(); this.log.close(); }
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }

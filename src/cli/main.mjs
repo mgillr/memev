@@ -21,6 +21,8 @@ Setup
   memev cloud on|off|status|url    reach this vault from cloud AI apps through a private tunnel (on by default)
   memev github setup               back the vault up to your own private GitHub repository
   memev service install|remove     start Memev at login (systemd or launchd)
+  memev devices [enroll|revoke|rotate|rename|keygen]   computers and apps using this vault, each with its own credential
+  memev license status             licence and seat report (report only: the free tier is never limited)
 
 Daily
   memev recall <query>  |  memev remember <text> [--kind decision]  |  memev card [--project P]
@@ -36,7 +38,7 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './service.mjs', contract: './contracts-cli.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './service.mjs', contract: './contracts-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 export function installRuntime(env = process.env) {

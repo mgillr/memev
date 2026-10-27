@@ -6,7 +6,7 @@
   "type": "module",
   "bin": { "memev": "bin/memev.mjs" },
   "engines": { "node": ">=22" },
-  "files": ["bin/", "src/", "templates/", "vendor/", "docs/", "LICENSE", "NOTICE", "README.md", "SECURITY.md"],
+  "files": ["bin/", "src/", "templates/", "vendor/", "docs/", "LICENSE", "NOTICE", "README.md", "SECURITY.md", "CHARTER.md"],
   "scripts": {
     "test": "node --test --test-concurrency=4 test/*.test.mjs",
     "leak-scan": "node scripts/leak-scan.mjs"

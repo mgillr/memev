@@ -113,7 +113,7 @@ export function supervise(vault, { root, port }) {
 export function connectorInfo(root, client = 'cloud') {
   const st = tunnelState(root); if (!st?.url) return null;
   const token = clientToken(root, client, { remote: true });
-  return { url: st.url, stable: !!st.stable, connector_url: `${st.url}/c/${token}/mcp`, mcp_url: `${st.url}/mcp`, headers: { Authorization: `Bearer ${token}`, 'X-Memev-Key': tunnelKey(root) } };
+  return { url: st.url, stable: !!st.stable, connector_url: `${st.url}/c/${token}/mcp`, mcp_url: `${st.url}/mcp`, headers: { Authorization: `Bearer ${token}` } };
 }
 
 async function reloadDaemon(root) { const t = adminToken(root); if (!t) return false; try { return (await api(root, '/v1/reload', { token: t })).ok; } catch { return false; } }
@@ -133,7 +133,7 @@ export async function command(cmd, pos, flags, { root }) {
     if (p === 'cloudflare' && (!flags.name || !flags.hostname)) throw new Error('memev cloud use cloudflare --name <tunnel> --hostname <host>');
     saveConfig(root, cfg); await reloadDaemon(root); console.log(`Tunnel provider: ${p}`); return 0;
   }
-  if (sub === 'rotate-key') { writePrivate(tunnelKeyFile(root), `${randomToken(24)}\n`); console.log('New tunnel key. Apps that send X-Memev-Key need the new one (memev cloud status --show-secrets).'); return 0; }
+  if (sub === 'rotate-key') { writePrivate(tunnelKeyFile(root), `${randomToken(24)}\n`); console.log('New legacy tunnel key. It is no longer needed: each app and computer has its own credential (memev devices). Apps that still send X-Memev-Key need the new value or should drop the header.'); return 0; }
   if (sub === 'status' || sub === 'url') {
     const st = tunnelState(root);
     if (!cfg.remote?.enabled) { console.log('Remote access: off (memev cloud on to enable)'); return 0; }
@@ -143,7 +143,7 @@ export async function command(cmd, pos, flags, { root }) {
     console.log(`  Address: ${info.url}${info.stable ? '' : ' (changes when the tunnel restarts; install Tailscale or set up a named Cloudflare tunnel for a stable address)'}`);
     if (flags['show-secrets'] || sub === 'url') {
       console.log(`  Connector URL for apps that take only a URL (claude.ai, ChatGPT): ${info.connector_url}`);
-      console.log(`  Or ${info.mcp_url} with headers Authorization: Bearer … and X-Memev-Key: …`);
+      console.log(`  Or ${info.mcp_url} with the header Authorization: Bearer … (each app and computer gets its own: memev devices enroll)`);
       console.log('  Treat the connector URL like a password. Revoke it with memev token revoke <id>.');
     } else console.log('  memev cloud url prints the connector URL (it contains a secret).');
     return 0;
