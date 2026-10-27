@@ -220,9 +220,16 @@ export function disconnect(id, { env = process.env, launcher, decline = true } =
   return { id, results };
 }
 
+// What each app needs before it uses Memev: apps load MCP servers and hooks when a session starts, so the
+// session that ran init does not have it yet.
+export const RESTART = {
+  'claude-code': 'Start a new Claude Code session', codex: 'Start a new Codex CLI session', 'gemini-cli': 'Start a new Gemini CLI session',
+  cursor: 'Open a new Cursor chat', 'claude-desktop': 'Quit and reopen Claude Desktop', windsurf: 'Quit and reopen Windsurf',
+  vscode: 'Reload the VS Code window (Developer: Reload Window)', zed: 'Quit and reopen Zed',
+};
 export function detect(env = process.env, launcher = 'memev') {
   const st = loadState(env);
-  return clientDefs(env, launcher).map((d) => ({ id: d.id, name: d.name, mode: d.mode, found: !!d.detect(), connected: !!st.connected[d.id], declined: st.declined.includes(d.id), note: d.note || null, manual: d.manual || null }));
+  return clientDefs(env, launcher).map((d) => ({ id: d.id, name: d.name, mode: d.mode, found: !!d.detect(), connected: !!st.connected[d.id], declined: st.declined.includes(d.id), note: d.note || null, manual: d.manual || null, restart: RESTART[d.id] || `Restart ${d.name}` }));
 }
 
 /** Connect every app that is installed and not yet connected (and not declined, unless forced). */
