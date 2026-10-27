@@ -4,6 +4,7 @@
 import path from 'node:path';
 import { readJson, writeJson, exists, now } from '../engine/util.mjs';
 import { config } from './common.mjs';
+import { loadMilestones, recordMilestones, MILESTONES } from '../engine/milestones.mjs';
 
 const ICON = { succeeded: '\u2713', added: '+', ready: '\u2713', 'needs-manual': '\u2192', failed: '\u2717', skipped: '-' };
 
@@ -58,7 +59,9 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
     const bad = fileChecks({ root, env, platform, ...(icacls ? { icacls } : {}) }).filter((c) => c.status === 'fail');
     add(bad.length ? 'failed' : 'succeeded', 'Self-test (memev doctor)', bad.length ? bad.map((c) => c.title).join(', ') : 'all checks pass');
   }
-  writeJson(path.join(root, '.memev', 'onboarding.json'), { at: now(), items }, 0o600);
+  // the milestones are worked out here, from the vault's own files, and kept in the same file; nothing leaves the machine
+  writeJson(path.join(root, '.memev', 'onboarding.json'), { at: now(), items, milestones: loadMilestones(root) }, 0o600);
+  try { recordMilestones({ root }); } catch { /* the checklist never fails over a milestone */ }
   return items;
 }
 
@@ -70,4 +73,10 @@ export function print(items) {
 }
 
 export async function firstRun(o) { const items = await checklist({ ...o, firstRun: true }); print(items); return items.some((i) => i.status === 'failed') ? 1 : 0; }
-export async function command(cmd, pos, flags, { root, env }) { const { launcherPath } = await import('./clients.mjs'); const items = await checklist({ root, env, flags, launcher: launcherPath(env) }); if (flags.json) console.log(JSON.stringify(items, null, 2)); else print(items); return items.some((i) => i.status === 'failed') ? 1 : 0; }
+export function printMilestones(m) {
+  console.log('Milestones (kept on this computer only):');
+  for (const n of MILESTONES) console.log(`  ${m[n] ? '\u2713' : ' '} ${n.replace(/_/g, ' ')}${m[n] ? `  ${m[n].at.slice(0, 16).replace('T', ' ')}` : ''}`);
+}
+export async function command(cmd, pos, flags, { root, env }) {
+  if (flags.milestones) { const m = recordMilestones({ root }); if (flags.json) console.log(JSON.stringify(m, null, 2)); else printMilestones(m); return 0; }
+  const { launcherPath } = await import('./clients.mjs'); const items = await checklist({ root, env, flags, launcher: launcherPath(env) }); if (flags.json) console.log(JSON.stringify(items, null, 2)); else print(items); return items.some((i) => i.status === 'failed') ? 1 : 0; }
