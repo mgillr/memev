@@ -3,7 +3,7 @@
 // sets how many other computers can be added to the vault; see docs/PRICING.md (draft).
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadLicense, verifyLicense, licenseFile } from '../engine/license.mjs';
+import { loadLicense, verifyLicense, licenseFile, extraFields, LICENSE_KEYS } from '../engine/license.mjs';
 import { report, seatPolicy } from '../engine/entitlements.mjs';
 import { DeviceRegistry, hostDevice, deviceKeygen } from '../engine/devices.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
@@ -24,6 +24,52 @@ export function licensingStatus({ root, env = process.env, vault = null }) {
   const seats = vault?.devices ? vault.devices.countSeats() : isVault(root) ? registry(root).reg.countSeats() : { computers: 1, connectors: 0, local_clients: 0, flagged: [], active_days: 30 };
   const devices = vault?.devices ? vault.devices.list() : isVault(root) ? registry(root).reg.list() : [];
   return { license, ...report({ license, seats, devices }) };
+}
+
+const MAX_LICENSE_BYTES = 64 * 1024;
+const loopback = (h) => h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '::1';
+
+/** The licence endpoint: --server, then MEMEV_LICENSE_URL. There is no built-in address, so nothing is contacted until one is set. */
+export function licenseEndpoint({ flags = {}, env = process.env } = {}) {
+  const raw = String(flags.server && flags.server !== true ? flags.server : env.MEMEV_LICENSE_URL || '').trim();
+  if (!raw) return null;
+  let u; try { u = new URL(raw); } catch { throw new Error(`the licence endpoint is not a URL: ${raw}`); }
+  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && loopback(u.hostname))) throw new Error('the licence endpoint must be https (plain http is accepted only for this computer)');
+  return u.toString();
+}
+
+const explain = (status, body) => {
+  let j = null; try { j = JSON.parse(body); } catch { /* plain text */ }
+  const why = (j && (j.error_description || j.reason || j.message || (typeof j.error === 'string' ? j.error : ''))) || String(body || '').trim().slice(0, 200);
+  return why || `the licence server answered ${status}`;
+};
+
+/**
+ * Activate a key: one call to the licence endpoint sends the key and nothing else, the answer is the signed licence
+ * file, and it is verified here, offline, before anything is written. A key the server refuses, an answer that does not
+ * verify, an expired licence, or a licence that carries an identity leaves no file. `keys` and `fetchImpl` are for tests.
+ */
+export async function activateLicense({ key, endpoint, env = process.env, keys = LICENSE_KEYS, fetchImpl = globalThis.fetch, now = Date.now(), timeoutMs = 15000 }) {
+  const k = String(key || '').trim();
+  if (!k || k.length > 200 || /\s/.test(k)) return { ok: false, reason: 'that does not look like a licence key' };
+  if (!endpoint) return { ok: false, reason: 'no licence server is set: pass --server <https url> or set MEMEV_LICENSE_URL' };
+  let res, body;
+  try {
+    res = await fetchImpl(endpoint, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json', accept: 'application/json' }, body: JSON.stringify({ key: k }), signal: AbortSignal.timeout(timeoutMs) });
+    body = await res.text();
+  } catch (e) { return { ok: false, reason: `could not reach the licence server (${e.cause?.code || e.name || 'network error'}); nothing was changed` }; }
+  if (body.length > MAX_LICENSE_BYTES) return { ok: false, reason: 'the licence server sent an answer that is too large' };
+  if (!res.ok) return { ok: false, reason: `the licence server refused the key: ${explain(res.status, body)}` };
+  let l; try { l = JSON.parse(body); } catch { return { ok: false, reason: 'the licence server did not send a licence file' }; }
+  if (l && typeof l === 'object' && !Array.isArray(l) && l.license && typeof l.license === 'object' && !l.lid) l = l.license;
+  const extra = extraFields(l);
+  if (extra.length) return { ok: false, reason: `the licence carries more than a licence may (${extra.join(', ')}); not installed` };
+  const v = verifyLicense(l, { keys, now });
+  if (v.state === 'invalid' || v.state === 'expired') return { ok: false, reason: `the licence does not install: ${v.reason}` };
+  const file = licenseFile(env);
+  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  writePrivate(file, `${JSON.stringify(l, null, 2)}\n`);
+  return { ok: true, license: l, state: v.state, file };
 }
 
 export async function command(cmd, pos, flags, { root, env }) {
@@ -49,8 +95,14 @@ export async function command(cmd, pos, flags, { root, env }) {
       fs.mkdirSync(configDir(env), { recursive: true }); writePrivate(licenseFile(env), `${JSON.stringify(l, null, 2)}\n`);
       out.ok(`installed licence ${l.lid} (${v.state}) in ${licenseFile(env)}`); return 0;
     }
+    if (sub === 'activate') {
+      const key = pos[1]; if (!key) throw new Error('memev license activate <key> [--server URL]');
+      const r = await activateLicense({ key, endpoint: licenseEndpoint({ flags, env }), env });
+      if (!r.ok) { out.bad(`not activated: ${r.reason}`); return 1; }
+      out.ok(`activated licence ${r.license.lid} (${r.state}) in ${r.file}; it is checked on this computer from now on, with no network`); return 0;
+    }
     if (sub === 'remove') { fs.rmSync(licenseFile(env), { force: true }); out.ok('licence removed; nothing changes for the free tier'); return 0; }
-    throw new Error('memev license status [--json] | install <file> | remove');
+    throw new Error('memev license status [--json] | activate <key> | install <file> | remove');
   }
   // devices
   if (sub === 'keygen') {
