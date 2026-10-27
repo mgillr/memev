@@ -1,4 +1,4 @@
-# Business: 10 to 20 computers
+# Business: from 10 people
 
 > **DRAFT and planned.** The company hub, sign-in with Google or Microsoft, departments, labels,
 > pseudonymising and the egress log are not built yet. Several computers can already share one vault
@@ -7,7 +7,7 @@
 For a company that wants one memory for its staff and their AI apps, on its own server, with
 departments that can't read each other's notes and sensitive work kept on a local model.
 
-## Worked example: 20 computers
+## Worked example: 20 people
 
 A firm of 20: a CEO, a senior leadership team of 3, and Sales (5), Operations (5), Finance (2), HR
 (1) and Legal (1), plus 2 in IT and admin.
@@ -98,7 +98,7 @@ These are starting points. Test the model you choose with your own work before b
 ### Cost for this example (draft)
 
 Priced on your requirements: contact us for a quote. The quote covers the Business subscription for
-20 computers, remote setup (the hub, sign-in, departments, computers and backup, with or without the
+20 people, remote setup (the hub, sign-in, departments, computers and backup, with or without the
 local model server and sensitivity rules), the support plan, and an admin training day if you want
 one. Hardware is yours; see above.
 
@@ -114,7 +114,10 @@ one. Hardware is yours; see above.
 
 ## Limits
 
-- 10 to 20 computers is the design point. Beyond about 50, see [Enterprise](enterprise.md).
+- Sold per person, from 10 people. Each person brings 3 computers, pooled into one licence number,
+  so 20 people can enrol 60 computers in any mix. Teams of 10 to 20 that need no hub, sign-in or
+  departments can choose [Team](team.md). For identity sync, SIEM export, retention, legal hold or
+  high availability, see [Enterprise](enterprise.md).
 - Every app on every enrolled computer gets a seat on the comms bus. IT or a team lead can run a
   comms check and hand out tasks from one session; a removed computer drops off the bus.
 - The licence sets how many computers can join the vault. Each one has its own device key, and IT
