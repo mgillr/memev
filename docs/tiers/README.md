@@ -12,7 +12,7 @@
 | AI models | whatever your apps use | cloud models, plus a local model for sensitive departments | the same, or local models only (air-gapped) |
 | Price | $0 | contact us for a quote | contact us for a quote; private deployment from $6,000/year (draft) |
 | Setup | you, in minutes | remote, $2,500 (draft), 2 to 4 weeks | remote or onsite, from $12,000, 6 to 12 weeks |
-| Support | GitHub issues | business hours by priority (20% plan) | named or embedded engineer |
+| Support | GitHub issues | business hours by priority (support plan quoted with the tier) | named or embedded engineer |
 | Status | built | planned (the shared vault over a secure link works today) | planned |
 
 Services, remote and onsite rates, travel and response times are in [services.md](services.md).

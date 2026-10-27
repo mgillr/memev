@@ -38,7 +38,7 @@ flowchart LR
 | Plan | Price (draft) | What you get |
 |---|---|---|
 | Community | free | GitHub issues, best effort |
-| Business support | 20% of the yearly subscription, at least $2,400/year | e-mail and tickets in business hours, response times below |
+| Business support | quoted with the tier | e-mail and tickets in business hours, response times below |
 | Named engineer | $1,950/month | one engineer who knows your setup, a monthly review, Enterprise response times |
 | Embedded engineer | $6,500/month | an engineer working with your team on agreed days each week |
 

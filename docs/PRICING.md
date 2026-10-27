@@ -41,7 +41,7 @@ covered by the connector allowance.
 | Service | Draft price |
 |---|---|
 | Onboarding | $750 small; $2,500 Business setup ($3,500 with a local model server); from $12,000 Enterprise |
-| Business support | 20% of the yearly subscription, at least $2,400/year |
+| Business support | quoted with the tier |
 | Named engineer | $1,950/month |
 | Embedded engineer | $6,500/month |
 | Custom development | $1,600/day |
