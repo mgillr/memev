@@ -144,7 +144,9 @@ test('over MCP: with no lead the tools and the session hook say to ask the user;
     const c = mcpClient(sb, 'cursor');
     try {
       const init = await c.request('initialize', { protocolVersion: '2025-06-18' });
-      assert.match(init.result.instructions, /If no lead is set, ask the user which AI should lead/);
+      // the lead rule reaches this app's session, in its MCP instructions or in what its session-start hook brings
+      const start = JSON.parse(sb.hook('session-start', { session_id: 'lead-2', cwd: sb.home }, 'cursor', ['--format', 'cursor']).out || '{}').additional_context || '';
+      assert.match(`${init.result.instructions}\n${start}`, /ask the user which AI (should lead|leads)/i);
       const u = (await c.tool('bus_unread', {})).structuredContent;
       assert.match(u.lead_needed, /bus_set_operator/);
       const refused = async (args, re) => { const r = await c.tool('bus_set_operator', args); assert.equal(r.isError, true); assert.match(r.content[0].text, re); };
