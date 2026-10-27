@@ -6,6 +6,8 @@ Run project dev on Claude code and Cursor knows about the context on Tuesday. Me
 apps learn in a folder of plain notes on your own computer, hands the right notes to whichever app
 you open next, and backs everything up to a private GitHub repository that you own.
 
+One memory and one team channel, both on computers you own.
+
 ## How it fits together
 
 ```mermaid
