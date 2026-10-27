@@ -26,7 +26,7 @@ function setFooter(sb, on) {
 // A signed contract, so the summary is a real summary. Returns the contract id.
 async function signContract(sb) {
   const work = path.join(sb.home, 'work'); fs.mkdirSync(work, { recursive: true });
-  const mcp = mcpClient(sb, 'claude-code');
+  const mcp = mcpClient(sb, 'cursor');
   try {
     await mcp.request('initialize', { protocolVersion: '2025-06-18' });
     const d = await mcp.tool('memev_contract_draft', {
