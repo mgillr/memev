@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `memev init` ends with "Finish: restart these apps" and one line for each app it connected, saying how to make that app load Memev (a new session or chat, a restart, or a window reload). Apps load MCP servers and hooks when a session starts, so the session that ran init does not have Memev yet.
 - A relay gives a vault one address that stays the same after restarts: the protocol (docs/RELAY.md), a client (`memev cloud relay on|off|status|address`, off by default) and a relay for development and tests. The relay only forwards, so it cannot read tokens.
 - When the tunnel address changes, the vault writes a signed address record into its git backup. A joined computer that cannot reach the old address reads that record, checks the host's signature, and switches. A bad signature is ignored.
 - `memev report on|off|show|send`: an anonymous milestone report that is off by default, asked once at init, and sends only milestone names, days and a random id to an address you set.
