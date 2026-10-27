@@ -67,13 +67,20 @@ Each computer is registered with its own key, and the plan sets how many compute
 ## Licences (draft)
 
 A licence is a small signed file (`~/.config/memev/license.json`, installed with
-`memev license install <file>`) with an id, tier, services, number of computers, number of
+`memev license install <file>`, or fetched once with `memev license activate <key>`) with an id, tier, services, number of computers, number of
 connectors, issue and expiry dates and grace days. It holds no name, e-mail, machine or vault
 information. It is checked offline against the vendor public key built into
 `src/engine/license.mjs`; Memev never calls home to check it. A licence that has been edited, or was
 signed with any other key, is ignored and the vault counts as Free. Licences are issued with
 `scripts/license/issue.mjs` by whoever holds the vendor private key, which is never in this
 repository.
+
+**Activating a key.** `memev license activate <key>` makes one HTTPS call to the licence endpoint
+(`--server <url>` or `MEMEV_LICENSE_URL`; there is no built-in address, so nothing is contacted until
+one is set). The call sends the key and nothing else. The answer is the signed licence file, which is
+checked on this computer against the vendor public key before it is stored. A key the server refuses,
+an answer that does not verify, an expired licence, or a licence that carries a name, e-mail or machine
+leaves no file, and the command prints why. After that the licence is checked offline, as above.
 
 - **Free:** one computer, no licence, no network needed.
 - **Personal:** as in the table, with the number of computers in the licence.

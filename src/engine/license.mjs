@@ -28,6 +28,12 @@ const SKEW_MS = DAY; // a licence issued "tomorrow" by a clock a little ahead st
 
 export const licenseFile = (env = process.env) => path.join(configDir(env), 'license.json');
 
+/** The only fields a licence may carry. Anything else (a name, an e-mail, a machine) is identity and is refused. */
+export const LICENSE_FIELDS = ['v', 'lid', 'tier', 'services', 'seats', 'connectors', 'iat', 'exp', 'grace_days', 'kid', 'sig'];
+
+/** Names of the fields in a licence object that a licence is not allowed to carry. */
+export const extraFields = (l) => (l && typeof l === 'object' && !Array.isArray(l) ? Object.keys(l).filter((k) => !LICENSE_FIELDS.includes(k)) : []);
+
 /** Canonical bytes: JSON with keys sorted at every level, without `sig`. */
 export function canonical(obj) {
   const sort = (v) => (Array.isArray(v) ? v.map(sort) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sort(v[k])])) : v);
