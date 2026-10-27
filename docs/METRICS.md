@@ -42,6 +42,33 @@ hours of `installed`. **Comms activation** is `comms_activation`: the agents can
 Stages 1 and 6 are counted outside your computer, from public download counts and from the licence
 endpoint. Stages 2 to 5 are your own file. Stage 7 is whatever the log shows you did next.
 
+## The anonymous milestone report (off by default)
+
+There is no telemetry by default. The one report Memev can make is opt-in:
+
+- **Asked once.** At the end of `memev init`, on a terminal, Memev asks whether to share anonymous
+  milestones, and the default is no. The question is not asked again, and it is not asked when there
+  is no terminal. The checklist shows whether the report is on or off.
+- **Off until you say yes.** A fresh install sends nothing. The setting is in
+  `report.json` in the Memev configuration folder. `memev report on` and `memev report off` change it;
+  turning it off forgets the random id, so turning it on again starts a new one that is unrelated.
+- **What it holds.** Milestone names (the table above), the day each was reached (a date, no time),
+  and a random id made when you turn it on. For example:
+
+```json
+{ "v": 1, "id": "0a1b2c3d4e5f60718293a4b5c6d7e8f9", "milestones": [ { "name": "installed", "date": "2026-11-01" } ] }
+```
+
+- **What it never holds.** Paths, names, memory text, app names, addresses, the licence, or anything
+  about the computer.
+- **See it first.** `memev report show` prints exactly the text that would be sent, and
+  `memev report status` says whether it is on.
+- **Where it goes.** To the address in `MEMEV_REPORT_URL` (https, or plain http for this computer).
+  There is no built-in address, so with the report on and no address set nothing is sent. Only
+  milestones not yet reported are sent, with a short time limit and no retry loop.
+- **Separate from the milestone code.** The code that works out milestones makes no network call; the
+  report is a small separate step that only runs when it is on.
+
 ## Licence activations
 
 An activation is one successful `memev license activate <key>` call. It is counted where the call

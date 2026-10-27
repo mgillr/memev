@@ -111,3 +111,19 @@ export function recordMilestones({ root, seen = isoNow() }) {
   if (JSON.stringify(next) !== JSON.stringify(have)) writeJson(file(root), { ...cur, milestones: next }, 0o600);
   return next;
 }
+
+export const REPORT_VERSION = 1;
+
+/**
+ * The anonymous report, as data: a random install id and, for each recorded milestone, its name and its day.
+ * That is all of it: no path, name, app, address or memory text can get in, because nothing else is read.
+ * Pure: this builds the payload and sends nothing.
+ */
+export function buildReport({ id, milestones = {} } = {}) {
+  const list = [];
+  for (const name of MILESTONES) {
+    const day = /^\d{4}-\d{2}-\d{2}/.exec(String(milestones[name]?.at || ''))?.[0];
+    if (day) list.push({ name, date: day });
+  }
+  return { v: REPORT_VERSION, id: String(id), milestones: list };
+}

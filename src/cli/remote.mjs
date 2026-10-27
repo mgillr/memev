@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { configDir, readJson, writePrivate, writePrivateJson, exists } from '../engine/util.mjs';
-import { signRequest, decodeInvite, deviceKeygen } from '../engine/devices.mjs';
+import { signRequest, decodeInvite, deviceKeygen, verifyAddressRecord } from '../engine/devices.mjs';
 import { out } from './common.mjs';
 
 export const remoteFile = (env = process.env) => path.join(configDir(env), 'remote.json');
@@ -16,7 +16,7 @@ export const deviceKeyFile = (env = process.env) => path.join(configDir(env), 'k
 export const loadRemote = (env = process.env) => { const r = readJson(remoteFile(env), null); return r?.url && r?.token ? r : null; };
 
 /** One request to the remote vault, signed with this computer's key. */
-export async function remoteFetch(remote, route, { method = 'POST', body = null, env = process.env, headers = {}, timeoutMs = 15000 } = {}) {
+async function remoteOnce(remote, route, { method = 'POST', body = null, env = process.env, headers = {}, timeoutMs = 15000 } = {}) {
   const key = fs.readFileSync(deviceKeyFile(env), 'utf8');
   const u = new URL(route, `${remote.url.replace(/\/+$/, '')}/`);
   const text = body === null ? '' : typeof body === 'string' ? body : JSON.stringify(body);
@@ -26,6 +26,40 @@ export async function remoteFetch(remote, route, { method = 'POST', body = null,
     const res = await r.text(); let json = null; try { json = JSON.parse(res); } catch {}
     return { ok: r.ok, status: r.status, json, text: res };
   } finally { clearTimeout(t); }
+}
+
+/** Read address.json from a backup checkout this computer can already see. */
+function backupAddress(remote) {
+  const backup = remote?.backup;
+  if (!backup || typeof backup !== 'string') return null;
+  const file = path.join(backup, 'address.json');
+  if (!exists(file)) return null;
+  return readJson(file, null);
+}
+
+/**
+ * After a connection error, take the address in the git backup when the host's signature checks.
+ * A bad signature leaves the saved address as it was.
+ */
+export function adoptSignedAddress(remote, env = process.env) {
+  if (!remote?.host_pubkey) return null;
+  const rec = backupAddress(remote);
+  if (!verifyAddressRecord(rec, remote.host_pubkey)) return null;
+  const url = String(rec.url).replace(/\/+$/, '');
+  if (!url || url === String(remote.url || '').replace(/\/+$/, '')) return null;
+  remote.url = url;
+  const saved = readJson(remoteFile(env), null);
+  if (saved?.token) writePrivateJson(remoteFile(env), { ...saved, url });
+  return url;
+}
+
+export async function remoteFetch(remote, route, opts = {}) {
+  try {
+    return await remoteOnce(remote, route, opts);
+  } catch (e) {
+    if (!adoptSignedAddress(remote, opts.env || process.env)) throw e;
+    return await remoteOnce(remote, route, opts);
+  }
 }
 
 const publicKeyOf = (pem) => crypto.createPublicKey(pem).export({ type: 'spki', format: 'der' }).toString('base64');
@@ -49,6 +83,8 @@ async function joinWithCode(code, flags, { env }) {
   if (!res.ok || !res.json?.token) { out.bad(res.json?.error_description || `the invite was refused (${res.status})`); return 1; }
   if (!hadKey) { fs.mkdirSync(path.dirname(keyPath), { recursive: true, mode: 0o700 }); writePrivate(keyPath, pem); fs.writeFileSync(`${keyPath}.pub`, `${pub}\n`, { mode: 0o644 }); }
   const remote = { url, token: res.json.token, joined: new Date().toISOString() };
+  if (decoded.pubkey) remote.host_pubkey = decoded.pubkey;
+  if (decoded.backup) remote.backup = decoded.backup;
   writePrivateJson(remoteFile(env), remote);
   out.ok(`joined the vault at ${url}; requests from this computer are signed with its device key`);
   if (!flags['no-connect']) { const { installRuntime } = await import('./main.mjs'); const { connectAll } = await import('./clients.mjs'); const rt = installRuntime(env); const connected = connectAll({ env, launcher: rt.launcher }); out.ok('connected the AI apps on this computer (memev clients)');
