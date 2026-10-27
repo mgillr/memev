@@ -1,0 +1,392 @@
+{
+ "about": "The labelled prompts for the benchmark. on_topic: prompts about something recorded in the vault, each naming the memory items (path#heading) recall must find. off_topic: ordinary coding prompts that should inject nothing. continuation: short follow-ups that should inject nothing. needles: the labelled memories, written into the seeded vault at those items. The prompt lists are the 20 plus 20 of the token usage report (2026-10-27).",
+ "project_off_topic": "billing",
+ "on_topic": [
+  {
+   "prompt": "how do we handle retries for webhook delivery in billing",
+   "project": "billing",
+   "expect": [
+    "memory/decisions/2026-09.md#2026-09-10 09:00Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "what is the postgres version behind the job queue",
+   "project": "billing",
+   "expect": [
+    "memory/facts/2026-09.md#2026-09-10 09:07Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "the invoice export times out again after the migration, any idea why",
+   "project": "billing",
+   "expect": [
+    "memory/gotchas/2026-09.md#2026-09-10 09:14Z · claude-code",
+    "memory/decisions/2026-09.md#2026-09-10 09:21Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "who owns the runbook for the staging environment",
+   "project": "infra",
+   "expect": [
+    "memory/people/2026-09.md#2026-09-10 09:28Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "we need to fix the cache layer in billing so it stops returning stale data",
+   "project": "billing",
+   "expect": [
+    "memory/gotchas/2026-09.md#2026-09-10 09:35Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "set up rate limiting for the admin dashboard",
+   "project": "billing",
+   "expect": [
+    "memory/decisions/2026-09.md#2026-09-10 09:42Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "is Redis 7 still what we use for session storage",
+   "project": "auth",
+   "expect": [
+    "memory/facts/2026-09.md#2026-09-10 09:49Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "add an index for the nightly backfill query",
+   "project": "data-pipeline",
+   "expect": [
+    "memory/patterns/2026-09.md#2026-09-10 09:56Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "why does Stripe double charge on retry in checkout",
+   "project": "checkout",
+   "expect": [
+    "memory/gotchas/2026-09.md#2026-09-10 10:03Z · claude-code",
+    "memory/decisions/2026-09.md#2026-09-10 10:10Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "check the lockfile problem in the data pipeline",
+   "project": "data-pipeline",
+   "expect": [
+    "memory/gotchas/2026-09.md#2026-09-10 10:17Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "what did we decide about audit logging",
+   "project": "billing",
+   "expect": [
+    "memory/decisions/2026-09.md#2026-09-10 10:24Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "update the release tagging script for billing",
+   "project": "billing",
+   "expect": [
+    "memory/patterns/2026-09.md#2026-09-10 10:31Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "the CSV imports fail on null created_at rows",
+   "project": "billing",
+   "expect": [
+    "memory/gotchas/2026-09.md#2026-09-10 10:38Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "use the same approach as the tenant isolation decision",
+   "project": "billing",
+   "expect": [
+    "memory/decisions/2026-09.md#2026-09-10 10:45Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "remind me what the gotcha was with the load balancer 502",
+   "project": "infra",
+   "expect": [
+    "memory/gotchas/2026-09.md#2026-09-10 10:52Z · claude-code",
+    "memory/facts/2026-09.md#2026-09-10 10:59Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "write the migration with a lock timeout like we agreed",
+   "project": "billing",
+   "expect": [
+    "memory/decisions/2026-09.md#2026-09-10 11:06Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "explain how background retries work in the notifications service",
+   "project": "notifications",
+   "expect": [
+    "memory/facts/2026-09.md#2026-09-10 11:13Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "which Kafka topic does the report export use",
+   "project": "analytics",
+   "expect": [
+    "memory/facts/2026-09.md#2026-09-10 11:20Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "open a PR for the feature flags change in billing",
+   "project": "billing",
+   "expect": [
+    "memory/preferences/2026-09.md#2026-09-10 11:27Z · claude-code"
+   ]
+  },
+  {
+   "prompt": "summarise what we know about the mobile push gateway",
+   "project": "mobile-app",
+   "expect": [
+    "memory/facts/2026-09.md#2026-09-10 11:34Z · claude-code",
+    "memory/decisions/2026-09.md#2026-09-10 11:41Z · claude-code"
+   ]
+  }
+ ],
+ "off_topic": [
+  {
+   "prompt": "add type hints to utils.py"
+  },
+  {
+   "prompt": "write a unit test for parse_date"
+  },
+  {
+   "prompt": "why does this regex not match multi-line input"
+  },
+  {
+   "prompt": "rename foo to bar everywhere in this file"
+  },
+  {
+   "prompt": "convert this loop to a list comprehension"
+  },
+  {
+   "prompt": "what does this error mean: TypeError: NoneType is not iterable"
+  },
+  {
+   "prompt": "format this JSON"
+  },
+  {
+   "prompt": "make the button blue"
+  },
+  {
+   "prompt": "explain what a closure is"
+  },
+  {
+   "prompt": "add a docstring to the main function"
+  },
+  {
+   "prompt": "run the tests and show me failures"
+  },
+  {
+   "prompt": "delete the unused imports"
+  },
+  {
+   "prompt": "split this function in two"
+  },
+  {
+   "prompt": "add a --verbose flag to the CLI"
+  },
+  {
+   "prompt": "why is this component re-rendering"
+  },
+  {
+   "prompt": "write a commit message for these changes"
+  },
+  {
+   "prompt": "sort the list by date descending"
+  },
+  {
+   "prompt": "add logging around the HTTP call"
+  },
+  {
+   "prompt": "what is the difference between map and flatMap"
+  },
+  {
+   "prompt": "make this async"
+  }
+ ],
+ "continuation": [
+  {
+   "prompt": "continue"
+  },
+  {
+   "prompt": "go on"
+  },
+  {
+   "prompt": "ok"
+  },
+  {
+   "prompt": "yes"
+  },
+  {
+   "prompt": "next"
+  },
+  {
+   "prompt": "thanks"
+  },
+  {
+   "prompt": "do it"
+  }
+ ],
+ "needles": [
+  {
+   "item": "memory/decisions/2026-09.md#2026-09-10 09:00Z · claude-code",
+   "kind": "decision",
+   "text": "Webhook delivery in billing retries with jittered backoff capped at 60 seconds, and every attempt carries the same idempotency key so a retry never charges twice.",
+   "why": "two customers were charged twice during the October incident",
+   "project": "billing"
+  },
+  {
+   "item": "memory/facts/2026-09.md#2026-09-10 09:07Z · claude-code",
+   "kind": "fact",
+   "text": "The job queue in billing runs on Postgres 16.4; Maya Chen owns it and its runbook is wiki page 2207.",
+   "project": "billing"
+  },
+  {
+   "item": "memory/gotchas/2026-09.md#2026-09-10 09:14Z · claude-code",
+   "kind": "gotcha",
+   "text": "After the tenant schema migration the invoice export times out: the new tenant_id column has no index, so the export does a sequential scan. Fix: add an index on (tenant_id, created_at).",
+   "why": "it took a day to find the first time",
+   "project": "billing"
+  },
+  {
+   "item": "memory/decisions/2026-09.md#2026-09-10 09:21Z · claude-code",
+   "kind": "decision",
+   "text": "The invoice export runs in a background worker, never in the request path, so a slow export cannot time out the API.",
+   "why": "the request timeout is 30 seconds",
+   "project": "billing"
+  },
+  {
+   "item": "memory/people/2026-09.md#2026-09-10 09:28Z · claude-code",
+   "kind": "person",
+   "text": "Tomas Ruiz owns the staging environment runbook and approves every change to the staging cluster.",
+   "project": "infra"
+  },
+  {
+   "item": "memory/gotchas/2026-09.md#2026-09-10 09:35Z · claude-code",
+   "kind": "gotcha",
+   "text": "The billing cache layer returns stale data because the cache is invalidated before the database transaction commits; invalidate after commit.",
+   "why": "stale invoice totals reached two customers",
+   "project": "billing"
+  },
+  {
+   "item": "memory/decisions/2026-09.md#2026-09-10 09:42Z · claude-code",
+   "kind": "decision",
+   "text": "Rate limiting for the admin dashboard is a token bucket of 120 requests per minute per user, enforced in the gateway rather than in the app.",
+   "why": "the app servers cannot share counters",
+   "project": "billing"
+  },
+  {
+   "item": "memory/facts/2026-09.md#2026-09-10 09:49Z · claude-code",
+   "kind": "fact",
+   "text": "Session storage moved from Redis 7 to Postgres in September; Redis is now only the read cache.",
+   "project": "auth"
+  },
+  {
+   "item": "memory/patterns/2026-09.md#2026-09-10 09:56Z · claude-code",
+   "kind": "pattern",
+   "text": "The nightly backfill query needs a partial index on events (created_at) where processed is false; build it with CREATE INDEX CONCURRENTLY.",
+   "project": "data-pipeline"
+  },
+  {
+   "item": "memory/gotchas/2026-09.md#2026-09-10 10:03Z · claude-code",
+   "kind": "gotcha",
+   "text": "Stripe double charges on retry in checkout when the idempotency key is generated per attempt; generate it once per order and reuse it on every retry.",
+   "why": "refunds cost a week of support time",
+   "project": "checkout"
+  },
+  {
+   "item": "memory/decisions/2026-09.md#2026-09-10 10:10Z · claude-code",
+   "kind": "decision",
+   "text": "Checkout stores the Stripe idempotency key on the order row before the first charge attempt.",
+   "project": "checkout"
+  },
+  {
+   "item": "memory/gotchas/2026-09.md#2026-09-10 10:17Z · claude-code",
+   "kind": "gotcha",
+   "text": "The data pipeline lockfile gets corrupted when two CI jobs run the dependency compile step at once; serialise those jobs with a concurrency group.",
+   "project": "data-pipeline"
+  },
+  {
+   "item": "memory/decisions/2026-09.md#2026-09-10 10:24Z · claude-code",
+   "kind": "decision",
+   "text": "Audit logging keeps every billing change for seven years in an append-only table that no service can update or delete.",
+   "why": "legal asked for a seven year audit trail",
+   "project": "billing"
+  },
+  {
+   "item": "memory/patterns/2026-09.md#2026-09-10 10:31Z · claude-code",
+   "kind": "pattern",
+   "text": "Release tagging for billing: tag vX.Y.Z on main only after the changelog entry is merged; the tagging script is scripts/release-tag.sh.",
+   "project": "billing"
+  },
+  {
+   "item": "memory/gotchas/2026-09.md#2026-09-10 10:38Z · claude-code",
+   "kind": "gotcha",
+   "text": "CSV imports fail on rows with a null created_at; default those rows to the import time and log their row numbers.",
+   "project": "billing"
+  },
+  {
+   "item": "memory/decisions/2026-09.md#2026-09-10 10:45Z · claude-code",
+   "kind": "decision",
+   "text": "Tenant isolation: every query goes through a tenant-scoped repository, and Postgres row level security is the backstop.",
+   "why": "a missing tenant filter leaked one report in a test environment",
+   "project": "billing"
+  },
+  {
+   "item": "memory/gotchas/2026-09.md#2026-09-10 10:52Z · claude-code",
+   "kind": "gotcha",
+   "text": "The load balancer returns 502 when the upstream keep-alive timeout is shorter than its own 60 seconds; set the upstream keep-alive to 65 seconds.",
+   "project": "infra"
+  },
+  {
+   "item": "memory/facts/2026-09.md#2026-09-10 10:59Z · claude-code",
+   "kind": "fact",
+   "text": "The load balancer idle timeout is 60 seconds on every environment.",
+   "project": "infra"
+  },
+  {
+   "item": "memory/decisions/2026-09.md#2026-09-10 11:06Z · claude-code",
+   "kind": "decision",
+   "text": "Schema migrations run with lock_timeout 5s and statement_timeout 60s.",
+   "why": "a migration once blocked writes for twenty minutes",
+   "project": "billing"
+  },
+  {
+   "item": "memory/facts/2026-09.md#2026-09-10 11:13Z · claude-code",
+   "kind": "fact",
+   "text": "Background retries in the notifications service use Celery with five attempts and exponential backoff from 30 seconds; failures go to a dead letter queue that support reviews.",
+   "project": "notifications"
+  },
+  {
+   "item": "memory/facts/2026-09.md#2026-09-10 11:20Z · claude-code",
+   "kind": "fact",
+   "text": "The report export publishes to the Kafka topic analytics.report-export.v2; the v1 topic is drained and read-only.",
+   "project": "analytics"
+  },
+  {
+   "item": "memory/preferences/2026-09.md#2026-09-10 11:27Z · claude-code",
+   "kind": "preference",
+   "text": "A PR that changes feature flags in billing needs a rollout plan in its description and a reviewer from the billing on-call rotation.",
+   "why": "a flag flip once disabled invoicing for an hour",
+   "project": "billing"
+  },
+  {
+   "item": "memory/facts/2026-09.md#2026-09-10 11:34Z · claude-code",
+   "kind": "fact",
+   "text": "The mobile push gateway sends through Firebase on Android and APNs on iOS, retries three times, and drops a device token after two hard bounces.",
+   "project": "mobile-app"
+  },
+  {
+   "item": "memory/decisions/2026-09.md#2026-09-10 11:41Z · claude-code",
+   "kind": "decision",
+   "text": "Push notifications go through our own gateway service, never straight from the app servers to the vendors.",
+   "why": "one place for rate limits and token cleanup",
+   "project": "mobile-app"
+  }
+ ]
+}

@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // Start Memev at login: a systemd user unit on Linux, a launchd agent on macOS. The daemon itself runs
 // the periodic jobs (git sync, app re-detection, recall tuning) and supervises the tunnel, so one
-// unit covers everything. `memev preflight` reports what this machine allows before anything is set up.
+// unit covers everything. `memev preflight` (preflight.mjs) reports what this machine allows before anything is set up.
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import net from 'node:net';
 import { spawnSync } from 'node:child_process';
 import { homeDir, configDir, exists, writeAtomic } from '../engine/util.mjs';
-import { resolveRoot, config, out } from './common.mjs';
+import { resolveRoot, out } from './common.mjs';
 import { launcherPath } from './clients.mjs';
 
 const run = (cmd, args) => { const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: 15000 }); return { ok: r.status === 0, out: `${r.stdout || ''}${r.stderr || ''}`.trim() }; };
@@ -81,29 +80,7 @@ export async function removeService({ env = process.env, quiet = false } = {}) {
   return { removed: true };
 }
 
-const portFree = (port) => new Promise((resolve) => { const s = net.createServer(); s.once('error', () => resolve(false)); s.listen(port, '127.0.0.1', () => s.close(() => resolve(true))); });
-
-/** What this machine allows: granted (works now), applied (Memev set it up), manual (needs you). */
-export async function preflight({ env = process.env, root }) {
-  const items = [];
-  const add = (state, what, detail = '') => items.push({ state, what, detail });
-  const major = Number(process.versions.node.split('.')[0]);
-  add(major >= 22 ? 'granted' : 'manual', 'Node.js 22 or newer', `found ${process.versions.node}`);
-  add(run('git', ['--version']).ok ? 'granted' : 'manual', 'git installed');
-  try { fs.mkdirSync(configDir(env), { recursive: true }); fs.accessSync(configDir(env), fs.constants.W_OK); add('granted', 'config folder writable', configDir(env)); } catch { add('manual', 'config folder writable', configDir(env)); }
-  const port = config(root).port || 7787;
-  add((await portFree(port)) || exists(path.join(root, '.memev', 'daemon.json')) ? 'granted' : 'manual', `port ${port} free on 127.0.0.1`);
-  const { kind, file } = unitPaths(env);
-  add(file && exists(file) ? 'applied' : kind === 'none' ? 'manual' : 'granted', `start at login (${kind})`, file || '');
-  const { pickProvider } = await import('./tunnel.mjs');
-  const prov = pickProvider({ remote: { provider: 'auto' } }, env);
-  add(prov === 'tailscale' ? 'granted' : 'applied', 'remote access provider', prov === 'tailscale' ? 'Tailscale Funnel (stable address)' : 'Cloudflare quick tunnel (address changes on restart; Tailscale gives a stable one)');
-  add(run('git', ['config', 'user.email']).ok ? 'granted' : 'applied', 'git identity for vault commits', 'Memev uses a local identity in the vault when none is set');
-  return items;
-}
-
 export async function command(cmd, pos, flags, { root, env }) {
-  if (cmd === 'preflight') { for (const i of await preflight({ env, root })) console.log(`  ${i.state.padEnd(8)} ${i.what}${i.detail ? ` · ${i.detail}` : ''}`); return 0; }
   const sub = pos[0] || 'status';
   if (sub === 'install') { const r = await installService({ env, root }); (r.status === 'added' ? out.ok : out.warn)(r.detail); return r.status === 'added' ? 0 : 1; }
   if (sub === 'remove') { await removeService({ env }); return 0; }

@@ -1,0 +1,284 @@
+{
+ "about": "Benchmark baseline: node scripts/bench/run.mjs --repo-sha <sha> --level <level> --record. Recall p95 here is for reference only; the guard compares latency against --latency-vs in the same run.",
+ "levels": {
+  "small": {
+   "harness": 1,
+   "level": "small",
+   "code": {
+    "sha": "18abe10161ca34d4665bb2fc58b1dc4f84c9bacb"
+   },
+   "at": "2026-10-27T20:02:50.515Z",
+   "vault": {
+    "memories": 1000,
+    "sessions": 60,
+    "notes": 84,
+    "needles": 24,
+    "prompts": {
+     "on_topic": 20,
+     "off_topic": 20,
+     "continuation": 7
+    }
+   },
+   "quality": {
+    "recall_at_6": 0.9167,
+    "precision_at_6": 0.1947,
+    "recall_at_4": 0.8333,
+    "precision_at_4": 0.2597,
+    "counts": {
+     "expected": 24,
+     "found_at_6": 22,
+     "returned_at_6": 113,
+     "relevant_at_6": 22,
+     "found_at_4": 20,
+     "injected_at_4": 77,
+     "relevant_at_4": 20
+    }
+   },
+   "autorecall": {
+    "offtopic_injection_rate": 0.5926,
+    "prompt_mean_on": 270.4,
+    "prompt_mean_off": 163.9,
+    "prompt_mean_continuation": 0,
+    "repeated_items": 15,
+    "journal_draft_items": 17,
+    "injected": {
+     "on": 20,
+     "off": 16,
+     "continuation": 0
+    },
+    "per_prompt_tokens": {
+     "on": [
+      278,
+      261,
+      315,
+      250,
+      287,
+      325,
+      286,
+      271,
+      256,
+      324,
+      294,
+      265,
+      269,
+      261,
+      317,
+      90,
+      265,
+      254,
+      256,
+      283
+     ],
+     "off": [
+      255,
+      53,
+      230,
+      308,
+      225,
+      301,
+      0,
+      0,
+      176,
+      182,
+      265,
+      243,
+      206,
+      120,
+      166,
+      187,
+      0,
+      249,
+      0,
+      111
+     ],
+     "continuation": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   },
+   "fixed": {
+    "instructions_tokens": 562,
+    "claude_md_tokens": 150,
+    "session_start_empty_tokens": 622,
+    "tool_names_tokens": 470,
+    "tools_count": 38,
+    "tools_list_tokens": 4150,
+    "fixed_overhead_default": 1804,
+    "fixed_overhead_all_tools": 5484,
+    "protocol_tokens": 562,
+    "protocol_channels": 2
+   },
+   "resume": {
+    "session_start_compact_tokens": 1687,
+    "session_start_compact_has_protocol": 1,
+    "session_start_resume_tokens": 1657,
+    "session_start_resume_has_protocol": 1,
+    "card_tokens": 940
+   },
+   "max_result_tokens": {
+    "get": 18689,
+    "get_chars": 64808,
+    "get_note": "memory/gotchas/2026-10.md",
+    "recall_limit_1000": 132541,
+    "recall_limit_10": 1317,
+    "recall_6hit": 813,
+    "recall_6hit_items": 6,
+    "list": 1468,
+    "list_entries": 84,
+    "bus_unread_200": 34808
+   },
+   "latency": {
+    "recall_p50_ms": 0.494,
+    "recall_p95_ms": 0.758,
+    "samples": 200,
+    "reps": 5
+   }
+  },
+  "large": {
+   "harness": 1,
+   "level": "large",
+   "code": {
+    "sha": "18abe10161ca34d4665bb2fc58b1dc4f84c9bacb"
+   },
+   "at": "2026-10-27T20:02:56.184Z",
+   "vault": {
+    "memories": 5000,
+    "sessions": 60,
+    "notes": 84,
+    "needles": 24,
+    "prompts": {
+     "on_topic": 20,
+     "off_topic": 20,
+     "continuation": 7
+    }
+   },
+   "quality": {
+    "recall_at_6": 0.7917,
+    "precision_at_6": 0.1583,
+    "recall_at_4": 0.75,
+    "precision_at_4": 0.225,
+    "counts": {
+     "expected": 24,
+     "found_at_6": 19,
+     "returned_at_6": 120,
+     "relevant_at_6": 19,
+     "found_at_4": 18,
+     "injected_at_4": 80,
+     "relevant_at_4": 18
+    }
+   },
+   "autorecall": {
+    "offtopic_injection_rate": 0.6296,
+    "prompt_mean_on": 280.5,
+    "prompt_mean_off": 180.2,
+    "prompt_mean_continuation": 0,
+    "repeated_items": 16,
+    "journal_draft_items": 22,
+    "injected": {
+     "on": 20,
+     "off": 17,
+     "continuation": 0
+    },
+    "per_prompt_tokens": {
+     "on": [
+      273,
+      267,
+      320,
+      250,
+      296,
+      365,
+      256,
+      285,
+      252,
+      326,
+      276,
+      265,
+      290,
+      260,
+      310,
+      272,
+      249,
+      299,
+      236,
+      263
+     ],
+     "off": [
+      250,
+      232,
+      230,
+      264,
+      247,
+      301,
+      0,
+      0,
+      230,
+      182,
+      238,
+      235,
+      193,
+      120,
+      166,
+      175,
+      119,
+      258,
+      0,
+      163
+     ],
+     "continuation": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+     ]
+    }
+   },
+   "fixed": {
+    "instructions_tokens": 562,
+    "claude_md_tokens": 150,
+    "session_start_empty_tokens": 622,
+    "tool_names_tokens": 470,
+    "tools_count": 38,
+    "tools_list_tokens": 4150,
+    "fixed_overhead_default": 1804,
+    "fixed_overhead_all_tools": 5484,
+    "protocol_tokens": 562,
+    "protocol_channels": 2
+   },
+   "resume": {
+    "session_start_compact_tokens": 1695,
+    "session_start_compact_has_protocol": 1,
+    "session_start_resume_tokens": 1665,
+    "session_start_resume_has_protocol": 1,
+    "card_tokens": 948
+   },
+   "max_result_tokens": {
+    "get": 93879,
+    "get_chars": 325796,
+    "get_note": "memory/gotchas/2026-10.md",
+    "recall_limit_1000": 132461,
+    "recall_limit_10": 1263,
+    "recall_6hit": 723,
+    "recall_6hit_items": 6,
+    "list": 1468,
+    "list_entries": 84,
+    "bus_unread_200": 34808
+   },
+   "latency": {
+    "recall_p50_ms": 1.326,
+    "recall_p95_ms": 3.311,
+    "samples": 120,
+    "reps": 3
+   }
+  }
+ },
+ "sha": "18abe10161ca34d4665bb2fc58b1dc4f84c9bacb"
+}
