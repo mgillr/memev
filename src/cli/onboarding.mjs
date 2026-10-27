@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // The onboarding checklist: what Memev did, what is ready, and the few things only you can do.
 // Printed at the end of `memev init`; `memev onboarding` checks again (for example after a manual step).
+import crypto from 'node:crypto';
 import path from 'node:path';
-import { readJson, writeJson, exists, now } from '../engine/util.mjs';
+import { readJson, writeJson, writePrivateJson, configDir, exists, now } from '../engine/util.mjs';
 import { config } from './common.mjs';
-import { loadMilestones, recordMilestones, MILESTONES } from '../engine/milestones.mjs';
+import { loadMilestones, recordMilestones, buildReport, MILESTONES } from '../engine/milestones.mjs';
 
 const ICON = { succeeded: '\u2713', added: '+', ready: '\u2713', 'needs-manual': '\u2192', failed: '\u2717', skipped: '-' };
 
@@ -59,9 +60,14 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
     const bad = fileChecks({ root, env, platform, ...(icacls ? { icacls } : {}) }).filter((c) => c.status === 'fail');
     add(bad.length ? 'failed' : 'succeeded', 'Self-test (memev doctor)', bad.length ? bad.map((c) => c.title).join(', ') : 'all checks pass');
   }
+  // the anonymous report: asked once, off unless you say yes
+  if (firstRun) await askReportOnce({ env }).catch(() => {});
+  const rs = reportSettings(env);
+  add('ready', 'Anonymous milestone report', rs.enabled ? 'on: only milestone names, days and a random id are sent (memev report show; memev report off)' : 'off, as it is for everyone until they choose (memev report on to share milestone names and days)');
   // the milestones are worked out here, from the vault's own files, and kept in the same file; nothing leaves the machine
   writeJson(path.join(root, '.memev', 'onboarding.json'), { at: now(), items, milestones: loadMilestones(root) }, 0o600);
   try { recordMilestones({ root }); } catch { /* the checklist never fails over a milestone */ }
+  await sendReport({ root, env }).catch(() => {}); // does nothing unless the report is on and an address is set
   return items;
 }
 
@@ -73,10 +79,93 @@ export function print(items) {
 }
 
 export async function firstRun(o) { const items = await checklist({ ...o, firstRun: true }); print(items); return items.some((i) => i.status === 'failed') ? 1 : 0; }
+// ---- the opt-in anonymous milestone report. Off by default; nothing is sent until it is on AND an address is set.
+export const reportFile = (env = process.env) => path.join(configDir(env), 'report.json');
+/** { enabled, asked, id, sent }. A fresh install: off, never asked, no id. */
+export function reportSettings(env = process.env) {
+  const s = readJson(reportFile(env), null) || {};
+  return { enabled: s.enabled === true, asked: s.asked === true, id: typeof s.id === 'string' ? s.id : null, sent: s.sent && typeof s.sent === 'object' ? s.sent : {} };
+}
+const saveReport = (env, s) => writePrivateJson(reportFile(env), s);
+/** Turn it on (making the random id) or off (forgetting the id, so a later yes starts a new, unrelated one). */
+export function setReport(env, on) {
+  const s = reportSettings(env);
+  saveReport(env, on ? { ...s, enabled: true, asked: true, id: s.id || crypto.randomBytes(16).toString('hex') } : { enabled: false, asked: true, id: null, sent: {} });
+  return reportSettings(env);
+}
+const loopbackHost = (h) => h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '::1';
+/** Where a report goes: MEMEV_REPORT_URL. There is no built-in address, so with none set nothing can be sent. */
+export function reportEndpoint(env = process.env) {
+  const raw = String(env.MEMEV_REPORT_URL || '').trim();
+  if (!raw) return null;
+  let u; try { u = new URL(raw); } catch { throw new Error(`MEMEV_REPORT_URL is not a URL: ${raw}`); }
+  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && loopbackHost(u.hostname))) throw new Error('MEMEV_REPORT_URL must be https (plain http only for this computer)');
+  return u.toString();
+}
+/** What would be sent, or null when the report is off or there is nothing to say yet. */
+export function reportPayload({ root, env = process.env }) {
+  const s = reportSettings(env);
+  if (!s.enabled || !s.id) return null;
+  const p = buildReport({ id: s.id, milestones: loadMilestones(root) });
+  return p.milestones.length ? p : null;
+}
+/** Send the report if it is on, an address is set and there is a milestone not yet reported. Never throws, never retries in a loop. */
+export async function sendReport({ root, env = process.env, fetchImpl = globalThis.fetch, timeoutMs = 3000 }) {
+  const s = reportSettings(env);
+  if (!s.enabled) return { sent: false, reason: 'off' };
+  let endpoint; try { endpoint = reportEndpoint(env); } catch (e) { return { sent: false, reason: e.message }; }
+  if (!endpoint) return { sent: false, reason: 'no report address is set, so nothing is sent' };
+  const p = reportPayload({ root, env });
+  if (!p) return { sent: false, reason: 'no milestones yet' };
+  if (p.milestones.every((m) => s.sent[m.name] === m.date)) return { sent: false, reason: 'everything is already reported' };
+  try {
+    const res = await fetchImpl(endpoint, { method: 'POST', redirect: 'error', headers: { 'content-type': 'application/json' }, body: JSON.stringify(p), signal: AbortSignal.timeout(timeoutMs) });
+    if (!res.ok) return { sent: false, reason: `the report address answered ${res.status}` };
+  } catch (e) { return { sent: false, reason: `could not reach the report address (${e.cause?.code || e.name || 'network error'})` }; }
+  saveReport(env, { ...reportSettings(env), sent: Object.fromEntries(p.milestones.map((m) => [m.name, m.date])) });
+  return { sent: true, payload: p };
+}
+export const REPORT_QUESTION = 'Share anonymous progress milestones to help improve Memev?\n  What would be sent: the names of the milestones you reach (for example "installed") with the day, and a random number that is not tied to you.\n  Never sent: your memories, file names or paths, app names, your name or address.\n  It is off unless you say yes, you can see the exact text with memev report show, and memev report off stops it.\n';
+/** Asked once, on a terminal only. The answer is kept either way and the question never comes back. `ask` forces (true) or forbids (false) it; input and output are for tests. */
+export async function askReportOnce({ env = process.env, ask, input = process.stdin, output = process.stdout } = {}) {
+  if (reportSettings(env).asked) return null;
+  if (!(ask ?? (!!input.isTTY && !!output.isTTY))) return null;
+  const readline = await import('node:readline/promises');
+  const rl = readline.createInterface({ input, output, terminal: false });
+  let a = '';
+  try { output.write(`\n${REPORT_QUESTION}`); a = (await rl.question('Share anonymous milestones? [y/N] ')).trim().toLowerCase(); } finally { rl.close(); }
+  const yes = a === 'y' || a === 'yes';
+  setReport(env, yes);
+  return yes;
+}
+async function reportCommand(pos, flags, { root, env }) {
+  const sub = pos[0] || 'status';
+  const s = reportSettings(env);
+  const endpoint = (() => { try { return reportEndpoint(env); } catch { return null; } })();
+  const preview = () => buildReport({ id: s.id || '<a random number, made when you turn the report on>', milestones: loadMilestones(root) });
+  if (sub === 'on') { const r = setReport(env, true); console.log(`  \u2713 the anonymous milestone report is on (random id ${r.id.slice(0, 8)}\u2026). memev report show prints exactly what is sent; memev report off stops it.`); if (!endpoint) console.log('    No report address is set yet (MEMEV_REPORT_URL), so nothing is sent.'); return 0; }
+  if (sub === 'off') { setReport(env, false); console.log('  \u2713 the anonymous milestone report is off; its random id is forgotten'); return 0; }
+  if (sub === 'show') { try { recordMilestones({ root }); } catch { /* no vault yet */ } console.log(s.enabled ? 'This is exactly what is sent (and nothing else):' : 'The report is off, so nothing is sent. If you turned it on, this is exactly what would be sent:'); console.log(JSON.stringify(preview(), null, 2)); return 0; }
+  if (sub === 'send') {
+    if (!s.enabled) { console.log('  The report is off, so nothing was sent (memev report on turns it on).'); return 1; }
+    try { recordMilestones({ root }); } catch { /* no vault yet */ }
+    const r = await sendReport({ root, env });
+    console.log(r.sent ? `  \u2713 sent ${r.payload.milestones.length} milestone(s)` : `  Nothing sent: ${r.reason}`);
+    return r.sent || /^(everything|no milestones)/.test(r.reason) ? 0 : 1;
+  }
+  if (sub === 'status') {
+    if (flags.json) { console.log(JSON.stringify({ enabled: s.enabled, asked: s.asked, address_set: !!endpoint }, null, 2)); return 0; }
+    console.log(`Anonymous milestone report: ${s.enabled ? 'on' : 'off'}${s.asked ? '' : ' (not asked yet)'}${s.enabled && !endpoint ? '; no report address is set, so nothing is sent' : ''}`);
+    console.log('It is off unless you turn it on. memev report on | off | show | send');
+    return 0;
+  }
+  throw new Error('memev report [status] | on | off | show | send');
+}
 export function printMilestones(m) {
   console.log('Milestones (kept on this computer only):');
   for (const n of MILESTONES) console.log(`  ${m[n] ? '\u2713' : ' '} ${n.replace(/_/g, ' ')}${m[n] ? `  ${m[n].at.slice(0, 16).replace('T', ' ')}` : ''}`);
 }
 export async function command(cmd, pos, flags, { root, env }) {
+  if (cmd === 'report') return reportCommand(pos, flags, { root, env });
   if (flags.milestones) { const m = recordMilestones({ root }); if (flags.json) console.log(JSON.stringify(m, null, 2)); else printMilestones(m); return 0; }
   const { launcherPath } = await import('./clients.mjs'); const items = await checklist({ root, env, flags, launcher: launcherPath(env) }); if (flags.json) console.log(JSON.stringify(items, null, 2)); else print(items); return items.some((i) => i.status === 'failed') ? 1 : 0; }

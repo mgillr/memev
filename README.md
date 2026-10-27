@@ -102,7 +102,9 @@ run a comms check, hand out tasks and put an app on hold. See [docs/BUS.md](docs
 You can check what Memev holds. `memev why` shows why a note came back, `memev audit` lists junk and
 stale notes, and nothing is deleted behind your back. Notes from one project don't turn up in
 another, and notes in Chinese, Japanese, Korean, Cyrillic, Greek or Arabic are searchable like any
-other. There is no telemetry and nothing to install besides Node and git.
+other. There is no telemetry by default and nothing to install besides Node and git. One short anonymous
+milestone report exists; it is off unless you turn it on with `memev report on`, and `memev report show`
+prints exactly what it would send ([docs/METRICS.md](docs/METRICS.md)).
 
 ## Documentation
 
