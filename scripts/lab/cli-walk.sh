@@ -43,8 +43,9 @@ run C18-claims 0 $M claims
 run C19-token-issue 0 $M token issue lab-app --scopes read
 run C20-token-list 0 $M token list
 run C21-devices 0 $M devices
-run C22-devices-enroll 0 $M devices enroll --kind remote-computer --label lab-laptop
-run C23-devices-keygen 0 $M devices keygen
+run C22-devices-keygen 0 $M devices keygen
+# exit 1 on purpose: with no licence the vault is licensed for 1 computer, so a second is refused
+run C23-devices-enroll-refused 1 $M devices enroll --kind remote-computer --label lab-laptop --pubkey-file "$MEMEV_CONFIG_DIR/keys/device-ed25519.pem.pub"
 run C24-license-status 0 $M license status
 run C25-license-status-json 0 $M license status --json
 run C26-cloud-status 0 $M cloud status
