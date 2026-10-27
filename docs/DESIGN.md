@@ -14,15 +14,29 @@ log is ever rewritten.
 project for checkpoints, one per session for the journal. git commits every change.
 
 **Recall.** A BM25 index over note sections (about six bytes per section-term pair), updated per
-write and incrementally on appends, persisted to `.memev/index.jsonl`. Results are boosted by the
-project and by feedback (`memev_feedback`). On large vaults very common terms are dropped from the
-query. Recall never reads the log.
+write and incrementally on appends, persisted to `.memev/index.jsonl`. Words are split by Unicode
+letter and digit, so every script is indexed: accents on Latin and Greek letters are folded, and
+Chinese, Japanese and Korean text is indexed as single characters plus overlapping pairs. ASCII text
+splits exactly as it did before. Sections are filtered before ranking: what the token may read, the
+project (recall with a project searches only that project and memories with no project;
+`all_projects` turns this back into a boost), and the review state. Results are then weighted by
+feedback (`memev_feedback`). On large vaults very common terms are dropped from the query. Recall
+never reads the log. `memev why` shows each matched word's share of a score, and the parts multiply
+back to it.
+
+**Memory quality.** `memev_remember` checks text before saving it, on this machine with fixed rules:
+acknowledgements, system noise, fragments under three words and duplicates of anything already in
+`memory/` are refused with a reason (`force` saves anyway, flagged). Notes that read as short-lived
+("for now", "today") get a `Review-By:` date and leave recall after it unless kept. Hedged notes and
+near-duplicates are flagged. `memev review` keeps or drops flagged memories; the decisions are log
+records, and the notes themselves are not edited. `memev audit` reports junk without changing
+anything.
 
 **Graph.** Entities extracted from sections, co-occurrence, explicit edges (`memev_link`), and
 claims whose status (conjecture, theory, fact, contested, refuted) is recomputed from the weight of
 supporting and opposing evidence. Usage records say which memory each session used.
 
 **Scale.** `scripts/growth-bench.mjs` simulates heavy use: 170 million tokens of sessions (99
-sessions, 8,096 turns, 25,862 logged operations) in 27 seconds, with the heap under 256 MB (it also
-passes with a 160 MB limit; the steady state after opening is about 52 MB), the log verified, every
-note rebuilt byte-identical from the log, and recall at 1.0 ms median, 2.8 ms p95.
+sessions, 8,096 turns, 25,862 logged operations) in 29 seconds, with the heap peaking at 160 MB
+under a 256 MB limit, the log verified, every note rebuilt byte-identical from the log, and recall at
+1.1 ms median, 3.4 ms p95 (measured after the Unicode index change).

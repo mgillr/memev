@@ -18,12 +18,13 @@ import { Graph } from './graph.mjs';
 import { Tournament, ROUNDS } from './tournament.mjs';
 import { loadTuning } from './tuning.mjs';
 import { attach as attachContracts, installVaultHooks } from './contracts.mjs';
+import { assess, DEFAULT_GATE } from './quality.mjs';
 
 export const VERSION = '0.1.0';
 export const STATE = '.memev';
 const KINDS = { decision: 'decisions', gotcha: 'gotchas', fact: 'facts', pattern: 'patterns', win: 'wins', person: 'people', note: 'notes', preference: 'preferences' };
 const PROTECTED = [/^contracts\/signed\//, /^contracts\/keys\//];
-const DEFAULT_CONFIG = { version: 1, port: 7787, remote: { enabled: true, provider: 'auto', rate_per_min: 120 }, sync: { interval_min: 30 }, recall: { per_prompt: true, max_chars: 1500, min_score: 1.0 }, journal: { enabled: true, max_chars: 2000 }, contracts: { exec_local_only: true } };
+const DEFAULT_CONFIG = { version: 1, port: 7787, remote: { enabled: true, provider: 'auto', rate_per_min: 120 }, sync: { interval_min: 30 }, recall: { per_prompt: true, max_chars: 1500, min_score: 1.0, scope: 'project' }, memory: { ...DEFAULT_GATE }, journal: { enabled: true, max_chars: 2000 }, contracts: { exec_local_only: true } };
 
 export class VaultError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
@@ -52,6 +53,7 @@ export class Vault extends EventEmitter {
     this.graph = new Graph();
     this.tournament = new Tournament();
     this.feedback = new Map();
+    this.reviews = new Map();
     this.contractSessions = new Map();
     this.contractResults = new Map();
     this.commits = new CommitQueue(this.root, { enabled: this.opts.git !== false, delayMs: this.opts.commitDelayMs ?? 400 });
@@ -240,17 +242,34 @@ export class Vault extends EventEmitter {
   }
 
   // ---- memory semantics
-  /** Save a durable memory. Entries go to month files so no note grows without bound. */
-  remember(identity, { text, kind = 'note', project = null, client = null, why = null, allow_secrets = false }) {
+  /**
+   * Save a durable memory. Entries go to month files so no note grows without bound. The write gate
+   * (quality.mjs) refuses acknowledgements, noise and duplicates, and gives short-lived notes a review
+   * date; `force` saves a refused memory anyway (it is flagged), `review_by` sets the date (YYYY-MM-DD
+   * or a number of days).
+   */
+  remember(identity, { text, kind = 'note', project = null, client = null, why = null, allow_secrets = false, review_by = null, force = false }) {
     text = String(text || '').trim(); if (!text) throw new VaultError('bad_request', 'nothing to remember');
     const k = KINDS[kind] ? kind : 'note';
     const p = `memory/${KINDS[k]}/${new Date().toISOString().slice(0, 7)}.md`;
-    const dup = this.index.query(text, { limit: 3, prefix: `memory/${KINDS[k]}/` }).find((h) => jaccard(String(h.snippet).replace(/\b(Why|Project): .*$/gm, '').replace(/\s(Why|Project): .*$/, ''), text) >= 0.9);
-    if (dup) return { duplicate: true, path: dup.path, heading: dup.heading };
+    this._need(identity, 'write', p); this._guard(p, text, allow_secrets, false); // permissions and the secrets check come before the quality check
+    const gate = { ...DEFAULT_GATE, ...(this.config.memory || {}) };
+    const similar = this.index.query(text, { limit: 5, prefix: 'memory/', filter: (d) => this.reviews.get(`${d.path}#${d.heading || ''}`)?.action !== 'drop' });
+    const a = assess(text, { similar, gate: gate.enabled === false ? { ...gate, min_words: 0 } : gate, review_by });
+    if (a.verdict === 'duplicate') return { duplicate: true, saved: false, path: a.duplicate_of.path, heading: a.duplicate_of.heading, reasons: a.reasons };
+    if (gate.enabled === false) { a.flags = []; if (!review_by) a.review_by = null; }
+    else if (a.verdict === 'refuse') {
+      if (!force) return { saved: false, refused: true, reasons: a.reasons, hint: 'Save decisions, gotchas, facts and preferences that will matter in a later session. Pass force to save it anyway.' };
+      a.flags.push('forced');
+    }
     const head = this._read(p) === null ? `# ${KINDS[k][0].toUpperCase()}${KINDS[k].slice(1)} ${p.slice(-10, -3)}\n` : '';
-    const entry = `${head}\n### ${stamp()} · ${client || identity.agent}\n${text}\n${why ? `Why: ${why}\n` : ''}${project ? `Project: ${project}\n` : ''}`;
+    // a heading names one memory (review, feedback and recall items are path#heading), so a second
+    // memory in the same minute from the same app gets a number
+    let heading = `${stamp()} · ${client || identity.agent}`;
+    for (let n = 2; this.index.docsOf(p, heading).length; n++) heading = `${stamp()} · ${client || identity.agent} · ${n}`;
+    const entry = `${head}\n### ${heading}\n${text}\n${why ? `Why: ${why}\n` : ''}${project ? `Project: ${project}\n` : ''}${a.review_by ? `Review-By: ${a.review_by}\n` : ''}${a.flags.length ? `Flags: ${a.flags.join(', ')}\n` : ''}`;
     const r = this.append(identity, { path: p, text: entry, client, allow_secrets });
-    return { ...r, kind: k, heading: `${stamp()} · ${client || identity.agent}` };
+    return { ...r, saved: true, kind: k, heading, ...(a.flags.length ? { flags: a.flags, reasons: a.reasons } : {}), ...(a.review_by ? { review_by: a.review_by } : {}) };
   }
 
   /** A progress checkpoint: what the task is, what is done, what is in progress, what is next. Append-only. */
@@ -291,10 +310,33 @@ export class Vault extends EventEmitter {
     return this.append(identity, { path: p, text: `${head}\n#### ${stamp()} · ${role}\n${body}\n`, client, allow_secrets: true });
   }
 
-  /** Recall: the index, filtered to what the token may read, annotated with graph context; the use is logged. */
-  recall(identity, { query, project = null, limit = 6, client = null, session = null, log = true }) {
+  /**
+   * Which sections a recall may return, decided before ranking: what the token may read, the project
+   * (hard scope: that project's sections plus sections with no project; `all_projects` widens it to a
+   * boost), and the review state (dropped sections and short-lived ones past their date are left out).
+   */
+  _recallFilter(identity, { project = null, all_projects = false } = {}) {
+    const scope = all_projects ? 'all' : (this.config.recall?.scope ?? 'project');
+    const pj = scope === 'project' && project ? slug(project) : null;
+    const open = !identity.paths || identity.paths.includes('**');
+    const today = new Date().toISOString().slice(0, 10);
+    const pc = new Map(), ac = new Map();
+    const fn = (d) => {
+      const r = this.reviews.size ? this.reviews.get(`${d.path}#${d.heading || ''}`) : null;
+      if (r?.action === 'drop') return false;
+      const until = r?.action === 'keep' ? r.until : d.rb;
+      if (until && until < today) return false;
+      if (pj && d.project) { let x = pc.get(d.project); if (x === undefined) { x = slug(d.project); pc.set(d.project, x); } if (x !== pj) return false; }
+      if (!open) { let x = ac.get(d.path); if (x === undefined) { x = allowed(identity, 'read', d.path); ac.set(d.path, x); } if (!x) return false; }
+      return true;
+    };
+    fn.scope = pj ? 'project' : 'all';
+    return fn;
+  }
+  /** Recall: the index, filtered to what the token may read and the project, annotated with graph context; the use is logged. */
+  recall(identity, { query, project = null, all_projects = false, limit = 6, client = null, session = null, log = true }) {
     this._need(identity, 'read', null);
-    const hits = this.index.query(query, { limit: limit * 3, project, boosts: this.tuning?.boosts }).filter((h) => allowed(identity, 'read', h.path)).slice(0, limit);
+    const hits = this.index.query(query, { limit, project, boosts: this.tuning?.boosts, filter: this._recallFilter(identity, { project, all_projects }) });
     for (const h of hits) {
       const key = `${h.path}#${h.heading || ''}`;
       const ents = this.graph.sectionEnts.get(key) || [];
@@ -306,6 +348,111 @@ export class Vault extends EventEmitter {
     if (log && hits.length) this._logUsage(identity, { client, session, query, items: hits.map((h) => `${h.path}#${h.heading || ''}`) });
     return hits;
   }
+
+  /**
+   * Why recall returned (or did not return) something: the matched words and their share of the
+   * score, the project and feedback multipliers, the review state, how often it was used, and for one
+   * named item where it came from. Read-only; nothing is logged as a use.
+   */
+  why(identity, { query, project = null, all_projects = false, path: p = null, heading = null, limit = 5 }) {
+    this._need(identity, 'read', null);
+    if (!query) throw new VaultError('bad_request', 'why needs the query that was recalled');
+    const filter = this._recallFilter(identity, { project, all_projects });
+    const opts = { project, boosts: this.tuning?.boosts };
+    const ranked = this.index.query(query, { limit: 50, ...opts, filter });
+    const rankOf = (d) => { const i = ranked.findIndex((h) => h.path === d.path && h.line === d.line); return i === -1 ? null : i + 1; };
+    const today = new Date().toISOString().slice(0, 10);
+    const describe = (d) => {
+      const key = `${d.path}#${d.heading || ''}`;
+      const ex = this.index.explain(query, d, opts);
+      const r = this.reviews.get(key); const u = this.graph.usage.get(key); const fb = this.feedback.get(key);
+      const rank = rankOf(d); const lines = [];
+      if (r?.action === 'drop') lines.push('Left out of recall: dropped in review.');
+      else if ((r?.action === 'keep' ? r.until : d.rb) && (r?.action === 'keep' ? r.until : d.rb) < today) lines.push(`Left out of recall: its review date ${r?.until || d.rb} has passed (memev review keep to bring it back).`);
+      else if (!filter(d)) lines.push(`Left out of recall: it belongs to project ${d.project}, and recall was limited to project ${project}.`);
+      if (!ex.matched.length) lines.push('None of the query words are in this section.');
+      else {
+        const total = ex.words.reduce((a, w) => a + w.contribution, 0) || 1;
+        lines.push(`Matched ${ex.words.filter((w) => w.contribution > 0).map((w) => `"${w.word}" (${w.in_section}x, ${Math.round((100 * w.contribution) / total)}% of the score)`).join(', ')}.`);
+      }
+      if (ex.dropped_common.length) lines.push(`Ignored as too common in this vault: ${ex.dropped_common.join(', ')}.`);
+      if (ex.project_multiplier !== 1) lines.push(`Scored x${ex.project_multiplier} because it belongs to project ${d.project}.`);
+      if (ex.feedback_multiplier !== 1) lines.push(`Scored x${ex.feedback_multiplier} from feedback (${fb?.up || 0} helpful, ${fb?.down || 0} not helpful).`);
+      if (d.rb && r?.action !== 'keep') lines.push(`Short-lived: review by ${d.rb}.`);
+      if (u) lines.push(`Recalled ${u.count} time${u.count === 1 ? '' : 's'} before.`);
+      if (rank) lines.push(`Rank ${rank} for this query.`);
+      return { item: key, rank, score: ex.score, recalled: !!rank && rank <= limit, why: lines, explanation: ex, used: u?.count || 0, feedback: fb || null, review: r || (d.rb ? { review_by: d.rb } : null) };
+    };
+    if (p) {
+      p = checkPath(p); this._need(identity, 'read', p);
+      const docs = this.index.docsOf(p, heading ?? undefined);
+      if (!docs.length) return { query, found: false, reason: `nothing indexed at ${p}${heading ? `#${heading}` : ''}` };
+      const prov = this.provenance(identity, { path: p, heading, limit: 5 });
+      return { query, project, scope: filter.scope, found: true, items: docs.slice(0, 10).map(describe), provenance: { written: prov.written, written_total: prov.written_total, used_total: prov.used_total, commits: prov.commits.slice(0, 5) } };
+    }
+    // session turns can share a heading, so a hit is matched to its section by line as well
+    const top = ranked.slice(0, limit).map((h) => this.index.docsOf(h.path, h.heading || '').find((d) => d.line === h.line)).filter(Boolean);
+    return { query, project, scope: filter.scope, found: top.length > 0, items: top.map(describe) };
+  }
+
+  /** The review inbox: flagged or short-lived memories nobody has kept or dropped yet, oldest date first. */
+  reviewInbox(identity, { limit = 50 } = {}) {
+    this._need(identity, 'read', null);
+    const today = new Date().toISOString().slice(0, 10); const out = [];
+    for (const d of this.index.docs.values()) {
+      if (!d.path.startsWith('memory/') || !(d.rb || d.fl) || !allowed(identity, 'read', d.path)) continue;
+      const key = `${d.path}#${d.heading || ''}`; const r = this.reviews.get(key);
+      if (r && !(r.action === 'keep' && r.until && r.until < today)) continue;
+      out.push({ item: key, snippet: truncate(d.snippet, 200), flags: d.fl ? d.fl.split(/,\s*/) : [], review_by: d.rb || null, expired: !!(d.rb && d.rb < today) });
+    }
+    return out.sort((a, b) => String(a.review_by || '9999').localeCompare(String(b.review_by || '9999'))).slice(0, limit);
+  }
+  /** Keep (optionally until a date) or drop memories. Logged; the notes themselves are not edited. */
+  review(identity, { action, items, days = null, client = null }) {
+    this._need(identity, 'write', null);
+    if (!['keep', 'drop', 'reset'].includes(action)) throw new VaultError('bad_request', 'action: keep, drop or reset');
+    const list = (Array.isArray(items) ? items : [items]).filter(Boolean).map(String).slice(0, 100);
+    if (!list.length) throw new VaultError('bad_request', 'review needs items (path#heading)');
+    for (const it of list) { const pth = it.split('#')[0]; checkPath(pth); this._need(identity, 'write', pth); }
+    const until = action === 'keep' && days ? new Date(Date.now() + Number(days) * 86400000).toISOString().slice(0, 10) : null;
+    const rec = this.log.append({ type: 'review', agent: identity.agent, client, data: { items: list, action, until } });
+    this._applyMisc(rec); this._indexSaveSoon();
+    return { seq: rec.seq, action, items: list.length, ...(until ? { until } : {}) };
+  }
+
+  /**
+   * A read-only report on memory quality: what the gate would refuse today, duplicates, short-lived
+   * notes past their date, hedged notes, memories never recalled after 30 days and memories rated
+   * unhelpful more than helpful. Nothing is changed; memev review acts on the findings.
+   */
+  audit(identity, { limit = 30 } = {}) {
+    this._need(identity, 'read', null);
+    const docs = [...this.index.docs.values()].filter((d) => d.path.startsWith('memory/') && d.path !== 'memory/north-star.md' && d.heading && /^\d{4}-\d{2}-\d{2} /.test(d.heading) && allowed(identity, 'read', d.path));
+    const today = new Date().toISOString().slice(0, 10); const old = Date.now() - 30 * 86400000;
+    const R = { refused_now: [], duplicates: [], expired: [], uncertain: [], never_recalled: [], unhelpful: [] };
+    const seen = new Set();
+    for (const d of docs) {
+      const key = `${d.path}#${d.heading || ''}`; const r = this.reviews.get(key);
+      if (r?.action === 'drop') continue;
+      const body = String(d.snippet).replace(/\s(Why|Project|Review-By|Flags): .*$/, '');
+      const a = assess(body, { similar: [] });
+      if (a.verdict === 'refuse') R.refused_now.push({ item: key, reason: a.reasons[0] });
+      if (a.flags.includes('uncertain')) R.uncertain.push({ item: key });
+      const until = r?.action === 'keep' ? r.until : d.rb; if (until && until < today) R.expired.push({ item: key, review_by: until });
+      if (!seen.has(key)) {
+        const sim = this.index.query(body, { limit: 4, prefix: 'memory/' }).filter((h) => `${h.path}#${h.heading || ''}` !== key);
+        for (const h of sim) { const k2 = `${h.path}#${h.heading || ''}`; if (seen.has(k2) || this.reviews.get(k2)?.action === 'drop') continue; const a2 = assess(body, { similar: [h] }); if (a2.verdict === 'duplicate') { R.duplicates.push({ item: key, same_as: k2 }); seen.add(k2); } }
+        seen.add(key);
+      }
+      const u = this.graph.usage.get(key); const t = Date.parse(d.mtime || '') || null;
+      if (!u && t && t < old) R.never_recalled.push({ item: key });
+      const fb = this.feedback.get(key); if (fb && fb.down > fb.up) R.unhelpful.push({ item: key, helpful: fb.up, unhelpful: fb.down });
+    }
+    const bad = new Set([...R.refused_now, ...R.duplicates, ...R.expired, ...R.unhelpful].map((x) => x.item));
+    const counts = Object.fromEntries(Object.entries(R).map(([k, v]) => [k, v.length]));
+    return { memories: docs.length, likely_junk: bad.size, junk_share: docs.length ? Number((bad.size / docs.length).toFixed(3)) : 0, counts, findings: Object.fromEntries(Object.entries(R).map(([k, v]) => [k, v.slice(0, limit)])), next: bad.size ? 'Drop what you do not want with memev review drop <item>; nothing has been changed.' : 'Nothing to clean up.' };
+  }
+
   _logUsage(identity, { client, session, query, items }) {
     const rec = this.log.append({ type: 'usage', agent: identity.agent, client, data: { session, query: truncate(query, 200), items } });
     this.graph.applyOp(rec);
@@ -341,6 +488,16 @@ export class Vault extends EventEmitter {
     return null;
   }
   _openContracts() { return this.contractStatus({ agent: 'memev', scopes: ['read'], paths: ['**'] }, {}).slice(0, 5).map(({ id, title, project, version, passed, total, remaining, last_verified }) => ({ id, title, project, version, passed, total, last_verified, remaining: remaining.map((t) => `${t.id} ${t.title} (${t.status})`) })); }
+
+  /** For a token limited to some paths: which entities and sections of the graph it may see. Null when it sees everything. */
+  graphView(identity) {
+    if (!identity?.paths || identity.paths.includes('**')) return null;
+    const ac = new Map(); const ok = (p) => { let x = ac.get(p); if (x === undefined) { x = allowed(identity, 'read', p); ac.set(p, x); } return x; };
+    const section = (key) => ok(key.slice(0, key.indexOf('#') === -1 ? key.length : key.indexOf('#')));
+    // an entity is visible when a readable section names it; entities that exist only through explicit links are not tied to a note
+    const entity = (id) => { const e = this.graph.entities.get(id); if (!e) return this.graph.edges.some((x) => x.from === id || x.to === id); if (!e.sections.size) return true; for (const k of e.sections) if (section(k)) return true; return false; };
+    return { entity, section };
+  }
 
   // ---- graph operations (logged)
   link(identity, { from, to, type = 'related', why = null, client = null }) {
@@ -403,15 +560,16 @@ export class Vault extends EventEmitter {
     if (rec.type === 'tournament.match') this.tournament.applyOp(rec);
     else if (rec.type === 'contract.signed') { if (rec.data.session) this.contractSessions.set(rec.data.id, rec.data.session); }
     else if (rec.type === 'contract.verified') { if (rec.data.tasks) this.contractResults.set(rec.data.id, { at: rec.ts, ok: rec.data.ok, tasks: rec.data.tasks }); }
+    else if (rec.type === 'review') for (const it of rec.data.items) { if (rec.data.action === 'reset') this.reviews.delete(it); else this.reviews.set(it, { action: rec.data.action, until: rec.data.until || null, seq: rec.seq, ts: rec.ts }); }
     else if (rec.type === 'feedback') for (const it of rec.data.items) { const f = this.feedback.get(it) || { up: 0, down: 0 }; rec.data.useful ? f.up++ : f.down++; this.feedback.set(it, f); }
   }
 
   _replayGraph() {
     const f = path.join(this.state, 'graph.json'); const snap = readJson(f, null); let from = 1;
-    if (snap?.version === 2) { for (const e of snap.edges) this.graph.edges.push(e); for (const c of snap.claims) this.graph.claims.set(c.id, c); for (const [k, u] of snap.usage) this.graph.usage.set(k, u); this.tournament.load(snap.tournament); this.feedback = new Map(snap.feedback || []); this.contractSessions = new Map(snap.contract_sessions || []); this.contractResults = new Map(snap.contract_results || []); from = snap.seq + 1; }
-    for (const rec of this.log.iterate({ fromSeq: from })) { if (/^(graph\.|claim|usage)/.test(rec.type)) this.graph.applyOp(rec); else if (rec.type === 'tournament.match' || rec.type === 'feedback' || rec.type === 'contract.signed' || rec.type === 'contract.verified') this._applyMisc(rec); }
+    if (snap?.version === 2) { for (const e of snap.edges) this.graph.edges.push(e); for (const c of snap.claims) this.graph.claims.set(c.id, c); for (const [k, u] of snap.usage) this.graph.usage.set(k, u); this.tournament.load(snap.tournament); this.feedback = new Map(snap.feedback || []); this.reviews = new Map(snap.reviews || []); this.contractSessions = new Map(snap.contract_sessions || []); this.contractResults = new Map(snap.contract_results || []); from = snap.seq + 1; }
+    for (const rec of this.log.iterate({ fromSeq: from })) { if (/^(graph\.|claim|usage)/.test(rec.type)) this.graph.applyOp(rec); else if (rec.type === 'tournament.match' || rec.type === 'feedback' || rec.type === 'review' || rec.type === 'contract.signed' || rec.type === 'contract.verified') this._applyMisc(rec); }
   }
-  _saveGraph() { writePrivateJson(path.join(this.state, 'graph.json'), { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()], contract_sessions: [...this.contractSessions.entries()], contract_results: [...this.contractResults.entries()] }); }
+  _saveGraph() { writePrivateJson(path.join(this.state, 'graph.json'), { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()], reviews: [...this.reviews.entries()], contract_sessions: [...this.contractSessions.entries()], contract_results: [...this.contractResults.entries()] }); }
 
   status() {
     const mu = process.memoryUsage();
@@ -421,7 +579,6 @@ export class Vault extends EventEmitter {
 
 attachContracts(Vault);
 
-function jaccard(a, b) { const A = new Set(tokenize(a)), B = new Set(tokenize(b)); if (!A.size || !B.size) return 0; let i = 0; for (const x of A) if (B.has(x)) i++; return i / (A.size + B.size - i); }
 
 /** Create a new vault in `root` from the template. Idempotent. Returns the admin token when one is minted. */
 export function initVault(root, { template, port = null } = {}) {

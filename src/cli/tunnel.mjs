@@ -121,6 +121,7 @@ async function reloadDaemon(root) { const t = adminToken(root); if (!t) return f
 export async function command(cmd, pos, flags, { root }) {
   const sub = pos[0] || 'status'; const cfg = config(root);
   if (sub === 'on' || sub === 'off') {
+    if (sub === 'on' && cfg.profile === 'org' && !flags.yes) { console.log('This is an organisation install, where remote access starts off. Recalled text sent through the tunnel reaches whichever cloud AI app asked for it. To switch it on anyway: memev cloud on --yes'); return 1; }
     cfg.remote = { ...cfg.remote, enabled: sub === 'on' }; saveConfig(root, cfg);
     const live = await reloadDaemon(root);
     console.log(sub === 'on' ? 'Remote access is on. Cloud AI apps can reach this vault through the tunnel (memev cloud status shows the address).' : 'Remote access is off. Only apps on this machine can reach the vault. Turn it back on with: memev cloud on');

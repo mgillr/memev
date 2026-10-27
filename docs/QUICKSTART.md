@@ -25,7 +25,10 @@ end of each turn; each prompt gets the few memories that match it.
 ```sh
 memev status                       # is it running, how big is the vault
 memev recall "how do we deploy"    # search memory
-memev remember "We use Postgres 16 for the API" --kind decision --project api
+memev remember "We use Postgres 16 for the API" --kind decision --project api --why "logical replication"
+memev why "how do we deploy"       # why recall returned what it did
+memev review                       # memories waiting for a keep or drop decision
+memev audit                        # junk, duplicates and stale memories (changes nothing)
 memev card --project api           # the resume card an app would see
 memev claims --status fact         # what the graph holds as established
 memev doctor                       # check everything; --fix repairs what it can

@@ -12,6 +12,9 @@
 | Fact / theory / conjecture with promotion and demotion | claims with evidence; status recomputed per piece of evidence; history kept | done |
 | Explain connections | `memev_explain`: the path between two entities and the notes behind it | done |
 | Provenance | `memev_provenance`: every operation, commit and recall of a memory or claim | done |
+| Why a memory was recalled | `memev_why` / `memev why`: matched words, their share of the score, project and feedback weights, review state | done |
+| Junk kept out of memory | quality check on `memev_remember`, review dates, `memev_review` inbox, `memev audit` report | done |
+| Recall stays inside the project | hard project scope in recall, the resume card and the prompt hooks; `all_projects` to widen | done |
 | Competing answers ranked | `memev_tournament_match` / `_standings` (Elo; advance at 1050, decompose under 950) | done |
 | Recall learns from use | feedback adjusts ranking and the per-prompt bar (`.memev/tuning.json`) | partial: tuning, not yet a learned model |
 | Build requests become signed contracts | prompt hook + `memev_contract_from_request` / `_sign` / `_status` / `_verify` | done |

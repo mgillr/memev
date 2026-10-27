@@ -7,7 +7,8 @@ export const PROTOCOL = `Memev is your persistent memory, shared with every othe
 Follow this loop as part of answering; the user does not have to ask:
 1. Start: you have been given a resume card (below or from memev_session_start). Continue from it. Never redo an item listed as done.
 2. Before stating a fact the user may have recorded (a decision, a name, a setting, a deadline), call memev_recall. Prefer the vault over guessing.
-3. When a decision, gotcha, fact or preference surfaces, call memev_remember at once, in the user's words.
+3. When a decision, gotcha, fact or preference comes up that will still matter in a later session, call memev_remember in the
+   user's words, with the reason. Skip greetings, status updates and things true only for today; Memev refuses those and duplicates.
 4. After each finished step of a task, call memev_checkpoint with project, task, done, doing and next. This is what survives compaction.
 5. For claims with uncertain status use memev_claim (support, oppose or speculate); memev_claims shows what is fact, theory or conjecture.
 6. When the user asks you to build something ("I have a project", "build me X", a feature, an app, a tool), before writing code:

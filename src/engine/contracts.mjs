@@ -152,7 +152,7 @@ export function attach(Vault) {
       if (v.type === 'grep') { let t = ''; try { t = fs.readFileSync(path.join(wd, v.file), 'utf8'); } catch { return { status: 'FAIL', detail: `${v.file} is missing` }; } return new RegExp(v.pattern, v.flags || '').test(t) ? { status: 'PASS', detail: `${v.file} matches` } : { status: 'FAIL', detail: `${v.file} does not match ${v.pattern}` }; }
       return { status: 'BLOCKED', detail: `${v.type} criteria are checked by a person or CI, not here` };
     };
-    const tasks = c.tasks.map((t) => ({ id: t.id, title: t.title, criteria: t.criteria.map((cr) => ({ id: cr.id, statement: cr.statement, mandatory: cr.mandatory !== false, ...run(cr) })) }));
+    const tasks = c.tasks.map((t) => ({ id: t.id, title: t.title, criteria: t.criteria.map((cr) => ({ id: cr.id, statement: cr.statement || `${cr.verifier?.type || "check"} check`, mandatory: cr.mandatory !== false, ...run(cr) })) }));
     for (const t of tasks) t.status = t.criteria.every((cr) => !cr.mandatory || cr.status === 'PASS') ? 'PASS' : t.criteria.some((cr) => cr.mandatory && cr.status === 'FAIL') ? 'FAIL' : 'BLOCKED';
     const ok = tasks.every((t) => t.status === 'PASS');
     const remaining = tasks.filter((t) => t.status !== 'PASS').map((t) => ({ id: t.id, title: t.title, status: t.status, failing: t.criteria.filter((cr) => cr.mandatory && cr.status !== 'PASS').map((cr) => `${cr.statement}: ${cr.detail}`) }));
