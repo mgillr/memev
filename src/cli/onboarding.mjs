@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { readJson, writeJson, writePrivateJson, configDir, exists, now } from '../engine/util.mjs';
 import { config } from './common.mjs';
+import { fetchOut } from '../engine/net.mjs';
 import { loadMilestones, recordMilestones, buildReport, MILESTONES } from '../engine/milestones.mjs';
 
 const ICON = { succeeded: '\u2713', added: '+', ready: '\u2713', 'needs-manual': '\u2192', failed: '\u2717', skipped: '-' };
@@ -127,7 +128,7 @@ export function reportPayload({ root, env = process.env }) {
   return p.milestones.length ? p : null;
 }
 /** Send the report if it is on, an address is set and there is a milestone not yet reported. Never throws, never retries in a loop. */
-export async function sendReport({ root, env = process.env, fetchImpl = globalThis.fetch, timeoutMs = 3000 }) {
+export async function sendReport({ root, env = process.env, fetchImpl = (u, o) => fetchOut(u, o, env), timeoutMs = 3000 }) {
   const s = reportSettings(env);
   if (!s.enabled) return { sent: false, reason: 'off' };
   let endpoint; try { endpoint = reportEndpoint(env); } catch (e) { return { sent: false, reason: e.message }; }

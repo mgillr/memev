@@ -8,6 +8,7 @@ import { initVault, isVault, VERSION } from '../engine/vault.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
 import { writeAtomic, configDir } from '../engine/util.mjs';
 import { renderCard } from '../engine/card.mjs';
+import { fetchOut } from '../engine/net.mjs';
 
 const HELP = `memev ${VERSION}: one memory shared by every AI session you run
 
@@ -219,7 +220,7 @@ async function run(argv, env) {
     }
     case 'claims': {
       need(); const { Vault } = await import('../engine/vault.mjs');
-      if (await healthy(root)) { const r = await fetch(`http://127.0.0.1:${daemonInfo(root).port}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${clientToken(root, 'cli')}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'memev_claims', arguments: { status: flags.status, subject: flags.subject } } }) }); console.log((await r.json()).result.content[0].text); return 0; }
+      if (await healthy(root)) { const r = await fetchOut(`http://127.0.0.1:${daemonInfo(root).port}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${clientToken(root, 'cli')}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'memev_claims', arguments: { status: flags.status, subject: flags.subject } } }) }); console.log((await r.json()).result.content[0].text); return 0; }
       const v = new Vault(root, { git: false }).open(); try { json(v.claims({ agent: 'cli', scopes: ['read'], paths: ['**'] }, { status: flags.status, subject: flags.subject })); } finally { v.close(); } return 0;
     }
     case 'token': {
