@@ -6,6 +6,7 @@
 // X-Memev-Key header (the tunnel key) or a connector URL (/c/<token>/mcp). Remote requests are rate
 // limited and audited. The only unauthenticated route is GET /healthz, which says {"ok":true}.
 import http from 'node:http';
+import { verifyProof } from '../engine/devices.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { handle } from './mcp.mjs';
@@ -68,10 +69,20 @@ export function createServer(vault, { tunnelKey = () => null } = {}) {
       if (!identity) return send(401, { error: 'unauthorized', error_description: 'a valid bearer token is required' }, { 'www-authenticate': 'Bearer' });
       if (!local) {
         if (!identity.remote) return send(403, { error: 'local_token', error_description: 'this token is for this machine only; mint a cloud token: memev connect cloud' });
-        const key = tunnelKey();
-        if (!cm && (!key || !timingSafeEqualHex(String(req.headers['x-memev-key'] || ''), key))) return send(401, { error: 'tunnel_key', error_description: 'send the X-Memev-Key header, or use the connector URL' });
+        // Each remote client has its own credential (its token, registered as a device). The old
+        // shared tunnel key is no longer needed; apps set up before still send it, and a wrong one
+        // is still refused so a half-changed configuration fails loudly instead of silently.
+        const sent = req.headers['x-memev-key']; const key = tunnelKey();
+        if (sent !== undefined && !(key && timingSafeEqualHex(String(sent), key))) return send(401, { error: 'tunnel_key', error_description: 'the X-Memev-Key header does not match; it is no longer needed, so remove it' });
       }
       vault.tokens.touch(identity.id);
+      // report only: which device this is, what kind of client, and whether its credential looks shared
+      try {
+        const dev = vault.devices.get(vault.devices.byToken.get(identity.id) || '');
+        const proof = dev?.pubkey && req.headers['x-memev-sig'] ? verifyProof(dev.pubkey, { method: req.method, path: url.pathname, ts: req.headers['x-memev-ts'], sig: req.headers['x-memev-sig'] }) : null;
+        const seen = vault.devices.observe({ tokenId: identity.id, identity, local, ip: req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress, userAgent: req.headers['user-agent'], connectorUrl: !!cm, proof });
+        if (!local && seen) fs.appendFile(audit, `${JSON.stringify({ ts: now(), device: seen.device, class: seen.class, route: route.slice(0, 64) })}\n`, () => {});
+      } catch {}
       const client = String(req.headers['x-memev-client'] || identity.agent).slice(0, 40);
       const session = req.headers['x-memev-session'] ? String(req.headers['x-memev-session']).slice(0, 64) : null;
       const ctx = { identity, client, session, local };

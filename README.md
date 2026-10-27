@@ -16,6 +16,8 @@ decision made in one session is there in the next, in another app, and after a c
 - **Reachable from cloud apps.** A private tunnel is on by default so claude.ai or ChatGPT can use the
   same vault. `memev cloud off` turns it off.
 - **No dependencies, no telemetry.** Node 22 or newer, nothing else.
+- **Free on your computer, for good.** Everything above is free and unlimited for one person on one
+  computer ([CHARTER.md](CHARTER.md)).
 
 ## Start
 
@@ -38,6 +40,8 @@ See [docs/QUICKSTART.md](docs/QUICKSTART.md).
 | [Contracts](docs/CONTRACTS.md) | signed, immutable work contracts |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | `memev doctor` and common fixes |
 | [Security](SECURITY.md) and [threat model](docs/THREAT-MODEL.md) | |
+| [Charter](CHARTER.md) | the free tier is never limited |
+| [Pricing (draft)](docs/PRICING.md) | proposed paid services; nothing is enforced |
 | [Design](docs/DESIGN.md) | log, index, graph, recall, scale |
 | [Hands-off runtime](docs/MAPPING.md) | everything Memev does without being asked |
 

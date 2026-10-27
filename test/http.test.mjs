@@ -41,11 +41,13 @@ test('MCP: initialize carries the operating protocol; tools are listed; a read t
   assert.match(w.json.result.content[0].text, /forbidden/);
 });
 
-test('remote: needs a remote token plus the tunnel key (or the connector URL), and obeys the off switch', async () => {
+test('remote: needs a per-device remote token (the old shared key is optional, but checked if sent), and obeys the off switch', async () => {
   const body = { jsonrpc: '2.0', id: 1, method: 'tools/list' };
   assert.equal((await call('/mcp', { token: local, body, headers: { ...viaTunnel, 'x-memev-key': key } })).status, 403, 'local token over the tunnel');
-  assert.equal((await call('/mcp', { token: remoteTok, body, headers: viaTunnel })).status, 401, 'no tunnel key');
-  assert.equal((await call('/mcp', { token: remoteTok, body, headers: { ...viaTunnel, 'x-memev-key': key } })).status, 200);
+  assert.equal((await call('/mcp', { token: remoteTok, body, headers: viaTunnel })).status, 200, 'its own token is enough');
+  assert.equal((await call('/mcp', { token: remoteTok, body, headers: { ...viaTunnel, 'x-memev-key': 'wrong' } })).status, 401, 'a wrong legacy key is refused');
+  assert.equal((await call('/mcp', { token: remoteTok, body, headers: { ...viaTunnel, 'x-memev-key': key } })).status, 200, 'apps set up before still work');
+  assert.equal((await call('/mcp', { body, headers: viaTunnel })).status, 401, 'no token');
   assert.equal((await call(`/c/${remoteTok}/mcp`, { body, headers: viaTunnel })).status, 200, 'connector URL');
   const denied = await call(`/c/${remoteTok}/mcp`, { body: rpc('memev_get', { path: 'memory/north-star.md' }), headers: viaTunnel });
   assert.equal(denied.json.result.isError, undefined);

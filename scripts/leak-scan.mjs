@@ -38,6 +38,7 @@ function scanText(where, text, file = '') {
     for (const m of line.matchAll(/(?<![\d.])(\d{1,3}(?:\.\d{1,3}){3})(?![\d.])/g)) if (!OK_IP(m[1])) findings.push(`${where}:${i + 1}: IP address ${m[1].replace(/\.\d+\.\d+$/, '.x.x')}`);
     for (const m of line.matchAll(/(?:\/Users\/|\/home\/)([A-Za-z0-9._-]+)/g)) if (!OK_HOME.has(m[1].toLowerCase())) findings.push(`${where}:${i + 1}: personal home path`);
     if (ROOT_HOME.test(line)) findings.push(`${where}:${i + 1}: root home path`);
+    if (/-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/.test(line)) findings.push(`${where}:${i + 1}: private key`);
   });
 }
 

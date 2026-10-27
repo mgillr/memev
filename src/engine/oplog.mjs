@@ -53,16 +53,36 @@ function hashFile(file) {
   } finally { fs.closeSync(fd); }
 }
 
+export const formatHlc = ({ ms, c }) => `${String(ms).padStart(13, '0')}.${String(c).padStart(4, '0')}`;
+export function parseHlc(s) { const m = /^(\d{13})\.(\d{4,})$/.exec(String(s || '')); return m ? { ms: Number(m[1]), c: Number(m[2]) } : null; }
+/** Total order for records from several devices: clock, then device id, then seq. Records without a clock sort by ts. */
+export function compareRecords(a, b) {
+  const ha = a.hlc || `${String(Date.parse(a.ts) || 0).padStart(13, '0')}.0000`, hb = b.hlc || `${String(Date.parse(b.ts) || 0).padStart(13, '0')}.0000`;
+  return ha < hb ? -1 : ha > hb ? 1 : String(a.dev || '') < String(b.dev || '') ? -1 : String(a.dev || '') > String(b.dev || '') ? 1 : a.seq - b.seq;
+}
+
 export function recordHash(rec) {
   const { hash, ...rest } = rec; void hash;
   return sha256(JSON.stringify(rest));
 }
 
 export class OpLog {
-  constructor(dir, { segmentBytes = 16 * 1024 * 1024, snapshotEvery = 1000, fsync = true } = {}) {
+  constructor(dir, { segmentBytes = 16 * 1024 * 1024, snapshotEvery = 1000, fsync = true, deviceId = null } = {}) {
     this.dir = dir; this.segmentBytes = segmentBytes; this.snapshotEvery = snapshotEvery; this.fsync = fsync;
     this.heads = new Map(); this.seq = 0; this.sinceSnapshot = 0; this.fd = null;
+    // Each record names the device that wrote it and carries a hybrid logical clock, so logs from
+    // several devices can later be merged in a deterministic order. Records written before this
+    // (no dev, no hlc) stay valid: the hash covers only the fields a record has.
+    this.deviceId = deviceId; this.clock = { ms: 0, c: 0 };
   }
+
+  /** The next hybrid logical clock value: wall-clock milliseconds, plus a counter when time stalls or goes back. */
+  tick(nowMs = Date.now()) {
+    if (nowMs > this.clock.ms) this.clock = { ms: nowMs, c: 0 }; else this.clock = { ms: this.clock.ms, c: this.clock.c + 1 };
+    return formatHlc(this.clock);
+  }
+  /** Merge a clock seen from another device (for sync): later ticks sort after it. */
+  observeClock(hlc) { const o = parseHlc(hlc); if (!o) return; if (o.ms > this.clock.ms || (o.ms === this.clock.ms && o.c > this.clock.c)) this.clock = o; }
 
   get manifestPath() { return path.join(this.dir, 'manifest.json'); }
   get snapshotPath() { return path.join(this.dir, 'snapshot.json'); }
@@ -75,6 +95,7 @@ export class OpLog {
     let fromSeg = 0, fromOff = 0;
     if (snap && snap.version === 1) {
       this.seq = snap.seq; this.heads = new Map(Object.entries(snap.heads || {}));
+      if (snap.hlc) this.observeClock(snap.hlc);
       fromSeg = Math.max(0, this.manifest.segments.findIndex((s) => s.name === snap.active?.name));
       fromOff = snap.active?.offset || 0;
     }
@@ -103,6 +124,7 @@ export class OpLog {
 
   _apply(rec) {
     this.seq = Math.max(this.seq, rec.seq);
+    if (rec.hlc) this.observeClock(rec.hlc);
     if (rec.path) {
       if (rec.type === 'delete') this.heads.set(rec.path, { seq: rec.seq, hash: rec.hash, deleted: true });
       else this.heads.set(rec.path, { seq: rec.seq, hash: rec.hash, ch: rec.data?.ch ?? null });
@@ -113,6 +135,8 @@ export class OpLog {
   append(op) {
     if (this.fd === null) throw new Error('op log is not open');
     const rec = { seq: this.seq + 1, ts: now(), type: op.type, path: op.path ?? null, agent: op.agent ?? null, client: op.client ?? null, data: op.data ?? null, prev: op.path ? this.heads.get(op.path)?.hash ?? null : null };
+    if (this.deviceId) rec.dev = this.deviceId;
+    rec.hlc = this.tick();
     rec.hash = recordHash(rec);
     const line = `${JSON.stringify(rec)}\n`;
     fs.writeSync(this.fd, line);
@@ -136,7 +160,7 @@ export class OpLog {
   }
 
   snapshot() {
-    writeJson(this.snapshotPath, { version: 1, seq: this.seq, at: now(), active: { name: this.active.name, offset: this.active.bytes }, heads: Object.fromEntries(this.heads) }, 0o600);
+    writeJson(this.snapshotPath, { version: 1, seq: this.seq, hlc: formatHlc(this.clock), at: now(), active: { name: this.active.name, offset: this.active.bytes }, heads: Object.fromEntries(this.heads) }, 0o600);
     this._saveManifest();
     this.sinceSnapshot = 0;
   }

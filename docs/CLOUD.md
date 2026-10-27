@@ -14,9 +14,22 @@ The tunnel is chosen in this order (`memev cloud use auto|tailscale|cloudflare|q
 
 - a **connector URL** (`https://…/c/<token>/mcp`) for apps that take only a URL. It contains a
   secret: treat it like a password; `memev token revoke <id>` kills it.
-- the plain MCP URL plus the two headers apps with header support should send:
-  `Authorization: Bearer <token>` and `X-Memev-Key: <tunnel key>`.
+- the plain MCP URL plus the header apps with header support should send:
+  `Authorization: Bearer <token>`.
+
+Every app and computer has its own credential; there is no shared key. `memev devices` lists them:
+
+```sh
+memev devices                                    # computers, connectors and local apps, with last use
+memev devices enroll --kind remote-computer --label laptop    # a token for another computer
+memev devices enroll --kind cloud-connector --label chatgpt   # a token for a cloud AI app
+memev devices rotate <id>   |   memev devices revoke <id>     # replace or cut off one credential
+```
+
+A remote computer can also prove who it is with its own key: run `memev devices keygen` on it and
+enroll it with `--pubkey`. A copied configuration is then useless without that key. Apps set up
+before per-device credentials still send `X-Memev-Key`; it keeps working, but is no longer needed.
 
 Remote requests always need a token issued for remote use, are rate limited (120 a minute by
 default) and are logged to `.memev/access.jsonl`. Contract signing and admin routes are local only.
-`memev cloud rotate-key` changes the tunnel key.
+`memev cloud rotate-key` changes the legacy shared key, for apps that still send it.
