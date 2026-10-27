@@ -111,7 +111,21 @@ async function run(argv, env) {
         const { join } = await import('./remote.mjs');
         return join(invite ? [invite] : [], flags, { env });
       }
-      let tookBackup = false;
+      if (!isVault(root) && process.stdin.isTTY && process.stdout.isTTY) {
+        const readline = await import('node:readline/promises');
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        const answer = (await rl.question('Is this the first computer, or are you adding this one to an existing vault? [first/joining] ')).trim().toLowerCase();
+        rl.close();
+        const picked = /^(?:joining|join)(?:\s+(\S+))?/.exec(answer);
+        if (picked) {
+          const { join } = await import('./remote.mjs');
+          return join(picked[1] ? [picked[1]] : [], flags, { env });
+        }
+      }
+      // nothing is written until the computer can run Memev: a failed check stops here with its fix
+      const { gate } = await import('./preflight.mjs');
+      if (!(await gate({ root, env, flags }))) return 1;
+      // after the check, so a failing check leaves the home untouched (the GitHub CLI writes its own state)
       if (!isVault(root)) {
         const { findMemevBackup, cloneBackup } = await import('./github.mjs');
         const backup = findMemevBackup();
@@ -128,24 +142,9 @@ async function run(argv, env) {
           if (/^(y|yes)$/.test(answer)) {
             const cloned = cloneBackup(backup.repo, root);
             if (!cloned.ok) { console.log(`Could not clone ${backup.repo}. Init did not create a new vault.`); return 1; }
-            tookBackup = true;
           }
         }
       }
-      if (!tookBackup && !isVault(root) && process.stdin.isTTY && process.stdout.isTTY) {
-        const readline = await import('node:readline/promises');
-        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-        const answer = (await rl.question('Is this the first computer, or are you adding this one to an existing vault? [first/joining] ')).trim().toLowerCase();
-        rl.close();
-        const picked = /^(?:joining|join)(?:\s+(\S+))?/.exec(answer);
-        if (picked) {
-          const { join } = await import('./remote.mjs');
-          return join(picked[1] ? [picked[1]] : [], flags, { env });
-        }
-      }
-      // nothing is written until the computer can run Memev: a failed check stops here with its fix
-      const { gate } = await import('./preflight.mjs');
-      if (!(await gate({ root, env, flags }))) return 1;
       const fresh = !isVault(root);
       const r = initVault(root, { template: path.join(PKG, 'templates', 'vault'), port: flags.port ? Number(flags.port) : null });
       fs.mkdirSync(path.dirname(defaultVaultFile(env)), { recursive: true });
