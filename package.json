@@ -6,10 +6,11 @@
   "type": "module",
   "bin": { "memev": "bin/memev.mjs" },
   "engines": { "node": ">=22" },
-  "files": ["bin/", "src/", "templates/", "vendor/", "docs/", "LICENSE", "NOTICE", "README.md", "SECURITY.md", "CHARTER.md"],
+  "files": ["bin/", "src/", "templates/", "vendor/", "docs/", "!docs/BENCH.md", "LICENSE", "NOTICE", "README.md", "SECURITY.md", "CHARTER.md"],
   "scripts": {
     "test": "node --test --test-concurrency=4 test/*.test.mjs",
-    "leak-scan": "node scripts/leak-scan.mjs"
+    "leak-scan": "node scripts/leak-scan.mjs",
+    "bench": "node scripts/bench/run.mjs"
   },
   "keywords": ["mcp", "memory", "ai-agents", "claude-code", "markdown", "git"]
 }
