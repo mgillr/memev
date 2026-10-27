@@ -56,11 +56,11 @@ flowchart TB
 - Legal hold stops Memev from deleting; it can't stop a cloud provider keeping what it was sent
   before the hold.
 
-## Price (draft)
+## Price
 
-Contact us for a quote. Typical parts: private deployment from $6,000/year; onboarding from $12,000; compliance
-pack $5,000 once or $15,000/year; named engineer $1,950/month or embedded engineer $6,500/month;
-custom development $1,600/day. See [services.md](services.md).
+Priced on your requirements: contact us. A quote usually covers onboarding, a private deployment
+if we run it for you, a compliance pack, a named or embedded engineer and any custom development.
+See [services.md](services.md).
 
 ## Setup
 

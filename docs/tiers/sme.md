@@ -86,28 +86,21 @@ through an MCP server your team runs, with a read-only database user.
 
 ### Hardware
 
-| Machine | Suggested spec | Rough cost |
+| Machine | Suggested spec | Notes |
 |---|---|---|
-| Hub | 4 to 8 CPU cores, 16 to 32 GB RAM, 500 GB SSD, Linux. A small VM is enough: one Memev process used 160 MB of heap after a 170-million-token growth test. | existing server, or about $1,500 |
-| Local model, small | one 24 GB GPU (for example RTX 4090 or L4), 64 GB RAM, 1 TB NVMe. Runs 7B to 14B models with Ollama for a few people at a time. | $3,000 to $5,000 |
-| Local model, larger | one or two 48 GB GPUs (for example RTX 6000 Ada or L40S), 128 GB RAM. Runs 30B to 70B quantised models with vLLM for several people at once. | $10,000 to $20,000 |
+| Hub | 4 to 8 CPU cores, 16 to 32 GB RAM, 500 GB SSD, Linux. A small VM is enough: one Memev process used 160 MB of heap after a 170-million-token growth test. | an existing server is usually enough |
+| Local model, small | one 24 GB GPU (for example RTX 4090 or L4), 64 GB RAM, 1 TB NVMe. Runs 7B to 14B models with Ollama for a few people at a time. | a workstation-class machine |
+| Local model, larger | one or two 48 GB GPUs (for example RTX 6000 Ada or L40S), 128 GB RAM. Runs 30B to 70B quantised models with vLLM for several people at once. | a server-class machine |
 | Backup | your company's GitHub organisation, or a git server on your network | existing |
 
 These are starting points. Test the model you choose with your own work before buying.
 
 ### Cost for this example (draft)
 
-| Item | Draft price |
-|---|---|
-| Business subscription, 20 computers | contact us for a quote |
-| Remote setup: hub, sign-in, departments, computers, backup | $2,500 once |
-| Remote setup including the local model server and sensitivity rules | $3,500 once (instead of $2,500) |
-| Business support plan | quoted with the subscription |
-| Admin training day (optional) | $2,400 |
-| Hardware | yours; see above |
-
-First year, with the local model setup and support: $3,500 for setup, plus the quote for the
-subscription and support, plus hardware.
+Priced on your requirements: contact us for a quote. The quote covers the Business subscription for
+20 computers, remote setup (the hub, sign-in, departments, computers and backup, with or without the
+local model server and sensitivity rules), the support plan, and an admin training day if you want
+one. Hardware is yours; see above.
 
 ## What's included
 
