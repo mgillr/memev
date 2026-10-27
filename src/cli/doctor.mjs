@@ -81,37 +81,19 @@ export function busChecks({ root, vault = null, connected = [] }) {
   return r;
 }
 
-/** Ports on this machine's loopback that something is listening on. */
-function loopbackListenPorts() {
-  const ports = new Set();
-  if (process.platform === 'linux') {
-    for (const file of ['/proc/net/tcp', '/proc/net/tcp6']) {
-      let text = '';
-      try { text = fs.readFileSync(file, 'utf8'); } catch { continue; }
-      for (const line of text.split('\n').slice(1)) {
-        const cols = line.trim().split(/\s+/);
-        if (cols.length < 4 || cols[3] !== '0A') continue;
-        const [addr, portHex] = cols[1].split(':');
-        const loop = addr === '0100007F' || addr === '00000000000000000000000001000000';
-        if (loop) ports.add(parseInt(portHex, 16));
-      }
-    }
-    return [...ports];
-  }
-  const listed = spawnSync('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN'], { encoding: 'utf8' });
-  for (const line of (listed.stdout || '').split('\n')) {
-    const hit = /127\.0\.0\.1:(\d+) \(LISTEN\)/.exec(line);
-    if (hit) ports.add(Number(hit[1]));
-  }
-  return [...ports];
+/** The next ports above this vault. A second vault started because the preferred port was taken lands here. */
+function nearbyPorts(minePort) {
+  const base = Number(minePort) || 7787;
+  const ports = [];
+  for (let p = base + 1; p < Math.min(base + 100, 65536); p++) ports.push(p);
+  return ports;
 }
 
 /** Another Memev on this computer, seen by its /healthz vault id. Empty when this is the only one. */
 async function twoVaultChecks(root) {
   const mine = config(root).vault_id;
   if (!mine || !isVault(root)) return [];
-  const minePort = daemonInfo(root)?.port || null;
-  const ports = loopbackListenPorts().filter((p) => p >= 1024 && p !== minePort);
+  const ports = nearbyPorts(daemonInfo(root)?.port || config(root).port);
   const found = [];
   for (let i = 0; i < ports.length; i += 16) {
     const rows = await Promise.all(ports.slice(i, i + 16).map(async (port) => {
