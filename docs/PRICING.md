@@ -39,6 +39,13 @@ counts from the moment it is enrolled until it is removed with `memev devices re
 frees the seat at once. Phones and tablets that use a cloud AI app are covered by the connector
 allowance.
 
+## Support (draft)
+
+Free: community help, best effort. Personal and Team: priority support, which starts from
+`memev doctor --bundle`, the one file that tells support what it needs, with no secrets in it. How it
+works and what the file holds: [SUPPORT.md](SUPPORT.md). Business and Enterprise support plans, with
+response times, are under [Services](#services-draft).
+
 ## Services (draft)
 
 Setup (remote or onsite), support plans, a named or embedded engineer, custom development, a private
