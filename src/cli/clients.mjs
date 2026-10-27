@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { configDir, homeDir, exists, readJson, writeJson, writeAtomic, sha256, now } from '../engine/util.mjs';
 import { VERSION } from '../engine/vault.mjs';
+import { changeJsonc } from '../engine/jsonc.mjs';
 import { out } from './common.mjs';
 
 const BLOCK_START = '<!-- memev:start -->', BLOCK_END = '<!-- memev:end -->';
@@ -163,10 +164,15 @@ function plan(def) {
     const before = readBytes(e.file);
     let after;
     if (e.kind === 'json') {
+      const text = before ? before.toString('utf8') : '';
       let obj = {};
-      if (before && before.toString('utf8').trim()) { try { obj = JSON.parse(before.toString('utf8')); } catch { return { error: `${e.file} is not plain JSON (comments?); add Memev by hand: see docs/CLIENTS.md` }; } }
-      if (typeof obj !== 'object' || Array.isArray(obj) || obj === null) return { error: `${e.file} is not a JSON object` };
-      after = Buffer.from(`${JSON.stringify(e.apply(obj), null, 2)}\n`);
+      if (text.trim()) { try { obj = JSON.parse(text); } catch { obj = undefined; } }
+      if (obj === undefined) { // comments or trailing commas (VS Code, Zed): change the text in place, so they stay
+        try { after = Buffer.from(changeJsonc(text, e.apply)); } catch (err) { return { error: `${e.file} ${err.message}; add Memev by hand: see docs/CLIENTS.md` }; }
+      } else {
+        if (typeof obj !== 'object' || Array.isArray(obj) || obj === null) return { error: `${e.file} is not a JSON object` };
+        after = Buffer.from(`${JSON.stringify(e.apply(obj), null, 2)}\n`);
+      }
     } else after = Buffer.from(e.apply(before ? before.toString('utf8') : ''));
     changes.push({ e, before, after });
   }
@@ -214,7 +220,11 @@ export function disconnect(id, { env = process.env, launcher, decline = true, pl
     } else if (cur && def) {
       const e = def.edits().find((x) => x.file === file);
       let next;
-      if (e.kind === 'json') { try { next = `${JSON.stringify(e.remove(JSON.parse(cur.toString('utf8'))), null, 2)}\n`; } catch { results.push({ file, action: 'needs-manual' }); continue; } }
+      if (e.kind === 'json') {
+        const text = cur.toString('utf8'); let obj;
+        try { obj = JSON.parse(text); } catch {}
+        try { next = obj === undefined ? changeJsonc(text, e.remove) : `${JSON.stringify(e.remove(obj), null, 2)}\n`; } catch { results.push({ file, action: 'needs-manual' }); continue; }
+      }
       else next = e.remove(cur.toString('utf8'));
       if (!rec.existed && (next.trim() === '{}' || next.trim() === '')) fs.rmSync(file, { force: true });
       else writeAtomic(file, next, fs.statSync(file).mode & 0o777);

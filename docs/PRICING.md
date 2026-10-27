@@ -1,37 +1,43 @@
 # Pricing and licensing: DRAFT
 
-> **DRAFT. Not an offer and not in force.** Prices, tiers and licence terms below are proposals.
-> Only Free and Personal have a set price. Everything else is priced on your requirements: contact us.
-> One thing is enforced: how many computers can use one vault, from the licence. Connectors are
-> counted, not limited, and one computer with no licence gets everything
-> ([CHARTER.md](../CHARTER.md)). Memev is licensed under Apache-2.0 today. Any licence change for
-> future releases awaits legal review.
+> **DRAFT. Not an offer and not in force.** The list below is the current table.
+> Self-serve checkout is Personal only, through Stripe, in test mode first. The checkout program
+> reads product ids, prices and the computer cap from config.
+> Team and Business have a list price and stay contact us until the features they need are built.
+> Enterprise is contact us. Hosted features are planned, with no date. There is no trial.
+> What the licence enforces today is how many computers can use one vault. One computer with no
+> licence gets the Free tier ([CHARTER.md](../CHARTER.md)). Memev is licensed under Apache-2.0
+> today. Any licence change for future releases awaits legal review.
 
 ## Tiers (draft)
 
-| | Free | Personal | Team | Office | Business (planned) | Enterprise |
-|---|---|---|---|---|---|---|
-| Price | free | $15/month or $144/year | contact us | contact us | contact us | contact us |
-| Computers using one vault | 1 | up to 4 (+$4/month each) | per computer, at least 3 | 10 or 25 | 10 to 50, in blocks of 10 | based on your requirements |
-| Local AI apps on a computer | unlimited | unlimited | unlimited | unlimited | unlimited | unlimited |
-| Cloud AI connectors | 5 | 10 | 5 per computer | 50 or 125 | 50 per 10 computers | based on your requirements |
-| Vault, recall, graph, contracts, doctor, your own tunnel | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Backup to your own GitHub (one writer) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Hosted end-to-end encrypted sync between computers | | ✓ | ✓ | ✓ | | ✓ or self-hosted |
-| Hosted encrypted backup and a stable relay address | | ✓ | ✓ | ✓ | | ✓ or self-hosted |
-| One shared vault for a team, member keys, provenance | | | ✓ | ✓ | ✓ | ✓ |
-| Company hub on your server, departments and roles from an org chart | | | | | ✓ | ✓ |
-| Sign-in with Google Workspace or Microsoft Entra ID | | | | | ✓ | ✓ |
-| Restricted notes served only to a local model, egress log | | | | | ✓ | ✓ |
-| SCIM, SIEM and audit export, retention, legal hold, high availability | | | | | | ✓ |
+| | Free | Personal | Team | Business | Enterprise |
+|---|---|---|---|---|---|
+| Price | free | $15/month or $144/year | $18/seat/month billed yearly ($216/seat/year), or $22/seat/month billed monthly. Contact us until member keys ship. | $24/seat/month billed yearly, setup quoted. Contact us. | contact us |
+| People | 1 | 1, non-transferable | 2 to 20 | from 10 | contact us |
+| Computers using one vault | 1 | up to 3 | 3 per seat, pooled | 3 per seat, pooled | based on your requirements |
+| Local AI apps on a computer | unlimited | unlimited | unlimited | unlimited | unlimited |
+| Cloud AI connectors | 5 | 10 | 10 per seat, pooled | based on your requirements | based on your requirements |
+| Vault, recall, graph, contracts, doctor, your own tunnel | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Backup to your own GitHub (one writer) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Hosted end-to-end encrypted sync between computers | | planned | planned | | planned, or self-hosted |
+| Hosted encrypted backup and a stable relay address | | planned | planned | | planned, or self-hosted |
+| One shared vault for a team, member keys, provenance | | | planned | ✓ | ✓ |
+| Company hub on your server, departments and roles from an org chart | | | | planned | planned |
+| Sign-in with Google Workspace or Microsoft Entra ID | | | | planned | planned |
+| Restricted notes served only to a local model, egress log | | | | planned | planned |
+| SCIM, SIEM and audit export, retention, legal hold, high availability | | | | | planned |
 
-Business is the tier for a company that runs its own hub; Office is several computers sharing one
-vault without a hub. Hosted sync and the hosted relay are not part of Business because its hub runs
-on the company's server. Sync, the relay, the hub, sign-in, roles, labels and the egress log are
-planned, not built; see [tiers/](tiers/README.md) for what each tier includes and how it is set up.
+Personal and Team prices are early-supporter prices: the price stays locked for as long as the
+subscription runs, and it is labelled that way while sync and the relay are planned. Team and
+Business overlap at 10 to 20 people on purpose. You choose by need (a hub, sign-in, roles), not by
+size. Office is not a tier. Hosted sync and the hosted relay are not part of Business, because its
+hub runs on the company's server. Sync, the relay, the hub, sign-in, roles, labels and the egress
+log are planned, not built, and no date is given. See [tiers/](tiers/README.md) for how each tier
+is set up.
 
-For Team, Office, Business and Enterprise the number of computers comes from the licence you are
-issued.
+A Team licence count is seats times 3. For Team, Business and Enterprise the number of computers
+comes from the licence you are issued.
 
 **A computer** is a machine that runs its own copy of the vault, or whose AI apps reach a vault
 remotely (through a tunnel or relay). The vault's own computer is one of them. Each added computer
@@ -43,8 +49,9 @@ allowance.
 
 Free: community help, best effort. Personal and Team: priority support, which starts from
 `memev doctor --bundle`, the one file that tells support what it needs, with no secrets in it. How it
-works and what the file holds: [SUPPORT.md](SUPPORT.md). Business and Enterprise support plans, with
-response times, are under [Services](#services-draft).
+works and what the file holds: [SUPPORT.md](SUPPORT.md). Business and Enterprise service agreements
+are under [Services for Business and Enterprise](#services-for-business-and-enterprise). Prices there
+are quoted.
 
 ## Services (draft)
 
@@ -52,6 +59,25 @@ Setup (remote or onsite), support plans, a named or embedded engineer, custom de
 deployment we run for you, a compliance pack and training. All of them are priced on your
 requirements: contact us. Onsite work has travel billed on top. What each one covers, timelines and
 response times are in [tiers/services.md](tiers/services.md).
+
+## Services for Business and Enterprise
+
+These are for Business and Enterprise. Each price is quoted.
+
+**Service agreements**
+
+- Standard: business-hours support. Quoted.
+- Priority support. Quoted.
+- 24/7 support with a critical-issue response target. Quoted.
+
+**Onboarding**
+
+- Remote setup package. Quoted.
+- In-person setup. Quoted.
+
+**Training and workshops.** Quoted.
+
+**Managed hosting** is an option. Quoted.
 
 ## How the computer limit works
 
@@ -91,7 +117,7 @@ leaves no file, and the command prints why. After that the licence is checked of
 
 - **Free:** one computer, no licence, no network needed.
 - **Personal:** as in the table, with the number of computers in the licence.
-- **Team, Office, Business and Enterprise:** the number of computers in the licence.
+- **Team, Business and Enterprise:** the number of computers in the licence. A Team licence count is seats times 3.
 
 When a licence lapses, its grace period (14 days unless the licence says otherwise) keeps
 everything working, and computers can still be added. After the grace period no computer can be
