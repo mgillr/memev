@@ -26,7 +26,7 @@ export function platformDirs(env = process.env) {
 }
 
 const isOurs = (cmd) => typeof cmd === 'string' && /memev/.test(cmd) && / hook /.test(cmd);
-const hookCmd = (prefix, event, client, format) => `${prefix} hook ${event} --client ${client}${format ? ` --format ${format}` : ''}`;
+const hookCmd = (launcher, event, client, format) => `${launcher} hook ${event} --client ${client}${format ? ` --format ${format}` : ''}`;
 
 // Since Node's CVE-2024-27980 fix, a Node app cannot spawn a .cmd file without a shell. On win32 the
 // registered command is the absolute node.exe with the runtime script as its first argument, never the
@@ -90,41 +90,41 @@ const text = (file, apply, remove) => ({ file, kind: 'text', apply, remove });
 const mdBlock = (file) => text(file, (t) => addBlock(t, INSTRUCTIONS), (t) => removeBlock(t));
 
 /** The apps Memev knows. mode: 'hooks' = state injected by hooks; 'instructions' = MCP + instructions only. */
-export function clientDefs(env, launcher, platform = process.platform) {
+export function clientDefs(env, bin, platform = process.platform) {
   const { home, appData } = platformDirs(env);
   const win = winSpawn(env, platform);
-  const prefix = win ? `"${win.node}" "${win.script}"` : `"${launcher}"`;
-  const stdio = (id) => win ? { command: win.node, args: [win.script, 'mcp', '--client', id] } : { command: launcher, args: ['mcp', '--client', id] };
+  const launcher = win ? `"${win.node}" "${win.script}"` : `"${bin}"`;
+  const stdio = (id) => win ? { command: win.node, args: [win.script, 'mcp', '--client', id] } : { command: bin, args: ['mcp', '--client', id] };
   const defs = [
     { id: 'claude-code', name: 'Claude Code', mode: 'hooks', detect: () => exists(path.join(home, '.claude')) || exists(path.join(home, '.claude.json')),
       edits: () => [
         json(path.join(home, '.claude.json'), setServer('mcpServers', { type: 'stdio', ...stdio('claude-code') }), delServer('mcpServers')),
         json(path.join(home, '.claude', 'settings.json'), (j) => setGroupHooks(j, {
-          SessionStart: { matcher: 'startup|resume|clear|compact', command: hookCmd(prefix, 'session-start', 'claude-code'), timeout: 10 },
-          UserPromptSubmit: { command: hookCmd(prefix, 'prompt', 'claude-code'), timeout: 10 },
-          PreCompact: { command: hookCmd(prefix, 'pre-compact', 'claude-code'), timeout: 15 },
-          Stop: { command: hookCmd(prefix, 'stop', 'claude-code'), timeout: 10 },
+          SessionStart: { matcher: 'startup|resume|clear|compact', command: hookCmd(launcher, 'session-start', 'claude-code'), timeout: 10 },
+          UserPromptSubmit: { command: hookCmd(launcher, 'prompt', 'claude-code'), timeout: 10 },
+          PreCompact: { command: hookCmd(launcher, 'pre-compact', 'claude-code'), timeout: 15 },
+          Stop: { command: hookCmd(launcher, 'stop', 'claude-code'), timeout: 10 },
         }), removeGroupHooks),
         mdBlock(path.join(home, '.claude', 'CLAUDE.md')),
       ] },
     { id: 'codex', name: 'Codex CLI', mode: 'hooks', detect: () => exists(path.join(home, '.codex')),
       edits: () => [
-        text(path.join(home, '.codex', 'config.toml'), (t) => addBlock(t, `${TOML_START}\n[mcp_servers.memev]\ncommand = ${tomlEsc(win ? win.node : launcher)}\nargs = [${[...(win ? [win.script] : []), 'mcp', '--client', 'codex'].map(tomlEsc).join(', ')}]\n${TOML_END}`, [TOML_START, TOML_END]), (t) => removeBlock(t, [TOML_START, TOML_END])),
+        text(path.join(home, '.codex', 'config.toml'), (t) => addBlock(t, `${TOML_START}\n[mcp_servers.memev]\ncommand = ${tomlEsc(win ? win.node : bin)}\nargs = [${[...(win ? [win.script] : []), 'mcp', '--client', 'codex'].map(tomlEsc).join(', ')}]\n${TOML_END}`, [TOML_START, TOML_END]), (t) => removeBlock(t, [TOML_START, TOML_END])),
         json(path.join(home, '.codex', 'hooks.json'), (j) => setGroupHooks(j, {
-          SessionStart: { matcher: 'startup|resume|clear|compact', command: hookCmd(prefix, 'session-start', 'codex'), timeout: 10 },
-          UserPromptSubmit: { command: hookCmd(prefix, 'prompt', 'codex'), timeout: 10 },
-          PreCompact: { command: hookCmd(prefix, 'pre-compact', 'codex'), timeout: 15 },
-          Stop: { command: hookCmd(prefix, 'stop', 'codex'), timeout: 10 },
+          SessionStart: { matcher: 'startup|resume|clear|compact', command: hookCmd(launcher, 'session-start', 'codex'), timeout: 10 },
+          UserPromptSubmit: { command: hookCmd(launcher, 'prompt', 'codex'), timeout: 10 },
+          PreCompact: { command: hookCmd(launcher, 'pre-compact', 'codex'), timeout: 15 },
+          Stop: { command: hookCmd(launcher, 'stop', 'codex'), timeout: 10 },
         }), removeGroupHooks),
         mdBlock(path.join(home, '.codex', 'AGENTS.md')),
       ], manual: 'Codex asks you to trust new hooks once: open /hooks in Codex and trust the Memev hooks.' },
     { id: 'gemini-cli', name: 'Gemini CLI', mode: 'hooks', detect: () => exists(path.join(home, '.gemini')),
       edits: () => [
         json(path.join(home, '.gemini', 'settings.json'), (j) => setGroupHooks(setServer('mcpServers', stdio('gemini-cli'))(j), {
-          SessionStart: { matcher: '*', command: hookCmd(prefix, 'session-start', 'gemini-cli', 'gemini'), timeout: 10000 },
-          BeforeAgent: { matcher: '*', command: hookCmd(prefix, 'prompt', 'gemini-cli', 'gemini'), timeout: 10000 },
-          PreCompress: { matcher: '*', command: hookCmd(prefix, 'pre-compact', 'gemini-cli', 'gemini'), timeout: 15000 },
-          AfterAgent: { matcher: '*', command: hookCmd(prefix, 'stop', 'gemini-cli', 'gemini'), timeout: 10000 },
+          SessionStart: { matcher: '*', command: hookCmd(launcher, 'session-start', 'gemini-cli', 'gemini'), timeout: 10000 },
+          BeforeAgent: { matcher: '*', command: hookCmd(launcher, 'prompt', 'gemini-cli', 'gemini'), timeout: 10000 },
+          PreCompress: { matcher: '*', command: hookCmd(launcher, 'pre-compact', 'gemini-cli', 'gemini'), timeout: 15000 },
+          AfterAgent: { matcher: '*', command: hookCmd(launcher, 'stop', 'gemini-cli', 'gemini'), timeout: 10000 },
         }), (j) => removeGroupHooks(delServer('mcpServers')(j))),
         mdBlock(path.join(home, '.gemini', 'GEMINI.md')),
       ] },
@@ -132,10 +132,10 @@ export function clientDefs(env, launcher, platform = process.platform) {
       edits: () => [
         json(path.join(home, '.cursor', 'mcp.json'), setServer('mcpServers', stdio('cursor')), delServer('mcpServers')),
         json(path.join(home, '.cursor', 'hooks.json'), (j) => setFlatHooks(j, {
-          sessionStart: hookCmd(prefix, 'session-start', 'cursor', 'cursor'),
-          beforeSubmitPrompt: hookCmd(prefix, 'prompt', 'cursor', 'cursor'),
-          preCompact: hookCmd(prefix, 'pre-compact', 'cursor', 'cursor'),
-          stop: hookCmd(prefix, 'stop', 'cursor', 'cursor'),
+          sessionStart: hookCmd(launcher, 'session-start', 'cursor', 'cursor'),
+          beforeSubmitPrompt: hookCmd(launcher, 'prompt', 'cursor', 'cursor'),
+          preCompact: hookCmd(launcher, 'pre-compact', 'cursor', 'cursor'),
+          stop: hookCmd(launcher, 'stop', 'cursor', 'cursor'),
         }), removeFlatHooks),
       ], note: 'Cursor injects the resume card at session start; per-prompt recall and post-compaction state come through the MCP instructions (Cursor hooks cannot add context to a prompt).' },
     { id: 'claude-desktop', name: 'Claude Desktop', mode: 'instructions', detect: () => exists(path.join(appData, 'Claude')),
