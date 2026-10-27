@@ -4,7 +4,8 @@
 // header and names a loopback host; everything else (a tunnel, a proxy, another machine) is remote.
 // Remote requests need: remote access switched on, a token minted for remote use, and either the
 // X-Memev-Key header (the tunnel key) or a connector URL (/c/<token>/mcp). Remote requests are rate
-// limited and audited. The only unauthenticated route is GET /healthz, which says {"ok":true}.
+// limited and audited. The only unauthenticated route is GET /healthz, which says {"ok":true} (and, to a direct
+// local caller, the vault's id).
 // Another computer must sign every request with its own device key; a cloud connector credential
 // must not be used from a computer. Computers over the licence's seat count, or on a lapsed
 // licence, can read but not write (src/engine/entitlements.mjs).
@@ -77,7 +78,8 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
     const local = isDirectLocal(req);
     let raw = null; const getBody = async () => (raw ??= await readBody(req));
     try {
-      if (req.method === 'GET' && url.pathname === '/healthz') return send(200, local ? { ok: true, name: 'memev', version: VERSION } : { ok: true });
+      // a local caller also gets the vault's id, so the CLI can tell this vault's daemon from another one on the same port
+      if (req.method === 'GET' && url.pathname === '/healthz') return send(200, local ? { ok: true, name: 'memev', version: VERSION, vault_id: vault.config?.vault_id ?? null } : { ok: true });
       let token = null; let route = url.pathname;
       const cm = /^\/c\/(mv_[0-9a-f]{8}_[0-9a-f]{32,})(\/.*)$/.exec(url.pathname);
       if (cm) { token = cm[1]; route = cm[2]; }

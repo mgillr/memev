@@ -3,10 +3,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { PKG, api, daemonInfo, pidAlive } from './common.mjs';
+import { PKG, api, daemonInfo, pidAlive, config } from './common.mjs';
 
+// Healthy means this vault's daemon answers: {"ok":true} and the vault_id in this vault's config.json. Anything else on
+// the port, another vault's daemon or any other service, is not healthy for this vault.
 export async function healthy(root, port = null) {
-  try { const r = await api(root, '/healthz', { method: 'GET', timeoutMs: 800, port }); return r.ok && r.json?.ok === true; } catch { return false; }
+  try {
+    const r = await api(root, '/healthz', { method: 'GET', timeoutMs: 800, port });
+    if (!(r.ok && r.json?.ok === true)) return false;
+    const want = config(root).vault_id;
+    return !want || r.json.vault_id === want;
+  } catch { return false; }
 }
 
 export async function ensureDaemon(root, { quiet = false, waitMs = 6000 } = {}) {
