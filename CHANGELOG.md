@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `memev upgrade` prints the checkout URL from this vault's config. Checkout is Stripe in test mode: Personal is $15/month or $144/year, up to 3 computers. The licence email From address is `MEMEV_LICENCE_FROM`, and the licence endpoint URL is configuration. No address, host, or IP is built in.
+- `memev upgrade` prints the checkout URL from this vault's config. Checkout is Stripe in test mode. Product ids, prices, and the computer cap come from config. The licence email From address is `MEMEV_LICENCE_FROM`, and the licence endpoint URL is configuration. No address, host, or IP is built in.
 - Windows is stated as a preview in the README and the quickstart, with what differs there: where Memev keeps its files, the user PATH, the access-list privacy check and no start at login yet. The lab plan has a Windows 11 section (T-WIN-01 to T-WIN-09).
 - `memev bus roster --card` prints a short, shareable summary of your AI team: the apps and the seat count, with no paths, tokens, names or machine names.
 - The rules every session follows are now a lean text of under 200 tokens (from 562), sent once per session: by the session-start hook in apps that have one, otherwise in the MCP instructions. The CLAUDE.md, AGENTS.md and GEMINI.md block points at them instead of repeating them, and the no-lead notice stops once the setup session has asked. The fixed cost of a session in an app with hooks falls from about 1,800 to about 820 tokens.

@@ -1,7 +1,7 @@
 # Checkout
 
 > **DRAFT. Not an offer and not in force.** Self-serve checkout is Stripe, in test mode only.
-> Nothing is live. Personal is $15/month or $144/year, up to 3 computers, all included.
+> Nothing is live. Product ids, prices, and the computer cap come from config.
 > The licence email From address comes from deployment config (`MEMEV_LICENCE_FROM`).
 > The licence endpoint URL comes from config. This repository contains no address, host, or IP.
 
@@ -39,7 +39,6 @@ free tier, the same as `memev license remove`. A refund does not need a second c
 ## Decided
 
 - Payment provider: Stripe, in test mode only. Nothing is live.
-- Personal: $15/month or $144/year, up to 3 computers, all included. There is no per-computer add-on.
-- Free stays free. Team and above stay contact us.
+- Product ids, prices, and the computer cap come from config. They are not written here.
 - The licence email From address is `MEMEV_LICENCE_FROM` in deployment config. No address is stored here.
 - The licence endpoint URL is configuration. No host or IP is stored here.

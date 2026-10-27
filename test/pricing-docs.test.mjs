@@ -11,8 +11,8 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const walk = (d) => fs.readdirSync(path.join(ROOT, d), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith('.md') ? [path.join(d, e.name)] : []));
 const DOCS = ['README.md', 'CHARTER.md', 'SECURITY.md', ...walk('docs')];
-// The Personal tier: $15/month or $144/year, up to 3 computers. No per-computer add-on.
-const ALLOWED = new Set(['$15/month', '$144/year']);
+// The Personal tier: $15/month or $144/year, +$4/month for each extra computer.
+const ALLOWED = new Set(['$15/month', '$144/year', '$4/month']);
 const MONEY = /[$€£]\s?\d[\d,.]*(?:k\b)?(?:\/(?:month|year|day))?|\b\d[\d,.]*\s?(?:USD|EUR|GBP|dollars?)\b/gi;
 
 test('the docs show no money figure except the Free and Personal prices', () => {
@@ -26,7 +26,7 @@ test('the docs show no money figure except the Free and Personal prices', () => 
 test('Free and Personal keep their prices; the other tiers say contact us', () => {
   const row = read('docs/PRICING.md').split('\n').find((l) => l.startsWith('| Price |')).split('|').map((c) => c.trim()).filter(Boolean);
   assert.deepEqual(row, ['Price', 'free', '$15/month or $144/year', 'contact us', 'contact us', 'contact us', 'contact us']);
-  assert.match(read('docs/PRICING.md'), /up to 3/);
+  assert.match(read('docs/PRICING.md'), /up to 4 \(\+\$4\/month each\)/);
   assert.match(read('docs/tiers/free.md'), /\$15\/month or \$144\/year/);
 });
 

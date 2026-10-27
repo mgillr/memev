@@ -12,7 +12,7 @@
 | | Free | Personal | Team | Office | Business (planned) | Enterprise |
 |---|---|---|---|---|---|---|
 | Price | free | $15/month or $144/year | contact us | contact us | contact us | contact us |
-| Computers using one vault | 1 | up to 3 | per computer, at least 3 | 10 or 25 | 10 to 50, in blocks of 10 | based on your requirements |
+| Computers using one vault | 1 | up to 4 (+$4/month each) | per computer, at least 3 | 10 or 25 | 10 to 50, in blocks of 10 | based on your requirements |
 | Local AI apps on a computer | unlimited | unlimited | unlimited | unlimited | unlimited | unlimited |
 | Cloud AI connectors | 5 | 10 | 5 per computer | 50 or 125 | 50 per 10 computers | based on your requirements |
 | Vault, recall, graph, contracts, doctor, your own tunnel | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
