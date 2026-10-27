@@ -7,7 +7,7 @@ import { isVault } from '../engine/vault.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { git } from '../engine/git.mjs';
-import { fileOf, label } from '../engine/bus.mjs';
+import { commsCheckView, commsCredentialFailure, fileOf, label } from '../engine/bus.mjs';
 
 // ---- setting the bus up: init, connect and the doctor share this
 // Every app that is found gets a seat at once. The lead (operator) seat is always the person's
@@ -121,12 +121,18 @@ export async function command(cmd, pos, flags, { root, env }) {
     return 0;
   }
   if (sub === 'check') {
-    const r = await call('bus_check', { to: flags.to || 'all', timeout_s: Number(flags.timeout ?? 20) });
+    let r;
+    try { r = await call('bus_check', { to: flags.to || 'all', timeout_s: Number(flags.timeout ?? 20) }); }
+    catch (e) {
+      const fail = commsCredentialFailure(e);
+      if (!fail) throw e;
+      for (const l of fail.lines) console.log(l);
+      return fail.code;
+    }
     if (flags.json) { json(r); return 0; }
-    console.log(`Comms check ${r.check}: ${r.answered.length} answered, ${r.missing.length} did not (waited ${Math.round(r.waited_ms / 1000)} s)`);
-    for (const a of r.answered) out.ok(`${a.seat} (${a.after_ms} ms)`);
-    for (const m of r.missing) out.bad(`${m.seat || `computer ${m.device}`}: ${m.reason}`);
-    return r.missing.some((m) => m.state === 'live') ? 1 : 0;
+    const view = commsCheckView(r);
+    for (const l of view.lines) console.log(l);
+    return view.code;
   }
   if (sub === 'send') {
     const [, to, type, ...text] = pos;

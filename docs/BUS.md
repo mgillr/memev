@@ -76,7 +76,8 @@ From the operator session (Claude Code, say), ask it to:
 - show the roster (`bus_roster`): every seat and licensed computer, with its state, when it was
   last seen, its last message, what it has claimed and any hold;
 - run a comms check (`bus_check`): it posts a check, waits up to 25 seconds and lists who answered
-  and why the others didn't;
+  (a tick), who is ready and answers on the next turn (a filled circle), and who has not opened the
+  app yet (an open circle, with the app to open). It exits 1 only when a credential is rejected.
 - assign a task (`bus_send`, type task, to a seat or all). The assignee claims it (type claim, ref =
   the task id) and restates it in its own words, so you can catch a misunderstanding early. One seat
   claims a task;

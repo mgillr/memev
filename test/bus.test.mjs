@@ -10,7 +10,7 @@ import { sandbox, mcpClient } from './helpers/cli.mjs';
 import { signLicense, loadLicense } from '../src/engine/license.mjs';
 import { seatPolicy } from '../src/engine/entitlements.mjs';
 import { deviceKeygen } from '../src/engine/devices.mjs';
-import { Bus } from '../src/engine/bus.mjs';
+import { Bus, commsCheckView, commsCredentialFailure } from '../src/engine/bus.mjs';
 import { createServer } from '../src/server/http.mjs';
 import { remoteFetch, deviceKeyFile } from '../src/cli/remote.mjs';
 import { writePrivate } from '../src/engine/util.mjs';
@@ -211,6 +211,54 @@ test('a comms check reports who answered and why the others did not', async (t) 
     assert.equal(codex.state, 'stale'); assert.match(codex.reason, /offline: last heartbeat 60 min ago/);
     assert.ok(r.waited_ms < 2500, 'it stops waiting once every live seat answered');
   } finally { s.close(); }
+});
+
+test('MEM-031 AC02: a live seat that has not answered is ready, not failed', async () => {
+  const s = await vaultServer();
+  try {
+    const host = s.v.devices.get(s.v.host.id);
+    const ctx = (client) => ({ identity: { scopes: ['read', 'write'], paths: ['**'] }, client, device: host, local: true });
+    s.v.bus.register({ client: 'cursor', device: host });
+    s.v.bus.register({ client: 'codex', device: host });
+    s.v.bus.pulse(ctx('cursor'));
+    s.v.bus.pulse(ctx('codex'));
+    const r = await s.v.bus.check(ctx('codex'), { timeout_s: 0 });
+    const view = commsCheckView(r);
+    const line = view.lines.find((l) => l.includes('cursor@host'));
+    assert.match(line, /\u25cf/);
+    assert.match(line, /ready/);
+    assert.equal(view.code, 0);
+    assert.equal(view.lines.some((l) => l.includes('\u2717')), false);
+  } finally { s.close(); }
+});
+
+test('MEM-031 AC03: a seat that never started is not opened yet, with the app to open', async () => {
+  const s = await vaultServer();
+  try {
+    const host = s.v.devices.get(s.v.host.id);
+    const ctx = { identity: { scopes: ['read', 'write'], paths: ['**'] }, client: 'claude-code', device: host, local: true };
+    s.v.bus.register({ client: 'claude-code', device: host });
+    s.v.bus.pulse(ctx);
+    s.v.bus.register({ client: 'codex', device: host });
+    const r = await s.v.bus.check(ctx, { timeout_s: 0 });
+    const view = commsCheckView(r);
+    const line = view.lines.find((l) => l.includes('codex@host'));
+    assert.match(line, /\u25cb/);
+    assert.match(line, /not opened yet/);
+    assert.match(line, /open codex/);
+    assert.equal(view.code, 0);
+  } finally { s.close(); }
+});
+
+test('MEM-031 AC04: a rejected credential is a cross and the check exits 1', async () => {
+  const view = commsCheckView({ check: 'c1', waited_ms: 0, answered: [], missing: [{ seat: 'cursor@host', state: 'rejected', reason: 'credential rejected' }] });
+  assert.equal(view.code, 1);
+  assert.match(view.lines.join('\n'), /\u2717/);
+  assert.match(view.lines.join('\n'), /credential rejected/);
+  const refused = commsCredentialFailure(new Error('the vault answered 401'));
+  assert.equal(refused.code, 1);
+  assert.match(refused.lines[0], /\u2717/);
+  assert.equal(commsCredentialFailure(new Error('the daemon is not running')), null);
 });
 
 test('one session coordinates: a task from the operator is claimed and restated by another seat; holds work', async () => {

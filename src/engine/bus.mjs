@@ -299,7 +299,7 @@ export class Bus {
     }
     const answered = acks.map((a) => ({ seat: a.from, after_ms: Date.parse(a.ts) - Date.parse(msg.ts) }));
     const rows = this.roster().seats.filter((r) => r.seat !== msg.from && (to === 'all' || r.seat === to));
-    const missing = rows.filter((r) => !acks.some((a) => a.from === r.seat)).map((r) => ({ seat: r.seat, device: r.device_label, state: r.state, reason: this.reasonFor(r) }));
+    const missing = rows.filter((r) => !acks.some((a) => a.from === r.seat)).map((r) => ({ seat: r.seat, device: r.device_label, client: r.client, state: r.state, reason: this.reasonFor(r) }));
     return { check: msg.id, seq: msg.seq, waited_ms: Date.now() - start, answered, missing };
   }
 
@@ -319,4 +319,38 @@ export class Bus {
     const r = this.roster({ at });
     return { seats: r.seats.filter((s) => s.seat).length, live: r.seats.filter((s) => s.state === 'live').length, stale: r.seats.filter((s) => s.state === 'stale').map((s) => `${s.seat} (${s.minutes_since} min)`), never: r.seats.filter((s) => s.state === 'never joined').length, operator: r.operator, bad_lines: bad, messages: this.all().length };
   }
+}
+
+/** answered, ready (answers on its next turn), not opened yet, or a rejected credential. */
+export function commsMark(row) {
+  const reason = String(row.reason || '');
+  if (row.state === 'rejected' || (/credential/i.test(reason) && /reject/i.test(reason))) return 'broken';
+  if (row.state === 'live') return 'ready';
+  if (!row.seat || row.state === 'never joined') return 'closed';
+  return 'other';
+}
+
+/** Lines and exit code for `memev bus check`. Exit 1 only when a credential is rejected. */
+export function commsCheckView(r) {
+  const answered = r.answered || [];
+  const buckets = { ready: [], closed: [], broken: [], other: [] };
+  for (const m of r.missing || []) buckets[commsMark(m)].push(m);
+  const lines = [`Comms check ${r.check}: ${answered.length} answered, ${buckets.ready.length} ready, ${buckets.closed.length} not opened yet${buckets.broken.length ? `, ${buckets.broken.length} broken` : ''} (waited ${Math.round((r.waited_ms || 0) / 1000)} s)`];
+  for (const a of answered) lines.push(`  \u2713 ${a.seat} (${a.after_ms} ms)`);
+  for (const m of buckets.ready) lines.push(`  \u25cf ${m.seat}: ready, answers on its next turn`);
+  for (const m of buckets.closed) {
+    const who = m.seat || m.device || 'that computer';
+    const app = m.client || (m.seat ? m.seat.split('@')[0] : 'an app');
+    lines.push(`  \u25cb ${who}: not opened yet, open ${app}`);
+  }
+  for (const m of buckets.other) lines.push(`    ${m.seat || m.device}: ${m.reason}`);
+  for (const m of buckets.broken) lines.push(`  \u2717 ${m.seat || m.device}: ${m.reason || 'credential rejected'}`);
+  return { lines, code: buckets.broken.length ? 1 : 0 };
+}
+
+/** A refused credential is a broken seat: the check prints a cross and exits 1. */
+export function commsCredentialFailure(err) {
+  const msg = String(err?.message || err || '');
+  if (!/401|403|credential|unauthori[sz]ed|invalid token|rejected/i.test(msg)) return null;
+  return { lines: [`  \u2717 credential rejected: ${msg}`], code: 1 };
 }
