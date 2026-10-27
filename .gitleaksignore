@@ -1,0 +1,3 @@
+# A fake AWS key in a test fixture (test/support.test.mjs, commit d27b85b), kept in history because history is never
+# rewritten. The test now builds the value from parts.
+d27b85b3fc209cc6444f7e644dd8c3607b50b76d:test/support.test.mjs:aws-access-token:18
