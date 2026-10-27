@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-// Start Memev at login: a systemd user unit on Linux, a launchd agent on macOS. The daemon itself runs
-// the periodic jobs (git sync, app re-detection, recall tuning) and supervises the tunnel, so one
-// unit covers everything. `memev preflight` (preflight.mjs) reports what this machine allows before anything is set up.
+// Start Memev at login: a systemd user unit on Linux, a launchd plist on macOS, a per-user Task Scheduler
+// entry on Windows. The daemon itself runs the periodic jobs (git sync, app re-detection, recall tuning) and
+// supervises the tunnel, so one unit covers everything. `memev preflight` (preflight.mjs) reports what this
+// machine allows before anything is set up.
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -12,11 +13,13 @@ import { launcherPath } from './clients.mjs';
 
 const run = (cmd, args) => { const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: 15000 }); return { ok: r.status === 0, out: `${r.stdout || ''}${r.stderr || ''}`.trim() }; };
 const LABEL = 'dev.memev.daemon';
+const TASK = 'Memev Daemon';
 
-export function unitPaths(env = process.env) {
+export function unitPaths(env = process.env, platform = process.platform) {
   const home = homeDir(env);
-  if (process.platform === 'darwin') return { kind: 'launchd', file: path.join(home, 'Library', 'LaunchAgents', `${LABEL}.plist`) };
-  if (process.platform === 'linux') return { kind: 'systemd', file: path.join(env.XDG_CONFIG_HOME || path.join(home, '.config'), 'systemd', 'user', 'memev.service') };
+  if (platform === 'darwin') return { kind: 'launchd', file: path.join(home, 'Library', 'LaunchAgents', `${LABEL}.plist`) };
+  if (platform === 'linux') return { kind: 'systemd', file: path.join(env.XDG_CONFIG_HOME || path.join(home, '.config'), 'systemd', 'user', 'memev.service') };
+  if (platform === 'win32') return { kind: 'schtasks', file: null };
   return { kind: 'none', file: null };
 }
 
@@ -52,10 +55,15 @@ WantedBy=default.target
 `;
 }
 
-export async function installService({ env = process.env, root, activate = true } = {}) {
-  const { kind, file } = unitPaths(env);
+export async function installService({ env = process.env, root, activate = true, platform = process.platform, run: runCmd = run } = {}) {
+  const { kind, file } = unitPaths(env, platform);
   if (kind === 'none') return { status: 'needs-manual', detail: 'no service manager support on this platform; run memev start at login' };
   const launcher = launcherPath(env);
+  if (kind === 'schtasks') {
+    const user = env.USERNAME || env.USER || os.userInfo().username;
+    const r = runCmd('schtasks', ['create', '/tn', TASK, '/tr', `"${launcher} serve --root ${root}"`, '/sc', 'onlogon', '/ru', user, '/f']);
+    return r.ok ? { status: 'added', detail: `Task Scheduler entry "${TASK}" starts the daemon at logon for ${user}` } : { status: 'needs-manual', detail: `task creation failed: ${r.out.split('\n')[0]}` };
+  }
   writeAtomic(file, renderUnit(kind, { launcher, root, logFile: path.join(root, '.memev', 'daemon.log') }), 0o644);
   if (!activate) return { status: 'added', detail: `${file} written (not activated)`, file };
   if (kind === 'systemd') {
@@ -71,8 +79,13 @@ export async function installService({ env = process.env, root, activate = true 
   return r.ok ? { status: 'added', detail: 'launchd agent loaded (starts at login)', file } : { status: 'needs-manual', detail: `agent written to ${file}; loading failed: ${r.out.split('\n')[0]}`, file };
 }
 
-export async function removeService({ env = process.env, quiet = false } = {}) {
-  const { kind, file } = unitPaths(env);
+export async function removeService({ env = process.env, quiet = false, platform = process.platform, run: runCmd = run } = {}) {
+  const { kind, file } = unitPaths(env, platform);
+  if (kind === 'schtasks') {
+    const r = runCmd('schtasks', ['delete', '/tn', TASK, '/f']);
+    if (!quiet) console.log(`Removed ${TASK}`);
+    return { removed: r.ok };
+  }
   if (!file || !exists(file)) return { removed: false };
   if (kind === 'systemd') { run('systemctl', ['--user', 'disable', '--now', 'memev.service']); fs.rmSync(file, { force: true }); run('systemctl', ['--user', 'daemon-reload']); }
   else { run('launchctl', ['bootout', `gui/${process.getuid?.() ?? 0}/${LABEL}`]); fs.rmSync(file, { force: true }); }
