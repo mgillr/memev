@@ -27,6 +27,7 @@ Setup
   memev disconnect [client|all]    remove it again, restoring the app's config
   memev uninstall [--purge]        disconnect everything and stop; --purge also removes the service files
   memev clients                    which AI apps are installed and connected
+  memev ready [--timeout S]        wait for each connected app's first session, then for two of them to share a memory
   memev preflight [--port N]       check this computer first: Node 22 or newer, git, the port, a folder to write to
                                    (init runs it before it writes anything and stops with the fix for your system)
   memev path add|remove|status     put the memev command on your PATH (a line in your shell's startup file, or your user PATH on
@@ -62,7 +63,7 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', bus: './bus-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', bus: './bus-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 export function installRuntime(env = process.env) {
