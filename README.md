@@ -74,14 +74,14 @@ says which. Details are in [docs/QUICKSTART.md](docs/QUICKSTART.md).
 |---|---|---|---|
 | For | one person, one computer | a company with 10 to 20 computers | larger or regulated organisations |
 | Runs on | your computer | your company server, optional local AI model | your data centre, high availability, air-gapped option |
-| Price | $0, for good | contact us for a quote; remote setup $2,500 (draft) | contact us for a quote |
+| Price | free, for good | contact us | contact us |
 | Support | GitHub issues | business hours, response times by priority | named or embedded engineer |
 
 Free is complete and is never limited ([CHARTER.md](CHARTER.md)). The company server, sign-in with
 Google or Microsoft, and department permissions are planned, not built. See
 [docs/tiers/](docs/tiers/README.md) for what each tier includes, how it is set up, its limits and a
-worked 20-computer example. Team, Office, Business and Enterprise are priced on request: contact us
-for a quote. Other prices on those pages are drafts.
+worked 20-computer example. Business and Enterprise, and the services around them, are priced on
+your requirements: contact us.
 
 ## What you get
 
@@ -104,14 +104,14 @@ other. There is no telemetry and nothing to install besides Node and git.
 | [Cloud access](docs/CLOUD.md) | the secure link, connector URLs, turning it off |
 | [GitHub backup](docs/GITHUB.md) | `memev github setup` |
 | [Docker](docs/DOCKER.md) | running Memev in a container |
-| [Tiers and setup](docs/tiers/README.md) | Free, Business and Enterprise, services and rates (draft) |
+| [Tiers and setup](docs/tiers/README.md) | Free, Business and Enterprise, and the services around them (draft) |
 | [Problems and solutions](docs/SOLUTIONS.md) | what users complain about and what Memev does about it |
 | [Contracts](docs/CONTRACTS.md) | signed, immutable work contracts |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | `memev doctor` and common fixes |
 | [Lab test plan](docs/testing/LAB-TEST-PLAN.md) | every test to run in a lab before a release, with expected results |
 | [Security](SECURITY.md) and [threat model](docs/THREAT-MODEL.md) | |
 | [Charter](CHARTER.md) | the free tier is never limited |
-| [Pricing (draft)](docs/PRICING.md) | proposed prices; nothing is enforced |
+| [Pricing (draft)](docs/PRICING.md) | Free and Personal prices; everything else on request; nothing is enforced |
 | [Design](docs/DESIGN.md) | log, index, graph, recall, scale |
 | [Hands-off runtime](docs/MAPPING.md) | everything Memev does without being asked |
 

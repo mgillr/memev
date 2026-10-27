@@ -1,5 +1,6 @@
-// Team, Office, Business and Enterprise are priced on request. Keep list prices for them out of
-// the docs so a stale figure can't come back in a later edit.
+// Only Free and Personal have a set price. Everything else (Team, Office, Business, Enterprise and
+// every service) is priced on the customer's requirements, so no other money figure may appear in
+// the docs. This keeps a stale figure from coming back in a later edit.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -8,32 +9,28 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
-const priceRow = (md) => md.split('\n').find((l) => /^\| Price( \(draft\))? \|/.test(l));
+const walk = (d) => fs.readdirSync(path.join(ROOT, d), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith('.md') ? [path.join(d, e.name)] : []));
+const DOCS = ['README.md', 'CHARTER.md', 'SECURITY.md', ...walk('docs')];
+// The Personal tier: $15/month or $144/year, +$4/month for each extra computer.
+const ALLOWED = new Set(['$15/month', '$144/year', '$4/month']);
+const MONEY = /[$€£]\s?\d[\d,.]*(?:k\b)?(?:\/(?:month|year|day))?|\b\d[\d,.]*\s?(?:USD|EUR|GBP|dollars?)\b/gi;
 
-test('quoted tiers show no list price in the tier tables', () => {
-  const pricing = priceRow(read('docs/PRICING.md')).split('|').map((c) => c.trim()).filter(Boolean);
-  // columns: label, Free, Personal, Team, Office, Business, Enterprise
-  for (const cell of pricing.slice(3)) {
-    assert.match(cell, /^contact us for a quote/, cell);
-    assert.doesNotMatch(cell.replace(/\$2,500 remote setup/, ''), /\$\d/, cell);
+test('the docs show no money figure except the Free and Personal prices', () => {
+  const found = [];
+  for (const doc of DOCS) {
+    read(doc).split('\n').forEach((line, i) => { for (const m of line.matchAll(MONEY)) if (!ALLOWED.has(m[0])) found.push(`${doc}:${i + 1}: ${m[0]}`); });
   }
-  for (const doc of ['README.md', 'docs/tiers/README.md']) {
-    const cells = priceRow(read(doc)).split('|').map((c) => c.trim()).filter(Boolean).slice(2);
-    for (const cell of cells) assert.match(cell, /^contact us for a quote/, `${doc}: ${cell}`);
-  }
+  assert.deepEqual(found, []);
 });
 
-test('the 20-computer example has no subscription total', () => {
-  const sme = read('docs/tiers/sme.md');
-  assert.doesNotMatch(sme, /\$199|\$398|\$4,776|\$10,700/);
-  assert.match(sme, /Business subscription, 20 computers \| contact us for a quote/);
+test('Free and Personal keep their prices; the other tiers say contact us', () => {
+  const row = read('docs/PRICING.md').split('\n').find((l) => l.startsWith('| Price |')).split('|').map((c) => c.trim()).filter(Boolean);
+  assert.deepEqual(row, ['Price', 'free', '$15/month or $144/year', 'contact us', 'contact us', 'contact us', 'contact us']);
+  assert.match(read('docs/PRICING.md'), /up to 4 \(\+\$4\/month each\)/);
+  assert.match(read('docs/tiers/free.md'), /\$15\/month or \$144\/year/);
 });
 
-test('Business support is quoted with the tier, not priced on its own', () => {
-  for (const doc of ['docs/PRICING.md', 'docs/tiers/services.md', 'docs/tiers/sme.md', 'docs/tiers/README.md']) {
-    const md = read(doc);
-    assert.doesNotMatch(md, /20% of the (yearly )?subscription|\(20% plan\)|\$2,400\/year|\$5,900/, doc);
-  }
-  assert.match(read('docs/PRICING.md'), /\| Business support \| quoted with the tier \|/);
+test('Business support is quoted with the tier', () => {
+  assert.match(read('docs/PRICING.md'), /support plans/);
   assert.match(read('docs/tiers/services.md'), /\| Business support \| quoted with the tier \|/);
 });

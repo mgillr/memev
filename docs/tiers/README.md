@@ -1,8 +1,8 @@
 # Tiers: how each one is set up
 
-> **DRAFT.** Prices, packages and service rates on these pages are proposals, not offers. Nothing is
-> enforced ([CHARTER.md](../../CHARTER.md)). Business and Enterprise are priced on request: contact us
-> for a quote. The other draft prices are in [PRICING.md](../PRICING.md).
+> **DRAFT.** Packages and services on these pages are proposals, not offers. Nothing is enforced
+> ([CHARTER.md](../../CHARTER.md)). Free is free; Business, Enterprise and every service are priced on
+> your requirements: contact us. See [PRICING.md](../PRICING.md).
 
 | | [Free](free.md) | [Business](sme.md) | [Enterprise](enterprise.md) |
 |---|---|---|---|
@@ -10,12 +10,12 @@
 | Where Memev runs | your computer | a server in your office or your cloud account | your data centre or private cloud, more than one server |
 | Who can see what | you | departments and roles from your org chart (planned) | the same, plus your identity provider's groups (planned) |
 | AI models | whatever your apps use | cloud models, plus a local model for sensitive departments | the same, or local models only (air-gapped) |
-| Price | $0 | contact us for a quote | contact us for a quote; private deployment from $6,000/year (draft) |
-| Setup | you, in minutes | remote, $2,500 (draft), 2 to 4 weeks | remote or onsite, from $12,000, 6 to 12 weeks |
+| Price | free | contact us | contact us |
+| Setup | you, in minutes | remote, 2 to 4 weeks | remote or onsite, 6 to 12 weeks |
 | Support | GitHub issues | business hours by priority (support plan quoted with the tier) | named or embedded engineer |
 | Status | built | planned (the shared vault over a secure link works today) | planned |
 
-Services, remote and onsite rates, travel and response times are in [services.md](services.md).
+Services, remote and onsite work, travel and response times are in [services.md](services.md).
 
 ## What is built and what is planned
 
