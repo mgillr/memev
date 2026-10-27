@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { configDir, homeDir, exists, readJson, writeJson, writeAtomic, sha256, now } from '../engine/util.mjs';
+import { VERSION } from '../engine/vault.mjs';
 import { out } from './common.mjs';
 
 const BLOCK_START = '<!-- memev:start -->', BLOCK_END = '<!-- memev:end -->';
@@ -27,7 +28,14 @@ export function platformDirs(env = process.env) {
 }
 
 const isOurs = (cmd) => typeof cmd === 'string' && /memev/.test(cmd) && / hook /.test(cmd);
-const hookCmd = (launcher, event, client, format) => `"${launcher}" hook ${event} --client ${client}${format ? ` --format ${format}` : ''}`;
+const hookCmd = (prefix, event, client, format) => `${prefix} hook ${event} --client ${client}${format ? ` --format ${format}` : ''}`;
+
+// Since Node's CVE-2024-27980 fix, a Node app cannot spawn a .cmd file without a shell. On win32 the
+// registered command is the absolute node.exe with the runtime script as its first argument, never the
+// memev.cmd launcher.
+const winSpawn = (env, platform) => platform === 'win32'
+  ? { node: path.join(path.dirname(process.execPath), 'node.exe'), script: path.join(configDir(env), 'runtime', VERSION, 'bin', 'memev.mjs') }
+  : null;
 
 // matcher-group hooks (Claude Code, Codex, Gemini CLI)
 function setGroupHooks(j, events) {
@@ -84,39 +92,41 @@ const text = (file, apply, remove) => ({ file, kind: 'text', apply, remove });
 const mdBlock = (file) => text(file, (t) => addBlock(t, INSTRUCTIONS), (t) => removeBlock(t));
 
 /** The apps Memev knows. mode: 'hooks' = state injected by hooks; 'instructions' = MCP + instructions only. */
-export function clientDefs(env, launcher) {
+export function clientDefs(env, launcher, platform = process.platform) {
   const { home, appData } = platformDirs(env);
-  const stdio = (id) => ({ command: launcher, args: ['mcp', '--client', id] });
+  const win = winSpawn(env, platform);
+  const prefix = win ? `"${win.node}" "${win.script}"` : `"${launcher}"`;
+  const stdio = (id) => win ? { command: win.node, args: [win.script, 'mcp', '--client', id] } : { command: launcher, args: ['mcp', '--client', id] };
   const defs = [
     { id: 'claude-code', name: 'Claude Code', mode: 'hooks', detect: () => exists(path.join(home, '.claude')) || exists(path.join(home, '.claude.json')),
       edits: () => [
         json(path.join(home, '.claude.json'), setServer('mcpServers', { type: 'stdio', ...stdio('claude-code') }), delServer('mcpServers')),
         json(path.join(home, '.claude', 'settings.json'), (j) => setGroupHooks(j, {
-          SessionStart: { matcher: 'startup|resume|clear|compact', command: hookCmd(launcher, 'session-start', 'claude-code'), timeout: 10 },
-          UserPromptSubmit: { command: hookCmd(launcher, 'prompt', 'claude-code'), timeout: 10 },
-          PreCompact: { command: hookCmd(launcher, 'pre-compact', 'claude-code'), timeout: 15 },
-          Stop: { command: hookCmd(launcher, 'stop', 'claude-code'), timeout: 10 },
+          SessionStart: { matcher: 'startup|resume|clear|compact', command: hookCmd(prefix, 'session-start', 'claude-code'), timeout: 10 },
+          UserPromptSubmit: { command: hookCmd(prefix, 'prompt', 'claude-code'), timeout: 10 },
+          PreCompact: { command: hookCmd(prefix, 'pre-compact', 'claude-code'), timeout: 15 },
+          Stop: { command: hookCmd(prefix, 'stop', 'claude-code'), timeout: 10 },
         }), removeGroupHooks),
         mdBlock(path.join(home, '.claude', 'CLAUDE.md')),
       ] },
     { id: 'codex', name: 'Codex CLI', mode: 'hooks', detect: () => exists(path.join(home, '.codex')),
       edits: () => [
-        text(path.join(home, '.codex', 'config.toml'), (t) => addBlock(t, `${TOML_START}\n[mcp_servers.memev]\ncommand = ${tomlEsc(launcher)}\nargs = ["mcp", "--client", "codex"]\n${TOML_END}`, [TOML_START, TOML_END]), (t) => removeBlock(t, [TOML_START, TOML_END])),
+        text(path.join(home, '.codex', 'config.toml'), (t) => addBlock(t, `${TOML_START}\n[mcp_servers.memev]\ncommand = ${tomlEsc(win ? win.node : launcher)}\nargs = [${[...(win ? [win.script] : []), 'mcp', '--client', 'codex'].map(tomlEsc).join(', ')}]\n${TOML_END}`, [TOML_START, TOML_END]), (t) => removeBlock(t, [TOML_START, TOML_END])),
         json(path.join(home, '.codex', 'hooks.json'), (j) => setGroupHooks(j, {
-          SessionStart: { matcher: 'startup|resume|clear|compact', command: hookCmd(launcher, 'session-start', 'codex'), timeout: 10 },
-          UserPromptSubmit: { command: hookCmd(launcher, 'prompt', 'codex'), timeout: 10 },
-          PreCompact: { command: hookCmd(launcher, 'pre-compact', 'codex'), timeout: 15 },
-          Stop: { command: hookCmd(launcher, 'stop', 'codex'), timeout: 10 },
+          SessionStart: { matcher: 'startup|resume|clear|compact', command: hookCmd(prefix, 'session-start', 'codex'), timeout: 10 },
+          UserPromptSubmit: { command: hookCmd(prefix, 'prompt', 'codex'), timeout: 10 },
+          PreCompact: { command: hookCmd(prefix, 'pre-compact', 'codex'), timeout: 15 },
+          Stop: { command: hookCmd(prefix, 'stop', 'codex'), timeout: 10 },
         }), removeGroupHooks),
         mdBlock(path.join(home, '.codex', 'AGENTS.md')),
       ], manual: 'Codex asks you to trust new hooks once: open /hooks in Codex and trust the Memev hooks.' },
     { id: 'gemini-cli', name: 'Gemini CLI', mode: 'hooks', detect: () => exists(path.join(home, '.gemini')),
       edits: () => [
         json(path.join(home, '.gemini', 'settings.json'), (j) => setGroupHooks(setServer('mcpServers', stdio('gemini-cli'))(j), {
-          SessionStart: { matcher: '*', command: hookCmd(launcher, 'session-start', 'gemini-cli', 'gemini'), timeout: 10000 },
-          BeforeAgent: { matcher: '*', command: hookCmd(launcher, 'prompt', 'gemini-cli', 'gemini'), timeout: 10000 },
-          PreCompress: { matcher: '*', command: hookCmd(launcher, 'pre-compact', 'gemini-cli', 'gemini'), timeout: 15000 },
-          AfterAgent: { matcher: '*', command: hookCmd(launcher, 'stop', 'gemini-cli', 'gemini'), timeout: 10000 },
+          SessionStart: { matcher: '*', command: hookCmd(prefix, 'session-start', 'gemini-cli', 'gemini'), timeout: 10000 },
+          BeforeAgent: { matcher: '*', command: hookCmd(prefix, 'prompt', 'gemini-cli', 'gemini'), timeout: 10000 },
+          PreCompress: { matcher: '*', command: hookCmd(prefix, 'pre-compact', 'gemini-cli', 'gemini'), timeout: 15000 },
+          AfterAgent: { matcher: '*', command: hookCmd(prefix, 'stop', 'gemini-cli', 'gemini'), timeout: 10000 },
         }), (j) => removeGroupHooks(delServer('mcpServers')(j))),
         mdBlock(path.join(home, '.gemini', 'GEMINI.md')),
       ] },
@@ -124,10 +134,10 @@ export function clientDefs(env, launcher) {
       edits: () => [
         json(path.join(home, '.cursor', 'mcp.json'), setServer('mcpServers', stdio('cursor')), delServer('mcpServers')),
         json(path.join(home, '.cursor', 'hooks.json'), (j) => setFlatHooks(j, {
-          sessionStart: hookCmd(launcher, 'session-start', 'cursor', 'cursor'),
-          beforeSubmitPrompt: hookCmd(launcher, 'prompt', 'cursor', 'cursor'),
-          preCompact: hookCmd(launcher, 'pre-compact', 'cursor', 'cursor'),
-          stop: hookCmd(launcher, 'stop', 'cursor', 'cursor'),
+          sessionStart: hookCmd(prefix, 'session-start', 'cursor', 'cursor'),
+          beforeSubmitPrompt: hookCmd(prefix, 'prompt', 'cursor', 'cursor'),
+          preCompact: hookCmd(prefix, 'pre-compact', 'cursor', 'cursor'),
+          stop: hookCmd(prefix, 'stop', 'cursor', 'cursor'),
         }), removeFlatHooks),
       ], note: 'Cursor injects the resume card at session start; per-prompt recall and post-compaction state come through the MCP instructions (Cursor hooks cannot add context to a prompt).' },
     { id: 'claude-desktop', name: 'Claude Desktop', mode: 'instructions', detect: () => exists(path.join(appData, 'Claude')),
@@ -165,8 +175,8 @@ function plan(def) {
   return { changes };
 }
 
-export function connect(id, { env = process.env, launcher, dryRun = false } = {}) {
-  const def = clientDefs(env, launcher).find((d) => d.id === id);
+export function connect(id, { env = process.env, launcher, dryRun = false, platform = process.platform } = {}) {
+  const def = clientDefs(env, launcher, platform).find((d) => d.id === id);
   if (!def) throw new Error(`unknown app: ${id}`);
   const p = plan(def);
   if (p.error) return { id, name: def.name, status: 'needs-manual', reason: p.error };
@@ -192,9 +202,9 @@ export function connect(id, { env = process.env, launcher, dryRun = false } = {}
   return { id, name: def.name, status: changed.length ? 'added' : 'already', mode: def.mode, files: changed.map((c) => c.e.file), manual: def.manual || null, note: def.note || null };
 }
 
-export function disconnect(id, { env = process.env, launcher, decline = true } = {}) {
+export function disconnect(id, { env = process.env, launcher, decline = true, platform = process.platform } = {}) {
   const st = loadState(env);
-  const defs = clientDefs(env, launcher || st.connected[id]?.launcher || 'memev');
+  const defs = clientDefs(env, launcher || st.connected[id]?.launcher || 'memev', platform);
   const def = defs.find((d) => d.id === id);
   const results = [];
   for (const [file, rec] of Object.entries(st.files)) {
@@ -227,14 +237,14 @@ export const RESTART = {
   cursor: 'Open a new Cursor chat', 'claude-desktop': 'Quit and reopen Claude Desktop', windsurf: 'Quit and reopen Windsurf',
   vscode: 'Reload the VS Code window (Developer: Reload Window)', zed: 'Quit and reopen Zed',
 };
-export function detect(env = process.env, launcher = 'memev') {
+export function detect(env = process.env, launcher = 'memev', platform = process.platform) {
   const st = loadState(env);
-  return clientDefs(env, launcher).map((d) => ({ id: d.id, name: d.name, mode: d.mode, found: !!d.detect(), connected: !!st.connected[d.id], declined: st.declined.includes(d.id), note: d.note || null, manual: d.manual || null, restart: RESTART[d.id] || `Restart ${d.name}` }));
+  return clientDefs(env, launcher, platform).map((d) => ({ id: d.id, name: d.name, mode: d.mode, found: !!d.detect(), connected: !!st.connected[d.id], declined: st.declined.includes(d.id), note: d.note || null, manual: d.manual || null, restart: RESTART[d.id] || `Restart ${d.name}` }));
 }
 
 /** Connect every app that is installed and not yet connected (and not declined, unless forced). */
-export function connectAll({ env = process.env, launcher, force = false } = {}) {
-  return detect(env, launcher).filter((c) => c.found && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
+export function connectAll({ env = process.env, launcher, force = false, platform = process.platform } = {}) {
+  return detect(env, launcher, platform).filter((c) => c.found && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
 }
 
 export function launcherPath(env = process.env) { return path.join(configDir(env), 'bin', process.platform === 'win32' ? 'memev.cmd' : 'memev'); }
