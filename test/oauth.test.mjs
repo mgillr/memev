@@ -87,7 +87,7 @@ test('MEM-058 AC03: refresh works and revocation makes the token fail', async ()
 });
 
 test('MEM-058 AC04: the connector URL token still works', async () => {
-  const tok = v.tokens.issue({ agent: 'cloud', remote: true, paths: ['memory/**', 'work/**'], note: 'cloud connector' }).token;
+  const { token: tok } = v.devices.enroll(v.tokens, { kind: 'cloud-connector', label: 'url app' });
   const r = await fetch(`${base}/c/${tok}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) });
   assert.equal(r.status, 200);
   assert.ok((await r.json()).result.tools.length > 0);

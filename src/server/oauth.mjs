@@ -131,7 +131,7 @@ export class OAuthStore {
     const r = this.data.access[t];
     if (!r) return null;
     if (Date.parse(r.expires) < Date.now()) { delete this.data.access[t]; this.save(); return null; }
-    return { id: r.id, agent: this.data.clients[r.client_id]?.name || 'oauth client', scopes: r.scopes, paths: PATHS, remote: true, expires: r.expires, note: 'cloud connector (oauth)' };
+    return { id: r.id, scopes: r.scopes, paths: PATHS, remote: true, expires: r.expires, note: 'cloud connector (oauth)' };
   }
 }
 
