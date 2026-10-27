@@ -6,6 +6,8 @@ Run project dev on Claude code and Cursor knows about the context on Tuesday. Me
 apps learn in a folder of plain notes on your own computer, hands the right notes to whichever app
 you open next, and backs everything up to a private GitHub repository that you own.
 
+One memory and one team channel, both on computers you own.
+
 ## How it fits together
 
 ```mermaid
@@ -77,6 +79,10 @@ For a global `memev` command, run `npm install -g . && memev init` there instead
 After setup, two things may need you: one browser sign-in for the GitHub backup
 (`memev github setup`), and a click in apps that ask before they trust a new tool. The checklist
 says which. Details are in [docs/QUICKSTART.md](docs/QUICKSTART.md).
+
+To see it work, run `memev ready` and open a new session in each app. It prints each app as it
+joins, then "Ready: <app> and <app> share one memory" once one of them recalls something another
+one saved.
 
 ## Which tier?
 
