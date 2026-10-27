@@ -26,6 +26,7 @@ Setup
   memev github setup               back the vault up to your own private GitHub repository
   memev service install|remove     start Memev at login (systemd or launchd)
   memev devices [enroll|remove|rotate|rename|keygen]   computers and apps using this vault, each with its own credential
+  memev invite [--ttl SECONDS]     print a one-time code, link and QR code so another computer can join
   memev join <url> --token T       use a vault on another computer from this one (after memev devices keygen)
   memev license status|install <file>|remove   the licence: how many computers may use this vault
   memev bus roster|check|send|tail|tasks|watch <seat>|operator <seat>   the comms bus between your AI apps
@@ -48,7 +49,7 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './service.mjs', contract: './contracts-cli.mjs', bus: './bus-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './service.mjs', contract: './contracts-cli.mjs', bus: './bus-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 export function installRuntime(env = process.env) {

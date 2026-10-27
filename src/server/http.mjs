@@ -4,13 +4,14 @@
 // header and names a loopback host; everything else (a tunnel, a proxy, another machine) is remote.
 // Remote requests need: remote access switched on, a token minted for remote use, and either the
 // X-Memev-Key header (the tunnel key) or a connector URL (/c/<token>/mcp). Remote requests are rate
-// limited and audited. The only unauthenticated route is GET /healthz, which says {"ok":true} (and, to a direct
-// local caller, the vault's id).
+// limited and audited. Unauthenticated routes are GET /healthz, which says {"ok":true} (and, to a
+// direct local caller, the vault's id), and POST /v1/invite-redeem, which enrolls one computer
+// from a one-time invite code.
 // Another computer must sign every request with its own device key; a cloud connector credential
 // must not be used from a computer. Computers over the licence's seat count, or on a lapsed
 // licence, can read but not write (src/engine/entitlements.mjs).
 import http from 'node:http';
-import { verifyProof, NonceCache, computerSide } from '../engine/devices.mjs';
+import { verifyProof, NonceCache, computerSide, redeemInvite } from '../engine/devices.mjs';
 import { loadLicense, LICENSE_KEYS } from '../engine/license.mjs';
 import { seatPolicy, readOnlyReason } from '../engine/entitlements.mjs';
 import fs from 'node:fs';
@@ -89,6 +90,16 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
         const ipKey = sha256(String(req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress)).slice(0, 16);
         if (!limiter.take(`ip:${ipKey}`) || (token && !limiter.take(`t:${token.slice(3, 11)}`))) return send(429, { error: 'rate_limited' }, { 'retry-after': '30' });
         fs.appendFile(audit, `${JSON.stringify({ ts: now(), ip: ipKey, route: route.slice(0, 64), method: req.method, token: token ? token.slice(3, 11) : null })}\n`, () => {});
+      }
+      if (req.method === 'POST' && route === '/v1/invite-redeem') {
+        let body; try { body = JSON.parse((await getBody()) || '{}'); } catch { return send(400, { error: 'bad_json', error_description: 'the body is not json' }); }
+        try {
+          const r = redeemInvite(vault.root, { code: body.code, pubkey: body.pubkey, label: body.label, tokens: vault.tokens, policy: policy() });
+          return send(200, { device_id: r.device.id, token: r.token });
+        } catch (e) {
+          const expired = /expired/i.test(e.message);
+          return send(expired ? 410 : 409, { error: expired ? 'expired' : 'refused', error_description: e.message });
+        }
       }
       const identity = vault.tokens.verify(token);
       if (!identity) return send(401, { error: 'unauthorized', error_description: 'a valid bearer token is required' }, { 'www-authenticate': 'Bearer' });

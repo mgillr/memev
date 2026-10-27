@@ -36,6 +36,13 @@ memev devices enroll --kind remote-computer --label laptop --pubkey <key>   # on
 memev join https://<address> --token <token>                  # on the laptop
 ```
 
+`memev invite` prints a one-time code, a link and a QR code. The code carries this vault's address and a secret. The secret is stored only as a hash and it expires (15 minutes, or `--ttl` seconds). Redeeming the code enrolls one computer. A second redemption is refused, and an expired code is refused with a message that says it expired.
+
+```sh
+memev invite                 # on the vault: code, link and QR code
+memev invite --ttl 600       # the same, expiring after ten minutes
+```
+
 `memev join` checks the vault answers, saves the address, and connects the AI apps on the laptop.
 From then on every request from the laptop is signed with its key, and the token alone does not
 work on another machine. The vault refuses to enroll more computers than its licence covers; with
