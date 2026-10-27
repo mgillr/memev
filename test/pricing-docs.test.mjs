@@ -37,6 +37,14 @@ test('the price row matches the decided tiers', () => {
   assert.match(read('docs/tiers/free.md'), /\$15\/month or \$144\/year/);
 });
 
+test('MEM-065 AC03: The pricing-docs test checks the Team row has a published price and its unit', () => {
+  const row = read('docs/PRICING.md').split('\n').find((l) => l.startsWith('| Price |')).split('|').map((c) => c.trim()).filter(Boolean);
+  const team = row[3];
+  assert.match(team, /\$18\/seat\/month/);
+  assert.match(team, /\$216\/seat\/year/);
+  assert.match(team, /\$22\/seat\/month/);
+});
+
 test('Business and Enterprise services are quoted', () => {
   const pricing = read('docs/PRICING.md');
   const section = pricing.split('## Services for Business and Enterprise')[1].split('\n## ')[0];
