@@ -7,12 +7,11 @@
 // After step 3 Memev never uses your GitHub sign-in again; `gh auth logout` is safe.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { configDir, exists, readJson, writeJson, slug } from '../engine/util.mjs';
+import { configDir, exists, readJson, writeJson, slug, run as spawn } from '../engine/util.mjs';
 import { git } from '../engine/git.mjs';
 import { config, saveConfig, out } from './common.mjs';
 
-const sh = (cmd, args, opts = {}) => { const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: opts.timeout || 60000, stdio: opts.inherit ? 'inherit' : 'pipe', env: { ...process.env, ...(opts.env || {}) }, input: opts.input }); return { ok: r.status === 0, out: (r.stdout || '').trim(), err: (r.stderr || '').trim(), status: r.status }; };
+const sh = (cmd, args, opts = {}) => { const r = spawn(cmd, args, { timeout: opts.timeout || 60000, stdio: opts.inherit ? 'inherit' : 'pipe', env: { ...process.env, ...(opts.env || {}) }, input: opts.input }); return { ok: r.ok, out: r.stdout.trim(), err: r.stderr.trim(), status: r.status }; };
 const has = (bin) => sh(process.platform === 'win32' ? 'where' : 'which', [bin]).ok;
 
 // The file a vault backup pushes. The first line is how init tells a private repository is one of ours.

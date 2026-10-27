@@ -9,19 +9,18 @@
 // new messages or a hold go into context.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { api, clientToken, resolveRoot } from './common.mjs';
 import { ensureDaemon } from './daemon.mjs';
 import { scanTranscript, todosToCheckpoint } from './transcript.mjs';
-import { readJson, writePrivateJson, sha256, slug, configDir } from '../engine/util.mjs';
+import { readJson, writePrivateJson, sha256, slug, configDir, run } from '../engine/util.mjs';
 import { isVault } from '../engine/vault.mjs';
 import { PROTOCOL } from '../engine/card.mjs';
 
 function readStdin() { try { return fs.readFileSync(0, 'utf8'); } catch { return ''; } }
 export function projectOf(cwd) {
   if (!cwd) return null;
-  const r = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', timeout: 1500 });
-  return slug(path.basename(r.status === 0 && r.stdout.trim() ? r.stdout.trim() : cwd));
+  const r = run('git', ['rev-parse', '--show-toplevel'], { cwd, timeout: 1500 });
+  return slug(path.basename(r.ok && r.stdout.trim() ? r.stdout.trim() : cwd));
 }
 
 // Output shapes: Claude Code and Codex share one; Gemini CLI uses it with its own event names;

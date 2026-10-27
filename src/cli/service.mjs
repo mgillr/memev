@@ -5,12 +5,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawnSync } from 'node:child_process';
-import { homeDir, configDir, exists, writeAtomic } from '../engine/util.mjs';
+import { homeDir, configDir, exists, writeAtomic, run as spawn } from '../engine/util.mjs';
 import { resolveRoot, out } from './common.mjs';
 import { launcherPath } from './clients.mjs';
 
-const run = (cmd, args) => { const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: 15000 }); return { ok: r.status === 0, out: `${r.stdout || ''}${r.stderr || ''}`.trim() }; };
+const run = (cmd, args) => { const r = spawn(cmd, args, { timeout: 15000 }); return { ok: r.ok, out: `${r.stdout}${r.stderr}`.trim() }; };
 const LABEL = 'dev.memev.daemon';
 
 export function unitPaths(env = process.env) {
