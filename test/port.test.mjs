@@ -68,3 +68,20 @@ test('MEM-005 AC02: Apps are connected with the port that was finally chosen (MC
   assert.equal(r.isError ?? false, false, JSON.stringify(r));
   assert.equal(daemon()?.port, port, 'the MCP entry brought the daemon up on the saved port');
 });
+
+test("a port held by another vault's daemon: init moves on and leaves that daemon running", () => {
+  const a = sandbox({ ports: 2 }), b = sandbox(); // b moves to the port after a's, which a reserved
+  const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+  try {
+    assert.equal(a.run(['init', '--port', String(a.port), '--local-only', '--no-connect']).code, 0);
+    const first = read(path.join(a.root, '.memev', 'daemon.json'));
+    const r = b.run(['init', '--port', String(a.port), '--local-only', '--no-connect']);
+    assert.equal(r.code, 0, r.out + r.err);
+    const port = read(path.join(b.root, '.memev', 'config.json')).port;
+    assert.notEqual(port, a.port);
+    assert.ok(r.out.includes(`Port ${a.port} is in use by another program; Memev is using ${port}`), r.out);
+    assert.equal(read(path.join(b.root, '.memev', 'daemon.json')).port, port, "the second vault's daemon is on the saved port");
+    assert.equal(read(path.join(a.root, '.memev', 'daemon.json')).pid, first.pid);
+    assert.ok(alive(first.pid), "the first vault's daemon is still running");
+  } finally { b.stop(); a.stop(); }
+});
