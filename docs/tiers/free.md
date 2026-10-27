@@ -56,9 +56,15 @@ Markdown in your private repository) and whatever recall returns to a cloud AI a
 link. `memev init --local-only` keeps the secure link off, and the backup stays off until you run
 `memev github setup`.
 
-## Personal (draft, planned)
+## Personal (draft)
 
-$15/month or $144/year: the same as Free on up to 4 computers, with end-to-end encrypted sync
-between them, a hosted encrypted backup and a stable address for the secure link. Sync is planned,
-not built. Your notes are encrypted on your computers before they leave, so the sync service cannot
-read them; it also cannot search them for you.
+One person, up to 3 computers and 10 cloud AI connectors, for $15/month or $144/year. The licence is
+for that person and cannot be passed on. The AI apps on all three computers share one memory and
+one comms bus, over the secure link, with a key for each computer.
+
+This is an early-supporter price: it stays the same for as long as your subscription runs.
+
+Planned, not built, and not part of the price: end-to-end encrypted sync between the computers, a
+hosted encrypted backup and a stable address for the secure link. With sync, your notes would be
+encrypted on your computers before they leave, so the sync service could not read them or search
+them for you.

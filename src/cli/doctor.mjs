@@ -73,7 +73,7 @@ export function privateFiles({ state, names, env = process.env, platform = proce
 }
 
 /** Checks that only need the files (safe inside the daemon too). */
-export function fileChecks({ root, env = process.env, vault = null, platform = process.platform, icacls = runIcacls }) {
+export function fileChecks({ root, env = process.env, vault = null, platform = process.platform, icacls = runIcacls, license = null }) {
   const r = [];
   const major = Number(process.versions.node.split('.')[0]);
   r.push(C('node', 'Node.js 22+', major >= 22 ? 'ok' : 'fail', process.versions.node));
@@ -114,9 +114,10 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   if (jobs.sync?.warning) r.push(C('writers', 'one computer writes the git backup', 'warn', jobs.sync.warning));
   try {
     // report only: licence and seats never fail the doctor and never limit anything
-    const ls = licensingStatus({ root, env, vault });
+    const ls = licensingStatus({ root, env, vault, license });
     const flagged = ls.usage.flagged || [];
-    r.push(C('license', 'licence and seats (report only)', flagged.length ? 'warn' : 'ok', `${ls.license.state === 'none' ? 'free tier, no licence needed' : `licence ${ls.license.state}${ls.license.tier ? ` (${ls.license.tier})` : ''}`}; ${ls.usage.computers} computer(s), ${ls.usage.connectors} connector(s), ${ls.usage.local_clients} local client(s)${ls.notes.length ? `; ${ls.notes.join(' ')}` : ''}${flagged.length ? `; credential flagged on ${flagged.map((f) => f.label).join(', ')}: memev devices` : ''}`));
+    const renewal = ls.renewal;
+    r.push(C('license', 'licence and seats (report only)', flagged.length || renewal ? 'warn' : 'ok', `${ls.license.state === 'none' ? 'free tier, no licence needed' : `licence ${ls.license.state}${ls.license.tier ? ` (${ls.license.tier})` : ''}`}; ${ls.usage.computers} computer(s), ${ls.usage.connectors} connector(s), ${ls.usage.local_clients} local client(s)${ls.notes.length ? `; ${ls.notes.join(' ')}` : ''}${renewal ? `; ${renewal}` : ''}${flagged.length ? `; credential flagged on ${flagged.map((f) => f.label).join(', ')}: memev devices` : ''}`));
   } catch (e) { r.push(C('license', 'licence and seats (report only)', 'ok', `not checked: ${e.message}`)); }
   try { const s = fs.statfsSync(root); const freePct = (s.bavail / s.blocks) * 100; const inodePct = s.files ? (s.ffree / s.files) * 100 : 100; r.push(C('disk', 'disk space', freePct < 3 || inodePct < 3 ? 'warn' : 'ok', `${freePct.toFixed(0)}% space, ${inodePct.toFixed(0)}% inodes free`)); } catch {}
   return r;
