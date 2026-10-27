@@ -15,7 +15,7 @@ The tunnel is chosen in this order (`memev cloud use auto|tailscale|cloudflare|q
 
 `memev cloud status` shows the state. `memev cloud url` prints:
 
-- a **connector URL** (`https://…/c/<token>/mcp`) for apps that take only a URL. It contains a
+- a **connector URL** (`https://<address>/c/<token>/mcp`) for apps that take only a URL. It contains a
   secret: treat it like a password; `memev token revoke <id>` kills it.
 - the plain MCP URL plus the header apps with header support should send:
   `Authorization: Bearer <token>`.

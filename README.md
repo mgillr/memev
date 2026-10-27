@@ -43,27 +43,26 @@ folder, starts Memev, connects the AI apps it finds on your computer and runs a 
 
 | Path | Who it's for | What happens on its own |
 |---|---|---|
-| **Ask your AI app to do it** | anyone already using Claude Code, Codex, Gemini CLI or Cursor | the app downloads Memev and runs the setup; you read the checklist it shows you |
-| **Two commands from a download** | anyone comfortable with a terminal | the same setup, run by you |
-| **npm from a download** | people who like a global `memev` command | the same, plus `memev` on your PATH |
-| **Docker** | an always-on server or a home lab | Memev runs in a container; you connect apps by hand |
+| Ask your AI app to do it | anyone already using Claude Code, Codex, Gemini CLI or Cursor | the app downloads Memev and runs the setup; you read the checklist it shows you |
+| One command in a download | anyone comfortable with a terminal | the same setup, run by you |
+| npm, from a download | people who like a global `memev` command | the same, plus `memev` on your PATH |
+| Docker | an always-on server or a home lab | Memev runs in a container; you connect apps by hand |
 | `npx memev init` | everyone | coming soon (not on the npm registry yet) |
 | One-line installer for macOS, Linux and Windows | everyone | coming soon |
 
-**Ask your AI app.** Paste this into a session:
+To have your AI app do it, paste this into a session:
 
 > Download the Memev repository, run `node bin/memev.mjs init` inside it, and show me the checklist
 > it prints.
 
-**Two commands.** In the folder you downloaded:
+To do it yourself, run this in the folder you downloaded:
 
 ```sh
 node bin/memev.mjs init
 ```
 
-**npm.** In the same folder: `npm install -g . && memev init`
-
-**Docker.** `docker compose up -d` builds the image on your machine; see [docs/DOCKER.md](docs/DOCKER.md).
+For a global `memev` command, run `npm install -g . && memev init` there instead. For Docker,
+`docker compose up -d` builds the image on your machine; see [docs/DOCKER.md](docs/DOCKER.md).
 
 After setup, two things may need you: one browser sign-in for the GitHub backup
 (`memev github setup`), and a click in apps that ask before they trust a new tool. The checklist
@@ -85,15 +84,15 @@ worked 20-computer example. All prices are drafts.
 
 ## What you get
 
-- **Your notes, your files.** Plain Markdown in `~/memev`, kept in git. Every change goes through a
-  checksummed log first, so nothing is lost.
-- **Works in many apps.** Claude Code, Codex, Gemini CLI, Cursor, Claude Desktop, Windsurf, VS Code
-  and Zed, plus ChatGPT and claude.ai through the optional secure link.
-- **Memory you can check.** `memev why` shows why a note came back; `memev audit` lists junk and
-  stale notes; nothing is deleted behind your back.
-- **Projects stay apart.** Notes from one project don't turn up in another.
-- **Any language.** Chinese, Japanese, Korean, Cyrillic, Greek and Arabic notes are searchable.
-- **No telemetry, no runtime dependencies.**
+Your notes are plain Markdown in `~/memev`, kept in git. Every change is written to a checksummed
+log first, so a crash or a bad edit can't lose anything. Claude Code, Codex, Gemini CLI, Cursor,
+Claude Desktop, Windsurf, VS Code and Zed all use the same notes, and ChatGPT and claude.ai can too
+through the optional secure link.
+
+You can check what Memev holds. `memev why` shows why a note came back, `memev audit` lists junk and
+stale notes, and nothing is deleted behind your back. Notes from one project don't turn up in
+another, and notes in Chinese, Japanese, Korean, Cyrillic, Greek or Arabic are searchable like any
+other. There is no telemetry and nothing to install besides Node and git.
 
 ## Documentation
 

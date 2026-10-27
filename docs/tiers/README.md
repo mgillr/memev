@@ -12,7 +12,7 @@
 | Price (draft) | $0 | $199/month per 10 computers | by contract, private deployment from $6,000/year |
 | Setup | you, in minutes | remote, $2,500 (draft), 2 to 4 weeks | remote or onsite, from $12,000, 6 to 12 weeks |
 | Support | GitHub issues | business hours by priority (20% plan) | named or embedded engineer |
-| Status | **built** | **planned** (the shared vault over a secure link works today) | **planned** |
+| Status | built | planned (the shared vault over a secure link works today) | planned |
 
 Services, remote and onsite rates, travel and response times are in [services.md](services.md).
 
@@ -44,12 +44,12 @@ delivery date.
 
 ## Limits that apply to every tier
 
-- **Cloud models are outside Memev's control.** Once a note is sent to a cloud AI app, the provider
+- Cloud models are outside Memev's control. Once a note is sent to a cloud AI app, the provider
   holds it under its own terms. Memev can decide what is sent; it cannot recall it afterwards.
-- **The company hub can read your notes.** To search notes, the hub must decrypt them. Encryption
+- The company hub can read your notes. To search notes, the hub must decrypt them. Encryption
   protects them in transit and on disk, not from the hub or whoever runs it. A self-hosted hub is
   not end-to-end encrypted, and we will not call it that.
-- **GitHub backup is a copy at GitHub.** The vault is pushed as plain Markdown to a private
+- GitHub backup is a copy at GitHub. The vault is pushed as plain Markdown to a private
   repository. Use a self-hosted git server instead if the notes must not leave your network.
-- **The AI app decides what it asks for.** Memev controls what it returns, not what the app does
+- The AI app decides what it asks for. Memev controls what it returns, not what the app does
   with it.
