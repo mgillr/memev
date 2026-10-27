@@ -12,13 +12,11 @@ import { out } from './common.mjs';
 
 const BLOCK_START = '<!-- memev:start -->', BLOCK_END = '<!-- memev:end -->';
 const TOML_START = '# memev:start', TOML_END = '# memev:end';
+// The block written into CLAUDE.md, AGENTS.md, GEMINI.md and the like. It repeats no rule: the rules come once per
+// session, from the session-start hook or the MCP instructions (src/engine/card.mjs).
 export const INSTRUCTIONS = `${BLOCK_START}
 ## Memory (Memev)
-You have Memev, a persistent memory shared with every other AI session this person runs (MCP server "memev").
-- If no "[Memev resume card]" is in your context, call memev_session_start with the task and project first.
-- Call memev_recall before answering anything the user may have recorded before. Prefer it over guessing.
-- Call memev_remember as soon as a decision, gotcha, fact or preference comes up, in the user's words.
-- Call memev_checkpoint after each finished step (done, doing, next). After a compaction, continue from the latest checkpoint and never redo what is done.
+Memev (MCP server "memev") is this person's memory across AI sessions. Its rules and the resume card arrive at session start; if they have not, call memev_session_start first.
 ${BLOCK_END}`;
 
 export function platformDirs(env = process.env) {
@@ -237,6 +235,8 @@ export const RESTART = {
   cursor: 'Open a new Cursor chat', 'claude-desktop': 'Quit and reopen Claude Desktop', windsurf: 'Quit and reopen Windsurf',
   vscode: 'Reload the VS Code window (Developer: Reload Window)', zed: 'Quit and reopen Zed',
 };
+// Apps whose session-start hook brings the protocol, so their MCP instructions need not repeat it.
+export const HOOK_CLIENTS = new Set(clientDefs({}, 'memev').filter((d) => d.mode === 'hooks').map((d) => d.id));
 export function detect(env = process.env, launcher = 'memev', platform = process.platform) {
   const st = loadState(env);
   return clientDefs(env, launcher, platform).map((d) => ({ id: d.id, name: d.name, mode: d.mode, found: !!d.detect(), connected: !!st.connected[d.id], declined: st.declined.includes(d.id), note: d.note || null, manual: d.manual || null, restart: RESTART[d.id] || `Restart ${d.name}` }));

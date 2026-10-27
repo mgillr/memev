@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // MCP (JSON-RPC 2.0): one handler shared by HTTP (/mcp) and the stdio proxy.
 import { VERSION, VaultError } from '../engine/vault.mjs';
-import { PROTOCOL, renderCard } from '../engine/card.mjs';
+import { PROTOCOL, PROTOCOL_POINTER, renderCard } from '../engine/card.mjs';
+import { HOOK_CLIENTS } from '../cli/clients.mjs';
 
 const S = (props, required = []) => ({ type: 'object', properties: props, required });
 const str = (description) => ({ type: 'string', description });
@@ -11,7 +12,7 @@ const TOOLS = new Map();
 export function tool(name, description, inputSchema, run, { readOnly = false, localOnly = false } = {}) { TOOLS.set(name, { name, description, inputSchema, run, readOnly, localOnly }); }
 
 tool('memev_session_start', 'Call first in every session (and after a compaction): returns the resume card with the project state, what is already done, the last session, recent decisions and memory relevant to the task.', S({ task: str('One sentence: what the user wants now'), project: str('The project or repository name'), session: str('Your session id, if you know it') }),
-  (v, a, c) => { const card = v.sessionStart(c.identity, { task: a.task, project: a.project, client: c.client, session: a.session || c.session }); return { text: `${PROTOCOL}\n\n${renderCard(card)}`, data: card }; }, { readOnly: true });
+  (v, a, c) => { const card = v.sessionStart(c.identity, { task: a.task, project: a.project, client: c.client, session: a.session || c.session }); return { text: HOOK_CLIENTS.has(c.client) ? `${PROTOCOL}\n\n${renderCard(card)}` : renderCard(card), data: card }; }, { readOnly: true });
 tool('memev_recall', 'Search memory before answering anything the user may have recorded. Returns exact snippets with their note, related entities and claim status. With a project, only that project\'s memories and memories with no project are searched.', S({ query: str('What you need to know'), project: str('The project: recall stays inside it'), all_projects: { type: 'boolean', description: 'Search every project (the given project is only ranked higher)' }, limit: { type: 'number' } }, ['query']),
   (v, a, c) => ({ data: v.recall(c.identity, { query: a.query, project: a.project, all_projects: !!a.all_projects, limit: a.limit || 6, client: c.client, session: c.session }) }), { readOnly: true });
 tool('memev_remember', 'Save something that will still matter in a later session: a decision, gotcha, fact, pattern, win, person or preference, in the user\'s words, with the reason when there is one. Skip greetings, status updates and anything true only for this session. Memev refuses acknowledgements, noise and duplicates and says why; short-lived notes get a review date.', S({ text: str('The memory'), kind: str('decision | gotcha | fact | pattern | win | person | preference | note'), project: str('Project name'), why: str('The reason, if given'), review_by: str('Optional: YYYY-MM-DD or a number of days after which it leaves recall unless kept'), force: { type: 'boolean', description: 'Save even if the quality check refuses it (it is flagged)' } }, ['text']),
@@ -78,7 +79,7 @@ export async function handle(vault, msg, ctx) {
   if (!msg || msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') return fail(-32600, 'invalid request');
   if (msg.id === undefined) return null; // notification
   switch (msg.method) {
-    case 'initialize': return reply({ protocolVersion: msg.params?.protocolVersion || '2025-06-18', serverInfo: { name: 'memev', version: VERSION }, capabilities: { tools: { listChanged: false } }, instructions: PROTOCOL });
+    case 'initialize': return reply({ protocolVersion: msg.params?.protocolVersion || '2025-06-18', serverInfo: { name: 'memev', version: VERSION }, capabilities: { tools: { listChanged: false } }, instructions: HOOK_CLIENTS.has(ctx.client) ? PROTOCOL_POINTER : PROTOCOL });
     case 'ping': return reply({});
     case 'tools/list': return reply({ tools: toolList() });
     case 'tools/call': {
