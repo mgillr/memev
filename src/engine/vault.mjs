@@ -59,6 +59,7 @@ export class Vault extends EventEmitter {
     this.contractSessions = new Map();
     this.contractResults = new Map();
     this.commits = new CommitQueue(this.root, { enabled: this.opts.git !== false, delayMs: this.opts.commitDelayMs ?? 400 });
+    this._seedBus();
     this.recover();
     const loaded = this.index.load();
     if (!loaded || this.index.stats().notes === 0) this.reindexAll(); else for (const p of this.allNotes()) this.graph.indexNote(p, this._read(p));
@@ -66,6 +67,18 @@ export class Vault extends EventEmitter {
     this.tuning = loadTuning(this);
     this.started = now();
     return this;
+  }
+
+  /** bus/ is part of the vault from the start: seed it and commit it on its own, before any other write. */
+  _seedBus() {
+    try {
+      const { paths, created } = this.bus.ensure(this.host.id);
+      if (this.opts.git === false) return;
+      const tracked = git(this.root, ['ls-files', '--', ...paths]).out.split('\n').filter(Boolean).length;
+      if (!created.length && tracked === paths.length) return;
+      for (const p of paths) this.commits.add(p, 'bus');
+      this.commits.flush();
+    } catch {}
   }
 
   close() { this.commits.flush(); this.index.save(); this._saveGraph(); this.devices?.saveSoon(); this.log.close(); }

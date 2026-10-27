@@ -54,15 +54,16 @@ async function mcp(url, headers, name, args) {
 }
 const state = (roster, seat) => roster.seats.find((s) => s.seat === seat)?.state;
 
-test('init gives every connected app a seat; each joins and says hello on its first session', async (t) => {
+test('init gives every connected app a seat and --lead picks the lead; each joins and says hello on its first session', async (t) => {
   const sb = sandbox();
   try {
     for (const d of ['.claude', '.cursor']) fs.mkdirSync(path.join(sb.home, d), { recursive: true });
     const s = performance.now();
-    const init = sb.run(['init', '--port', String(sb.port), '--local-only']);
+    const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--lead', 'claude-code@host']);
     t.diagnostic(`memev init with two apps: ${(performance.now() - s).toFixed(0)} ms`);
     assert.equal(init.code, 0, init.err + init.out);
-    assert.match(init.out, /Agent comms bus: 2 seat\(s\): claude-code@host, cursor@host; claude-code@host speaks for you/);
+    assert.match(init.out, /Agent comms bus: bus\/ set up and committed in the vault; 2 seat\(s\): claude-code@host, cursor@host/);
+    assert.match(init.out, /Lead AI: claude-code@host leads and coordinates the others, chosen by you/);
     let r = JSON.parse(sb.run(['bus', 'roster', '--json']).out);
     assert.equal(r.operator, 'claude-code@host');
     assert.equal(state(r, 'claude-code@host'), 'never joined'); assert.equal(state(r, 'cursor@host'), 'never joined');

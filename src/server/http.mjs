@@ -52,7 +52,7 @@ function readBody(req, limit = 2 * 1024 * 1024) {
 }
 
 /** Bus messages as a few lines for a hook to put in the session's context. Empty when there is nothing new. */
-export function renderBus(u) {
+export function renderBus(u, { lead = false } = {}) {
   const L = [];
   if (u.hold) L.push(`[Memev bus] ${u.seat} is ON HOLD by ${u.hold.by} since ${u.hold.since.slice(0, 16)}Z: ${u.hold.reason || 'no reason given'}. Do not start new work until the operator lifts it.`);
   if (u.messages?.length) {
@@ -60,6 +60,7 @@ export function renderBus(u) {
     for (const m of u.messages.slice(-8)) L.push(`  #${m.seq} ${m.type} from ${m.from}${m.operator ? ' [operator]' : ''}${m.to !== 'all' ? ` to ${m.to}` : ''}${m.ref ? ` re ${m.ref}` : ''} (id ${m.id}): ${String(m.body).slice(0, 300)}`);
     if (u.messages.some((m) => m.type === 'task')) L.push('  For a task: claim it with bus_send (type claim, ref = its id) before starting, then restate it.');
   }
+  if (lead && u.lead_needed) L.push(`[Memev bus] ${u.lead_needed}`);
   return L.join('\n');
 }
 
@@ -142,9 +143,9 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
         if (route === '/v1/journal') return send(200, vault.journal(identity, { ...body, client }));
         if (route === '/v1/contract-gate') return send(200, { open: vault.contractGate(body.session) });
         if (route === '/v1/remember') return send(200, vault.remember(identity, { ...body, client }));
-        if (route === '/v1/bus-pulse') { const u = vault.bus.unread(ctx, { peek: !!body.peek }); return send(200, { ...u, text: renderBus(u) }); }
-        if (route === '/v1/bus-register') { const reg = []; for (const cl of [].concat(body.clients || [])) { try { reg.push(vault.bus.resolve({ ...ctx, client: String(cl).slice(0, 40), cli: false }).seat); } catch {} } if (local && body.operator && !vault.bus.operator()) vault.bus.setOperator(body.operator); return send(200, { seats: reg, operator: vault.bus.operator() }); }
-        if (route === '/v1/bus-operator' && ctx.cli) return send(200, { operator: vault.bus.setOperator(body.seat || null) });
+        if (route === '/v1/bus-pulse') { const u = vault.bus.unread(ctx, { peek: !!body.peek }); return send(200, { ...u, text: renderBus(u, { lead: !!body.lead }) }); }
+        if (route === '/v1/bus-register') { if (local) vault._seedBus(); const reg = []; for (const cl of [].concat(body.clients || [])) { try { reg.push(vault.bus.resolve({ ...ctx, client: String(cl).slice(0, 40), cli: false }).seat); } catch {} } if (local && body.operator && !vault.bus.operator()) try { vault.bus.setOperator(body.operator); } catch {} vault.commits.flush(); return send(200, { seats: reg, operator: vault.bus.operator() }); }
+        if (route === '/v1/bus-operator' && ctx.cli) { const seat = body.seat ? vault.bus.seatFor(body.seat) || body.seat : null; const op = vault.bus.setOperator(seat, { by: body.by || 'terminal' }); vault.commits.flush(); return send(200, { operator: op }); }
         if (route === '/v1/reload' && local && identity.scopes.includes('admin')) { vault.emit('reload'); return send(200, { ok: true }); }
       }
       if (req.method === 'GET' && route === '/v1/status') return send(200, vault.status());

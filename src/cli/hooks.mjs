@@ -69,7 +69,7 @@ export async function runHook(event, flags, env = process.env) {
     };
     if (event === 'session-start') {
       const r = await call('session-start', { task: null });
-      const bus = await call('bus-pulse', {}).catch(() => null);
+      const bus = await call('bus-pulse', { lead: true }).catch(() => null); // at session start: also whether the person still has to pick a lead
       await call('journal', { role: 'event', text: `session ${input.source || 'start'} (${client}${project ? `, ${project}` : ''})` }).catch(() => {});
       const lead = input.source === 'compact' ? 'The context was just compacted. The card below is the saved state: continue from "In progress" and do not redo anything listed as done.\n\n' : '';
       emit(format, 'SessionStart', `${lead}${r.protocol || PROTOCOL}\n\n${r.text}${bus?.text ? `\n\n${bus.text}` : ''}`);

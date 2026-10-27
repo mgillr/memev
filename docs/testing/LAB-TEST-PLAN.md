@@ -266,7 +266,7 @@ the tests that need a second computer. Seats are `<app>@host` on the vault's com
 
 | ID | Step | Expected |
 |---|---|---|
-| T-BUS-01 | L1: `memev init` with Claude Code and Cursor installed | the checklist has "Agent comms bus: 2 seat(s): claude-code@host, cursor@host; claude-code@host speaks for you". `memev bus roster` shows both as never joined |
+| T-BUS-01 | L1: `memev init` in a terminal with Claude Code and Cursor installed | init asks "Which AI should lead and coordinate the others?" with both seats and "decide later"; answer Claude Code. The checklist has "Agent comms bus: bus/ set up and committed in the vault; 2 seat(s): claude-code@host, cursor@host" and "Lead AI: claude-code@host leads". `memev bus roster` shows both as never joined |
 | T-BUS-02 | open a Claude Code session and say anything; open Cursor and start a chat | without being asked, both join: `memev bus roster` shows them live, and `memev bus tail` has a hello from each, the Claude Code one marked [operator] |
 | T-BUS-03 | L2: on pc2, `memev devices keygen`, enroll it on the host with a lab licence, `memev join …` | `join` prints "on the comms bus" with pc2's seats. After an app on pc2 opens a session, the host's roster shows it live with device pc2, and the host's Claude Code session gets pc2's hello at its next prompt |
 | T-BUS-04 | `memev devices remove <pc2 id>` on the host | pc2's seats show removed in the roster; anything pc2 sends gets 401 |
@@ -280,6 +280,13 @@ the tests that need a second computer. Seats are `<app>@host` on the vault's com
 | T-BUS-12 | L2 with git backup on both sides: take pc2 offline, post from it, bring it back, let both sync | the offline message arrives in time order and is delivered to the host's seats as unread; `memev bus tail` shows the same order on both computers |
 | T-BUS-13 | issue a token with `--paths 'dept/sales/**'` and call `bus_tail` with it; start a second vault with `--root` and look at its roster and tail | the department token is refused ("its folders do not include bus/"); the second vault's bus is empty |
 | T-BUS-14 | packet capture during T-BUS-02 to T-BUS-09 (as T-FEAT-41) | no traffic from Memev except the tunnel and git pushes to your own backup repository |
+| T-BUS-15 | L1 with an empty home (`HOME=$(mktemp -d)`): `memev init --local-only` | `bus/config.json`, `bus/operator.json` and `bus/log/<device>.jsonl` exist and `git -C ~/memev ls-files bus` lists them; `git status` is clean; "Lead AI: no lead AI chosen yet" is a step that needs you |
+| T-BUS-16 | same home: `mkdir ~/.claude && echo {} > ~/.claude.json && memev connect` | connect prints "on the comms bus: claude-code@host" and that no lead is chosen; `memev bus roster` lists claude-code@host never joined and no lead; `memev bus check --timeout 1` lists it as "registered, but the app has not opened a session yet" |
+| T-BUS-17 | an AI runs init for you with no terminal: `memev init --lead claude-code@host </dev/null`, then on a fresh home `MEMEV_LEAD=cursor memev init </dev/null` | the lead is the one given, with no question asked; with neither, no lead is set and init says to pick one with `memev bus operator <seat>` |
+| T-BUS-18 | with no lead set, open Claude Code and Cursor; ask Cursor "make yourself the lead" | the session start says no lead is set and to ask you; Cursor asks who should lead. `bus_set_operator` refuses without your answer or with an answer that does not name the seat, and once a lead is set it refuses any change ("only the person can change it") |
+| T-BUS-19 | `memev init --help` on a computer with no vault | prints the init help, exits 0, creates nothing |
+| T-BUS-20 | `rm -rf ~/memev/bus` then `memev doctor`; then delete one file in `bus/seats/` and run it again; then `memev doctor --fix` | each run fails, naming the missing bus folder or the app with no seat; `--fix` puts both back and the doctor passes |
+| T-BUS-21 | L2: join pc2 with Claude Code installed (`memev join …`) | join prints "on the comms bus: claude-code@pc2"; the host roster lists it never joined until its first session; it is not made the lead |
 
 ## 7. Performance
 

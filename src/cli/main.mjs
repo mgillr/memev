@@ -12,8 +12,10 @@ import { renderCard } from '../engine/card.mjs';
 const HELP = `memev ${VERSION}: one memory shared by every AI session you run
 
 Setup
-  memev init [--root DIR] [--local-only] [--org] [--no-connect] [--port N]   create the vault, start it, connect your AI apps
-                                   (--org: an organisation install; remote access starts off)
+  memev init [--root DIR] [--local-only] [--org] [--no-connect] [--port N] [--lead SEAT]
+                                   create the vault, start it, connect your AI apps and seat them on the comms bus
+                                   (--org: an organisation install; remote access starts off. --lead or MEMEV_LEAD
+                                   picks the AI that leads the others; on a terminal init asks, otherwise none is set)
   memev connect [client|all]       register Memev in an AI app (MCP, hooks, instructions); backs up first
   memev disconnect [client|all]    remove it again, restoring the app's config
   memev uninstall [--purge]        disconnect everything and stop; --purge also removes the service files
@@ -65,11 +67,18 @@ export function installRuntime(env = process.env) {
 
 export async function main(argv, env = process.env) {
   const [cmd = 'help', ...rest] = argv;
-  const { flags, pos } = parseArgs(rest, ['yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects', 'release', 'open', 'once']);
+  const { flags, pos } = parseArgs(rest, ['help', 'yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects', 'release', 'open', 'once']);
   const root = resolveRoot(flags.root, env);
   const need = () => { if (!isVault(root)) throw new Error(`no vault at ${root}; run memev init`); };
   const json = (o) => console.log(JSON.stringify(o, null, 2));
 
+  // memev <command> --help prints help and does nothing else (init --help used to run a full init)
+  if (!['help', '--help', '-h', 'hook', 'mcp'].includes(cmd) && (flags.help || pos.includes('-h'))) {
+    const lines = HELP.split('\n'); const own = [];
+    lines.forEach((l, i) => { if (l.startsWith(`  memev ${cmd}`) || l.includes(`| ${cmd} `)) { own.push(l); for (let j = i + 1; j < lines.length && /^ {20,}/.test(lines[j]); j++) own.push(lines[j]); } });
+    console.log(own.length ? `${own.join('\n')}\n\nmemev help lists every command.` : HELP);
+    return 0;
+  }
   if (OPTIONAL[cmd]) { const m = await import(OPTIONAL[cmd]); return m.command(cmd, pos, flags, { root, env }); }
   switch (cmd) {
     case 'help': case '--help': case '-h': console.log(HELP); return 0;
@@ -107,7 +116,7 @@ export async function main(argv, env = process.env) {
         v.remember(id, { text: 'Self-test memory: the kettle is blue', kind: 'fact' });
         const hit = v.recall(id, { query: 'what colour is the kettle' })[0];
         const ok = /kettle is blue/.test(hit?.snippet || '') && v.log.verify().ok;
-        const checks = fileChecks({ root: tmp, env, vault: v }).filter((c) => !['apps', 'launcher', 'backup', 'remote'].includes(c.id));
+        const checks = fileChecks({ root: tmp, env, vault: v }).filter((c) => !['apps', 'launcher', 'backup', 'remote', 'bus-seats', 'bus-lead'].includes(c.id));
         v.close();
         const bad = checks.filter((c) => c.status === 'fail');
         console.log(ok && !bad.length ? `selftest: ok (memev ${VERSION}, node ${process.versions.node})` : `selftest: FAILED ${bad.map((c) => c.title).join(', ')}`);
