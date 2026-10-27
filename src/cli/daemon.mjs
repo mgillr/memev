@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Start, stop and find the daemon. Anything that needs the vault starts the daemon on demand.
 import fs from 'node:fs';
+import net from 'node:net';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { PKG, api, daemonInfo, pidAlive, config } from './common.mjs';
@@ -14,6 +15,23 @@ export async function healthy(root, port = null) {
     const want = config(root).vault_id;
     return !want || r.json.vault_id === want;
   } catch { return false; }
+}
+
+// True when nothing listens on the port on this machine's loopback address.
+export const portFree = (port) => new Promise((resolve) => {
+  const s = net.createServer(); s.unref();
+  s.once('error', () => resolve(false));
+  s.listen(port, '127.0.0.1', () => s.close(() => resolve(true)));
+});
+
+// The port this vault should use: the one asked for when it is free or already serves this vault, otherwise the next
+// free port above it. With nothing free nearby it returns the one asked for, and the daemon reports the listen error.
+export async function choosePort(root, wanted) {
+  const info = daemonInfo(root);
+  if (info && info.port === wanted && pidAlive(info.pid)) return wanted; // this vault's daemon already has it
+  if ((await portFree(wanted)) || (await healthy(root, wanted))) return wanted;
+  for (let p = wanted + 1; p < Math.min(wanted + 100, 65536); p++) if (await portFree(p)) return p;
+  return wanted;
 }
 
 export async function ensureDaemon(root, { quiet = false, waitMs = 6000 } = {}) {

@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PKG, parseArgs, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, out } from './common.mjs';
-import { ensureDaemon, startDaemon, stopDaemon, healthy } from './daemon.mjs';
+import { ensureDaemon, startDaemon, stopDaemon, healthy, choosePort } from './daemon.mjs';
 import { initVault, isVault, VERSION } from '../engine/vault.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
 import { writeAtomic, configDir } from '../engine/util.mjs';
@@ -94,8 +94,16 @@ export async function main(argv, env = process.env) {
       const rt = installRuntime(env);
       console.log(`${fresh ? 'Created' : 'Found'} your vault at ${root}`);
       if (r.admin) console.log(`  Admin token saved to ${path.join(root, '.memev', 'admin.json')} (only this user can read it)`);
+      // a port held by another program: take the next free one, and save it before any app is pointed at it
+      const wanted = Number(config(root).port) || 7787;
+      const port = await choosePort(root, wanted);
+      if (port !== wanted) {
+        const c = config(root); c.port = port;
+        fs.writeFileSync(path.join(root, '.memev', 'config.json'), `${JSON.stringify(c, null, 2)}\n`, { mode: 0o600 });
+        out.warn(`Port ${wanted} is in use by another program; Memev is using ${port}`);
+      }
       const up = await startDaemon(root, { quiet: true });
-      up ? out.ok(`Memev is running on http://127.0.0.1:${daemonInfo(root)?.port}`) : out.bad('Memev did not start: run memev doctor');
+      up ? out.ok(`Memev is running on http://127.0.0.1:${daemonInfo(root)?.port ?? config(root).port}`) : out.bad('Memev did not start: run memev doctor');
       const onboarding = await import('./onboarding.mjs').catch(() => null);
       if (onboarding) return onboarding.firstRun({ root, env, flags, launcher: rt.launcher, daemonUp: up });
       return up ? 0 : 1;
