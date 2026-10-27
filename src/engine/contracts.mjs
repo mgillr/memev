@@ -8,7 +8,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { configDir, randomToken, slug, now, readJson, writePrivate, exists, truncate, run } from './util.mjs';
+import { configDir, randomToken, slug, now, readJson, writePrivate, exists, truncate, run as spawn } from './util.mjs';
 import { git } from './git.mjs';
 import * as A from '../../vendor/attest/contract.mjs';
 import { decompose as attestDecompose } from '../../vendor/attest/decompose.mjs';
@@ -142,7 +142,7 @@ export function attach(Vault) {
       if (v.type === 'command') {
         if (!local && this.config.contracts?.exec_local_only !== false) return { status: 'BLOCKED', detail: 'commands run only from this machine' };
         if (this.config.contracts?.exec === false) return { status: 'BLOCKED', detail: 'running commands is switched off (contracts.exec)' };
-        const r = run('sh', ['-c', v.cmd], { cwd: wd, timeout: (v.timeout_s || 300) * 1000 });
+        const r = spawn('sh', ['-c', v.cmd], { cwd: wd, timeout: (v.timeout_s || 300) * 1000 });
         const want = v.expect_exit ?? 0;
         return { status: r.status === want ? 'PASS' : 'FAIL', detail: `exit ${r.status}${r.status === want ? '' : `: ${r.error || truncate(`${r.stderr}${r.stdout}`.trim(), 300)}`}` };
       }
