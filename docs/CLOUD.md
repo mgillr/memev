@@ -20,6 +20,16 @@ The tunnel is chosen in this order (`memev cloud use auto|tailscale|cloudflare|q
 - the plain MCP URL plus the header apps with header support should send:
   `Authorization: Bearer <token>`.
 
+Apps that speak OAuth 2.1 use the standard flow instead of a URL with a secret in it. The server
+publishes its metadata at `/.well-known/oauth-authorization-server` and
+`/.well-known/oauth-protected-resource`. The app registers itself at `/oauth/register` (dynamic
+client registration) and gets a client id, then starts the authorization code grant with PKCE at
+`/oauth/authorize`. That redirects to a consent page on the vault's machine, where the owner
+approves or denies it. The app exchanges the code at `/oauth/token` for a bearer token it sends as
+`Authorization: Bearer <token>`, refreshes it with the refresh token, and gives it back at
+`/oauth/revoke`. Each registered client shows up in `memev devices` as a cloud connector. The
+connector URL above stays available for apps that take only a URL.
+
 Every app and computer has its own credential; there is no shared key. `memev devices` lists them:
 
 ```sh

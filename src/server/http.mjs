@@ -17,6 +17,7 @@ import { seatPolicy, readOnlyReason } from '../engine/entitlements.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { handle } from './mcp.mjs';
+import { OAuthStore, OAuthError, consentPage } from './oauth.mjs';
 import { VaultError, VERSION } from '../engine/vault.mjs';
 import { timingSafeEqualHex, sha256, now, slug } from '../engine/util.mjs';
 import { renderCard, renderRecall, PROTOCOL } from '../engine/card.mjs';
@@ -81,6 +82,7 @@ export function renderBus(u, { lead = false } = {}) {
 export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICENSE_KEYS, env = process.env } = {}) {
   const limiter = new Buckets(vault.config.remote?.rate_per_min || 120);
   const nonces = new NonceCache();
+  const oauth = new OAuthStore(path.join(vault.state, 'oauth.json'));
   // the licence file is read again at most every few seconds, so an install takes effect at once
   let lic = null; let licAt = 0;
   const policy = () => { if (Date.now() - licAt > 3000) { lic = loadLicense({ env, keys: licenseKeys }); licAt = Date.now(); } return seatPolicy({ license: lic, devices: vault.devices.list() }); };
@@ -93,6 +95,74 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
     try {
       // a local caller also gets the vault's id, so the CLI can tell this vault's daemon from another one on the same port
       if (req.method === 'GET' && url.pathname === '/healthz') return send(200, local ? { ok: true, name: 'memev', version: VERSION, vault_id: vault.config?.vault_id ?? null } : { ok: true });
+      // OAuth 2.1 for cloud AI apps: discovery, dynamic client registration, authorization code
+      // with PKCE and a consent page served here, token, refresh and revocation. These setup routes
+      // stay open to remote callers; /mcp itself still needs remote access on and a valid credential.
+      const issuer = `${local ? 'http' : 'https'}://${String(req.headers.host || 'localhost')}`;
+      if (req.method === 'GET' && url.pathname === '/.well-known/oauth-authorization-server') {
+        return send(200, {
+          issuer,
+          authorization_endpoint: `${issuer}/oauth/authorize`,
+          token_endpoint: `${issuer}/oauth/token`,
+          registration_endpoint: `${issuer}/oauth/register`,
+          revocation_endpoint: `${issuer}/oauth/revoke`,
+          response_types_supported: ['code'],
+          grant_types_supported: ['authorization_code', 'refresh_token'],
+          code_challenge_methods_supported: ['S256'],
+          token_endpoint_auth_methods_supported: ['none'],
+          scopes_supported: ['read', 'write'],
+        });
+      }
+      if (req.method === 'GET' && url.pathname === '/.well-known/oauth-protected-resource') {
+        return send(200, { resource: `${issuer}/mcp`, authorization_servers: [issuer], bearer_methods_supported: ['header'] });
+      }
+      if (req.method === 'POST' && url.pathname === '/oauth/register') {
+        let body; try { body = JSON.parse((await getBody()) || '{}'); } catch { return send(400, { error: 'invalid_client_metadata', error_description: 'the body is not json' }); }
+        try { return send(201, oauth.register(body)); }
+        catch (e) { return send(e instanceof OAuthError ? e.status : 400, { error: e.code, error_description: e.message }); }
+      }
+      if (req.method === 'GET' && url.pathname === '/oauth/authorize') {
+        const q = url.searchParams;
+        if (q.get('response_type') !== 'code') return send(400, { error: 'unsupported_response_type', error_description: 'response_type must be code' });
+        try {
+          const { code } = oauth.authorize({ client_id: q.get('client_id'), redirect_uri: q.get('redirect_uri'), code_challenge: q.get('code_challenge'), code_challenge_method: q.get('code_challenge_method'), scope: q.get('scope'), state: q.get('state') });
+          return send(302, '', { location: `/oauth/consent?code=${code}` });
+        } catch (e) {
+          const redir = q.get('redirect_uri');
+          if (redir && /^https?:/i.test(redir)) { const u = new URL(redir); u.searchParams.set('error', e instanceof OAuthError ? e.code : 'invalid_request'); if (q.get('state')) u.searchParams.set('state', q.get('state')); return send(302, '', { location: u.toString() }); }
+          return send(400, { error: e instanceof OAuthError ? e.code : 'invalid_request', error_description: e.message });
+        }
+      }
+      if (req.method === 'GET' && url.pathname === '/oauth/consent') {
+        const rec = oauth.pending(url.searchParams.get('code'));
+        if (!rec) return send(400, 'unknown or expired consent code');
+        return send(200, consentPage({ client: oauth.client(rec.client_id), scopes: rec.scopes, code: rec.code, state: rec.state }), { 'content-type': 'text/html; charset=utf-8' });
+      }
+      if (req.method === 'POST' && url.pathname === '/oauth/consent') {
+        const form = new URLSearchParams((await getBody()) || '');
+        const decision = form.get('decision');
+        if (!['approve', 'deny'].includes(decision)) return send(400, { error: 'invalid_request', error_description: 'decision must be approve or deny' });
+        try {
+          const rec = oauth.consent(form.get('code'), { approve: decision === 'approve' });
+          const u = new URL(rec.redirect_uri);
+          if (rec.approved) u.searchParams.set('code', rec.code); else u.searchParams.set('error', 'access_denied');
+          if (rec.state) u.searchParams.set('state', rec.state);
+          return send(302, '', { location: u.toString() });
+        } catch (e) { return send(400, { error: e.code, error_description: e.message }); }
+      }
+      if (req.method === 'POST' && url.pathname === '/oauth/token') {
+        const form = new URLSearchParams((await getBody()) || '');
+        try {
+          if (form.get('grant_type') === 'authorization_code') return send(200, oauth.exchange({ client_id: form.get('client_id'), code: form.get('code'), redirect_uri: form.get('redirect_uri'), code_verifier: form.get('code_verifier') }));
+          if (form.get('grant_type') === 'refresh_token') return send(200, oauth.refresh({ client_id: form.get('client_id'), refresh_token: form.get('refresh_token') }));
+          return send(400, { error: 'unsupported_grant_type', error_description: 'grant_type must be authorization_code or refresh_token' });
+        } catch (e) { return send(e instanceof OAuthError ? e.status : 400, { error: e.code, error_description: e.message }); }
+      }
+      if (req.method === 'POST' && url.pathname === '/oauth/revoke') {
+        const form = new URLSearchParams((await getBody()) || '');
+        oauth.revoke(form.get('token'));
+        return send(200, {});
+      }
       let token = null; let route = url.pathname;
       const cm = /^\/c\/(mv_[0-9a-f]{8}_[0-9a-f]{32,})(\/.*)$/.exec(url.pathname);
       if (cm) { token = cm[1]; route = cm[2]; }
@@ -113,7 +183,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
           return send(expired ? 410 : 409, { error: expired ? 'expired' : 'refused', error_description: e.message });
         }
       }
-      const identity = vault.tokens.verify(token);
+      const identity = vault.tokens.verify(token) || (token ? oauth.verify(token) : null);
       if (!identity) return send(401, { error: 'unauthorized', error_description: 'a valid bearer token is required' }, { 'www-authenticate': 'Bearer' });
       if (!local) {
         if (!identity.remote) return send(403, { error: 'local_token', error_description: 'this token is for this machine only; for a cloud AI app use the connector URL from memev cloud url, and add another computer with memev devices enroll' });
