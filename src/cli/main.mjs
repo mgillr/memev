@@ -12,9 +12,12 @@ import { renderCard } from '../engine/card.mjs';
 const HELP = `memev ${VERSION}: one memory shared by every AI session you run
 
 Setup
-  memev init [--root DIR] [--local-only] [--org] [--no-connect] [--port N] [--lead SEAT]
+  memev init [--root DIR] [--join CODE] [--local-only] [--org] [--no-connect] [--port N] [--lead SEAT]
                                    create the vault, start it, connect your AI apps and seat them on the comms bus
-                                   (--org: an organisation install; remote access starts off. --lead or MEMEV_LEAD
+                                   (--join CODE adds this computer to an existing vault and creates none here.
+                                   On a terminal, init asks: first computer, or joining. Without a terminal it
+                                   creates a vault and says how a second computer uses memev init --join.
+                                   --org: an organisation install; remote access starts off. --lead or MEMEV_LEAD
                                    picks the AI that leads the others; on a terminal init asks, otherwise none is set)
   memev connect [client|all]       register Memev in an AI app (MCP, hooks, instructions); backs up first
   memev disconnect [client|all]    remove it again, restoring the app's config
@@ -87,6 +90,22 @@ export async function main(argv, env = process.env) {
     case 'join': { const { join } = await import('./remote.mjs'); return join(pos, flags, { env }); }
     case 'version': case '--version': case '-v': console.log(VERSION); return 0;
     case 'init': {
+      const invite = typeof flags.join === 'string' ? flags.join : '';
+      if (flags.join !== undefined && flags.join !== false) {
+        const { join } = await import('./remote.mjs');
+        return join(invite ? [invite] : [], flags, { env });
+      }
+      if (!isVault(root) && process.stdin.isTTY && process.stdout.isTTY) {
+        const readline = await import('node:readline/promises');
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        const answer = (await rl.question('Is this the first computer, or are you adding this one to an existing vault? [first/joining] ')).trim().toLowerCase();
+        rl.close();
+        const picked = /^(?:joining|join)(?:\s+(\S+))?/.exec(answer);
+        if (picked) {
+          const { join } = await import('./remote.mjs');
+          return join(picked[1] ? [picked[1]] : [], flags, { env });
+        }
+      }
       const fresh = !isVault(root);
       const r = initVault(root, { template: path.join(PKG, 'templates', 'vault'), port: flags.port ? Number(flags.port) : null });
       fs.mkdirSync(path.dirname(defaultVaultFile(env)), { recursive: true });
@@ -95,6 +114,7 @@ export async function main(argv, env = process.env) {
       if (flags['local-only'] || org) { const c = config(root); c.remote = { ...c.remote, enabled: false }; if (org) c.profile = 'org'; fs.writeFileSync(path.join(root, '.memev', 'config.json'), `${JSON.stringify(c, null, 2)}\n`, { mode: 0o600 }); }
       const rt = installRuntime(env);
       console.log(`${fresh ? 'Created' : 'Found'} your vault at ${root}`);
+      if (!process.stdin.isTTY) console.log('A second computer joins this one with memev init --join and an invite from memev invite.');
       if (r.admin) console.log(`  Admin token saved to ${path.join(root, '.memev', 'admin.json')} (only this user can read it)`);
       // a port held by another program: take the next free one, and save it before any app is pointed at it
       const wanted = Number(config(root).port) || 7787;
