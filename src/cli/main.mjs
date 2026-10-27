@@ -29,7 +29,7 @@ Setup
   memev invite [--ttl SECONDS]     print a one-time code, link and QR code so another computer can join
   memev join <code>                make a key, enrol this computer and connect its apps
   memev join <url> --token T       the same, with a key and a token made ahead of time
-  memev license status|install <file>|remove   the licence: how many computers may use this vault
+  memev license status|activate <key>|install <file>|remove   the licence: how many computers may use this vault
   memev bus roster|check|send|tail|tasks|watch <seat>|operator <seat>   the comms bus between your AI apps
 
 Daily
