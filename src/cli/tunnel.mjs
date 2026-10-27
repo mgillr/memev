@@ -106,7 +106,9 @@ export function supervise(vault, { root, port }) {
     if (tunnelState(root)?.provider === 'tailscale') { const ts = which('tailscale'); if (ts) spawnSync(ts, ['funnel', '--bg', String(port), 'off'], { timeout: 10000 }); }
   }
   start();
-  return { stop() { stopped = true; halt(); }, reload() { halt(); start(); } };
+  // the relay (off unless the setting is on) is kept up beside the tunnel; see relay.mjs and docs/RELAY.md
+  const relay = import('./relay.mjs').then((m) => m.superviseRelay(vault, { root, port, env })).catch((e) => { log(`relay: ${e.message}`); return null; });
+  return { stop() { stopped = true; halt(); relay.then((r) => r?.stop()); }, reload() { halt(); start(); relay.then((r) => r?.reload()); } };
 }
 
 /** Connector URLs a cloud app can use: the URL form carries the token, so treat it like a password. */
@@ -118,7 +120,7 @@ export function connectorInfo(root, client = 'cloud') {
 
 async function reloadDaemon(root) { const t = adminToken(root); if (!t) return false; try { return (await api(root, '/v1/reload', { token: t })).ok; } catch { return false; } }
 
-export async function command(cmd, pos, flags, { root }) {
+export async function command(cmd, pos, flags, { root, env = process.env }) {
   const sub = pos[0] || 'status'; const cfg = config(root);
   if (sub === 'on' || sub === 'off') {
     if (sub === 'on' && cfg.profile === 'org' && !flags.yes) { console.log('This is an organisation install, where remote access starts off. Recalled text sent through the tunnel reaches whichever cloud AI app asked for it. To switch it on anyway: memev cloud on --yes'); return 1; }
@@ -134,6 +136,7 @@ export async function command(cmd, pos, flags, { root }) {
     if (p === 'cloudflare' && (!flags.name || !flags.hostname)) throw new Error('memev cloud use cloudflare --name <tunnel> --hostname <host>');
     saveConfig(root, cfg); await reloadDaemon(root); console.log(`Tunnel provider: ${p}`); return 0;
   }
+  if (sub === 'relay') { const rc = await (await import('./relay.mjs')).command(pos.slice(1), flags, { root, env }); if (['on', 'off'].includes(pos[1]) && rc === 0) await reloadDaemon(root); return rc; }
   if (sub === 'rotate-key') { writePrivate(tunnelKeyFile(root), `${randomToken(24)}\n`); console.log('New legacy tunnel key. It is no longer needed: each app and computer has its own credential (memev devices). Apps that still send X-Memev-Key need the new value or should drop the header.'); return 0; }
   if (sub === 'status' || sub === 'url') {
     const st = tunnelState(root);
@@ -149,5 +152,5 @@ export async function command(cmd, pos, flags, { root }) {
     } else console.log('  memev cloud url prints the connector URL (it contains a secret).');
     return 0;
   }
-  throw new Error('memev cloud on|off|status|url|use|rotate-key');
+  throw new Error('memev cloud on|off|status|url|use|relay|rotate-key');
 }
