@@ -13,6 +13,8 @@ import { CommitQueue, git } from './git.mjs';
 import { lineSplice, applySplice } from './diff.mjs';
 import { findSecrets, redactSecrets } from './secrets.mjs';
 import { Graph } from './graph.mjs';
+import { Tournament, ROUNDS } from './tournament.mjs';
+import { loadTuning } from './tuning.mjs';
 
 export const VERSION = '0.1.0';
 export const STATE = '.memev';
@@ -41,11 +43,14 @@ export class Vault extends EventEmitter {
     this.log = new OpLog(path.join(this.state, 'oplog'), { segmentBytes: this.opts.segmentBytes, snapshotEvery: this.opts.snapshotEvery, fsync: this.opts.fsync ?? true }).open();
     this.index = new RecallIndex(path.join(this.state, 'index.json'));
     this.graph = new Graph();
+    this.tournament = new Tournament();
+    this.feedback = new Map();
     this.commits = new CommitQueue(this.root, { enabled: this.opts.git !== false, delayMs: this.opts.commitDelayMs ?? 400 });
     this.recover();
     const loaded = this.index.load();
     if (!loaded || this.index.stats().notes === 0) this.reindexAll(); else for (const p of this.allNotes()) this.graph.indexNote(p, this._read(p));
     this._replayGraph();
+    this.tuning = loadTuning(this);
     this.started = now();
     return this;
   }
@@ -62,30 +67,68 @@ export class Vault extends EventEmitter {
   }
   reindexAll() { for (const p of this.allNotes()) { const b = this._read(p); this.index.update(p, b); this.graph.indexNote(p, b); } this.index.save(); }
 
-  /** After a crash: any note whose file differs from what the log says is rebuilt from the log. */
+  /**
+   * Reconcile the files with the log at startup (and before every write to a note):
+   *   file missing             → rebuilt from the log, byte for byte
+   *   file is a prefix of it   → a crash cut an append short: completed from the log
+   *   file differs otherwise   → edited by hand or by git: recorded as an external 'put' (the old
+   *                              version stays in the log), never overwritten
+   */
   recover() {
-    const fixed = [];
+    const fixed = [], imported = [];
     for (const [p, h] of this.log.heads) {
       if (h.deleted || !h.ch) continue;
       const cur = this._read(p);
       if (cur !== null && sha256(cur) === h.ch) continue;
       const content = this.materialize(p);
-      if (content !== null && sha256(content) === h.ch) { fs.mkdirSync(path.dirname(this.abs(p)), { recursive: true }); fs.writeFileSync(this.abs(p), content); fixed.push(p); }
+      if (content === null || sha256(content) !== h.ch) continue;
+      if (cur === null || (content.startsWith(cur) && cur.length < content.length)) { fs.mkdirSync(path.dirname(this.abs(p)), { recursive: true }); fs.writeFileSync(this.abs(p), content); fixed.push(p); }
+      else { this._importExternal(p, cur, 'startup'); imported.push(p); }
     }
-    this.recovered = fixed;
+    for (const p of this.allNotes()) if (!this.log.heads.has(p)) { this._importExternal(p, this._read(p), 'startup'); imported.push(p); }
+    this.recovered = fixed; this.imported = imported;
     return fixed;
   }
+  _importExternal(p, body, source) {
+    const rec = this.log.append({ type: 'put', path: p, agent: 'external', client: source, data: { content: body, ch: sha256(body), external: true } });
+    return rec;
+  }
+  /** A note changed on disk outside Memev (an editor, git pull): log it before touching it. */
+  syncFromDisk(p, source = 'external') {
+    const cur = this._read(p); const h = this.log.heads.get(p);
+    if (cur === null) { if (h && !h.deleted) { const rec = this.log.append({ type: 'delete', path: p, agent: 'external', client: source, data: { external: true } }); this.index.remove(p); this.graph.removeNote(p); return rec; } return null; }
+    if (h && !h.deleted && h.ch === sha256(cur)) return null;
+    const rec = this._importExternal(p, cur, source);
+    this.index.update(p, cur, { mtime: rec.ts }); this.graph.indexNote(p, cur); this._indexSaveSoon();
+    return rec;
+  }
 
-  /** Fold the log for one path into its content (streams the log). */
-  materialize(p) {
+  /** Fold the log for one path into its content (streams the log). `uptoSeq` gives any earlier version. */
+  materialize(p, { uptoSeq = Infinity } = {}) {
     let c = null;
     for (const rec of this.log.iterate({ path: p })) {
+      if (rec.seq > uptoSeq) break;
       if (rec.type === 'put') c = rec.data.content;
       else if (rec.type === 'append') c = (c ?? '') + rec.data.text;
       else if (rec.type === 'splice') c = applySplice(c ?? '', rec.data);
       else if (rec.type === 'delete') c = null;
     }
     return c;
+  }
+
+  /** Rebuild every note from the log alone into `dir` (a disaster-recovery copy), in one streaming pass. */
+  rebuildInto(dir) {
+    const cur = new Map();
+    for (const rec of this.log.iterate()) {
+      if (!rec.path) continue;
+      const c = cur.get(rec.path) ?? null;
+      if (rec.type === 'put') cur.set(rec.path, rec.data.content);
+      else if (rec.type === 'append') cur.set(rec.path, (c ?? '') + rec.data.text);
+      else if (rec.type === 'splice') cur.set(rec.path, applySplice(c ?? '', rec.data));
+      else if (rec.type === 'delete') cur.delete(rec.path);
+    }
+    for (const [p, c] of cur) { const f = path.join(dir, ...p.split('/')); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, c); }
+    return [...cur.keys()].sort();
   }
 
   // ---- auth helpers
@@ -112,6 +155,7 @@ export class Vault extends EventEmitter {
   write(identity, { path: p, body, client = null, allow_secrets = false, internal = false }) {
     p = checkPath(p); this._need(identity, 'write', p); body = String(body ?? '');
     this._guard(p, body, allow_secrets, internal);
+    this.syncFromDisk(p);
     const old = this._read(p);
     let rec;
     if (old === null) rec = this.log.append({ type: 'put', path: p, agent: identity.agent, client, data: { content: body, ch: sha256(body) } });
@@ -131,6 +175,7 @@ export class Vault extends EventEmitter {
 
   append(identity, { path: p, text, client = null, allow_secrets = false, internal = false }) {
     p = checkPath(p); this._need(identity, 'write', p);
+    this.syncFromDisk(p);
     const old = this._read(p) ?? '';
     let t = String(text ?? ''); if (old && !old.endsWith('\n')) t = `\n${t}`; if (!t.endsWith('\n')) t += '\n';
     this._guard(p, t, allow_secrets, internal);
@@ -204,7 +249,7 @@ export class Vault extends EventEmitter {
   /** Recall: the index, filtered to what the token may read, annotated with graph context; the use is logged. */
   recall(identity, { query, project = null, limit = 6, client = null, session = null, log = true }) {
     this._need(identity, 'read', null);
-    const hits = this.index.query(query, { limit: limit * 3, project }).filter((h) => allowed(identity, 'read', h.path)).slice(0, limit);
+    const hits = this.index.query(query, { limit: limit * 3, project, boosts: this.tuning?.boosts }).filter((h) => allowed(identity, 'read', h.path)).slice(0, limit);
     for (const h of hits) {
       const key = `${h.path}#${h.heading || ''}`;
       const ents = this.graph.sectionEnts.get(key) || [];
@@ -296,16 +341,39 @@ export class Vault extends EventEmitter {
     return { path: p, heading, written: origin.slice(-limit), written_total: origin.length, used: used.slice(-limit), used_total: used.length, commits };
   }
 
+  /** Say whether recalled items helped; recall tuning learns from it. */
+  feedbackOn(identity, { items, useful, client = null, session = null }) {
+    this._need(identity, 'write', null);
+    const list = (Array.isArray(items) ? items : [items]).filter(Boolean).map(String).slice(0, 20);
+    if (!list.length) throw new VaultError('bad_request', 'feedback needs items (path#heading from recall)');
+    const rec = this.log.append({ type: 'feedback', agent: identity.agent, client, data: { items: list, useful: !!useful, session } });
+    this._applyMisc(rec); this._indexSaveSoon();
+    return { seq: rec.seq, items: list.length };
+  }
+  match(identity, { topic, a, b, winner = null, round = 'evidence', why = null, client = null }) {
+    this._need(identity, 'write', null);
+    if (!topic || !a || !b || a === b) throw new VaultError('bad_request', 'a match needs a topic and two different contenders');
+    if (winner && winner !== a && winner !== b) throw new VaultError('bad_request', 'winner must be a, b or empty for a draw');
+    if (!ROUNDS.includes(round)) throw new VaultError('bad_request', `round: ${ROUNDS.join(', ')}`);
+    const rec = this.log.append({ type: 'tournament.match', agent: identity.agent, client, data: { topic, a, b, winner, round, why } });
+    this._applyMisc(rec); this._indexSaveSoon();
+    return { seq: rec.seq, standings: this.tournament.standings(topic) };
+  }
+  _applyMisc(rec) {
+    if (rec.type === 'tournament.match') this.tournament.applyOp(rec);
+    else if (rec.type === 'feedback') for (const it of rec.data.items) { const f = this.feedback.get(it) || { up: 0, down: 0 }; rec.data.useful ? f.up++ : f.down++; this.feedback.set(it, f); }
+  }
+
   _replayGraph() {
     const f = path.join(this.state, 'graph.json'); const snap = readJson(f, null); let from = 1;
-    if (snap?.version === 1) { for (const e of snap.edges) this.graph.edges.push(e); for (const c of snap.claims) this.graph.claims.set(c.id, c); for (const [k, u] of snap.usage) this.graph.usage.set(k, u); from = snap.seq + 1; }
-    for (const rec of this.log.iterate({ fromSeq: from })) if (/^(graph\.|claim|usage)/.test(rec.type)) this.graph.applyOp(rec);
+    if (snap?.version === 2) { for (const e of snap.edges) this.graph.edges.push(e); for (const c of snap.claims) this.graph.claims.set(c.id, c); for (const [k, u] of snap.usage) this.graph.usage.set(k, u); this.tournament.load(snap.tournament); this.feedback = new Map(snap.feedback || []); from = snap.seq + 1; }
+    for (const rec of this.log.iterate({ fromSeq: from })) { if (/^(graph\.|claim|usage)/.test(rec.type)) this.graph.applyOp(rec); else if (rec.type === 'tournament.match' || rec.type === 'feedback') this._applyMisc(rec); }
   }
-  _saveGraph() { writePrivateJson(path.join(this.state, 'graph.json'), { version: 1, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()] }); }
+  _saveGraph() { writePrivateJson(path.join(this.state, 'graph.json'), { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()] }); }
 
   status() {
     const mu = process.memoryUsage();
-    return { version: VERSION, vault: this.root, started: this.started, oplog: this.log.stats(), index: this.index.stats(), graph: this.graph.stats(), memory: { rss_mb: Math.round(mu.rss / 1048576), heap_mb: Math.round(mu.heapUsed / 1048576) }, recovered: this.recovered?.length || 0 };
+    return { version: VERSION, vault: this.root, started: this.started, oplog: this.log.stats(), index: this.index.stats(), graph: this.graph.stats(), memory: { rss_mb: Math.round(mu.rss / 1048576), heap_mb: Math.round(mu.heapUsed / 1048576) }, recovered: this.recovered?.length || 0, imported: this.imported?.length || 0 };
   }
 }
 

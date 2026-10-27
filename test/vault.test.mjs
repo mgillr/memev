@@ -17,18 +17,52 @@ test('an edit to a large note is logged as a small splice, not the whole note', 
   v.close();
 });
 
-test('a lost or damaged note is rebuilt byte for byte from the log', () => {
+test('a lost note is rebuilt and a cut-short append completed, byte for byte, from the log', () => {
   const { root, v } = newVault();
   v.write(OWNER, { path: 'notes/a.md', body: '# A\nfirst\n' });
   v.append(OWNER, { path: 'notes/a.md', text: 'second' });
   v.write(OWNER, { path: 'notes/a.md', body: '# A\nfirst\nsecond\nthird\n' });
-  const want = fs.readFileSync(path.join(root, 'notes/a.md'));
+  v.append(OWNER, { path: 'notes/b.md', text: 'one\ntwo\nthree' });
+  const wantA = fs.readFileSync(path.join(root, 'notes/a.md')), wantB = fs.readFileSync(path.join(root, 'notes/b.md'));
   v.close();
-  fs.writeFileSync(path.join(root, 'notes/a.md'), 'garbage');
+  fs.rmSync(path.join(root, 'notes/a.md'));
+  fs.writeFileSync(path.join(root, 'notes/b.md'), wantB.subarray(0, 6));
   const v2 = new Vault(root, { git: false, fsync: false }).open();
-  assert.deepEqual(v2.recovered, ['notes/a.md']);
-  assert.deepEqual(fs.readFileSync(path.join(root, 'notes/a.md')), want);
+  assert.deepEqual(v2.recovered.sort(), ['notes/a.md', 'notes/b.md']);
+  assert.deepEqual(fs.readFileSync(path.join(root, 'notes/a.md')), wantA);
+  assert.deepEqual(fs.readFileSync(path.join(root, 'notes/b.md')), wantB);
   v2.close();
+});
+
+test('a note edited by hand is never overwritten: the edit is logged and the old version kept', () => {
+  const { root, v } = newVault();
+  const w = v.write(OWNER, { path: 'notes/h.md', body: 'original\n' });
+  v.close();
+  fs.writeFileSync(path.join(root, 'notes/h.md'), 'edited in an editor\n');
+  const v2 = new Vault(root, { git: false, fsync: false }).open();
+  assert.equal(fs.readFileSync(path.join(root, 'notes/h.md'), 'utf8'), 'edited in an editor\n');
+  assert.equal(v2.materialize('notes/h.md', { uptoSeq: w.seq }), 'original\n');
+  fs.writeFileSync(path.join(root, 'notes/h.md'), 'edited again while running\n');
+  v2.append(OWNER, { path: 'notes/h.md', text: 'and appended' });
+  assert.equal(v2.materialize('notes/h.md'), 'edited again while running\nand appended\n');
+  v2.close();
+});
+
+test('the whole vault can be rebuilt from the log alone, byte for byte, after rolls and snapshots', () => {
+  const { root, v: v0 } = newVault(); v0.close();
+  const v = new Vault(root, { git: false, fsync: false, segmentBytes: 8192, snapshotEvery: 40 }).open();
+  for (let i = 0; i < 300; i++) {
+    if (i % 3 === 0) v.remember(OWNER, { text: `fact number ${i} about ${['cats', 'ships', 'tea'][i % 3]} ${i * 7}`, kind: 'fact' });
+    else if (i % 3 === 1) v.append(OWNER, { path: `notes/n${i % 11}.md`, text: `entry ${i}` });
+    else v.write(OWNER, { path: `notes/w${i % 5}.md`, body: `# W\n${'line\n'.repeat(i % 17)}version ${i}\n` });
+  }
+  assert.ok(v.log.stats().segments > 2);
+  const out = path.join(root, '..', 'rebuilt');
+  const paths = v.rebuildInto(out);
+  for (const p of v.allNotes()) assert.deepEqual(fs.readFileSync(path.join(out, p)), fs.readFileSync(path.join(root, p)), p);
+  assert.equal(paths.length, v.allNotes().length);
+  assert.equal(v.log.verify().ok, true);
+  v.close();
 });
 
 test('secrets, signed contracts and paths outside the vault are refused', () => {

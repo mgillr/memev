@@ -73,7 +73,7 @@ export class RecallIndex {
   }
 
   /** BM25. Returns [{ path, heading, line, snippet, score, project }]. `project` boosts that project's sections. */
-  query(q, { limit = 8, project = null, prefix = null } = {}) {
+  query(q, { limit = 8, project = null, prefix = null, boosts = null } = {}) {
     const terms = [...new Set(tokenize(q))];
     if (!terms.length || !this.docs.size) return [];
     const N = this.docs.size, avg = this.totalLen / N, k1 = 1.2, b = 0.75;
@@ -89,7 +89,7 @@ export class RecallIndex {
     const proj = project ? String(project).toLowerCase() : null;
     return [...scores.entries()].map(([id, s]) => {
       const d = this.docs.get(id);
-      return { d, score: s * (proj && d.project === proj ? 1.5 : 1) };
+      return { d, score: s * (proj && d.project === proj ? 1.5 : 1) * (boosts?.[`${d.path}#${d.heading || ''}`] ?? 1) };
     }).filter(({ d }) => !prefix || d.path.startsWith(prefix))
       .sort((x, y) => y.score - x.score).slice(0, limit)
       .map(({ d, score }) => ({ path: d.path, heading: d.heading, line: d.line, snippet: d.snippet, score: Number(score.toFixed(3)), project: d.project }));
