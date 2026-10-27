@@ -119,27 +119,30 @@ export class Graph {
     return null;
   }
 
-  neighbours(entityOrKey, limit = 12) {
+  /** `view` (from Vault.graphView) hides entities that only appear in notes the caller may not read. */
+  neighbours(entityOrKey, limit = 12, view = null) {
     const id = this.entities.has(entityOrKey) ? entityOrKey : slug(entityOrKey);
-    const out = [];
+    if (view && !view.entity(id)) return [];
+    let out = [];
     for (const [k, w] of this.cooc) { const [a, b] = k.split('|'); if (a === id) out.push({ entity: b, weight: w, via: 'co_occurs' }); else if (b === id) out.push({ entity: a, weight: w, via: 'co_occurs' }); }
     for (const e of this.edges) if (!e.retracted && (e.from === id || e.to === id)) out.push({ entity: e.from === id ? e.to : e.from, weight: 3, via: e.type, why: e.why, seq: e.seq });
+    if (view) out = out.filter((n) => view.entity(n.entity));
     return out.sort((x, y) => y.weight - x.weight).slice(0, limit).map((n) => ({ ...n, name: this.entities.get(n.entity)?.name || n.entity }));
   }
 
   /** Shortest chain of connections between two entities (BFS over co-occurrence and explicit edges). */
-  explain(a, b, maxDepth = 4) {
+  explain(a, b, maxDepth = 4, view = null) {
     const s = slug(a), t = slug(b);
-    if (!this.entities.has(s) && !this.edges.some((e) => e.from === s || e.to === s)) return { found: false, reason: `nothing in memory names ${a}` };
+    if ((!this.entities.has(s) && !this.edges.some((e) => e.from === s || e.to === s)) || (view && !view.entity(s))) return { found: false, reason: `nothing in memory names ${a}` };
     const prev = new Map([[s, null]]); let frontier = [s];
     for (let d = 0; d < maxDepth && frontier.length; d++) {
       const next = [];
-      for (const n of frontier) for (const nb of this.neighbours(n, 50)) if (!prev.has(nb.entity)) { prev.set(nb.entity, { from: n, via: nb.via, why: nb.why }); next.push(nb.entity); }
+      for (const n of frontier) for (const nb of this.neighbours(n, 50, view)) if (!prev.has(nb.entity)) { prev.set(nb.entity, { from: n, via: nb.via, why: nb.why }); next.push(nb.entity); }
       if (prev.has(t)) break; frontier = next;
     }
     if (!prev.has(t)) return { found: false, reason: `no chain of up to ${maxDepth} links between ${a} and ${b}` };
     const steps = []; let cur = t;
-    while (prev.get(cur)) { const p = prev.get(cur); steps.unshift({ from: this.entities.get(p.from)?.name || p.from, to: this.entities.get(cur)?.name || cur, via: p.via, why: p.why || null, evidence: this.sharedSections(p.from, cur).slice(0, 3) }); cur = p.from; }
+    while (prev.get(cur)) { const p = prev.get(cur); steps.unshift({ from: this.entities.get(p.from)?.name || p.from, to: this.entities.get(cur)?.name || cur, via: p.via, why: p.why || null, evidence: this.sharedSections(p.from, cur).filter((k) => !view || view.section(k)).slice(0, 3) }); cur = p.from; }
     return { found: true, steps };
   }
   sharedSections(a, b) { const A = this.entities.get(a)?.sections, B = this.entities.get(b)?.sections; if (!A || !B) return []; return [...A].filter((k) => B.has(k)); }

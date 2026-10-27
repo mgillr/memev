@@ -12,20 +12,26 @@ import { renderCard } from '../engine/card.mjs';
 const HELP = `memev ${VERSION}: one memory shared by every AI session you run
 
 Setup
-  memev init [--root DIR] [--local-only] [--no-connect] [--port N]   create the vault, start it, connect your AI apps
+  memev init [--root DIR] [--local-only] [--org] [--no-connect] [--port N]   create the vault, start it, connect your AI apps
+                                   (--org: an organisation install; remote access starts off)
   memev connect [client|all]       register Memev in an AI app (MCP, hooks, instructions); backs up first
   memev disconnect [client|all]    remove it again, restoring the app's config
   memev uninstall [--purge]        disconnect everything and stop; --purge also removes the service files
   memev clients                    which AI apps are installed and connected
   memev status | doctor [--fix] [--bundle]
-  memev cloud on|off|status|url    reach this vault from cloud AI apps through a private tunnel (on by default)
+  memev cloud on|off|status|url    reach this vault from cloud AI apps through a private tunnel (on by default
+                                   for personal installs, off for --org installs)
   memev github setup               back the vault up to your own private GitHub repository
   memev service install|remove     start Memev at login (systemd or launchd)
   memev devices [enroll|revoke|rotate|rename|keygen]   computers and apps using this vault, each with its own credential
   memev license status             licence and seat report (report only: the free tier is never limited)
 
 Daily
-  memev recall <query>  |  memev remember <text> [--kind decision]  |  memev card [--project P]
+  memev recall <query> [--project P] [--all-projects]  |  memev card [--project P]
+  memev remember <text> [--kind decision] [--why W] [--review-by DATE|DAYS] [--force]
+  memev why <query> [--item path#heading] [--project P]   why recall returned what it did
+  memev review [list|keep|drop|reset] [items] [--days N]  the inbox of flagged and short-lived memories
+  memev audit [--json]             a read-only report on junk, duplicates and stale memories
   memev checkpoint --project P [--task T] [--done a,b] [--doing x] [--next c,d]
   memev claims [--status fact]  |  memev contract status|from-request|new|sign|verify|list|amend|decompose|hook
   memev verify [id]  |  memev gate [--workdir DIR]   check signed contracts on this machine (never CI)
@@ -38,7 +44,7 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './service.mjs', contract: './contracts-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './service.mjs', contract: './contracts-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 export function installRuntime(env = process.env) {
@@ -57,7 +63,7 @@ export function installRuntime(env = process.env) {
 
 export async function main(argv, env = process.env) {
   const [cmd = 'help', ...rest] = argv;
-  const { flags, pos } = parseArgs(rest, ['yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all']);
+  const { flags, pos } = parseArgs(rest, ['yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects']);
   const root = resolveRoot(flags.root, env);
   const need = () => { if (!isVault(root)) throw new Error(`no vault at ${root}; run memev init`); };
   const json = (o) => console.log(JSON.stringify(o, null, 2));
@@ -71,7 +77,8 @@ export async function main(argv, env = process.env) {
       const r = initVault(root, { template: path.join(PKG, 'templates', 'vault'), port: flags.port ? Number(flags.port) : null });
       fs.mkdirSync(path.dirname(defaultVaultFile(env)), { recursive: true });
       fs.writeFileSync(defaultVaultFile(env), `${root}\n`);
-      if (flags['local-only']) { const c = config(root); c.remote = { ...c.remote, enabled: false }; fs.writeFileSync(path.join(root, '.memev', 'config.json'), `${JSON.stringify(c, null, 2)}\n`, { mode: 0o600 }); }
+      const org = !!flags.org || env.MEMEV_PROFILE === 'org';
+      if (flags['local-only'] || org) { const c = config(root); c.remote = { ...c.remote, enabled: false }; if (org) c.profile = 'org'; fs.writeFileSync(path.join(root, '.memev', 'config.json'), `${JSON.stringify(c, null, 2)}\n`, { mode: 0o600 }); }
       const rt = installRuntime(env);
       console.log(`${fresh ? 'Created' : 'Found'} your vault at ${root}`);
       if (r.admin) console.log(`  Admin token saved to ${path.join(root, '.memev', 'admin.json')} (only this user can read it)`);
@@ -121,8 +128,8 @@ export async function main(argv, env = process.env) {
       need(); if (!(await ensureDaemon(root, { quiet: true }))) throw new Error('the daemon is not running');
       const token = clientToken(root, 'cli'); const list = (v) => (v ? String(v).split(',').map((s) => s.trim()).filter(Boolean) : []);
       const call = async (route, body) => { const r = await api(root, `/v1/${route}`, { body, token }); if (!r.ok) throw new Error(r.json?.error_description || r.text); return r.json; };
-      if (cmd === 'recall') { const r = await call('recall', { query: pos.join(' '), limit: Number(flags.limit || 6), project: flags.project }); flags.json ? json(r.hits) : console.log(r.text || 'Nothing found.'); }
-      if (cmd === 'remember') json(await call('remember', { text: pos.join(' '), kind: flags.kind, project: flags.project, why: flags.why }));
+      if (cmd === 'recall') { const r = await call('recall', { query: pos.join(' '), limit: Number(flags.limit || 6), project: flags.project, all_projects: !!flags['all-projects'] }); flags.json ? json(r.hits) : console.log(r.text || 'Nothing found.'); }
+      if (cmd === 'remember') json(await call('remember', { text: pos.join(' '), kind: flags.kind, project: flags.project, why: flags.why, review_by: flags['review-by'], force: !!flags.force }));
       if (cmd === 'checkpoint') json(await call('checkpoint', { project: flags.project, task: flags.task, done: list(flags.done), doing: flags.doing, next: list(flags.next), files: list(flags.files), source: 'cli' }));
       if (cmd === 'card') { const r = await call('session-start', { project: flags.project, task: flags.task || pos.join(' ') || null }); console.log(flags.json ? JSON.stringify(r.card, null, 2) : renderCard(r.card)); }
       return 0;

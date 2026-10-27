@@ -29,7 +29,7 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   else add(u.file && exists(u.file) ? 'ready' : 'needs-manual', 'Start at login', u.file && exists(u.file) ? u.file : 'memev service install');
   // cloud
   const cfg = config(root);
-  if (!cfg.remote?.enabled) add('ready', 'Cloud AI apps', 'remote access is off (memev cloud on to enable)');
+  if (!cfg.remote?.enabled) add('ready', 'Cloud AI apps', cfg.profile === 'org' ? 'remote access is off, as for every organisation install (memev cloud on --yes to enable)' : 'remote access is off (memev cloud on to enable)');
   else {
     let st = readJson(path.join(root, '.memev', 'tunnel.json'), null);
     for (let i = 0; firstRun && daemonUp && i < 40 && !st?.url && !/error|no provider|MEMEV_NO_TUNNEL/.test(st?.state || ''); i++) { await new Promise((r) => setTimeout(r, 250)); st = readJson(path.join(root, '.memev', 'tunnel.json'), null); }
