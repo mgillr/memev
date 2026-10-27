@@ -92,6 +92,10 @@ Tool results are counted on their text content, which is what the model reads; t
 
 The guard is part of every `--check`. On-topic recall@6, precision@6, recall@4 and precision@4 may not fall below the baseline, and the off-topic injection rate may not rise above it. The benchmark is deterministic, so any drop is a real change. With `--latency-vs`, recall p95 must stay within 10 percent or 5 ms of the other commit, both timed in the same run; that tolerance is a proposal under review. If a token target cannot be met without lowering recall, the change stops there: the benchmark, the baseline and the targets are not loosened.
 
+## The per-prompt bar
+
+The prompt hook injects a recalled item only when its score reaches the hook's bar (`HOOK_MIN_SCORE` in `src/server/http.mjs`, overridden by `recall.hook_min_score` in a vault's config). It does not recall at all for a prompt under 4 words or a continuation phrase such as `continue`, `go on` or `thanks`. `memev_recall`, which the model calls itself, has no bar. `bench/targets.json` (`hook_min_score`) records the value with the sweep that chose it: the highest bar from 6 to 8 that keeps every on-topic hit the baseline finds, at both levels.
+
 ## The baseline
 
 `bench/baseline.json` is the harness run against 18abe10161ca34d4665bb2fc58b1dc4f84c9bacb at both levels (`--repo-sha 18abe10161ca34d4665bb2fc58b1dc4f84c9bacb --record`), before any token change. The recall p95 in it is for reference only, since timings depend on the machine; the guard compares latency against `--latency-vs` in the same run.

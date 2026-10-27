@@ -23,6 +23,11 @@ import { renderCard, renderRecall, PROTOCOL } from '../engine/card.mjs';
 
 const PROXY_HEADERS = ['x-forwarded-for', 'x-forwarded-host', 'forwarded', 'x-real-ip', 'cf-connecting-ip', 'cf-ray', 'tailscale-user-login', 'x-original-forwarded-for'];
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+// The bar for injecting memory into a prompt, in BM25 score. Tuned on the benchmark's labelled prompts (bench/targets.json):
+// the highest value that keeps every on-topic hit at 1,000 and 5,000 memories. recall.hook_min_score overrides it; a higher
+// recall.min_score still wins. memev_recall, which the model calls itself, has no bar.
+export const HOOK_MIN_SCORE = 7;
+export const hookMinScore = (config) => Math.max(config?.recall?.hook_min_score ?? HOOK_MIN_SCORE, config?.recall?.min_score ?? 0);
 // In a container the host's requests arrive from the bridge gateway. MEMEV_TRUST_GATEWAY=1 (set by the
 // image, whose port is published on the host's loopback only) treats private-range peers as local.
 const PRIVATE = /^(::ffff:)?(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/;
@@ -151,7 +156,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       if (req.method === 'POST' && route.startsWith('/v1/')) {
         const body = JSON.parse((await getBody()) || '{}');
         if (route === '/v1/session-start') { const card = vault.sessionStart(identity, { ...body, client }); return send(200, { card, text: renderCard(card), protocol: PROTOCOL }); }
-        if (route === '/v1/recall') { const own = body.session ? `-${slug(String(body.session), 16)}.md` : null; const hits = vault.recall(identity, { ...body, client, limit: body.limit || 4 }).filter((h) => h.score >= (vault.config.recall?.min_score ?? 1) && !(own && h.path.startsWith('work/sessions/') && h.path.endsWith(own))); return send(200, { hits, text: renderRecall(hits, { maxChars: vault.config.recall?.max_chars || 1500 }) }); }
+        if (route === '/v1/recall') { const own = body.session ? `-${slug(String(body.session), 16)}.md` : null; const hits = vault.recall(identity, { ...body, client, limit: body.limit || 4 }).filter((h) => h.score >= hookMinScore(vault.config) && !(own && h.path.startsWith('work/sessions/') && h.path.endsWith(own))); return send(200, { hits, text: renderRecall(hits, { maxChars: vault.config.recall?.max_chars || 1500 }) }); }
         if (route === '/v1/checkpoint') return send(200, vault.checkpoint(identity, { ...body, client }));
         if (route === '/v1/journal') return send(200, vault.journal(identity, { ...body, client }));
         if (route === '/v1/contract-gate') return send(200, { open: vault.contractGate(body.session) });

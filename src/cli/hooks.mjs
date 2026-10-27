@@ -38,6 +38,10 @@ function emit(format, event, context) {
 // A request to build something: the session is reminded to turn it into a signed contract first.
 const BUILD_RE = /\b(i have a (new )?project|build (me|us)\b|(build|make|create|write|implement|develop|set up) (me |us )?(an? |the )?[\w -]{0,40}\b(app|application|tool|cli|api|service|site|website|bot|library|script|feature|game|dashboard|server|extension|plugin|pipeline))/i;
 export const isBuildRequest = (p) => BUILD_RE.test(String(p || ''));
+// A prompt that only moves the conversation on: under 4 words, or a continuation phrase. Recall has nothing to match
+// it against, so the hook does not recall for it.
+const CONTINUATION = /^(continue|go on|go ahead|carry on|keep going|yes|yes please|yep|yeah|ok|okay|sure|thanks|thank you|fix it|do it|next|proceed|please continue)[\s.!]*$/i;
+export const isContinuation = (p) => { const s = String(p || '').trim(); return s.split(/\s+/).filter(Boolean).length < 4 || CONTINUATION.test(s); };
 const BUILD_NUDGE = '[Memev] This is a build request. Before writing code: infer the requirements, call memev_contract_from_request (each requirement with a local check), then memev_contract_sign, and say in one line what you signed. If an open contract already covers it, use memev_contract_status instead.';
 
 export async function runHook(event, flags, env = process.env) {
@@ -77,10 +81,10 @@ export async function runHook(event, flags, env = process.env) {
       const prompt = String(input.prompt || input.user_prompt || '').trim();
       if (prompt) {
         if (!st.task) st.task = prompt.slice(0, 200);
-        const r = await call('recall', { query: prompt.slice(0, 1000), limit: 4 });
+        const r = isContinuation(prompt) ? null : await call('recall', { query: prompt.slice(0, 1000), limit: 4 });
         const bus = await call('bus-pulse', {}).catch(() => null);
         await call('journal', { role: 'user', text: prompt });
-        emit(format, 'UserPromptSubmit', [bus?.text, r.text, isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
+        emit(format, 'UserPromptSubmit', [bus?.text, r?.text, isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
       }
     } else if (event === 'pre-compact') {
       await saveCheckpoint('pre-compact');
