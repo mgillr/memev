@@ -15,7 +15,10 @@ Setup
   memev init [--root DIR] [--join CODE] [--local-only] [--org] [--no-connect] [--port N] [--lead SEAT]
                                    create the vault, start it, connect your AI apps and seat them on the comms bus
                                    (--join CODE adds this computer to an existing vault and creates none here.
-                                   On a terminal, init asks: first computer, or joining. Without a terminal it
+                                   On a terminal, init asks: first computer, or joining. If GitHub is signed in
+                                   and a private backup's README is a Memev vault, init offers to join that
+                                   vault before it creates a new one. With no GitHub CLI, or signed out, init
+                                   makes no GitHub call. Without a terminal it
                                    creates a vault and says how a second computer uses memev init --join.
                                    --org: an organisation install; remote access starts off. --lead or MEMEV_LEAD
                                    picks the AI that leads the others; on a terminal init asks, otherwise none is set)
@@ -108,7 +111,28 @@ async function run(argv, env) {
         const { join } = await import('./remote.mjs');
         return join(invite ? [invite] : [], flags, { env });
       }
-      if (!isVault(root) && process.stdin.isTTY && process.stdout.isTTY) {
+      let tookBackup = false;
+      if (!isVault(root)) {
+        const { findMemevBackup, cloneBackup } = await import('./github.mjs');
+        const backup = findMemevBackup();
+        if (backup) {
+          console.log(`A Memev backup is at ${backup.repo}. Join that vault?`);
+          if (!(process.stdin.isTTY && process.stdout.isTTY)) {
+            console.log('Run memev init in a terminal to answer. Init did not create a new vault.');
+            return 0;
+          }
+          const readline = await import('node:readline/promises');
+          const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+          const answer = (await rl.question('[yes/no] ')).trim().toLowerCase();
+          rl.close();
+          if (/^(y|yes)$/.test(answer)) {
+            const cloned = cloneBackup(backup.repo, root);
+            if (!cloned.ok) { console.log(`Could not clone ${backup.repo}. Init did not create a new vault.`); return 1; }
+            tookBackup = true;
+          }
+        }
+      }
+      if (!tookBackup && !isVault(root) && process.stdin.isTTY && process.stdout.isTTY) {
         const readline = await import('node:readline/promises');
         const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
         const answer = (await rl.question('Is this the first computer, or are you adding this one to an existing vault? [first/joining] ')).trim().toLowerCase();

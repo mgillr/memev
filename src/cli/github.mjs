@@ -15,6 +15,38 @@ import { config, saveConfig, out } from './common.mjs';
 const sh = (cmd, args, opts = {}) => { const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: opts.timeout || 60000, stdio: opts.inherit ? 'inherit' : 'pipe', env: { ...process.env, ...(opts.env || {}) }, input: opts.input }); return { ok: r.status === 0, out: (r.stdout || '').trim(), err: (r.stderr || '').trim(), status: r.status }; };
 const has = (bin) => sh(process.platform === 'win32' ? 'where' : 'which', [bin]).ok;
 
+// The file a vault backup pushes. The first line is how init tells a private repository is one of ours.
+const BACKUP_MARKER = '# Your Memev vault';
+
+/**
+ * A private repository of the signed-in user whose README is a Memev vault, or null.
+ * No GitHub call when the CLI is missing or the user is signed out: the status check is local,
+ * and a failed status returns before any repository call.
+ */
+export function findMemevBackup() {
+  if (!has('gh')) return null;
+  if (!sh('gh', ['auth', 'status', '--hostname', 'github.com']).ok) return null;
+  const list = sh('gh', ['repo', 'list', '--limit', '100', '--json', 'nameWithOwner,isPrivate']);
+  if (!list.ok || !list.out) return null;
+  let repos = [];
+  try { repos = JSON.parse(list.out); } catch { return null; }
+  for (const repo of repos) {
+    if (!repo?.isPrivate || typeof repo.nameWithOwner !== 'string') continue;
+    const file = sh('gh', ['api', `repos/${repo.nameWithOwner}/contents/README.md`, '--jq', '.content']);
+    if (!file.ok || !file.out) continue;
+    let text = '';
+    try { text = Buffer.from(file.out.replace(/\s/g, ''), 'base64').toString('utf8'); } catch { continue; }
+    if (text.startsWith(BACKUP_MARKER)) return { repo: repo.nameWithOwner };
+  }
+  return null;
+}
+
+/** Clone that backup into root. The caller has already decided to join it. */
+export function cloneBackup(repo, root) {
+  fs.mkdirSync(path.dirname(path.resolve(root)), { recursive: true });
+  return sh('gh', ['repo', 'clone', repo, root]);
+}
+
 export const PRE_PUSH = (url) => `#!/bin/sh
 # Memev: the vault only ever pushes to the repository set up by memev github setup.
 expected=${JSON.stringify(url)}
