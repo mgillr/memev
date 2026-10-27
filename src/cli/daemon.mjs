@@ -34,6 +34,34 @@ export async function choosePort(root, wanted) {
   return wanted;
 }
 
+// The listen error the daemon logged on its last start, or null when a later start served the vault.
+export function lastListenError(root) {
+  let text;
+  try {
+    const fd = fs.openSync(path.join(root, '.memev', 'daemon.log'), 'r');
+    try { const size = fs.fstatSync(fd).size, n = Math.min(size, 65536), b = Buffer.alloc(n); fs.readSync(fd, b, 0, n, size - n); text = b.toString('utf8'); }
+    finally { fs.closeSync(fd); }
+  } catch { return null; }
+  for (const line of text.split('\n').reverse()) {
+    if (line.startsWith('[memev] serving ')) return null;
+    const m = /^\[memev\] cannot listen on (\S+):(\d+): (.*)$/.exec(line);
+    if (m) return { bind: m[1], port: Number(m[2]), message: m[3] };
+  }
+  return null;
+}
+
+// Why this vault's daemon is not serving, in one line: a port held by another program right now, or else the listen
+// error of its last start. Null when there is nothing more to say than that it is not running.
+export async function whyNotRunning(root) {
+  const info = daemonInfo(root);
+  if (info && pidAlive(info.pid)) return `the daemon (pid ${info.pid}) is running on port ${info.port} but does not answer; run memev restart`;
+  const last = lastListenError(root);
+  for (const port of new Set([Number(config(root).port) || 7787, last?.port].filter(Boolean))) {
+    if (!(await portFree(port))) return `port ${port} is held by another program; run memev init --port ${await choosePort(root, port)}`;
+  }
+  return last ? `the last start could not listen on ${last.bind}:${last.port}: ${last.message}` : null;
+}
+
 export async function ensureDaemon(root, { quiet = false, waitMs = 6000 } = {}) {
   if (!fs.existsSync(path.join(root, '.memev', 'config.json'))) return false;
   const info = daemonInfo(root);

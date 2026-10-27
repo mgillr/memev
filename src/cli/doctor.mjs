@@ -170,9 +170,10 @@ async function twoVaultChecks(root) {
 export async function allChecks({ root, env }) {
   const r = [];
   const info = daemonInfo(root);
-  const { healthy, startDaemon } = await import('./daemon.mjs');
+  const { healthy, startDaemon, whyNotRunning } = await import('./daemon.mjs');
   const up = info && pidAlive(info.pid) && (await healthy(root));
-  r.push(C('daemon', 'daemon running', up ? 'ok' : 'fail', up ? `pid ${info.pid}, port ${info.port}` : 'not running', up ? null : { desc: 'start it', destructive: false, run: () => startDaemon(root, { quiet: true }) }));
+  const why = up ? null : await whyNotRunning(root); // for example another program on its port
+  r.push(C('daemon', 'daemon running', up ? 'ok' : 'fail', up ? `pid ${info.pid}, port ${info.port}` : why || 'not running', up ? null : { desc: 'start it', destructive: false, run: () => startDaemon(root, { quiet: true }) }));
   r.push(...await twoVaultChecks(root));
   let vault = null;
   if (!up && isVault(root)) { const { Vault } = await import('../engine/vault.mjs'); try { vault = new Vault(root, { git: false }).open(); } catch (e) { r.push(C('open', 'vault opens', 'fail', e.message)); } }
@@ -210,7 +211,9 @@ export async function command(cmd, pos, flags, { root, env }) {
   const icon = { ok: '\u2713', warn: '!', fail: '\u2717' };
   if (flags.json) console.log(JSON.stringify(checks.map(({ fix, ...c }) => ({ ...c, fix: fix ? { desc: fix.desc, destructive: fix.destructive } : null })), null, 2));
   else { console.log(`Memev ${VERSION} doctor · ${root}`); for (const c of checks) console.log(`  ${icon[c.status]} ${c.title}${c.detail ? `: ${c.detail}` : ''}${c.fix && c.status !== 'ok' ? `\n      fix: ${c.fix.desc}${c.fix.destructive ? ' (asks first)' : ''}` : ''}`); }
+  let final = checks;
   if (flags.fix) {
+    const tried = [];
     for (const c of checks.filter((x) => x.status !== 'ok' && x.fix)) {
       if (c.fix.destructive && !flags.yes) {
         if (!process.stdin.isTTY) { out.warn(`skipped (needs confirmation, rerun with --yes): ${c.fix.desc}`); continue; }
@@ -222,12 +225,18 @@ export async function command(cmd, pos, flags, { root, env }) {
         else if (c.fix.cmd === 'runtime' || c.fix.cmd === 'service') { const m = await import('./main.mjs'); m.installRuntime(env); if (c.fix.cmd === 'service') { const s = await import('./service.mjs'); await s.installService({ env, root }); } }
         else if (c.fix.cmd === 'bus') { const st = readJson(path.join(configDir(env), 'clients-state.json'), { connected: {} }); const { setupBus } = await import('./bus-cli.mjs'); const b = await setupBus({ root, env, clients: Object.keys(st.connected || {}), ask: false }); if (!b.ok) throw new Error(b.problems.join('; ')); }
         else if (c.fix.cmd === 'init') { out.warn('run memev init'); continue; }
-        out.ok(`fixed: ${c.title}`);
+        tried.push(c);
       } catch (e) { out.bad(`could not fix ${c.title}: ${e.message}`); }
     }
+    // a fix is done only when its check passes when the checks run again
+    final = await allChecks({ root, env });
+    for (const c of tried) {
+      const now = final.find((x) => x.id === c.id && x.title === c.title) ?? final.find((x) => x.id === c.id);
+      if (!now || now.status === 'ok') out.ok(`fixed: ${c.title}`);
+      else out.bad(`could not fix ${c.title}${now.detail ? `: ${now.detail}` : ''}`);
+    }
+    const left = final.filter((c) => c.status === 'fail'); console.log(left.length ? `Still failing: ${left.map((c) => c.title).join(', ')}` : 'No failing checks left.');
   }
-  let final = checks;
-  if (flags.fix) { final = await allChecks({ root, env }); const left = final.filter((c) => c.status === 'fail'); console.log(left.length ? `Still failing: ${left.map((c) => c.title).join(', ')}` : 'No failing checks left.'); }
   if (flags.bundle) console.log(`Support bundle (no secrets): ${bundle({ root, env, checks: final })}`);
   return final.some((c) => c.status === 'fail') ? 1 : 0;
 }
