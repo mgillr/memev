@@ -1,8 +1,9 @@
 # Checkout
 
-> **DRAFT. Not an offer and not in force.** The payment provider, the prices, the address that
-> sends the licence key, and who operates the licence endpoint are not decided. This note is the
-> flow only. Those four values are filled in after that decision, and not before.
+> **DRAFT. Not an offer and not in force.** Self-serve checkout is Stripe, in test mode only.
+> Nothing is live. Personal is $15/month or $144/year, up to 3 computers, all included.
+> The licence email From address comes from deployment config (`MEMEV_LICENCE_FROM`).
+> The licence endpoint URL comes from config. This repository contains no address, host, or IP.
 
 `memev upgrade` prints the checkout URL stored in this vault's config at `checkout.url`. The
 program does not contain a built-in checkout address. When `checkout.url` is empty, the command
@@ -25,8 +26,9 @@ The webhook carries a payment reference and the email address typed at checkout.
 a machine name or a vault id. The licence endpoint checks the webhook, makes one licence key, and
 emails that key to the address from the checkout.
 
-The From address of that email is not set. The operator of the licence endpoint is not set. Until
-both are set, the endpoint sends nothing.
+The From address of that email is the deployment value `MEMEV_LICENCE_FROM`. It is not written in
+this repository. The licence endpoint URL is configuration, and no host or IP is written here.
+Until both are set, the endpoint sends nothing.
 
 ## Refund path
 
@@ -34,9 +36,10 @@ A refund notice arrives on the same webhook path as the payment notice. The lice
 that licence key ended. The vault is not deleted. After the key has ended, the computer is on the
 free tier, the same as `memev license remove`. A refund does not need a second checkout URL.
 
-## Not decided yet
+## Decided
 
-- payment provider
-- prices
-- licence-key sender address
-- who operates the licence endpoint
+- Payment provider: Stripe, in test mode only. Nothing is live.
+- Personal: $15/month or $144/year, up to 3 computers, all included. There is no per-computer add-on.
+- Free stays free. Team and above stay contact us.
+- The licence email From address is `MEMEV_LICENCE_FROM` in deployment config. No address is stored here.
+- The licence endpoint URL is configuration. No host or IP is stored here.
