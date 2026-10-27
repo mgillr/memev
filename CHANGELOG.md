@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- An opt-in, off-by-default "Made with Memev" footer on exported hand-offs (the resume card) and contract summaries (`memev contract status`). I turn it on by setting `footer: true` in the vault config. It appears only on artefacts I export and share, never in private notes.
 - Windows is stated as a preview in the README and the quickstart, with what differs there: where Memev keeps its files, the user PATH, the access-list privacy check and no start at login yet. The lab plan has a Windows 11 section (T-WIN-01 to T-WIN-09).
 - `memev bus roster --card` prints a short, shareable summary of your AI team: the apps and the seat count, with no paths, tokens, names or machine names.
 
