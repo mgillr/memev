@@ -8,7 +8,29 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { git } from '../engine/git.mjs';
+import { signAddressRecord } from '../engine/devices.mjs';
 import { now, readJson, writeJson } from '../engine/util.mjs';
+
+export const ADDRESS_FILE = 'address.json';
+
+/** Commit address.json when it is new or changed, so the git backup carries the signed record. */
+export function commitAddressFile(root) {
+  const st = git(root, ['status', '--porcelain', '--', ADDRESS_FILE]);
+  if (!st.out) return false;
+  git(root, ['add', '--', ADDRESS_FILE]);
+  return git(root, ['commit', '-q', '-m', 'memev: record the vault address', '--', ADDRESS_FILE]).ok;
+}
+
+/** Write the signed address into the vault and commit it on the git backup. */
+export function publishAddressRecord(root, url) {
+  const body = `${JSON.stringify(signAddressRecord(root, url), null, 2)}\n`;
+  const file = path.join(root, ADDRESS_FILE);
+  let prev = null;
+  try { prev = fs.readFileSync(file, 'utf8'); } catch { prev = null; }
+  if (prev !== body) fs.writeFileSync(file, body);
+  const committed = commitAddressFile(root);
+  return { url, committed };
+}
 
 export function syncOnce(vault, { root }) {
   vault.commits.flush();
@@ -26,6 +48,7 @@ export function syncOnce(vault, { root }) {
     for (const p of changed) if (vault.syncFromDisk(p, 'git-pull')) res.pulled++;
   }
   const w = writerCheck(vault, { root }); if (w.warning) res.warning = w.warning; res.writers = w.writers.length;
+  commitAddressFile(root);
   const p = git(root, ['push', '-q', remote, `HEAD:${branch}`]);
   res.pushed = p.ok; if (!p.ok) res.error = `push: ${p.err.split('\n').pop()}`;
   return res;

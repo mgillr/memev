@@ -12,7 +12,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { readJson, writePrivateJson, randomToken, now, sha256 } from './util.mjs';
+import { readJson, writePrivate, writePrivateJson, exists, randomToken, now, sha256 } from './util.mjs';
+import { git } from './git.mjs';
 import { seatPolicy } from './entitlements.mjs';
 
 /** Refused enrolment: the message is meant for the person running the command. */
@@ -233,14 +234,17 @@ export function deviceKeygen() {
 const invitePath = (root) => path.join(root, '.memev', 'invites.json');
 export const inviteHash = (secret) => sha256(String(secret));
 
-export function encodeInvite({ address, secret }) {
-  return Buffer.from(JSON.stringify({ a: address, s: secret }), 'utf8').toString('base64url');
+export function encodeInvite({ address, secret, pubkey = undefined, backup = undefined }) {
+  const o = { a: address, s: secret };
+  if (pubkey) o.k = pubkey;
+  if (backup) o.b = backup;
+  return Buffer.from(JSON.stringify(o), 'utf8').toString('base64url');
 }
 export function decodeInvite(code) {
   let o;
   try { o = JSON.parse(Buffer.from(String(code), 'base64url').toString('utf8')); } catch { throw new Error('bad invite code'); }
   if (!o || typeof o.a !== 'string' || typeof o.s !== 'string' || !o.a || !o.s) throw new Error('bad invite code');
-  return { address: o.a, secret: o.s };
+  return { address: o.a, secret: o.s, pubkey: typeof o.k === 'string' && o.k ? o.k : null, backup: typeof o.b === 'string' && o.b ? o.b : null };
 }
 
 function loadInvites(root) { return readJson(invitePath(root), null) || { version: 1, invites: {} }; }
@@ -254,7 +258,8 @@ export function mintInvite(root, { address, ttlSec = 15 * 60, at = Date.now() } 
   const data = loadInvites(root);
   data.invites[id] = { id, hash: inviteHash(secret), expires, address, used: false };
   writePrivateJson(invitePath(root), data);
-  const code = encodeInvite({ address, secret });
+  const origin = git(root, ['remote', 'get-url', 'origin']);
+  const code = encodeInvite({ address, secret, pubkey: addressKeypair(root).publicKey, backup: origin.ok ? origin.out : null });
   return { id, code, secret, expires, address, link: `${String(address).replace(/\/$/, '')}/i/${code}` };
 }
 
@@ -275,4 +280,54 @@ export function redeemInvite(root, { code, pubkey, label, tokens, policy, at = D
   row.device = enrolled.device.id;
   writePrivateJson(invitePath(root), data);
   return { device: enrolled.device, token: enrolled.token };
+}
+
+const addressKeyFile = (root) => path.join(root, '.memev', 'address-ed25519.pem');
+
+/** This vault's key for address records. The private half stays in .memev and is not committed. */
+export function addressKeypair(root) {
+  const f = addressKeyFile(root);
+  if (!exists(f)) {
+    const k = deviceKeygen();
+    writePrivate(f, k.privateKeyPem);
+    return k;
+  }
+  const privateKeyPem = fs.readFileSync(f, 'utf8');
+  const publicKey = crypto.createPublicKey(privateKeyPem).export({ type: 'spki', format: 'der' }).toString('base64');
+  return { privateKeyPem, publicKey };
+}
+
+function sortJson(v) {
+  return Array.isArray(v) ? v.map(sortJson) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortJson(v[k])])) : v;
+}
+
+/** Bytes covered by an address-record signature. The signature field itself is left out. */
+export function addressBytes(rec) {
+  const { sig, ...rest } = rec || {};
+  void sig;
+  return Buffer.from(JSON.stringify(sortJson(rest)), 'utf8');
+}
+
+/** A signed note of where this vault can be reached. */
+export function signAddressRecord(root, url) {
+  if (!url || typeof url !== 'string') throw new Error('an address record needs a url');
+  const key = addressKeypair(root);
+  const cfg = readJson(path.join(root, '.memev', 'config.json'), {});
+  const rec = { v: 1, url, vault_id: cfg.vault_id || null, at: now(), pubkey: key.publicKey };
+  const sig = crypto.sign(null, addressBytes(rec), crypto.createPrivateKey(key.privateKeyPem)).toString('base64');
+  return { ...rec, sig: `ed25519:${sig}` };
+}
+
+/**
+ * True only when the public key saved at join verifies the record.
+ * A bad signature, or a record signed by any other key, is false.
+ */
+export function verifyAddressRecord(rec, pinnedPubkey) {
+  if (!pinnedPubkey || !rec || rec.v !== 1 || typeof rec.url !== 'string' || !/^https?:\/\//.test(rec.url)) return false;
+  if (typeof rec.sig !== 'string' || !rec.sig.startsWith('ed25519:')) return false;
+  if (rec.pubkey && rec.pubkey !== pinnedPubkey) return false;
+  try {
+    const sig = Buffer.from(rec.sig.slice('ed25519:'.length), 'base64');
+    return crypto.verify(null, addressBytes(rec), publicKeyFrom(pinnedPubkey), sig);
+  } catch { return false; }
 }
