@@ -1,0 +1,11 @@
+services:
+  memev:
+    build: .
+    image: memev:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7787:7787"   # loopback only: nothing on your network can reach it
+    volumes:
+      - memev-vault:/vault
+volumes:
+  memev-vault:

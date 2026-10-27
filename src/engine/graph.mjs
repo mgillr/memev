@@ -18,7 +18,7 @@
 //   refuted     opposition >= 0.6 and above support
 // Promotion and demotion happen as evidence arrives; every change is logged as a claim.status op.
 import { slug, truncate } from './util.mjs';
-import { sections } from './index.mjs';
+import { sections, own } from './index.mjs';
 
 const noisyOr = (xs) => 1 - xs.reduce((p, x) => p * (1 - Math.max(0, Math.min(1, x))), 1);
 export const EDGE_TYPES = ['related', 'causes', 'depends_on', 'contradicts', 'derived_from', 'part_of', 'supersedes'];
@@ -41,6 +41,7 @@ export class Graph {
     this.entities = new Map();      // id -> { id, name, kind, sections:Set }
     this.sectionEnts = new Map();   // sectionKey -> [entity ids]
     this.notesSections = new Map(); // path -> [sectionKeys]
+    this.noteEnts = new Map();      // path -> [[entity ids] per section], to undo co-occurrence exactly
     this.cooc = new Map();          // "a|b" -> weight
     this.edges = [];                // explicit edges { from, to, type, by, seq, why }
     this.claims = new Map();        // id -> claim
@@ -48,30 +49,33 @@ export class Graph {
   }
 
   // ---- derived: from the notes
-  indexNote(p, body) {
-    this.removeNote(p);
-    const keys = [];
-    for (const s of sections(body)) {
-      const key = `${p}#${s.heading || ''}`;
+  indexNote(p, body) { this.removeNote(p); this.indexSections(p, sections(body)); }
+  /** Add sections to a note's entry (an append adds only its new sections). */
+  indexSections(p, secs) {
+    const keys = this.notesSections.get(p) || []; const lists = this.noteEnts.get(p) || [];
+    for (const s of secs) {
+      const key = own(`${p}#${s.heading || ''}`);
       const ents = extractEntities(`${s.heading || ''}\n${s.text}`);
-      const ids = ents.map((e) => e.id);
       for (const e of ents) {
-        if (!this.entities.has(e.id)) this.entities.set(e.id, { id: e.id, name: e.name, kind: e.kind, sections: new Set() });
+        if (!this.entities.has(e.id)) this.entities.set(own(e.id), { id: own(e.id), name: own(e.name), kind: e.kind, sections: new Set() });
         this.entities.get(e.id).sections.add(key);
       }
+      // ids are the entity map's own strings, never views of the note text
+      const ids = ents.map((e) => this.entities.get(e.id).id);
       for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) { const k = ids[i] < ids[j] ? `${ids[i]}|${ids[j]}` : `${ids[j]}|${ids[i]}`; this.cooc.set(k, (this.cooc.get(k) || 0) + 1); }
-      this.sectionEnts.set(key, ids); keys.push(key);
+      if (!this.sectionEnts.has(key)) { keys.push(key); this.sectionEnts.set(key, ids); }
+      else this.sectionEnts.set(key, [...new Set([...this.sectionEnts.get(key), ...ids])]);
+      if (ids.length) lists.push(ids);
     }
-    this.notesSections.set(p, keys);
+    this.notesSections.set(p, keys); this.noteEnts.set(p, lists);
   }
   removeNote(p) {
     for (const key of this.notesSections.get(p) || []) {
-      const ids = this.sectionEnts.get(key) || [];
-      for (const id of ids) { const e = this.entities.get(id); if (e) { e.sections.delete(key); if (!e.sections.size) this.entities.delete(id); } }
-      for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) { const k = ids[i] < ids[j] ? `${ids[i]}|${ids[j]}` : `${ids[j]}|${ids[i]}`; const w = (this.cooc.get(k) || 0) - 1; if (w > 0) this.cooc.set(k, w); else this.cooc.delete(k); }
+      for (const id of this.sectionEnts.get(key) || []) { const e = this.entities.get(id); if (e) { e.sections.delete(key); if (!e.sections.size) this.entities.delete(id); } }
       this.sectionEnts.delete(key);
     }
-    this.notesSections.delete(p);
+    for (const ids of this.noteEnts.get(p) || []) for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) { const k = ids[i] < ids[j] ? `${ids[i]}|${ids[j]}` : `${ids[j]}|${ids[i]}`; const w = (this.cooc.get(k) || 0) - 1; if (w > 0) this.cooc.set(k, w); else this.cooc.delete(k); }
+    this.notesSections.delete(p); this.noteEnts.delete(p);
   }
 
   // ---- logged: applied from operations (live and on replay)

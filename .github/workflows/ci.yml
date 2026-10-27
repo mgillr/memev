@@ -1,30 +1,27 @@
+# Memev's own development checks. Kept to one short job on pull requests: Actions minutes are a
+# shared budget. Slow suites (the Docker smoke test, the 170M-token growth bench, the macOS run) are
+# run locally before merging: scripts/docker-smoke.sh, scripts/growth-bench.mjs.
+# The Memev product never installs workflows into a user's repositories (test/no-ci.test.mjs).
 name: ci
 on:
-  push:
-    branches: [main]
   pull_request:
+    paths:
+      - 'src/**'
+      - 'bin/**'
+      - 'vendor/**'
+      - 'templates/**'
+      - 'test/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'Dockerfile'
+      - '.github/workflows/**'
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 jobs:
-  test:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        node: [22, 24]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ matrix.node }}
-      - run: git config --global user.name ci && git config --global user.email ci@example.invalid
-      - run: npm test
-  leak-scan:
+  check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -34,9 +31,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Denylist, e-mail, IP and home-path scan (files and every commit message)
+      - run: git config --global user.name ci && git config --global user.email ci@example.invalid
+      - run: npm test
+      - name: Leak scan (files and every commit message)
         run: node scripts/leak-scan.mjs --history
-      - name: gitleaks (pinned release, checksum verified) over the full history
+      - name: gitleaks (pinned release, checksum verified)
         run: |
           V=8.30.1
           SUM=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb

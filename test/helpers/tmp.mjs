@@ -12,6 +12,6 @@ export const OWNER = { id: 'test', agent: 'test', scopes: ['read', 'write', 'adm
 export function newVault(opts = {}) {
   const root = path.join(tmpdir(), 'vault');
   initVault(root, { template: path.join(PKG, 'templates', 'vault') });
-  const v = new Vault(root, { commitDelayMs: 10, fsync: false, ...opts }).open();
+  const v = new Vault(root, { commitDelayMs: 10, fsync: false, keyDir: path.join(root, '..', 'keys'), ...opts }).open();
   return { root, v };
 }

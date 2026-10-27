@@ -16,15 +16,17 @@ Setup
   memev connect [client|all]       register Memev in an AI app (MCP, hooks, instructions); backs up first
   memev disconnect [client|all]    remove it again, restoring the app's config
   memev uninstall [--purge]        disconnect everything and stop; --purge also removes the service files
+  memev clients                    which AI apps are installed and connected
   memev status | doctor [--fix] [--bundle]
-  memev cloud on|off|status        reach this vault from cloud AI apps through a private tunnel (on by default)
+  memev cloud on|off|status|url    reach this vault from cloud AI apps through a private tunnel (on by default)
   memev github setup               back the vault up to your own private GitHub repository
   memev service install|remove     start Memev at login (systemd or launchd)
 
 Daily
   memev recall <query>  |  memev remember <text> [--kind decision]  |  memev card [--project P]
   memev checkpoint --project P [--task T] [--done a,b] [--doing x] [--next c,d]
-  memev claims [--status fact]  |  memev contract new|sign|verify|list|close
+  memev claims [--status fact]  |  memev contract status|from-request|new|sign|verify|list|amend|decompose|hook
+  memev verify [id]  |  memev gate [--workdir DIR]   check signed contracts on this machine (never CI)
   memev token issue|list|revoke|rotate
   memev start | stop | restart | serve
 
@@ -34,7 +36,7 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './service.mjs', contract: './contracts-cli.mjs', onboarding: './onboarding.mjs', tournament: './tournament-cli.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './service.mjs', contract: './contracts-cli.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 export function installRuntime(env = process.env) {
@@ -53,7 +55,7 @@ export function installRuntime(env = process.env) {
 
 export async function main(argv, env = process.env) {
   const [cmd = 'help', ...rest] = argv;
-  const { flags, pos } = parseArgs(rest, ['yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets']);
+  const { flags, pos } = parseArgs(rest, ['yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all']);
   const root = resolveRoot(flags.root, env);
   const need = () => { if (!isVault(root)) throw new Error(`no vault at ${root}; run memev init`); };
   const json = (o) => console.log(JSON.stringify(o, null, 2));
@@ -76,6 +78,29 @@ export async function main(argv, env = process.env) {
       const onboarding = await import('./onboarding.mjs').catch(() => null);
       if (onboarding) return onboarding.firstRun({ root, env, flags, launcher: rt.launcher, daemonUp: up });
       return up ? 0 : 1;
+    }
+    case 'container': {
+      // the image's entry point: create the vault on first run, print how to connect, then serve
+      if (!isVault(root)) { initVault(root, { template: path.join(PKG, 'templates', 'vault') }); console.log(`Created a vault in ${root}`); }
+      console.log(`Connect an app: http://127.0.0.1:${config(root).port || 7787}/mcp with the header Authorization: Bearer <token>; get a token with: docker compose exec memev memev token issue <app-name>`);
+      await import('../server/main.mjs'); return new Promise(() => {});
+    }
+    case 'selftest': {
+      // a throwaway vault: write, recall, verify the log, run the doctor's checks
+      const os = await import('node:os'); const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-selftest-'));
+      const { Vault } = await import('../engine/vault.mjs'); const { fileChecks } = await import('./doctor.mjs');
+      try {
+        initVault(tmp, { template: path.join(PKG, 'templates', 'vault') });
+        const v = new Vault(tmp, { keyDir: path.join(tmp, '.memev', 'keys') }).open(); const id = { id: 's', agent: 'selftest', scopes: ['read', 'write'], paths: ['**'] };
+        v.remember(id, { text: 'Self-test memory: the kettle is blue', kind: 'fact' });
+        const hit = v.recall(id, { query: 'what colour is the kettle' })[0];
+        const ok = /kettle is blue/.test(hit?.snippet || '') && v.log.verify().ok;
+        const checks = fileChecks({ root: tmp, env, vault: v }).filter((c) => !['apps', 'launcher', 'backup', 'remote'].includes(c.id));
+        v.close();
+        const bad = checks.filter((c) => c.status === 'fail');
+        console.log(ok && !bad.length ? `selftest: ok (memev ${VERSION}, node ${process.versions.node})` : `selftest: FAILED ${bad.map((c) => c.title).join(', ')}`);
+        return ok && !bad.length ? 0 : 1;
+      } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
     }
     case 'start': need(); return (await ensureDaemon(root)) ? 0 : 1;
     case 'serve': need(); await import('../server/main.mjs'); return new Promise(() => {});

@@ -10,7 +10,13 @@ Follow this loop as part of answering; the user does not have to ask:
 3. When a decision, gotcha, fact or preference surfaces, call memev_remember at once, in the user's words.
 4. After each finished step of a task, call memev_checkpoint with project, task, done, doing and next. This is what survives compaction.
 5. For claims with uncertain status use memev_claim (support, oppose or speculate); memev_claims shows what is fact, theory or conjecture.
-6. If a signed contract is open, finish its criteria and run memev_contract_verify before saying the work is done.
+6. When the user asks you to build something ("I have a project", "build me X", a feature, an app, a tool), before writing code:
+   infer the requirements from the conversation and call memev_contract_from_request with them, each with a check that runs on
+   this machine (a file that must exist, a command that must exit 0, a pattern a file must contain). Then call memev_contract_sign
+   and tell the user in one line what you signed. Do not ask the user to do these steps.
+7. While building, run memev_contract_verify after each task: it records a receipt and reports PASS/FAIL per task and what is left.
+   Never call the work done until verify says PASS. A signed contract never changes: if the requirements change, memev_contract_amend
+   signs a new version that supersedes it. Verification runs locally; it never needs a CI service.
 Never store secrets. If Memev is unreachable, say so once and continue.`;
 
 export function renderCard(c, { maxChars = 6000 } = {}) {
@@ -27,7 +33,10 @@ export function renderCard(c, { maxChars = 6000 } = {}) {
     L.push('Active projects:');
     for (const a of c.active_projects) L.push(`  ${a.project} (${a.at}): ${a.task || ''}${a.doing ? ` | in progress: ${a.doing}` : ''}`);
   }
-  if (c.open_contracts?.length) L.push(`Open signed contracts: ${c.open_contracts.map((x) => `${x.id} (${x.title})`).join('; ')}`);
+  for (const k of c.open_contracts || []) {
+    L.push(`Active contract ${k.id} v${k.version || 1} "${k.title}"${k.project ? ` (project ${k.project})` : ''}: ${k.passed ?? 0}/${k.total ?? '?'} tasks pass${k.last_verified ? ` at last verify ${k.last_verified}` : ', not verified yet'}.`);
+    if (k.remaining?.length) L.push(`  Remaining: ${k.remaining.join('; ')}. Build these, then memev_contract_verify { id: "${k.id}" }.`);
+  }
   if (c.last_session?.turns?.length) { L.push(`Last session (${c.last_session.path}):`); for (const t of c.last_session.turns) L.push(`  ${t}`); }
   if (c.recent_decisions?.length) { L.push('Recent decisions:'); for (const d of c.recent_decisions) L.push(`  ${d}`); }
   if (c.relevant?.length) { L.push('Relevant memory:'); for (const h of c.relevant) L.push(`  [${h.path}${h.heading ? `#${h.heading}` : ''}] ${truncate(h.snippet, 260)}${h.claims ? ` {${h.claims.map((x) => `${x.claim}: ${x.status}`).join('; ')}}` : ''}`); }
