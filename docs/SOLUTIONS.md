@@ -234,8 +234,8 @@ because it does not exist yet.
 ignore firms under 50 people.
 
 **What Memev does.** One person on one computer gets all of Memev for free, for good
-([CHARTER.md](../CHARTER.md)). Draft prices for teams and companies are in
-[PRICING.md](PRICING.md) and [tiers/](tiers/README.md).
+([CHARTER.md](../CHARTER.md)). Team, Office, Business and
+Enterprise are priced on request; see [PRICING.md](PRICING.md) and [tiers/](tiers/README.md).
 
 **Tier.** All.
 

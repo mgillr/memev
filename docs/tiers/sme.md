@@ -99,14 +99,15 @@ These are starting points. Test the model you choose with your own work before b
 
 | Item | Draft price |
 |---|---|
-| Business subscription, 20 computers (2 × $199) | $398/month, $4,776/year |
+| Business subscription, 20 computers | contact us for a quote |
 | Remote setup: hub, sign-in, departments, computers, backup | $2,500 once |
 | Remote setup including the local model server and sensitivity rules | $3,500 once (instead of $2,500) |
 | Business support plan (20% of the subscription, at least $2,400) | $2,400/year |
 | Admin training day (optional) | $2,400 |
 | Hardware | yours; see above |
 
-First year, with the local model setup and support: about $10,700 plus hardware.
+First year, with the local model setup and support: the subscription quote plus $5,900 ($3,500
+setup and $2,400 support), plus hardware.
 
 ## What's included
 

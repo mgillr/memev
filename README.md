@@ -74,13 +74,14 @@ says which. Details are in [docs/QUICKSTART.md](docs/QUICKSTART.md).
 |---|---|---|---|
 | For | one person, one computer | a company with 10 to 20 computers | larger or regulated organisations |
 | Runs on | your computer | your company server, optional local AI model | your data centre, high availability, air-gapped option |
-| Price (draft) | $0, for good | $199/month per 10 computers, $2,500 remote setup | by contract |
+| Price | $0, for good | contact us for a quote; remote setup $2,500 (draft) | contact us for a quote |
 | Support | GitHub issues | business hours, response times by priority | named or embedded engineer |
 
 Free is complete and is never limited ([CHARTER.md](CHARTER.md)). The company server, sign-in with
 Google or Microsoft, and department permissions are planned, not built. See
 [docs/tiers/](docs/tiers/README.md) for what each tier includes, how it is set up, its limits and a
-worked 20-computer example. All prices are drafts.
+worked 20-computer example. Team, Office, Business and Enterprise are priced on request: contact us
+for a quote. Other prices on those pages are drafts.
 
 ## What you get
 
