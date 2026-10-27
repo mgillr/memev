@@ -1,0 +1,33 @@
+{
+ "about": "Token targets and the quality guard for node scripts/bench/run.mjs --check. Token counts are o200k_base. Sources: the token usage report of 2026-10-27, measured at 18abe10 (its figures are quoted in each target), and the MEM-106 to MEM-117 contracts. A target is never loosened to make a run pass.",
+ "guard": [
+  { "metric": "quality.recall_at_6", "rule": "not_below_baseline", "why": "on-topic recall on the tool path, zero drop" },
+  { "metric": "quality.precision_at_6", "rule": "not_below_baseline", "why": "precision on the tool path, zero drop" },
+  { "metric": "quality.recall_at_4", "rule": "not_below_baseline", "why": "on-topic recall on the per-prompt hook, zero drop" },
+  { "metric": "quality.precision_at_4", "rule": "not_below_baseline", "why": "precision on the per-prompt hook, zero drop" },
+  { "metric": "autorecall.offtopic_injection_rate", "rule": "not_above_baseline", "why": "off-topic injection not higher" }
+ ],
+ "latency": { "metric": "latency.recall_p95_ms", "ratio": 1.1, "ms": 5, "why": "recall p95 within 10 percent or 5 ms of the --latency-vs commit, both run interleaved in the same process; the tolerance is the proposal under review" },
+ "targets": [
+  { "group": "caps", "only": "get", "metric": "max_result_tokens.get", "max": 2500, "contract": "MEM-107", "what": "memev_get on the largest note, at most 2,500 tokens (report: 98,649)" },
+  { "group": "caps", "only": "get", "metric": "max_result_tokens.get_chars", "max": 8000, "contract": "MEM-107", "what": "memev_get on the largest note, at most 8,000 characters" },
+  { "group": "caps", "only": "recall", "metric": "max_result_tokens.recall_limit_1000", "max": 1300, "contract": "MEM-108", "what": "memev_recall at limit 1000, at most 1,300 tokens (report: 138,407)" },
+  { "group": "caps", "only": "recall", "metric": "max_result_tokens.recall_limit_1000", "max_metric": "max_result_tokens.recall_limit_10", "contract": "MEM-108", "what": "memev_recall at limit 1000 is no larger than at limit 10" },
+  { "group": "caps", "only": "bus", "metric": "max_result_tokens.bus_unread_200", "max": 1300, "contract": "MEM-109", "what": "bus_unread with 200 unread messages, at most 1,300 tokens (report: 30,285)" },
+  { "group": "caps", "only": "list", "metric": "max_result_tokens.list_entries", "max": 50, "contract": "MEM-110", "what": "memev_list on a vault with many sessions, at most 50 entries per page" },
+  { "group": "autorecall", "only": "gate", "metric": "autorecall.offtopic_injection_rate", "max": 0.45, "contract": "MEM-111", "what": "share of off-topic and continuation prompts that inject anything, at most 0.45 (report: 14 to 17 of 20 today, 9 of 20 at min score 6)" },
+  { "group": "autorecall", "only": "gate", "metric": "autorecall.prompt_mean_on", "max": 289, "contract": "MEM-111", "what": "mean tokens injected per on-topic prompt, at most 289 (report baseline)" },
+  { "group": "autorecall", "only": "gate", "metric": "autorecall.prompt_mean_off", "max": 83, "contract": "MEM-111", "what": "mean tokens injected per off-topic prompt, at most 83 (report: min score 6)" },
+  { "group": "autorecall", "only": "dedupe", "metric": "autorecall.repeated_items", "max": 0, "contract": "MEM-112", "what": "items injected again later in the same session: none" },
+  { "group": "autorecall", "only": "dedupe", "metric": "autorecall.journal_draft_items", "max": 0, "contract": "MEM-112", "what": "session journal or contract draft items injected per prompt: none" },
+  { "group": "protocol", "only": "once", "metric": "fixed.protocol_tokens", "max": 200, "contract": "MEM-113", "what": "the protocol text, at most 200 tokens (report: 562)" },
+  { "group": "protocol", "only": "once", "metric": "fixed.protocol_channels", "equals": 1, "contract": "MEM-113", "what": "the protocol appears in exactly one channel per session (report: two)" },
+  { "group": "protocol", "only": "once", "metric": "fixed.fixed_overhead_default", "max": 1000, "contract": "MEM-113", "what": "fixed overhead, Claude Code default, empty vault, at most 1,000 (report: 1,804)" },
+  { "group": "protocol", "only": "resume", "metric": "resume.session_start_compact_has_protocol", "equals": 0, "contract": "MEM-114", "what": "session start after a compaction carries no protocol text" },
+  { "group": "protocol", "only": "resume", "metric": "resume.session_start_compact_tokens", "max_metric": "resume.card_tokens", "contract": "MEM-114", "what": "session start after a compaction is at most the resume card" },
+  { "group": "lean", "only": "tools", "metric": "fixed.tools_list_tokens", "max": 600, "contract": "MEM-115", "what": "default tools/list as the model sees it, at most 600 tokens (report: 4,150)" },
+  { "group": "lean", "only": "tools", "metric": "fixed.fixed_overhead_all_tools", "max": 1100, "contract": "MEM-115", "what": "fixed overhead with every tool counted, at most 1,100 (report: 5,484)" },
+  { "group": "lean", "only": "recall-output", "metric": "max_result_tokens.recall_6hit", "max": 450, "contract": "MEM-116", "what": "a 6-hit memev_recall result, at most 450 tokens (report: 761)" },
+  { "group": "lean", "only": "recall-output", "metric": "max_result_tokens.recall_6hit_items", "equals": 6, "contract": "MEM-116", "what": "the 6-hit recall still returns 6 hits" }
+ ]
+}
