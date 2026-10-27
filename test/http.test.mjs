@@ -25,6 +25,16 @@ async function call(url, { token, body, headers = {}, method = 'POST' } = {}) {
 }
 const viaTunnel = { 'x-forwarded-for': '198.51.100.7', 'cf-connecting-ip': '198.51.100.7' };
 
+test('MEM-004 AC03: A non-local caller of /healthz still receives no vault_id', async () => {
+  const remote = (await call('/healthz', { method: 'GET', headers: viaTunnel })).json;
+  assert.deepEqual(remote, { ok: true });
+  assert.equal(Object.hasOwn(remote, 'vault_id'), false);
+  // the direct local caller does get it: the vault this daemon serves
+  const local = (await call('/healthz', { method: 'GET' })).json;
+  assert.ok(v.config.vault_id);
+  assert.equal(local.vault_id, v.config.vault_id);
+});
+
 test('only /healthz is open, and remotely it says nothing but ok', async () => {
   assert.deepEqual((await call('/healthz', { method: 'GET', headers: viaTunnel })).json, { ok: true });
   assert.equal((await call('/mcp', { body: { jsonrpc: '2.0', id: 1, method: 'tools/list' } })).status, 401);

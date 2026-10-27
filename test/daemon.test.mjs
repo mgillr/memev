@@ -4,9 +4,11 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import http from 'node:http';
 import { spawnSync } from 'node:child_process';
-import { cleanup, PKG } from './helpers/tmp.mjs';
+import { cleanup, PKG, tmpdir } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
+import { healthy } from '../src/cli/daemon.mjs';
 
 after(() => cleanup());
 
@@ -45,4 +47,20 @@ test('a start that gives up stops the daemon it began, so none comes up later un
     let lockPid = null; try { lockPid = Number(fs.readFileSync(path.join(sb.root, '.memev', 'daemon.lock'), 'utf8')); } catch {}
     if (lockPid) assert.equal(alive(lockPid), false, 'the daemon that took the lock is not running');
   } finally { sb.stop(); }
+});
+
+test('MEM-004 AC02: healthy() returns false for a service that answers {"ok":true} without the vault\'s vault_id', async () => {
+  const root = path.join(tmpdir('vault-id-'), 'vault');
+  fs.mkdirSync(path.join(root, '.memev'), { recursive: true });
+  fs.writeFileSync(path.join(root, '.memev', 'config.json'), JSON.stringify({ vault_id: 'ours' }));
+  let answer = null;
+  const other = http.createServer((req, res) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(answer)); });
+  await new Promise((r) => other.listen(0, '127.0.0.1', r));
+  try {
+    const port = other.address().port;
+    for (const [body, want] of [[{ ok: true }, false], [{ ok: true, vault_id: 'another vault' }, false], [{ ok: true, vault_id: 'ours' }, true]]) {
+      answer = body;
+      assert.equal(await healthy(root, port), want, JSON.stringify(body));
+    }
+  } finally { other.close(); }
 });
