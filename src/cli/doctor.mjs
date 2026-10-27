@@ -39,6 +39,8 @@ export function fileChecks({ root, env = process.env, vault = null }) {
     r.push(C('drift', 'notes match the log', drift ? 'warn' : 'ok', drift ? `${drift} note(s) changed outside Memev; they are imported on the next write or restart` : 'in sync', drift ? { desc: 'import the changes now', destructive: false, run: () => { for (const [p] of vault.log.heads) vault.syncFromDisk(p, 'doctor'); } } : null));
     let leaks = 0; for (const p of notes.filter((x) => !x.startsWith('work/sessions/')).slice(0, 5000)) if (findSecrets(vault._read(p) || '').length) leaks++;
     r.push(C('secrets', 'no credentials stored in notes', leaks ? 'warn' : 'ok', leaks ? `${leaks} note(s) look like they hold a credential; rotate it and remove it from the note (git history keeps old versions)` : 'none found'));
+    const b = vault.bus.health();
+    r.push(C('bus', 'agent comms bus', b.bad_lines ? 'fail' : b.stale.length ? 'warn' : 'ok', `${b.seats} seat(s), ${b.live} live, ${b.messages} message(s)${b.operator ? `, operator ${b.operator}` : ', no operator seat'}${b.never ? `, ${b.never} never joined` : ''}${b.stale.length ? `; stale: ${b.stale.join(', ')} (no heartbeat lately: the app is closed or offline; memev bus check asks everyone)` : ''}${b.bad_lines ? `; ${b.bad_lines} unreadable line(s) in bus/log/` : ''}`));
   }
   const clients = readJson(path.join(configDir(env), 'clients-state.json'), { connected: {}, files: {} });
   const launcher = path.join(configDir(env), 'bin', process.platform === 'win32' ? 'memev.cmd' : 'memev');
@@ -78,7 +80,7 @@ export async function allChecks({ root, env }) {
       const { api, clientToken } = await import('./common.mjs');
       const s = await api(root, '/mcp', { token: clientToken(root, 'doctor'), body: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'memev_doctor', arguments: {} } }, timeoutMs: 20000 });
       const live = s.json?.result?.structuredContent?.checks || [];
-      r.push(...live.filter((c) => ['oplog', 'index', 'drift', 'secrets'].includes(c.id)).map((c) => ({ ...c, fix: c.fix ? { desc: `${c.fix} (restarts Memev)`, destructive: false, run: restart } : null })));
+      r.push(...live.filter((c) => ['oplog', 'index', 'drift', 'secrets', 'bus'].includes(c.id)).map((c) => ({ ...c, fix: c.fix ? { desc: `${c.fix} (restarts Memev)`, destructive: false, run: restart } : null })));
     } catch (e) { r.push(C('mcp', 'MCP answers', 'fail', e.message)); }
     r.push(...fileChecks({ root, env, vault: null }));
   } else r.push(...fileChecks({ root, env, vault }));

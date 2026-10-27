@@ -36,7 +36,10 @@ export async function join(pos, flags, { env }) {
   if (!r.ok) { out.bad(`the vault refused this computer (${r.status || 'no answer'}): ${r.json?.error_description || r.text}`); return 1; }
   writePrivateJson(remoteFile(env), remote);
   out.ok(`joined the vault at ${url}; requests from this computer are signed with its device key`);
-  if (!flags['no-connect']) { const { installRuntime } = await import('./main.mjs'); const { connectAll } = await import('./clients.mjs'); const rt = installRuntime(env); connectAll({ env, launcher: rt.launcher }); out.ok('connected the AI apps on this computer (memev clients)'); }
+  if (!flags['no-connect']) { const { installRuntime } = await import('./main.mjs'); const { connectAll } = await import('./clients.mjs'); const rt = installRuntime(env); const res = connectAll({ env, launcher: rt.launcher }); out.ok('connected the AI apps on this computer (memev clients)');
+    const ids = res.filter((x) => ['added', 'already'].includes(x.status)).map((x) => x.id);
+    const b = await remoteFetch(remote, 'v1/bus-register', { body: { clients: ids }, env }).catch(() => null);
+    if (b?.ok) out.ok(`on the comms bus: ${b.json.seats.join(', ') || 'apps get a seat on their first session'}`); }
   return 0;
 }
 

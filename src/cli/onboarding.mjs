@@ -21,6 +21,16 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
     if (c.connected) { add(firstRun ? 'added' : 'ready', c.name, c.mode === 'hooks' ? 'MCP + session hooks + instructions: memory is loaded and saved automatically' : 'MCP + instructions'); if (c.manual) add('needs-manual', `${c.name}: one step`, c.manual); }
     else add(c.declined ? 'skipped' : 'needs-manual', c.name, c.declined ? 'you disconnected it (memev connect ' + c.id + ' to undo)' : `memev connect ${c.id}`);
   }
+  // the comms bus: every connected app gets a seat; it joins and says hello on its first session
+  const connected = found.filter((x) => x.connected).map((x) => x.id);
+  if (daemonUp) {
+    try {
+      const { api, clientToken } = await import('./common.mjs');
+      const op = connected.includes('claude-code') ? 'claude-code@host' : connected[0] ? `${connected[0]}@host` : null;
+      const r = await api(root, '/v1/bus-register', { body: { clients: connected, operator: op }, token: clientToken(root, 'cli'), timeoutMs: 4000 });
+      if (r.ok) add('succeeded', 'Agent comms bus', r.json.seats.length ? `${r.json.seats.length} seat(s): ${r.json.seats.join(', ')}; ${r.json.operator ? `${r.json.operator} speaks for you` : 'no operator seat yet (memev bus operator <seat>)'}. Each app joins on its first session` : 'ready; apps get a seat when they connect');
+    } catch {}
+  }
   if (!found.some((x) => x.found)) add('needs-manual', 'AI apps', 'none found yet; install one and Memev connects it automatically within 30 minutes (or run memev connect)');
   // service
   const svc = await import('./service.mjs');

@@ -14,6 +14,9 @@ not open a public issue.
   a one-time nonce and the body, so a copied config or a replayed request is refused. Remote
   requests are rate limited and logged. Admin and contract-signing routes are local only.
 - Writes are scanned for secrets (keys, tokens, private keys) and refused unless explicitly allowed.
+  Comms bus messages are scanned the same way and always refused.
+- The comms bus is files in the vault (`bus/`). It travels only with the vault: to your own git
+  backup and through the secure link. A seat can only post as itself; removed computers are off it.
 - Files under `.memev/` and in the config directory are created readable by your user only.
 - GitHub backup uses a deploy key limited to one private repository, and a pre-push check.
 - No telemetry. Memev makes no network requests except the tunnel you enable, the `cloudflared`

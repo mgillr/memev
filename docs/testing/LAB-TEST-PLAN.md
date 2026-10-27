@@ -6,7 +6,7 @@ yet, the test says **expect: not available**. Record what you see; don't fill in
 you didn't observe.
 
 Contents: 0 rules · 1 lab setup · 2 getting the code · 3 install paths · 4 AI app registration ·
-5 CLI commands · 6 features · 7 performance · 8 security · 9 failure and recovery · 10 results.
+5 CLI commands · 6 features (6.12 is the comms bus) · 7 performance · 8 security · 9 failure and recovery · 10 results.
 
 ## 0. Rules
 
@@ -258,6 +258,29 @@ number. One computer needs no licence. The lab licences are in the handoff pack 
 | T-FEAT-49 | restricted notes served only to a local model, labels, egress log, pseudonymising | expect: not available (planned) |
 | T-FEAT-50 | integrations: run a vendor's MCP server (for example a ticketing or database one) next to Memev in the same app | both work side by side. Connectors that bring that data into the vault: expect: not available (planned) |
 
+### 6.12 Comms bus and pulse
+
+How it should work is in docs/BUS.md. Use L1 with at least Claude Code and one other app, and L2 for
+the tests that need a second computer. Seats are `<app>@host` on the vault's computer and
+`<app>@<computer label>` on a joined one.
+
+| ID | Step | Expected |
+|---|---|---|
+| T-BUS-01 | L1: `memev init` with Claude Code and Cursor installed | the checklist has "Agent comms bus: 2 seat(s): claude-code@host, cursor@host; claude-code@host speaks for you". `memev bus roster` shows both as never joined |
+| T-BUS-02 | open a Claude Code session and say anything; open Cursor and start a chat | without being asked, both join: `memev bus roster` shows them live, and `memev bus tail` has a hello from each, the Claude Code one marked [operator] |
+| T-BUS-03 | L2: on pc2, `memev devices keygen`, enroll it on the host with a lab licence, `memev join …` | `join` prints "on the comms bus" with pc2's seats. After an app on pc2 opens a session, the host's roster shows it live with device pc2, and the host's Claude Code session gets pc2's hello at its next prompt |
+| T-BUS-04 | `memev devices remove <pc2 id>` on the host | pc2's seats show removed in the roster; anything pc2 sends gets 401 |
+| T-BUS-05 | from the Claude Code session: "post a task to cursor@host: list the TODOs in this repo" | the message is marked operator. In Cursor, at the next prompt, the task shows up; Cursor claims it (bus_send claim) and restates it. `memev bus tasks` shows it claimed by cursor@host with the restatement |
+| T-BUS-06 | from Cursor, post a task to all; then try to claim the first task from a third app | the Cursor task is marked as an agent request (operator false); the second claim is refused with "already claimed by cursor@host" |
+| T-BUS-07 | from the Claude Code session: "put cursor@host on hold", then "lift the hold" | Cursor's next prompt starts with an ON HOLD notice; after the release it is gone. A hold sent by Cursor or another agent changes nothing |
+| T-BUS-08 | `memev bus check --timeout 20` with Claude Code in a session, Cursor closed for over 15 minutes and one app never opened | Claude Code answers after its next prompt (or straight away with `memev bus watch`); Cursor is listed "offline: last heartbeat N min ago"; the unopened app "registered, but the app has not opened a session yet"; a removed computer "removed from the vault" |
+| T-BUS-09 | `memev bus watch codex@host` in a terminal, then a comms check from another session | the watch prints the check and acks it within about 5 seconds; the roster shows codex@host live |
+| T-BUS-10 | close every app and wait 16 minutes; `memev doctor` | the bus check is a warning listing the stale seats; nothing fails |
+| T-BUS-11 | `memev bus send all finding "key AKIA…"` (a made-up AWS-style key) and the same through `bus_send` in an app | refused: "looks like it holds a credential"; nothing written to `bus/log/` |
+| T-BUS-12 | L2 with git backup on both sides: take pc2 offline, post from it, bring it back, let both sync | the offline message arrives in time order and is delivered to the host's seats as unread; `memev bus tail` shows the same order on both computers |
+| T-BUS-13 | issue a token with `--paths 'dept/sales/**'` and call `bus_tail` with it; start a second vault with `--root` and look at its roster and tail | the department token is refused ("its folders do not include bus/"); the second vault's bus is empty |
+| T-BUS-14 | packet capture during T-BUS-02 to T-BUS-09 (as T-FEAT-41) | no traffic from Memev except the tunnel and git pushes to your own backup repository |
+
 ## 7. Performance
 
 | ID | Step | Target |
@@ -327,8 +350,8 @@ Issues filed: <links>
 
 | Test id | Result | Evidence | Notes |
 |---|---|---|---|
-| T-GET-03 | pass | evidence/T-GET-03.txt | 76 tests |
-| T-FEAT-32 | expect: not available | evidence/T-FEAT-32.txt | served and flagged reuse |
+| T-GET-03 | pass | evidence/T-GET-03.txt | all tests pass |
+| T-FEAT-32 | pass | evidence/T-FEAT-32.txt | the copy got 401 device_key |
 
 Result is one of: pass, fail, expect: not available (confirmed), not run.
 
@@ -353,4 +376,5 @@ One table per failed or surprising test.
 | Performance (T-PERF) | 6 |
 | Security and cleanup (T-SEC) | 12 |
 | Failure and recovery (T-FAIL) | 13 |
-| Total | 130 |
+| Comms bus and pulse (T-BUS) | 14 |
+| Total | 144 |

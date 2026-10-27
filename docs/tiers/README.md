@@ -28,6 +28,7 @@ Services, remote and onsite work, travel and response times are in [services.md]
 | Secure link for cloud AI apps | built | on for personal installs, off for `--org` installs |
 | Backup to your own private GitHub repository | built | one writer per vault |
 | Several computers using one vault through the secure link | built | per-computer keys, `memev join`; no user accounts |
+| Comms bus between AI apps: seats, automatic join, heartbeats, roster, comms checks, tasks and holds | built | every tier; stored in the vault and its own git backup ([BUS.md](../BUS.md)) |
 | Offline licence and computer limit | built | each added computer has its own key; the vault refuses computers past the licensed number. One computer needs no licence |
 | End-to-end encrypted sync between one person's computers | planned | |
 | Company hub with user accounts | planned | |

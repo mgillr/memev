@@ -18,10 +18,13 @@
 | Competing answers ranked | `memev_tournament_match` / `_standings` (Elo; advance at 1050, decompose under 950) | done |
 | Recall learns from use | feedback adjusts ranking and the per-prompt bar (`.memev/tuning.json`) | partial: tuning, not yet a learned model |
 | Build requests become signed contracts | prompt hook + `memev_contract_from_request` / `_sign` / `_status` / `_verify` | done |
+| Apps join the comms bus | `memev init`, app re-detection and `memev join` give each app a seat; its first session posts a hello | done |
+| Heartbeat and unread check each turn | session-start and prompt hooks call the bus; new messages, tasks and holds go into context; comms checks are answered | done (Cursor: session start only) |
 | Background jobs | git sync, app re-detection and tuning run inside the daemon | done |
 | Automated reasoning over the graph (contradiction search, new hypotheses) | | planned |
 | Multi-perspective review of a decision | | planned |
 | Curated reading library and discovery loop | | planned |
 
 Continuity is covered by `test/continuity.test.mjs` (compaction, resume, cross-app) and
-`test/proofline-flow.test.mjs` (request to verified contract across a compaction).
+`test/proofline-flow.test.mjs` (request to verified contract across a compaction). The bus is
+covered by `test/bus.test.mjs`.

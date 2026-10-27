@@ -81,7 +81,7 @@ export class DeviceRegistry {
       if (!p.can_enroll) throw new SeatError(p.reason);
     }
     const remote = kind !== 'local-client';
-    const t = tokens.issue({ agent: String(label || kind).slice(0, 40), scopes: ['read', 'write'], paths: remote ? ['memory/**', 'work/**', 'contracts/**'] : ['**'], ttlDays, remote, note: `device ${kind}` });
+    const t = tokens.issue({ agent: String(label || kind).slice(0, 40), scopes: ['read', 'write'], paths: remote ? ['memory/**', 'work/**', 'contracts/**', 'bus/**'] : ['**'], ttlDays, remote, note: `device ${kind}` });
     const d = this._add({ kind, label, tokenId: t.id, pubkey });
     this.save();
     return { device: d, token: t.token };

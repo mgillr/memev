@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { DeviceRegistry, hostDevice } from './devices.mjs';
+import { Bus } from './bus.mjs';
 import crypto from 'node:crypto';
 import { sha256, readJson, writeJson, writePrivateJson, exists, now, stamp, slug, truncate, randomToken } from './util.mjs';
 import { OpLog } from './oplog.mjs';
@@ -49,6 +50,7 @@ export class Vault extends EventEmitter {
     this.devices = new DeviceRegistry(path.join(this.state, 'devices.json'));
     this.devices.ensureHost(this.host);
     this.devices.migrate(this.tokens); // existing installs: every token becomes its own device entry
+    this.bus = new Bus({ root: this.root, devices: this.devices, commit: (p) => this.commits.add(p, 'bus'), config: this.config.bus || {} });
     this.index = new RecallIndex(path.join(this.state, 'index.jsonl'));
     this.graph = new Graph();
     this.tournament = new Tournament();

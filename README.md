@@ -13,12 +13,17 @@ flowchart LR
     subgraph computer["Your computer"]
         apps["AI apps<br/>Claude Code, Codex, Gemini CLI,<br/>Cursor, Claude Desktop and more"]
         vault[("Memev<br/>runs quietly in the background<br/>your notes, in plain Markdown")]
+        bus["Comms bus<br/>every app has a seat"]
         apps <--> vault
+        apps <--> bus
+        bus --- vault
     end
     github[("Your private GitHub repository<br/>backup and history")]
     cloud["AI on the web<br/>ChatGPT, claude.ai"]
+    laptop["Your other computers<br/>each with its own key"]
     vault -- "backup every few minutes" --> github
     cloud -. "optional secure link,<br/>you can switch it off" .-> vault
+    laptop -. "the same secure link" .-> vault
 ```
 
 ## What happens when you chat
@@ -90,6 +95,10 @@ log first, so a crash or a bad edit can't lose anything. Claude Code, Codex, Gem
 Claude Desktop, Windsurf, VS Code and Zed all use the same notes, and ChatGPT and claude.ai can too
 through the optional secure link.
 
+Your AI apps can also talk to each other. Each one gets a seat on a comms bus kept in the vault,
+joins on its own, and keeps a heartbeat, so from one Claude Code session you can see who is there,
+run a comms check, hand out tasks and put an app on hold. See [docs/BUS.md](docs/BUS.md).
+
 You can check what Memev holds. `memev why` shows why a note came back, `memev audit` lists junk and
 stale notes, and nothing is deleted behind your back. Notes from one project don't turn up in
 another, and notes in Chinese, Japanese, Korean, Cyrillic, Greek or Arabic are searchable like any
@@ -101,7 +110,8 @@ other. There is no telemetry and nothing to install besides Node and git.
 |---|---|
 | [Quickstart](docs/QUICKSTART.md) | install, first session, everyday commands |
 | [AI apps](docs/CLIENTS.md) | what is changed in each app, hooks vs instructions, undoing it |
-| [Cloud access](docs/CLOUD.md) | the secure link, connector URLs, turning it off |
+| [Cloud access](docs/CLOUD.md) | the secure link, connector URLs, other computers, turning it off |
+| [Comms bus](docs/BUS.md) | how your AI apps talk to each other, the roster and comms checks |
 | [GitHub backup](docs/GITHUB.md) | `memev github setup` |
 | [Docker](docs/DOCKER.md) | running Memev in a container |
 | [Tiers and setup](docs/tiers/README.md) | Free, Business and Enterprise, and the services around them (draft) |
@@ -111,7 +121,7 @@ other. There is no telemetry and nothing to install besides Node and git.
 | [Lab test plan](docs/testing/LAB-TEST-PLAN.md) | every test to run in a lab before a release, with expected results |
 | [Security](SECURITY.md) and [threat model](docs/THREAT-MODEL.md) | |
 | [Charter](CHARTER.md) | the free tier is never limited |
-| [Pricing (draft)](docs/PRICING.md) | Free and Personal prices; everything else on request; nothing is enforced |
+| [Pricing (draft)](docs/PRICING.md) | Free and Personal prices; everything else on request; the computer limit |
 | [Design](docs/DESIGN.md) | log, index, graph, recall, scale |
 | [Hands-off runtime](docs/MAPPING.md) | everything Memev does without being asked |
 

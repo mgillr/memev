@@ -24,6 +24,8 @@ flowchart LR
   other apps
 - The quality check, review inbox, audit and `memev why`
 - Signed contracts with local checks
+- The comms bus: every AI app on your computer gets a seat, and you can coordinate them from one
+  session ([BUS.md](../BUS.md))
 - `memev doctor`
 - The secure link for cloud AI apps (up to 5 connectors counted; nothing is refused)
 - Backup to your own private GitHub repository

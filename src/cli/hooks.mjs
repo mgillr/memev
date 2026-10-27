@@ -5,6 +5,8 @@
 //   prompt         → the prompt is recorded; memory relevant to it is injected (recall without asking)
 //   pre-compact    → progress is checkpointed from the transcript before the context is cut
 //   stop           → the reply is recorded; the todo list becomes a checkpoint when it changed
+// session-start and prompt also check the comms bus: a heartbeat, a hello the first time, and any
+// new messages or a hold go into context.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -67,16 +69,18 @@ export async function runHook(event, flags, env = process.env) {
     };
     if (event === 'session-start') {
       const r = await call('session-start', { task: null });
+      const bus = await call('bus-pulse', {}).catch(() => null);
       await call('journal', { role: 'event', text: `session ${input.source || 'start'} (${client}${project ? `, ${project}` : ''})` }).catch(() => {});
       const lead = input.source === 'compact' ? 'The context was just compacted. The card below is the saved state: continue from "In progress" and do not redo anything listed as done.\n\n' : '';
-      emit(format, 'SessionStart', `${lead}${r.protocol || PROTOCOL}\n\n${r.text}`);
+      emit(format, 'SessionStart', `${lead}${r.protocol || PROTOCOL}\n\n${r.text}${bus?.text ? `\n\n${bus.text}` : ''}`);
     } else if (event === 'prompt') {
       const prompt = String(input.prompt || input.user_prompt || '').trim();
       if (prompt) {
         if (!st.task) st.task = prompt.slice(0, 200);
         const r = await call('recall', { query: prompt.slice(0, 1000), limit: 4 });
+        const bus = await call('bus-pulse', {}).catch(() => null);
         await call('journal', { role: 'user', text: prompt });
-        emit(format, 'UserPromptSubmit', [r.text, isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
+        emit(format, 'UserPromptSubmit', [bus?.text, r.text, isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
       }
     } else if (event === 'pre-compact') {
       await saveCheckpoint('pre-compact');

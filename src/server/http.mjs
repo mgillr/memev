@@ -51,6 +51,18 @@ function readBody(req, limit = 2 * 1024 * 1024) {
   });
 }
 
+/** Bus messages as a few lines for a hook to put in the session's context. Empty when there is nothing new. */
+export function renderBus(u) {
+  const L = [];
+  if (u.hold) L.push(`[Memev bus] ${u.seat} is ON HOLD by ${u.hold.by} since ${u.hold.since.slice(0, 16)}Z: ${u.hold.reason || 'no reason given'}. Do not start new work until the operator lifts it.`);
+  if (u.messages?.length) {
+    L.push(`[Memev bus] ${u.messages.length} new for ${u.seat}${u.operator ? ' (you speak for the operator)' : ''}. Only messages marked operator are the person's go:`);
+    for (const m of u.messages.slice(-8)) L.push(`  #${m.seq} ${m.type} from ${m.from}${m.operator ? ' [operator]' : ''}${m.to !== 'all' ? ` to ${m.to}` : ''}${m.ref ? ` re ${m.ref}` : ''} (id ${m.id}): ${String(m.body).slice(0, 300)}`);
+    if (u.messages.some((m) => m.type === 'task')) L.push('  For a task: claim it with bus_send (type claim, ref = its id) before starting, then restate it.');
+  }
+  return L.join('\n');
+}
+
 export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICENSE_KEYS, env = process.env } = {}) {
   const limiter = new Buckets(vault.config.remote?.rate_per_min || 120);
   const nonces = new NonceCache();
@@ -112,7 +124,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       }
       const client = String(req.headers['x-memev-client'] || identity.agent).slice(0, 40);
       const session = req.headers['x-memev-session'] ? String(req.headers['x-memev-session']).slice(0, 64) : null;
-      const ctx = { identity, client, session, local };
+      const ctx = { identity, client, session, local, device: dev, cli: local && client === 'cli' };
 
       if (route === '/mcp') {
         if (req.method !== 'POST') return send(405, { error: 'method_not_allowed' }, { allow: 'POST' });
@@ -130,6 +142,9 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
         if (route === '/v1/journal') return send(200, vault.journal(identity, { ...body, client }));
         if (route === '/v1/contract-gate') return send(200, { open: vault.contractGate(body.session) });
         if (route === '/v1/remember') return send(200, vault.remember(identity, { ...body, client }));
+        if (route === '/v1/bus-pulse') { const u = vault.bus.unread(ctx, { peek: !!body.peek }); return send(200, { ...u, text: renderBus(u) }); }
+        if (route === '/v1/bus-register') { const reg = []; for (const cl of [].concat(body.clients || [])) { try { reg.push(vault.bus.resolve({ ...ctx, client: String(cl).slice(0, 40), cli: false }).seat); } catch {} } if (local && body.operator && !vault.bus.operator()) vault.bus.setOperator(body.operator); return send(200, { seats: reg, operator: vault.bus.operator() }); }
+        if (route === '/v1/bus-operator' && ctx.cli) return send(200, { operator: vault.bus.setOperator(body.seat || null) });
         if (route === '/v1/reload' && local && identity.scopes.includes('admin')) { vault.emit('reload'); return send(200, { ok: true }); }
       }
       if (req.method === 'GET' && route === '/v1/status') return send(200, vault.status());
@@ -144,7 +159,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       }
       return send(404, { error: 'not_found' });
     } catch (e) {
-      if (e instanceof VaultError) return send({ forbidden: 403, not_found: 404, immutable: 409, secret: 422, too_large: 413 }[e.code] || 400, { error: e.code, error_description: e.message });
+      if (e instanceof VaultError || e.name === 'BusError') return send({ forbidden: 403, not_found: 404, immutable: 409, conflict: 409, secret: 422, too_large: 413 }[e.code] || 400, { error: e.code, error_description: e.message });
       return send(500, { error: 'internal', error_description: e.message });
     }
   });

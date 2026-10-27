@@ -115,6 +115,8 @@ one. Hardware is yours; see above.
 ## Limits
 
 - 10 to 20 computers is the design point. Beyond about 50, see [Enterprise](enterprise.md).
+- Every app on every enrolled computer gets a seat on the comms bus. IT or a team lead can run a
+  comms check and hand out tasks from one session; a removed computer drops off the bus.
 - The licence sets how many computers can join the vault. Each one has its own device key, and IT
   frees a seat with `memev devices remove <id>`. Past the count the vault refuses the next one.
 - One hub server. If it is down, each computer keeps working on its own notes and catches up after;

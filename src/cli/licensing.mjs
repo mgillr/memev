@@ -34,7 +34,9 @@ export async function command(cmd, pos, flags, { root, env }) {
       if (flags.json) { console.log(JSON.stringify(s, null, 2)); return 0; }
       const l = s.license;
       console.log(l.state === 'none' ? 'Licence: none. The free tier needs none: everything on this computer is free and unlimited.' : `Licence ${l.lid || ''}: ${l.state}${l.tier ? ` · ${l.tier}` : ''}${l.seats ? ` · ${l.seats} computer(s)` : ''}${l.connectors != null ? ` · ${l.connectors} connector(s)` : ''} · ${l.reason}`);
-      console.log(`Computers: ${s.computers_enrolled} of ${s.seats_licensed} enrolled${s.can_enroll ? '' : ' (no more can be added)'}. This computer is never limited.`);
+      console.log(s.computers_enrolled > s.seats_licensed
+        ? `Computers: ${s.computers_enrolled} enrolled, but the licence covers ${s.seats_licensed}; the others can read but not write, and none can be added. This computer is never limited.`
+        : `Computers: ${s.computers_enrolled} of ${s.seats_licensed} enrolled${s.can_enroll ? '' : ' (no more can be added)'}. This computer is never limited.`);
       console.log(`Seen in the last ${s.usage.active_days} days: ${s.usage.computers} computer(s), ${s.usage.connectors} cloud connector(s), ${s.usage.local_clients} local client(s). Connectors are counted, not limited.`);
       if (!s.can_enroll && s.computers_enrolled > 1) out.info(s.enroll_refused);
       for (const n of s.notes) out.info(n);
