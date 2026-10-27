@@ -94,7 +94,9 @@ The guard is part of every `--check`. On-topic recall@6, precision@6, recall@4 a
 
 ## The per-prompt bar
 
-The prompt hook injects a recalled item only when its score reaches the hook's bar (`HOOK_MIN_SCORE` in `src/server/http.mjs`, overridden by `recall.hook_min_score` in a vault's config). It does not recall at all for a prompt under 4 words or a continuation phrase such as `continue`, `go on` or `thanks`. `memev_recall`, which the model calls itself, has no bar. `bench/targets.json` (`hook_min_score`) records the value with the sweep that chose it: the highest bar from 6 to 8 that keeps every on-topic hit the baseline finds, at both levels.
+The prompt hook injects a recalled item only when its score reaches the hook's bar. BM25 scores grow with the size of the vault, so the bar is a share (`HOOK_BAR` in `src/server/http.mjs`) of the largest score one rare word can add in that vault, `ln(1 + (sections - 0.5) / 1.5)`: about 7.0 at the small level and 7.9 at the large. `recall.hook_bar` in a vault's config changes the share, `recall.hook_min_score` sets a fixed score instead, and a higher `recall.min_score` still wins. `bench/targets.json` (`hook_bar`) records the share with the sweep that chose it: the highest that keeps every on-topic hit the baseline finds, at both levels.
+
+The hook also does not recall at all for a prompt under 4 words or a continuation phrase such as `continue`, `go on` or `thanks`. It never injects the same item twice in a session (a compaction or a clear starts over). It leaves out past session journals and contract drafts unless `recall.hook_include_journals` is on. `memev_recall`, which the model calls itself, and `memev recall` on the command line have none of these limits.
 
 ## The baseline
 

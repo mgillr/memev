@@ -8,19 +8,21 @@
   { "metric": "autorecall.offtopic_injection_rate", "rule": "not_above_baseline", "why": "off-topic injection not higher" }
  ],
  "latency": { "metric": "latency.recall_p95_ms", "ratio": 1.1, "ms": 5, "why": "recall p95 within 10 percent or 5 ms of the --latency-vs commit, both run interleaved in the same process; the tolerance is the proposal under review" },
- "hook_min_score": {
-  "value": 7, "contract": "MEM-111",
-  "rule": "the highest per-prompt bar in 6 to 8 that keeps every on-topic hit the baseline finds, at both levels; prompts under 4 words and continuation phrases are not recalled",
-  "how": "the scripts/bench harness (measureQuality) with recall.hook_min_score set on the seeded vault and short prompts skipped",
+ "hook_bar": {
+  "value": 0.94, "contract": "MEM-111",
+  "rule": "the prompt hook injects a hit only when its BM25 score is at least this share of ln(1 + (sections - 0.5) / 1.5), the largest score one rare word can add in the vault; that is about 7.0 at the small level (2,598 sections) and 7.9 at the large (6,598). The value is the highest share in the sweep that keeps every on-topic hit the baseline finds at both levels.",
+  "how": "the scripts/bench harness (measureQuality) with recall.hook_bar set on the seeded vault, prompts under 4 words skipped, items already injected in the session and session journals and contract drafts left out",
   "sweep": [
-   {"level": "small", "hook_min_score": 6, "found_at_4": 20, "expected": 24, "recall_at_4": 0.8333, "precision_at_4": 0.2778, "offtopic_injection_rate": 0.4444, "prompt_mean_on": 252.4, "prompt_mean_off": 123.5},
-   {"level": "small", "hook_min_score": 7, "found_at_4": 20, "expected": 24, "recall_at_4": 0.8333, "precision_at_4": 0.2857, "offtopic_injection_rate": 0.4444, "prompt_mean_on": 243.8, "prompt_mean_off": 119.3},
-   {"level": "small", "hook_min_score": 7.5, "found_at_4": 19, "expected": 24, "recall_at_4": 0.7917, "precision_at_4": 0.2754, "offtopic_injection_rate": 0.4444, "prompt_mean_on": 240.3, "prompt_mean_off": 105.9},
-   {"level": "small", "hook_min_score": 8, "found_at_4": 19, "expected": 24, "recall_at_4": 0.7917, "precision_at_4": 0.2923, "offtopic_injection_rate": 0.4074, "prompt_mean_on": 226.3, "prompt_mean_off": 85.6},
-   {"level": "large", "hook_min_score": 6, "found_at_4": 18, "expected": 24, "recall_at_4": 0.75, "precision_at_4": 0.225, "offtopic_injection_rate": 0.4444, "prompt_mean_on": 280.5, "prompt_mean_off": 111.5},
-   {"level": "large", "hook_min_score": 7, "found_at_4": 18, "expected": 24, "recall_at_4": 0.75, "precision_at_4": 0.2308, "offtopic_injection_rate": 0.4074, "prompt_mean_on": 271.9, "prompt_mean_off": 83.2},
-   {"level": "large", "hook_min_score": 7.5, "found_at_4": 18, "expected": 24, "recall_at_4": 0.75, "precision_at_4": 0.2308, "offtopic_injection_rate": 0.4074, "prompt_mean_on": 271.9, "prompt_mean_off": 81.1},
-   {"level": "large", "hook_min_score": 8, "found_at_4": 18, "expected": 24, "recall_at_4": 0.75, "precision_at_4": 0.2338, "offtopic_injection_rate": 0.4074, "prompt_mean_on": 268.9, "prompt_mean_off": 81.1}
+   {"level": "small", "hook_bar": 0.9, "found_at_4": 20, "expected": 24, "recall_at_4": 0.8333, "precision_at_4": 0.2857, "offtopic_injection_rate": 0.3704, "prompt_mean_on": 245.9, "prompt_mean_off": 80.7, "repeated_items": 0, "journal_draft_items": 0},
+   {"level": "small", "hook_bar": 0.92, "found_at_4": 20, "expected": 24, "recall_at_4": 0.8333, "precision_at_4": 0.2941, "offtopic_injection_rate": 0.3704, "prompt_mean_on": 237.3, "prompt_mean_off": 80.7, "repeated_items": 0, "journal_draft_items": 0},
+   {"level": "small", "hook_bar": 0.94, "found_at_4": 20, "expected": 24, "recall_at_4": 0.8333, "precision_at_4": 0.2941, "offtopic_injection_rate": 0.3704, "prompt_mean_on": 237.3, "prompt_mean_off": 80.7, "repeated_items": 0, "journal_draft_items": 0},
+   {"level": "small", "hook_bar": 0.96, "found_at_4": 19, "expected": 24, "recall_at_4": 0.7917, "precision_at_4": 0.2836, "offtopic_injection_rate": 0.3704, "prompt_mean_on": 233.8, "prompt_mean_off": 77.2, "repeated_items": 0, "journal_draft_items": 0},
+   {"level": "small", "hook_bar": 1, "found_at_4": 19, "expected": 24, "recall_at_4": 0.7917, "precision_at_4": 0.2836, "offtopic_injection_rate": 0.3333, "prompt_mean_on": 233.8, "prompt_mean_off": 70.2, "repeated_items": 0, "journal_draft_items": 0},
+   {"level": "large", "hook_bar": 0.9, "found_at_4": 18, "expected": 24, "recall_at_4": 0.75, "precision_at_4": 0.2466, "offtopic_injection_rate": 0.2963, "prompt_mean_on": 253.8, "prompt_mean_off": 49.9, "repeated_items": 0, "journal_draft_items": 0},
+   {"level": "large", "hook_bar": 0.92, "found_at_4": 18, "expected": 24, "recall_at_4": 0.75, "precision_at_4": 0.2466, "offtopic_injection_rate": 0.2963, "prompt_mean_on": 253.8, "prompt_mean_off": 49.9, "repeated_items": 0, "journal_draft_items": 0},
+   {"level": "large", "hook_bar": 0.94, "found_at_4": 18, "expected": 24, "recall_at_4": 0.75, "precision_at_4": 0.2466, "offtopic_injection_rate": 0.2963, "prompt_mean_on": 253.8, "prompt_mean_off": 49.9, "repeated_items": 0, "journal_draft_items": 0},
+   {"level": "large", "hook_bar": 0.96, "found_at_4": 18, "expected": 24, "recall_at_4": 0.75, "precision_at_4": 0.2466, "offtopic_injection_rate": 0.2963, "prompt_mean_on": 253.8, "prompt_mean_off": 49.9, "repeated_items": 0, "journal_draft_items": 0},
+   {"level": "large", "hook_bar": 1, "found_at_4": 18, "expected": 24, "recall_at_4": 0.75, "precision_at_4": 0.25, "offtopic_injection_rate": 0.2963, "prompt_mean_on": 249.7, "prompt_mean_off": 49.9, "repeated_items": 0, "journal_draft_items": 0}
   ]
  },
  "targets": [

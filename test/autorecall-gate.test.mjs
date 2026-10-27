@@ -8,7 +8,7 @@ import http from 'node:http';
 import { spawn, spawnSync } from 'node:child_process';
 import { sandbox, BIN } from './helpers/cli.mjs';
 import { newVault, cleanup, PKG, OWNER, tmpdir } from './helpers/tmp.mjs';
-import { createServer, HOOK_MIN_SCORE, hookMinScore } from '../src/server/http.mjs';
+import { createServer, HOOK_BAR, hookMinScore } from '../src/server/http.mjs';
 import { handle } from '../src/server/mcp.mjs';
 
 after(() => cleanup());
@@ -64,23 +64,27 @@ test('MEM-111 AC03: Prompts under 4 words and the continuation list inject nothi
 });
 
 test('MEM-111 AC04: The hook minimum score is in the range 6 to 8 or a documented relative rule, and the tool path threshold is unchanged', async () => {
-  assert.ok(HOOK_MIN_SCORE >= 6 && HOOK_MIN_SCORE <= 8, String(HOOK_MIN_SCORE));
-  assert.equal(targets.hook_min_score.value, HOOK_MIN_SCORE, 'bench/targets.json records the bar in use');
-  assert.equal(hookMinScore({ recall: { min_score: 1 } }), HOOK_MIN_SCORE, 'an existing vault (min_score 1.0 in its config) gets the new bar');
-  assert.equal(hookMinScore({ recall: { hook_min_score: 6.5 } }), 6.5);
-  assert.equal(hookMinScore({ recall: { min_score: 9 } }), 9, 'a higher bar set by the user still wins');
-  // a weak match: memev_recall returns it, the per-prompt route leaves it out
+  // the rule: a share of the largest score one rare word can add in the vault, documented in http.mjs and targets.json
+  assert.equal(targets.hook_bar.value, HOOK_BAR, 'bench/targets.json records the share in use');
+  assert.match(targets.hook_bar.rule, /share of ln\(1 \+ \(sections - 0\.5\) \/ 1\.5\)/);
+  const at = (sections, recall = { min_score: 1 }) => hookMinScore({ config: { recall }, index: { docs: { size: sections } } });
+  // at both benchmark sizes the bar falls inside 6 to 8
+  for (const n of [2598, 6598]) assert.ok(at(n) >= 6 && at(n) <= 8, `${n} sections: ${at(n)}`);
+  assert.ok(at(30) < at(2598) && at(30) >= 1, 'a small vault gets a lower bar, never under recall.min_score');
+  assert.equal(at(2598, { hook_min_score: 6.5 }), 6.5, 'recall.hook_min_score sets a fixed bar');
+  assert.equal(at(2598, { min_score: 9 }), 9, 'a higher recall.min_score still wins');
+  // the tool path keeps no bar: with the hook bar set out of reach, memev_recall still returns the hit and the hook gets none
   const { v } = newVault();
+  v.config.recall = { ...v.config.recall, hook_min_score: 1000 };
   v.remember(OWNER, { text: 'The deploy pipeline for billing runs nightly at 02:00 UTC, after the ledger snapshot finishes.', kind: 'fact', force: true });
-  const r = await handle(v, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'memev_recall', arguments: { query: 'deploy' } } }, { identity: OWNER, client: 'test', local: true });
+  const r = await handle(v, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'memev_recall', arguments: { query: 'deploy pipeline' } } }, { identity: OWNER, client: 'test', local: true });
   const hits = JSON.parse(r.result.content[0].text);
-  const weak = hits.find((h) => h.snippet.includes('deploy pipeline'));
-  assert.ok(weak && weak.score > 0 && weak.score < HOOK_MIN_SCORE, JSON.stringify(hits));
+  assert.ok(hits.some((h) => h.snippet.includes('deploy pipeline') && h.score < 1000), JSON.stringify(hits));
   const server = createServer(v);
   await new Promise((res) => server.listen(0, '127.0.0.1', res));
   try {
     const token = v.tokens.issue({ agent: 'claude-code' }).token;
-    const route = await (await fetch(`http://127.0.0.1:${server.address().port}/v1/recall`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ query: 'deploy', limit: 4 }) })).json();
+    const route = await (await fetch(`http://127.0.0.1:${server.address().port}/v1/recall`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ query: 'deploy pipeline', limit: 4 }) })).json();
     assert.deepEqual(route.hits, [], 'the hook gets nothing below its bar');
     assert.equal(route.text, '');
   } finally { server.close(); v.close(); }
@@ -98,19 +102,20 @@ test('MEM-111 AC05: Hook recall@4 on the labelled on-topic prompts is not lower 
 });
 
 test('MEM-111 AC06: The chosen value is recorded in bench/targets.json with the sweep that justified it', () => {
-  const h = targets.hook_min_score;
-  assert.equal(h.value, HOOK_MIN_SCORE);
+  const h = targets.hook_bar;
+  assert.equal(h.value, HOOK_BAR);
   assert.equal(h.contract, 'MEM-111');
   const rows = h.sweep;
-  assert.ok(rows.every((x) => x.hook_min_score >= 6 && x.hook_min_score <= 8), 'the sweep stays in 6 to 8');
   for (const level of ['small', 'large']) {
-    const at = rows.find((x) => x.level === level && x.hook_min_score === h.value);
-    assert.ok(at, `the chosen value was measured at ${level}`);
-    assert.equal(at.found_at_4, baseline.levels[level].quality.counts.found_at_4, `${level}: no on-topic hit lost at the chosen value`);
+    const at = rows.find((x) => x.level === level && x.hook_bar === h.value);
+    assert.ok(at, `the chosen share was measured at ${level}`);
+    assert.equal(at.found_at_4, baseline.levels[level].quality.counts.found_at_4, `${level}: no on-topic hit lost at the chosen share`);
   }
-  // every higher value in the sweep loses a hit somewhere, so the chosen one is the highest that does not
-  for (const x of rows.filter((r) => r.hook_min_score > h.value)) {
-    const loses = ['small', 'large'].some((level) => (rows.find((r) => r.level === level && r.hook_min_score === x.hook_min_score)?.found_at_4 ?? Infinity) < baseline.levels[level].quality.counts.found_at_4);
-    assert.ok(loses, `bar ${x.hook_min_score} keeps every hit, so ${h.value} is not the highest`);
+  // every higher share in the sweep loses a hit somewhere, so the chosen one is the highest that does not
+  const higher = rows.filter((r) => r.hook_bar > h.value);
+  assert.ok(higher.length, 'the sweep goes above the chosen share');
+  for (const x of higher) {
+    const loses = ['small', 'large'].some((level) => (rows.find((r) => r.level === level && r.hook_bar === x.hook_bar)?.found_at_4 ?? Infinity) < baseline.levels[level].quality.counts.found_at_4);
+    assert.ok(loses, `share ${x.hook_bar} keeps every hit, so ${h.value} is not the highest`);
   }
 });

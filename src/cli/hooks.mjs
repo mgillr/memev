@@ -72,6 +72,7 @@ export async function runHook(event, flags, env = process.env) {
       return false;
     };
     if (event === 'session-start') {
+      if (input.source === 'compact' || input.source === 'clear') st.injected = []; // the context no longer holds them
       const r = await call('session-start', { task: null });
       const bus = await call('bus-pulse', { lead: true }).catch(() => null); // at session start: also whether the person still has to pick a lead
       await call('journal', { role: 'event', text: `session ${input.source || 'start'} (${client}${project ? `, ${project}` : ''})` }).catch(() => {});
@@ -81,7 +82,9 @@ export async function runHook(event, flags, env = process.env) {
       const prompt = String(input.prompt || input.user_prompt || '').trim();
       if (prompt) {
         if (!st.task) st.task = prompt.slice(0, 200);
-        const r = isContinuation(prompt) ? null : await call('recall', { query: prompt.slice(0, 1000), limit: 4 });
+        // never the same item twice in a session: the route leaves out what this session was already given
+        const r = isContinuation(prompt) ? null : await call('recall', { query: prompt.slice(0, 1000), limit: 4, exclude: st.injected || [] });
+        if (r?.hits?.length) st.injected = [...new Set([...(st.injected || []), ...r.hits.map((h) => `${h.path}#${h.heading || ''}`)])].slice(-500);
         const bus = await call('bus-pulse', {}).catch(() => null);
         await call('journal', { role: 'user', text: prompt });
         emit(format, 'UserPromptSubmit', [bus?.text, r?.text, isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
