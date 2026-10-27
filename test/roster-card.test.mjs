@@ -11,8 +11,8 @@ after(cleanup);
 test('MEM-071 AC01: roster --card shows the apps and seat count with no path, token, e-mail or machine name', () => {
   const sb = sandbox();
   try {
-    for (const d of ['.claude', '.cursor']) fs.mkdirSync(path.join(sb.home, d), { recursive: true });
-    const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--lead', 'claude-code@host']);
+    for (const d of ['.cursor', '.codex']) fs.mkdirSync(path.join(sb.home, d), { recursive: true });
+    const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--lead', 'cursor@host']);
     assert.equal(init.code, 0, init.err + init.out);
     const roster = JSON.parse(sb.run(['bus', 'roster', '--json']).out);
     const seats = roster.seats.filter((s) => s.seat);
