@@ -12,7 +12,8 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   const add = (status, step, detail = '') => items.push({ status, step, detail });
   add('succeeded', 'Vault', root);
   if (daemonUp === null) { const { healthy } = await import('./daemon.mjs'); daemonUp = await healthy(root); }
-  add(daemonUp ? 'succeeded' : 'failed', 'Memev running', daemonUp ? 'on this machine (127.0.0.1)' : 'run memev doctor');
+  const why = daemonUp ? null : await (await import('./daemon.mjs')).whyNotRunning(root); // the listen error, if any
+  add(daemonUp ? 'succeeded' : 'failed', 'Memev running', daemonUp ? 'on this machine (127.0.0.1)' : why ? `${why} (memev doctor)` : 'run memev doctor');
   // apps
   const clients = await import('./clients.mjs');
   if (firstRun && !flags['no-connect']) clients.connectAll({ env, launcher });
