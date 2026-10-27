@@ -68,7 +68,9 @@ export function supervise(vault, { root }) {
     const { exists } = await import('../engine/util.mjs');
     if (!exists(launcherPath())) return { skipped: 'no launcher' };
     const r = connectAll({ launcher: launcherPath() });
-    return { added: r.filter((x) => x.status === 'added').map((x) => x.id) };
+    const added = r.filter((x) => x.status === 'added').map((x) => x.id);
+    for (const id of added) try { vault.bus.register({ client: id, device: vault.devices.get(vault.host.id) }); } catch {}
+    return { added };
   }, 'redetect');
   const tune = every(24 * 60, async () => { const { tuneRecall } = await import('../engine/tuning.mjs'); return tuneRecall(vault); }, 'tuning');
   if (process.env.MEMEV_NO_BACKGROUND !== '1') { setTimeout(redetect, 5000).unref?.(); setTimeout(tune, 15000).unref?.(); }

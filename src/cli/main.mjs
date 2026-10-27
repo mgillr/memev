@@ -26,6 +26,7 @@ Setup
   memev devices [enroll|remove|rotate|rename|keygen]   computers and apps using this vault, each with its own credential
   memev join <url> --token T       use a vault on another computer from this one (after memev devices keygen)
   memev license status|install <file>|remove   the licence: how many computers may use this vault
+  memev bus roster|check|send|tail|tasks|watch <seat>|operator <seat>   the comms bus between your AI apps
 
 Daily
   memev recall <query> [--project P] [--all-projects]  |  memev card [--project P]
@@ -45,7 +46,7 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './service.mjs', contract: './contracts-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './service.mjs', contract: './contracts-cli.mjs', bus: './bus-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 export function installRuntime(env = process.env) {
@@ -64,7 +65,7 @@ export function installRuntime(env = process.env) {
 
 export async function main(argv, env = process.env) {
   const [cmd = 'help', ...rest] = argv;
-  const { flags, pos } = parseArgs(rest, ['yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects']);
+  const { flags, pos } = parseArgs(rest, ['yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects', 'release', 'open', 'once']);
   const root = resolveRoot(flags.root, env);
   const need = () => { if (!isVault(root)) throw new Error(`no vault at ${root}; run memev init`); };
   const json = (o) => console.log(JSON.stringify(o, null, 2));

@@ -41,7 +41,7 @@ export function clientToken(root, client, { remote = false } = {}) {
   const key = remote ? `cloud:${client}` : client;
   const ts = new TokenStore(path.join(root, STATE, 'tokens.json'));
   if (all[key] && ts.verify(all[key])) return all[key];
-  const t = ts.issue({ agent: client, scopes: ['read', 'write'], paths: remote ? ['memory/**', 'work/**', 'contracts/**'] : ['**'], ttlDays: remote ? 90 : 365, remote, note: remote ? 'cloud connector' : 'local client' });
+  const t = ts.issue({ agent: client, scopes: ['read', 'write'], paths: remote ? ['memory/**', 'work/**', 'contracts/**', 'bus/**'] : ['**'], ttlDays: remote ? 90 : 365, remote, note: remote ? 'cloud connector' : 'local client' });
   all[key] = t.token; writePrivateJson(f, all);
   return t.token;
 }
