@@ -228,3 +228,51 @@ export function deviceKeygen() {
   const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519');
   return { privateKeyPem: privateKey.export({ type: 'pkcs8', format: 'pem' }), publicKey: publicKey.export({ type: 'spki', format: 'der' }).toString('base64') };
 }
+
+// ---- one-time invites: a code carries the vault address and a secret that is stored only as a hash
+const invitePath = (root) => path.join(root, '.memev', 'invites.json');
+export const inviteHash = (secret) => sha256(String(secret));
+
+export function encodeInvite({ address, secret }) {
+  return Buffer.from(JSON.stringify({ a: address, s: secret }), 'utf8').toString('base64url');
+}
+export function decodeInvite(code) {
+  let o;
+  try { o = JSON.parse(Buffer.from(String(code), 'base64url').toString('utf8')); } catch { throw new Error('bad invite code'); }
+  if (!o || typeof o.a !== 'string' || typeof o.s !== 'string' || !o.a || !o.s) throw new Error('bad invite code');
+  return { address: o.a, secret: o.s };
+}
+
+function loadInvites(root) { return readJson(invitePath(root), null) || { version: 1, invites: {} }; }
+
+/** Mint a one-time secret. The file keeps the hash, the expiry and the address, never the secret. */
+export function mintInvite(root, { address, ttlSec = 15 * 60, at = Date.now() } = {}) {
+  if (!address) throw new Error('an invite needs the vault address');
+  const secret = crypto.randomBytes(16).toString('base64url');
+  const expires = new Date(at + ttlSec * 1000).toISOString();
+  const id = `inv_${randomToken(4)}`;
+  const data = loadInvites(root);
+  data.invites[id] = { id, hash: inviteHash(secret), expires, address, used: false };
+  writePrivateJson(invitePath(root), data);
+  const code = encodeInvite({ address, secret });
+  return { id, code, secret, expires, address, link: `${String(address).replace(/\/$/, '')}/i/${code}` };
+}
+
+/**
+ * Redeem a code once. A second try is refused. An invite past its expiry is refused with a message
+ * that says it expired. On success one remote computer is enrolled.
+ */
+export function redeemInvite(root, { code, pubkey, label, tokens, policy, at = Date.now() }) {
+  const { address, secret } = decodeInvite(code);
+  const data = loadInvites(root);
+  const row = Object.values(data.invites).find((i) => i.hash === inviteHash(secret) && i.address === address);
+  if (!row) throw new Error('unknown invite');
+  if (Date.parse(row.expires) <= at) throw new Error('this invite expired');
+  if (row.used) throw new Error('this invite was already used');
+  const reg = new DeviceRegistry(path.join(root, '.memev', 'devices.json'));
+  const enrolled = reg.enroll(tokens, { kind: 'remote-computer', label: label || 'invited computer', pubkey, policy });
+  row.used = true;
+  row.device = enrolled.device.id;
+  writePrivateJson(invitePath(root), data);
+  return { device: enrolled.device, token: enrolled.token };
+}
