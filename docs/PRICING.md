@@ -1,6 +1,7 @@
 # Pricing and licensing: DRAFT
 
 > **DRAFT. Not an offer and not in force.** Prices, tiers and licence terms below are proposals.
+> Team, Office, Business and Enterprise have no list price: contact us for a quote.
 > Nothing is enforced: Memev reports computers and connectors and never limits them
 > ([CHARTER.md](../CHARTER.md)). Memev is licensed under Apache-2.0 today. Any licence change for
 > future releases awaits legal review.
@@ -9,10 +10,10 @@
 
 | | Free | Personal | Team | Office | Business (planned) | Enterprise |
 |---|---|---|---|---|---|---|
-| Price (draft) | $0 | $15/month or $144/year | $12 per computer per month, at least 3 | $99/month for 10 computers, $219/month for 25 | $199/month per 10 computers, plus $2,500 remote setup | by contract |
-| Computers using one vault | 1 | up to 4 (+$4/month each) | per computer | 10 or 25 | 10 to 50, in blocks of 10 | by contract |
+| Price (draft) | $0 | $15/month or $144/year | contact us for a quote, at least 3 computers | contact us for a quote, 10 or 25 computers | contact us for a quote, plus $2,500 remote setup | contact us for a quote |
+| Computers using one vault | 1 | up to 4 (+$4/month each) | per computer | 10 or 25 | 10 to 50, in blocks of 10 | agreed in the quote |
 | Local AI apps on a computer | unlimited | unlimited | unlimited | unlimited | unlimited | unlimited |
-| Cloud AI connectors | 5 | 10 | 5 per computer | 50 or 125 | 50 per 10 computers | by contract |
+| Cloud AI connectors | 5 | 10 | 5 per computer | 50 or 125 | 50 per 10 computers | agreed in the quote |
 | Vault, recall, graph, contracts, doctor, your own tunnel | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Backup to your own GitHub (one writer) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Hosted end-to-end encrypted sync between computers | | ✓ | ✓ | ✓ | | ✓ or self-hosted |
@@ -27,6 +28,8 @@ Business is the tier for a company that runs its own hub; Office is several comp
 vault without a hub. Hosted sync and the hosted relay are not part of Business because its hub runs
 on the company's server. Sync, the relay, the hub, sign-in, roles, labels and the egress log are
 planned, not built; see [tiers/](tiers/README.md) for what each tier includes and how it is set up.
+
+Team, Office and Business quotes are still per computer, using the counts above.
 
 **A computer** is a machine that runs its own copy of the vault, or whose AI apps reach a vault
 remotely (through a tunnel or relay). It counts while it is enrolled and has been seen in the last

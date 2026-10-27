@@ -58,7 +58,7 @@ flowchart TB
 
 ## Price (draft)
 
-By contract. Typical parts: private deployment from $6,000/year; onboarding from $12,000; compliance
+Contact us for a quote. Typical parts: private deployment from $6,000/year; onboarding from $12,000; compliance
 pack $5,000 once or $15,000/year; named engineer $1,950/month or embedded engineer $6,500/month;
 custom development $1,600/day. See [services.md](services.md).
 
