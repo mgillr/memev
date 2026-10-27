@@ -36,9 +36,9 @@ async function defaultPortCheck(root, wanted) {
 /** The commands that fix each check on each platform. */
 export function fixFor(id, platform, extra = {}) {
   const win = platform === 'win32'; const mac = platform === 'darwin';
-  if (id === 'node') return win ? 'Install Node.js 22 or newer: winget install OpenJS.NodeJS.LTS (or download it from https://nodejs.org), then open a new terminal.'
-    : mac ? 'Install Node.js 22 or newer: brew install node (or download it from https://nodejs.org), then open a new terminal.'
-      : 'Install Node.js 22 or newer from https://nodejs.org (for example with nvm: nvm install 22), then open a new terminal.';
+  if (id === 'node') return win ? 'Install Node.js 22 or newer: winget install OpenJS.NodeJS.LTS (or download it from nodejs.org), then open a new terminal.'
+    : mac ? 'Install Node.js 22 or newer: brew install node (or download it from nodejs.org), then open a new terminal.'
+      : 'Install Node.js 22 or newer from nodejs.org (for example with nvm: nvm install 22), then open a new terminal.';
   if (id === 'git') return win ? 'Install git: winget install Git.Git, then open a new terminal.'
     : mac ? 'Install git: xcode-select --install'
       : 'Install git: sudo apt install git (Debian, Ubuntu); on Fedora: sudo dnf install git';
