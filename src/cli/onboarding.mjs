@@ -54,6 +54,10 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   const { git } = await import('../engine/git.mjs');
   const remote = git(root, ['remote']).out;
   add(remote ? 'ready' : 'needs-manual', 'Backup to your own private GitHub repository', remote ? `remote ${remote}` : 'memev github setup (two minutes, one browser sign-in)');
+  // the memev command itself: a source install leaves the launcher off PATH
+  const { launcherDir, onPath, commandName } = await import('./pathsetup.mjs');
+  if (onPath(launcherDir(env), env)) add('ready', 'memev command', 'on your PATH');
+  else add('needs-manual', 'memev command', `not on your PATH yet: memev path add puts it there (until then use ${commandName(env)})`);
   // self-test
   if (daemonUp) {
     const { fileChecks } = await import('./doctor.mjs');
@@ -73,7 +77,7 @@ export function print(items) {
   console.log(manual.length ? `\n${manual.length} step(s) need you; run memev onboarding to check again after doing them.` : '\nEverything is set up.');
 }
 
-export async function firstRun(o) { const items = await checklist({ ...o, firstRun: true }); print(items); return items.some((i) => i.status === 'failed') ? 1 : 0; }
+export async function firstRun(o) { const items = await checklist({ ...o, firstRun: true }); print(items); await (await import('./pathsetup.mjs')).offer({ env: o.env }); return items.some((i) => i.status === 'failed') ? 1 : 0; }
 export function printMilestones(m) {
   console.log('Milestones (kept on this computer only):');
   for (const n of MILESTONES) console.log(`  ${m[n] ? '\u2713' : ' '} ${n.replace(/_/g, ' ')}${m[n] ? `  ${m[n].at.slice(0, 16).replace('T', ' ')}` : ''}`);

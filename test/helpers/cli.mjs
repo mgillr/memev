@@ -34,10 +34,11 @@ export function freePort({ span = 1 } = {}) {
   }
   throw new Error('no free port for the test daemon');
 }
+// The sandbox has the launcher folder on PATH, as a person who ran memev path add does; a test of the other case sets PATH itself.
 export function sandbox({ ports = 1 } = {}) {
   const home = tmpdir('home-');
   const port = freePort({ span: ports });
-  const env = { PATH: process.env.PATH, HOME: home, XDG_CONFIG_HOME: path.join(home, '.config'), MEMEV_CONFIG_DIR: path.join(home, '.config', 'memev'), MEMEV_ROOT: path.join(home, 'memev'), MEMEV_NO_SERVICE: '1', MEMEV_NO_TUNNEL: '1', MEMEV_NO_BACKGROUND: '1', MEMEV_NO_DOWNLOAD: '1', GIT_CONFIG_NOSYSTEM: '1', GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.invalid', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.invalid' };
+  const env = { PATH: path.join(home, '.config', 'memev', 'bin') + path.delimiter + process.env.PATH, HOME: home, XDG_CONFIG_HOME: path.join(home, '.config'), MEMEV_CONFIG_DIR: path.join(home, '.config', 'memev'), MEMEV_ROOT: path.join(home, 'memev'), MEMEV_NO_SERVICE: '1', MEMEV_NO_TUNNEL: '1', MEMEV_NO_BACKGROUND: '1', MEMEV_NO_DOWNLOAD: '1', GIT_CONFIG_NOSYSTEM: '1', GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.invalid', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.invalid' };
   const run = (args, { input = '', extraEnv = {} } = {}) => { const r = spawnSync(process.execPath, [BIN, ...args], { env: { ...env, ...extraEnv }, input, encoding: 'utf8', timeout: 30000 }); return { code: r.status, out: r.stdout, err: r.stderr }; };
   const hook = (event, payload, client = 'claude-code', extra = []) => run(['hook', event, '--client', client, ...extra], { input: JSON.stringify(payload) });
   const stop = () => run(['stop']);
