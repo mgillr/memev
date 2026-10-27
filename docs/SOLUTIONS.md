@@ -235,7 +235,7 @@ ignore firms under 50 people.
 
 **What Memev does.** One person on one computer gets all of Memev for free, for good
 ([CHARTER.md](../CHARTER.md)). Draft prices for teams and companies are in
-[PRICING.md](PRICING.md).
+[PRICING.md](PRICING.md) and [tiers/](tiers/README.md).
 
 **Tier.** All.
 
@@ -280,7 +280,7 @@ Most fixes above are ordinary. These are the parts competitors would find hard t
 4. **Decisions stay local.** The quality check, the explanations and the project scope run on your
    machine, without a model call or a server.
 5. **A self-hosted memory for 10 to 100 people (planned).** Permissions that follow the org chart,
-   sensitive departments kept on a local model, and a log of what leaves. See [PRICING.md](PRICING.md).
+   sensitive departments kept on a local model, and a log of what leaves. See [tiers/](tiers/README.md).
 
 ## Planned work in order
 
