@@ -3,10 +3,12 @@
 // computer's token; `memev mcp` and the session hooks then send every request there, signed with
 // this computer's device key (`memev devices keygen`). The key never leaves this computer, so the
 // saved details are no use anywhere else.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { configDir, readJson, writePrivateJson, exists } from '../engine/util.mjs';
-import { signRequest } from '../engine/devices.mjs';
+import { configDir, readJson, writePrivate, writePrivateJson, exists } from '../engine/util.mjs';
+import { signRequest, decodeInvite, deviceKeygen } from '../engine/devices.mjs';
 import { out } from './common.mjs';
 
 export const remoteFile = (env = process.env) => path.join(configDir(env), 'remote.json');
@@ -26,10 +28,42 @@ export async function remoteFetch(remote, route, { method = 'POST', body = null,
   } finally { clearTimeout(t); }
 }
 
-/** `memev join <url> --token T [--no-connect]` on the computer being added. */
+const publicKeyOf = (pem) => crypto.createPublicKey(pem).export({ type: 'spki', format: 'der' }).toString('base64');
+
+/** `memev join <code>` makes a key, enrols this computer and connects its apps. A bad or used code writes nothing. */
+async function joinWithCode(code, flags, { env }) {
+  let decoded;
+  try { decoded = decodeInvite(code); } catch (e) { out.bad(e.message || 'bad invite code'); return 1; }
+  const keyPath = deviceKeyFile(env);
+  const hadKey = exists(keyPath);
+  let pem; let pub;
+  if (hadKey) { pem = fs.readFileSync(keyPath, 'utf8'); pub = publicKeyOf(pem); }
+  else { const k = deviceKeygen(); pem = k.privateKeyPem; pub = k.publicKey; }
+  const url = decoded.address.replace(/\/+$/, '');
+  let res;
+  try {
+    const r = await fetch(`${url}/v1/invite-redeem`, { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'memev-remote' }, body: JSON.stringify({ code, pubkey: pub, label: os.hostname() || 'laptop' }) });
+    const text = await r.text(); let json = null; try { json = JSON.parse(text); } catch {}
+    res = { ok: r.ok, status: r.status, json, text };
+  } catch (e) { out.bad(`the vault did not answer: ${e.message}`); return 1; }
+  if (!res.ok || !res.json?.token) { out.bad(res.json?.error_description || `the invite was refused (${res.status})`); return 1; }
+  if (!hadKey) { fs.mkdirSync(path.dirname(keyPath), { recursive: true, mode: 0o700 }); writePrivate(keyPath, pem); fs.writeFileSync(`${keyPath}.pub`, `${pub}\n`, { mode: 0o644 }); }
+  const remote = { url, token: res.json.token, joined: new Date().toISOString() };
+  writePrivateJson(remoteFile(env), remote);
+  out.ok(`joined the vault at ${url}; requests from this computer are signed with its device key`);
+  if (!flags['no-connect']) { const { installRuntime } = await import('./main.mjs'); const { connectAll } = await import('./clients.mjs'); const rt = installRuntime(env); const connected = connectAll({ env, launcher: rt.launcher }); out.ok('connected the AI apps on this computer (memev clients)');
+    const ids = connected.filter((x) => ['added', 'already'].includes(x.status)).map((x) => x.id);
+    const b = await remoteFetch(remote, 'v1/bus-register', { body: { clients: ids }, env }).catch(() => null);
+    if (b?.ok) out.ok(`on the comms bus: ${b.json.seats.join(', ') || 'apps get a seat on their first session'}`); }
+  return 0;
+}
+
+/** `memev join <code>`, or `memev join <url> --token T [--no-connect]`, on the computer being added. */
 export async function join(pos, flags, { env }) {
-  const url = String(pos[0] || '').replace(/\/mcp\/?$/, '').replace(/\/+$/, '');
-  if (!/^https?:\/\//.test(url) || !flags.token) { console.log('memev join <vault URL> --token <token>\n  The vault admin gets both from: memev devices enroll --kind remote-computer --pubkey <key> and memev cloud url'); return 2; }
+  const arg = String(pos[0] || '').trim();
+  if (arg && !/^https?:\/\//.test(arg)) return joinWithCode(arg, flags, { env });
+  const url = arg.replace(/\/mcp\/?$/, '').replace(/\/+$/, '');
+  if (!/^https?:\/\//.test(url) || !flags.token) { console.log('memev join <code>\n  or: memev join <vault URL> --token <token>\n  A code comes from memev invite on the vault. The older path still starts with memev devices keygen.'); return 2; }
   if (!exists(deviceKeyFile(env))) { out.bad('this computer has no device key yet: run memev devices keygen, give the public key to the vault admin, then join'); return 1; }
   const remote = { url, token: String(flags.token), joined: new Date().toISOString() };
   const r = await remoteFetch(remote, 'mcp', { body: { jsonrpc: '2.0', id: 1, method: 'tools/list' }, env }).catch((e) => ({ ok: false, status: 0, text: e.message }));

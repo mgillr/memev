@@ -43,6 +43,8 @@ memev invite                 # on the vault: code, link and QR code
 memev invite --ttl 600       # the same, expiring after ten minutes
 ```
 
+On the other computer, `memev join <code>` makes a device key, enrols this computer and connects the AI apps on it. A bad or used code stops before any credential is saved. The older path still works: `memev devices keygen`, then `memev join <url> --token <token>`.
+
 `memev join` checks the vault answers, saves the address, and connects the AI apps on the laptop.
 From then on every request from the laptop is signed with its key, and the token alone does not
 work on another machine. The vault refuses to enroll more computers than its licence covers; with
