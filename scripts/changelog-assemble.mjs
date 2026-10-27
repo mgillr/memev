@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 export const SECTIONS = ['Added', 'Changed', 'Deprecated', 'Removed', 'Fixed', 'Security'];
 // branches opened before the rule (bus decision MERGE-RACE-FIX, 27 Oct) keep their own CHANGELOG.md edit; drop each one
 // once it has landed
-export const EXEMPT = ['mem-064-checkout', 'mem-114-resume-card', 'oc-1/MEM-002'];
+export const EXEMPT = ['mem-064-checkout', 'mem-114-resume-card'];
 const DIR = 'changelog.d';
 const isNote = (f) => f.endsWith('.md') && f !== 'README.md';
 
