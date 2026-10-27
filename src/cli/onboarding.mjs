@@ -21,16 +21,18 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
     if (c.connected) { add(firstRun ? 'added' : 'ready', c.name, c.mode === 'hooks' ? 'MCP + session hooks + instructions: memory is loaded and saved automatically' : 'MCP + instructions'); if (c.manual) add('needs-manual', `${c.name}: one step`, c.manual); }
     else add(c.declined ? 'skipped' : 'needs-manual', c.name, c.declined ? 'you disconnected it (memev connect ' + c.id + ' to undo)' : `memev connect ${c.id}`);
   }
-  // the comms bus: every connected app gets a seat; it joins and says hello on its first session
+  // the comms bus: bus/ is in the vault and committed, every connected app has a seat (each joins
+  // and says hello on its first session), and the lead is the person's choice, never automatic
   const connected = found.filter((x) => x.connected).map((x) => x.id);
   if (daemonUp) {
-    try {
-      const { api, clientToken } = await import('./common.mjs');
-      const op = connected.includes('claude-code') ? 'claude-code@host' : connected[0] ? `${connected[0]}@host` : null;
-      const r = await api(root, '/v1/bus-register', { body: { clients: connected, operator: op }, token: clientToken(root, 'cli'), timeoutMs: 4000 });
-      if (r.ok) add('succeeded', 'Agent comms bus', r.json.seats.length ? `${r.json.seats.length} seat(s): ${r.json.seats.join(', ')}; ${r.json.operator ? `${r.json.operator} speaks for you` : 'no operator seat yet (memev bus operator <seat>)'}. Each app joins on its first session` : 'ready; apps get a seat when they connect');
-    } catch {}
-  }
+    const bus = await import('./bus-cli.mjs');
+    let r; try { r = await bus.setupBus({ root, env, clients: connected, flags, ask: firstRun ? undefined : false }); } catch (e) { r = { ok: false, seats: [], operator: null, problems: [e.message] }; }
+    if (r.ok) add('succeeded', 'Agent comms bus', `bus/ set up and committed in the vault; ${r.seats.length ? `${r.seats.length} seat(s): ${r.seats.join(', ')}, each joins on its first session` : 'no AI apps yet, each gets a seat when it connects'}`);
+    else add('failed', 'Agent comms bus', `${r.problems.join('; ')} (memev doctor --fix)`);
+    for (const n of r.notes || []) add('needs-manual', 'Lead AI', n);
+    if (r.operator) add('succeeded', 'Lead AI', `${r.operator} leads and coordinates the others, chosen by you (memev bus operator <seat> changes it)`);
+    else if (!(r.notes || []).length) add('needs-manual', 'Lead AI', bus.LEAD_LATER);
+  } else add('failed', 'Agent comms bus', 'not set up: Memev is not running (memev doctor)');
   if (!found.some((x) => x.found)) add('needs-manual', 'AI apps', 'none found yet; install one and Memev connects it automatically within 30 minutes (or run memev connect)');
   // service
   const svc = await import('./service.mjs');

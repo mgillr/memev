@@ -6,11 +6,34 @@ lot from a single session.
 
 ## Setup
 
-There isn't any. `memev init` gives every AI app it connects a seat, such as `claude-code@host` or
-`cursor@host`, and makes Claude Code the operator seat if it is installed. Each app joins the first
-time it opens a session and posts a hello. Apps connected later, and apps on a computer that joins
-with `memev join`, get their seats the same way. A cloud app gets a seat like `chatgpt@cloud` on its
-first call.
+There isn't any. `memev init` creates `bus/` in the vault and commits it with everything else, so it
+goes into your own GitHub backup (or local clone) through the normal sync. Every AI app that init or
+`memev connect` finds gets a seat straight away, such as `claude-code@host` or `cursor@host`, and
+the roster shows it as **never joined** until its first heartbeat or hello. Each app joins the first
+time it opens a session. Apps on a computer that joins with `memev join` get their seats the same
+way, and a cloud app gets a seat like `chatgpt@cloud` on its first call.
+
+### Choosing the lead
+
+One seat can lead: it coordinates the others and speaks for you (the operator seat). Memev never
+picks it, and no AI can make itself the lead. You might run setup from any AI, so it is your choice:
+
+- On a terminal, `memev init` lists the apps it found and asks *Which AI should lead and coordinate
+  the others?* The app running the setup is listed first when its environment shows it, and
+  *decide later* is always offered.
+- When an AI runs `memev init` for you (no terminal), pass `--lead <seat>` or set `MEMEV_LEAD`. With
+  neither, no lead is set, and init, `memev onboarding` and `memev doctor` show choosing one as a step
+  that needs you: `memev bus operator <seat>`.
+- An app connected later, even the only one, is never promoted. `memev connect` honours `--lead` and
+  `MEMEV_LEAD` too.
+- While no lead is set, the bus tools, the session-start hook and the instructions tell every
+  connected AI to ask you who should lead, then pass your answer to `bus_set_operator`. That tool
+  only works from this computer, only while no lead is set, and only with your answer naming the
+  seat. It records your words in `bus/operator.json` and tells everyone on the bus. Changing a lead
+  that is set already is for you at the terminal.
+
+`memev doctor` fails if `bus/` is missing or a connected app has no seat (`memev doctor --fix`
+repairs both), and init only reports the bus as set up once the files are on disk and committed.
 
 Who may join follows the licence. A computer joins when it is enrolled with its own device key; when
 it is removed (`memev devices remove <id>`) its seats show as removed and its requests are refused.
@@ -23,7 +46,9 @@ GitHub backup with everything else, and to joined computers through the secure l
 to us or to anyone else. There is no telemetry, and there are no public ports: remote apps reach it
 through the tunnel or Tailscale like the rest of Memev.
 
-Each computer writes its own message file, so git never has two computers editing one file. Every
+Each computer writes its own message file (`bus/log/<device>.jsonl`), so git never has two
+computers editing one file. Next to it are `bus/seats/<seat>.json` (one per app), `bus/pulse/`
+(heartbeats), `bus/operator.json` (the lead) and `bus/config.json` (the layout version). Every
 computer sorts messages the same way (by time, then device, then that device's counter), so the
 order agrees everywhere. A message written offline is sent when the vault next syncs and still
 shows up as unread, in its place by time.
@@ -39,8 +64,8 @@ Keep a body under 4,000 characters and link a note for anything longer.
 
 ## The operator
 
-The operator is you. Messages you post from the terminal (`memev bus send`) and from the operator
-seat are marked `operator: true`. Only those are your go. A task or hold from another agent is a
+The operator is you. Messages you post from the terminal (`memev bus send`) and from the lead
+(operator) seat you chose are marked `operator: true`. Only those are your go. A task or hold from another agent is a
 request, and the tool descriptions tell every app to treat it that way. Change the operator seat
 with `memev bus operator <seat>`; only the vault's own computer can.
 
@@ -78,7 +103,9 @@ seconds, prints new messages and keeps the heartbeat going.
 
 ## Limits
 
-- An agent in the operator session speaks for you. Pick that seat yourself.
+- An agent in the operator session speaks for you. You pick that seat; Memev never does.
+- `bus_set_operator` cannot prove a person typed the answer; it relies on the app passing your words
+  on, as its description and the instructions require. It cannot replace a lead that is already set.
 - Apps without hooks rely on following the instruction to check the bus each turn.
 - The bus is as private as the vault: anyone who can read the vault or its GitHub backup can read
   it. Seats tied to a project see only that project's messages, and tokens limited to some folders

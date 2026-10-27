@@ -232,7 +232,7 @@ export function connectAll({ env = process.env, launcher, force = false } = {}) 
 
 export function launcherPath(env = process.env) { return path.join(configDir(env), 'bin', process.platform === 'win32' ? 'memev.cmd' : 'memev'); }
 
-export async function command(cmd, pos, flags, { env }) {
+export async function command(cmd, pos, flags, { env, root }) {
   const launcher = launcherPath(env);
   if (!exists(launcher)) { const { installRuntime } = await import('./main.mjs'); installRuntime(env); }
   const target = pos[0] || 'all';
@@ -250,6 +250,8 @@ export async function command(cmd, pos, flags, { env }) {
       else out.bad(`${r.name}: ${r.reason}`);
       if (r.manual) out.warn(r.manual);
     }
+    const ids = res.filter((r) => ['added', 'already'].includes(r.status)).map((r) => r.id);
+    if (ids.length && !flags['dry-run']) await seatOnBus({ root, env, ids, flags });
     return res.some((r) => r.status === 'failed') ? 1 : 0;
   }
   if (cmd === 'disconnect' || cmd === 'uninstall') {
@@ -266,4 +268,23 @@ export async function command(cmd, pos, flags, { env }) {
     return 0;
   }
   return 2;
+}
+
+/** After connect: each app gets its seat on the comms bus straight away (here, or on the vault this computer joined). */
+async function seatOnBus({ root, env, ids, flags }) {
+  const { isVault } = await import('../engine/vault.mjs');
+  try {
+    if (root && isVault(root)) {
+      const bus = await import('./bus-cli.mjs');
+      const r = await bus.setupBus({ root, env, clients: ids, flags });
+      if (r.ok) out.ok(`on the comms bus: ${r.seats.join(', ')} (each joins on its first session)`); else out.bad(`comms bus: ${r.problems.join('; ')}`);
+      for (const n of r.notes || []) out.warn(n);
+      if (r.operator) out.ok(`${r.operator} leads the others`); else out.warn(bus.LEAD_LATER);
+      return;
+    }
+    const { loadRemote, remoteFetch } = await import('./remote.mjs');
+    const remote = loadRemote(env); if (!remote) return;
+    const b = await remoteFetch(remote, 'v1/bus-register', { body: { clients: ids }, env });
+    if (b.ok) out.ok(`on the comms bus: ${b.json.seats.join(', ')}`); else out.bad(`comms bus: the vault answered ${b.status}`);
+  } catch (e) { out.bad(`comms bus: ${e.message}`); }
 }

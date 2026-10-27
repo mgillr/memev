@@ -7,6 +7,8 @@
 //   bus/seats/<seat>.json    one seat per AI app (or session) on a computer
 //   bus/pulse/<seat>.json    the seat's last heartbeat and what it has read
 //   bus/operator.json        which seat speaks for you
+//   bus/config.json          the layout version, so another computer knows how to read the rest
+// init seeds these (Vault.open on an older vault), and they are committed with the vault like any note.
 // Order is the same on every computer: by time, then device id, then the device's own counter.
 // What a seat has read is kept per device counter, so messages that arrive late from a computer
 // that was offline are still delivered.
@@ -20,13 +22,14 @@ export const TYPES = ['hello', 'status', 'task', 'claim', 'restate', 'review', '
 export const BUS_DIR = 'bus';
 export const OPERATOR = 'operator';
 const MAX_BODY = 4000;
+export const LEAD_NEEDED = 'No lead AI is set for this vault. Ask the user which AI should lead and coordinate the others (bus_roster lists the seats), then call bus_set_operator with the seat and their answer. Never choose yourself or another app without asking.';
 const SEAT_RE = /^[a-z0-9][a-z0-9._-]{0,40}@[a-z0-9][a-z0-9._-]{0,40}(\/[a-z0-9._-]{1,24})?$/;
 const PULSE_COMMIT_MS = 5 * 60e3;
 
 export class BusError extends Error { constructor(code, message) { super(message); this.code = code; this.name = 'BusError'; } }
 
-const fileOf = (seat) => seat.replace(/[^a-z0-9._-]/g, (c) => (c === '@' ? '~' : c === '/' ? '+' : '_'));
-const label = (s) => String(s || 'computer').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'computer';
+export const fileOf = (seat) => seat.replace(/[^a-z0-9._-]/g, (c) => (c === '@' ? '~' : c === '/' ? '+' : '_'));
+export const label = (s) => String(s || 'computer').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'computer';
 const order = (a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : a.device < b.device ? -1 : a.device > b.device ? 1 : a.dseq - b.dseq);
 const ago = (ts, at) => Math.round((at - Date.parse(ts)) / 60e3);
 
@@ -41,6 +44,19 @@ export class Bus {
 
   _p(...a) { return path.join(this.dir, ...a); }
   _rel(...a) { return [BUS_DIR, ...a].join('/'); }
+
+  /** Seed bus/ (the caller commits it) so the bus is part of the vault from the first commit: the layout, no operator yet, and this computer's own (empty) message file. */
+  ensure(deviceId) {
+    const files = [
+      ['config.json', () => writeJson(this._p('config.json'), { format: 1, log: 'log/<device>.jsonl, one append-only file per computer', seats: 'seats/<seat>.json', pulse: 'pulse/<seat>.json', operator: 'operator.json' })],
+      ['operator.json', () => writeJson(this._p('operator.json'), { seat: null, set: null })],
+      ...(deviceId ? [[`log/${deviceId}.jsonl`, () => fs.writeFileSync(this._p('log', `${deviceId}.jsonl`), '')]] : []),
+    ];
+    fs.mkdirSync(this._p('log'), { recursive: true });
+    const created = [];
+    for (const [rel, make] of files) if (!fs.existsSync(this._p(...rel.split('/')))) { make(); created.push(this._rel(...rel.split('/'))); }
+    return { paths: files.map(([rel]) => this._rel(...rel.split('/'))), created };
+  }
 
   // ---- seats
   /** The seat name for an app on a device: claude-code@host, cursor@laptop, chatgpt@cloud. */
@@ -66,12 +82,44 @@ export class Bus {
     return rec;
   }
   operator() { return readJson(this._p('operator.json'), null)?.seat || null; }
-  /** Which seat speaks for you. Only the person at the vault sets this (memev bus operator). */
-  setOperator(seat) {
-    if (seat && !this.seat(seat)) throw new BusError('not_found', `no seat ${seat}; memev bus roster lists them`);
+  /**
+   * Which seat leads and speaks for you. Never chosen by Memev or by an AI on its own: the person
+   * picks it at init, with memev bus operator, or by answering an AI that then calls bus_set_operator.
+   */
+  setOperator(seat, { by = 'terminal', answer = null } = {}) {
+    const rec = seat ? this.seat(seat) : null;
+    if (seat && (!rec || rec.removed)) throw new BusError('not_found', `no seat ${seat}; memev bus roster lists them`);
     fs.mkdirSync(this.dir, { recursive: true });
-    writeJson(this._p('operator.json'), { seat: seat || null, set: now() }); this.commit(this._rel('operator.json'));
-    return seat;
+    writeJson(this._p('operator.json'), { seat: seat || null, set: now(), by, ...(answer ? { user_answer: answer } : {}) }); this.commit(this._rel('operator.json'));
+    return seat || null;
+  }
+  /** A seat name from what the person typed: a seat, or an app id meaning its seat on this computer. */
+  seatFor(choice) {
+    const c = String(choice || '').trim().toLowerCase();
+    if (!c) return null;
+    if (this.seat(c)) return c;
+    const host = `${label(c)}@host`;
+    return this.seat(host) ? host : null;
+  }
+  /**
+   * bus_set_operator: an AI passes on the person's answer to "which AI should lead?". It only works
+   * while no lead is set and only from this computer; the answer must name the seat it sets. Changing
+   * a lead that is already set is for the person at the terminal (memev bus operator <seat>).
+   */
+  chooseLead(ctx, { seat, user_answer } = {}) {
+    if (!ctx.local) throw new BusError('forbidden', 'the lead is chosen on the vault\'s own computer');
+    const cur = this.operator();
+    if (cur) throw new BusError('conflict', `${cur} already leads; only the person can change it, from the terminal: memev bus operator <seat>`);
+    const answer = String(user_answer || '').trim().slice(0, 300);
+    if (!answer) throw new BusError('bad_request', 'ask the user which AI should lead and pass their answer as user_answer; never pick one yourself');
+    const name = this.seatFor(seat);
+    if (!name) throw new BusError('not_found', `no seat ${seat}; bus_roster lists them`);
+    const rec = this.seat(name); const words = answer.toLowerCase();
+    if (!words.includes(name) && !words.includes(rec.client) && !words.includes(rec.client.replace(/-/g, ' '))) throw new BusError('bad_request', `the user's answer does not name ${name}; ask them again and pass their exact words`);
+    const who = this.resolve(ctx, { need: 'write' });
+    this.setOperator(name, { by: who.seat, answer });
+    this._append({ ...who, operator: false }, { to: 'all', type: 'status', body: `${name} now leads and speaks for the user (the user chose it: "${answer.slice(0, 120)}")`, ref: null, project: null });
+    return { operator: name };
   }
 
   /**
@@ -184,7 +232,7 @@ export class Bus {
         try { if (!ctx.identity?.read_only) { this._append(who, { to: m.from, type: 'ack', body: 'comms check: here', ref: m.id, project: null }); acked.push(m.id); } } catch {}
       }
     }
-    return { seat: who.seat, operator: who.operator, hold: this.holdOn(who.seat, all), messages: fresh, acked };
+    return { seat: who.seat, operator: who.operator, hold: this.holdOn(who.seat, all), messages: fresh, acked, ...(this.operator() ? {} : { lead_needed: LEAD_NEEDED }) };
   }
 
   // ---- pulse
@@ -228,7 +276,7 @@ export class Bus {
     // licensed computers with no app on the bus yet
     const seated = new Set(rows.map((r) => r.device));
     for (const d of this.devices.list().filter((x) => x.kind === 'remote-computer' && !seated.has(x.id))) rows.push({ seat: null, client: null, device: d.id, device_label: d.label, device_kind: d.kind, state: d.status === 'active' ? 'never joined' : 'removed', operator: false, last_seen: null, minutes_since: null, last_message: null, hold: null, claims: [], status: null, project: null });
-    return { live_minutes: this.liveMin, operator: op, seats: rows };
+    return { live_minutes: this.liveMin, operator: op, seats: rows, ...(op ? {} : { lead_needed: LEAD_NEEDED }) };
   }
   reasonFor(row) {
     if (row.state === 'removed') return 'removed from the vault (its licence seat is free)';

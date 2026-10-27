@@ -12,6 +12,7 @@ import { redactSecrets, findSecrets } from '../engine/secrets.mjs';
 import { VERSION, isVault } from '../engine/vault.mjs';
 import { daemonInfo, pidAlive, config, out, clientsFile } from './common.mjs';
 import { licensingStatus } from './licensing.mjs';
+import { fileOf, label } from '../engine/bus.mjs';
 
 const C = (id, title, status, detail = '', fix = null) => ({ id, title, status, detail, fix });
 
@@ -43,6 +44,7 @@ export function fileChecks({ root, env = process.env, vault = null }) {
     r.push(C('bus', 'agent comms bus', b.bad_lines ? 'fail' : b.stale.length ? 'warn' : 'ok', `${b.seats} seat(s), ${b.live} live, ${b.messages} message(s)${b.operator ? `, operator ${b.operator}` : ', no operator seat'}${b.never ? `, ${b.never} never joined` : ''}${b.stale.length ? `; stale: ${b.stale.join(', ')} (no heartbeat lately: the app is closed or offline; memev bus check asks everyone)` : ''}${b.bad_lines ? `; ${b.bad_lines} unreadable line(s) in bus/log/` : ''}`));
   }
   const clients = readJson(path.join(configDir(env), 'clients-state.json'), { connected: {}, files: {} });
+  r.push(...busChecks({ root, vault, connected: Object.keys(clients.connected || {}) }));
   const launcher = path.join(configDir(env), 'bin', process.platform === 'win32' ? 'memev.cmd' : 'memev');
   r.push(C('launcher', 'stable launcher installed', exists(launcher) ? 'ok' : 'warn', exists(launcher) ? launcher : 'missing: apps cannot start Memev', exists(launcher) ? null : { desc: 'reinstall the launcher', destructive: false, cmd: 'runtime' }));
   const missing = Object.entries(clients.files || {}).filter(([f]) => { try { return !fs.readFileSync(f, 'utf8').includes('memev'); } catch { return true; } }).map(([f, rec]) => rec.client);
@@ -63,6 +65,19 @@ export function fileChecks({ root, env = process.env, vault = null }) {
     r.push(C('license', 'licence and seats (report only)', flagged.length ? 'warn' : 'ok', `${ls.license.state === 'none' ? 'free tier, no licence needed' : `licence ${ls.license.state}${ls.license.tier ? ` (${ls.license.tier})` : ''}`}; ${ls.usage.computers} computer(s), ${ls.usage.connectors} connector(s), ${ls.usage.local_clients} local client(s)${ls.notes.length ? `; ${ls.notes.join(' ')}` : ''}${flagged.length ? `; credential flagged on ${flagged.map((f) => f.label).join(', ')}: memev devices` : ''}`));
   } catch (e) { r.push(C('license', 'licence and seats (report only)', 'ok', `not checked: ${e.message}`)); }
   try { const s = fs.statfsSync(root); const freePct = (s.bavail / s.blocks) * 100; const inodePct = s.files ? (s.ffree / s.files) * 100 : 100; r.push(C('disk', 'disk space', freePct < 3 || inodePct < 3 ? 'warn' : 'ok', `${freePct.toFixed(0)}% space, ${inodePct.toFixed(0)}% inodes free`)); } catch {}
+  return r;
+}
+
+/** The comms bus on disk: bus/ in the vault, a seat for every connected app, and a lead the person chose. */
+export function busChecks({ root, vault = null, connected = [] }) {
+  const r = [];
+  const has = (f) => exists(path.join(root, 'bus', f));
+  const folder = has('config.json') && has('operator.json') && has('log');
+  r.push(C('bus-files', 'comms bus folder in the vault', folder ? 'ok' : 'fail', folder ? 'bus/ (committed with the vault)' : 'bus/ is missing from the vault', folder ? null : vault ? { desc: 'set bus/ up again', destructive: false, run: () => vault.bus.ensure(vault.host.id) } : { desc: 'set bus/ up again', destructive: false, cmd: 'bus' }));
+  const missing = connected.filter((id) => { const f = path.join(root, 'bus', 'seats', `${fileOf(`${label(id)}@host`)}.json`); const rec = readJson(f, null); return !rec || rec.removed; });
+  r.push(C('bus-seats', 'every connected app has a bus seat', missing.length ? 'fail' : 'ok', missing.length ? `no seat for ${missing.join(', ')}` : `${connected.length} app(s) seated`, missing.length ? { desc: 'seat them', destructive: false, cmd: 'bus' } : null));
+  const lead = readJson(path.join(root, 'bus', 'operator.json'), null)?.seat || null;
+  r.push(C('bus-lead', 'lead AI chosen', lead ? 'ok' : 'warn', lead ? `${lead} leads the others` : 'needs you: no lead AI chosen yet; pick the AI that leads and coordinates the others with memev bus operator <seat> (memev bus roster lists the seats)'));
   return r;
 }
 
@@ -118,6 +133,7 @@ export async function command(cmd, pos, flags, { root, env }) {
         if (c.fix.run) await c.fix.run();
         else if (c.fix.cmd === 'connect') { const m = await import('./clients.mjs'); m.connectAll({ env, launcher: m.launcherPath(env), force: false }); }
         else if (c.fix.cmd === 'runtime' || c.fix.cmd === 'service') { const m = await import('./main.mjs'); m.installRuntime(env); if (c.fix.cmd === 'service') { const s = await import('./service.mjs'); await s.installService({ env, root }); } }
+        else if (c.fix.cmd === 'bus') { const st = readJson(path.join(configDir(env), 'clients-state.json'), { connected: {} }); const { setupBus } = await import('./bus-cli.mjs'); const b = await setupBus({ root, env, clients: Object.keys(st.connected || {}), ask: false }); if (!b.ok) throw new Error(b.problems.join('; ')); }
         else if (c.fix.cmd === 'init') { out.warn('run memev init'); continue; }
         out.ok(`fixed: ${c.title}`);
       } catch (e) { out.bad(`could not fix ${c.title}: ${e.message}`); }
