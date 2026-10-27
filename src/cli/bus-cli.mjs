@@ -85,7 +85,7 @@ export async function setupBus({ root, env = process.env, clients = [], flags = 
   return { ok: !problems.length, seats, operator, problems, notes };
 }
 
-const USAGE = `memev bus roster | check [--to SEAT] [--timeout S] | send TO TYPE TEXT [--ref ID] [--release]
+const USAGE = `memev bus roster [--card] | check [--to SEAT] [--timeout S] | send TO TYPE TEXT [--ref ID] [--release]
           | tail [--n N] [--type T] | since SEQ | tasks [--open] | unread [SEAT] | watch SEAT [--interval S]
           | operator [SEAT]`;
 
@@ -108,6 +108,14 @@ function unwrap(j, r) {
   return j.result.structuredContent?.result ?? j.result.structuredContent;
 }
 const line = (m) => `#${m.seq} ${m.ts.slice(11, 19)} ${m.type.padEnd(8)} ${m.from}${m.operator ? ' [operator]' : ''} → ${m.to}${m.ref ? ` re ${m.ref}` : ''}  ${m.body}`;
+/** A short, shareable summary of the team: the apps and the seat count. No paths, tokens, names or machine names. */
+export function rosterCard(r) {
+  const rows = (r.seats || []).filter((s) => s.seat);
+  const n = rows.length;
+  if (!n) return 'My Memev AI team\nno seats yet';
+  const apps = [...new Set(rows.map((s) => s.client).filter(Boolean))];
+  return `My Memev AI team\n${n} seat${n === 1 ? '' : 's'}: ${apps.join(', ')}`;
+}
 
 export async function command(cmd, pos, flags, { root, env }) {
   const sub = pos[0] || 'roster';
@@ -115,6 +123,7 @@ export async function command(cmd, pos, flags, { root, env }) {
   const json = (o) => console.log(JSON.stringify(o, null, 2));
   if (sub === 'roster') {
     const r = await call('bus_roster', {});
+    if (flags.card) { console.log(rosterCard(r)); return 0; }
     if (flags.json) { json(r); return 0; }
     console.log(`Lead (operator): ${r.operator || 'not chosen yet; pick one with memev bus operator <seat>'} · live means a heartbeat in the last ${r.live_minutes} min`);
     for (const s of r.seats) console.log(`  ${(s.seat || '(no app yet)').padEnd(28)} ${s.state.padEnd(12)} ${String(s.device_label).padEnd(16)} ${s.last_seen ? `seen ${s.minutes_since} min ago` : 'never seen'}${s.last_message ? ` · last: ${s.last_message.type}` : ''}${s.claims.length ? ` · claims ${s.claims.join(', ')}` : ''}${s.hold ? ' · ON HOLD' : ''}${s.operator ? ' · LEAD' : ''}`);
