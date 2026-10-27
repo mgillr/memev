@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { configDir, homeDir, readJson, writePrivateJson, exists } from '../engine/util.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
+import { fetchOut } from '../engine/net.mjs';
 
 export const PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const STATE = '.memev';
@@ -56,7 +57,7 @@ export async function api(root, route, { method = 'POST', body = null, token = n
   const p = port || daemonInfo(root)?.port || config(root).port;
   const ac = new AbortController(); const t = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const r = await fetch(`http://127.0.0.1:${p}${route}`, { method, signal: ac.signal, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    const r = await fetchOut(`http://127.0.0.1:${p}${route}`, { method, signal: ac.signal, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
     const text = await r.text(); let json = null; try { json = JSON.parse(text); } catch {}
     return { ok: r.ok, status: r.status, json, text };
   } finally { clearTimeout(t); }
