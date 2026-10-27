@@ -1,13 +1,36 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync, spawn } from 'node:child_process';
 import { PKG, tmpdir } from './tmp.mjs';
 
 export const BIN = path.join(PKG, 'bin', 'memev.mjs');
-let nextPort = 20000 + (process.pid % 20000);
+// A daemon port for each sandbox. The system hands out a port nothing is listening on, and a file per port
+// under a folder for this test run reserves it, so two test files running at once never get the same port.
+// node --test runs each file in a child of one runner, so the runner's pid names the run.
+const RESERVED = path.join(os.tmpdir(), `memev-test-ports-${process.ppid}`);
+const FREE_PORT = "const s=require('net').createServer();s.listen(0,'127.0.0.1',()=>{process.stdout.write(String(s.address().port));s.close()})";
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+let swept = false;
+export function freePort() {
+  if (!swept) { // the folders of runs that have finished
+    swept = true;
+    for (const d of fs.readdirSync(os.tmpdir())) {
+      const m = /^memev-test-ports-(\d+)$/.exec(d);
+      if (m && !alive(Number(m[1]))) fs.rmSync(path.join(os.tmpdir(), d), { recursive: true, force: true });
+    }
+  }
+  fs.mkdirSync(RESERVED, { recursive: true });
+  for (let tries = 0; tries < 50; tries++) {
+    const port = Number(spawnSync(process.execPath, ['-e', FREE_PORT], { encoding: 'utf8' }).stdout);
+    if (!Number.isInteger(port) || port <= 0) continue;
+    try { fs.writeFileSync(path.join(RESERVED, String(port)), String(process.pid), { flag: 'wx' }); return port; } catch {}
+  }
+  throw new Error('no free port for the test daemon');
+}
 export function sandbox() {
   const home = tmpdir('home-');
-  const port = nextPort++ + Math.floor(Math.random() * 500);
+  const port = freePort();
   const env = { PATH: process.env.PATH, HOME: home, XDG_CONFIG_HOME: path.join(home, '.config'), MEMEV_CONFIG_DIR: path.join(home, '.config', 'memev'), MEMEV_ROOT: path.join(home, 'memev'), MEMEV_NO_SERVICE: '1', MEMEV_NO_TUNNEL: '1', MEMEV_NO_BACKGROUND: '1', MEMEV_NO_DOWNLOAD: '1', GIT_CONFIG_NOSYSTEM: '1', GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@example.invalid', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@example.invalid' };
   const run = (args, { input = '', extraEnv = {} } = {}) => { const r = spawnSync(process.execPath, [BIN, ...args], { env: { ...env, ...extraEnv }, input, encoding: 'utf8', timeout: 30000 }); return { code: r.status, out: r.stdout, err: r.stderr }; };
   const hook = (event, payload, client = 'claude-code', extra = []) => run(['hook', event, '--client', client, ...extra], { input: JSON.stringify(payload) });
