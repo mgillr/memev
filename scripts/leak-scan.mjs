@@ -18,6 +18,10 @@ if (process.env.LEAK_DENYLIST) for (const w of fs.readFileSync(process.env.LEAK_
 const EXEMPT = [/^vendor\/[^/]+\/(NOTICE|LICENSE)$/, /^NOTICE$/];
 const ALLOW_LINE = [{ file: /^docs\/READINESS-REVIEW\.md$/, line: /^Approved-By: \S+ \(\d{4}-\d{2}-\d{2}\)$/ }];
 const SELF = new Set(['scripts/leak-denylist.json']);
+// Commit messages already on main that can't be changed, because history is never rewritten. Only the
+// listed line of each is skipped; the rest of the message is still scanned. Merge pull requests with
+// an explicit subject (gh pr merge --subject) so this list doesn't grow.
+const ALLOW_COMMIT_LINE = new Map([['e5297abf3dd51b953cb0a6829b21927fc56567d4', 1]]); // GitHub's default merge subject for PR 7
 const OK_EMAIL = /(@(example\.(com|org|net)|[a-z0-9-]+\.invalid|localhost|users\.noreply\.github\.com)|^git@github\.com)$/i; // git@github.com is an SSH remote, not an address
 const OK_IP = (ip) => /^(127\.|0\.0\.0\.0$|10\.|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.|255\.)/.test(ip) || ip.split('.').some((x) => Number(x) > 255);
 const OK_HOME = new Set(['you', 'me', 'user', 'username', 'name', 'runner', 'example', 'alice', 'bob', 'node', '<name>', '<user>', 'ubuntu', 'shared', 'memev']);
@@ -51,7 +55,11 @@ for (const f of files) {
 }
 if (process.argv.includes('--history')) {
   const log = execFileSync('git', ['log', '--format=%H%x00%B%x00'], { cwd: root, encoding: 'utf8' }).split('\0');
-  for (let i = 0; i + 1 < log.length; i += 2) scanText(`commit ${log[i].trim().slice(0, 10)}`, log[i + 1]);
+  for (let i = 0; i + 1 < log.length; i += 2) {
+    const sha = log[i].trim(); const lines = log[i + 1].split('\n'); const skip = ALLOW_COMMIT_LINE.get(sha);
+    if (skip) lines[skip - 1] = '';
+    scanText(`commit ${sha.slice(0, 10)}`, lines.join('\n'));
+  }
 }
 if (findings.length) { console.error(`leak scan: ${findings.length} finding(s)`); for (const f of findings) console.error(`  ${f}`); process.exit(1); }
 console.log(`leak scan: clean (${files.length} files${process.argv.includes('--history') ? ' and every commit message' : ''}, ${deny.size} denylisted words)`);

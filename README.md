@@ -108,6 +108,7 @@ other. There is no telemetry and nothing to install besides Node and git.
 | [Problems and solutions](docs/SOLUTIONS.md) | what users complain about and what Memev does about it |
 | [Contracts](docs/CONTRACTS.md) | signed, immutable work contracts |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | `memev doctor` and common fixes |
+| [Lab test plan](docs/testing/LAB-TEST-PLAN.md) | every test to run in a lab before a release, with expected results |
 | [Security](SECURITY.md) and [threat model](docs/THREAT-MODEL.md) | |
 | [Charter](CHARTER.md) | the free tier is never limited |
 | [Pricing (draft)](docs/PRICING.md) | proposed prices; nothing is enforced |
