@@ -7,6 +7,7 @@
 // After step 3 Memev never uses your GitHub sign-in again; `gh auth logout` is safe.
 import fs from 'node:fs';
 import path from 'node:path';
+import net from 'node:net';
 import { spawnSync } from 'node:child_process';
 import { configDir, exists, readJson, writeJson, slug } from '../engine/util.mjs';
 import { git } from '../engine/git.mjs';
@@ -47,14 +48,72 @@ export function cloneBackup(repo, root) {
   return sh('gh', ['repo', 'clone', repo, root]);
 }
 
-export const PRE_PUSH = (url) => `#!/bin/sh
+// The hook accepts the repository's ssh URL and, when the network blocks port 22, its ssh-over-443 form.
+export const PRE_PUSH = (url) => {
+  const alt = alt443(url);
+  return `#!/bin/sh
 # Memev: the vault only ever pushes to the repository set up by memev github setup.
 expected=${JSON.stringify(url)}
-if [ "$2" != "$expected" ]; then
-  echo "memev: refusing to push the vault to $2 (expected $expected)" >&2
+${alt ? `alt=${JSON.stringify(alt)}\n` : ''}if [ "$2" != "$expected" ]${alt ? ` && [ "$2" != "$alt" ]` : ''}; then
+  echo "memev: refusing to push the vault to $2 (expected $expected${alt ? ` or $alt` : ''})" >&2
   exit 1
 fi
 `;
+};
+
+/** The ssh-over-443 form of a github.com remote, or null when the remote is not one. */
+export function alt443(url) {
+  const m = /^git@github\.com:(.+)$/.exec(String(url || '').trim());
+  return m ? `ssh://git@ssh.github.com:443/${m[1]}` : null;
+}
+
+/**
+ * Run a git command against the backup remote. When it fails and the remote is a github.com ssh
+ * one (the network blocks port 22), the same command is retried through ssh.github.com on 443.
+ * The result carries `via`, the URL the successful run used.
+ */
+export function gitVia443(root, args, token, url = token) {
+  const alt = alt443(url);
+  const run = (dest) => { const r = git(root, args.map((a) => (a === token ? dest : a))); return { ...r, via: dest }; };
+  const p = run(token);
+  if (p.ok || !alt) return p;
+  return run(alt);
+}
+
+/**
+ * Push the vault to its backup remote, retrying through ssh.github.com:443 when port 22 is
+ * unreachable. `upstream` records the remote as the branch's upstream (the first push).
+ */
+export function pushBackup(root, { upstream = false, quiet = true, remote = null } = {}) {
+  remote = remote || git(root, ['remote']).out.split('\n').filter(Boolean)[0];
+  if (!remote) return { ok: false, via: null, error: 'push: no remote' };
+  const branch = git(root, ['rev-parse', '--abbrev-ref', 'HEAD']).out || 'main';
+  const url = git(root, ['remote', 'get-url', remote]).out;
+  const args = upstream ? ['push', '-u', remote, `HEAD:${branch}`] : (quiet ? ['push', '-q', remote, `HEAD:${branch}`] : ['push', remote, `HEAD:${branch}`]);
+  const p = gitVia443(root, args, remote, url);
+  return { ok: p.ok, via: p.via, error: p.ok ? null : `push: ${p.err.split('\n').pop()}` };
+}
+
+// A TCP connect with a short timeout: true when the host answers. Injectable so tests never touch the network.
+const tcpProbe = (host, port) => new Promise((resolve) => {
+  const s = net.connect({ host, port, timeout: 2500 });
+  const done = (ok) => { s.destroy(); resolve(ok); };
+  s.once('connect', () => done(true));
+  s.once('timeout', () => done(false));
+  s.once('error', () => done(false));
+});
+
+/**
+ * Whether GitHub can be reached for a git push: port 22 first, then the 443 alternate.
+ * ok is true when at least one path answers; open lists the ones that do.
+ */
+export async function githubReachable({ probe = tcpProbe } = {}) {
+  const open = [];
+  for (const [host, port] of [['github.com', 22], ['ssh.github.com', 443]]) {
+    try { if (await probe(host, port)) open.push(`${host}:${port}`); } catch { /* treat as closed */ }
+  }
+  return { ok: open.length > 0, open };
+}
 
 export async function setup({ root, env = process.env, repo = null, flags = {} }) {
   const steps = [];
@@ -97,9 +156,8 @@ export async function setup({ root, env = process.env, repo = null, flags = {} }
   git(root, ['config', 'core.sshCommand', `ssh -i "${key}" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new`]);
   fs.writeFileSync(path.join(root, '.git', 'hooks', 'pre-push'), PRE_PUSH(sshUrl), { mode: 0o755 });
   const cfg = config(root); cfg.github = { repo: name, remote: sshUrl, key: path.basename(key) }; saveConfig(root, cfg);
-  const branch = git(root, ['rev-parse', '--abbrev-ref', 'HEAD']).out || 'main';
-  const p = git(root, ['push', '-u', 'origin', `HEAD:${branch}`]);
-  if (!p.ok) { step('manual', 'First push', `${p.err.split('\n').pop()} (Memev retries every 30 minutes)`); return { ok: false, steps, repo: name }; }
+  const p = pushBackup(root, { upstream: true, quiet: false, remote: 'origin' });
+  if (!p.ok) { step('manual', 'First push', `${p.error} (Memev retries every 30 minutes)`); return { ok: false, steps, repo: name }; }
   step('ok', 'Vault pushed', `${name} (synced every ${cfg.sync?.interval_min ?? 30} minutes)`);
   console.log('Memev does not use your GitHub sign-in from here on; you can run gh auth logout.');
   return { ok: true, steps, repo: name };

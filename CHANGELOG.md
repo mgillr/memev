@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- When a network blocks port 22, the GitHub backup fetches and pushes are retried through ssh.github.com on port 443, and `memev doctor` checks that GitHub is reachable and says how to fix it, including pushing over HTTPS with a fine-grained token for the one repository.
+
 - The rules every session follows are now a lean text of under 200 tokens (from 562), sent once per session: by the session-start hook in apps that have one, otherwise in the MCP instructions. The CLAUDE.md, AGENTS.md and GEMINI.md block points at them instead of repeating them, and the no-lead notice stops once the setup session has asked. The fixed cost of a session in an app with hooks falls from about 1,800 to about 820 tokens.
 - When GitHub is signed in, `memev init` looks for a private backup whose README is a Memev vault and offers to join that vault before it creates a new one. With no GitHub CLI, or signed out, init makes no GitHub call.
 - `memev init` ends with "Finish: restart these apps" and one line for each app it connected, saying how to make that app load Memev (a new session or chat, a restart, or a window reload). Apps load MCP servers and hooks when a session starts, so the session that ran init does not have Memev yet.

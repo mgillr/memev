@@ -12,6 +12,7 @@ import { redactSecrets, findSecrets } from '../engine/secrets.mjs';
 import { VERSION, isVault } from '../engine/vault.mjs';
 import { PKG, daemonInfo, pidAlive, config, out, clientsFile } from './common.mjs';
 import { licensingStatus } from './licensing.mjs';
+import { alt443, githubReachable } from './github.mjs';
 import { fileOf, label } from '../engine/bus.mjs';
 
 const C = (id, title, status, detail = '', fix = null) => ({ id, title, status, detail, fix });
@@ -134,6 +135,17 @@ export function busChecks({ root, vault = null, connected = [] }) {
   return r;
 }
 
+/**
+ * Whether GitHub can be reached for the git backup: port 22 first, then ssh.github.com on 443.
+ * A failing check carries the fix. probe is injectable so tests never touch the network.
+ */
+export async function githubNetCheck({ probe } = {}) {
+  const net = await githubReachable({ probe });
+  return C('github-net', 'GitHub reachable for the backup', net.ok ? 'ok' : 'fail',
+    net.ok ? `reachable at ${net.open.join(', ')}` : 'neither github.com:22 nor ssh.github.com:443 answers, so the backup cannot push',
+    net.ok ? null : { desc: 'fix the network, or push over HTTPS with a fine-grained token for that one repository (docs/GITHUB.md)', destructive: false });
+}
+
 /** The next ports above this vault. A second vault started because the preferred port was taken lands here. */
 function nearbyPorts(minePort) {
   const base = Number(minePort) || 7787;
@@ -188,6 +200,9 @@ export async function allChecks({ root, env }) {
     r.push(...fileChecks({ root, env, vault: null }));
   } else r.push(...fileChecks({ root, env, vault }));
   if (vault) vault.close();
+  // the reachability probe only runs for a GitHub ssh backup, so a local or HTTPS remote never touches the network here
+  const backupRemote = spawnSync('git', ['remote'], { cwd: root, encoding: 'utf8' }).stdout.trim().split('\n')[0];
+  if (backupRemote && alt443(spawnSync('git', ['remote', 'get-url', backupRemote], { cwd: root, encoding: 'utf8' }).stdout.trim())) r.push(await githubNetCheck());
   const { unitPaths } = await import('./service.mjs');
   const u = unitPaths(env);
   r.push(C('service', 'starts at login', u.file && exists(u.file) ? 'ok' : 'warn', u.file && exists(u.file) ? u.file : 'not installed: memev service install', u.file && exists(u.file) ? null : { desc: 'install the login service', destructive: false, cmd: 'service' }));
