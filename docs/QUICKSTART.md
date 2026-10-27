@@ -2,18 +2,25 @@
 
 You need Node 22 or newer and git.
 
+In a copy of the Memev repository:
+
 ```sh
-npx memev init            # or: npm install -g memev && memev init
+node bin/memev.mjs init   # or: npm install -g . && memev init
 ```
+
+`npx memev init` will work once Memev is on the npm registry (coming soon). Or ask an AI app that
+can run commands to do it: "Download the Memev repository, run `node bin/memev.mjs init` inside it,
+and show me the checklist it prints."
 
 `init`:
 
 1. creates the vault in `~/memev` (choose another place with `--root DIR`),
 2. copies Memev to a stable place (`~/.config/memev/runtime`) and adds a launcher at
-   `~/.config/memev/bin/memev`, so your apps never point into a temporary npx folder,
+   `~/.config/memev/bin/memev`, so your apps never point into the folder you installed from,
 3. starts the Memev daemon on `127.0.0.1:7787` and installs a login service (systemd or launchd),
 4. connects every AI app it finds (see [CLIENTS.md](CLIENTS.md)), backing up each file it changes,
-5. opens a private tunnel for cloud apps (see [CLOUD.md](CLOUD.md)); `--local-only` skips it,
+5. opens a private tunnel for cloud apps (see [CLOUD.md](CLOUD.md)); `--local-only` skips it, and
+   `--org` (an install for an organisation) leaves it off until `memev cloud on --yes`,
 6. prints a checklist: what is connected, what needs one click from you, and how to back up to GitHub.
 
 Open a new session in any connected app. It starts with a short resume card: what you were doing,

@@ -144,7 +144,7 @@ export async function command(cmd, pos, flags, { root }) {
     console.log(`  Address: ${info.url}${info.stable ? '' : ' (changes when the tunnel restarts; install Tailscale or set up a named Cloudflare tunnel for a stable address)'}`);
     if (flags['show-secrets'] || sub === 'url') {
       console.log(`  Connector URL for apps that take only a URL (claude.ai, ChatGPT): ${info.connector_url}`);
-      console.log(`  Or ${info.mcp_url} with the header Authorization: Bearer … (each app and computer gets its own: memev devices enroll)`);
+      console.log(`  Or ${info.mcp_url} with the header Authorization: Bearer <token> (each app and computer gets its own: memev devices enroll)`);
       console.log('  Treat the connector URL like a password. Revoke it with memev token revoke <id>.');
     } else console.log('  memev cloud url prints the connector URL (it contains a secret).');
     return 0;

@@ -9,8 +9,8 @@ to, and the command that proves it works.
 The counts come from issue trackers, forums and review sites (about 70% from Hacker News and GitHub),
 so they show what those sources say, not how common each problem is everywhere.
 
-Status: **built** means the code and tests are in this repository. **Planned** means it is not built
-yet; nothing on this page claims otherwise.
+Status: "built" means the code and tests are in this repository. "Planned" means it is not built
+yet, and nothing on this page claims otherwise.
 
 Many fixes here are things a careful memory tool should do anyway. Where a fix is ordinary, the
 "Why it matters for Memev" line says so. The parts that are hard for others to copy are listed at the
@@ -235,7 +235,7 @@ ignore firms under 50 people.
 
 **What Memev does.** One person on one computer gets all of Memev for free, for good
 ([CHARTER.md](../CHARTER.md)). Draft prices for teams and companies are in
-[PRICING.md](PRICING.md).
+[PRICING.md](PRICING.md) and [tiers/](tiers/README.md).
 
 **Tier.** All.
 
@@ -269,18 +269,23 @@ number (`· 2`).
 
 ## What sets Memev apart
 
-Most fixes above are ordinary. These are the parts competitors would find hard to copy:
+Most fixes above are ordinary. A few things would be hard for a competitor to copy.
 
-1. **It works across vendors.** One memory for Claude Code, Codex, Gemini CLI, Cursor and cloud
-   apps. The model companies benefit from keeping memory inside their own products.
-2. **Tested hooks in each app.** Context arrives at session start, on each prompt and after
-   compaction without the user asking, with tests for each app.
-3. **A record you can audit.** An append-only log, git history, provenance, claims with a status,
-   and signed contracts. Every recall can be explained and every change traced.
-4. **Decisions stay local.** The quality check, the explanations and the project scope run on your
-   machine, without a model call or a server.
-5. **A self-hosted memory for 10 to 100 people (planned).** Permissions that follow the org chart,
-   sensitive departments kept on a local model, and a log of what leaves. See [PRICING.md](PRICING.md).
+It works across vendors: one memory for Claude Code, Codex, Gemini CLI, Cursor and the cloud apps.
+The model companies have every reason to keep memory inside their own products.
+
+The hooks are tested in each app, so context arrives at session start, on each prompt and after a
+compaction without the user asking.
+
+There is a record you can audit. The append-only log, git history, provenance, claims with a status
+and signed contracts mean every recall can be explained and every change traced.
+
+The decisions stay on your machine. The quality check, the explanations and the project scope need
+no model call and no server.
+
+For companies of 10 to 100 people, a self-hosted memory is planned with permissions that follow the
+org chart, sensitive departments kept on a local model, and a log of what leaves. See
+[tiers/](tiers/README.md).
 
 ## Planned work in order
 

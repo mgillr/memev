@@ -473,7 +473,7 @@ export class Vault extends EventEmitter {
   }
   _recentEntries(dir, n) {
     const files = this.allNotes(dir.replace(/\/$/, '')).slice(-2); const out = [];
-    for (const f of files) { const b = this._read(f) || ''; for (const s of b.split(/\n(?=### )/).filter((x) => x.startsWith('### '))) out.push(truncate(s.replace(/\n+/g, ' — ').replace(/^### /, ''), 300)); }
+    for (const f of files) { const b = this._read(f) || ''; for (const s of b.split(/\n(?=### )/).filter((x) => x.startsWith('### '))) out.push(truncate(s.replace(/\n+/g, ' · ').replace(/^### /, ''), 300)); }
     return out.slice(-n);
   }
   _lastSession(project, exclude) {

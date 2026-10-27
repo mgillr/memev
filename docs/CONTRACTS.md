@@ -16,7 +16,7 @@ the prompt hook in hooks-mode apps, by the MCP instructions everywhere) to:
    `make test`) when there is one; otherwise the draft is refused with `needs_checks` and the list of
    requirements to give checks to. Stop rules are added to every task.
 2. **Sign it** with `memev_contract_sign`. Signing writes the contract, its DSSE/Ed25519 signature
-   and the public key into the vault, records a decision memory ("Signed contract … for project …"),
+   and the public key into the vault, records a decision memory ("Signed contract <id> for project <name>"),
    and links the contract in the graph to the project, the conversation that asked for it, and the
    decisions it rests on.
 3. **Remember it.** Every session start, including after a compaction, shows the active contract,
@@ -53,7 +53,7 @@ or deleted.
 
 ```sh
 memev contract list | status [id]
-memev contract from-request "build me …" [--project P] [--workdir DIR]
+memev contract from-request "build me a CLI that ..." [--project P] [--workdir DIR]
 memev contract new spec.json | sign <id> | amend <id> | decompose scope.json
 ```
 
