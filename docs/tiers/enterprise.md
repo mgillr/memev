@@ -3,8 +3,9 @@
 > **DRAFT and planned.** Everything specific to this tier is planned; see the
 > [status table](README.md#what-is-built-and-what-is-planned).
 
-For organisations with more than about 50 computers, several sites, or rules about where data may
-go: banks, health, law firms, public bodies, defence suppliers.
+For organisations with compliance needs: identity sync by SCIM, audit export to a SIEM, retention
+rules, legal hold and high availability, often with several sites or rules about where data may go:
+banks, health, law firms, public bodies, defence suppliers. It is chosen by need, not by size.
 
 ```mermaid
 flowchart TB
