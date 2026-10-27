@@ -81,12 +81,64 @@ export function busChecks({ root, vault = null, connected = [] }) {
   return r;
 }
 
+/** Ports on this machine's loopback that something is listening on. */
+function loopbackListenPorts() {
+  const ports = new Set();
+  if (process.platform === 'linux') {
+    for (const file of ['/proc/net/tcp', '/proc/net/tcp6']) {
+      let text = '';
+      try { text = fs.readFileSync(file, 'utf8'); } catch { continue; }
+      for (const line of text.split('\n').slice(1)) {
+        const cols = line.trim().split(/\s+/);
+        if (cols.length < 4 || cols[3] !== '0A') continue;
+        const [addr, portHex] = cols[1].split(':');
+        const loop = addr === '0100007F' || addr === '00000000000000000000000001000000';
+        if (loop) ports.add(parseInt(portHex, 16));
+      }
+    }
+    return [...ports];
+  }
+  const listed = spawnSync('lsof', ['-nP', '-iTCP', '-sTCP:LISTEN'], { encoding: 'utf8' });
+  for (const line of (listed.stdout || '').split('\n')) {
+    const hit = /127\.0\.0\.1:(\d+) \(LISTEN\)/.exec(line);
+    if (hit) ports.add(Number(hit[1]));
+  }
+  return [...ports];
+}
+
+/** Another Memev on this computer, seen by its /healthz vault id. Empty when this is the only one. */
+async function twoVaultChecks(root) {
+  const mine = config(root).vault_id;
+  if (!mine || !isVault(root)) return [];
+  const minePort = daemonInfo(root)?.port || null;
+  const ports = loopbackListenPorts().filter((p) => p >= 1024 && p !== minePort);
+  const found = [];
+  for (let i = 0; i < ports.length; i += 16) {
+    const rows = await Promise.all(ports.slice(i, i + 16).map(async (port) => {
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 200);
+      try {
+        const r = await fetch(`http://127.0.0.1:${port}/healthz`, { signal: ac.signal });
+        const body = await r.json();
+        if (body?.ok === true && body.vault_id && body.vault_id !== mine) return body.vault_id;
+      } catch { /* closed port or not Memev */ }
+      finally { clearTimeout(timer); }
+      return null;
+    }));
+    for (const id of rows) if (id) found.push(id);
+  }
+  if (!found.length) return [];
+  const ids = [...new Set(found)];
+  return [C('two-vaults', 'one vault on this computer', 'warn', `two vaults on this computer: this one is ${mine} and another is ${ids.join(', ')}. Join that vault instead of keeping two: memev init --join`)];
+}
+
 export async function allChecks({ root, env }) {
   const r = [];
   const info = daemonInfo(root);
   const { healthy, startDaemon } = await import('./daemon.mjs');
   const up = info && pidAlive(info.pid) && (await healthy(root));
   r.push(C('daemon', 'daemon running', up ? 'ok' : 'fail', up ? `pid ${info.pid}, port ${info.port}` : 'not running', up ? null : { desc: 'start it', destructive: false, run: () => startDaemon(root, { quiet: true }) }));
+  r.push(...await twoVaultChecks(root));
   let vault = null;
   if (!up && isVault(root)) { const { Vault } = await import('../engine/vault.mjs'); try { vault = new Vault(root, { git: false }).open(); } catch (e) { r.push(C('open', 'vault opens', 'fail', e.message)); } }
   if (up) {
