@@ -1,6 +1,7 @@
 # Memev in a container. The vault lives in the /vault volume; the port is published on the host's
-# loopback only (see compose.yaml). Remote access from inside the container is off: run a tunnel on
-# the host, or add a cloudflared sidecar (docs/DOCKER.md).
+# loopback only (see compose.yaml). With MEMEV_TRUST_GATEWAY=1 the server trusts only the bridge
+# gateway (the host, found from the default route) as local. Remote access from inside the container
+# is off: run a tunnel on the host, or add a cloudflared sidecar (docs/DOCKER.md).
 FROM node:22-alpine
 RUN apk add --no-cache git openssh-client tini \
  && addgroup -S memev && adduser -S -G memev -h /home/memev memev
