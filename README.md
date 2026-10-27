@@ -46,6 +46,11 @@ worth reading.
 You need Node 22 or newer and git. Every path below sets up the same thing: it creates your notes
 folder, starts Memev, connects the AI apps it finds on your computer and runs a self-test.
 
+Memev runs on macOS and Linux. **Windows (preview):** setup, app connections, hooks and the doctor
+have Windows code paths and tests, but Windows has not had a full lab run yet, and Memev does not
+start at login there (run `memev start` after you sign in).
+[docs/QUICKSTART.md](docs/QUICKSTART.md#windows-preview) says what differs.
+
 | Path | Who it's for | What happens on its own |
 |---|---|---|
 | Ask your AI app to do it | anyone already using Claude Code, Codex, Gemini CLI or Cursor | the app downloads Memev and runs the setup; you read the checklist it shows you |

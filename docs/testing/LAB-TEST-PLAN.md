@@ -6,7 +6,8 @@ yet, the test says **expect: not available**. Record what you see; don't fill in
 you didn't observe.
 
 Contents: 0 rules · 1 lab setup · 2 getting the code · 3 install paths · 4 AI app registration ·
-5 CLI commands · 6 features (6.12 is the comms bus) · 7 performance · 8 security · 9 failure and recovery · 10 results.
+5 CLI commands · 6 features (6.12 is the comms bus) · 7 performance · 8 security · 9 failure and recovery ·
+10 Windows 11 (preview) · 11 results.
 
 ## 0. Rules
 
@@ -333,7 +334,26 @@ the tests that need a second computer. Seats are `<app>@host` on the vault's com
 | T-FAIL-12 | reboot during a long session | the next session starts with the last checkpoint |
 | T-FAIL-13 | licence file with a future issue date, an expired date inside the grace period, and past it | not yet valid (the vault counts as free); grace (computers can still be added); expired (no computer can be added, added ones read only). The host vault keeps reading and writing in every case |
 
-## 10. Results
+## 10. Windows 11 (preview)
+
+Windows is a preview: it has its own code paths but has not had a full lab run. Use a Windows 11 VM
+(23H2 or newer, 2 CPUs, 4 GB RAM, 20 GB disk) with Node.js 22 from nodejs.org and Git for Windows.
+Run the steps in PowerShell. Memev keeps its settings and launcher in `$env:APPDATA\memev` and the
+vault in `$env:USERPROFILE\memev`.
+
+| ID | Step | Expected |
+|---|---|---|
+| T-WIN-01 | `npm test` in the clone | record the pass and fail counts and the name of every failing test; report each failure as an issue with this id |
+| T-WIN-02 | `node bin/memev.mjs init`, answer yes to the PATH question | vault in `$env:USERPROFILE\memev`, daemon on `127.0.0.1:7787`, checklist printed, self-test passes; "Start at login" is listed as a manual step |
+| T-WIN-03 | open a new PowerShell window, then `memev --version` and `reg query HKCU\Environment /v Path` | `0.1.0`; the user PATH holds `$env:APPDATA\memev\bin`, which holds `memev.cmd` |
+| T-WIN-04 | connect Claude Code, Codex, Gemini CLI and Cursor (create `.claude`, `.codex`, `.gemini` and `.cursor` under `$env:USERPROFILE` first for apps that are not installed); read each file listed in section 4 | each file names the Memev command as in section 4; in each installed app a new session starts with the resume card |
+| T-WIN-05 | `memev doctor` | exit 0; the private files check passes |
+| T-WIN-06 | `icacls "$env:USERPROFILE\memev\.memev\tokens.json" /grant Everyone:R`, then `memev doctor` | the private files check fails and names `tokens.json`; after `icacls <same file> /remove Everyone` a second `doctor` passes |
+| T-WIN-07 | `memev service install` | expect: not available. It says there is no service manager support and to run `memev start` at login; nothing is written |
+| T-WIN-08 | sign out and in, then `memev status` | the daemon is not running; `memev start` starts it and a new app session gets the resume card |
+| T-WIN-09 | `memev uninstall --purge` | app files restored as in T-REG-09; `$env:APPDATA\memev\bin` and the runtime copy are gone; the user PATH entry stays until `node bin/memev.mjs path remove` (record what you see) |
+
+## 11. Results
 
 Write results in one Markdown file, one row per test id, and attach the evidence files
 (command output, screenshots, packet captures) in a folder next to it.
