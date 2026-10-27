@@ -7,7 +7,7 @@
   { "metric": "quality.precision_at_4", "rule": "not_below_baseline", "why": "precision on the per-prompt hook, zero drop" },
   { "metric": "autorecall.offtopic_injection_rate", "rule": "not_above_baseline", "why": "off-topic injection not higher" }
  ],
- "latency": { "metric": "latency.recall_p95_ms", "ratio": 1.1, "ms": 5, "why": "recall p95 within 10 percent or 5 ms of the --latency-vs commit, both run interleaved in the same process; the tolerance is the proposal under review" },
+ "latency": { "metric": "latency.recall_p95_ms", "ratio": 1.1, "ms": 5, "why": "recall p95 within 10 percent or 5 ms of the --latency-vs commit, both run interleaved in the same process; tolerance accepted 2026-10-27" },
  "hook_bar": {
   "value": 0.94, "contract": "MEM-111",
   "rule": "the prompt hook injects a hit only when its BM25 score is at least this share of ln(1 + (sections - 0.5) / 1.5), the largest score one rare word can add in the vault; that is about 7.0 at the small level (2,598 sections) and 7.9 at the large (6,598). The value is the highest share in the sweep that keeps every on-topic hit the baseline finds at both levels.",
