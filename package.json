@@ -8,7 +8,7 @@
   "engines": { "node": ">=22" },
   "files": ["bin/", "src/", "templates/", "vendor/", "docs/", "LICENSE", "NOTICE", "README.md", "SECURITY.md"],
   "scripts": {
-    "test": "node --test --test-concurrency=4 test/",
+    "test": "node --test --test-concurrency=4 test/*.test.mjs",
     "leak-scan": "node scripts/leak-scan.mjs"
   },
   "keywords": ["mcp", "memory", "ai-agents", "claude-code", "markdown", "git"]

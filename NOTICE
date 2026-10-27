@@ -1,0 +1,5 @@
+Memev
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Third-party code vendored in this repository keeps its own licence and notices; see the
+LICENSE and NOTICE files inside each directory under vendor/.
