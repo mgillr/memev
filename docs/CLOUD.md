@@ -43,6 +43,8 @@ memev invite                 # on the vault: code, link and QR code
 memev invite --ttl 600       # the same, expiring after ten minutes
 ```
 
+`memev init` on a terminal asks whether this is the first computer or you are adding this one to an existing vault. Answering joining runs the join flow and creates no vault here. Without a terminal, init creates a vault and prints one line on how a second computer uses `memev init --join`. `memev init --join <code>` joins straight away and does not ask.
+
 On the other computer, `memev join <code>` makes a device key, enrols this computer and connects the AI apps on it. A bad or used code stops before any credential is saved. The older path still works: `memev devices keygen`, then `memev join <url> --token <token>`.
 
 `memev join` checks the vault answers, saves the address, and connects the AI apps on the laptop.
