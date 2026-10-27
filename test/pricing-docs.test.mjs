@@ -28,3 +28,12 @@ test('the 20-computer example has no subscription total', () => {
   assert.doesNotMatch(sme, /\$199|\$398|\$4,776|\$10,700/);
   assert.match(sme, /Business subscription, 20 computers \| contact us for a quote/);
 });
+
+test('Business support is quoted with the tier, not priced on its own', () => {
+  for (const doc of ['docs/PRICING.md', 'docs/tiers/services.md', 'docs/tiers/sme.md', 'docs/tiers/README.md']) {
+    const md = read(doc);
+    assert.doesNotMatch(md, /20% of the (yearly )?subscription|\(20% plan\)|\$2,400\/year|\$5,900/, doc);
+  }
+  assert.match(read('docs/PRICING.md'), /\| Business support \| quoted with the tier \|/);
+  assert.match(read('docs/tiers/services.md'), /\| Business support \| quoted with the tier \|/);
+});
