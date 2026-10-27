@@ -3,6 +3,11 @@
 ## Unreleased
 
 - On Free, enrolling a second computer now says "Free covers this computer. Adding more computers is part of Personal (up to 4 computers). Run memev upgrade to see plans, or start a trial." instead of telling the user to remove a computer that cannot be removed. The computer count comes from the entitlement table, and the text is shown only at that moment, never in the resume card or the AI context.
+- The npm package ships only bin, src, templates, vendor and the published docs: a .npmignore guards the development paths and docs/RELEASING.md is the release checklist. Installing the packed tarball and running `memev init` on a clean machine works.
+- The tier pages follow the final tiers, sold by person and enforced by computer count: Personal is one person on up to 3 computers at an early-supporter price; a new Team page (2 to 20 people, 3 computers and 10 cloud connectors per person, pooled; contact us until member keys ship); Business is from 10 people per seat; Enterprise is chosen for compliance needs, not size. The status table lists the hosted backup, the hosted relay and member keys as planned.
+- Windows is stated as a preview in the README and the quickstart, with what differs there: where Memev keeps its files, the user PATH, the access-list privacy check and no start at login yet. The lab plan has a Windows 11 section (T-WIN-01 to T-WIN-09).
+- `memev bus roster --card` prints a short, shareable summary of your AI team: the apps and the seat count, with no paths, tokens, names or machine names.
+
 - The rules every session follows are now a lean text of under 200 tokens (from 562), sent once per session: by the session-start hook in apps that have one, otherwise in the MCP instructions. The CLAUDE.md, AGENTS.md and GEMINI.md block points at them instead of repeating them, and the no-lead notice stops once the setup session has asked. The fixed cost of a session in an app with hooks falls from about 1,800 to about 820 tokens.
 - When GitHub is signed in, `memev init` looks for a private backup whose README is a Memev vault and offers to join that vault before it creates a new one. With no GitHub CLI, or signed out, init makes no GitHub call.
 - `memev init` ends with "Finish: restart these apps" and one line for each app it connected, saying how to make that app load Memev (a new session or chat, a restart, or a window reload). Apps load MCP servers and hooks when a session starts, so the session that ran init does not have Memev yet.
@@ -12,3 +17,4 @@
 - Activation milestones are worked out on your computer from the vault's own files and kept in onboarding.json; `memev onboarding --milestones` lists them. Nothing is sent.
 - docs/METRICS.md says how licence activations and package downloads are counted, with the queries.
 - `memev license activate <key>` fetches the signed licence once from a configurable endpoint and verifies it on this computer from then on.
+- `memev devices` shows a seats line, "N of M computers", and the doctor and `memev license status` say once that the licence expires within 14 days. The reminder is human output only; it never goes into the AI context.
