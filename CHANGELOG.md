@@ -3,6 +3,7 @@
 ## Unreleased
 
 - `memev upgrade` prints the checkout URL from this vault's config. Checkout is Stripe in test mode. Product ids, prices, and the computer cap come from config. The licence email From address is `MEMEV_LICENCE_FROM`, and the licence endpoint URL is configuration. No address, host, or IP is built in.
+- The tier pages follow the final tiers, sold by person and enforced by computer count: Personal is one person on up to 3 computers at an early-supporter price; a new Team page (2 to 20 people, 3 computers and 10 cloud connectors per person, pooled; contact us until member keys ship); Business is from 10 people per seat; Enterprise is chosen for compliance needs, not size. The status table lists the hosted backup, the hosted relay and member keys as planned.
 - Windows is stated as a preview in the README and the quickstart, with what differs there: where Memev keeps its files, the user PATH, the access-list privacy check and no start at login yet. The lab plan has a Windows 11 section (T-WIN-01 to T-WIN-09).
 - `memev bus roster --card` prints a short, shareable summary of your AI team: the apps and the seat count, with no paths, tokens, names or machine names.
 - The rules every session follows are now a lean text of under 200 tokens (from 562), sent once per session: by the session-start hook in apps that have one, otherwise in the MCP instructions. The CLAUDE.md, AGENTS.md and GEMINI.md block points at them instead of repeating them, and the no-lead notice stops once the setup session has asked. The fixed cost of a session in an app with hooks falls from about 1,800 to about 820 tokens.
@@ -15,3 +16,4 @@
 
 - docs/METRICS.md says how licence activations and package downloads are counted, with the queries.
 - `memev license activate <key>` fetches the signed licence once from a configurable endpoint and verifies it on this computer from then on.
+- `memev devices` shows a seats line, "N of M computers", and the doctor and `memev license status` say once that the licence expires within 14 days. The reminder is human output only; it never goes into the AI context.
