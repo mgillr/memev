@@ -2,7 +2,6 @@
 
 ## Unreleased
 
-- Cloud AI apps that speak OAuth 2.1 connect without a URL that carries a secret: the server publishes its authorization server and protected resource metadata, the app registers itself, the owner approves a consent page on the vault's machine, and the app gets a bearer token it can refresh and revoke.
 - Windows is stated as a preview in the README and the quickstart, with what differs there: where Memev keeps its files, the user PATH, the access-list privacy check and no start at login yet. The lab plan has a Windows 11 section (T-WIN-01 to T-WIN-09).
 - `memev bus roster --card` prints a short, shareable summary of your AI team: the apps and the seat count, with no paths, tokens, names or machine names.
 
