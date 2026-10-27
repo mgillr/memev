@@ -78,6 +78,10 @@ After setup, two things may need you: one browser sign-in for the GitHub backup
 (`memev github setup`), and a click in apps that ask before they trust a new tool. The checklist
 says which. Details are in [docs/QUICKSTART.md](docs/QUICKSTART.md).
 
+To see it work, run `memev ready` and open a new session in each app. It prints each app as it
+joins, then "Ready: <app> and <app> share one memory" once one of them recalls something another
+one saved.
+
 ## Which tier?
 
 | | Free | Business (planned) | Enterprise (planned) |
