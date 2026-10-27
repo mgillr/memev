@@ -23,6 +23,8 @@ Setup
   memev disconnect [client|all]    remove it again, restoring the app's config
   memev uninstall [--purge]        disconnect everything and stop; --purge also removes the service files
   memev clients                    which AI apps are installed and connected
+  memev path add|remove|status     put the memev command on your PATH (a line in your shell's startup file, or your user PATH on
+                                   Windows) and take it out again; until it is there, init prints the full path in every hint
   memev status | doctor [--fix] [--bundle]
   memev cloud on|off|status|url    reach this vault from cloud AI apps through a private tunnel (on by default
                                    for personal installs, off for --org installs)
@@ -71,6 +73,12 @@ export function installRuntime(env = process.env) {
 }
 
 export async function main(argv, env = process.env) {
+  // a source install leaves the launcher off PATH: init's own hints then name it by its full path
+  if (argv[0] === 'init' || argv[0] === 'onboarding') { const { withHints } = await import('./pathsetup.mjs'); return withHints(env, argv, () => run(argv, env)); }
+  return run(argv, env);
+}
+
+async function run(argv, env) {
   const [cmd = 'help', ...rest] = argv;
   const { flags, pos } = parseArgs(rest, ['help', 'yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects', 'release', 'open', 'once']);
   const root = resolveRoot(flags.root, env);
