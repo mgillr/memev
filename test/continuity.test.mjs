@@ -18,7 +18,8 @@ test('after compaction the session gets its exact state back and is told not to 
   transcript(tr, [user('Add CSV export to the reports page'), assistant('Starting.', [todos([['completed', 'Add export button'], ['completed', 'Write CSV serializer'], ['in_progress', 'Wire the download endpoint'], ['pending', 'Add tests for the endpoint']]), ['Edit', { file_path: 'src/reports/export.js' }]])]);
   assert.equal(sb.hook('pre-compact', { ...base, trigger: 'auto' }, 'claude-code', ['--project', 'reports']).code, 0);
   const card = ctx(sb.hook('session-start', { ...base, source: 'compact' }, 'claude-code', ['--project', 'reports']));
-  assert.match(card, /context was just compacted/i);
+  assert.match(card, /\[Memev resume card\]/, 'a compaction sends the resume card');
+  assert.doesNotMatch(card, /context was just compacted/i, 'the card is sent alone, with no lead line');
   assert.match(card, /In progress: Wire the download endpoint/);
   assert.match(card, /Already done \(do not redo\): Add export button; Write CSV serializer/);
   assert.match(card, /Next: Add tests for the endpoint/);

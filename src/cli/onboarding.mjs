@@ -12,7 +12,7 @@ const ICON = { succeeded: '\u2713', added: '+', ready: '\u2713', 'needs-manual':
 
 export async function checklist({ root, env, flags = {}, launcher, daemonUp = null, firstRun = false, platform = process.platform, icacls }) {
   const items = [];
-  const add = (status, step, detail = '') => items.push({ status, step, detail });
+  const add = (status, step, detail = '', more = {}) => items.push({ status, step, detail, ...more });
   add('succeeded', 'Vault', root);
   if (daemonUp === null) { const { healthy } = await import('./daemon.mjs'); daemonUp = await healthy(root); }
   const why = daemonUp ? null : await (await import('./daemon.mjs')).whyNotRunning(root); // the listen error, if any
@@ -22,8 +22,8 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   if (firstRun && !flags['no-connect']) clients.connectAll({ env, launcher });
   const found = clients.detect(env, launcher);
   for (const c of found.filter((x) => x.found)) {
-    if (c.connected) { add(firstRun ? 'added' : 'ready', c.name, c.mode === 'hooks' ? 'MCP + session hooks + instructions: memory is loaded and saved automatically' : 'MCP + instructions'); if (c.manual) add('needs-manual', `${c.name}: one step`, c.manual); }
-    else add(c.declined ? 'skipped' : 'needs-manual', c.name, c.declined ? 'you disconnected it (memev connect ' + c.id + ' to undo)' : `memev connect ${c.id}`);
+    if (c.connected) { add(firstRun ? 'added' : 'ready', c.name, c.mode === 'hooks' ? 'MCP + session hooks + instructions: memory is loaded and saved automatically' : 'MCP + instructions', { app: c.id }); if (c.manual) add('needs-manual', `${c.name}: one step`, c.manual, { app: c.id, note: true }); }
+    else add(c.declined ? 'skipped' : 'needs-manual', c.name, c.declined ? 'you disconnected it (memev connect ' + c.id + ' to undo)' : `memev connect ${c.id}`, { app: c.id });
   }
   // the comms bus: bus/ is in the vault and committed, every connected app has a seat (each joins
   // and says hello on its first session), and the lead is the person's choice, never automatic
@@ -77,11 +77,34 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   return items;
 }
 
+// what can wait: printed under 'Later, optional' whatever its state, so the steps that need you now stay few
+const LATER = /^(Start at login|Cloud AI apps|Backup to your own private GitHub repository|memev command|Anonymous milestone report)\b/;
+const line = (i) => `  ${ICON[i.status] || '?'} ${i.step}${i.detail ? `: ${i.detail}` : ''}`;
+const list = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
+
+/**
+ * Setup, then the one line that matters: Ready (the apps that now share one memory) or Not ready. Then at most two
+ * steps that need you: restarting the apps (an app's own extra step belongs to it) and choosing the lead. What can
+ * wait comes last, under 'Later, optional'.
+ */
 export function print(items) {
+  const now = items.filter((i) => !LATER.test(i.step)); const later = items.filter((i) => LATER.test(i.step));
   console.log('\nSetup');
-  for (const i of items) console.log(`  ${ICON[i.status] || '?'} ${i.step}${i.detail ? `: ${i.detail}` : ''}`);
-  const manual = items.filter((i) => i.status === 'needs-manual');
-  console.log(manual.length ? `\n${manual.length} step(s) need you; run memev onboarding to check again after doing them.` : '\nEverything is set up.');
+  for (const i of now.filter((x) => x.status !== 'needs-manual')) console.log(line(i));
+  const failed = now.filter((i) => i.status === 'failed');
+  const apps = now.filter((i) => i.app && !i.note && (i.status === 'added' || i.status === 'ready')).map((i) => i.step);
+  if (failed.length) console.log(`\nNot ready: ${list(failed.map((i) => i.step))} (memev doctor says why).`);
+  else console.log(`\nReady: ${apps.length > 1 ? `${list(apps)} share one memory` : apps.length ? `${apps[0]} has Memev; connect a second app and they share one memory` : 'Memev is running; connect an AI app to use it'}.`);
+  const todo = now.filter((i) => i.status === 'needs-manual');
+  const appTodo = todo.filter((i) => i.app); const other = todo.filter((i) => !i.app);
+  const restart = apps.length || appTodo.length;
+  const steps = (restart ? 1 : 0) + other.length;
+  if (steps) {
+    console.log(`\n${steps} step(s) need you; run memev onboarding to check again after doing them.`);
+    if (restart) { console.log(`  \u2192 Apps: ${apps.length ? 'restart them as listed under Finish below' : 'connect them'}${appTodo.length ? ', and' : ''}`); for (const i of appTodo) console.log(`  ${line(i)}`); }
+    for (const i of other) console.log(line(i));
+  } else console.log('\nEverything is set up.');
+  if (later.length) { console.log('\nLater, optional'); for (const i of later) console.log(line(i)); }
 }
 
 export async function firstRun(o) {
