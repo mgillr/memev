@@ -1,8 +1,9 @@
 # Tiers: how each one is set up
 
-> **DRAFT.** Packages and services on these pages are proposals, not offers. Nothing is enforced
-> ([CHARTER.md](../../CHARTER.md)). Free is free; Business, Enterprise and every service are priced on
-> your requirements: contact us. See [PRICING.md](../PRICING.md).
+> **DRAFT.** Packages and services on these pages are proposals, not offers. A licence sets one
+> thing, how many computers can join a vault ([CHARTER.md](../../CHARTER.md)). Free is free;
+> Business, Enterprise and every service are priced on your requirements: contact us. See
+> [PRICING.md](../PRICING.md).
 
 | | [Free](free.md) | [Business](sme.md) | [Enterprise](enterprise.md) |
 |---|---|---|---|

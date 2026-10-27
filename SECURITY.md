@@ -25,8 +25,7 @@ not open a public issue.
 - Licences are verified offline against the vendor public key in `src/engine/license.mjs`; nothing
   is sent anywhere to check one. The vault refuses to add computers past the licensed number. With
   no licence that number is one, the vault's own computer, which is never limited
-  ([CHARTER.md](CHARTER.md)). The code is open, so the check can be patched out; it is there to keep
-  licensing honest, not as a security boundary. A faked cloud-app user agent or an SSH port forward
-  also gets around the computer count.
+  ([CHARTER.md](CHARTER.md)). Each added computer is registered with its own key, and the licence
+  sets how many computers can join.
 
 See [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md).

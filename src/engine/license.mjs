@@ -16,9 +16,7 @@ import { configDir } from './util.mjs';
 
 /**
  * Public keys that may sign licences, by key id. The private half is held by the vendor, outside
- * this repository, and signs licences with scripts/license/issue.mjs. The code is open, so anyone
- * can patch this check out of their own copy; it is here to keep licensing honest, not to lock
- * anyone in.
+ * this repository, and signs licences with scripts/license/issue.mjs.
  */
 export const LICENSE_KEYS = {
   'memev-2026-10': 'MCowBQYDK2VwAyEALBLRg3jHHn5jy7zhSkuLm5nSFsun1qp8X7tGedNQIbw=',

@@ -314,7 +314,6 @@ the tests that need a second computer. Seats are `<app>@host` on the vault's com
 | T-SEC-09 | `memev uninstall --purge` | also removes `~/.config/memev/runtime` and the launcher; the vault is still there |
 | T-SEC-10 | after uninstall, `ps`, `launchctl list` or `systemctl --user list-units`, `crontab -l`, and grep app configs for `memev` | nothing left running or registered |
 | T-SEC-11 | delete `~/memev` by hand at the end | no other files to clean up besides `~/.config/memev` (check with `find ~ -newer <a file made before install>`) |
-| T-SEC-12 | SSH port forward from a client (`ssh -L 7787:127.0.0.1:7787 host`) and call `/mcp` | record what happens. Forwarded requests arrive from loopback, so the vault treats them as apps on the host and does not count a computer. This is a known limit, written up in docs/PRICING.md |
 
 ## 9. Failure and recovery
 
@@ -381,7 +380,7 @@ One table per failed or surprising test.
 | CLI commands (T-CMD) | 24 |
 | Features (T-FEAT) | 50 |
 | Performance (T-PERF) | 6 |
-| Security and cleanup (T-SEC) | 12 |
+| Security and cleanup (T-SEC) | 11 |
 | Failure and recovery (T-FAIL) | 13 |
 | Comms bus and pulse (T-BUS) | 14 |
-| Total | 144 |
+| Total | 143 |
