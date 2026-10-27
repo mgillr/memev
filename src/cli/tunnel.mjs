@@ -11,7 +11,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
-import { configDir, readJson, writePrivate, writePrivateJson, writeJson, randomToken, now, exists } from '../engine/util.mjs';
+import { configDir, readJson, writePrivate, writePrivateJson, writeJson, randomToken, now, exists, run } from '../engine/util.mjs';
 import { tunnelKeyFile, tunnelKey, config, saveConfig, clientToken, adminToken, api, out } from './common.mjs';
 import { publishAddressRecord } from './sync.mjs';
 
@@ -26,7 +26,7 @@ export const CLOUDFLARED = {
   },
 };
 
-const which = (bin) => { const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', [bin], { encoding: 'utf8' }); return r.status === 0 ? r.stdout.split(/\r?\n/)[0].trim() : null; };
+const which = (bin) => { const r = run(process.platform === 'win32' ? 'where' : 'which', [bin]); return r.ok ? r.stdout.split(/\r?\n/)[0].trim() : null; };
 export function ensureTunnelKey(root) { let k = tunnelKey(root); if (!k) { k = randomToken(24); writePrivate(tunnelKeyFile(root), `${k}\n`); } return k; }
 const stateFile = (root) => path.join(root, '.memev', 'tunnel.json');
 export const tunnelState = (root) => readJson(stateFile(root), null);
@@ -45,7 +45,7 @@ export async function cloudflaredPath(env = process.env, { download = true } = {
   const got = crypto.createHash('sha256').update(buf).digest('hex');
   if (got !== pin[1]) throw new Error(`cloudflared checksum mismatch (got ${got.slice(0, 12)}…); not using it`);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  if (pin[0].endsWith('.tgz')) { const tgz = path.join(dir, 'c.tgz'); fs.writeFileSync(tgz, buf); spawnSync('tar', ['xzf', tgz, '-C', dir]); fs.rmSync(tgz); }
+  if (pin[0].endsWith('.tgz')) { const tgz = path.join(dir, 'c.tgz'); fs.writeFileSync(tgz, buf); run('tar', ['xzf', tgz, '-C', dir]); fs.rmSync(tgz); }
   else fs.writeFileSync(bin, buf, { mode: 0o755 });
   fs.chmodSync(bin, 0o755);
   return bin;
