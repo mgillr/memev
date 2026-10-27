@@ -28,7 +28,7 @@ test('github setup: private repo, a deploy key for that repo only, first push, p
   assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
   const bin = path.join(sb.home, 'fakebin'), log = path.join(sb.home, 'gh.log');
   fakeGh(bin, log);
-  const bare = path.join(sb.home, 'backup.git'); execFileSync('git', ['init', '-q', '--bare', bare]);
+  const bare = path.join(sb.home, 'backup.git'); execFileSync('git', ['init', '-q', '--bare', '--initial-branch=main', bare]);
   const r = sb.run(['github', 'setup', '--remote-url', bare], { extraEnv: { PATH: `${bin}:${process.env.PATH}` } });
   assert.equal(r.code, 0, r.out + r.err);
   const calls = fs.readFileSync(log, 'utf8');
@@ -39,7 +39,7 @@ test('github setup: private repo, a deploy key for that repo only, first push, p
   assert.match(execFileSync('git', ['config', 'core.sshCommand'], { cwd: sb.root }).toString(), /IdentitiesOnly=yes/);
   const key = fs.readdirSync(path.join(sb.env.MEMEV_CONFIG_DIR, 'keys')).find((f) => f.startsWith('deploy-') && !f.endsWith('.pub'));
   assert.equal((fs.statSync(path.join(sb.env.MEMEV_CONFIG_DIR, 'keys', key)).mode & 0o777).toString(8), '600');
-  const other = path.join(sb.home, 'other.git'); execFileSync('git', ['init', '-q', '--bare', other]);
+  const other = path.join(sb.home, 'other.git'); execFileSync('git', ['init', '-q', '--bare', '--initial-branch=main', other]);
   assert.throws(() => execFileSync('git', ['push', other, 'HEAD:main'], { cwd: sb.root, stdio: 'pipe' }), /refusing to push the vault/);
   sb.stop();
 });
