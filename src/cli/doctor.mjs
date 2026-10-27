@@ -16,8 +16,63 @@ import { fileOf, label } from '../engine/bus.mjs';
 
 const C = (id, title, status, detail = '', fix = null) => ({ id, title, status, detail, fix });
 
+/** Run icacls on a path; null when icacls is not available (not Windows, or not on PATH). */
+export function runIcacls(args) {
+  const r = spawnSync('icacls', args, { encoding: 'utf8', timeout: 15000 });
+  if (r.error || r.status !== 0) return null;
+  return `${r.stdout || ''}`;
+}
+
+/** Principals an ACL entry may name without making a file readable by others: this user, the system and administrators. */
+function aclOthers(text, file, user) {
+  const ok = (who) => {
+    const w = who.trim().toLowerCase();
+    if (w === 'creator owner' || w === 'system' || w.endsWith('\\system') || w.endsWith('\\administrators') || w === 'administrators' || w.endsWith('\\trustedinstaller')) return true;
+    const u = String(user || '').toLowerCase();
+    return !!u && (w === u || w.endsWith(`\\${u}`));
+  };
+  const others = [];
+  for (let line of String(text).split(/\r?\n/)) {
+    if (line.startsWith(file)) line = line.slice(file.length);
+    const m = /^\s*(.+?):\(/.exec(line);
+    if (m && !/\(DENY\)/.test(line) && !ok(m[1])) others.push(m[1].trim());
+  }
+  return [...new Set(others)];
+}
+
+const under = (file, base) => { const rel = path.relative(path.resolve(base), path.resolve(file)); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
+
+/**
+ * Which of Memev's private files other users can read. POSIX: the mode bits. Windows has no mode bits to judge
+ * (every file reports 0o666), so there the ACL is read with icacls where it exists, and where it does not the
+ * files only count as private when they sit under the user profile, whose ACL already keeps other users out.
+ */
+export function privateFiles({ state, names, env = process.env, platform = process.platform, icacls = runIcacls }) {
+  const loose = [];
+  if (platform !== 'win32') {
+    const mode = (f) => { try { return fs.statSync(f).mode & 0o777; } catch { return null; } };
+    if ((mode(state) ?? 0) & 0o077) loose.push('.memev/');
+    for (const f of names) { const m = mode(path.join(state, f)); if (m !== null && m & 0o077) loose.push(f); }
+    return { loose, unknown: false, detail: '0600/0700', fix: loose.length ? { desc: 'restrict them to you (chmod 600/700)', destructive: false, run: () => { try { fs.chmodSync(state, 0o700); } catch {} for (const f of loose) try { fs.chmodSync(path.join(state, f.replace(/\/$/, '')), f.endsWith('/') ? 0o700 : 0o600); } catch {} } } : null };
+  }
+  const user = env.USERNAME || (() => { try { return os.userInfo().username; } catch { return ''; } })();
+  const targets = [['.memev/', state], ...names.filter((f) => exists(path.join(state, f))).map((f) => [f, path.join(state, f)])];
+  let aclSeen = false;
+  for (const [label, file] of targets) {
+    const text = icacls([file]);
+    if (text === null) continue;
+    aclSeen = true;
+    if (aclOthers(text, file, user).length) loose.push(label);
+  }
+  const fix = loose.length ? { desc: 'restrict them to you (icacls /inheritance:r, then grant your user)', destructive: false, run: () => { for (const [label, file] of targets) if (loose.includes(label)) { icacls([file, '/inheritance:r']); icacls([file, '/grant:r', `${user}:(OI)(CI)F`]); } } } : null;
+  if (aclSeen) return { loose, unknown: false, detail: 'only you, the system and administrators can read them (checked with icacls)', fix };
+  const home = homeDir(env);
+  if (under(state, home)) return { loose, unknown: false, detail: 'under your user profile, which other users cannot read (icacls not available to check)', fix: null };
+  return { loose, unknown: true, detail: `${state} is outside your user profile and icacls is not available to check it; keep the vault under ${home}`, fix: null };
+}
+
 /** Checks that only need the files (safe inside the daemon too). */
-export function fileChecks({ root, env = process.env, vault = null }) {
+export function fileChecks({ root, env = process.env, vault = null, platform = process.platform, icacls = runIcacls }) {
   const r = [];
   const major = Number(process.versions.node.split('.')[0]);
   r.push(C('node', 'Node.js 22+', major >= 22 ? 'ok' : 'fail', process.versions.node));
@@ -26,11 +81,9 @@ export function fileChecks({ root, env = process.env, vault = null }) {
   if (!isVault(root)) { r.push(C('vault', 'vault exists', 'fail', `no vault at ${root}`, { desc: 'create it: memev init', destructive: false, cmd: 'init' })); return r; }
   r.push(C('vault', 'vault exists', 'ok', root));
   const state = path.join(root, '.memev');
-  const loose = [];
-  const mode = (f) => { try { return fs.statSync(f).mode & 0o777; } catch { return null; } };
-  if ((mode(state) ?? 0) & 0o077) loose.push('.memev/');
-  for (const f of ['tokens.json', 'admin.json', 'clients.json', 'tunnel-key.txt', 'config.json']) { const m = mode(path.join(state, f)); if (m !== null && m & 0o077) loose.push(f); }
-  r.push(C('permissions', 'private files are private', loose.length ? 'fail' : 'ok', loose.length ? `readable by others: ${loose.join(', ')}` : '0600/0700', loose.length ? { desc: 'restrict them to you (chmod 600/700)', destructive: false, run: () => { try { fs.chmodSync(state, 0o700); } catch {} for (const f of loose) try { fs.chmodSync(path.join(state, f.replace(/\/$/, '')), f.endsWith('/') ? 0o700 : 0o600); } catch {} } } : null));
+  const names = ['tokens.json', 'admin.json', 'clients.json', 'tunnel-key.txt', 'config.json'];
+  const mine = privateFiles({ state, names, env, platform, icacls });
+  r.push(C('permissions', 'private files are private', mine.loose.length ? 'fail' : mine.unknown ? 'warn' : 'ok', mine.loose.length ? `readable by others: ${mine.loose.join(', ')}` : mine.detail, mine.loose.length ? mine.fix : null));
   if (vault) {
     const v = vault.log.verify();
     r.push(C('oplog', 'operation log intact', v.ok ? 'ok' : 'fail', v.ok ? `${v.ops} ops in ${v.segments} segment(s), every seal and chain verified` : v.errors.slice(0, 3).join('; ')));

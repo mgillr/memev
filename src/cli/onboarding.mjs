@@ -7,7 +7,7 @@ import { config } from './common.mjs';
 
 const ICON = { succeeded: '\u2713', added: '+', ready: '\u2713', 'needs-manual': '\u2192', failed: '\u2717', skipped: '-' };
 
-export async function checklist({ root, env, flags = {}, launcher, daemonUp = null, firstRun = false }) {
+export async function checklist({ root, env, flags = {}, launcher, daemonUp = null, firstRun = false, platform = process.platform, icacls }) {
   const items = [];
   const add = (status, step, detail = '') => items.push({ status, step, detail });
   add('succeeded', 'Vault', root);
@@ -55,7 +55,7 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   // self-test
   if (daemonUp) {
     const { fileChecks } = await import('./doctor.mjs');
-    const bad = fileChecks({ root, env }).filter((c) => c.status === 'fail');
+    const bad = fileChecks({ root, env, platform, ...(icacls ? { icacls } : {}) }).filter((c) => c.status === 'fail');
     add(bad.length ? 'failed' : 'succeeded', 'Self-test (memev doctor)', bad.length ? bad.map((c) => c.title).join(', ') : 'all checks pass');
   }
   writeJson(path.join(root, '.memev', 'onboarding.json'), { at: now(), items }, 0o600);
