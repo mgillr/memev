@@ -18,12 +18,26 @@ export function registry(root) {
   return { reg, tokens };
 }
 
-/** Licence, seats and notes in one object (the doctor check and `memev license status --json`). */
-export function licensingStatus({ root, env = process.env, vault = null }) {
-  const license = loadLicense({ env });
+/** How many days before expiry the renewal reminder shows (the report's figure). */
+export const RENEWAL_REMINDER_DAYS = 14;
+
+/**
+ * One reminder line for a licence that expires within the window, or null. Human output only:
+ * it is shown by the doctor and `memev license status`, and never goes into the AI context.
+ */
+export function renewalReminder(license, { days = RENEWAL_REMINDER_DAYS } = {}) {
+  if (!license || license.state !== 'valid' || !Number.isInteger(license.days_left) || license.days_left < 0 || license.days_left > days || !license.exp) return null;
+  return `The licence expires in ${license.days_left === 1 ? '1 day' : `${license.days_left} days`} (${license.exp}); renew it with memev license activate <key> or memev license install <file>.`;
+}
+
+/** Licence, seats and notes in one object (the doctor check and `memev license status --json`). `license` is a test seam for a pre-loaded licence. */
+export function licensingStatus({ root, env = process.env, vault = null, license = null }) {
+  const lic = license ?? loadLicense({ env });
   const seats = vault?.devices ? vault.devices.countSeats() : isVault(root) ? registry(root).reg.countSeats() : { computers: 1, connectors: 0, local_clients: 0, flagged: [], active_days: 30 };
   const devices = vault?.devices ? vault.devices.list() : isVault(root) ? registry(root).reg.list() : [];
-  return { license, ...report({ license, seats, devices }) };
+  const s = { license: lic, ...report({ license: lic, seats, devices }) };
+  s.renewal = renewalReminder(lic);
+  return s;
 }
 
 const MAX_LICENSE_BYTES = 64 * 1024;
@@ -72,14 +86,15 @@ export async function activateLicense({ key, endpoint, env = process.env, keys =
   return { ok: true, license: l, state: v.state, file };
 }
 
-export async function command(cmd, pos, flags, { root, env }) {
+export async function command(cmd, pos, flags, { root, env, license = null }) {
   const sub = pos[0] || (cmd === 'devices' ? 'list' : 'status');
   if (cmd === 'license') {
     if (sub === 'status') {
-      const s = licensingStatus({ root, env });
+      const s = licensingStatus({ root, env, license });
       if (flags.json) { console.log(JSON.stringify(s, null, 2)); return 0; }
       const l = s.license;
       console.log(l.state === 'none' ? 'Licence: none. The free tier needs none: everything on this computer is free and unlimited.' : `Licence ${l.lid || ''}: ${l.state}${l.tier ? ` · ${l.tier}` : ''}${l.seats ? ` · ${l.seats} computer(s)` : ''}${l.connectors != null ? ` · ${l.connectors} connector(s)` : ''} · ${l.reason}`);
+      if (s.renewal) console.log(s.renewal);
       console.log(s.computers_enrolled > s.seats_licensed
         ? `Computers: ${s.computers_enrolled} enrolled, but the licence covers ${s.seats_licensed}; the others can read but not write, and none can be added. This computer is never limited.`
         : `Computers: ${s.computers_enrolled} of ${s.seats_licensed} enrolled${s.can_enroll ? '' : ' (no more can be added)'}. This computer is never limited.`);
@@ -121,8 +136,8 @@ export async function command(cmd, pos, flags, { root, env }) {
     for (const d of reg.list()) console.log(`  ${d.status === 'active' ? (d.kind === 'host' ? '*' : ' ') : 'x'} ${d.id}  ${d.kind.padEnd(16)} ${String(d.label).padEnd(20)} ${d.last_seen ? `seen ${d.last_seen.slice(0, 16)}` : 'not seen yet'}${d.pubkey ? ' · key' : ''}${d.flags?.length ? ` · ${d.flags.map((f) => f.type).join(', ')}` : ''}`);
     console.log(`Computers: ${seats.computers} · cloud connectors: ${seats.connectors} · local clients: ${seats.local_clients} (active in the last ${seats.active_days} days)`);
     for (const f of seats.flagged) out.warn(`${f.label} (${f.id}): ${f.flags.join(', ')}; memev devices rotate ${f.id} if its credential was copied`);
-    const s = report({ license: loadLicense({ env }), seats, devices: reg.list() });
-    console.log(`Licensed for ${s.seats_licensed} computer(s); ${s.computers_enrolled} enrolled.`);
+    const s = report({ license: license ?? loadLicense({ env }), seats, devices: reg.list() });
+    console.log(`Seats: ${s.computers_enrolled} of ${s.seats_licensed} computers${s.can_enroll ? '' : ' (no more can be added)'}`);
     for (const n of s.notes) out.info(n);
     return 0;
   }
