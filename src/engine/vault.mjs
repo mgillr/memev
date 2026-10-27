@@ -168,6 +168,7 @@ export class Vault extends EventEmitter {
 
   // ---- auth helpers
   _need(identity, scope, p) {
+    if (scope !== 'read' && identity?.read_only) throw new VaultError('forbidden', identity.read_only);
     if (!allowed(identity, scope, p)) throw new VaultError('forbidden', `this token may not ${scope}${p ? ` ${p}` : ''}`);
   }
   _guard(p, text, allowSecrets, internal) {

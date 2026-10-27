@@ -17,9 +17,18 @@
    repository for anyone to read.
 
 **This is a review gate.** A change that limits, slows, nags or removes anything in the free tier is
-refused in review, whoever proposes it. Code that counts or reports must say "report only" until a
-public decision says otherwise, and it may never apply to the free tier.
+refused in review, whoever proposes it.
 
-Today `entitlements.can()` answers with free-tier behaviour for everything and enforcement is off
-(`src/engine/entitlements.mjs`). `test/licensing.test.mjs` checks that requests over the free
-computer count, with reused credentials or bad device signatures, are still served.
+The one limit Memev applies is how many other computers can be added to a vault. It was decided in
+October 2026 and never touches the computer the vault runs on. Each added computer makes its own
+device key and signs its requests with it, so a copied configuration does not work anywhere else.
+The vault refuses to add a computer past the number in its licence; with no licence that number is
+one, the vault's own computer, which keeps everything in point 1. When a licence runs out and its
+grace period ends, no computer can be added and the ones already added can read but not write. The
+vault's own computer keeps reading and writing (point 4). Cloud AI connectors are counted, not
+limited.
+
+The code is in `src/engine/entitlements.mjs`, `src/engine/devices.mjs` and
+`src/engine/license.mjs`. Because it is open, anyone can patch the check out. It is there to keep
+licensing honest, not to lock anyone in. `test/seats.test.mjs` checks the limit and checks that one
+computer with no licence gets everything.

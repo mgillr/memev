@@ -121,12 +121,12 @@ Gemini CLI and Cursor folders so registration runs too.
 | T-CMD-10 | then `memev cloud on` | exit 1, asks for `--yes`; remote stays off |
 | T-CMD-11 | `memev cloud on --yes`, `memev cloud status`, `memev cloud url`, `memev cloud off` | a tunnel starts (needs internet); `url` prints a connector URL and a plain URL with a header; `off` stops it |
 | T-CMD-12 | `memev token issue lab --scopes read`, `token list`, `token rotate <id>`, `token revoke <id>` | the secret is shown once; after rotate the old secret gets 401; after revoke the new one does too |
-| T-CMD-13 | `memev devices enroll --kind remote-computer --label pc2`, `devices rename <id> pc-two`, `devices rotate <id>`, `devices revoke <id>` | each works; the host can't be revoked |
-| T-CMD-14 | `memev license status` and `--json` | "Licence: none", the counts, and "Enforcement: off" |
-| T-CMD-15 | Licence install: `node scripts/license-dev.mjs keygen --out /tmp/lic`, then `node scripts/license-dev.mjs sign --key <private_key_file printed by keygen> --tier team --seats 3 --exp none > /tmp/team.json`, then `memev license install /tmp/team.json` | expect: refused with "unknown signing key". Release builds only trust the embedded key, so a development licence can't be installed. That is correct; record it |
-| T-CMD-16 | `memev license install` a file with a changed field, and a file that isn't JSON | exit 1 with a reason (a signature or JSON error); nothing written to `~/.config/memev/license.json` |
-| T-CMD-17 | `memev license remove` | "licence removed; nothing changes for the free tier" |
-| T-CMD-18 | Upgrade flow: `memev upgrade`, and look for an upgrade or purchase link in `license status` and `doctor` | expect: not available. `memev upgrade` is an unknown command (exit 2) and no command sells or upgrades anything. There are no paid services yet |
+| T-CMD-13 | `memev devices enroll --kind cloud-connector --label app2`, `devices rename <id> app-two`, `devices rotate <id>`, `devices remove <id>`; then `memev devices enroll --kind remote-computer --label pc2` with no `--pubkey` | each of the first four works and the host can't be removed; the last is refused (exit 1) asking for the computer's device key |
+| T-CMD-14 | `memev license status` and `--json` | "Licence: none", "Computers: 1 of 1 enrolled" and the counts; `--json` has `"enforcement": "computers"` and `"seats_licensed": 1` |
+| T-CMD-15 | Licence install: `node scripts/license-dev.mjs keygen --out /tmp/lic`, then `node scripts/license-dev.mjs sign --key <private_key_file printed by keygen> --tier team --seats 3 --exp none > /tmp/team.json`, then `memev license install /tmp/team.json`; then `memev license install licences/team-3.json` from the handoff pack | the development licence is refused with "unknown signing key", because only the vendor key built into memev is trusted. The lab licence installs; `license status` shows team, 3 computers, valid |
+| T-CMD-16 | `memev license install` a copy of `licences/team-3.json` with `seats` changed to 30, and a file that isn't JSON | exit 1 with a reason ("signature does not verify" or a JSON error); nothing written to `~/.config/memev/license.json` |
+| T-CMD-17 | `memev license remove` | "licence removed; nothing changes for the free tier"; `license status` is back to 1 of 1 |
+| T-CMD-18 | Upgrade flow: `memev upgrade`, and look for an upgrade or purchase link in `license status` and `doctor` | expect: not available. `memev upgrade` is an unknown command (exit 2) and no command sells anything. Refusals say "contact us" |
 | T-CMD-19 | `memev service install`, reboot or log out and in, `memev status`, `memev service remove` | daemon comes back at login (systemd user unit on Linux, launchd agent on macOS); remove takes it away |
 | T-CMD-20 | `memev github setup` against a throwaway private repository | deploy key for that repository only, first push works, a later write lands in the repository within minutes |
 | T-CMD-21 | `memev github setup` against a public repository | refused |
@@ -215,18 +215,19 @@ support.
 
 ### 6.8 Per-computer licensing
 
-Today a licence changes only what the status report says. Enforcement is off by design (see
-CHARTER.md): nothing is refused for being over a seat count. What exists is per-computer
-credentials, seat counting and copy detection. Test that, and test that the refusals don't exist.
+Each added computer has its own device key and the vault refuses computers past the licensed
+number. One computer needs no licence. The lab licences are in the handoff pack under `licences/`:
+`team-3.json` (3 computers, valid), `team-3-grace.json` (expired, inside its grace period) and
+`team-3-expired.json` (past grace). They are signed with the vendor key and hold no personal data.
 
 | ID | Step | Expected |
 |---|---|---|
-| T-FEAT-31 | L2: on the host `memev devices enroll --kind remote-computer --label pc2`; on pc2, point an app at the host's `memev cloud url` with that token | works; `memev devices` on the host shows 2 computers |
-| T-FEAT-32 | copy pc2's MCP config (URL and token) to pc3 and use it from a different network within a few minutes | expect: still served, and the device is flagged `reuse` in `memev devices` and `memev doctor`. It is not refused (enforcement is off) |
-| T-FEAT-33 | on pc2 run `memev devices keygen`, re-enroll pc2 with `--pubkey`, then copy only the config (not the key) to pc3 | pc3's requests are flagged as unsigned or a bad proof. expect: not refused today |
-| T-FEAT-34 | `memev devices revoke <pc2 id>` | pc2 and every copy of its config get 401 at once; the seat count drops |
-| T-FEAT-35 | L3: enrol 9 clients and use each one | `memev license status` reports 10 computers; with no licence it notes the free tier covers 1. Nothing is blocked |
-| T-FEAT-36 | refusing a computer over the licensed count, or refusing a copied config | expect: not available. Record it as a gap if the requirement is that a copy must not work |
+| T-FEAT-31 | L2 with no licence: on pc2 `memev devices keygen`; on the host `memev devices enroll --kind remote-computer --label pc2 --pubkey <key>` | refused, exit 1: "This vault is licensed for 1 computer. Remove one with `memev devices remove <id>` or contact us for more." Then install `licences/team-3.json` on the host and enroll again: works and prints a token. On pc2 `memev join https://<host address> --token <token>`: joins, and an app on pc2 can recall from the host's vault; `memev devices` on the host shows 2 computers |
+| T-FEAT-32 | copy pc2's MCP config, `remote.json` and the token to pc3 (but not pc2's key) and use it | expect: pass. pc3 gets 401 `device_key`, "A computer's connection details only work on the computer that holds its device key" |
+| T-FEAT-33 | capture one signed request from pc2 (for example with a proxy) and send it again; then paste the host's connector URL into Claude Code or Cursor on pc3 | expect: pass. The replay gets 401; the pasted connector URL gets 403 `connector_on_computer` |
+| T-FEAT-34 | `memev devices remove <pc2 id>`, then enroll pc3 with its own key | pc2 and every copy of its config get 401 at once; the seat is free and pc3 enrolls |
+| T-FEAT-35 | L3 with `licences/team-3.json`: enroll computers until one is refused; then enroll 9 cloud connectors | expect: pass. The third added computer (fourth in total with the host) is refused with the plain message; `license status` shows "Computers: 3 of 3 enrolled (no more can be added)". Connectors are never refused |
+| T-FEAT-36 | install `licences/team-3-grace.json`, enroll one computer and write from it; then install `licences/team-3-expired.json` and try to enroll another, read from an added computer, write from it, and write on the host | expect: pass. In grace: enrolment and writes work, and `license status` notes the days of grace left. Past grace: enrolment is refused ("its grace period is over"), the added computer can read but its write is refused with a message about the expired licence, and the host still reads and writes |
 
 ### 6.9 Org structure
 
@@ -283,7 +284,7 @@ credentials, seat counting and copy detection. Test that, and test that the refu
 | T-SEC-09 | `memev uninstall --purge` | also removes `~/.config/memev/runtime` and the launcher; the vault is still there |
 | T-SEC-10 | after uninstall, `ps`, `launchctl list` or `systemctl --user list-units`, `crontab -l`, and grep app configs for `memev` | nothing left running or registered |
 | T-SEC-11 | delete `~/memev` by hand at the end | no other files to clean up besides `~/.config/memev` (check with `find ~ -newer <a file made before install>`) |
-| T-SEC-12 | SSH port forward from a client (`ssh -L 7787:127.0.0.1:7787 host`) and call `/mcp` | record what happens and how the device is counted in `memev devices` (forwarded requests arrive from loopback) |
+| T-SEC-12 | SSH port forward from a client (`ssh -L 7787:127.0.0.1:7787 host`) and call `/mcp` | record what happens. Forwarded requests arrive from loopback, so the vault treats them as apps on the host and does not count a computer. This is a known limit, written up in docs/PRICING.md |
 
 ## 9. Failure and recovery
 
@@ -301,7 +302,7 @@ credentials, seat counting and copy detection. Test that, and test that the refu
 | T-FAIL-10 | run every hook with no vault (`MEMEV_ROOT=/nonexistent memev hook session-start --client claude-code < /dev/null`) | exit 0 and a message: hooks never break an app session |
 | T-FAIL-11 | a second computer pushing the same vault through git | a warning about a second writer, not a block |
 | T-FAIL-12 | reboot during a long session | the next session starts with the last checkpoint |
-| T-FAIL-13 | licence file with a future issue date, an expired date inside the grace period, and past it | not yet valid; grace; expired. The local vault keeps working in every case |
+| T-FAIL-13 | licence file with a future issue date, an expired date inside the grace period, and past it | not yet valid (the vault counts as free); grace (computers can still be added); expired (no computer can be added, added ones read only). The host vault keeps reading and writing in every case |
 
 ## 10. Results
 

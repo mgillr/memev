@@ -225,7 +225,7 @@ and offboarding.
 
 **Tier.** Business and Enterprise.
 
-**Done check.** `node --test test/licensing.test.mjs` (device credentials). The hub has no check yet
+**Done check.** `node --test test/licensing.test.mjs test/seats.test.mjs` (device credentials and keys). The hub has no check yet
 because it does not exist yet.
 
 ## 12. Price and access for small companies (9)

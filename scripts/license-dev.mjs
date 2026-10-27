@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
-// DEVELOPMENT ONLY: make a licence signing key pair and sign test licences with it. The client never
-// signs anything; the production key will live with the hosted entitlement service, not here.
+// DEVELOPMENT ONLY: make a throwaway signing key pair and sign test licences with it. memev only
+// trusts the vendor key in src/engine/license.mjs, so these licences cannot be installed; they are
+// for tests that pass their own key set. Real licences come from scripts/license/issue.mjs.
 // The private key is written outside this repository (it refuses a path inside it) and .gitignore
 // excludes *.pem as a second guard.
 //

@@ -2,7 +2,8 @@
 
 > **DRAFT. Not an offer and not in force.** Prices, tiers and licence terms below are proposals.
 > Only Free and Personal have a set price. Everything else is priced on your requirements: contact us.
-> Nothing is enforced: Memev reports computers and connectors and never limits them
+> One thing is enforced: how many computers can use one vault, from the licence. Connectors are
+> counted, not limited, and one computer with no licence gets everything
 > ([CHARTER.md](../CHARTER.md)). Memev is licensed under Apache-2.0 today. Any licence change for
 > future releases awaits legal review.
 
@@ -29,12 +30,14 @@ vault without a hub. Hosted sync and the hosted relay are not part of Business b
 on the company's server. Sync, the relay, the hub, sign-in, roles, labels and the egress log are
 planned, not built; see [tiers/](tiers/README.md) for what each tier includes and how it is set up.
 
-Team, Office and Business are still counted per computer, using the counts above.
+For Team, Office, Business and Enterprise the number of computers comes from the licence you are
+issued.
 
 **A computer** is a machine that runs its own copy of the vault, or whose AI apps reach a vault
-remotely (through a tunnel or relay). It counts while it is enrolled and has been seen in the last
-30 days; `memev devices revoke` frees it at once. Phones and tablets that use a cloud AI app are
-covered by the connector allowance.
+remotely (through a tunnel or relay). The vault's own computer is one of them. Each added computer
+counts from the moment it is enrolled until it is removed with `memev devices remove <id>`, which
+frees the seat at once. Phones and tablets that use a cloud AI app are covered by the connector
+allowance.
 
 ## Services (draft)
 
@@ -43,23 +46,47 @@ deployment we run for you, a compliance pack and training. All of them are price
 requirements: contact us. Onsite work has travel billed on top. What each one covers, timelines and
 response times are in [tiers/services.md](tiers/services.md).
 
-## How counting works (report only)
+## How the computer limit works
 
-- Every computer and app has its own credential (`memev devices`); there is no shared key.
-- Requests are classified as a local app, a cloud AI connector or a remote computer. A connector
-  credential used by something that is not a cloud AI app is counted as a computer.
-- A computer credential used from two networks within minutes is flagged as possibly copied.
-- `memev license status` and `memev doctor` show the counts and notes. **Nothing is refused.**
+- Each added computer makes its own Ed25519 key with `memev devices keygen`. The private key stays
+  on that computer. The vault admin enrolls the public key
+  (`memev devices enroll --kind remote-computer --pubkey <key>`), and the computer joins with
+  `memev join <url> --token <token>`.
+- Every request from an added computer is signed with its key, over the method, path, time, a
+  one-time nonce and the body. A token or config copied to another machine is refused there, and so
+  is a replayed request.
+- Enrolling past the licensed number is refused with: "This vault is licensed for N computers.
+  Remove one with `memev devices remove <id>` or contact us for more." `memev devices` lists every
+  device and `memev license status` shows how many of how many are in use.
+- A cloud connector URL is for a cloud AI app. Pasted into a coding app on a computer it is refused,
+  as long as the app says what it is in its user agent; see the limits below.
+- Apps on the vault's own computer and cloud AI connectors are not capped.
+
+What this does not stop, because the code is open and runs on your machine: someone can patch the
+check out, fake a cloud app's user agent to use a connector URL from a computer, or forward the
+vault's port over SSH so that requests look local. The check is there to keep licensing honest. It
+is not DRM.
 
 ## Licences (draft)
 
-A licence is a small signed file (`~/.config/memev/license.json`) with an id, tier, services,
-number of computers, number of connectors, issue and expiry dates and grace days. It holds no name,
-e-mail, machine or vault information and is checked offline with Ed25519 (`src/engine/license.mjs`).
-Today a licence changes only what the status report says.
+A licence is a small signed file (`~/.config/memev/license.json`, installed with
+`memev license install <file>`) with an id, tier, services, number of computers, number of
+connectors, issue and expiry dates and grace days. It holds no name, e-mail, machine or vault
+information. It is checked offline against the vendor public key built into
+`src/engine/license.mjs`; Memev never calls home to check it. A licence that has been edited, or was
+signed with any other key, is ignored and the vault counts as Free. Licences are issued with
+`scripts/license/issue.mjs` by whoever holds the vendor private key, which is never in this
+repository.
 
-When a licence lapses: hosted services stop after the grace period; the local vault keeps working,
-read and write, and can fall back to git backup.
+- **Free:** one computer, no licence, no network needed.
+- **Personal:** as in the table, with the number of computers in the licence.
+- **Team, Office, Business and Enterprise:** the number of computers in the licence.
+
+When a licence lapses, its grace period (14 days unless the licence says otherwise) keeps
+everything working, and computers can still be added. After the grace period no computer can be
+added and the added ones can read but not write. The vault's own computer keeps reading and
+writing, hosted services stop, and the vault can fall back to git backup. Installing a renewed
+licence restores the rest at once.
 
 ## Source licence
 

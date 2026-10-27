@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-// Offline licence files. A licence is a small signed JSON file; it is checked here with Ed25519 and
-// never with the network. It names no person, machine or vault. Memev works the same without one:
-// today a licence changes only what `memev license status` reports (see entitlements.mjs).
+// Offline licence files. A licence is a small signed JSON file the customer drops in; it is checked
+// here with Ed25519 and never with the network. It names no person, machine or vault. Without one a
+// vault is the free tier: this computer, with everything, and no other computer can be added. A
+// licence sets how many computers may use the vault (entitlements.seatPolicy).
 //
-//   { "v": 1, "lid": "lic_…", "tier": "personal", "services": ["sync","backup","relay"], "seats": 4,
-//     "connectors": 10, "iat": "2026-11-01", "exp": "2027-11-15" | null, "grace_days": 14,
-//     "kid": "…", "sig": "ed25519:<base64>" }
+//   { "v": 1, "lid": "lic_…", "tier": "team", "services": [], "seats": 5,
+//     "connectors": 25, "iat": "2026-11-01", "exp": "2027-11-15" | null, "grace_days": 14,
+//     "kid": "memev-2026-10", "sig": "ed25519:<base64>" }
 //
 // The signature covers every field except `sig`, serialised as JSON with sorted keys.
 import crypto from 'node:crypto';
@@ -14,15 +15,16 @@ import path from 'node:path';
 import { configDir } from './util.mjs';
 
 /**
- * Public keys that may sign licences, by key id. PLACEHOLDER: the private half of this key was
- * discarded when it was made, so no licence verifies against it. The production key replaces it
- * before any paid service launches.
+ * Public keys that may sign licences, by key id. The private half is held by the vendor, outside
+ * this repository, and signs licences with scripts/license/issue.mjs. The code is open, so anyone
+ * can patch this check out of their own copy; it is here to keep licensing honest, not to lock
+ * anyone in.
  */
 export const LICENSE_KEYS = {
-  'placeholder-2026-10': 'MCowBQYDK2VwAyEASX14mOJX1mjQmD36dlPZlER83xaU9Pd61KWOivHP1yo=',
+  'memev-2026-10': 'MCowBQYDK2VwAyEALBLRg3jHHn5jy7zhSkuLm5nSFsun1qp8X7tGedNQIbw=',
 };
 
-export const TIER_NAMES = ['personal', 'team', 'office', 'enterprise', 'founder'];
+export const TIER_NAMES = ['personal', 'team', 'office', 'business', 'enterprise', 'founder'];
 const DAY = 86400e3;
 const SKEW_MS = DAY; // a licence issued "tomorrow" by a clock a little ahead still verifies
 

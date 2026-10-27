@@ -24,11 +24,11 @@ Services, remote and onsite work, travel and response times are in [services.md]
 | Vault, recall, graph, hooks, contracts, doctor | built | every tier |
 | Quality check, review inbox, audit, `why` | built | every tier |
 | Hard project scope, path-limited tokens, graph filtered by path | built | every tier |
-| Per-computer and per-app credentials, revocation | built | `memev devices` |
+| Per-computer and per-app credentials, removal | built | `memev devices`, `memev devices remove <id>` |
 | Secure link for cloud AI apps | built | on for personal installs, off for `--org` installs |
 | Backup to your own private GitHub repository | built | one writer per vault |
-| Several computers using one vault through the secure link | built | per-computer credentials; no user accounts |
-| Licence and seat report | built | report only, never limits anything |
+| Several computers using one vault through the secure link | built | per-computer keys, `memev join`; no user accounts |
+| Offline licence and computer limit | built | each added computer has its own key; the vault refuses computers past the licensed number. One computer needs no licence |
 | End-to-end encrypted sync between one person's computers | planned | |
 | Company hub with user accounts | planned | |
 | Sign-in with Google Workspace or Microsoft Entra ID, SCIM | planned | |

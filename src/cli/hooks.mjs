@@ -11,7 +11,8 @@ import { spawnSync } from 'node:child_process';
 import { api, clientToken, resolveRoot } from './common.mjs';
 import { ensureDaemon } from './daemon.mjs';
 import { scanTranscript, todosToCheckpoint } from './transcript.mjs';
-import { readJson, writePrivateJson, sha256, slug } from '../engine/util.mjs';
+import { readJson, writePrivateJson, sha256, slug, configDir } from '../engine/util.mjs';
+import { isVault } from '../engine/vault.mjs';
 import { PROTOCOL } from '../engine/card.mjs';
 
 function readStdin() { try { return fs.readFileSync(0, 'utf8'); } catch { return ''; } }
@@ -44,12 +45,18 @@ export async function runHook(event, flags, env = process.env) {
   const client = String(flags.client || 'claude-code');
   const session = String(input.session_id || input.sessionId || input.conversation_id || env.MEMEV_SESSION || 'session').slice(0, 64);
   const project = flags.project || projectOf(input.cwd || input.workspace_roots?.[0] || process.cwd());
-  const stateFile = path.join(root, '.memev', 'hooks', `${slug(session, 64)}.json`);
+  const { loadRemote, remoteFetch } = await import('./remote.mjs');
+  const remote = !isVault(root) ? loadRemote(env) : null; // this computer uses a vault elsewhere (memev join)
+  const stateFile = remote ? path.join(configDir(env), 'hooks', `${slug(session, 64)}.json`) : path.join(root, '.memev', 'hooks', `${slug(session, 64)}.json`);
   const st = readJson(stateFile, { offset: 0, todos: null });
   try {
-    if (!(await ensureDaemon(root, { quiet: true }))) throw new Error('daemon not reachable');
-    const token = clientToken(root, client);
-    const call = (route, body) => api(root, `/v1/${route}`, { body: { session, project, ...body }, token, timeoutMs: 4000 }).then((r) => { if (!r.ok) throw new Error(`${route}: ${r.status}`); return r.json; });
+    let call;
+    if (remote) call = (route, body) => remoteFetch(remote, `v1/${route}`, { body: { session, project, ...body }, env, headers: { 'x-memev-client': client }, timeoutMs: 8000 }).then((r) => { if (!r.ok) throw new Error(`${route}: ${r.status}`); return r.json; });
+    else {
+      if (!(await ensureDaemon(root, { quiet: true }))) throw new Error('daemon not reachable');
+      const token = clientToken(root, client);
+      call = (route, body) => api(root, `/v1/${route}`, { body: { session, project, ...body }, token, timeoutMs: 4000 }).then((r) => { if (!r.ok) throw new Error(`${route}: ${r.status}`); return r.json; });
+    }
     const tr = input.transcript_path ? scanTranscript(input.transcript_path, { fromOffset: st.offset }) : null;
     const saveCheckpoint = async (source) => {
       const cp = todosToCheckpoint(tr?.todos);
