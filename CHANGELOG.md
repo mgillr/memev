@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The npm package ships only bin, src, templates, vendor and the published docs: a .npmignore guards the development paths and docs/RELEASING.md is the release checklist. Installing the packed tarball and running `memev init` on a clean machine works.
 - Windows is stated as a preview in the README and the quickstart, with what differs there: where Memev keeps its files, the user PATH, the access-list privacy check and no start at login yet. The lab plan has a Windows 11 section (T-WIN-01 to T-WIN-09).
 - `memev bus roster --card` prints a short, shareable summary of your AI team: the apps and the seat count, with no paths, tokens, names or machine names.
 
