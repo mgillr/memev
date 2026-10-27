@@ -1,0 +1,346 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Index every script",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "CJK, Cyrillic, Greek and Arabic text is searchable",
+        "ASCII splits exactly as before",
+        "notes rebuild byte-identical"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "src/engine/index.mjs",
+          "test/**"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "The tokenizer handles Han, Hiragana, Katakana and Hangul",
+          "verifier": {
+            "type": "grep",
+            "file": "src/engine/index.mjs",
+            "pattern": "Script=Han"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "The index format version is 3",
+          "verifier": {
+            "type": "grep",
+            "file": "src/engine/index.mjs",
+            "pattern": "INDEX_VERSION = 3"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "Tokenizer, gate, review, scope and why tests exist",
+          "verifier": {
+            "type": "test_exists",
+            "test_file": "test/memory-quality.test.mjs"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any metric misses its threshold: STOP, report the measured number, a per-stage trace and file:line. Do not start the next task."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Check memories before saving",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "acknowledgements, noise, fragments and duplicates are refused with a reason",
+        "short-lived notes get a review date",
+        "a review inbox and a read-only audit exist in the CLI and MCP"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "src/engine/**",
+          "src/server/mcp.mjs",
+          "src/cli/**"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T2-AC01",
+          "mandatory": true,
+          "statement": "The quality check module exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "src/engine/quality.mjs"
+          }
+        },
+        {
+          "id": "T2-AC02",
+          "mandatory": true,
+          "statement": "memev_review is an MCP tool",
+          "verifier": {
+            "type": "grep",
+            "file": "src/server/mcp.mjs",
+            "pattern": "memev_review"
+          }
+        },
+        {
+          "id": "T2-AC03",
+          "mandatory": true,
+          "statement": "memev_audit is an MCP tool",
+          "verifier": {
+            "type": "grep",
+            "file": "src/server/mcp.mjs",
+            "pattern": "memev_audit"
+          }
+        },
+        {
+          "id": "T2-AC04",
+          "mandatory": true,
+          "statement": "The save instruction asks only for memories that matter later",
+          "verifier": {
+            "type": "grep",
+            "file": "src/engine/card.mjs",
+            "pattern": "still matter in a later session"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any metric misses its threshold: STOP, report the measured number, a per-stage trace and file:line. Do not start the next task."
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Scope recall to the project and explain it",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "recall with a project excludes other projects before ranking",
+        "all_projects widens it",
+        "why explains a result or a missing note",
+        "the graph hides entities from unreadable paths"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "src/engine/**",
+          "src/server/mcp.mjs",
+          "src/cli/**"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T3-AC01",
+          "mandatory": true,
+          "statement": "Recall filters before ranking",
+          "verifier": {
+            "type": "grep",
+            "file": "src/engine/vault.mjs",
+            "pattern": "_recallFilter"
+          }
+        },
+        {
+          "id": "T3-AC02",
+          "mandatory": true,
+          "statement": "memev_why is an MCP tool",
+          "verifier": {
+            "type": "grep",
+            "file": "src/server/mcp.mjs",
+            "pattern": "memev_why"
+          }
+        },
+        {
+          "id": "T3-AC03",
+          "mandatory": true,
+          "statement": "The graph tools take a path view",
+          "verifier": {
+            "type": "grep",
+            "file": "src/server/mcp.mjs",
+            "pattern": "graphView"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any metric misses its threshold: STOP, report the measured number, a per-stage trace and file:line. Do not start the next task."
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "Tunnel off for organisation installs",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "init --org turns remote access off",
+        "personal installs are unchanged"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "src/cli/**"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T4-AC01",
+          "mandatory": true,
+          "statement": "init reads the org profile",
+          "verifier": {
+            "type": "grep",
+            "file": "src/cli/main.mjs",
+            "pattern": "MEMEV_PROFILE"
+          }
+        },
+        {
+          "id": "T4-AC02",
+          "mandatory": true,
+          "statement": "cloud on asks for --yes under the org profile",
+          "verifier": {
+            "type": "grep",
+            "file": "src/cli/tunnel.mjs",
+            "pattern": "profile"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any metric misses its threshold: STOP, report the measured number, a per-stage trace and file:line. Do not start the next task."
+      ]
+    },
+    {
+      "id": "T5",
+      "title": "Document problems and solutions, keep everything passing",
+      "phase": "implement",
+      "depends_on": [
+        "T1",
+        "T2",
+        "T3",
+        "T4"
+      ],
+      "requirements": [
+        "docs/SOLUTIONS.md lists each problem with a check",
+        "the whole suite passes",
+        "the leak scan is clean"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "docs/**"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T5-AC01",
+          "mandatory": true,
+          "statement": "SOLUTIONS.md exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/SOLUTIONS.md"
+          }
+        },
+        {
+          "id": "T5-AC02",
+          "mandatory": true,
+          "statement": "Every problem has a done check",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/SOLUTIONS.md",
+            "pattern": "Done check"
+          }
+        },
+        {
+          "id": "T5-AC03",
+          "mandatory": true,
+          "statement": "The whole test suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test"
+          }
+        },
+        {
+          "id": "T5-AC04",
+          "mandatory": true,
+          "statement": "The leak scan is clean, history included",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any metric misses its threshold: STOP, report the measured number, a per-stage trace and file:line. Do not start the next task."
+      ]
+    }
+  ],
+  "id": "k-memory-quality-multiling-4468b8",
+  "title": "Memory quality, multilingual recall, project scope and explanations",
+  "workdir": "/workspace/memev",
+  "created": "2026-10-27T11:19:44.294Z",
+  "version": 1,
+  "request": "Fix the memory problems users report most: junk and stale memories, English-only search, memories bleeding across projects, recall nobody can explain, and the cloud tunnel being on for organisation installs. Document each problem, its fix, its tier and a check in docs/SOLUTIONS.md. Keep the whole test suite and the leak scan passing."
+}
