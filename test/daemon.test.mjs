@@ -42,8 +42,9 @@ test('a start that gives up stops the daemon it began, so none comes up later un
     assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
     assert.equal(sb.run(['stop']).code, 0);
     assert.equal(fs.existsSync(daemonFile(sb)), false);
-    // a wait of 1 ms gives up before any daemon can be ready
-    const src = `import('${path.join(PKG, 'src', 'cli', 'daemon.mjs')}').then((m) => m.startDaemon(process.env.MEMEV_ROOT, { quiet: true, waitMs: 1 })).then((ok) => process.stdout.write(String(ok)))`;
+    // a wait of 0 ms gives up at once: startDaemon sleeps 100 ms before its first check, so any longer wait lets
+    // a fast machine bring the daemon up in time
+    const src = `import('${path.join(PKG, 'src', 'cli', 'daemon.mjs')}').then((m) => m.startDaemon(process.env.MEMEV_ROOT, { quiet: true, waitMs: 0 })).then((ok) => process.stdout.write(String(ok)))`;
     const r = spawnSync(process.execPath, ['--input-type=module', '-e', src], { env: sb.env, encoding: 'utf8', timeout: 30000 });
     assert.equal(r.stdout, 'false', r.stderr);
     // a daemon left running would write daemon.json within a fraction of a second; give it two
