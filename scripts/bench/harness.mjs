@@ -230,7 +230,8 @@ export async function measureResume(b, code) {
   clock.advance(60000);
   const compact = await b.hook('session-start', { session_id: 'bench-on', source: 'compact' }, { project: 'billing' });
   const resume = await b.hook('session-start', { session_id: 'bench-on', source: 'resume' }, { project: 'billing' });
-  const card = await b.route('/v1/session-start', { session: 'bench-card', project: 'billing', task: null });
+  // the card this same session gets, so the comparison is like with like (another session's card lists a different last session)
+  const card = await b.route('/v1/session-start', { session: 'bench-on', project: 'billing', task: null });
   const protocol = norm(code.PROTOCOL);
   return {
     session_start_compact_tokens: count(compact), session_start_compact_has_protocol: protocol && norm(compact).includes(protocol) ? 1 : 0,

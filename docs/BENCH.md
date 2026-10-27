@@ -63,7 +63,7 @@ The on-topic and off-topic prompts are those of the 2026-10-27 token usage repor
 | `fixed.fixed_overhead_all_tools` | The same with every tool definition (name, description, input schema, compact JSON) instead of the names, for clients that load all tools. |
 | `fixed.protocol_tokens`, `fixed.protocol_channels` | The protocol text, and in how many of the three channels (MCP instructions, SessionStart output, CLAUDE.md block) it appears. |
 | `fixed.tools_list_tokens` | `tools/list` as the model sees it. |
-| `resume.*` | Session start after a compaction and on resume, whether it repeats the protocol, and the resume card alone. |
+| `resume.*` | Session start after a compaction and on resume in the on-topic session, whether it repeats the protocol, and the resume card that same session gets. |
 | `max_result_tokens.get` (`get_chars`) | `memev_get` on the largest note. |
 | `max_result_tokens.recall_limit_1000` (`recall_limit_10`) | `memev_recall` for `database migration` over all projects at limit 1000 (and 10). |
 | `max_result_tokens.recall_6hit` | The same query at limit 6, and `recall_6hit_items` the number of hits it returned. |
@@ -90,7 +90,13 @@ Tool results are counted on their text content, which is what the model reads; t
 | lean / tools | default `tools/list` at most 600 tokens (report: 4,150); fixed overhead with every tool at most 1,100 (report: 5,484) | MEM-115 |
 | lean / recall-output | a 6-hit recall at most 450 tokens (report: 761), still 6 hits | MEM-116 |
 
-The guard is part of every `--check`. On-topic recall@6, precision@6, recall@4 and precision@4 may not fall below the baseline, and the off-topic injection rate may not rise above it. The benchmark is deterministic, so any drop is a real change. With `--latency-vs`, recall p95 must stay within 10 percent or 5 ms of the other commit, both timed in the same run; that tolerance is a proposal under review. If a token target cannot be met without lowering recall, the change stops there: the benchmark, the baseline and the targets are not loosened.
+The guard is part of every `--check`. On-topic recall@6, precision@6, recall@4 and precision@4 may not fall below the baseline, and the off-topic injection rate may not rise above it. The benchmark is deterministic, so any drop is a real change. With `--latency-vs`, recall p95 must stay within 10 percent or 5 ms of the other commit, both timed in the same run (the tolerance accepted on 2026-10-27). If a token target cannot be met without lowering recall, the change stops there: the benchmark, the baseline and the targets are not loosened.
+
+## The per-prompt bar
+
+The prompt hook injects a recalled item only when its score reaches the hook's bar. BM25 scores grow with the size of the vault, so the bar is a share (`HOOK_BAR` in `src/server/http.mjs`) of the largest score one rare word can add in that vault, `ln(1 + (sections - 0.5) / 1.5)`: about 7.0 at the small level and 7.9 at the large. `recall.hook_bar` in a vault's config changes the share, `recall.hook_min_score` sets a fixed score instead, and a higher `recall.min_score` still wins. `bench/targets.json` (`hook_bar`) records the share with the sweep that chose it: the highest that keeps every on-topic hit the baseline finds, at both levels.
+
+The hook also does not recall at all for a prompt under 4 words or a continuation phrase such as `continue`, `go on` or `thanks`. It never injects the same item twice in a session (a compaction or a clear starts over). It leaves out past session journals and contract drafts unless `recall.hook_include_journals` is on. `memev_recall`, which the model calls itself, and `memev recall` on the command line have none of these limits.
 
 ## The baseline
 

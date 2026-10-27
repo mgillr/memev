@@ -1,8 +1,8 @@
 # Memev
 
-One memory for every AI app you use.
+Memory and recall stack for all of the AI apps you use, local system and cloud.
 
-Tell Claude Code about a decision on Monday and Cursor knows it on Tuesday. Memev keeps what your AI
+Run project dev on Claude code and Cursor knows about the context on Tuesday. Memev keeps what your AI
 apps learn in a folder of plain notes on your own computer, hands the right notes to whichever app
 you open next, and backs everything up to a private GitHub repository that you own.
 

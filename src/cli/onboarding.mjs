@@ -83,7 +83,19 @@ export function print(items) {
   console.log(manual.length ? `\n${manual.length} step(s) need you; run memev onboarding to check again after doing them.` : '\nEverything is set up.');
 }
 
-export async function firstRun(o) { const items = await checklist({ ...o, firstRun: true }); print(items); await (await import('./pathsetup.mjs')).offer({ env: o.env }); return items.some((i) => i.status === 'failed') ? 1 : 0; }
+export async function firstRun(o) {
+  const items = await checklist({ ...o, firstRun: true }); print(items); await (await import('./pathsetup.mjs')).offer({ env: o.env });
+  await finish(o);
+  return items.some((i) => i.status === 'failed') ? 1 : 0;
+}
+/** The last thing init prints: one line per connected app saying how to make it pick Memev up. */
+export async function finish({ env, launcher }) {
+  const { detect } = await import('./clients.mjs');
+  const apps = detect(env, launcher).filter((c) => c.connected);
+  if (!apps.length) return;
+  console.log('\nFinish: restart these apps');
+  for (const c of apps) console.log(`  \u2192 ${c.restart}`);
+}
 // ---- the opt-in anonymous milestone report. Off by default; nothing is sent until it is on AND an address is set.
 export const reportFile = (env = process.env) => path.join(configDir(env), 'report.json');
 /** { enabled, asked, id, sent }. A fresh install: off, never asked, no id. */
