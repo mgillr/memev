@@ -92,6 +92,8 @@ export async function main(argv, env = process.env) {
     case 'join': { const { join } = await import('./remote.mjs'); return join(pos, flags, { env }); }
     case 'version': case '--version': case '-v': console.log(VERSION); return 0;
     case 'init': {
+      // inside a sandbox init cannot write anything: stop first, before even a question, and print the command to run outside
+      { const pf = await import('./preflight.mjs'); if (pf.stopInSandbox({ env, flags })) return 1; }
       const invite = typeof flags.join === 'string' ? flags.join : '';
       if (flags.join !== undefined && flags.join !== false) {
         const { join } = await import('./remote.mjs');
