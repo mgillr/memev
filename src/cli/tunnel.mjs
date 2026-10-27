@@ -13,6 +13,7 @@ import crypto from 'node:crypto';
 import { spawn, spawnSync } from 'node:child_process';
 import { configDir, readJson, writePrivate, writePrivateJson, writeJson, randomToken, now, exists } from '../engine/util.mjs';
 import { tunnelKeyFile, tunnelKey, config, saveConfig, clientToken, adminToken, api, out } from './common.mjs';
+import { publishAddressRecord } from './sync.mjs';
 
 export const CLOUDFLARED = {
   version: '2026.10.4',
@@ -93,7 +94,16 @@ export function supervise(vault, { root, port }) {
       if (fixed) write({ enabled: true, provider, url: fixed, stable: true, state: 'starting' });
       const onData = (d) => {
         const m = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/.exec(String(d));
-        if (m && !fixed) { const prev = tunnelState(root)?.url; write({ enabled: true, provider, url: m[0], stable: false, state: 'up' }); if (prev && prev !== m[0]) { fs.appendFileSync(path.join(root, '.memev', 'tunnel-urls.log'), `${now()} ${m[0]}\n`); log(`address changed to ${m[0]}; cloud apps need the new address (memev cloud status)`); } else log(`up at ${m[0]}`); backoff = 1000; }
+        if (m && !fixed) {
+          const prev = tunnelState(root)?.url;
+          write({ enabled: true, provider, url: m[0], stable: false, state: 'up' });
+          if (prev && prev !== m[0]) {
+            fs.appendFileSync(path.join(root, '.memev', 'tunnel-urls.log'), `${now()} ${m[0]}\n`);
+            log(`address changed to ${m[0]}; cloud apps need the new address (memev cloud status)`);
+            try { publishAddressRecord(root, m[0]); } catch (e) { log(e.message); }
+          } else log(`up at ${m[0]}`);
+          backoff = 1000;
+        }
         if (fixed && /Registered tunnel connection/.test(String(d))) { write({ enabled: true, provider, url: fixed, stable: true, state: 'up' }); backoff = 1000; }
       };
       child.stdout.on('data', onData); child.stderr.on('data', onData);

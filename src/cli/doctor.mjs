@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { readJson, writeJson, exists, sha256, configDir, homeDir, now } from '../engine/util.mjs';
 import { redactSecrets, findSecrets } from '../engine/secrets.mjs';
 import { VERSION, isVault } from '../engine/vault.mjs';
-import { daemonInfo, pidAlive, config, out, clientsFile } from './common.mjs';
+import { PKG, daemonInfo, pidAlive, config, out, clientsFile } from './common.mjs';
 import { licensingStatus } from './licensing.mjs';
 import { fileOf, label } from '../engine/bus.mjs';
 
@@ -195,6 +195,12 @@ export async function allChecks({ root, env }) {
 }
 const dedupe = (r) => { const seen = new Set(); return r.filter((c) => (seen.has(c.id) ? false : seen.add(c.id))); };
 
+/** Where a support bundle goes: the support page, which names the contact and what the bundle holds. */
+export function supportLines(pkg = PKG) {
+  const page = path.join(pkg, 'docs', 'SUPPORT.md');
+  return [`To get help, send this file as described in ${exists(page) ? page : 'docs/SUPPORT.md in the Memev package'}.`, 'It is plain JSON you can read first: it holds no tokens, keys or passwords, and your home folder is shortened to ~.'];
+}
+
 export function bundle({ root, env, checks }) {
   const home = homeDir(env);
   const scrub = (s) => redactSecrets(String(s)).split(home).join('~').replace(/mv_[0-9a-f]{8}_[0-9a-f]+/g, 'mv_[redacted]').replace(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/g, 'https://[tunnel].trycloudflare.com');
@@ -202,7 +208,10 @@ export function bundle({ root, env, checks }) {
   const cfg = config(root); delete cfg.vault_id;
   const data = { memev: VERSION, at: now(), platform: `${process.platform}-${process.arch}`, node: process.versions.node, os: os.release(), config: cfg, checks: checks.map(({ fix, ...c }) => ({ ...c, fixable: !!fix })), jobs: readJson(path.join(root, '.memev', 'jobs.json'), {}), tunnel: readJson(path.join(root, '.memev', 'tunnel.json'), null), clients: Object.keys(readJson(path.join(configDir(env), 'clients-state.json'), { connected: {} }).connected), daemon_log_tail: log };
   const file = path.join(root, '.memev', `doctor-bundle-${Date.now()}.json`);
-  fs.writeFileSync(file, scrub(JSON.stringify(data, null, 2)), { mode: 0o600 });
+  // Scrub each value before it is written as JSON: once a line break has become the two characters \n, the first
+  // letter of a token that follows it no longer starts a word, and a pattern that needs a word start misses it.
+  const clean = (v) => (typeof v === 'string' ? scrub(v) : Array.isArray(v) ? v.map(clean) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, clean(x)])) : v);
+  fs.writeFileSync(file, scrub(JSON.stringify(clean(data), null, 2)), { mode: 0o600 });
   return file;
 }
 
@@ -237,6 +246,6 @@ export async function command(cmd, pos, flags, { root, env }) {
     }
     const left = final.filter((c) => c.status === 'fail'); console.log(left.length ? `Still failing: ${left.map((c) => c.title).join(', ')}` : 'No failing checks left.');
   }
-  if (flags.bundle) console.log(`Support bundle (no secrets): ${bundle({ root, env, checks: final })}`);
+  if (flags.bundle) { console.log(`Support bundle (no secrets): ${bundle({ root, env, checks: final })}`); for (const l of supportLines()) console.log(l); }
   return final.some((c) => c.status === 'fail') ? 1 : 0;
 }
