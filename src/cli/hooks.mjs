@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { api, clientToken, resolveRoot } from './common.mjs';
+import { api, clientToken, resolveRoot, config } from './common.mjs';
 import { ensureDaemon } from './daemon.mjs';
 import { scanTranscript, todosToCheckpoint } from './transcript.mjs';
 import { readJson, writePrivateJson, sha256, slug, configDir } from '../engine/util.mjs';
@@ -96,7 +96,8 @@ export async function runHook(event, flags, env = process.env) {
         if (r?.hits?.length) st.injected = [...new Set([...(st.injected || []), ...r.hits.map((h) => `${h.path}#${h.heading || ''}`)])].slice(-500);
         const bus = await call('bus-pulse', {}).catch(() => null);
         await call('journal', { role: 'user', text: prompt });
-        emit(format, 'UserPromptSubmit', [bus?.text, r?.text, isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
+        const contractsOn = remote || config(root).contracts?.enabled !== false;
+        emit(format, 'UserPromptSubmit', [bus?.text, r?.text, contractsOn && isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
       }
     } else if (event === 'pre-compact') {
       await saveCheckpoint('pre-compact');
@@ -105,7 +106,7 @@ export async function runHook(event, flags, env = process.env) {
       const reply = input.last_assistant_message || input.prompt_response || tr?.lastAssistant;
       if (reply) await call('journal', { role: 'assistant', text: reply });
       await saveCheckpoint('auto');
-      if (format === 'claude' && !input.stop_hook_active) {
+      if (format === 'claude' && !input.stop_hook_active && (remote || config(root).contracts?.enabled !== false)) {
         const g = await call('contract-gate', {});
         if (g.open?.length) process.stdout.write(JSON.stringify({ decision: 'block', reason: `You signed ${g.open.map((c) => `${c.id} (${c.title})`).join(', ')} and it is not verified yet. Finish the remaining criteria and run memev_contract_verify, or report exactly what blocks you.` }));
       }
