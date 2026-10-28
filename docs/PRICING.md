@@ -1,6 +1,6 @@
 # Pricing and licensing: DRAFT
 
-Part of the [Memev documentation](README.md). Up: the [README](../README.md#which-tier). Down: [tiers/](tiers/README.md),
+Part of the [Memev documentation](README.md). Up: the [README](../README.md). Down: [tiers/](tiers/README.md),
 [CHECKOUT.md](CHECKOUT.md), [REFERRAL.md](REFERRAL.md), [CONVERGENCE.md](CONVERGENCE.md).
 
 > **DRAFT. Not an offer and not in force.** The list below is the current table (decided 28 October

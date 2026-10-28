@@ -1,6 +1,6 @@
 # Personal: one computer, free
 
-Part of the [tiers pages](README.md). Up: the [README](../../README.md#which-tier). Architecture chart:
+Part of the [tiers pages](README.md). Up: the [README](../../README.md). Architecture chart:
 [ARCHITECTURE.md](../ARCHITECTURE.md#personal).
 
 For one person on one computer at a time. Complete, and never limited ([CHARTER.md](../../CHARTER.md)).
