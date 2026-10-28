@@ -16,7 +16,7 @@ air-gapped organisation. You run the server; nothing of yours runs on a host you
 ## Air-gapped limits
 
 An air-gapped install can't use a cloud AI service or the hosted relay, by design: the one AI
-provider is an on-premises LLM. The same limits are stated in
+provider is a model inside your environment. The same limits are stated in
 [corporate.md](tiers/corporate.md).
 
 ## Recording the choice
