@@ -2,7 +2,6 @@
 
 ## Unreleased
 
-- When a network blocks port 22, the GitHub backup fetches and pushes are retried through ssh.github.com on port 443, and `memev doctor` checks that GitHub is reachable and says how to fix it, including pushing over HTTPS with a fine-grained token for the one repository.
 - The npm package ships only bin, src, templates, vendor and the published docs: a .npmignore guards the development paths and docs/RELEASING.md is the release checklist. Installing the packed tarball and running `memev init` on a clean machine works.
 - The tier pages follow the final tiers, sold by person and enforced by computer count: Personal is one person on up to 3 computers at an early-supporter price; a new Team page (2 to 20 people, 3 computers and 10 cloud connectors per person, pooled; contact us until member keys ship); Business is from 10 people per seat; Enterprise is chosen for compliance needs, not size. The status table lists the hosted backup, the hosted relay and member keys as planned.
 - Windows is stated as a preview in the README and the quickstart, with what differs there: where Memev keeps its files, the user PATH, the access-list privacy check and no start at login yet. The lab plan has a Windows 11 section (T-WIN-01 to T-WIN-09).
