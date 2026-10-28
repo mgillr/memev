@@ -4,7 +4,7 @@
 > work we plan to do, and each page doubles as a test plan.
 
 A **custom module** is business-specific work that Memev can be extended with. It is delivered as
-custom implementation work for **Business** and **Enterprise**, priced **quoted** per job (see
+custom implementation work for **Business** and **Corporate** (both coming), priced **quoted** per job (see
 [add-ons](../roadmap/add-ons.md#1-custom-implementation-services) and [services](../tiers/services.md)).
 
 The free core stays as it is. A module sits next to it and adds what one business needs: a connection
@@ -34,7 +34,7 @@ secure" is not.
 - **Nothing from your systems enters the Memev repository.** Test data is fictional.
 - **A module proposes, a person approves.** Nothing is sent, paid, deleted or written to a system of
   record without a human step.
-- **The free tier is not touched.** A module never limits, slows or removes anything in Free.
+- **The free tier is not touched.** A module never limits, slows or removes anything in Personal.
 - **Honest wording.** We do not call anything proven safe or end-to-end encrypted unless it
   is. A module that reports on evidence says what the evidence shows and no more.
 - **Who owns the module's code is written into each order.**
