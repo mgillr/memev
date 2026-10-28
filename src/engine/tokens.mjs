@@ -16,6 +16,11 @@ export function expiryWarningLine(t, { at = Date.now() } = {}) {
   return `${t.agent} ${t.remote ? 'connector' : 'client'} credential expires in ${daysLeft === 1 ? '1 day' : `${daysLeft} days`} (${t.expires.slice(0, 10)}); renew with memev token rotate ${t.id} or revoke it with memev token revoke ${t.id}`;
 }
 
+/** One warning line for a credential that is already past its expiry: it stops working now. */
+export function expiredWarningLine(t) {
+  return `${t.agent} ${t.remote ? 'connector' : 'client'} credential expired on ${t.expires.slice(0, 10)}; renew with memev token rotate ${t.id} or revoke it with memev token revoke ${t.id}`;
+}
+
 export class TokenStore {
   constructor(file, { clock = () => Date.now() } = {}) { this.file = file; this._clock = clock; this.data = readJson(file, null) || { version: 1, tokens: {} }; this.mtime = this._mtime(); }
   _mtime() { try { const s = fs.statSync(this.file); return `${s.ino}:${s.mtimeMs}:${s.size}`; } catch { return ''; } }
@@ -63,6 +68,15 @@ export class TokenStore {
   }
 
   list() { return Object.values(this.data.tokens).map(({ hash, ...r }) => (void hash, r)); }
+
+  /** Active tokens that are already past their expiry: they stop working now, and would do so without notice. */
+  expired({ at = this._clock() } = {}) {
+    this.fresh();
+    return Object.values(this.data.tokens)
+      .filter((t) => !t.revoked && t.expires && Date.parse(t.expires) <= at)
+      .map(({ hash, ...r }) => (void hash, r))
+      .sort((a, b) => Date.parse(a.expires) - Date.parse(b.expires));
+  }
 
   /** Active tokens whose expiry falls within `days` days: the ones that would otherwise stop working without notice. */
   expiringWithin(days, { at = this._clock() } = {}) {

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { configDir, homeDir, readJson, writePrivateJson, exists } from '../engine/util.mjs';
-import { TokenStore, EXPIRY_WARNING_DAYS, expiryWarningLine } from '../engine/tokens.mjs';
+import { TokenStore, TOKEN_RE, EXPIRY_WARNING_DAYS, expiryWarningLine, expiredWarningLine } from '../engine/tokens.mjs';
 import { fetchOut } from '../engine/net.mjs';
 
 export const PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -46,14 +46,19 @@ export function clientToken(root, client, { remote = false } = {}) {
   const key = remote ? `cloud:${client}` : client;
   const ts = new TokenStore(path.join(root, STATE, 'tokens.json'));
   if (all[key] && ts.verify(all[key])) return all[key];
+  // the credential being replaced has stopped working (it expired or was revoked); revoke the record
+  // too, so it does not warn forever
+  const old = all[key] && TOKEN_RE.exec(all[key]);
+  if (old) ts.revoke(old[1]);
   const t = ts.issue({ agent: client, scopes: ['read', 'write'], paths: remote ? ['memory/**', 'work/**', 'contracts/**', 'bus/**'] : ['**'], ttlDays: 365, remote, note: remote ? 'cloud connector' : 'local client' });
   all[key] = t.token; writePrivateJson(f, all);
   return t.token;
 }
 
-/** The credentials that will expire within `days` days, one warning line each. */
+/** The credentials that have already expired, or that will expire within `days` days, one warning line each. */
 export function tokenExpiryWarnings(root, { days = EXPIRY_WARNING_DAYS } = {}) {
-  return new TokenStore(path.join(root, STATE, 'tokens.json')).expiringWithin(days).map((t) => expiryWarningLine(t));
+  const ts = new TokenStore(path.join(root, STATE, 'tokens.json'));
+  return [...ts.expired().map((t) => expiredWarningLine(t)), ...ts.expiringWithin(days).map((t) => expiryWarningLine(t))];
 }
 export function adminToken(root) { return readJson(path.join(root, STATE, 'admin.json'), {})?.token || null; }
 export const tunnelKeyFile = (root) => path.join(root, STATE, 'tunnel-key.txt');
