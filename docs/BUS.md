@@ -81,7 +81,9 @@ From the operator session (Claude Code, say), ask it to:
 - assign a task (`bus_send`, type task, to a seat or all). The assignee claims it (type claim, ref =
   the task id) and restates it in its own words, so you can catch a misunderstanding early. One seat
   claims a task;
-- see the tasks (`bus_tasks`): who claimed what, the restatement, the latest status and the verdict;
+- see the tasks (`bus_tasks`): who claimed what, the restatement, the latest status and the verdict.
+  An unclaimed task to a live seat that has not read it yet is **waiting for next turn**: the app
+  answers between turns, so the task is picked up when that app next runs a turn;
 - put a seat on hold (type hold), and lift it (type hold with `release`).
 
 The same things work from a terminal: `memev bus roster`, `memev bus check`, `memev bus send`,
