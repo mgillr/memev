@@ -45,6 +45,7 @@ memev card --project api           # the resume card an app would see
 memev claims --status fact         # what the graph holds as established
 memev doctor                       # check everything; --fix repairs what it can
 memev clients                      # which apps are connected
+memev bus hello <seat>             # guided test: post a hello and wait for the app to read it
 memev cloud status                 # remote access
 memev github setup                 # back the vault up to a private GitHub repo
 ```
