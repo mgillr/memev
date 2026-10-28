@@ -82,9 +82,12 @@ export function syncConflicts(root = currentVault()) {
 
 export function renderCard(c, { maxChars = 6000, footer } = {}) {
   const L = ['[Memev resume card]'];
-  if (c.operator && c.conflicts?.files?.length) {
-    L.push('Sync conflicts (the two computers disagreed; both versions are kept):');
-    for (const f of c.conflicts.files) L.push(`  ${f.path}: ${f.how} (memev doctor)`);
+  if (c.operator) {
+    const conflicts = syncConflicts();
+    if (conflicts?.files?.length) {
+      L.push('Sync conflicts (the two computers disagreed; both versions are kept):');
+      for (const f of conflicts.conflicts || []) L.push(`  ${f.path}: ${f.how} (memev doctor)`);
+    }
   }
   if (c.project_state?.checkpoints) {
     const s = c.project_state;
