@@ -37,11 +37,13 @@ The file is plain JSON. Open it and read it before you send it.
 
 | Plan | Support |
 |---|---|
-| Free | community help in the project's issue tracker, best effort, no response time |
-| Personal | priority: requests that come with a bundle are answered ahead of community requests |
-| Team | priority, as for Personal |
+| Personal, one computer (free) | community help in the project's issue tracker, best effort, no response time |
+| Personal with more computers | priority: requests that come with a bundle are answered ahead of community requests |
 
-Business and Enterprise support plans, with response times, are described in
+There is no Team tier. Teammates belong on the business side, where an org admin invites them into
+the company vault.
+
+Business and Corporate support plans (both coming), with response times, are described in
 [tiers/services.md](tiers/services.md).
 
 ## Where to send it
