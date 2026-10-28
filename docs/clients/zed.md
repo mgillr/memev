@@ -1,5 +1,7 @@
 # Zed
 
+Part of the [Memev documentation](../README.md). Up: [AI apps](../CLIENTS.md), the [README](../../README.md).
+
 Id: `zed`
 
 `memev init` connects this app when it finds the Zed config folder. On macOS and Linux that folder is `~/.config/zed`. On Windows it is `%APPDATA%\zed`. To connect it yourself:

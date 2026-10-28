@@ -1,5 +1,7 @@
 # Threat model
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 **Assets:** the vault contents; the tokens; the contract signing key; the integrity of the log.
 
 | Threat | Mitigation |

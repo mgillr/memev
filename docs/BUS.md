@@ -1,5 +1,7 @@
 # The comms bus
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 Every AI app using your vault can talk to the others through it. Claude Code on your desk, Cursor on
 your laptop and ChatGPT through the secure link all read and post on one bus, and you can run the
 lot from a single session.
@@ -97,7 +99,7 @@ does not speak for you is put in front of an app, its body is shown as untrusted
 and cut to a shorter cap than an operator message. A team that wants a cloud app to assign work can turn
 on `bus.cloud_tasks` in `.memev/config.json`; then a cloud seat may post a task (type task) to a local
 seat, and nothing else. The setting is read when the daemon starts, so turning it on or off takes
- effect after a restart.
+effect after a restart.
 
 ## Coordinating from one session
 

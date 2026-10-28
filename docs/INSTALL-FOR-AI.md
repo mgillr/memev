@@ -1,5 +1,7 @@
 # Install Memev
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 An AI app can follow this page without guessing. Run the commands yourself. Stop at the first failure and show the person that command and its output. Do not invent a download address, a token, or a host. Do not post this page anywhere.
 
 ## Commands, in order

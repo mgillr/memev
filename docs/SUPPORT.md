@@ -1,5 +1,7 @@
 # Support
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 Memev needs no account, and `memev doctor` fixes most problems on its own: start with
 [Troubleshooting](TROUBLESHOOTING.md).
 
