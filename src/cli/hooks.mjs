@@ -7,10 +7,13 @@
 //   stop           → the reply is recorded; the todo list becomes a checkpoint when it changed
 // session-start and prompt also check the comms bus: a heartbeat, a hello the first time, and any
 // new messages or a hold go into context.
+// Cursor's stop hook can only continue the session with a followup_message, so it is reserved for
+// operator tasks waiting for you. The loop limit is a setting on the stop entry in hooks.json
+// (loop_limit, default 5 there), and the hook itself stops following up once loop_count reaches it.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { api, clientToken, resolveRoot } from './common.mjs';
+import { api, clientToken, resolveRoot, config } from './common.mjs';
 import { ensureDaemon } from './daemon.mjs';
 import { scanTranscript, todosToCheckpoint } from './transcript.mjs';
 import { readJson, writePrivateJson, sha256, slug, configDir } from '../engine/util.mjs';
@@ -94,9 +97,12 @@ export async function runHook(event, flags, env = process.env) {
         // never the same item twice in a session: the route leaves out what this session was already given
         const r = isContinuation(prompt) ? null : await call('recall', { query: prompt.slice(0, 1000), limit: 4, exclude: st.injected || [] });
         if (r?.hits?.length) st.injected = [...new Set([...(st.injected || []), ...r.hits.map((h) => `${h.path}#${h.heading || ''}`)])].slice(-500);
-        const bus = await call('bus-pulse', {}).catch(() => null);
+        // Cursor cannot show prompt context anyway, so it only peeks: a task that is already waiting
+        // when the person types must stay unread for the stop hook's follow-up, not be swallowed here
+        const bus = await call('bus-pulse', { peek: format === 'cursor' }).catch(() => null);
         await call('journal', { role: 'user', text: prompt });
-        emit(format, 'UserPromptSubmit', [bus?.text, r?.text, isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
+        const contractsOn = remote || config(root).contracts?.enabled !== false;
+        emit(format, 'UserPromptSubmit', [bus?.text, r?.text, contractsOn && isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
       }
     } else if (event === 'pre-compact') {
       await saveCheckpoint('pre-compact');
@@ -105,16 +111,34 @@ export async function runHook(event, flags, env = process.env) {
       const reply = input.last_assistant_message || input.prompt_response || tr?.lastAssistant;
       if (reply) await call('journal', { role: 'assistant', text: reply });
       await saveCheckpoint('auto');
-      if (format === 'claude' && !input.stop_hook_active) {
+      if (format === 'claude' && !input.stop_hook_active && (remote || config(root).contracts?.enabled !== false)) {
         const g = await call('contract-gate', {});
         if (g.open?.length) process.stdout.write(JSON.stringify({ decision: 'block', reason: `You signed ${g.open.map((c) => `${c.id} (${c.title})`).join(', ')} and it is not verified yet. Finish the remaining criteria and run memev_contract_verify, or report exactly what blocks you.` }));
+      }
+      // loop_count 3 is the loop_limit set on the stop entry in hooks.json: at that point Cursor
+      // would loop anyway, so the hook stops following up
+      if (format === 'cursor' && Number(input.loop_count ?? 0) < 3) {
+        const u = await call('bus-pulse', { peek: true }).catch(() => null);
+        const waiting = (u?.messages || []).filter((m) => m.type === 'task' && m.operator);
+        if (waiting.length) {
+          await call('bus-pulse', {}).catch(() => null); // the follow-up claims these tasks, so they are read
+          const lines = waiting.slice(-3).map((m) => `#${m.seq} ${String(m.body).slice(0, 300)}`);
+          process.stdout.write(JSON.stringify({
+            followup_message: `[Memev] The operator has ${waiting.length} task${waiting.length > 1 ? 's' : ''} waiting for you:\n${lines.join('\n')}\nClaim each (bus_send, type claim, ref = its id), restate it, then do it.`,
+          }));
+        }
       }
     }
     if (tr) st.offset = tr.offset;
     writePrivateJson(stateFile, st);
   } catch (e) {
     if (env.MEMEV_DEBUG) process.stderr.write(`[memev hook ${event}] ${e.message}\n`);
-    if (event === 'session-start') emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev is not reachable right now (${e.message}); run \`memev doctor\`.]`);
+    if (event === 'session-start') {
+      if (e?.moved && e.refresh !== false) emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev] vault address changed: the vault did not answer at its saved address. Run \`memev join --refresh\` to fetch the current address, or \`memev doctor\` if the address is right.`);
+      // no backup address or no address key: --refresh has nothing to follow, so name the way that works
+      else if (e?.moved) emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev] the vault did not answer at its saved address, and this computer has no signed address record to follow. On the vault's computer run \`memev invite\`, then here run \`memev join <code>\`; or run \`memev doctor\` if the address is right.`);
+      else emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev is not reachable right now (${e.message}); run \`memev doctor\`.]`);
+    }
   }
   return 0;
 }

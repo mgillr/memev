@@ -1,5 +1,7 @@
 # GitHub backup
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 ```sh
 memev github setup                 # or: memev github setup --repo you/my-memory
 memev github setup --host ghe.example.com   # GitHub Enterprise

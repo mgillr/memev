@@ -24,6 +24,7 @@ export const OPERATOR = 'operator';
 const MAX_BODY = 4000;
 export const LEAD_NEEDED = 'No lead AI is set for this vault. Ask the user which AI should lead and coordinate the others (bus_roster lists the seats), then call bus_set_operator with the seat and their answer. Never choose yourself or another app without asking.';
 const SEAT_RE = /^[a-z0-9][a-z0-9._-]{0,40}@[a-z0-9][a-z0-9._-]{0,40}(\/[a-z0-9._-]{1,24})?$/;
+const REF_RE = /^[A-Za-z0-9._:-]{1,64}$/;
 const PULSE_COMMIT_MS = 5 * 60e3;
 
 export class BusError extends Error { constructor(code, message) { super(message); this.code = code; this.name = 'BusError'; } }
@@ -38,6 +39,7 @@ export class Bus {
   constructor({ root, devices, commit = () => {}, config = {} }) {
     this.root = root; this.devices = devices; this.commit = commit;
     this.liveMin = config.live_min ?? 15;
+    this.cloudTasks = !!config.cloud_tasks;
     this.dir = path.join(root, BUS_DIR);
     this._cache = new Map(); this._pulseCommitted = new Map(); this._last = new Map();
   }
@@ -70,15 +72,25 @@ export class Bus {
     if (device.kind === 'cloud-connector') return `${label(device.label)}@cloud`;
     return `${label(client)}@${label(device.label)}`;
   }
-  /** The seat this app uses on this computer: its machine-name seat, or an older '@host' seat when one already exists. */
+  /**
+   * The seat this app uses on this computer: the one it already has here (its machine-name seat, an older '@host'
+   * seat, or a numbered one), otherwise its machine-name seat. A seat is only ever one computer's: when another
+   * computer with the same short name holds that name, this one takes the first free <app>@<machine>-2, -3 ...
+   */
   ownSeatName(client, device) {
     const fresh = this.seatName(client, device);
-    if (this.seat(fresh)) return fresh;
-    if (!device || device.kind === 'host' || device.kind === 'local-client') {
-      const legacy = `${label(client)}@host`;
-      if (legacy !== fresh && this.seat(legacy)) return legacy;
+    const mine = (n) => { const r = this.seat(n); return r && (!device || r.device === device.id) ? r.seat : null; };
+    const legacy = !device || device.kind === 'host' || device.kind === 'local-client' ? `${label(client)}@host` : null;
+    const held = mine(fresh) || (legacy && legacy !== fresh && mine(legacy));
+    if (held) return held;
+    const [app, machine] = fresh.split('@');
+    for (let i = 1; i < 100; i++) {
+      const n = i === 1 ? fresh : `${app}@${machine.slice(0, 41 - `-${i}`.length)}-${i}`;
+      const r = this.seat(n);
+      if (!r) return n;
+      if (!device || r.device === device.id) return r.seat;
     }
-    return fresh;
+    throw new BusError('conflict', `no free seat name for ${fresh}`);
   }
   /** True when the machine part of a seat name is this vault's own computer (or the older 'host' word). */
   _onHost(seat) {
@@ -102,6 +114,7 @@ export class Bus {
     const name = seat || this.ownSeatName(client, device);
     if (!SEAT_RE.test(name)) throw new BusError('bad_request', `not a seat name: ${name}`);
     const cur = this.seat(name);
+    if (cur && !cur.removed && device && cur.device !== device.id) throw new BusError('conflict', `seat ${name} belongs to another computer`);
     if (cur && !cur.removed) return cur;
     const rec = { seat: name, client: label(client), device: device.id, device_kind: device.kind, device_label: device.label, project: project || null, created: now(), joined: cur?.joined || null, removed: null };
     fs.mkdirSync(this._p('seats'), { recursive: true });
@@ -135,7 +148,14 @@ export class Bus {
       this.commit(this._rel('pulse', `${fileOf(newName)}.json`));
       this.commit(this._rel('pulse', `${fileOf(from)}.json`));
     }
+    const op = readJson(this._p('operator.json'), null);
+    if (op?.seat === from) { writeJson(this._p('operator.json'), { ...op, seat: newName }); this.commit(this._rel('operator.json')); }
     return rec;
+  }
+  /** A seat's name and the names it had before a rename: messages to or from any of them are its own. */
+  _names(seat) {
+    const rec = this.seat(seat);
+    return [...new Set([seat, ...(rec ? [rec.seat, ...(rec.renamed_from || [])] : [])])];
   }
   operator() { return readJson(this._p('operator.json'), null)?.seat || null; }
   /**
@@ -229,16 +249,21 @@ export class Bus {
     if (who.operator || !who.project) return true;
     return !m.project || m.project === who.project;
   }
-  _toMe(who, m) { return m.from !== who.seat && (m.to === 'all' || m.to === who.seat || (m.to === OPERATOR && who.operator)); }
+  _toMe(who, m, names = this._names(who.seat)) { return !names.includes(m.from) && (m.to === 'all' || names.includes(m.to) || (m.to === OPERATOR && who.operator)); }
 
-  send(ctx, { to = 'all', type, body = '', ref = null, project = null, seat = null, release = false, check = false } = {}) {
+  send(ctx, { to, type, body = '', ref = null, project = null, seat = null, release = false, check = false } = {}) {
     if (!TYPES.includes(type)) throw new BusError('bad_request', `type must be one of: ${TYPES.join(', ')}`);
     body = String(body ?? '');
     if (body.length > MAX_BODY) throw new BusError('too_large', `keep a message under ${MAX_BODY} characters; put long text in a note and send its path`);
     const secrets = findSecrets(body);
     if (secrets.length) throw new BusError('secret', `refused: the message looks like it holds a credential (${secrets.join(', ')}). Never send keys or tokens over the bus`);
+    if (ref != null && !REF_RE.test(String(ref))) throw new BusError('bad_request', 'ref must be a message or task id: letters, digits and . _ : -, at most 64 characters');
     const who = this.resolve(ctx, { seat, project, need: 'write' });
-    to = String(to || 'all');
+    to = String(to || (who.device?.kind === 'cloud-connector' ? OPERATOR : 'all'));
+    if (who.device?.kind === 'cloud-connector') {
+      const toOperator = to === OPERATOR || (!!this.operator() && to === this.operator());
+      if (!toOperator && !(this.cloudTasks && type === 'task')) throw new BusError('forbidden', 'a cloud seat may post only to the operator; to let a cloud app assign a task to a seat, the person turns on the bus cloud_tasks setting');
+    }
     if (to !== 'all' && to !== OPERATOR && !this.seat(to)) throw new BusError('not_found', `no seat ${to}; bus_roster lists them`);
     const all = this.all();
     if (['claim', 'restate'].includes(type)) {
@@ -280,12 +305,13 @@ export class Bus {
     const who = this.resolve(ctx, { seat });
     const p = this._pulse(who.seat); const read = p.read || {};
     const all = this.all();
-    const fresh = all.filter((m) => m.dseq > (read[m.device] || 0) && this._toMe(who, m) && this._visible(who, m));
-    if (!peek) for (const m of all) if (this._toMe(who, m) || m.from === who.seat) read[m.device] = Math.max(read[m.device] || 0, m.dseq);
+    const names = this._names(who.seat);
+    const fresh = all.filter((m) => m.dseq > (read[m.device] || 0) && this._toMe(who, m, names) && this._visible(who, m));
+    if (!peek) for (const m of all) if (this._toMe(who, m, names) || names.includes(m.from)) read[m.device] = Math.max(read[m.device] || 0, m.dseq);
     this.pulse(ctx, { who, read: peek ? null : read });
     const acked = [];
     if (!(who.operator && who.seat === OPERATOR)) {
-      for (const m of fresh.filter((x) => x.check)) if (!all.some((a) => a.type === 'ack' && a.ref === m.id && a.from === who.seat)) {
+      for (const m of fresh.filter((x) => x.check)) if (!all.some((a) => a.type === 'ack' && a.ref === m.id && names.includes(a.from))) {
         try { if (!ctx.identity?.read_only) { this._append(who, { to: m.from, type: 'ack', body: 'comms check: here', ref: m.id, project: null }); acked.push(m.id); } } catch {}
       }
     }
@@ -313,7 +339,8 @@ export class Bus {
   }
 
   holdOn(seat, all = this.all()) {
-    const h = all.filter((m) => m.type === 'hold' && m.operator && (m.to === seat || m.to === 'all')).at(-1);
+    const names = this._names(seat);
+    const h = all.filter((m) => m.type === 'hold' && m.operator && (names.includes(m.to) || m.to === 'all')).at(-1);
     return h && !h.release ? { since: h.ts, by: h.from, reason: h.body, id: h.id } : null;
   }
 
@@ -322,12 +349,13 @@ export class Bus {
     const all = this.all(); const op = this.operator();
     const rows = this.seats().map((s) => {
       const dev = this.devices.get(s.device); const p = this._pulse(s.seat);
-      const last = all.filter((m) => m.from === s.seat).at(-1);
+      const names = [s.seat, ...(s.renamed_from || [])];
+      const last = all.filter((m) => names.includes(m.from)).at(-1);
       let state = 'never joined';
       if (s.removed || !dev || dev.status !== 'active') state = 'removed';
       else if (s.joined && p.last_seen) state = ago(p.last_seen, at) <= this.liveMin ? 'live' : 'stale';
-      const claims = all.filter((m) => m.type === 'claim' && m.from === s.seat && !all.some((v) => v.type === 'verdict' && v.ref === m.ref)).map((m) => m.ref);
-      const status = all.filter((m) => m.type === 'status' && m.from === s.seat && !m.check).at(-1);
+      const claims = all.filter((m) => m.type === 'claim' && names.includes(m.from) && !all.some((v) => v.type === 'verdict' && v.ref === m.ref)).map((m) => m.ref);
+      const status = all.filter((m) => m.type === 'status' && names.includes(m.from) && !m.check).at(-1);
       return { seat: s.seat, client: s.client, device: s.device, device_label: dev?.label || s.device_label, device_kind: dev?.kind || s.device_kind, state, operator: op === s.seat, last_seen: p.last_seen || null, minutes_since: p.last_seen ? ago(p.last_seen, at) : null, last_message: last ? { seq: last.seq, type: last.type, ts: last.ts, body: last.body.slice(0, 120) } : null, hold: this.holdOn(s.seat, all), claims, status: status ? status.body.slice(0, 160) : null, project: s.project };
     });
     // licensed computers with no app on the bus yet
@@ -360,13 +388,21 @@ export class Bus {
     return { check: msg.id, seq: msg.seq, waited_ms: Date.now() - start, answered, missing };
   }
 
-  /** Tasks with who claimed them, the restatement, the latest status and the verdict. */
+  /** Has this seat not seen this message yet (its read pointer is still behind it)? */
+  unreadFor(seat, m) {
+    const p = this._pulse(seat);
+    return m.dseq > (p.read?.[m.device] || 0);
+  }
+  /** Tasks with who claimed them, the restatement, the latest status and the verdict. An unclaimed
+   * task to a live seat that has not read it yet waits for that seat's next turn. */
   tasks(ctx, { open = false } = {}) {
     const who = this.resolve(ctx); const all = this.all().filter((m) => this._visible(who, m));
+    const live = new Set(this.roster().seats.filter((r) => r.seat && r.state === 'live').map((r) => r.seat));
     return all.filter((m) => m.type === 'task').map((t) => {
       const rel = all.filter((m) => m.ref === t.id);
       const claim = rel.find((m) => m.type === 'claim'); const verdict = rel.filter((m) => m.type === 'verdict').at(-1);
-      return { id: t.id, seq: t.seq, from: t.from, operator: t.operator, to: t.to, body: t.body, claimed_by: claim?.from || null, restated: rel.filter((m) => m.type === 'restate').at(-1)?.body || null, status: rel.filter((m) => m.type === 'status').at(-1)?.body || null, verdict: verdict?.body || null, state: verdict ? 'done' : claim ? 'claimed' : 'open' };
+      const state = verdict ? 'done' : claim ? 'claimed' : live.has(t.to) && this.unreadFor(t.to, t) ? 'waiting for next turn' : 'open';
+      return { id: t.id, seq: t.seq, from: t.from, operator: t.operator, to: t.to, body: t.body, claimed_by: claim?.from || null, restated: rel.filter((m) => m.type === 'restate').at(-1)?.body || null, status: rel.filter((m) => m.type === 'status').at(-1)?.body || null, verdict: verdict?.body || null, state };
     }).filter((t) => !open || t.state !== 'done');
   }
 

@@ -11,20 +11,23 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const cells = (line) => line.split('|').slice(1, -1).map((c) => c.trim());
 // the rows of the pricing table that are limits, not features
-const LIMITS = ['Price', 'People', 'Computers using one vault', 'Local AI apps on a computer', 'Cloud AI connectors'];
+const LIMITS = ['Price', 'People', 'Computers using one vault', 'Local AI apps on a computer', 'Cloud AI connectors', 'Trial'];
 // each feature row of the pricing table, and the parts of the status table it sells (matched by their start)
 const SELLS = {
   'Vault, recall, graph, contracts, doctor, your own tunnel': ['Vault, recall, graph, hooks, contracts, doctor', 'Secure link for cloud AI apps'],
   'Backup to your own GitHub (one writer)': ['Backup to your own private GitHub repository'],
   'One memory for every AI app, and the comms bus between them': ['Vault, recall, graph, hooks, contracts, doctor', 'Comms bus between AI apps'],
+  'Several computers on one vault over the secure link, provenance': ['Several computers using one vault through the secure link', 'Per-computer and per-app credentials'],
+  'Automatic merge when several computers edit at once (crdt-merge)': ['Concurrent edits on several computers merged'],
   'Hosted end-to-end encrypted sync between computers': ["End-to-end encrypted sync between one person's computers"],
   'Hosted encrypted backup and a stable relay address': ['Hosted encrypted backup', 'Hosted relay with a stable address'],
-  'One shared vault for a team over the secure link, provenance': ['Several computers using one vault through the secure link', 'Per-computer and per-app credentials'],
   'Member keys: one key per person, covering their computers': ['Member keys'],
-  'Company hub on your server, departments and roles from an org chart': ['Company hub with user accounts', 'Departments, roles and path grants from an org chart'],
+  "One company vault that all members' work data syncs into, with an admin console that sees and searches it": ["One company vault that all members' work data syncs into", 'Company admin console'],
+  'One AI provider per organisation, a cloud AI service or an on-premises LLM, over MCP': ['One AI provider per organisation'],
+  'Company server, departments and roles from an org chart': ['Company server with user accounts', 'Departments, roles and path grants from an org chart'],
   'Sign-in with Google Workspace or Microsoft Entra ID': ['Sign-in with Google Workspace or Microsoft Entra ID'],
-  'Restricted notes served only to a local model, egress log': ['Labels on notes and local-model-only routing', 'Egress log of what reached each cloud app'],
-  'SCIM, SIEM and audit export, retention, legal hold, high availability': ['Sign-in with Google Workspace or Microsoft Entra ID, SCIM', 'SIEM and audit export', 'High-availability hub'],
+  'Rules for what reaches the AI provider, egress log': ['Labels on notes and rules for what reaches the AI provider', 'Egress log of what reached the AI provider'],
+  'SCIM, SIEM and audit export, retention, legal hold, high availability': ['Sign-in with Google Workspace or Microsoft Entra ID, SCIM', 'SIEM and audit export', 'High-availability servers'],
 };
 
 /** Part -> 'built' or 'planned', from the "What is built and what is planned" table. */
@@ -66,9 +69,9 @@ test("MEM-066 AC01: The test fails if any unbuilt feature is listed as included 
   const sync = pricing.split('\n').find((l) => l.startsWith('| Hosted end-to-end encrypted sync'));
   assert.ok(sync.includes('planned'));
   const ticked = pricing.replace(sync, sync.replace('planned', '✓'));
-  assert.deepEqual(problems(ticked, status), ['Hosted end-to-end encrypted sync between computers / Personal: "✓" sells a planned feature']);
+  assert.deepEqual(problems(ticked, status), ['Hosted end-to-end encrypted sync between computers / Personal with more computers: "✓" sells a planned feature']);
   // and so is a new feature row that nobody matched to the status table
-  const added = pricing.replace(sync, `${sync}\n| Teleporting notes between offices | | ✓ | ✓ | ✓ | | ✓ |`);
+  const added = pricing.replace(sync, `${sync}\n| Teleporting notes between offices | | ✓ | ✓ | ✓ |`);
   assert.deepEqual(problems(added, status), ['unclassified row: Teleporting notes between offices']);
   // a feature that is still planned in the status table keeps its row honest even if the pricing page is not edited
   const built = new Map(status); built.set("End-to-end encrypted sync between one person's computers", 'built');
@@ -80,5 +83,5 @@ test('the Personal description in the tiers pages matches the pricing table and 
   assert.match(personal, /up to 3 computers/);
   assert.match(personal, /comms bus/);
   assert.match(personal, /Planned, not built, and not part of the price/);
-  assert.match(read('docs/PRICING.md'), /Personal is sold for what exists today/);
+  assert.match(read('docs/PRICING.md'), /Personal with more computers is sold for what exists today/);
 });

@@ -1,24 +1,26 @@
 # Planned add-ons and services
 
+Part of the [Memev documentation](../README.md). Up: the [README](../../README.md).
+
 > **DRAFT.** Everything on this page is **planned**. None of it is built, none of it is on sale, and
-> none of it has a date. Free is free and nothing here takes anything away from it
+> none of it has a date. Personal on one computer is free and nothing here takes anything away from it
 > ([CHARTER.md](../../CHARTER.md)). A price is either **quoted** (we price it on your requirements,
 > contact us) or **included in** a tier. See [PRICING.md](../PRICING.md) and the [tiers](../tiers/README.md).
 
 These are the add-ons and services we plan to offer next to the free core, mostly for Business and
-Enterprise. They are ranked by how much they would do for a customer's work, the first being the one
-we would start with. A planned part goes into an offer only when it is built.
+Corporate (both coming). They are ranked by how much they would do for a customer's work, the first
+being the one we would start with. A planned part goes into an offer only when it is built.
 
 | Rank | Add-on or service | What you get | Tier | Price | Status |
 |---|---|---|---|---|---|
-| 1 | [Custom implementation services](#1-custom-implementation-services) | Memev wired into your own tools and way of working | Business, Enterprise | quoted per job | planned |
-| 2 | [Evidence Pack](#2-evidence-pack) | A signed audit log, retention rules and an export you can hand to a reviewer | Enterprise; Business as an add-on | included in Enterprise; quoted for Business | planned |
-| 3 | [Governance bundle](#3-governance-bundle) | Roles, review of held writes, a share preview and an egress log | Business, Enterprise | included in Business and Enterprise | planned |
-| 4 | [Profession starter packs](#4-profession-starter-packs) | Ready-made rules, note layouts, checks and example workflows for a profession | Team, Business | one pack included in Team; more packs included in Business | planned |
-| 5 | [Conflict radar](#5-conflict-radar) | Contradicting decisions shown side by side, with dates and sources | Free (your own apps), Team, Business | included in each | planned |
-| 6 | [Verified work add-on](#6-verified-work-add-on) | A plain verdict on whether a change's own tests prove it | Team, Business | quoted | planned |
-| 7 | [Metered hosted usage](#7-metered-hosted-usage) | More hosted sync, backup and relay room without moving up a tier | Personal, Team, Business (hosted only) | quoted | planned |
-| 8 | [Per-role signing keys](#8-per-role-signing-keys) | Each note says which AI app role wrote it, on which computer, vouched for by whom | Team, Business | included in Team and Business | planned |
+| 1 | [Custom implementation services](#1-custom-implementation-services) | Memev wired into your own tools and way of working | Business, Corporate | quoted per job | planned |
+| 2 | [Evidence Pack](#2-evidence-pack) | A signed audit log, retention rules and an export you can hand to a reviewer | Corporate; Business as an add-on | included in Corporate; quoted for Business | planned |
+| 3 | [Governance bundle](#3-governance-bundle) | Roles, review of held writes, a share preview and an egress log | Business, Corporate | included in Business and Corporate | planned |
+| 4 | [Profession starter packs](#4-profession-starter-packs) | Ready-made rules, note layouts, checks and example workflows for a profession | Business | packs included in Business | planned |
+| 5 | [Conflict radar](#5-conflict-radar) | Contradicting decisions shown side by side, with dates and sources | Personal (your own apps), Business | included in each | planned |
+| 6 | [Verified work add-on](#6-verified-work-add-on) | A plain verdict on whether a change's own tests prove it | Business | quoted | planned |
+| 7 | [Metered hosted usage](#7-metered-hosted-usage) | More hosted sync, backup and relay room without moving up a tier | Personal with more computers, Business (hosted only) | quoted | planned |
+| 8 | [Per-role signing keys](#8-per-role-signing-keys) | Each note says which AI app role wrote it, on which computer, vouched for by whom | Business | included in Business | planned |
 
 ## 1. Custom implementation services
 
@@ -32,7 +34,7 @@ One short example of custom work: a business connects Memev to the project softw
 so that when one team changes a plan, Memev checks the change against the other teams' plans and tells
 the people involved about any clash.
 
-**Tier.** Business and Enterprise, as a service next to [services.md](../tiers/services.md).
+**Tier.** Business and Corporate, as a service next to [services.md](../tiers/services.md).
 **Price.** Quoted per job, as a fixed-scope package.
 **Status.** Planned.
 
@@ -47,20 +49,20 @@ true.
 It covers a signed audit log, retention rules with legal hold, and an export of the log. The
 audit and export parts of this are already on the [tier status table](../tiers/README.md).
 
-**Tier.** Included in Enterprise. An add-on for Business.
-**Price.** Included in Enterprise; quoted for Business.
+**Tier.** Included in Corporate. An add-on for Business.
+**Price.** Included in Corporate; quoted for Business.
 **Status.** Planned.
 
 ## 3. Governance bundle
 
 **What it does for you.** A company can limit who sees what, hold a suspicious write for a reviewer
 before it lands, preview exactly what would leave before sharing it, and keep a log of what reached
-each cloud AI app. This is the reason to choose Business over Team.
+each cloud AI app. This is a reason to choose Business.
 
-The company hub can read the notes it serves, so we will never call this end-to-end encrypted.
+The company server can read the notes it serves, so we will never call this end-to-end encrypted.
 
-**Tier.** Business and Enterprise.
-**Price.** Included in Business and Enterprise. Not sold separately.
+**Tier.** Business and Corporate.
+**Price.** Included in Business and Corporate. Not sold separately.
 **Status.** Planned. Sign-in and roles come first ([tiers](../tiers/README.md)).
 
 ## 4. Profession starter packs
@@ -70,8 +72,8 @@ layouts, checks and example workflows for a profession such as project managemen
 engineering. Packs are written by us. Packs from outside authors wait until a module can be limited
 to what it is allowed to do.
 
-**Tier.** Team and Business.
-**Price.** One pack included in Team; more packs included in Business.
+**Tier.** Business.
+**Price.** Packs included in Business.
 **Status.** Planned.
 
 ## 5. Conflict radar
@@ -81,10 +83,10 @@ shows both, with dates and sources, instead of silently overwriting one. It is a
 team to share one memory. Two notes that disagree are not always an error, so it shows them and
 leaves the call to a person.
 
-A basic local list for your own apps is part of Free. A shared view comes with Team; a weekly digest
-and a reviewer workflow come with Business.
+A basic local list for your own apps is part of Personal. A shared view, a weekly digest and a
+reviewer workflow come with Business.
 
-**Tier.** Free (your own apps), Team, Business.
+**Tier.** Personal (your own apps), Business.
 **Price.** Included in each tier.
 **Status.** Planned.
 
@@ -94,7 +96,7 @@ and a reviewer workflow come with Business.
 the change, and every AI app on the team remembers the verdict. The verdict says what the tests do
 and do not show. It is not a security guarantee and the page will never say a change is proven safe.
 
-**Tier.** Team and Business.
+**Tier.** Business.
 **Price.** Quoted.
 **Status.** Planned.
 
@@ -104,7 +106,7 @@ and do not show. It is not a security guarantee and the page will never say a ch
 moving up a tier. We would meter storage and relay hours, not individual operations. The free tier is
 never metered, limited or nagged, and the hosted services are not built yet.
 
-**Tier.** Personal, Team and Business, hosted services only.
+**Tier.** Personal with more computers and Business, hosted services only.
 **Price.** Quoted.
 **Status.** Planned.
 
@@ -114,8 +116,8 @@ never metered, limited or nagged, and the hosted services are not built yet.
 by which person, and a lost key can be revoked. Memev already has a key per computer; this adds a key
 per role. We will say plainly where the key is stored on your machine.
 
-**Tier.** Team and Business.
-**Price.** Included in Team and Business.
+**Tier.** Business.
+**Price.** Included in Business.
 **Status.** Planned.
 
 ## How we decide what ships
