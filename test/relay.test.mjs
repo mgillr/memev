@@ -212,3 +212,22 @@ test('MEM-029: the relay is off until the setting says otherwise, and nothing co
     assert.equal(sb.run(['cloud', 'relay', 'address']).out.trim(), addr, 'the address is kept');
   } finally { sb.stop(); dummy.close(); }
 });
+
+test('MEM-030 AC02: The default relay URL is read from config and the client uses it when Personal is active', async () => {
+  const sb = sandbox();
+  const url = 'relay://127.0.0.1:9';
+  try {
+    assert.equal(sb.run(['init', '--no-connect', '--local-only']).code, 0);
+    client.setRelay(sb.root, { default_url: url, default_domain: DOMAIN });
+    await assert.rejects(() => client.command(['on'], {}, { root: sb.root, env: sb.env, license: { state: 'none', tier: null } }), /no relay is built in/);
+    await assert.rejects(() => client.command(['on'], {}, { root: sb.root, env: sb.env, license: { state: 'valid', tier: 'team' } }), /no relay is built in/);
+    assert.equal(await client.command(['on'], {}, { root: sb.root, env: sb.env, license: { state: 'valid', tier: 'personal' } }), 0);
+    const saved = client.relaySetting(sb.root);
+    assert.equal(saved.url, url);
+    assert.equal(saved.domain, DOMAIN);
+    assert.equal(saved.enabled, true);
+    const sup = client.superviseRelay({ config: { remote: { enabled: true, relay: saved } } }, { root: sb.root, port: 1, env: { ...sb.env, MEMEV_NO_TUNNEL: '1' } });
+    sup.stop();
+    assert.equal(client.relaySetting(sb.root).url, url);
+  } finally { sb.stop(); }
+});
