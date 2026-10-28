@@ -21,7 +21,7 @@ const settingsPath = (env) => path.join(env.HOME, '.claude', 'settings.json');
 
 test('MEM-051 AC01: connect claude-code --allow-tools adds mcp__memev; disconnect removes it', () => {
   const { env } = fixtureHome({ withSettings: false }); // no settings.json yet, as on a fresh install
-  const launcher = '/opt/memev/bin/memev';
+  const launcher = '/x/memev';
   connect('claude-code', { env, launcher, allowTools: true });
   const after = fs.readFileSync(settingsPath(env), 'utf8');
   assert.match(after, /mcp__memev/, 'mcp__memev is written into settings.json');
@@ -32,7 +32,7 @@ test('MEM-051 AC01: connect claude-code --allow-tools adds mcp__memev; disconnec
 
 test('MEM-051 AC02: without consent, permissions.allow is not changed', () => {
   const { env, files } = fixtureHome({ withSettings: true });
-  const launcher = '/opt/memev/bin/memev';
+  const launcher = '/x/memev';
   connect('claude-code', { env, launcher }); // no allowTools: no consent
   const cs = JSON.parse(fs.readFileSync(files.claudeSettings, 'utf8'));
   assert.deepEqual(cs.permissions.allow, ['Bash(ls:*)'], 'without consent permissions.allow is exactly as it was');
@@ -41,7 +41,7 @@ test('MEM-051 AC02: without consent, permissions.allow is not changed', () => {
 
 test('a consented connect keeps the user\'s own allow entries, and a later user edit is kept on disconnect', () => {
   const { env, files } = fixtureHome({ withSettings: true });
-  const launcher = '/opt/memev/bin/memev';
+  const launcher = '/x/memev';
   connect('claude-code', { env, launcher, allowTools: true });
   let cs = JSON.parse(fs.readFileSync(files.claudeSettings, 'utf8'));
   assert.ok(cs.permissions.allow.includes('Bash(ls:*)'), 'the user entry stays next to mcp__memev');
