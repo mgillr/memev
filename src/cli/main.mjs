@@ -2,7 +2,7 @@
 // The memev command.
 import fs from 'node:fs';
 import path from 'node:path';
-import { PKG, parseArgs, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, out } from './common.mjs';
+import { PKG, parseArgs, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, out, tokenExpiryWarnings } from './common.mjs';
 import { ensureDaemon, startDaemon, stopDaemon, healthy, choosePort } from './daemon.mjs';
 import { initVault, isVault, VERSION } from '../engine/vault.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
@@ -237,7 +237,7 @@ async function run(argv, env) {
       need(); const up = await healthy(root);
       if (!up) { console.log(`Vault ${root}: daemon not running (memev start)`); return 1; }
       const s = await api(root, '/v1/status', { method: 'GET', token: clientToken(root, 'cli') });
-      if (flags.json) json(s.json); else { const j = s.json; console.log(`Memev ${j.version} · ${root}\n  log: ${j.oplog.seq} ops in ${j.oplog.segments} segment(s) · index: ${j.index.notes} notes / ${j.index.sections} sections · graph: ${j.graph.entities} entities, ${j.graph.claims} claims · heap ${j.memory.heap_mb} MB`); }
+      if (flags.json) json(s.json); else { const j = s.json; console.log(`Memev ${j.version} · ${root}\n  log: ${j.oplog.seq} ops in ${j.oplog.segments} segment(s) · index: ${j.index.notes} notes / ${j.index.sections} sections · graph: ${j.graph.entities} entities, ${j.graph.claims} claims · heap ${j.memory.heap_mb} MB`); for (const w of tokenExpiryWarnings(root)) console.log(`  ! ${w}`); }
       return 0;
     }
     case 'mcp': {
@@ -251,7 +251,7 @@ async function run(argv, env) {
       if (cmd === 'recall') { const r = await call('recall', { query: pos.join(' '), limit: Number(flags.limit || 6), project: flags.project, all_projects: !!flags['all-projects'] }); flags.json ? json(r.hits) : console.log(r.text || 'Nothing found.'); }
       if (cmd === 'remember') json(await call('remember', { text: pos.join(' '), kind: flags.kind, project: flags.project, why: flags.why, review_by: flags['review-by'], force: !!flags.force }));
       if (cmd === 'checkpoint') json(await call('checkpoint', { project: flags.project, task: flags.task, done: list(flags.done), doing: flags.doing, next: list(flags.next), files: list(flags.files), source: 'cli' }));
-      if (cmd === 'card') { const r = await call('session-start', { project: flags.project, task: flags.task || pos.join(' ') || null }); console.log(flags.json ? JSON.stringify(r.card, null, 2) : renderCard(r.card)); }
+      if (cmd === 'card') { const r = await call('session-start', { project: flags.project, task: flags.task || pos.join(' ') || null }); console.log(flags.json ? JSON.stringify(r.card, null, 2) : renderCard(r.card, { root })); }
       return 0;
     }
     case 'claims': {
@@ -264,7 +264,7 @@ async function run(argv, env) {
       if (sub === 'list') { for (const t of ts.list()) console.log(`${t.id}  ${t.agent.padEnd(16)} ${t.scopes.join('+').padEnd(16)} ${t.remote ? 'remote' : 'local '} ${t.revoked ? 'REVOKED' : t.expires ? `expires ${t.expires.slice(0, 10)}` : 'no expiry'}  ${t.paths.join(',')}`); return 0; }
       if (sub === 'issue') { const t = ts.issue({ agent: flags.agent || pos[1] || 'agent', scopes: String(flags.scopes || 'read,write').split(','), paths: String(flags.paths || '**').split(','), ttlDays: Number(flags.ttl ?? 180), remote: !!flags.remote, note: flags.note || '' }); console.log(`Token for ${flags.agent || pos[1] || 'agent'} (shown once):\n${t.token}`); return 0; }
       if (sub === 'revoke') { if (!pos[1]) throw new Error('memev token revoke <id>'); console.log(ts.revoke(pos[1]) ? `Revoked ${pos[1]}.` : `No token ${pos[1]}.`); return 0; }
-      if (sub === 'rotate') { if (!pos[1]) throw new Error('memev token rotate <id>'); const t = ts.rotate(pos[1]); const f = path.join(root, '.memev', 'clients.json'); try { const all = JSON.parse(fs.readFileSync(f, 'utf8')); for (const k of Object.keys(all)) if (all[k].startsWith(`mv_${pos[1]}_`)) all[k] = t.token; fs.writeFileSync(f, JSON.stringify(all, null, 2), { mode: 0o600 }); } catch {} console.log(`Rotated ${pos[1]}; the old secret no longer works. New token (shown once):\n${t.token}`); return 0; }
+      if (sub === 'rotate') { if (!pos[1]) throw new Error('memev token rotate <id> [--ttl DAYS]'); const t = ts.rotate(pos[1], { ttlDays: Number(flags.ttl ?? 365) }); const f = path.join(root, '.memev', 'clients.json'); try { const all = JSON.parse(fs.readFileSync(f, 'utf8')); for (const k of Object.keys(all)) if (all[k].startsWith(`mv_${pos[1]}_`)) all[k] = t.token; fs.writeFileSync(f, JSON.stringify(all, null, 2), { mode: 0o600 }); } catch {} console.log(`Rotated ${pos[1]}; the credential now expires ${t.expires ? t.expires.slice(0, 10) : 'never'}. The old secret no longer works, so the link pasted into the cloud app must be pasted again: memev cloud url prints the new one. New token (shown once):\n${t.token}`); return 0; }
       throw new Error('memev token list|issue|revoke|rotate');
     }
     case 'admin-token': need(); console.log(adminToken(root) || '(none)'); return 0;
