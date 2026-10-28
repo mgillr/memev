@@ -44,6 +44,10 @@ const CONTINUATION = /^(continue|go on|go ahead|carry on|keep going|yes|yes plea
 export const isContinuation = (p) => { const s = String(p || '').trim(); return s.split(/\s+/).filter(Boolean).length < 4 || CONTINUATION.test(s); };
 const BUILD_NUDGE = '[Memev] This is a build request. Before writing code: infer the requirements, call memev_contract_from_request (each requirement with a local check), then memev_contract_sign, and say in one line what you signed. If an open contract already covers it, use memev_contract_status instead.';
 
+// The whole hook runs inside this budget. The app gives the prompt hook 10 s, but the person is
+// waiting on every turn, so the hook decides for itself when it is done: what is in hand goes out,
+// whatever is still in flight is dropped.
+const HOOK_BUDGET_MS = 1500;
 export async function runHook(event, flags, env = process.env) {
   const format = flags.format || 'claude';
   let input = {}; try { input = JSON.parse(readStdin() || '{}'); } catch {}
@@ -55,6 +59,8 @@ export async function runHook(event, flags, env = process.env) {
   const remote = !isVault(root) ? loadRemote(env) : null; // this computer uses a vault elsewhere (memev join)
   const stateFile = remote ? path.join(configDir(env), 'hooks', `${slug(session, 64)}.json`) : path.join(root, '.memev', 'hooks', `${slug(session, 64)}.json`);
   const st = readJson(stateFile, { offset: 0, todos: null });
+  const budget = Number(env.MEMEV_HOOK_BUDGET_MS) > 0 ? Number(env.MEMEV_HOOK_BUDGET_MS) : HOOK_BUDGET_MS;
+  const deadline = Date.now() + budget;
   try {
     let call;
     if (remote) call = (route, body) => remoteFetch(remote, `v1/${route}`, { body: { session, project, ...body }, env, headers: { 'x-memev-client': client }, timeoutMs: 8000 }).then((r) => { if (!r.ok) throw new Error(`${route}: ${r.status}`); return r.json; });
@@ -63,6 +69,13 @@ export async function runHook(event, flags, env = process.env) {
       const token = clientToken(root, client);
       call = (route, body) => api(root, `/v1/${route}`, { body: { session, project, ...body }, token, timeoutMs: 4000 }).then((r) => { if (!r.ok) throw new Error(`${route}: ${r.status}`); return r.json; });
     }
+    // The calls that go out together share the budget: each one gets whatever is left, and when the
+    // budget runs out the ones still in flight are dropped, so the hook returns what it has.
+    const withBudget = (p) => new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('budget exceeded')), Math.max(1, deadline - Date.now()));
+      p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+    });
+    const fire = (p) => { p.catch(() => {}); return null; }; // no result is wanted; it must not hold the hook
     const tr = input.transcript_path ? scanTranscript(input.transcript_path, { fromOffset: st.offset }) : null;
     const saveCheckpoint = async (source) => {
       const cp = todosToCheckpoint(tr?.todos);
@@ -76,12 +89,12 @@ export async function runHook(event, flags, env = process.env) {
       // a compaction or a clear empties the context; a resume brings the earlier conversation back, card included
       if (source === 'compact' || source === 'clear') { st.injected = []; st.card = null; }
       const fresh = source !== 'compact' && source !== 'resume'; // startup or clear: a new context, so the rules as well
-      const r = await call('session-start', { task: null });
+      const r = await withBudget(call('session-start', { task: null }));
       // whether the person still has to pick a lead: only at a fresh start, and only until the setup session has asked
       // (bus/operator.json records it)
       const asked = remote ? null : readJson(path.join(root, 'bus', 'operator.json'), null)?.asked;
-      const bus = await call('bus-pulse', { lead: fresh && !(typeof asked === 'string' && asked) }).catch(() => null);
-      await call('journal', { role: 'event', text: `session ${source} (${client}${project ? `, ${project}` : ''})` }).catch(() => {});
+      const bus = await withBudget(call('bus-pulse', { lead: fresh && !(typeof asked === 'string' && asked) })).catch(() => null);
+      fire(call('journal', { role: 'event', text: `session ${source} (${client}${project ? `, ${project}` : ''})` }));
       // the card goes in when the context does not hold it: at a fresh start, after a compaction, or when it changed
       const card = sha256(String(r.text || ''));
       const parts = [fresh ? r.protocol || PROTOCOL : '', fresh || card !== st.card ? r.text : '', bus?.text || ''].filter(Boolean);
@@ -92,21 +105,25 @@ export async function runHook(event, flags, env = process.env) {
       if (prompt) {
         if (!st.task) st.task = prompt.slice(0, 200);
         // never the same item twice in a session: the route leaves out what this session was already given
-        const r = isContinuation(prompt) ? null : await call('recall', { query: prompt.slice(0, 1000), limit: 4, exclude: st.injected || [] });
+        // recall and the bus pulse go out at the same time, and the journal is fire-and-forget: the
+        // person is waiting on the turn, and the journal can land after the hook has answered
+        const recallP = isContinuation(prompt) ? null : withBudget(call('recall', { query: prompt.slice(0, 1000), limit: 4, exclude: st.injected || [] })).catch(() => null);
+        const busP = withBudget(call('bus-pulse', {})).catch(() => null);
+        fire(call('journal', { role: 'user', text: prompt }));
+        const r = await recallP;
         if (r?.hits?.length) st.injected = [...new Set([...(st.injected || []), ...r.hits.map((h) => `${h.path}#${h.heading || ''}`)])].slice(-500);
-        const bus = await call('bus-pulse', {}).catch(() => null);
-        await call('journal', { role: 'user', text: prompt });
+        const bus = await busP;
         emit(format, 'UserPromptSubmit', [bus?.text, r?.text, isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
       }
     } else if (event === 'pre-compact') {
-      await saveCheckpoint('pre-compact');
-      if (tr?.lastAssistant) await call('journal', { role: 'assistant', text: tr.lastAssistant });
+      await withBudget(saveCheckpoint('pre-compact'));
+      if (tr?.lastAssistant) fire(call('journal', { role: 'assistant', text: tr.lastAssistant }));
     } else if (event === 'stop') {
       const reply = input.last_assistant_message || input.prompt_response || tr?.lastAssistant;
-      if (reply) await call('journal', { role: 'assistant', text: reply });
-      await saveCheckpoint('auto');
+      if (reply) fire(call('journal', { role: 'assistant', text: reply }));
+      await withBudget(saveCheckpoint('auto'));
       if (format === 'claude' && !input.stop_hook_active) {
-        const g = await call('contract-gate', {});
+        const g = await withBudget(call('contract-gate', {}));
         if (g.open?.length) process.stdout.write(JSON.stringify({ decision: 'block', reason: `You signed ${g.open.map((c) => `${c.id} (${c.title})`).join(', ')} and it is not verified yet. Finish the remaining criteria and run memev_contract_verify, or report exactly what blocks you.` }));
       }
     }
