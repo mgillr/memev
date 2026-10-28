@@ -23,7 +23,12 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   const found = clients.detect(env, launcher);
   for (const c of found.filter((x) => x.found)) {
     if (c.connected) { add(firstRun ? 'added' : 'ready', c.name, c.mode === 'hooks' ? 'MCP + session hooks + instructions: memory is loaded and saved automatically' : 'MCP + instructions', { app: c.id }); if (c.manual) add('needs-manual', `${c.name}: one step`, c.manual, { app: c.id, note: true }); }
-    else add(c.declined ? 'skipped' : 'needs-manual', c.name, c.declined ? 'you disconnected it (memev connect ' + c.id + ' to undo)' : `memev connect ${c.id}`, { app: c.id });
+    else if (c.declined) add('skipped', c.name, 'you disconnected it (memev connect ' + c.id + ' to undo)', { app: c.id });
+    else {
+      // why it is not connected: a file Memev cannot edit is named, with the snippet to paste by hand
+      let dry = null; try { dry = clients.connect(c.id, { env, launcher, dryRun: true }); } catch { /* reported by memev connect */ }
+      add('needs-manual', c.name, dry?.status === 'needs-manual' && dry.file ? `${dry.file} ${dry.problem}, so Memev cannot add itself there; memev connect ${c.id} --print shows what to paste by hand` : `memev connect ${c.id}`, { app: c.id });
+    }
   }
   // the comms bus: bus/ is in the vault and committed, every connected app has a seat (each joins
   // and says hello on its first session), and the lead is the person's choice, never automatic
