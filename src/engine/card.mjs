@@ -93,7 +93,7 @@ export function renderCard(c, { maxChars = 6000, footer, root } = {}) {
     const conflicts = syncConflicts(root || currentVault());
     if (conflicts?.files?.length) {
       L.push('Sync conflicts (the two computers disagreed; both versions are kept):');
-      for (const f of conflicts.conflicts || []) L.push(`  ${f.path}: ${f.how} (memev doctor)`);
+      for (const f of conflicts.conflicts || []) L.push(`  ${f.path}: ${f.how}${f.copy ? `; the other computer's version is ${f.copy}` : ''} (memev doctor)`);
     }
   }
   if (c.project_state?.checkpoints) {
