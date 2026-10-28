@@ -60,9 +60,9 @@ Each lookup directory is the one the app's own docs name, cited in the last colu
 |---|---|---|
 | Cline | `~/.cline/` | [config](https://docs.cline.bot/getting-started/config) |
 | Roo | `~/.roo/` on Linux and macOS, `%USERPROFILE%\.roo` on Windows | [custom instructions](https://docs.roocode.com/features/custom-instructions) |
-| Continue | `~/.continue` | [config file](https://docs.continue.dev/customization/config-file) |
+| Continue | `~/.continue` | [config file](https://docs.continue.dev/customize/deep-dives/configuration) |
 | Kiro | `~/.kiro` | [CLI chat configuration](https://kiro.dev/docs/cli/chat/configuration/) |
-| JetBrains AI | `~/.config/JetBrains` on Linux, `~/Library/Application Support/JetBrains` on macOS, `%APPDATA%\JetBrains` on Windows | [settings and plugins](https://www.jetbrains.com/help/idea/settings-and-plugins.html) |
+| JetBrains AI | `~/.config/JetBrains` on Linux, `~/Library/Application Support/JetBrains` on macOS, `%APPDATA%\JetBrains` on Windows | [settings and plugins](https://www.jetbrains.com/help/idea/directories-used-by-the-ide-to-store-settings-caches-plugins-and-logs.html) |
 | Amp | `~/.config/amp` on macOS and Linux, `%USERPROFILE%\.config\amp` on Windows | [manual](https://ampcode.com/manual) |
 | Goose | `~/.config/goose` on macOS and Linux, `%APPDATA%\Block\goose` on Windows | [config files](https://goose-docs.ai/docs/guides/config-files) |
 
