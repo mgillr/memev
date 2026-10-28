@@ -38,6 +38,7 @@ export class Bus {
   constructor({ root, devices, commit = () => {}, config = {} }) {
     this.root = root; this.devices = devices; this.commit = commit;
     this.liveMin = config.live_min ?? 15;
+    this.cloudTasks = !!config.cloud_tasks;
     this.dir = path.join(root, BUS_DIR);
     this._cache = new Map(); this._pulseCommitted = new Map(); this._last = new Map();
   }
@@ -257,6 +258,10 @@ export class Bus {
     if (secrets.length) throw new BusError('secret', `refused: the message looks like it holds a credential (${secrets.join(', ')}). Never send keys or tokens over the bus`);
     const who = this.resolve(ctx, { seat, project, need: 'write' });
     to = String(to || 'all');
+    if (who.device?.kind === 'cloud-connector') {
+      const toOperator = to === OPERATOR || (!!this.operator() && to === this.operator());
+      if (!toOperator && !(this.cloudTasks && type === 'task')) throw new BusError('forbidden', 'a cloud seat may post only to the operator; to let a cloud app assign a task to a seat, the person turns on the bus cloud_tasks setting');
+    }
     if (to !== 'all' && to !== OPERATOR && !this.seat(to)) throw new BusError('not_found', `no seat ${to}; bus_roster lists them`);
     const all = this.all();
     if (['claim', 'restate'].includes(type)) {
