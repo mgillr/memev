@@ -72,6 +72,17 @@ The operator is you. Messages you post from the terminal (`memev bus send`) and 
 request, and the tool descriptions tell every app to treat it that way. Change the operator seat
 with `memev bus operator <seat>`; only the vault's own computer can.
 
+## The runner
+
+An app only answers between turns, so a task can sit until someone opens the app. A runner keeps
+one seat reachable without a person at the keyboard: `memev runner on <seat> --max-runs-per-day N`
+turns it on for that seat, and while `memev runner watch <seat>` runs, every task the operator posts
+to the seat starts a headless turn of the seat's app. It is off by default, and there is no default
+limit: you give the number of runs a day with `--max-runs-per-day`, and the runner refuses to start
+without one. When the day's limit is reached, later tasks wait for the next day. `memev runner
+status` shows what is on and how many runs each seat has had today; `memev runner off <seat>` stops
+it.
+
 ## Coordinating from one session
 
 From the operator session (Claude Code, say), ask it to:
