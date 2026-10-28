@@ -44,6 +44,6 @@ test('MEM-057 AC02: CLOUD.md has the plan matrix naming Plus and Business', () =
   const md = fs.readFileSync(path.join(PKG, 'docs', 'CLOUD.md'), 'utf8');
   assert.match(md, /Plus/, 'the matrix names the Plus plan');
   assert.match(md, /Business/, 'the matrix names the Business plan');
-  assert.match(md, /claude\.ai/, 'the matrix covers claude.ai');
+  assert.match(md, /Other cloud app/, 'the matrix covers the other cloud app');
   assert.match(md, /\d{4}-\d{2}-\d{2}/, 'the matrix carries the date it was checked');
 });

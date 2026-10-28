@@ -29,10 +29,10 @@ Checked 2026-10-28 against the apps' own documentation; the limits change, so re
 | --- | --- | --- |
 | ChatGPT | Plus, Pro (developer mode) | Read and fetch only. Tools that change state are refused; full MCP needs a Business, Enterprise or Edu seat. |
 | ChatGPT | Business, Enterprise, Edu | Full MCP: read and write tools. |
-| claude.ai | Free | One custom connector. |
-| claude.ai | Pro, Max | Custom connectors. |
+| Other cloud app | Free | One custom connector. |
+| Other cloud app | Pro, Max | Custom connectors. |
 
-Sources: the ChatGPT developer mode and MCP documentation, and the claude.ai connectors documentation.
+Sources: the ChatGPT developer mode and MCP documentation, and the other cloud app's connectors documentation.
 
 Every app and computer has its own credential; there is no shared key. `memev devices` lists them:
 

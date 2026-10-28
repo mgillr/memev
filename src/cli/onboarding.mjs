@@ -54,7 +54,7 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   else {
     let st = readJson(path.join(root, '.memev', 'tunnel.json'), null);
     for (let i = 0; firstRun && daemonUp && i < 40 && !st?.url && !/error|no provider|MEMEV_NO_TUNNEL/.test(st?.state || ''); i++) { await new Promise((r) => setTimeout(r, 250)); st = readJson(path.join(root, '.memev', 'tunnel.json'), null); }
-    if (st?.url) add('needs-manual', 'Cloud AI apps (claude.ai, ChatGPT)', `add a custom connector with the URL from: memev cloud url${st.stable ? '' : ' (this address changes when the tunnel restarts; Tailscale gives a stable one)'}. By plan: ChatGPT Plus and Pro developer mode are read and fetch only (full MCP on Business, Enterprise and Edu), and claude.ai Free allows one custom connector (docs/CLOUD.md has the matrix).`);
+    if (st?.url) add('needs-manual', 'Cloud AI apps (ChatGPT and the other)', `add a custom connector with the URL from: memev cloud url${st.stable ? '' : ' (this address changes when the tunnel restarts; Tailscale gives a stable one)'}. By plan: ChatGPT Plus and Pro developer mode are read and fetch only (full MCP on Business, Enterprise and Edu); the other app's Free plan allows one custom connector (docs/CLOUD.md has the matrix).`);
     else add('needs-manual', 'Cloud AI apps', `remote access is on but the tunnel is ${st?.state || 'starting'}; check memev cloud status, or memev cloud off for local only`);
   }
   // backup
