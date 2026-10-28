@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { git } from '../engine/git.mjs';
+import { gitVia443 } from './github.mjs';
 import { signAddressRecord } from '../engine/devices.mjs';
 import { now, readJson, writeJson } from '../engine/util.mjs';
 
@@ -39,7 +40,8 @@ export function syncOnce(vault, { root }) {
   if (!remote) return res;
   const before = git(root, ['rev-parse', 'HEAD']).out;
   const branch = git(root, ['rev-parse', '--abbrev-ref', 'HEAD']).out || 'main';
-  const f = git(root, ['fetch', '-q', remote, branch]);
+  const url = git(root, ['remote', 'get-url', remote]).out;
+  const f = gitVia443(root, ['fetch', '-q', remote, branch], remote, url);
   if (!f.ok && !/couldn't find remote ref/.test(f.err)) { res.error = `fetch: ${f.err.split('\n').pop()}`; return res; }
   if (f.ok) {
     const m = git(root, ['merge', '--no-edit', '-q', `${remote}/${branch}`]);
@@ -49,7 +51,7 @@ export function syncOnce(vault, { root }) {
   }
   const w = writerCheck(vault, { root }); if (w.warning) res.warning = w.warning; res.writers = w.writers.length;
   commitAddressFile(root);
-  const p = git(root, ['push', '-q', remote, `HEAD:${branch}`]);
+  const p = gitVia443(root, ['push', '-q', remote, `HEAD:${branch}`], remote, url);
   res.pushed = p.ok; if (!p.ok) res.error = `push: ${p.err.split('\n').pop()}`;
   return res;
 }

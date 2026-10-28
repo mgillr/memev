@@ -20,15 +20,19 @@
 | Cloud AI connectors | 5 | 10 | 10 per seat, pooled | based on your requirements | based on your requirements |
 | Vault, recall, graph, contracts, doctor, your own tunnel | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Backup to your own GitHub (one writer) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| One memory for every AI app, and the comms bus between them | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Hosted end-to-end encrypted sync between computers | | planned | planned | | planned, or self-hosted |
 | Hosted encrypted backup and a stable relay address | | planned | planned | | planned, or self-hosted |
-| One shared vault for a team, member keys, provenance | | | planned | ✓ | ✓ |
+| One shared vault for a team over the secure link, provenance | | | ✓ | ✓ | ✓ |
+| Member keys: one key per person, covering their computers | | | planned | planned | planned |
 | Company hub on your server, departments and roles from an org chart | | | | planned | planned |
 | Sign-in with Google Workspace or Microsoft Entra ID | | | | planned | planned |
 | Restricted notes served only to a local model, egress log | | | | planned | planned |
 | SCIM, SIEM and audit export, retention, legal hold, high availability | | | | | planned |
 
-Personal and Team prices are early-supporter prices: the price stays locked for as long as the
+Personal is sold for what exists today: the Free core on up to 3 computers, so the AI apps on all of
+them share one memory and one comms bus. A cell marked *planned* is not built and is not part of what
+you pay for. Personal and Team prices are early-supporter prices: the price stays locked for as long as the
 subscription runs, and it is labelled that way while sync and the relay are planned. Team and
 Business overlap at 10 to 20 people on purpose. You choose by need (a hub, sign-in, roles), not by
 size. Office is not a tier. Hosted sync and the hosted relay are not part of Business, because its
@@ -44,6 +48,14 @@ remotely (through a tunnel or relay). The vault's own computer is one of them. E
 counts from the moment it is enrolled until it is removed with `memev devices remove <id>`, which
 frees the seat at once. Phones and tablets that use a cloud AI app are covered by the connector
 allowance.
+
+## Referral credit (draft)
+
+A customer on a running Personal subscription can opt in to a referral code. When a new customer
+enters that code at Stripe checkout and their first Personal payment succeeds, the referrer gets
+one free month of Personal. The referred customer pays the normal price. There is no in-app
+tracking and no telemetry: the code is issued and redeemed by Stripe, and Memev never sees it.
+The full mechanism: [REFERRAL.md](REFERRAL.md).
 
 ## Support (draft)
 
