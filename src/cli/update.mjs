@@ -5,10 +5,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { configDir, exists, writeAtomic } from '../engine/util.mjs';
+import { configDir, exists, writeAtomic, sha256 } from '../engine/util.mjs';
 import { config } from './common.mjs';
 import { VERSION } from '../engine/vault.mjs';
 import { installRuntime, launcherScript, recordedNode } from './main.mjs';
+import { stopDaemon, startDaemon, healthy } from './daemon.mjs';
 
 /** The static version file the opt-in check reads, from the vault config. Empty when it is not set. */
 export function versionFile(root) {
@@ -33,14 +34,29 @@ export function checkEnabled(root, env = process.env) {
   return config(root)?.update?.check === true;
 }
 
+/** Parse a version string into [major, minor, patch] or null when it is not a valid major.minor.patch. */
+function parseVer(v) {
+  const m = String(v).trim().match(/^(\d+)\.(\d+)\.(\d+)$/);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+}
+
+/** Whether a is numerically newer than b. Returns false when either is not a valid major.minor.patch. */
+function isNewer(a, b) {
+  const pa = parseVer(a), pb = parseVer(b);
+  if (!pa || !pb) return false;
+  if (pa[0] !== pb[0]) return pa[0] > pb[0];
+  if (pa[1] !== pb[1]) return pa[1] > pb[1];
+  return pa[2] > pb[2];
+}
+
 /**
- * One 'update available' line when the check is on and the static file names a newer version, else null.
- * It reads only the local static file; it makes no network call.
+ * One 'update available' line when the check is on and the static file names a numerically newer version,
+ * else null. It reads only the local static file; it makes no network call.
  */
 export function updateLine(root, env = process.env) {
   if (!checkEnabled(root, env)) return null;
   const latest = latestVersion(root);
-  if (!latest || latest === VERSION) return null;
+  if (!latest || !isNewer(latest, VERSION)) return null;
   return `update available: memev ${latest} (you have ${VERSION}); run memev update`;
 }
 
@@ -48,9 +64,21 @@ export function updateLine(root, env = process.env) {
  * Install the tarball into a new runtime folder and point the launcher at it. The tarball is a local file
  * (the release tarball, or a test one); nothing is fetched. The new runtime is a fresh folder under the config
  * dir, and the launcher is rewritten to run it, so the old runtime stays until it is replaced.
+ *
+ * A `.sha256` file beside the tarball (or `--sha256 <hex>`) is required; the install is refused when the
+ * checksum does not match.
  */
-export function installFromTarball(tarball, env = process.env) {
+export function installFromTarball(tarball, env = process.env, { sha256: expectedSha = null } = {}) {
   if (!exists(tarball)) throw new Error(`no such file: ${tarball}`);
+  const shaFile = tarball + '.sha256';
+  let expected = expectedSha;
+  if (!expected && exists(shaFile)) {
+    const line = fs.readFileSync(shaFile, 'utf8').trim().split(/\s+/)[0];
+    if (line) expected = line.toLowerCase();
+  }
+  if (!expected) throw new Error(`no sha256: put a ${path.basename(shaFile)} beside the tarball, or pass --sha256`);
+  const actual = sha256(fs.readFileSync(tarball));
+  if (actual !== expected.toLowerCase()) throw new Error(`sha256 mismatch: expected ${expected}, got ${actual}`);
   const cfgDir = configDir(env);
   fs.mkdirSync(cfgDir, { recursive: true });
   const work = fs.mkdtempSync(path.join(cfgDir, 'update-'));
@@ -81,10 +109,17 @@ export async function command(cmd, pos, flags, { root, env }) {
   void cmd;
   const tarball = pos[0];
   if (!tarball) {
-    console.log('Usage: memev update <tarball>');
+    console.log('Usage: memev update <tarball> [--sha256 <hex>]');
     return 1;
   }
-  const r = installFromTarball(tarball, env);
+  const r = installFromTarball(tarball, env, { sha256: flags.sha256 || null });
   console.log(`Installed memev ${r.version} at ${r.dir}; the launcher now runs it.`);
+  if (await healthy(root)) {
+    await stopDaemon(root);
+    await startDaemon(root);
+    console.log('Daemon restarted with the new version.');
+  } else {
+    console.log('Run memev restart to use the new version.');
+  }
   return 0;
 }

@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { sandbox } from './helpers/cli.mjs';
 import { cleanup, tmpdir, PKG } from './helpers/tmp.mjs';
 import { command, updateLine, checkEnabled, latestVersion } from '../src/cli/update.mjs';
+import { stopDaemon } from '../src/cli/daemon.mjs';
 import { VERSION } from '../src/engine/vault.mjs';
 
 after(() => cleanup());
@@ -16,7 +17,7 @@ after(() => cleanup());
 const launcherOf = (sb) => path.join(sb.env.MEMEV_CONFIG_DIR, 'bin', 'memev');
 
 // A local tarball with the shape npm publishes (package/ at the top) and a version of its own.
-function makeTarball(version) {
+async function makeTarball(version, { withSha = true } = {}) {
   const d = tmpdir('pkg-');
   const top = path.join(d, 'package');
   fs.mkdirSync(path.join(top, 'bin'), { recursive: true });
@@ -26,6 +27,10 @@ function makeTarball(version) {
   fs.writeFileSync(path.join(top, 'src', 'cli', 'main.mjs'), `export const VERSION = '${version}';\n`);
   const t = path.join(d, `memev-${version}.tgz`);
   spawnSync('tar', ['-czf', t, '-C', d, 'package'], { encoding: 'utf8' });
+  if (withSha) {
+    const { sha256 } = await import('../src/engine/util.mjs');
+    fs.writeFileSync(t + '.sha256', `${sha256(fs.readFileSync(t))}  ${path.basename(t)}\n`);
+  }
   return t;
 }
 
@@ -39,7 +44,7 @@ function setUpdate(root, update) {
 test('MEM-082 AC01: memev update from a local test tarball installs the new runtime and the launcher points to it', async () => {
   const sb = sandbox();
   assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
-  const tarball = makeTarball('9.9.9');
+  const tarball = await makeTarball('9.9.9');
   const lines = [];
   const orig = console.log;
   console.log = (...a) => lines.push(a.join(' '));
@@ -107,4 +112,109 @@ test('MEM-082 AC03: With the check on and a newer version in the static file, do
   // the same version shows no line
   fs.writeFileSync(vf, `${VERSION}\n`);
   assert.equal(updateLine(sb.root, sb.env), null, 'no line when the static file names the current version');
+});
+
+test('MEM-082 AC04: update is refused when the sha256 does not match', async () => {
+  const sb = sandbox();
+  assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
+  const tarball = await makeTarball('9.9.9');
+  // a wrong sha256 beside the tarball
+  fs.writeFileSync(tarball + '.sha256', `${'0'.repeat(64)}  ${path.basename(tarball)}\n`);
+  const lines = [];
+  const orig = console.log;
+  console.log = (...a) => lines.push(a.join(' '));
+  try {
+    await assert.rejects(command('update', [tarball], {}, { root: sb.root, env: sb.env }), /sha256 mismatch/);
+  } finally {
+    console.log = orig;
+  }
+  // the runtime folder was not created
+  const dir = path.join(sb.env.MEMEV_CONFIG_DIR, 'runtime', '9.9.9');
+  assert.equal(fs.existsSync(dir), false, 'no runtime folder when the sha256 does not match');
+});
+
+test('MEM-082 AC05: update is refused when there is no sha256', async () => {
+  const sb = sandbox();
+  assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
+  const tarball = await makeTarball('9.9.9', { withSha: false });
+  const lines = [];
+  const orig = console.log;
+  console.log = (...a) => lines.push(a.join(' '));
+  try {
+    await assert.rejects(command('update', [tarball], {}, { root: sb.root, env: sb.env }), /no sha256/);
+  } finally {
+    console.log = orig;
+  }
+  // the runtime folder was not created
+  const dir = path.join(sb.env.MEMEV_CONFIG_DIR, 'runtime', '9.9.9');
+  assert.equal(fs.existsSync(dir), false, 'no runtime folder when there is no sha256');
+});
+
+test('MEM-082 AC06: update accepts a --sha256 flag when the tarball has no .sha256 file', async () => {
+  const sb = sandbox();
+  assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
+  const tarball = await makeTarball('9.9.9', { withSha: false });
+  const { sha256 } = await import('../src/engine/util.mjs');
+  const expected = sha256(fs.readFileSync(tarball));
+  const lines = [];
+  const orig = console.log;
+  console.log = (...a) => lines.push(a.join(' '));
+  try {
+    assert.equal(await command('update', [tarball], { sha256: expected }, { root: sb.root, env: sb.env }), 0);
+  } finally {
+    console.log = orig;
+  }
+  // the new runtime is installed
+  const dir = path.join(sb.env.MEMEV_CONFIG_DIR, 'runtime', '9.9.9');
+  assert.ok(fs.existsSync(path.join(dir, 'bin', 'memev.mjs')), 'the new runtime folder holds the installed files');
+});
+
+test('MEM-082 AC07: update restarts the daemon when it is running', async () => {
+  const sb = sandbox();
+  assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
+  const start = sb.run(['start']);
+  assert.equal(start.code, 0, start.out);
+  const tarball = await makeTarball('9.9.9');
+  const lines = [];
+  const orig = console.log;
+  console.log = (...a) => lines.push(a.join(' '));
+  try {
+    assert.equal(await command('update', [tarball], {}, { root: sb.root, env: sb.env }), 0);
+  } finally {
+    console.log = orig;
+  }
+  assert.ok(lines.some((l) => l.includes('Daemon restarted')), lines.join('\n'));
+});
+
+test('MEM-082 AC08: update prints a restart instruction when the daemon is not running', async () => {
+  const sb = sandbox();
+  assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
+  // make sure the daemon is not running
+  await stopDaemon(sb.root);
+  const tarball = await makeTarball('9.9.9');
+  const lines = [];
+  const orig = console.log;
+  console.log = (...a) => lines.push(a.join(' '));
+  try {
+    assert.equal(await command('update', [tarball], {}, { root: sb.root, env: sb.env }), 0);
+  } finally {
+    console.log = orig;
+  }
+  assert.ok(lines.some((l) => l.includes('Run memev restart')), lines.join('\n'));
+});
+
+test('MEM-082 AC09: updateLine only warns for numerically newer versions', async () => {
+  const sb = sandbox();
+  assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
+  const vf = path.join(sb.root, 'version.txt');
+  setUpdate(sb.root, { version_file: vf, check: true });
+  // a numerically older version shows no line
+  fs.writeFileSync(vf, '0.0.1\n');
+  assert.equal(updateLine(sb.root, sb.env), null, 'no line for an older version');
+  // an invalid version shows no line
+  fs.writeFileSync(vf, 'not-a-version\n');
+  assert.equal(updateLine(sb.root, sb.env), null, 'no line for an invalid version');
+  // a numerically newer version shows a line
+  fs.writeFileSync(vf, '9.9.9\n');
+  assert.ok(updateLine(sb.root, sb.env), 'a line for a newer version');
 });
