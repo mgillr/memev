@@ -113,7 +113,7 @@ function upsertCodexToml(t, block) {
 // The user table is still there after the edit: say so, so the skip is never a silent no-op.
 const codexTomlSkipNote = (b) => (b && MEMEV_TABLE.test(removeBlock(b, [TOML_START, TOML_END])) ? 'Codex already has a [mcp_servers.memev] table in config.toml, so Memev left it as-is' : null);
 
-const json = (file, apply, remove) => ({ file, kind: 'json', apply, remove });
+const json = (file, apply, remove, note) => ({ file, kind: 'json', apply, remove, note });
 const text = (file, apply, remove, note) => ({ file, kind: 'text', apply, remove, note });
 const mdBlock = (file) => text(file, (t) => addBlock(t, INSTRUCTIONS), (t) => removeBlock(t));
 
@@ -124,6 +124,8 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
   const win = winSpawn(env, platform);
   const launcher = win ? `"${win.node}" "${win.script}"` : `"${bin}"`;
   const stdio = (id) => win ? { command: win.node, args: [win.script, 'mcp', '--client', id] } : { command: bin, args: ['mcp', '--client', id] };
+  // OpenCode takes a local MCP server as a command array in opencode.json
+  const opencodeLocal = (id) => ({ type: 'local', command: [...(win ? [win.node, win.script] : [bin]), 'mcp', '--client', id], enabled: true });
   const defs = [
     { id: 'claude-code', name: 'Claude Code', mode: 'hooks', detect: () => exists(path.join(home, '.claude')) || exists(path.join(home, '.claude.json')),
       edits: () => [
@@ -176,8 +178,43 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
       edits: () => [json(path.join(appData, 'Code', 'User', 'mcp.json'), setServer('servers', { type: 'stdio', ...stdio('vscode') }), delServer('servers'))] },
     { id: 'zed', name: 'Zed', mode: 'instructions', detect: () => exists(path.join(process.platform === 'darwin' ? path.join(home, '.config') : platformDirs(env).appData, 'zed')),
       edits: () => [json(path.join(process.platform === 'darwin' ? path.join(home, '.config') : platformDirs(env).appData, 'zed', 'settings.json'), setServer('context_servers', { source: 'custom', ...stdio('zed') }), delServer('context_servers'))] },
+    { id: 'opencode', name: 'OpenCode', mode: 'instructions', detect: () => exists(path.join(home, '.config', 'opencode')),
+      edits: () => {
+        const mdPath = path.join(home, '.config', 'opencode', 'AGENTS.md');
+        const skip = !exists(mdPath) && exists(path.join(home, '.claude', 'CLAUDE.md'));
+        // When the user's rules already live in CLAUDE.md, creating the OpenCode rules file would switch them off,
+        // so Memev leaves it alone and the protocol arrives through the MCP instructions instead.
+        const edits = [json(path.join(home, '.config', 'opencode', 'opencode.json'), setServer('mcp', opencodeLocal('opencode')), delServer('mcp'),
+          skip ? () => 'Your rules stay in CLAUDE.md, so Memev left the OpenCode rules file alone; the protocol arrives through the MCP instructions.' : null)];
+        if (!skip) edits.push(mdBlock(mdPath));
+        return edits;
+      } },
+    { id: 'copilot-cli', name: 'GitHub Copilot CLI', mode: 'instructions', detect: () => exists(env.COPILOT_HOME || path.join(home, '.copilot')),
+      edits: () => {
+        const copilotHome = env.COPILOT_HOME || path.join(home, '.copilot');
+        const entry = { type: 'local', command: win ? win.node : bin, args: [...(win ? [win.script] : []), 'mcp', '--client', 'copilot-cli'], tools: ['*'] };
+        // Copilot CLI reads its user-level instructions from copilot-instructions.md in the same folder
+        return [json(path.join(copilotHome, 'mcp-config.json'), setServer('mcpServers', entry), delServer('mcpServers')), mdBlock(path.join(copilotHome, 'copilot-instructions.md'))];
+      } },
   ];
   return defs;
+}
+
+/** The apps Memev detects but does not support yet. They are listed as found, not supported, and their files are never changed.
+ *  Each app is looked up at the directory its own docs name, which differs per app and per platform. */
+export function unsupportedDefs(env) {
+  const { home, appData } = platformDirs(env);
+  const xdg = env.XDG_CONFIG_HOME || path.join(home, '.config');
+  const win = process.platform === 'win32';
+  return [
+    { id: 'cline', name: 'Cline', detect: () => exists(path.join(home, '.cline')) },
+    { id: 'roo', name: 'Roo', detect: () => exists(path.join(home, '.roo')) },
+    { id: 'continue', name: 'Continue', detect: () => exists(path.join(home, '.continue')) },
+    { id: 'kiro', name: 'Kiro', detect: () => exists(path.join(home, '.kiro')) },
+    { id: 'jetbrains-ai', name: 'JetBrains AI', detect: () => exists(path.join(appData, 'JetBrains')) },
+    { id: 'amp', name: 'Amp', detect: () => exists(win ? path.join(home, '.config', 'amp') : path.join(xdg, 'amp')) },
+    { id: 'goose', name: 'Goose', detect: () => exists(win ? path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Block', 'goose') : path.join(xdg, 'goose')) },
+  ];
 }
 
 // ---- state: what is connected, what the user declined, and the backups
@@ -282,17 +319,20 @@ export const RESTART = {
   'claude-code': 'Start a new Claude Code session', codex: 'Start a new Codex CLI session', 'gemini-cli': 'Start a new Gemini CLI session',
   cursor: 'Open a new Cursor chat', 'claude-desktop': 'Quit and reopen Claude Desktop', windsurf: 'Quit and reopen Windsurf',
   vscode: 'Reload the VS Code window (Developer: Reload Window)', zed: 'Quit and reopen Zed',
+  opencode: 'Quit and reopen OpenCode', 'copilot-cli': 'Start a new Copilot CLI session',
 };
 // Apps whose session-start hook brings the protocol, so their MCP instructions need not repeat it.
 export const HOOK_CLIENTS = new Set(clientDefs({}, 'memev').filter((d) => d.mode === 'hooks').map((d) => d.id));
 export function detect(env = process.env, launcher = 'memev', platform = process.platform) {
   const st = loadState(env);
-  return clientDefs(env, launcher, platform).map((d) => ({ id: d.id, name: d.name, mode: d.mode, found: !!d.detect(), connected: !!st.connected[d.id], declined: st.declined.includes(d.id), note: d.note || null, manual: d.manual || null, restart: RESTART[d.id] || `Restart ${d.name}` }));
+  const supported = clientDefs(env, launcher, platform).map((d) => ({ id: d.id, name: d.name, mode: d.mode, found: !!d.detect(), connected: !!st.connected[d.id], declined: st.declined.includes(d.id), note: d.note || null, manual: d.manual || null, restart: RESTART[d.id] || `Restart ${d.name}`, supported: true }));
+  const unsupported = unsupportedDefs(env).map((d) => ({ id: d.id, name: d.name, found: !!d.detect(), supported: false }));
+  return [...supported, ...unsupported];
 }
 
-/** Connect every app that is installed and not yet connected (and not declined, unless forced). */
+/** Connect every app that is installed and not yet connected (and not declined, unless forced). Apps that are found but not supported yet are left alone. */
 export function connectAll({ env = process.env, launcher, force = false, platform = process.platform, project = null } = {}) {
-  return detect(env, launcher, platform).filter((c) => c.found && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform, project }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
+  return detect(env, launcher, platform).filter((c) => c.found && c.supported && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform, project }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
 }
 
 export function launcherPath(env = process.env) { return path.join(configDir(env), 'bin', process.platform === 'win32' ? 'memev.cmd' : 'memev'); }
@@ -302,7 +342,7 @@ export async function command(cmd, pos, flags, { env, root }) {
   if (!exists(launcher)) { const { installRuntime } = await import('./main.mjs'); installRuntime(env); }
   const target = pos[0] || 'all';
   if (cmd === 'clients') {
-    for (const c of detect(env, launcher)) console.log(`  ${c.connected ? '\u2713' : c.found ? '\u00b7' : ' '} ${c.name.padEnd(15)} ${c.found ? (c.connected ? `connected (${c.mode === 'hooks' ? 'hooks + MCP' : 'MCP + instructions'})` : c.declined ? 'found, disconnected by you' : 'found, not connected') : 'not found'}`);
+    for (const c of detect(env, launcher)) console.log(`  ${c.connected ? '\u2713' : c.found ? '\u00b7' : ' '} ${c.name.padEnd(15)} ${c.found ? (c.supported ? (c.connected ? `connected (${c.mode === 'hooks' ? 'hooks + MCP' : 'MCP + instructions'})` : c.declined ? 'found, disconnected by you' : 'found, not connected') : 'found, not supported yet') : 'not found'}`);
     return 0;
   }
   if (cmd === 'connect' && flags.print) {
@@ -314,8 +354,16 @@ export async function command(cmd, pos, flags, { env, root }) {
     return 0;
   }
   if (cmd === 'connect') {
+    if (target !== 'all') {
+      const c = detect(env, launcher).find((x) => x.id === target);
+      if (c && c.found && !c.supported) { out.info(`${c.name}: found, not supported yet (see docs/CLIENTS.md to ask for it)`); return 0; }
+    }
     const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force, project: flags.project }) : [connect(target, { env, launcher, dryRun: !!flags['dry-run'], project: flags.project })];
-    if (!res.length) console.log('No AI apps found. Install one (Claude Code, Codex, Cursor, Gemini CLI, Claude Desktop, Windsurf, VS Code, Zed) and run memev connect again.');
+    if (!res.length) {
+      const unsup = detect(env, launcher).filter((c) => c.found && !c.supported);
+      if (unsup.length) { console.log(`Found ${unsup.map((c) => c.name).join(', ')} but Memev does not support ${unsup.length > 1 ? 'them' : 'it'} yet (see docs/CLIENTS.md to ask for it).`); return 0; }
+    }
+    if (!res.length) console.log('No AI apps found. Install one (Codex, Cursor, Gemini CLI, Windsurf, VS Code, Zed, OpenCode, GitHub Copilot CLI, or a Claude product) and run memev connect again.');
     for (const r of res) {
       if (r.status === 'added') out.ok(`${r.name}: connected (${r.mode === 'hooks' ? 'hooks + MCP + instructions' : 'MCP + instructions'})`);
       else if (r.status === 'already') out.ok(`${r.name}: already connected`);

@@ -20,6 +20,8 @@ connects them, unless you disconnected that app yourself.
 | Windsurf | `~/.codeium/windsurf/mcp_config.json`; a block in `memories/global_rules.md` | instructions |
 | VS Code | `Code/User/mcp.json` | instructions |
 | Zed | `context_servers` in `zed/settings.json` | instructions |
+| OpenCode | `mcp` entry in `~/.config/opencode/opencode.json`; a block in the OpenCode rules file (skipped if the Claude rules file exists and the OpenCode one is missing) | instructions |
+| GitHub Copilot CLI | `mcpServers` entry in `~/.copilot/mcp-config.json` and a block in `~/.copilot/copilot-instructions.md` (in `$COPILOT_HOME` when it is set) | instructions |
 
 **Hooks** mode: the resume card is injected at session start, relevant memories are added to each
 prompt, a checkpoint is written before compaction, and the turn is journaled when it ends. The app
@@ -48,6 +50,23 @@ hook); they cannot add context to a prompt. Memev works around this in three way
   the stop entry in `~/.cursor/hooks.json` so the follow-ups cannot run away. The prompt hook only
   peeks at the bus, so a task that is already waiting when you type is still picked up by the stop
   hook; the stop hook marks the tasks it followed up on as read.
+
+## Apps Memev does not support yet
+
+Memev detects these apps and lists them as found, not supported yet. It never changes their files.
+The checklist points to this page until there is a public place to ask for the next one.
+
+Each lookup directory is the one the app's own docs name, cited in the last column.
+
+| App | Where Memev looks | Docs |
+|---|---|---|
+| Cline | `~/.cline/` | [config](https://docs.cline.bot/getting-started/config) |
+| Roo | `~/.roo/` on Linux and macOS, `%USERPROFILE%\.roo` on Windows | [custom instructions](https://docs.roocode.com/features/custom-instructions) |
+| Continue | `~/.continue` | [config file](https://docs.continue.dev/customize/deep-dives/configuration) |
+| Kiro | `~/.kiro` | [CLI chat configuration](https://kiro.dev/docs/cli/chat/configuration/) |
+| JetBrains AI | `~/.config/JetBrains` on Linux, `~/Library/Application Support/JetBrains` on macOS, `%APPDATA%\JetBrains` on Windows | [settings and plugins](https://www.jetbrains.com/help/idea/directories-used-by-the-ide-to-store-settings-caches-plugins-and-logs.html) |
+| Amp | `~/.config/amp` on macOS and Linux, `%USERPROFILE%\.config\amp` on Windows | [manual](https://ampcode.com/manual) |
+| Goose | `~/.config/goose` on macOS and Linux, `%APPDATA%\Block\goose` on Windows | [config files](https://goose-docs.ai/docs/guides/config-files) |
 
 Cloud apps (claude.ai, ChatGPT, others that take a remote MCP URL) connect through the tunnel, side by
 side; see [CLOUD.md](CLOUD.md).

@@ -9,7 +9,7 @@ import { fetchOut } from '../engine/net.mjs';
 import { loadMilestones, recordMilestones, buildReport, MILESTONES } from '../engine/milestones.mjs';
 import { cloudSeat } from './tunnel.mjs';
 
-const ICON = { succeeded: '\u2713', added: '+', ready: '\u2713', 'needs-manual': '\u2192', failed: '\u2717', skipped: '-' };
+const ICON = { succeeded: '\u2713', added: '+', ready: '\u2713', 'needs-manual': '\u2192', failed: '\u2717', skipped: '-', unsupported: '\u00b7' };
 
 export async function checklist({ root, env, flags = {}, launcher, daemonUp = null, firstRun = false, platform = process.platform, icacls }) {
   const items = [];
@@ -23,6 +23,7 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   if (firstRun && !flags['no-connect']) clients.connectAll({ env, launcher });
   const found = clients.detect(env, launcher);
   for (const c of found.filter((x) => x.found)) {
+    if (!c.supported) { add('unsupported', c.name, 'found, not supported yet (see docs/CLIENTS.md to ask for it)', { app: c.id }); continue; }
     if (c.connected) { add(firstRun ? 'added' : 'ready', c.name, c.mode === 'hooks' ? 'MCP + session hooks + instructions: memory is loaded and saved automatically' : 'MCP + instructions', { app: c.id }); if (c.manual) add('needs-manual', `${c.name}: one step`, c.manual, { app: c.id, note: true }); }
     else if (c.declined) add('skipped', c.name, 'you disconnected it (memev connect ' + c.id + ' to undo)', { app: c.id });
     else {
@@ -66,6 +67,9 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   const { git } = await import('../engine/git.mjs');
   const remote = git(root, ['remote']).out;
   add(remote ? 'ready' : 'needs-manual', 'Backup to your own private GitHub repository', remote ? `remote ${remote}` : 'memev github setup (two minutes, one browser sign-in)');
+  // a sync merge that the two computers could not join by itself: both versions are kept, the person looks
+  const conflicts = readJson(path.join(root, '.memev', 'jobs.json'), {})?.sync?.conflicts || null;
+  if (conflicts?.files?.length) add('needs-manual', 'Sync conflicts', `${conflicts.files.join(', ')}: both versions kept (memev doctor)`);
   // the memev command itself: a source install leaves the launcher off PATH
   const { launcherDir, onPath, commandName } = await import('./pathsetup.mjs');
   if (onPath(launcherDir(env), env)) add('ready', 'memev command', 'on your PATH');
