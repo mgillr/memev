@@ -59,10 +59,15 @@ export const funnelConsent = (cfg) => cfg.remote?.funnelConsent === true;
 export function pickProvider(cfg, env = process.env, { run = spawnSync, whichFn = which } = {}) {
   const want = cfg.remote?.provider || 'auto';
   if (want === 'cloudflare' && cfg.remote?.cloudflare?.name) return 'cloudflare';
-  if (want === 'tailscale' && funnelConsent(cfg)) {
+  if (want === 'tailscale' || want === 'auto') {
     const ts = whichFn('tailscale');
-    if (ts) { const s = run(ts, ['status', '--json'], { encoding: 'utf8', timeout: 3000 }); try { if (JSON.parse(s.stdout).BackendState === 'Running') return 'tailscale'; } catch {} }
-    return null;
+    if (ts) {
+      const s = run(ts, ['status', '--json'], { encoding: 'utf8', timeout: 3000 });
+      try {
+        if (JSON.parse(s.stdout).BackendState === 'Running') return 'tailscale';
+      } catch {}
+    }
+    if (want === 'tailscale') return null;
   }
   if (want === 'cloudflare' && !cfg.remote?.cloudflare?.name) return null;
   return 'quick';
@@ -98,7 +103,22 @@ export function supervise(vault, { root, port, run = spawnSync, whichFn = which 
     try {
       if (provider === 'tailscale') {
         const ts = whichFn('tailscale');
-        const url = tailscaleFunnel({ ts, port, run }).up();
+        // A funnel needs an explicit yes; without consent the tailnet-only serve is what comes up.
+        if (funnelConsent(vault.config)) {
+          const f = tailscaleFunnel({ ts, port, run });
+          // A funnel that already exists for the port is left alone: Memev only manages the one it opens.
+          if (f.alreadyConfigured()) {
+            const st = JSON.parse(run(ts, ['status', '--json'], { encoding: 'utf8' }).stdout);
+            const url = `https://${String(st.Self.DNSName).replace(/\.$/, '')}`;
+            write({ enabled: true, provider, url, stable: true, state: 'up (existing funnel left as is)' }); log(`up at ${url} (existing funnel left as is)`); return;
+          }
+          const url = f.up();
+          write({ enabled: true, provider, url, stable: true, state: 'up' }); log(`up at ${url}`); return;
+        }
+        const r = run(ts, ['serve', '--bg', String(port)], { encoding: 'utf8', timeout: 20000 });
+        if (r.status !== 0) throw new Error((r.stderr || r.stdout).trim().split('\n').pop());
+        const st = JSON.parse(run(ts, ['status', '--json'], { encoding: 'utf8' }).stdout);
+        const url = `https://${String(st.Self.DNSName).replace(/\.$/, '')}`;
         write({ enabled: true, provider, url, stable: true, state: 'up' }); log(`up at ${url}`); return;
       }
       const bin = await cloudflaredPath(env);
@@ -130,7 +150,19 @@ export function supervise(vault, { root, port, run = spawnSync, whichFn = which 
   function halt() {
     clearTimeout(timer);
     if (child) { child.removeAllListeners('exit'); child.kill(); child = null; }
-    if (tunnelState(root)?.provider === 'tailscale') { const ts = whichFn('tailscale'); if (ts) tailscaleFunnel({ ts, port, run }).down(); }
+    if (tunnelState(root)?.provider === 'tailscale') {
+      const ts = whichFn('tailscale');
+      if (ts) {
+        // A pre-existing funnel is never turned off; only the tunnel Memev started is.
+        if (tunnelState(root)?.state !== 'up (existing funnel left as is)') {
+          if (funnelConsent(vault.config)) {
+            tailscaleFunnel({ ts, port, run }).down();
+          } else {
+            run(ts, ['serve', '--bg', '--https=443', 'off'], { timeout: 10000 });
+          }
+        }
+      }
+    }
   }
   start();
   // the relay (off unless the setting is on) is kept up beside the tunnel; see relay.mjs and docs/RELAY.md
