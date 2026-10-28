@@ -54,12 +54,27 @@ export function adoptSignedAddress(remote, env = process.env) {
   return url;
 }
 
+/** The vault did not answer and there is no signed address to follow: the host may have moved. */
+export class VaultMovedError extends Error {
+  constructor(url, detail) {
+    super(`vault address changed: ${detail || `the vault at ${url} did not answer`} (run \`memev join --refresh\` to fetch the current address)`);
+    this.name = 'VaultMovedError';
+    this.moved = true;
+  }
+}
+
 export async function remoteFetch(remote, route, opts = {}) {
   try {
     return await remoteOnce(remote, route, opts);
   } catch (e) {
-    if (!adoptSignedAddress(remote, opts.env || process.env)) throw e;
-    return await remoteOnce(remote, route, opts);
+    if (e?.code === 'ENOENT') throw e; // no device key on this computer: a setup problem, not a moved vault
+    if (!adoptSignedAddress(remote, opts.env || process.env)) throw new VaultMovedError(String(remote.url));
+    try {
+      return await remoteOnce(remote, route, opts);
+    } catch (e2) {
+      if (e2?.code === 'ENOENT') throw e2;
+      throw new VaultMovedError(String(remote.url), `the vault moved to ${remote.url} but that address did not answer either`);
+    }
   }
 }
 
@@ -95,8 +110,23 @@ async function joinWithCode(code, flags, { env }) {
   return 0;
 }
 
-/** `memev join <code>`, or `memev join <url> --token T [--no-connect]`, on the computer being added. */
+/** `memev join --refresh`: follow the signed address record in the backup again, and check the vault answers. */
+async function joinRefresh({ env }) {
+  const saved = readJson(remoteFile(env), null);
+  if (!saved?.url || !saved?.token) { out.bad('this computer has not joined a vault yet: memev join <code> first'); return 1; }
+  const remote = { ...saved };
+  const before = String(remote.url).replace(/\/+$/, '');
+  adoptSignedAddress(remote, env);
+  const changed = String(remote.url).replace(/\/+$/, '') !== before;
+  const r = await remoteFetch(remote, 'mcp', { body: { jsonrpc: '2.0', id: 1, method: 'tools/list' }, env }).catch((e) => ({ ok: false, status: 0, text: e.message }));
+  if (!r.ok) { out.bad(`the vault did not answer at ${remote.url}: ${r.json?.error_description || r.text}`); return 1; }
+  out.ok(changed ? `vault address updated to ${remote.url}` : `the stored address is current: ${remote.url}`);
+  return 0;
+}
+
+/** `memev join <code>`, `memev join <url> --token T [--no-connect]`, or `memev join --refresh`, on the computer being added. */
 export async function join(pos, flags, { env }) {
+  if (flags.refresh) return joinRefresh({ env });
   const arg = String(pos[0] || '').trim();
   if (arg && !/^https?:\/\//.test(arg)) return joinWithCode(arg, flags, { env });
   const url = arg.replace(/\/mcp\/?$/, '').replace(/\/+$/, '');
