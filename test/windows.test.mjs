@@ -5,9 +5,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { sandbox } from './helpers/cli.mjs';
-import { cleanup } from './helpers/tmp.mjs';
+import { tmpdir, cleanup } from './helpers/tmp.mjs';
 import { fileChecks } from '../src/cli/doctor.mjs';
 import { firstRun } from '../src/cli/onboarding.mjs';
+import { clientDefs } from '../src/cli/clients.mjs';
+import { VERSION } from '../src/engine/vault.mjs';
 
 let sb;
 const STATE_FILES = ['tokens.json', 'admin.json', 'clients.json', 'tunnel-key.txt', 'config.json'];
@@ -72,4 +74,57 @@ test('MEM-012 AC02: With platform win32 injected, init self-test exit code is 0 
   const items = JSON.parse(fs.readFileSync(path.join(sb.root, '.memev', 'onboarding.json'), 'utf8')).items;
   const st = items.find((i) => /Self-test/.test(i.step));
   assert.equal(st.status, 'succeeded', st.detail);
+});
+
+// Since Node's CVE-2024-27980 fix, a Node app cannot spawn a .cmd file without a shell, so on win32 the
+// MCP and hook entries register node.exe with the runtime script as arguments, never the memev.cmd launcher.
+const winEnv = () => { const home = tmpdir('home-'); return { home, env: { HOME: home, MEMEV_CONFIG_DIR: path.join(home, '.config', 'memev') } }; };
+const winLauncher = (env) => path.join(env.MEMEV_CONFIG_DIR, 'bin', 'memev.cmd');
+const mcpEntries = (obj, out = []) => { for (const [k, v] of Object.entries(obj || {})) { if (k === 'memev' && v && typeof v === 'object' && 'command' in v) out.push(v); else if (v && typeof v === 'object') mcpEntries(v, out); } return out; };
+const hookCommands = (o, out = []) => { if (typeof o === 'string') { if (/ hook /.test(o)) out.push(o); return out; } if (Array.isArray(o)) { for (const x of o) hookCommands(x, out); return out; } if (o && typeof o === 'object') for (const v of Object.values(o)) hookCommands(v, out); return out; };
+
+test('MEM-011 AC01: with platform win32 injected, every MCP entry registers node.exe and no command or arg ends in .cmd or .bat', () => {
+  const { env } = winEnv();
+  const launcher = winLauncher(env); // a .cmd launcher must not leak into any entry
+  const defs = clientDefs(env, launcher, 'win32');
+  assert.ok(defs.length >= 8, 'every known app is defined');
+  for (const def of defs) {
+    let found = 0;
+    for (const e of def.edits()) {
+      if (e.kind === 'json') {
+        for (const entry of mcpEntries(e.apply({}))) {
+          found++;
+          assert.ok(entry.command.endsWith('node.exe'), `${def.id}: command ${entry.command}`);
+          for (const s of [entry.command, ...(entry.args || [])]) assert.ok(!/\.(cmd|bat)$/i.test(s), `${def.id}: ${s}`);
+        }
+      } else {
+        const t = e.apply('');
+        const m = t.match(/command = "([^"]*)"/);
+        if (m) { found++; assert.ok(m[1].endsWith('node.exe'), `${def.id}: ${m[1]}`); }
+        assert.ok(!/\.cmd|\.bat/.test(t), `${def.id}: ${t}`);
+      }
+    }
+    assert.equal(found, 1, `${def.id} has exactly one MCP entry`);
+  }
+});
+
+test('MEM-011 AC02: with platform win32 injected, every hook command runs node.exe with the memev.mjs path as its first argument', () => {
+  const { env } = winEnv();
+  const script = path.join(env.MEMEV_CONFIG_DIR, 'runtime', VERSION, 'bin', 'memev.mjs');
+  const defs = clientDefs(env, winLauncher(env), 'win32');
+  let hooks = 0;
+  for (const def of defs) {
+    for (const e of def.edits()) {
+      if (e.kind !== 'json') continue;
+      for (const cmd of hookCommands(e.apply({}))) {
+        hooks++;
+        const quoted = [...cmd.matchAll(/"([^"]*)"/g)].map((q) => q[1]);
+        assert.ok(quoted.length >= 2, cmd);
+        assert.ok(quoted[0].endsWith('node.exe'), cmd);
+        assert.equal(quoted[1], script, cmd);
+        assert.ok(cmd.startsWith(`"${quoted[0]}" "${quoted[1]}" hook `), cmd);
+      }
+    }
+  }
+  assert.ok(hooks >= 16, `hook commands found: ${hooks}`);
 });

@@ -8,6 +8,7 @@ import { initVault, isVault, VERSION } from '../engine/vault.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
 import { writeAtomic, configDir } from '../engine/util.mjs';
 import { renderCard } from '../engine/card.mjs';
+import { fetchOut } from '../engine/net.mjs';
 
 const HELP = `memev ${VERSION}: one memory shared by every AI session you run
 
@@ -26,6 +27,7 @@ Setup
   memev disconnect [client|all]    remove it again, restoring the app's config
   memev uninstall [--purge]        disconnect everything and stop; --purge also removes the service files
   memev clients                    which AI apps are installed and connected
+  memev ready [--timeout S]        wait for each connected app's first session, then for two of them to share a memory
   memev preflight [--port N]       check this computer first: Node 22 or newer, git, the port, a folder to write to
                                    (init runs it before it writes anything and stops with the fix for your system)
   memev path add|remove|status     put the memev command on your PATH (a line in your shell's startup file, or your user PATH on
@@ -61,7 +63,7 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', bus: './bus-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', bus: './bus-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 export function installRuntime(env = process.env) {
@@ -219,7 +221,7 @@ async function run(argv, env) {
     }
     case 'claims': {
       need(); const { Vault } = await import('../engine/vault.mjs');
-      if (await healthy(root)) { const r = await fetch(`http://127.0.0.1:${daemonInfo(root).port}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${clientToken(root, 'cli')}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'memev_claims', arguments: { status: flags.status, subject: flags.subject } } }) }); console.log((await r.json()).result.content[0].text); return 0; }
+      if (await healthy(root)) { const r = await fetchOut(`http://127.0.0.1:${daemonInfo(root).port}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${clientToken(root, 'cli')}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'memev_claims', arguments: { status: flags.status, subject: flags.subject } } }) }); console.log((await r.json()).result.content[0].text); return 0; }
       const v = new Vault(root, { git: false }).open(); try { json(v.claims({ agent: 'cli', scopes: ['read'], paths: ['**'] }, { status: flags.status, subject: flags.subject })); } finally { v.close(); } return 0;
     }
     case 'token': {
