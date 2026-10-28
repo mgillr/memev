@@ -107,6 +107,8 @@ export function clientDefs(env, bin, platform = process.platform) {
   const win = winSpawn(env, platform);
   const launcher = win ? `"${win.node}" "${win.script}"` : `"${bin}"`;
   const stdio = (id) => win ? { command: win.node, args: [win.script, 'mcp', '--client', id] } : { command: bin, args: ['mcp', '--client', id] };
+  // OpenCode takes a local MCP server as a command array in opencode.json
+  const opencodeLocal = (id) => ({ type: 'local', command: [...(win ? [win.node, win.script] : [bin]), 'mcp', '--client', id], enabled: true });
   const defs = [
     { id: 'claude-code', name: 'Claude Code', mode: 'hooks', detect: () => exists(path.join(home, '.claude')) || exists(path.join(home, '.claude.json')),
       edits: () => [
@@ -158,6 +160,16 @@ export function clientDefs(env, bin, platform = process.platform) {
       edits: () => [json(path.join(appData, 'Code', 'User', 'mcp.json'), setServer('servers', { type: 'stdio', ...stdio('vscode') }), delServer('servers'))] },
     { id: 'zed', name: 'Zed', mode: 'instructions', detect: () => exists(path.join(process.platform === 'darwin' ? path.join(home, '.config') : platformDirs(env).appData, 'zed')),
       edits: () => [json(path.join(process.platform === 'darwin' ? path.join(home, '.config') : platformDirs(env).appData, 'zed', 'settings.json'), setServer('context_servers', { source: 'custom', ...stdio('zed') }), delServer('context_servers'))] },
+    { id: 'opencode', name: 'OpenCode', mode: 'instructions', detect: () => exists(path.join(home, '.config', 'opencode')),
+      edits: () => [
+        json(path.join(home, '.config', 'opencode', 'opencode.json'), setServer('mcp', opencodeLocal('opencode')), delServer('mcp')),
+        mdBlock(path.join(home, '.config', 'opencode', 'AGENTS.md')),
+      ] },
+    { id: 'copilot-cli', name: 'GitHub Copilot CLI', mode: 'instructions', detect: () => exists(path.join(home, '.copilot')),
+      edits: () => [
+        json(path.join(home, '.copilot', 'mcp.json'), setServer('mcpServers', stdio('copilot-cli')), delServer('mcpServers')),
+        mdBlock(path.join(home, '.copilot', 'AGENTS.md')),
+      ] },
   ];
   return defs;
 }
@@ -263,6 +275,7 @@ export const RESTART = {
   'claude-code': 'Start a new Claude Code session', codex: 'Start a new Codex CLI session', 'gemini-cli': 'Start a new Gemini CLI session',
   cursor: 'Open a new Cursor chat', 'claude-desktop': 'Quit and reopen Claude Desktop', windsurf: 'Quit and reopen Windsurf',
   vscode: 'Reload the VS Code window (Developer: Reload Window)', zed: 'Quit and reopen Zed',
+  opencode: 'Quit and reopen OpenCode', 'copilot-cli': 'Start a new Copilot CLI session',
 };
 // Apps whose session-start hook brings the protocol, so their MCP instructions need not repeat it.
 export const HOOK_CLIENTS = new Set(clientDefs({}, 'memev').filter((d) => d.mode === 'hooks').map((d) => d.id));
@@ -296,7 +309,7 @@ export async function command(cmd, pos, flags, { env, root }) {
   }
   if (cmd === 'connect') {
     const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force }) : [connect(target, { env, launcher, dryRun: !!flags['dry-run'] })];
-    if (!res.length) console.log('No AI apps found. Install one (Claude Code, Codex, Cursor, Gemini CLI, Claude Desktop, Windsurf, VS Code, Zed) and run memev connect again.');
+      if (!res.length) console.log('No AI apps found. Install one (Claude Code, Codex, Cursor, Gemini CLI, Claude Desktop, Windsurf, VS Code, Zed, OpenCode, GitHub Copilot CLI) and run memev connect again.');
     for (const r of res) {
       if (r.status === 'added') out.ok(`${r.name}: connected (${r.mode === 'hooks' ? 'hooks + MCP + instructions' : 'MCP + instructions'})`);
       else if (r.status === 'already') out.ok(`${r.name}: already connected`);
