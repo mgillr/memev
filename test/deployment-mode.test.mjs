@@ -191,7 +191,7 @@ const BANNED = [
   /seamless|robust|powerful|leverage|unlock|cutting[- ]edge/i,
   /not just .* but /i,
   /!/u,
-  /—/,
+  /\u2014/,
   /[\u{1F000}-\u{1FAFF}\u{2190}-\u{2BFF}]/u,
   /certified|certification|accredit/i,
   /iso[- ]?\d{3,4}|soc[- ]?2|hipaa|gdpr|ccpa|pci[- ]?dss/i,
