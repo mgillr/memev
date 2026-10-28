@@ -20,6 +20,20 @@ The tunnel is chosen in this order (`memev cloud use auto|tailscale|cloudflare|q
 - the plain MCP URL plus the header apps with header support should send:
   `Authorization: Bearer <token>`.
 
+## What each plan allows
+
+The cloud apps gate MCP by plan, so the same connector URL does different things on different plans.
+Checked 2026-10-28 against the apps' own documentation; the limits change, so re-check before relying on one:
+
+| App | Plan | What the connector can do |
+| --- | --- | --- |
+| ChatGPT | Plus, Pro (developer mode) | Read and fetch only. Tools that change state are refused; full MCP needs a Business, Enterprise or Edu seat. |
+| ChatGPT | Business, Enterprise, Edu | Full MCP: read and write tools. |
+| claude.ai | Free | One custom connector. |
+| claude.ai | Pro, Max | Custom connectors. |
+
+Sources: the ChatGPT developer mode and MCP documentation, and the claude.ai connectors documentation.
+
 Every app and computer has its own credential; there is no shared key. `memev devices` lists them:
 
 ```sh
