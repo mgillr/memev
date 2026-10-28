@@ -35,9 +35,9 @@ Show the person the whole checklist. Keep every line that asks them to do someth
 - The GitHub backup is a separate step: `memev github setup`. Do not create a repository unless the person asked.
 - Do not repeat a connector URL, a token, or a home path in a shared chat. `memev cloud url` prints a secret.
 
-## If a config file is not plain JSON
+## If a config file cannot be edited
 
-`memev connect` will not rewrite a JSON file that contains comments. It names the file. Add the Memev entry by hand from the client page, and tell the person what you added.
+`memev connect` edits JSON with comments in place. If it cannot edit a file, it names the file and the reason. Then `memev connect <id> --print` prints what to paste by hand. `--print` changes nothing.
 
 ## Undo
 
