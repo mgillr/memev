@@ -2,7 +2,7 @@
 
 [![Memev demo: how each tier works and how the tiers connect](Demo%20Video/memev-tiers.gif)](Demo%20Video/memev-tiers.mp4)
 
-[Watch the demo video](Demo%20Video/memev-tiers.mp4) (3 min 9 s): how each tier works and how the tiers connect.
+[Watch the demo video](Demo%20Video/memev-tiers.mp4) (14 min 35 s): how each tier works and how the tiers connect.
 
 Memory and recall stack for all of the AI apps you use, local system and cloud.
 
@@ -28,7 +28,7 @@ flowchart LR
     cloud["AI on the web<br/>ChatGPT, claude.ai"]
     laptop["Your other computers<br/>each with its own key"]
     vault -- "backup every few minutes" --> github
-    cloud -. "optional secure link,<br/>you can switch it off" .-> vault
+    cloud -. "optional secure link,<br/>off until you switch it on" .-> vault
     laptop -. "the same secure link" .-> vault
 ```
 
@@ -144,7 +144,7 @@ prints exactly what it would send ([docs/METRICS.md](docs/METRICS.md)).
 |---|---|
 | [Quickstart](docs/QUICKSTART.md) | install, first session, everyday commands |
 | [AI apps](docs/CLIENTS.md) | what is changed in each app, hooks vs instructions, undoing it |
-| [Cloud access](docs/CLOUD.md) | the secure link, connector URLs, other computers, turning it off |
+| [Cloud access](docs/CLOUD.md) | the secure link, connector URLs, other computers, turning it on |
 | [Comms bus](docs/BUS.md) | how your AI apps talk to each other, the roster and comms checks |
 | [GitHub backup](docs/GITHUB.md) | `memev github setup` |
 | [Docker](docs/DOCKER.md) | running Memev in a container |

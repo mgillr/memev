@@ -39,6 +39,9 @@ function setup() {
   const sb = sandbox();
   const init = sb.run(['init', '--port', String(sb.port), '--no-connect']);
   assert.equal(init.code, 0, init.out + init.err);
+  // a fresh init starts with remote access off; the connect flow needs it on
+  const on = sb.run(['cloud', 'on']);
+  assert.equal(on.code, 0, on.out + on.err);
   fs.writeFileSync(path.join(sb.root, '.memev', 'tunnel.json'), JSON.stringify({ url: `http://127.0.0.1:${sb.port}`, enabled: true, state: 'up', provider: 'test' }));
   const token = clientToken(sb.root, 'claude', { remote: true });
   return { sb, token };

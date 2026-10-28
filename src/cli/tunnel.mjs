@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Remote access for cloud AI apps, on by default, one command to switch off (`memev cloud off`).
+// Remote access for cloud AI apps, off by default, one command to switch on (`memev cloud on`).
 // Providers, best first:
 //   tailscale   `tailscale serve` on this machine: a stable https name, tailnet only (never Funnel)
 //   cloudflare  a named Cloudflare tunnel you configured (`memev cloud use cloudflare --name N --hostname H`): stable
@@ -167,7 +167,7 @@ export function deviceSeenSince(root, token, start) {
   return !!(d?.last_seen && Date.parse(d.last_seen) >= start);
 }
 
-async function reloadDaemon(root) { const t = adminToken(root); if (!t) return false; try { return (await api(root, '/v1/reload', { token: t })).ok; } catch { return false; } }
+export async function reloadDaemon(root) { const t = adminToken(root); if (!t) return false; try { return (await api(root, '/v1/reload', { token: t })).ok; } catch { return false; } }
 
 export async function command(cmd, pos, flags, { root, env = process.env }) {
   const sub = pos[0] || 'status'; const cfg = config(root);
