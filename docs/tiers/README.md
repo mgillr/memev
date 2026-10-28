@@ -20,7 +20,7 @@ company vault.
 | Who can see what | you | you | the company, through the admin console, sees and searches everything in the company vault (coming) | the same, plus your identity provider's groups (coming) |
 | AI apps and models | several cloud AI apps side by side (Claude, ChatGPT; more coming soon) and local coding tools via MCP | the same, on each computer | ONE AI provider for the organisation: one cloud AI service or an on-premises LLM, over MCP (coming) | the same, with an air-gapped on-premises option (coming) |
 | Two computers | one at a time: you switch computers through your own GitHub. Git sync is single-writer backup, so a second computer that pushes gets a warning that concurrent edits can conflict | at once: edit on two machines, nothing to resolve. The crdt-merge convergence engine, in its own repository and called as an external dependency, does the merging (planned) | coming | coming |
-| Price | free | $12/month or $120/year (CHF 10 or CHF 100), early-supporter price | contact us | contact us |
+| Price | free | $12/month or $120/year, early-supporter price | contact us | contact us |
 | Trial | not needed | none | 5 members and 10 computers, self-serve for one hosted cloud AI provider; a sales-assisted pilot for on-premises, air-gapped or compliance-led organisations (planned) | a sales-assisted pilot (planned) |
 | Setup | you, in minutes | you, in minutes on each computer | remote, 2 to 4 weeks | remote or onsite, 6 to 12 weeks |
 | Support | GitHub issues | priority support | business hours by priority (support plan quoted with the tier) | named or embedded engineer |

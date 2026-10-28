@@ -72,7 +72,7 @@ link. `memev init --local-only` keeps the secure link off, and the backup stays 
 ## Personal with more computers (draft)
 
 Edit on two machines at once, nothing to resolve. One person, up to 3 computers and 10 cloud AI
-connectors, for $12/month or $120/year (CHF 10 or CHF 100). The licence is for that person and cannot
+connectors, for $12/month or $120/year. The licence is for that person and cannot
 be passed on. The AI apps on all three computers share one memory and one comms bus, over the secure
 link, with a key for each computer. The same mix of several cloud AI apps side by side and local coding
 tools over MCP applies on each.
