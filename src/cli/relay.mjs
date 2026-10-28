@@ -13,6 +13,7 @@ import net from 'node:net';
 import path from 'node:path';
 import tls from 'node:tls';
 import { readJson, writePrivateJson, now } from '../engine/util.mjs';
+import { loadLicense } from '../engine/license.mjs';
 import { config, saveConfig, out } from './common.mjs';
 
 // The name and the two signed messages are defined by the protocol (docs/RELAY.md). The development relay holds
@@ -200,7 +201,9 @@ export function relayFetch(address, { relay, path: p = '/', method = 'GET', head
 }
 
 // ---- the setting and the daemon side
-export const relaySetting = (root) => ({ enabled: false, url: null, domain: null, ...(config(root).remote?.relay || {}) });
+export const relaySetting = (root) => ({ enabled: false, url: null, domain: null, default_url: null, default_domain: null, ...(config(root).remote?.relay || {}) });
+/** A Personal licence that is currently valid. The free tier and every other tier are not. */
+export const personalActive = (license) => license?.state === 'valid' && license.tier === 'personal';
 export function setRelay(root, patch) { const c = config(root); c.remote = { ...c.remote, relay: { ...relaySetting(root), ...patch } }; saveConfig(root, c); return c.remote.relay; }
 export const relayState = (root) => readJson(relayStateFile(root), null);
 
@@ -220,11 +223,13 @@ export function superviseRelay(vault, { root, port, env = process.env }) {
 }
 
 /** `memev cloud relay on --url relay://host:port --domain NAME | off | status | address` */
-export async function command(pos, flags, { root, env = process.env }) {
+export async function command(pos, flags, { root, env = process.env, license = null }) {
   const sub = pos[0] || 'status';
   const s = relaySetting(root);
   if (sub === 'on') {
-    const url = String(flags.url && flags.url !== true ? flags.url : s.url || ''); const domain = String(flags.domain && flags.domain !== true ? flags.domain : s.domain || '');
+    let url = String(flags.url && flags.url !== true ? flags.url : s.url || ''); let domain = String(flags.domain && flags.domain !== true ? flags.domain : s.domain || '');
+    // No address is built in. A valid Personal licence uses the address already stored in config.
+    if (!url && personalActive(license || loadLicense({ env }))) { url = String(s.default_url || ''); if (!domain) domain = String(s.default_domain || ''); }
     if (!url) throw new Error('memev cloud relay on --url relay://host:port --domain NAME (no relay is built in)');
     parseRelayUrl(url);
     if (!domain || !/^[a-z0-9.-]+$/i.test(domain)) throw new Error('memev cloud relay on needs --domain: the name its addresses are made under');
