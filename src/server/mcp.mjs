@@ -11,6 +11,77 @@ const arr = (description) => ({ type: 'array', items: { type: 'string' }, descri
 const TOOLS = new Map();
 export function tool(name, description, inputSchema, run, { readOnly = false, localOnly = false } = {}) { TOOLS.set(name, { name, description, inputSchema, run, readOnly, localOnly }); }
 
+/** Characters returned to the caller in one memev_get page, including the one continuation line. */
+export const GET_PAGE = 8000;
+
+/** The markdown section that starts at `heading`, including its heading line, or null when it is not there. */
+export function sectionOf(body, heading) {
+  const want = String(heading).trim().toLowerCase();
+  if (!want) return null;
+  const lines = String(body ?? '').split('\n');
+  let start = -1;
+  let level = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^(#{1,6})\s+(.*?)\s*$/.exec(lines[i]);
+    if (!m) continue;
+    if (start < 0) {
+      if (m[2].trim().toLowerCase() === want) { start = i; level = m[1].length; }
+      continue;
+    }
+    if (m[1].length <= level) return lines.slice(start, i).join('\n');
+  }
+  return start < 0 ? null : lines.slice(start).join('\n');
+}
+
+/** One page of `text` from `offset`, cut on a line boundary when a line fits in the limit. */
+export function pageNote(text, { offset = 0, limit = GET_PAGE } = {}) {
+  const src = String(text ?? '');
+  const total = src.length;
+  const start = Math.trunc(Number(offset) || 0);
+  const cap = Math.max(1, Math.trunc(limit) || GET_PAGE);
+  let end = Math.min(start + cap, total);
+  if (end < total) {
+    const nl = src.slice(start, end).lastIndexOf('\n');
+    if (nl >= 0) end = start + nl + 1;
+  }
+  const page = src.slice(start, end);
+  const remaining = total - end;
+  return { page, offset: start, total, remaining, next: remaining > 0 ? end : null };
+}
+
+/**
+ * Page a note for memev_get. `text` is what the caller reads (at most GET_PAGE characters).
+ * `data.page` is the note bytes for this page; joining those pages rebuilds the note.
+ */
+export function readCapped(note, { offset = 0, heading } = {}) {
+  const path = note.path;
+  let source = String(note.body ?? '');
+  const asked = heading == null || heading === '' ? null : String(heading);
+  if (asked) {
+    const sec = sectionOf(source, asked);
+    if (sec === null) {
+      const message = `No section named ${asked}.`;
+      return { text: message, data: { path, heading: asked, page: '', offset: 0, total: 0, remaining: 0, next: null, message } };
+    }
+    source = sec;
+  }
+  const off = Math.trunc(Number(offset) || 0);
+  if (off < 0 || off > source.length || (off === source.length && source.length > 0)) {
+    const message = 'That offset is past the end of this note.';
+    return { text: message, data: { path, heading: asked, page: '', offset: off, total: source.length, remaining: 0, next: null, message } };
+  }
+  // Leave room for the one continuation line so the text the caller reads stays within GET_PAGE.
+  const reserve = 160;
+  let paged = pageNote(source, { offset: off, limit: GET_PAGE });
+  let line = '';
+  if (paged.remaining > 0) {
+    paged = pageNote(source, { offset: off, limit: GET_PAGE - reserve });
+    line = `Call memev_get again with offset ${paged.next}. ${paged.remaining} characters remain.`;
+  }
+  const text = line ? `${paged.page}${paged.page.endsWith('\n') ? '' : '\n'}${line}` : paged.page;
+  return { text, data: { path, heading: asked, page: paged.page, offset: paged.offset, total: paged.total, remaining: paged.remaining, next: paged.next, message: null } };
+}
+
 tool('memev_session_start', 'Call first in every session (and after a compaction): returns the resume card with the project state, what is already done, the last session, recent decisions and memory relevant to the task.', S({ task: str('One sentence: what the user wants now'), project: str('The project or repository name'), session: str('Your session id, if you know it') }),
   (v, a, c) => { const card = v.sessionStart(c.identity, { task: a.task, project: a.project, client: c.client, session: a.session || c.session }); return { text: HOOK_CLIENTS.has(c.client) ? `${PROTOCOL}\n\n${renderCard(card)}` : renderCard(card), data: card }; }, { readOnly: true });
 tool('memev_recall', 'Search memory before answering anything the user may have recorded. Returns exact snippets with their note, related entities and claim status. With a project, only that project\'s memories and memories with no project are searched.', S({ query: str('What you need to know'), project: str('The project: recall stays inside it'), all_projects: { type: 'boolean', description: 'Search every project (the given project is only ranked higher)' }, limit: { type: 'number' } }, ['query']),
@@ -24,7 +95,7 @@ tool('memev_review', 'The memory review inbox. list: flagged and short-lived mem
 tool('memev_audit', 'A read-only memory quality report: memories the quality check would refuse today, duplicates, short-lived memories past their review date, hedged ones, ones never recalled after 30 days and ones rated unhelpful. Changes nothing.', S({}), (v, a, c) => ({ data: v.audit(c.identity) }), { readOnly: true });
 tool('memev_checkpoint', 'Record progress after each finished step: the task, what is done, what is in progress, what is next. This is what survives compaction and stops duplicate work.', S({ project: str('Project name'), task: str('The overall task'), done: arr('Steps finished'), doing: str('The step in progress'), next: arr('Steps not started'), files: arr('Files touched') }, ['project']),
   (v, a, c) => ({ data: v.checkpoint(c.identity, { ...a, client: c.client, session: c.session }) }));
-tool('memev_get', 'Read one note.', S({ path: str('Note path, e.g. memory/north-star.md') }, ['path']), (v, a, c) => ({ data: v.get(c.identity, a.path) }), { readOnly: true });
+tool('memev_get', 'Read one note. A note longer than 8,000 characters comes back one page at a time, cut at a line. Pass the offset from the previous page to continue, or a heading to read that section.', S({ path: str('Note path, e.g. memory/north-star.md'), offset: { type: 'number', description: 'Character offset for the next page. Omit to start at the beginning.' }, heading: str('Optional section heading. The page is taken from that section.') }, ['path']), (v, a, c) => readCapped(v.get(c.identity, a.path), { offset: a.offset, heading: a.heading }), { readOnly: true });
 tool('memev_list', 'List notes, optionally under a folder.', S({ prefix: str('Folder, e.g. work/active') }), (v, a, c) => ({ data: v.list(c.identity, a.prefix || '') }), { readOnly: true });
 tool('memev_write', 'Write a whole note (stored as a small diff when the note exists).', S({ path: str('Note path'), body: str('Markdown') }, ['path', 'body']), (v, a, c) => ({ data: v.write(c.identity, { path: a.path, body: a.body, client: c.client }) }));
 tool('memev_append', 'Append text to a note.', S({ path: str('Note path'), text: str('Text to append') }, ['path', 'text']), (v, a, c) => ({ data: v.append(c.identity, { path: a.path, text: a.text, client: c.client }) }));
