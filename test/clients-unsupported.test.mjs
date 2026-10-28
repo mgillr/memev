@@ -57,16 +57,16 @@ test('detect marks a found unsupported app with supported false, and connectAll 
   const sb = sandbox();
   try {
     fs.mkdirSync(path.join(sb.home, '.config', 'cline'), { recursive: true });
-    fs.mkdirSync(path.join(sb.home, '.claude'), { recursive: true });
+    fs.mkdirSync(path.join(sb.home, '.codex'), { recursive: true });
     const d = detect(sb.env, '/x/memev');
     const cline = d.find((c) => c.id === 'cline');
     assert.equal(cline.found, true);
     assert.equal(cline.supported, false);
-    const claude = d.find((c) => c.id === 'claude-code');
-    assert.equal(claude.found, true);
-    assert.equal(claude.supported, true);
+    const codex = d.find((c) => c.id === 'codex');
+    assert.equal(codex.found, true);
+    assert.equal(codex.supported, true);
     const res = connectAll({ env: sb.env, launcher: '/x/memev' });
-    assert.deepEqual(res.map((x) => x.id), ['claude-code'], 'connectAll connects the supported app and leaves the unsupported one alone');
+    assert.deepEqual(res.map((x) => x.id), ['codex'], 'connectAll connects the supported app and leaves the unsupported one alone');
   } finally { sb.stop(); }
 });
 
