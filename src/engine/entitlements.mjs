@@ -25,6 +25,9 @@ export const TIERS = {
   enterprise: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team', 'sso', 'audit'] },
 };
 
+/** The length of the Personal trial, in days. */
+export const TRIAL_DAYS = 14;
+
 /** Free-tier behaviour for features: core yes, hosted services no (they do not exist yet). */
 export function can(feature) {
   if (CORE_FEATURES.includes(feature)) return true;
