@@ -4,6 +4,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { initVault, Vault } from '../../src/engine/vault.mjs';
 
+// Tests run on whatever machine they happen to land on; give the vault's own computer a fixed
+// short name so seat names (my-app@host) are the same everywhere. A test that needs a
+// different machine name sets MEMEV_MACHINE_NAME before it opens a vault.
+process.env.MEMEV_MACHINE_NAME = process.env.MEMEV_MACHINE_NAME || 'host';
+
 export const PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BASE = process.env.MEMEV_TEST_TMP || os.tmpdir();
 const made = [];

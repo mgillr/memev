@@ -316,7 +316,7 @@ export async function command(cmd, pos, flags, { env, root }) {
     }
     const ids = res.filter((r) => ['added', 'already'].includes(r.status)).map((r) => r.id);
     if (ids.length && !flags['dry-run']) await seatOnBus({ root, env, ids, flags });
-    return res.some((r) => r.status === 'failed') ? 1 : 0;
+    return res.some((r) => r.status === 'failed' || (target !== 'all' && r.status === 'needs-manual')) ? 1 : 0;
   }
   if (cmd === 'disconnect' || cmd === 'uninstall') {
     const st = loadState(env);
