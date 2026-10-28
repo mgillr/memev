@@ -34,8 +34,8 @@ Manual steps:
 - **Cursor** hooks cannot add context to a prompt, only at session start, so per-prompt recall comes
   from the MCP instructions.
 
-**Cursor's hook limits.** Cursor hooks can only add context at session start; they cannot add context
-to a prompt. Memev works around this in three ways:
+**Cursor's hook limits.** Cursor hooks can only add context at session start (the `sessionStart`
+hook); they cannot add context to a prompt. Memev works around this in three ways:
 
 - `memev connect cursor --project <dir>` writes an always-on rule to `<dir>/.cursor/rules/memev.mdc`
   (`alwaysApply: true`), so the memory rule is in every session of that project, not only at session

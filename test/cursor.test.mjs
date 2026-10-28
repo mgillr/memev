@@ -56,7 +56,7 @@ test('MEM-053 AC02: the Cursor stop hook follows up only on waiting operator tas
 
 test('MEM-053 AC03: CLIENTS.md documents Cursor hook limits', () => {
   const t = fs.readFileSync(path.join(PKG, 'docs', 'CLIENTS.md'), 'utf8');
-  assert.match(t, /session start/i, 'the session-start-only limit is documented');
+  assert.match(t, /sessionStart/, 'the sessionStart-only limit is documented');
   assert.match(t, /alwaysApply/);
   assert.match(t, /followup_message/);
   assert.match(t, /loop_limit/);
