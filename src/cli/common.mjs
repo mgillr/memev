@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { configDir, homeDir, readJson, writePrivateJson, exists } from '../engine/util.mjs';
-import { TokenStore } from '../engine/tokens.mjs';
+import { TokenStore, EXPIRY_WARNING_DAYS, expiryWarningLine } from '../engine/tokens.mjs';
 import { fetchOut } from '../engine/net.mjs';
 
 export const PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -36,15 +36,24 @@ export const config = (root) => readJson(path.join(root, STATE, 'config.json'), 
 export const saveConfig = (root, c) => writePrivateJson(path.join(root, STATE, 'config.json'), c);
 export const clientsFile = (root) => path.join(root, STATE, 'clients.json');
 
-/** The token a client uses (minted on first use). Cloud clients get remote tokens with memory-only paths. */
+/**
+ * The token a client uses (minted on first use). Cloud clients get remote tokens with memory-only paths.
+ * Connector credentials are long-lived (a year, like local ones) and revocable; the 14-day-ahead warning
+ * in doctor, memev status and the resume card says before one gets close to its expiry.
+ */
 export function clientToken(root, client, { remote = false } = {}) {
   const f = clientsFile(root); const all = readJson(f, {});
   const key = remote ? `cloud:${client}` : client;
   const ts = new TokenStore(path.join(root, STATE, 'tokens.json'));
   if (all[key] && ts.verify(all[key])) return all[key];
-  const t = ts.issue({ agent: client, scopes: ['read', 'write'], paths: remote ? ['memory/**', 'work/**', 'contracts/**', 'bus/**'] : ['**'], ttlDays: remote ? 90 : 365, remote, note: remote ? 'cloud connector' : 'local client' });
+  const t = ts.issue({ agent: client, scopes: ['read', 'write'], paths: remote ? ['memory/**', 'work/**', 'contracts/**', 'bus/**'] : ['**'], ttlDays: 365, remote, note: remote ? 'cloud connector' : 'local client' });
   all[key] = t.token; writePrivateJson(f, all);
   return t.token;
+}
+
+/** The credentials that will expire within `days` days, one warning line each. */
+export function tokenExpiryWarnings(root, { days = EXPIRY_WARNING_DAYS } = {}) {
+  return new TokenStore(path.join(root, STATE, 'tokens.json')).expiringWithin(days).map((t) => expiryWarningLine(t));
 }
 export function adminToken(root) { return readJson(path.join(root, STATE, 'admin.json'), {})?.token || null; }
 export const tunnelKeyFile = (root) => path.join(root, STATE, 'tunnel-key.txt');
