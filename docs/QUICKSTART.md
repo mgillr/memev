@@ -19,8 +19,8 @@ and show me the checklist it prints."
    `~/.config/memev/bin/memev`, so your apps never point into the folder you installed from,
 3. starts the Memev daemon on `127.0.0.1:7787` and installs a login service (systemd or launchd),
 4. connects every AI app it finds (see [CLIENTS.md](CLIENTS.md)), backing up each file it changes,
-5. opens a private tunnel for cloud apps (see [CLOUD.md](CLOUD.md)); `--local-only` skips it, and
-   `--org` (an install for an organisation) leaves it off until `memev cloud on --yes`,
+5. leaves the private tunnel for cloud apps off (see [CLOUD.md](CLOUD.md)); init asks once on a terminal,
+   or `memev cloud on` turns it on; `--local-only` and `--org` (an install for an organisation) skip the question,
 6. prints a checklist: what is connected, what needs one click from you, and how to back up to GitHub.
 
 Run `memev ready`, then open a new session or chat in each connected app. It prints "<app> joined at
