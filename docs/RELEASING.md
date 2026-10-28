@@ -24,6 +24,12 @@ A checklist for cutting a release of the `memev` npm package.
 
 `scripts/install.sh <tarball-url>` fetches that tarball and the `.sha256` file beside the same URL, checks the SHA-256, runs `memev init`, and restarts from the installed copy. The URL must be https or a file URL. A local check uses a `file://` URL. The script has no download address built in. When Node.js 22 or newer is not on PATH, the installer fetches the pinned runtime named in `scripts/node-runtime.json`, checks that SHA-256, and runs from that copy. The same pins are carried in the installer scripts, so a one-line install still finds them. A later install reuses that copy when its version matches. `MEMEV_NODE_SPEC` and `MEMEV_NODE_FETCH` are for tests. `scripts/install.ps1 <tarball-url>` does the same on Windows and checks the hash with `Get-FileHash`.
 
+## Update and version check
+
+`memev update <tarball>` installs the tarball into a new runtime folder under the config dir and points the launcher at it. The tarball is a local file (the release tarball, or a test one); nothing is fetched. The old runtime stays until it is replaced.
+
+The version check is opt-in and off by default. When it is on, `memev doctor` and `memev status` read a static version file whose location comes from the vault config (`update.version_file`) and show one `update available` line when it names a newer version. It reads only that local file; it makes no network call. Turn it on with `update.check: true` in the vault config, or `MEMEV_UPDATE_CHECK=1`.
+
 ## Publish
 
 - [ ] `npm publish`, run by the maintainer from their own terminal.
