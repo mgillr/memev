@@ -76,6 +76,7 @@ test('MEM-044 AC03: OpenCode skips its rules file when the Claude rules file exi
   const cfg = JSON.parse(fs.readFileSync(opencodeJson, 'utf8'));
   assert.deepEqual(cfg.mcp.memev, { type: 'local', command: ['/x/memev', 'mcp', '--client', 'opencode'], enabled: true });
   assert.equal(fs.existsSync(path.join(env.HOME, '.config', 'opencode', 'AGENTS.md')), false, 'the OpenCode rules file is not created');
+  assert.ok(r.notes && r.notes.some((n) => /MCP instructions/.test(n)), 'a line says the protocol arrives through the MCP instructions');
   const d = disconnect('opencode', { env });
   assert.deepEqual(d.results.map((x) => x.action), ['restored']);
 });

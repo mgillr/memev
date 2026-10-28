@@ -113,7 +113,7 @@ function upsertCodexToml(t, block) {
 // The user table is still there after the edit: say so, so the skip is never a silent no-op.
 const codexTomlSkipNote = (b) => (b && MEMEV_TABLE.test(removeBlock(b, [TOML_START, TOML_END])) ? 'Codex already has a [mcp_servers.memev] table in config.toml, so Memev left it as-is' : null);
 
-const json = (file, apply, remove) => ({ file, kind: 'json', apply, remove });
+const json = (file, apply, remove, note) => ({ file, kind: 'json', apply, remove, note });
 const text = (file, apply, remove, note) => ({ file, kind: 'text', apply, remove, note });
 const mdBlock = (file) => text(file, (t) => addBlock(t, INSTRUCTIONS), (t) => removeBlock(t));
 
@@ -180,14 +180,13 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
       edits: () => [json(path.join(process.platform === 'darwin' ? path.join(home, '.config') : platformDirs(env).appData, 'zed', 'settings.json'), setServer('context_servers', { source: 'custom', ...stdio('zed') }), delServer('context_servers'))] },
     { id: 'opencode', name: 'OpenCode', mode: 'instructions', detect: () => exists(path.join(home, '.config', 'opencode')),
       edits: () => {
-        const edits = [json(path.join(home, '.config', 'opencode', 'opencode.json'), setServer('mcp', opencodeLocal('opencode')), delServer('mcp'))];
         const mdPath = path.join(home, '.config', 'opencode', 'AGENTS.md');
-        if (!exists(mdPath) && exists(path.join(home, '.claude', 'CLAUDE.md'))) {
-          // Rules already live in CLAUDE.md; creating the OpenCode rules file would switch them off.
-          // MCP instructions carry the protocol instead.
-        } else {
-          edits.push(mdBlock(mdPath));
-        }
+        const skip = !exists(mdPath) && exists(path.join(home, '.claude', 'CLAUDE.md'));
+        // When the user's rules already live in CLAUDE.md, creating the OpenCode rules file would switch them off,
+        // so Memev leaves it alone and the protocol arrives through the MCP instructions instead.
+        const edits = [json(path.join(home, '.config', 'opencode', 'opencode.json'), setServer('mcp', opencodeLocal('opencode')), delServer('mcp'),
+          skip ? () => 'Your rules stay in CLAUDE.md, so Memev left the OpenCode rules file alone; the protocol arrives through the MCP instructions.' : null)];
+        if (!skip) edits.push(mdBlock(mdPath));
         return edits;
       } },
     { id: 'copilot-cli', name: 'GitHub Copilot CLI', mode: 'instructions', detect: () => exists(env.COPILOT_HOME || path.join(home, '.copilot')),
