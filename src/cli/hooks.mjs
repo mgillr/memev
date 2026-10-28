@@ -49,6 +49,12 @@ const CONTINUATION = /^(continue|go on|go ahead|carry on|keep going|yes|yes plea
 export const isContinuation = (p) => { const s = String(p || '').trim(); return s.split(/\s+/).filter(Boolean).length < 4 || CONTINUATION.test(s); };
 const BUILD_NUDGE = '[Memev] This is a build request. Before writing code: infer the requirements, call memev_contract_from_request (each requirement with a local check), then memev_contract_sign, and say in one line what you signed. If an open contract already covers it, use memev_contract_status instead.';
 
+// The prompt hook runs inside this budget. The app gives it 10 s, but the person is waiting on
+// every turn, so the hook decides for itself when it is done: what is in hand goes out, whatever is
+// still in flight is dropped. The other hooks keep their own timeouts: the stop hook's contract gate
+// is a safety check that must not fail open under load, and the pre-compact checkpoint must land
+// before the context is cut.
+const HOOK_BUDGET_MS = 1500;
 export async function runHook(event, flags, env = process.env) {
   const format = flags.format || 'claude';
   let input = {}; try { input = JSON.parse(readStdin() || '{}'); } catch {}
@@ -97,14 +103,36 @@ export async function runHook(event, flags, env = process.env) {
       if (prompt) {
         if (!st.task) st.task = prompt.slice(0, 200);
         // never the same item twice in a session: the route leaves out what this session was already given
-        const r = isContinuation(prompt) ? null : await call('recall', { query: prompt.slice(0, 1000), limit: 4, exclude: st.injected || [] });
-        if (r?.hits?.length) st.injected = [...new Set([...(st.injected || []), ...r.hits.map((h) => `${h.path}#${h.heading || ''}`)])].slice(-500);
+        // recall and the bus pulse go out at the same time, and the journal is fire-and-forget: the
+        // person is waiting on the turn, and the journal can land after the hook has answered
+        const budget = Number(env.MEMEV_HOOK_BUDGET_MS) > 0 ? Number(env.MEMEV_HOOK_BUDGET_MS) : HOOK_BUDGET_MS;
+        const deadline = Date.now() + budget;
+        // each call gets whatever is left of the budget, and when it runs out the ones still in
+        // flight are dropped, so the hook returns what it has
+        const withBudget = (p) => new Promise((resolve, reject) => {
+          const t = setTimeout(() => reject(new Error('budget exceeded')), Math.max(1, deadline - Date.now()));
+          p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+        });
+        const recallP = isContinuation(prompt) ? null : withBudget(call('recall', { query: prompt.slice(0, 1000), limit: 4, exclude: st.injected || [] })).catch(() => null);
         // Cursor cannot show prompt context anyway, so it only peeks: a task that is already waiting
         // when the person types must stay unread for the stop hook's follow-up, not be swallowed here
-        const bus = await call('bus-pulse', { peek: format === 'cursor' }).catch(() => null);
-        await call('journal', { role: 'user', text: prompt });
+        const busP = withBudget(call('bus-pulse', { peek: format === 'cursor' })).catch(() => null);
+        call('journal', { role: 'user', text: prompt }).catch(() => {}); // no result is wanted; it must not hold the hook
+        const r = await recallP;
+        if (r?.hits?.length) st.injected = [...new Set([...(st.injected || []), ...r.hits.map((h) => `${h.path}#${h.heading || ''}`)])].slice(-500);
+        const bus = await busP;
         const contractsOn = remote || config(root).contracts?.enabled !== false;
         emit(format, 'UserPromptSubmit', [bus?.text, r?.text, contractsOn && isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
+        if (tr) st.offset = tr.offset;
+        writePrivateJson(stateFile, st);
+        // the app times the hook process, not this promise: once the output is written and the state
+        // is saved, end the process, so the calls the budget dropped and the fire-and-forget journal
+        // do not keep it open. The journal is accepted as lost when the vault is slow. In-process
+        // callers (the bench harness, the tests) are not the hook, so they just return.
+        if (process.argv[2] === 'hook') {
+          await new Promise((r) => process.stdout.write('', r));
+          process.exit(0);
+        }
       }
     } else if (event === 'pre-compact') {
       await saveCheckpoint('pre-compact');
