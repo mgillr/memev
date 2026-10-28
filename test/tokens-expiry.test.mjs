@@ -141,3 +141,23 @@ test('MEM-056 AC01: a credential past its expiry warns in doctor, status and the
   clientToken(root, 'cloud-app', { remote: true });
   assert.equal(new TokenStore(tokensPath(root)).expired().length, 0, 'the replaced credential is revoked');
 });
+
+test('MEM-056 AC01: memev card --root warns from the command root, not from MEMEV_ROOT', () => {
+  const sb = sandbox({ ports: 2 });
+  const a = path.join(sb.home, 'other-vault');
+  try {
+    // vault B is the default one, picked by MEMEV_ROOT; vault A only by --root
+    assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
+    assert.equal(sb.run(['init', '--root', a, '--port', String(sb.port + 1), '--local-only', '--no-connect']).code, 0);
+    // a credential near expiry in each vault, under a different name
+    assert.equal(sb.run(['token', 'issue', 'app-a', '--ttl', '10', '--remote', '--root', a]).code, 0);
+    assert.equal(sb.run(['token', 'issue', 'app-b', '--ttl', '10', '--remote']).code, 0);
+    const k = sb.run(['card', '--root', a]);
+    assert.equal(k.code, 0, k.err);
+    assert.match(k.out, /app-a connector credential expires in 10 days/, k.out);
+    assert.doesNotMatch(k.out, /app-b/, k.out);
+  } finally {
+    sb.run(['stop', '--root', a]);
+    sb.stop();
+  }
+});

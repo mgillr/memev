@@ -249,7 +249,7 @@ async function run(argv, env) {
       if (cmd === 'recall') { const r = await call('recall', { query: pos.join(' '), limit: Number(flags.limit || 6), project: flags.project, all_projects: !!flags['all-projects'] }); flags.json ? json(r.hits) : console.log(r.text || 'Nothing found.'); }
       if (cmd === 'remember') json(await call('remember', { text: pos.join(' '), kind: flags.kind, project: flags.project, why: flags.why, review_by: flags['review-by'], force: !!flags.force }));
       if (cmd === 'checkpoint') json(await call('checkpoint', { project: flags.project, task: flags.task, done: list(flags.done), doing: flags.doing, next: list(flags.next), files: list(flags.files), source: 'cli' }));
-      if (cmd === 'card') { const r = await call('session-start', { project: flags.project, task: flags.task || pos.join(' ') || null }); console.log(flags.json ? JSON.stringify(r.card, null, 2) : renderCard(r.card)); }
+      if (cmd === 'card') { const r = await call('session-start', { project: flags.project, task: flags.task || pos.join(' ') || null }); console.log(flags.json ? JSON.stringify(r.card, null, 2) : renderCard(r.card, { root })); }
       return 0;
     }
     case 'claims': {
