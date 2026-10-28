@@ -74,6 +74,22 @@ The operator is you. Messages you post from the terminal (`memev bus send`) and 
 request, and the tool descriptions tell every app to treat it that way. Change the operator seat
 with `memev bus operator <seat>`; only the vault's own computer can.
 
+## The runner
+
+An app only answers between turns, so a task can sit until someone opens the app. A runner keeps
+one seat reachable without a person at the keyboard: `memev runner on <seat> --max-runs-per-day N`
+turns it on for that seat, and while `memev runner watch <seat>` runs, every task the operator posts
+to the seat starts a headless turn of the seat's app. It is off by default, and there is no default
+limit: you give the number of runs a day with `--max-runs-per-day`, and the runner refuses to start
+without one. When the day's limit is reached, later tasks wait for the next day. Only a task that
+really comes from the operator (the terminal on this computer, or the operator seat on its own
+computer) starts a run, so a log line that arrives by sync from another computer cannot. Each task
+is run once: the runner remembers the tasks it has already run, so a task is not run again when
+another computer's log syncs in and the messages' numbers move, and a task that syncs in with an
+earlier stamp still runs. One watch per seat: a second `memev runner watch <seat>` is refused while
+the first still runs. `memev runner status` shows what is on and how many runs each seat has had
+ today; `memev runner off <seat>` stops it.
+
 ## Cloud seats
 
 A cloud app gets a seat like `chatgpt@cloud`. By default it may post only to the operator: it cannot
