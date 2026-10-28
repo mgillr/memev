@@ -25,7 +25,7 @@ const RUNNING = [
 export function runningApp(env = process.env) { return RUNNING.find(([, t]) => t(env))?.[0] || null; }
 /** The seats to offer as lead: the app running the setup first, then the rest, then decide later. */
 export function leadChoices(seats, env = process.env) {
-  const run = runningApp(env); const mine = run ? `${label(run)}@host` : null;
+  const run = runningApp(env); const mine = run ? seats.find((s) => s.split('@')[0] === label(run)) || null : null;
   const list = [...seats].sort((a, b) => (a === mine ? -1 : b === mine ? 1 : 0));
   return [...list.map((seat) => ({ seat, label: seat === mine ? `${seat} (running this setup)` : seat })), { seat: null, label: 'decide later' }];
 }
@@ -87,7 +87,7 @@ export async function setupBus({ root, env = process.env, clients = [], flags = 
 
 const USAGE = `memev bus roster [--card] | check [--to SEAT] [--timeout S] | send TO TYPE TEXT [--ref ID] [--release]
           | tail [--n N] [--type T] | since SEQ | tasks [--open] | unread [SEAT] | watch SEAT [--interval S]
-          | operator [SEAT]`;
+          | operator [SEAT] | rename OLD NEW`;
 
 async function caller(root, env) {
   if (!isVault(root)) {
@@ -177,6 +177,23 @@ export async function command(cmd, pos, flags, { root, env }) {
     const r = await call.route('/v1/bus-operator', { seat: pos[1] === 'none' ? null : pos[1] });
     if (!r.ok) throw new Error(r.json?.error_description || r.text);
     out.ok(r.json.operator ? `${r.json.operator} now speaks for you on the bus` : 'no operator seat; only this terminal speaks for you'); return 0;
+  }
+  if (sub === 'rename') {
+    const oldName = pos[1], newName = pos[2];
+    if (!oldName || !newName) throw new Error('memev bus rename <old> <new>  (memev bus roster lists the seats)');
+    if (!isVault(root)) throw new Error('only the vault\'s own computer can rename a seat');
+    const { DeviceRegistry, hostDevice } = await import('../engine/devices.mjs');
+    const { Bus } = await import('../engine/bus.mjs');
+    const { CommitQueue } = await import('../engine/git.mjs');
+    const host = hostDevice(root);
+    const devices = new DeviceRegistry(path.join(root, '.memev', 'devices.json'));
+    devices.ensureHost(host);
+    const q = new CommitQueue(root, { delayMs: 0 });
+    const bus = new Bus({ root, devices, commit: (p) => q.add(p, 'bus') });
+    bus.renameSeat(oldName, newName);
+    q.flush();
+    out.ok(`${oldName} is now ${newName}; its history and read state follow it, and the old name still finds it`);
+    return 0;
   }
   throw new Error(USAGE);
 }
