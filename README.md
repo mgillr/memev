@@ -6,8 +6,8 @@
 
 <h1>Memev</h1>
 
-<p><strong>One memory for every AI app you use, on your own computer.</strong><br>
-Memory and recall for local coding tools and cloud AI apps alike.</p>
+<p><strong>Shared context and coordination for the AI tools you already use.</strong><br>
+Keep project knowledge consistent across AI sessions, and give supported agents a shared place to coordinate work.</p>
 
 <p>
 <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue">
@@ -24,16 +24,19 @@ Memory and recall for local coding tools and cloud AI apps alike.</p>
 <a href="CHANGELOG.md">Changelog</a>
 </p>
 
-<p>Start a project in Claude Code on Monday, and Cursor knows the context on Tuesday.<br>
-Memev keeps what your AI apps learn in a folder of plain notes on your own computer,<br>
-hands the right notes to whichever app you open next, and backs everything up to<br>
-a private GitHub repository that you own.</p>
+<p>Move between supported AI tools without rebuilding the project context every time.<br>
+Memev keeps shared project knowledge in plain Markdown on your own computer, makes relevant context available to connected tools, and provides a communications bus for agent presence, checks and task handoffs.<br>
+Your notes remain inspectable and can be backed up to a private GitHub repository that you own.</p>
 
-<p><strong>One memory and one team channel, both on computers you own.</strong></p>
+<p><strong>One shared working context. One coordination layer. Your data stays under your control.</strong></p>
 
 </div>
 
 ## How it fits together
+
+Memev is designed as a local-first coordination layer for AI work, not just a memory store. Shared context helps tools pick up where work left off; the communications bus gives connected sessions a way to discover one another and hand off tasks. The aim is to reduce repeated explanations, lost decisions and duplicated effort when people use several AI tools.
+
+The current implementation is still evolving. Multi-computer convergence and the Business and Corporate tiers are planned work, not capabilities to assume are production-ready today.
 
 ```mermaid
 flowchart LR
@@ -53,7 +56,7 @@ flowchart LR
     laptop -. "the same secure link" .-> vault
 ```
 
-## What happens when you chat
+## How shared context works
 
 ```mermaid
 flowchart LR
@@ -65,8 +68,7 @@ flowchart LR
     f --> c
 ```
 
-You don't have to ask for any of this. Memev refuses small talk and duplicates, so the notes stay
-worth reading.
+Memev is intended to keep useful project context available without making you manually copy and paste the same background into every new session. It filters for relevant notes so the shared context stays useful rather than becoming a transcript dump.
 
 ## Install
 
@@ -172,9 +174,7 @@ log first, so a crash or a bad edit can't lose anything. Claude Code, Codex, Gem
 Claude Desktop, Windsurf, VS Code and Zed all use the same notes, and cloud AI apps such as Claude and
 ChatGPT can too, side by side, through the optional secure link.
 
-Your AI apps can also talk to each other. Each one gets a seat on a comms bus kept in the vault,
-joins on its own, and keeps a heartbeat, so from one Claude Code session you can see who is there,
-run a comms check, hand out tasks and put an app on hold. See [docs/BUS.md](docs/BUS.md).
+Connected AI sessions can also coordinate through Memev's communications bus. Each connected app gets a seat, joins the roster and reports a heartbeat. From one session, you can see which peers are present, run a communications check, hand out tasks and put an app on hold. This is the foundation for cross-agent coordination; it does not mean every workflow is yet fully autonomous. See [docs/BUS.md](docs/BUS.md).
 
 You can check what Memev holds. `memev why` shows why a note came back, `memev audit` lists junk and
 stale notes, and nothing is deleted behind your back. Notes from one project don't turn up in
@@ -213,8 +213,7 @@ up. The main pages:
 
 ## For developers
 
-Memev is a local MCP server over a Markdown vault. Each session starts with a resume card, each
-prompt gets the most relevant notes (in apps with hooks), and state is saved before a compaction.
+Memev is a local MCP server and coordination layer built around a Markdown vault. Each session starts with a resume card, supported prompts can receive relevant project context (in apps with hooks), and state is saved before a compaction.
 The graph holds entities, links and claims with a status (fact, theory, conjecture) and provenance.
 Recall is BM25 over note sections, filtered by project and permissions before ranking. Node 22,
 nothing else. See [docs/DESIGN.md](docs/DESIGN.md), the [module map](docs/MODULES.md) and

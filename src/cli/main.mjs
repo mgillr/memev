@@ -44,6 +44,7 @@ Setup
   memev invite [--ttl SECONDS]     print a one-time code, link and QR code so another computer can join
   memev join <code>                make a key, enrol this computer and connect its apps
   memev join <url> --token T       the same, with a key and a token made ahead of time
+  memev join --refresh             fetch the vault's current address from the signed record in the backup
   memev license status|activate <key>|install <file>|remove   the licence: how many computers may use this vault
   memev upgrade                    the plans and what each adds, and how to buy
   memev plan                       what this vault uses: computers used and allowed, connectors counted
@@ -127,7 +128,7 @@ export async function main(argv, env = process.env) {
 
 async function run(argv, env) {
   const [cmd = 'help', ...rest] = argv;
-  const { flags, pos } = parseArgs(rest, ['help', 'yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects', 'release', 'open', 'once']);
+  const { flags, pos } = parseArgs(rest, ['help', 'yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects', 'release', 'open', 'once', 'refresh']);
   const root = resolveRoot(flags.root, env);
   const need = () => { if (!isVault(root)) throw new Error(`no vault at ${root}; run memev init`); };
   const json = (o) => console.log(JSON.stringify(o, null, 2));
