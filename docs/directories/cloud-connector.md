@@ -1,5 +1,7 @@
 # Connector directory entry (draft)
 
+Part of the [Memev documentation](../README.md). Up: the [README](../../README.md).
+
 This is draft text for a directory of remote connectors. It has not been submitted. Do not post it.
 
 ## Listing

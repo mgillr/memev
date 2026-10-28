@@ -9,8 +9,10 @@
    address) or that only organisations need (several computers on one vault, company vaults,
    SSO, audit export). They are added next to the free tier; nothing is removed from it to make room.
 3. **Your vault never talks to us.** Memev has no telemetry. A licence is a signed file checked on
-   your computer without the network. Only a hosted service you switch on talks to its server, and
-   then only with a licence id and encrypted data.
+   your computer without the network. Only licence information passes between an install and our side:
+   a licence key goes out once, to activate, and a signed licence comes back. Vault data never goes to the licence
+   server. A hosted service you switch on (none exists yet) talks only to its own server, and only with a
+   licence id and encrypted data. The one anonymous milestone report is off unless you turn it on.
 4. **You are never locked out.** If a licence lapses or a paid service stops, your vault stays on
    your computer, readable and writable, as Markdown in git.
 5. **Everything is visible.** The code that counts computers or reads a licence is in this

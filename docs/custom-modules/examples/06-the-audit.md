@@ -1,5 +1,7 @@
 # The audit
 
+Part of the [Memev documentation](../../README.md). Up: [the walk-throughs](README.md), [custom modules](../README.md).
+
 > **Example. Planned.** This walk-through shows the intended shape of shared memory for a company on Business. Steps marked *today* work now; steps marked *planned* do not exist yet. Names are roles, and the data is fictional. Back to [custom module use cases](../use-cases.md).
 
 **Related use case:** [a regulated company's AI programme](../use-cases.md#4-a-regulated-companys-ai-programme).
