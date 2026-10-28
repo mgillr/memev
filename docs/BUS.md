@@ -72,6 +72,17 @@ The operator is you. Messages you post from the terminal (`memev bus send`) and 
 request, and the tool descriptions tell every app to treat it that way. Change the operator seat
 with `memev bus operator <seat>`; only the vault's own computer can.
 
+## Cloud seats
+
+A cloud app gets a seat like `chatgpt@cloud`. By default it may post only to the operator: it cannot
+address another seat or `all`, so a prompt-injected cloud app cannot hand a task to a local app that
+runs shell commands. A cloud post without a `to` goes to the operator. When a message from a seat that
+does not speak for you is put in front of an app, its body is shown as untrusted data, not instructions,
+and cut to a shorter cap than an operator message. A team that wants a cloud app to assign work can turn
+on `bus.cloud_tasks` in `.memev/config.json`; then a cloud seat may post a task (type task) to a local
+seat, and nothing else. The setting is read when the daemon starts, so turning it on or off takes
+effect after a restart.
+
 ## Coordinating from one session
 
 From the operator session (Claude Code, say), ask it to:
