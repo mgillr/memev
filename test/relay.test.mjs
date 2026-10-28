@@ -213,6 +213,20 @@ test('MEM-029: the relay is off until the setting says otherwise, and nothing co
   } finally { sb.stop(); dummy.close(); }
 });
 
+test('MEM-030-FU: a Personal licence in grace still uses the configured relay address', async () => {
+  assert.equal(client.personalActive({ state: 'grace', tier: 'personal' }), true);
+  assert.equal(client.personalActive({ state: 'expired', tier: 'personal' }), false);
+  const sb = sandbox();
+  const url = 'relay://127.0.0.1:9';
+  try {
+    assert.equal(sb.run(['init', '--no-connect', '--local-only']).code, 0);
+    client.setRelay(sb.root, { default_url: url, default_domain: DOMAIN });
+    assert.equal(await client.command(['on'], {}, { root: sb.root, env: sb.env, license: { state: 'grace', tier: 'personal' } }), 0);
+    assert.equal(client.relaySetting(sb.root).url, url);
+    assert.equal(client.relaySetting(sb.root).enabled, true);
+  } finally { sb.stop(); }
+});
+
 test('MEM-030 AC02: The default relay URL is read from config and the client uses it when Personal is active', async () => {
   const sb = sandbox();
   const url = 'relay://127.0.0.1:9';
