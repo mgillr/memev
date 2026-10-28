@@ -1,5 +1,7 @@
 # The comms bus
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 Every AI app using your vault can talk to the others through it. Claude Code on your desk, Cursor on
 your laptop and ChatGPT through the secure link all read and post on one bus, and you can run the
 lot from a single session.
@@ -8,8 +10,11 @@ lot from a single session.
 
 There isn't any. `memev init` creates `bus/` in the vault and commits it with everything else, so it
 goes into your own GitHub backup (or local clone) through the normal sync. Every AI app that init or
-`memev connect` finds gets a seat straight away, such as `claude-code@host` or `cursor@host`, and
-the roster shows it as **never joined** until its first heartbeat or hello. Each app joins the first
+`memev connect` finds gets a seat straight away, named after the app and this computer's short name,
+such as `claude-code@my-laptop` or `cursor@my-laptop`, and the roster shows it as **never joined** until
+its first heartbeat or hello. A vault set up before seats used the machine name keeps its older
+`claude-code@host` seats, and `memev bus rename <old> <new>` changes a seat's name; messages sent to the
+old name still reach it. Each app joins the first
 time it opens a session. Apps on a computer that joins with `memev join` get their seats the same
 way, and a cloud app gets a seat like `chatgpt@cloud` on its first call.
 
@@ -69,6 +74,17 @@ The operator is you. Messages you post from the terminal (`memev bus send`) and 
 request, and the tool descriptions tell every app to treat it that way. Change the operator seat
 with `memev bus operator <seat>`; only the vault's own computer can.
 
+## Cloud seats
+
+A cloud app gets a seat like `chatgpt@cloud`. By default it may post only to the operator: it cannot
+address another seat or `all`, so a prompt-injected cloud app cannot hand a task to a local app that
+runs shell commands. A cloud post without a `to` goes to the operator. When a message from a seat that
+does not speak for you is put in front of an app, its body is shown as untrusted data, not instructions,
+and cut to a shorter cap than an operator message. A team that wants a cloud app to assign work can turn
+on `bus.cloud_tasks` in `.memev/config.json`; then a cloud seat may post a task (type task) to a local
+seat, and nothing else. The setting is read when the daemon starts, so turning it on or off takes
+effect after a restart.
+
 ## Coordinating from one session
 
 From the operator session (Claude Code, say), ask it to:
@@ -81,11 +97,24 @@ From the operator session (Claude Code, say), ask it to:
 - assign a task (`bus_send`, type task, to a seat or all). The assignee claims it (type claim, ref =
   the task id) and restates it in its own words, so you can catch a misunderstanding early. One seat
   claims a task;
-- see the tasks (`bus_tasks`): who claimed what, the restatement, the latest status and the verdict;
+- see the tasks (`bus_tasks`): who claimed what, the restatement, the latest status and the verdict.
+  An unclaimed task to a live seat that has not read it yet is **waiting for next turn**: the app
+  answers between turns, so the task is picked up when that app next runs a turn;
 - put a seat on hold (type hold), and lift it (type hold with `release`).
 
 The same things work from a terminal: `memev bus roster`, `memev bus check`, `memev bus send`,
 `memev bus tasks`, `memev bus tail`.
+
+To test the link to one seat, run `memev bus hello <seat> [--timeout S]`: it posts a single hello
+to that seat, tells you what to do in the app (start a turn; the app checks the bus at the start
+of every turn), and waits until the seat reads it, reporting how long that took. If the seat has
+not read it by the timeout (default 60 s), it exits 1 and says the seat is waiting for its next
+turn. The seat may be the `operator` alias, which is resolved to the lead's real seat first (so
+`memev bus hello operator` is a natural way to test the lead); `all` is refused, because a hello
+is to one seat. On the vault's own computer the read is exact (the seat's pulse says what it has
+read); from another computer there is no pulse to read, so the answer is approximate: the seat's
+last heartbeat after the send is the closest signal, and it can count a heartbeat the seat's own
+send makes.
 
 ## The pulse
 

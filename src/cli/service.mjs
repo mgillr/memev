@@ -12,6 +12,9 @@ import { launcherPath } from './clients.mjs';
 
 const run = (cmd, args) => { const r = spawn(cmd, args, { timeout: 15000 }); return { ok: r.ok, out: `${r.stdout}${r.stderr}`.trim() }; };
 const LABEL = 'dev.memev.daemon';
+// launchctl, systemctl and schtasks act on the whole user account, not on the HOME in use, so with MEMEV_NO_SERVICE set
+// (tests and sandboxes set it) Memev never calls them: a sandbox must not replace the person's own login service
+export const serviceOff = (env = process.env) => !!env.MEMEV_NO_SERVICE;
 const TASK = 'Memev Daemon';
 
 export function unitPaths(env = process.env, platform = process.platform) {
@@ -55,6 +58,7 @@ WantedBy=default.target
 }
 
 export async function installService({ env = process.env, root, activate = true, platform = process.platform, run: runCmd = run } = {}) {
+  if (serviceOff(env)) return { status: 'skipped', detail: 'MEMEV_NO_SERVICE is set, so no login service is installed' };
   const { kind, file } = unitPaths(env, platform);
   if (kind === 'none') return { status: 'needs-manual', detail: 'no service manager support on this platform; run memev start at login' };
   const launcher = launcherPath(env);
@@ -79,6 +83,7 @@ export async function installService({ env = process.env, root, activate = true,
 }
 
 export async function removeService({ env = process.env, quiet = false, platform = process.platform, run: runCmd = run } = {}) {
+  if (serviceOff(env)) return { removed: false };
   const { kind, file } = unitPaths(env, platform);
   if (kind === 'schtasks') {
     const r = runCmd('schtasks', ['delete', '/tn', TASK, '/f']);

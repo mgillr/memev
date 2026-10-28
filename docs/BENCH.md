@@ -1,5 +1,7 @@
 # Benchmark: recall quality and tokens
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 `scripts/bench/run.mjs` measures how well Memev finds what was recorded and how many tokens it puts into an AI client's context. It guards every change that trims tokens: a change may cut tokens, but recall quality may not drop.
 
 It is a development tool. It is not in the npm package, it makes no model calls and no network calls, and it reports nothing anywhere.

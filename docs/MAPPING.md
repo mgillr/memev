@@ -1,9 +1,11 @@
 # Hands-off runtime: what Memev does without being asked
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 | Mechanism | In Memev | Status |
 |---|---|---|
 | Standing instructions for every session | the protocol in MCP `initialize` instructions, plus a block in each app's instructions file | done |
-| Starts with the machine | `memev service install` (systemd or launchd), run by `memev init` | done |
+| Starts with the machine | `memev service install` (systemd, launchd, or a Task Scheduler entry at logon on Windows), run by `memev init` | done |
 | State injected at session start and after compaction | resume card via SessionStart hooks and `memev_session_start` | done |
 | Memory recalled for each prompt without asking | UserPromptSubmit / BeforeAgent hooks call recall | done (Cursor: session start only) |
 | Progress saved before compaction and after each turn | PreCompact and Stop hooks write checkpoints and the journal | done |
