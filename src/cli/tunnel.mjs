@@ -14,6 +14,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { configDir, readJson, writePrivate, writePrivateJson, writeJson, randomToken, now, exists } from '../engine/util.mjs';
 import { tunnelKeyFile, tunnelKey, config, saveConfig, clientToken, adminToken, api, out } from './common.mjs';
 import { publishAddressRecord } from './sync.mjs';
+import { fetchOut } from '../engine/net.mjs';
 
 export const CLOUDFLARED = {
   version: '2026.10.4',
@@ -40,7 +41,7 @@ export async function cloudflaredPath(env = process.env, { download = true } = {
   if (exists(bin)) return bin;
   if (!download || env.MEMEV_NO_DOWNLOAD) return null;
   const url = `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED.version}/${pin[0]}`;
-  const r = await fetch(url); if (!r.ok) throw new Error(`download failed: ${r.status}`);
+  const r = await fetchOut(url, {}, env); if (!r.ok) throw new Error(`download failed: ${r.status}`);
   const buf = Buffer.from(await r.arrayBuffer());
   const got = crypto.createHash('sha256').update(buf).digest('hex');
   if (got !== pin[1]) throw new Error(`cloudflared checksum mismatch (got ${got.slice(0, 12)}…); not using it`);
