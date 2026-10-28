@@ -96,7 +96,8 @@ export async function runHook(event, flags, env = process.env) {
         if (r?.hits?.length) st.injected = [...new Set([...(st.injected || []), ...r.hits.map((h) => `${h.path}#${h.heading || ''}`)])].slice(-500);
         const bus = await call('bus-pulse', {}).catch(() => null);
         await call('journal', { role: 'user', text: prompt });
-        emit(format, 'UserPromptSubmit', [bus?.text, r?.text, isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
+        const contractsOn = remote || config(root).contracts?.enabled !== false;
+        emit(format, 'UserPromptSubmit', [bus?.text, r?.text, contractsOn && isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
       }
     } else if (event === 'pre-compact') {
       await saveCheckpoint('pre-compact');

@@ -49,6 +49,12 @@ test('MEM-052 AC02: with contracts off, the prompt hook adds no nudge and the St
       assert.ok(!s.isError, JSON.stringify(s));
     } finally { await mcp.close(); }
 
+    // prompt hook: no contract nudge when contracts are off
+    const p = sb.hook('prompt', { ...base, prompt: 'build me a todo app with a REST API' });
+    assert.equal(p.code, 0, p.err);
+    const pOut = p.out ? JSON.parse(p.out).hookSpecificOutput?.additionalContext || '' : '';
+    assert.ok(!pOut.includes('memev_contract_from_request'), `the prompt hook must not nudge when contracts are off:\n${p.out}`);
+
     // stop hook: never blocks, even with an open contract for this session
     const s = sb.hook('stop', { ...base, last_assistant_message: 'done' });
     assert.equal(s.code, 0, s.err);
