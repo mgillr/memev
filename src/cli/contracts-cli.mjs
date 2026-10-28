@@ -6,6 +6,7 @@ import path from 'node:path';
 
 import { healthy, startDaemon } from './daemon.mjs';
 import { api, clientToken } from './common.mjs';
+import { FOOTER, footerEnabled } from '../engine/card.mjs';
 
 export const GATE_HOOK = (launcher, wd) => `#!/bin/sh
 # memev: refuse to push while a signed contract for this directory does not verify (runs locally).
@@ -26,7 +27,7 @@ export async function command(cmd, pos, flags, { root, env }) {
   };
   if (!(await healthy(root))) await startDaemon(root, { quiet: true });
   if (sub === 'list') return call('memev_contract_list', {});
-  if (sub === 'status') return call('memev_contract_status', { id: pos[1], project: flags.project, all: !!flags.all });
+  if (sub === 'status') { const code = await call('memev_contract_status', { id: pos[1], project: flags.project, all: !!flags.all }); if (code === 0 && footerEnabled(root)) console.log(`\n${FOOTER}`); return code; }
   if (sub === 'from-request') return call('memev_contract_from_request', { request: pos.slice(1).join(' '), project: flags.project, workdir: flags.workdir ? path.resolve(String(flags.workdir)) : process.cwd() });
   if (sub === 'verify-cmd' || sub === 'gate') {
     // memev verify [id]: verify one contract, or every open one. memev gate: the same, as an exit code,
