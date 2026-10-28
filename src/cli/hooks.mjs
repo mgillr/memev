@@ -134,7 +134,9 @@ export async function runHook(event, flags, env = process.env) {
   } catch (e) {
     if (env.MEMEV_DEBUG) process.stderr.write(`[memev hook ${event}] ${e.message}\n`);
     if (event === 'session-start') {
-      if (e?.moved) emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev] vault address changed: the vault did not answer at its saved address. Run \`memev join --refresh\` to fetch the current address, or \`memev doctor\` if the address is right.`);
+      if (e?.moved && e.refresh !== false) emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev] vault address changed: the vault did not answer at its saved address. Run \`memev join --refresh\` to fetch the current address, or \`memev doctor\` if the address is right.`);
+      // no backup address or no address key: --refresh has nothing to follow, so name the way that works
+      else if (e?.moved) emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev] the vault did not answer at its saved address, and this computer has no signed address record to follow. On the vault's computer run \`memev invite\`, then here run \`memev join <code>\`; or run \`memev doctor\` if the address is right.`);
       else emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev is not reachable right now (${e.message}); run \`memev doctor\`.]`);
     }
   }
