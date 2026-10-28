@@ -139,6 +139,5 @@ licence restores the rest at once.
 
 ## Source licence
 
-The Memev client is **Apache-2.0**. A source-available licence with a free-use grant for one
-computer has been proposed for future releases; it will not be adopted without legal review and a
-public announcement, and releases already published stay Apache-2.0.
+The Memev core is **Apache-2.0** and stays Apache-2.0. The convergence engine is a separate
+component under its own licence, not included in this repository.
