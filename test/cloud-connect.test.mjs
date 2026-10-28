@@ -1,5 +1,6 @@
 // memev cloud connect <chatgpt|claude>: prints the plan note and the copy-ready connector URL with a QR
-// code, then waits until the app's first <app>@cloud seat shows up on the bus.
+// code, then waits until the app uses the connector (its device is seen after the command started),
+// and marks the onboarding row done.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -8,6 +9,7 @@ import { spawn } from 'node:child_process';
 import { sandbox, BIN } from './helpers/cli.mjs';
 import { cleanup } from './helpers/tmp.mjs';
 import { clientToken } from '../src/cli/common.mjs';
+import { planNote, connectTimeoutMs } from '../src/cli/tunnel.mjs';
 
 after(() => cleanup());
 
@@ -51,7 +53,11 @@ test('MEM-095 AC01: memev cloud connect claude prints the URL and the plan note,
     const r = await done;
     assert.equal(r.code, 0, r.out + r.err);
     assert.ok(r.out.includes(`http://127.0.0.1:${sb.port}/c/${token}/mcp`), `the connector URL: ${r.out}`);
-    assert.match(r.out, /Plan: free/, 'the plan note');
+    assert.match(r.out, /Plan: free \(5 cloud connectors covered\)/, 'the plan note prints the number the free tier covers');
+    assert.ok(!/not limited/.test(r.out), `the plan note does not say "not limited": ${r.out}`);
+    assert.ok(r.out.includes('Connect claude.ai to this vault.'), `the person-facing line says claude.ai: ${r.out}`);
+    assert.ok(r.out.includes('add as a custom connector in claude.ai'), `the person-facing line says custom connector: ${r.out}`);
+    assert.ok(r.out.includes('Treat the connector URL like a password'), `the secret warning: ${r.out}`);
     assert.match(r.out, /claude@cloud is on the bus/, 'it saw the seat appear');
     // the onboarding row is done now that a cloud seat exists
     const ob = sb.run(['onboarding']);
@@ -62,6 +68,25 @@ test('MEM-095 AC01: memev cloud connect claude prints the URL and the plan note,
   } finally { sb.stop(); }
 });
 
+test('MEM-095 AC01: the person-facing lines say ChatGPT and keep the command and seat names', async () => {
+  const { sb } = setup();
+  try {
+    const r = await connect(sb, ['chatgpt', '--timeout', '1']);
+    assert.notEqual(r.code, 0, r.out + r.err);
+    assert.ok(r.out.includes('Connect ChatGPT to this vault.'), r.out);
+    assert.ok(r.out.includes('add as a custom connector in ChatGPT'), r.out);
+    assert.match(r.out, /no chatgpt@cloud seat after 1s/, 'the seat name is kept');
+    assert.match(r.out, /memev cloud connect chatgpt again/, 'the command is kept');
+  } finally { sb.stop(); }
+});
+
+test('MEM-095 AC01: the plan note prints the connector count for capped tiers and says not capped only when the tier has no number', () => {
+  assert.equal(planNote({ connectors: 5 }), '5 cloud connectors covered');
+  assert.equal(planNote({ connectors: 10 }), '10 cloud connectors covered');
+  assert.equal(planNote({ connectors: null }), 'cloud connectors not capped');
+  assert.ok(!/not limited/.test(planNote({ connectors: 5 })), 'no "not limited"');
+});
+
 test('MEM-095 AC02: memev cloud connect exits non-zero after --timeout when no cloud seat appears', async () => {
   const { sb } = setup();
   try {
@@ -69,4 +94,22 @@ test('MEM-095 AC02: memev cloud connect exits non-zero after --timeout when no c
     assert.notEqual(r.code, 0, r.out + r.err);
     assert.match(r.out, /no claude@cloud seat after 2s/, r.out);
   } finally { sb.stop(); }
+});
+
+test('MEM-095 AC02: a claude@cloud seat from before the command does not count as a new connection', async () => {
+  const { sb, token } = setup();
+  try {
+    assert.equal(await cloudRegister(sb, token, 'claude'), 200, 'the seat exists before the command');
+    const r = await connect(sb, ['claude', '--timeout', '2']);
+    assert.notEqual(r.code, 0, `a stale seat must not count as connected: ${r.out}`);
+    assert.match(r.out, /no claude@cloud seat after 2s/, r.out);
+  } finally { sb.stop(); }
+});
+
+test('MEM-095 AC02: a missing or non-numeric --timeout falls back to 120 seconds instead of waiting forever', () => {
+  assert.equal(connectTimeoutMs({}), 120000);
+  assert.equal(connectTimeoutMs({ timeout: 'abc' }), 120000);
+  assert.equal(connectTimeoutMs({ timeout: '' }), 120000);
+  assert.equal(connectTimeoutMs({ timeout: '2' }), 2000);
+  assert.equal(connectTimeoutMs({ timeout: '-5' }), 1000);
 });
