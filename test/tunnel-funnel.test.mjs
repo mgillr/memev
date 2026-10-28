@@ -32,8 +32,9 @@ test('MEM-055 AC01: without consent no tailscale funnel command is run', async (
   // tailscale is installed and logged in, and the user pinned tailscale, but there is no consent.
   assert.equal(funnelConsent({ remote: { provider: 'tailscale' } }), false);
   const probe = fakeRun();
-  assert.equal(pickProvider({ remote: { provider: 'tailscale' } }, process.env, { run: probe.run, whichFn }), 'quick');
-  // With the same machine, consent is exactly what switches the provider to tailscale.
+  // A pinned tailscale stays tailscale (the tailnet-only serve); it never falls back to a public
+  // quick tunnel, with or without consent.
+  assert.equal(pickProvider({ remote: { provider: 'tailscale' } }, process.env, { run: probe.run, whichFn }), 'tailscale');
   assert.equal(pickProvider({ remote: { provider: 'tailscale', funnelConsent: true } }, process.env, { run: probe.run, whichFn }), 'tailscale');
 
   const root = tmpdir('tunnel-');

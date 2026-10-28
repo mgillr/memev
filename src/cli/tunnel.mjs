@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Remote access for cloud AI apps, off by default, one command to switch on (`memev cloud on`).
 // Providers, best first:
-//   tailscale   `tailscale serve` on this machine: a stable https name, tailnet only (never Funnel)
+//   tailscale   `tailscale serve` on this machine: a stable https name, tailnet only; a public
+//               Funnel only after the explicit `memev cloud funnel on`
 //   cloudflare  a named Cloudflare tunnel you configured (`memev cloud use cloudflare --name N --hostname H`): stable
 //   quick       a Cloudflare quick tunnel: no account, but the address changes when it restarts
 // The daemon supervises the tunnel, restarts it with backoff and records the current address.
@@ -63,9 +64,8 @@ export const funnelConsent = (cfg) => cfg.remote?.funnelConsent === true;
 export function pickProvider(cfg, env = process.env, { run = runCmd, whichFn = which } = {}) {
   const want = cfg.remote?.provider || 'auto';
   if (want === 'cloudflare' && cfg.remote?.cloudflare?.name) return 'cloudflare';
-  // A pinned tailscale asks for a funnel, and a funnel needs consent. Without it we fall back to quick.
-  // `auto` keeps the tailnet-only serve, so it is not gated on consent here.
-  if (want === 'tailscale' && !funnelConsent(cfg)) return 'quick';
+  // A pinned tailscale stays tailscale: without consent it is the tailnet-only serve, never a
+  // public quick tunnel. A funnel is a separate explicit step (memev cloud funnel on).
   if (want === 'tailscale' || want === 'auto') {
     const ts = whichFn('tailscale');
     if (ts) { const s = run(ts, ['status', '--json'], { timeout: 3000 }); if (s.ok) { try { if (JSON.parse(s.stdout).BackendState === 'Running') return 'tailscale'; } catch {} } }
@@ -85,8 +85,9 @@ export function tailscaleFunnel({ ts, port, run = runCmd }) {
     alreadyConfigured,
     // Bring the funnel up only when there is not already one for this port. Returns the address.
     up() { if (alreadyConfigured()) return url(); const r = run(ts, ['funnel', '--bg', '--yes', String(port)], { timeout: 20000 }); if (!r.ok) throw new Error(r.error || (r.stderr || r.stdout).trim().split('\n').pop()); return url(); },
-    // Turn the funnel off only when Memev created it (no pre-existing funnel for the port).
-    down() { if (alreadyConfigured()) return; run(ts, ['funnel', '--bg', String(port), 'off'], { timeout: 10000 }); },
+    // Turn the funnel off. Only call this for a funnel Memev opened itself (the tunnel state
+    // records that); a pre-existing funnel for the port is never touched.
+    down() { const r = run(ts, ['funnel', '--bg', String(port), 'off'], { timeout: 10000 }); if (!r.ok) log(`tailscale funnel off failed: ${r.error || (r.stderr || r.stdout).trim()}`); },
   };
 }
 
@@ -116,7 +117,7 @@ export function supervise(vault, { root, port, run = runCmd, whichFn = which }) 
             write({ enabled: true, provider, url, stable: true, state: 'up (existing funnel left as is)' }); log(`up at ${url} (existing funnel left as is)`); return;
           }
           const url = f.up();
-          write({ enabled: true, provider, url, stable: true, state: 'up' }); log(`up at ${url}`); return;
+          write({ enabled: true, provider, url, stable: true, state: 'up', mode: 'funnel' }); log(`up at ${url}`); return;
         }
         const r = run(ts, ['serve', '--bg', String(port)], { timeout: 20000 });
         if (!r.ok) throw new Error(r.error || (r.stderr || r.stdout).trim().split('\n').pop() || `tailscale serve failed (exit ${r.status})`);
@@ -124,7 +125,7 @@ export function supervise(vault, { root, port, run = runCmd, whichFn = which }) 
         if (!st.ok) throw new Error(st.error || (st.stderr || st.stdout).trim().split('\n').pop() || 'tailscale status failed');
         const parsed = JSON.parse(st.stdout);
         const url = `https://${String(parsed.Self.DNSName).replace(/\.$/, '')}`;
-        write({ enabled: true, provider, url, stable: true, state: 'up' }); log(`up at ${url}`); return;
+        write({ enabled: true, provider, url, stable: true, state: 'up', mode: 'serve' }); log(`up at ${url}`); return;
       }
       const bin = await cloudflaredPath(env);
       if (!bin) throw new Error('cloudflared is not installed and could not be downloaded');
@@ -158,9 +159,10 @@ export function supervise(vault, { root, port, run = runCmd, whichFn = which }) 
     if (tunnelState(root)?.provider === 'tailscale') {
       const ts = whichFn('tailscale');
       if (ts) {
-        // A pre-existing funnel is never turned off; only the tunnel Memev started is.
+        // A pre-existing funnel is never turned off; only the tunnel Memev started is, and the
+        // state records whether that was a funnel Memev opened or a tailnet-only serve.
         if (tunnelState(root)?.state !== 'up (existing funnel left as is)') {
-          if (funnelConsent(vault.config)) {
+          if (tunnelState(root)?.mode === 'funnel') {
             tailscaleFunnel({ ts, port, run }).down();
           } else {
             const r = run(ts, ['serve', '--bg', '--https=443', 'off'], { timeout: 10000 });
@@ -231,10 +233,18 @@ export async function command(cmd, pos, flags, { root, env = process.env }) {
   }
   if (sub === 'use') {
     const p = pos[1]; if (!['auto', 'tailscale', 'cloudflare', 'quick'].includes(p)) throw new Error('memev cloud use auto|tailscale|cloudflare|quick');
-    // Choosing tailscale here is the explicit consent to open a funnel; any other provider withdraws it.
-    cfg.remote = { ...cfg.remote, provider: p, funnelConsent: p === 'tailscale', ...(p === 'cloudflare' ? { cloudflare: { name: flags.name, hostname: flags.hostname } } : {}) };
+    // Choosing tailscale here picks the tailnet-only serve; a public funnel is a separate explicit step.
+    cfg.remote = { ...cfg.remote, provider: p, ...(p === 'cloudflare' ? { cloudflare: { name: flags.name, hostname: flags.hostname } } : {}) };
     if (p === 'cloudflare' && (!flags.name || !flags.hostname)) throw new Error('memev cloud use cloudflare --name <tunnel> --hostname <host>');
-    saveConfig(root, cfg); await reloadDaemon(root); console.log(p === 'tailscale' ? 'Tunnel provider: tailscale (Tailscale Funnel is now allowed on this machine)' : `Tunnel provider: ${p}`); return 0;
+    saveConfig(root, cfg); await reloadDaemon(root); console.log(p === 'tailscale' ? 'Tunnel provider: tailscale (tailnet only; a public funnel needs memev cloud funnel on)' : `Tunnel provider: ${p}`); return 0;
+  }
+  if (sub === 'funnel') {
+    const f = pos[1]; if (!['on', 'off'].includes(f)) throw new Error('memev cloud funnel on|off');
+    if (f === 'on' && !flags.yes) { console.log('A Tailscale Funnel puts this machine on the public internet: anyone who knows the address can reach the vault. To switch it on anyway: memev cloud funnel on --yes'); return 1; }
+    cfg.remote = { ...cfg.remote, funnelConsent: f === 'on' };
+    saveConfig(root, cfg); await reloadDaemon(root);
+    console.log(f === 'on' ? 'Tailscale Funnel is allowed: with the tailscale provider the tunnel goes public (memev cloud status shows the address).' : 'Tailscale Funnel is off: the tailscale tunnel stays tailnet only.');
+    return 0;
   }
   if (sub === 'relay') { const rc = await (await import('./relay.mjs')).command(pos.slice(1), flags, { root, env }); if (['on', 'off'].includes(pos[1]) && rc === 0) await reloadDaemon(root); return rc; }
   if (sub === 'rotate-key') { writePrivate(tunnelKeyFile(root), `${randomToken(24)}\n`); console.log('New legacy tunnel key. It is no longer needed: each app and computer has its own credential (memev devices). Apps that still send X-Memev-Key need the new value or should drop the header.'); return 0; }
@@ -282,5 +292,5 @@ export async function command(cmd, pos, flags, { root, env = process.env }) {
       await new Promise((r) => setTimeout(r, 500));
     }
   }
-  throw new Error('memev cloud on|off|status|url|use|relay|rotate-key|connect');
+  throw new Error('memev cloud on|off|status|url|use|funnel|relay|rotate-key|connect');
 }
