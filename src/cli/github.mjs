@@ -14,6 +14,8 @@ import { git } from '../engine/git.mjs';
 import { config, saveConfig, out } from './common.mjs';
 
 const sh = (cmd, args, opts = {}) => { const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: opts.timeout || 60000, stdio: opts.inherit ? 'inherit' : 'pipe', env: { ...process.env, ...(opts.env || {}) }, input: opts.input }); return { ok: r.status === 0, out: (r.stdout || '').trim(), err: (r.stderr || '').trim(), status: r.status }; };
+// gh takes the host as GH_HOST: only `gh auth` has a --hostname flag that repo, api and deploy-key commands do not
+const ghOn = (host) => (args, opts = {}) => sh('gh', args, host && host !== 'github.com' ? { ...opts, env: { ...(opts.env || {}), GH_HOST: host } } : opts);
 const has = (bin) => sh(process.platform === 'win32' ? 'where' : 'which', [bin]).ok;
 
 // The file a vault backup pushes. The first line is how init tells a private repository is one of ours.
@@ -24,16 +26,17 @@ const BACKUP_MARKER = '# Your Memev vault';
  * No GitHub call when the CLI is missing or the user is signed out: the status check is local,
  * and a failed status returns before any repository call.
  */
-export function findMemevBackup() {
+export function findMemevBackup(host = 'github.com') {
   if (!has('gh')) return null;
-  if (!sh('gh', ['auth', 'status', '--hostname', 'github.com']).ok) return null;
-  const list = sh('gh', ['repo', 'list', '--limit', '100', '--json', 'nameWithOwner,isPrivate']);
+  if (!sh('gh', ['auth', 'status', '--hostname', host]).ok) return null;
+  const gh = ghOn(host);
+  const list = gh(['repo', 'list', '--limit', '100', '--json', 'nameWithOwner,isPrivate']);
   if (!list.ok || !list.out) return null;
   let repos = [];
   try { repos = JSON.parse(list.out); } catch { return null; }
   for (const repo of repos) {
     if (!repo?.isPrivate || typeof repo.nameWithOwner !== 'string') continue;
-    const file = sh('gh', ['api', `repos/${repo.nameWithOwner}/contents/README.md`, '--jq', '.content']);
+    const file = gh(['api', `repos/${repo.nameWithOwner}/contents/README.md`, '--jq', '.content']);
     if (!file.ok || !file.out) continue;
     let text = '';
     try { text = Buffer.from(file.out.replace(/\s/g, ''), 'base64').toString('utf8'); } catch { continue; }
@@ -120,30 +123,32 @@ export async function githubReachable({ probe = tcpProbe } = {}) {
 }
 
 export async function setup({ root, env = process.env, repo = null, flags = {} }) {
+  const host = flags.host || 'github.com';
+  const gh = ghOn(host);
   const steps = [];
   const step = (status, what, detail = '') => { steps.push({ status, what, detail }); (status === 'ok' ? out.ok : status === 'manual' ? out.warn : out.bad)(`${what}${detail ? `: ${detail}` : ''}`); };
   if (!has('gh')) { step('manual', 'GitHub CLI', 'install it from https://cli.github.com and run memev github setup again (or follow docs/GITHUB.md to do it by hand)'); return { ok: false, steps }; }
-  let st = sh('gh', ['auth', 'status', '--hostname', 'github.com']);
+  let st = sh('gh', ['auth', 'status', '--hostname', host]);
   if (!st.ok) {
-    if (flags['no-login']) { step('manual', 'GitHub sign-in', 'run gh auth login'); return { ok: false, steps }; }
-    console.log('Sign in to GitHub: a one-time code is shown; enter it at https://github.com/login/device');
-    const l = sh('gh', ['auth', 'login', '--hostname', 'github.com', '--git-protocol', 'https', '--web', '--scopes', 'repo'], { inherit: true, timeout: 15 * 60000 });
+    if (flags['no-login']) { step('manual', 'GitHub sign-in', `run gh auth login --hostname ${host}`); return { ok: false, steps }; }
+    console.log(`Sign in to ${host}: a one-time code is shown; enter it at https://${host}/login/device`);
+    const l = sh('gh', ['auth', 'login', '--hostname', host, '--git-protocol', 'https', '--web', '--scopes', 'repo'], { inherit: true, timeout: 15 * 60000 });
     if (!l.ok) { step('fail', 'GitHub sign-in', 'did not finish'); return { ok: false, steps }; }
   }
-  const login = sh('gh', ['api', 'user', '--jq', '.login']).out;
+  const login = gh(['api', 'user', '--jq', '.login']).out;
   if (!login) { step('fail', 'GitHub account', 'could not read the signed-in account'); return { ok: false, steps }; }
-  step('ok', 'Signed in to GitHub', login);
+  step('ok', `Signed in to ${host}`, login);
   const name = repo || `${login}/${slug(path.basename(root), 40)}-vault`;
-  const view = sh('gh', ['repo', 'view', name, '--json', 'visibility,sshUrl', '--jq', '.visibility + " " + .sshUrl']);
+  const view = gh(['repo', 'view', name, '--json', 'visibility,sshUrl', '--jq', '.visibility + " " + .sshUrl']);
   let sshUrl;
   if (view.ok) {
     const [vis, url] = view.out.split(' ');
     if (vis !== 'PRIVATE') { step('fail', 'Repository', `${name} is ${vis.toLowerCase()}; Memev only backs up to a private repository`); return { ok: false, steps }; }
     sshUrl = url; step('ok', 'Using your private repository', name);
   } else {
-    const c = sh('gh', ['repo', 'create', name, '--private', '--disable-issues', '--disable-wiki', '--description', 'My Memev vault (private)']);
+    const c = gh(['repo', 'create', name, '--private', '--disable-issues', '--disable-wiki', '--description', 'My Memev vault (private)']);
     if (!c.ok) { step('fail', 'Create repository', c.err.split('\n').pop()); return { ok: false, steps }; }
-    sshUrl = sh('gh', ['repo', 'view', name, '--json', 'sshUrl', '--jq', '.sshUrl']).out || `git@github.com:${name}.git`;
+    sshUrl = gh(['repo', 'view', name, '--json', 'sshUrl', '--jq', '.sshUrl']).out || `git@${host}:${name}.git`;
     step('ok', 'Created a private repository', name);
   }
   if (flags['remote-url']) sshUrl = flags['remote-url'];
@@ -152,14 +157,14 @@ export async function setup({ root, env = process.env, repo = null, flags = {} }
   const key = path.join(keyDir, `deploy-${slug(name, 60)}`);
   if (!exists(key)) { const k = sh('ssh-keygen', ['-t', 'ed25519', '-N', '', '-C', `memev deploy key (${slug(name, 60)})`, '-f', key, '-q']); if (!k.ok) { step('fail', 'Deploy key', k.err); return { ok: false, steps }; } }
   fs.chmodSync(key, 0o600);
-  const add = sh('gh', ['repo', 'deploy-key', 'add', `${key}.pub`, '--repo', name, '--allow-write', '--title', `memev (${path.basename(root)})`]);
+  const add = gh(['repo', 'deploy-key', 'add', `${key}.pub`, '--repo', name, '--allow-write', '--title', `memev (${path.basename(root)})`]);
   if (!add.ok && !/already in use|key is already/i.test(add.err)) { step('fail', 'Deploy key', add.err.split('\n').pop()); return { ok: false, steps }; }
   step('ok', 'Deploy key added', 'write access to this one repository only');
   // the vault: remote, ssh key, push guard
   if (git(root, ['remote', 'get-url', 'origin']).ok) git(root, ['remote', 'set-url', 'origin', sshUrl]); else git(root, ['remote', 'add', 'origin', sshUrl]);
   git(root, ['config', 'core.sshCommand', `ssh -i "${key}" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new`]);
   fs.writeFileSync(path.join(root, '.git', 'hooks', 'pre-push'), PRE_PUSH(sshUrl), { mode: 0o755 });
-  const cfg = config(root); cfg.github = { repo: name, remote: sshUrl, key: path.basename(key) }; saveConfig(root, cfg);
+  const cfg = config(root); cfg.github = { repo: name, remote: sshUrl, key: path.basename(key), host }; saveConfig(root, cfg);
   const p = pushBackup(root, { upstream: true, quiet: false, remote: 'origin' });
   if (!p.ok) { step('manual', 'First push', `${p.error} (Memev retries every 30 minutes)`); return { ok: false, steps, repo: name }; }
   const via = p.via && p.via !== sshUrl ? ` via ${p.via.replace('ssh://git@', '')}` : '';
@@ -171,6 +176,6 @@ export async function setup({ root, env = process.env, repo = null, flags = {} }
 export async function command(cmd, pos, flags, { root, env }) {
   const sub = pos[0] || 'setup';
   if (sub === 'setup') return (await setup({ root, env, repo: flags.repo || pos[1] || null, flags })).ok ? 0 : 1;
-  if (sub === 'status') { const c = config(root).github; console.log(c ? `Backing up to ${c.repo} (${c.remote})` : 'Not set up: memev github setup'); return 0; }
+  if (sub === 'status') { const c = config(root).github; console.log(c ? `Backing up to ${c.repo} on ${c.host || 'github.com'} (${c.remote})` : 'Not set up: memev github setup'); return 0; }
   throw new Error('memev github setup [--repo owner/name] | status');
 }
