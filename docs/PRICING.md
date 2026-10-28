@@ -36,6 +36,14 @@ hub runs on the company's server. Sync, the relay, the hub, sign-in, roles, labe
 log are planned, not built, and no date is given. See [tiers/](tiers/README.md) for how each tier
 is set up.
 
+## Referral credit (draft)
+
+A customer on a running Personal subscription can opt in to a referral code. When a new customer
+enters that code at Stripe checkout and their first Personal payment succeeds, the referrer gets
+one free month of Personal. The referred customer pays the normal price. There is no in-app
+tracking and no telemetry: the code is issued and redeemed by Stripe, and Memev never sees it.
+The full mechanism: [REFERRAL.md](REFERRAL.md).
+
 A Team licence count is seats times 3. For Team, Business and Enterprise the number of computers
 comes from the licence you are issued.
 
