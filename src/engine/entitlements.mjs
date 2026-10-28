@@ -18,7 +18,7 @@ export const PAID_FEATURES = ['sync_hosted', 'backup_hosted', 'relay_hosted', 'e
 /** Draft limits per tier (docs/PRICING.md). A licence's own seats and connectors win. */
 export const TIERS = {
   free: { computers: 1, connectors: 5, local_clients: null, services: [] },
-  personal: { computers: 4, connectors: 10, local_clients: null, services: ['sync', 'backup', 'relay'] },
+  personal: { computers: 3, connectors: 10, local_clients: null, services: ['sync', 'backup', 'relay'] },
   team: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team'] },
   office: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team'] },
   business: { computers: null, connectors: null, local_clients: null, services: ['team'] },
