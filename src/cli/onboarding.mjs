@@ -64,7 +64,7 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   // a sync merge that the two computers could not join by itself: both versions are kept, the person looks
   const { readConflicts } = await import('./sync.mjs');
   const conflicts = readConflicts(root);
-  if (conflicts?.files?.length) add('needs-manual', 'Sync conflicts', `${conflicts.files.map((f) => f.path).join(', ')}: both versions kept (memev doctor)`);
+  if (conflicts?.files?.length) add('needs-manual', 'Sync conflicts', `${conflicts.files.join(', ')}: both versions kept (memev doctor)`);
   // the memev command itself: a source install leaves the launcher off PATH
   const { launcherDir, onPath, commandName } = await import('./pathsetup.mjs');
   if (onPath(launcherDir(env), env)) add('ready', 'memev command', 'on your PATH');
