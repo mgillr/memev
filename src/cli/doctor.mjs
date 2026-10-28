@@ -13,7 +13,7 @@ import { VERSION, isVault } from '../engine/vault.mjs';
 import { PKG, daemonInfo, pidAlive, config, out, clientsFile } from './common.mjs';
 import { licensingStatus } from './licensing.mjs';
 import { alt443, githubReachable } from './github.mjs';
-import { fileOf, label } from '../engine/bus.mjs';
+import { label } from '../engine/bus.mjs';
 import { fetchOut } from '../engine/net.mjs';
 import { fixFor } from './preflight.mjs';
 
@@ -155,7 +155,10 @@ export function busChecks({ root, vault = null, connected = [] }) {
   const has = (f) => exists(path.join(root, 'bus', f));
   const folder = has('config.json') && has('operator.json') && has('log');
   r.push(C('bus-files', 'comms bus folder in the vault', folder ? 'ok' : 'fail', folder ? 'bus/ (committed with the vault)' : 'bus/ is missing from the vault', folder ? null : vault ? { desc: 'set bus/ up again', destructive: false, run: () => vault.bus.ensure(vault.host.id) } : { desc: 'set bus/ up again', destructive: false, cmd: 'bus' }));
-  const missing = connected.filter((id) => { const f = path.join(root, 'bus', 'seats', `${fileOf(`${label(id)}@host`)}.json`); const rec = readJson(f, null); return !rec || rec.removed; });
+  // each connected app's seat on this computer, whatever it is called: <app>@<machine>, an older <app>@host, or a new name
+  let seats = [];
+  try { seats = fs.readdirSync(path.join(root, 'bus', 'seats')).filter((f) => f.endsWith('.json')).map((f) => readJson(path.join(root, 'bus', 'seats', f), null)).filter(Boolean); } catch { /* no seats yet */ }
+  const missing = connected.filter((id) => !seats.some((s) => s.client === label(id) && s.device_kind === 'host' && !s.removed));
   r.push(C('bus-seats', 'every connected app has a bus seat', missing.length ? 'fail' : 'ok', missing.length ? `no seat for ${missing.join(', ')}` : `${connected.length} app(s) seated`, missing.length ? { desc: 'seat them', destructive: false, cmd: 'bus' } : null));
   const lead = readJson(path.join(root, 'bus', 'operator.json'), null)?.seat || null;
   r.push(C('bus-lead', 'lead AI chosen', lead ? 'ok' : 'warn', lead ? `${lead} leads the others` : 'needs you: no lead AI chosen yet; pick the AI that leads and coordinates the others with memev bus operator <seat> (memev bus roster lists the seats)'));
