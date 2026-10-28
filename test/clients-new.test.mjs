@@ -25,7 +25,7 @@ test('MEM-044 AC01: with a fake ~/.config/opencode, init connects OpenCode and d
   const cfg = JSON.parse(fs.readFileSync(opencodeJson, 'utf8'));
   assert.equal(cfg.theme, 'dark');
   assert.ok(cfg.mcp.other, 'the user server stays');
-  assert.deepEqual(cfg.mcp.memev, { type: 'local', command: ['/x/memev', 'mcp', '--client', 'opencode'], enabled: true });
+  assert.deepEqual(cfg.mcp.memev, { type: 'local', command: '/x/memev', args: ['mcp', '--client', 'opencode'], enabled: true });
   assert.match(fs.readFileSync(agentsMd, 'utf8'), /^# My rules\n\nAlways use tabs\.\n\n<!-- memev:start -->/);
   const d = disconnect('opencode', { env });
   assert.deepEqual(d.results.map((x) => x.action), ['restored', 'restored']);

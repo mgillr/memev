@@ -381,13 +381,21 @@ export class Bus {
     return { check: msg.id, seq: msg.seq, waited_ms: Date.now() - start, answered, missing };
   }
 
-  /** Tasks with who claimed them, the restatement, the latest status and the verdict. */
+  /** Has this seat not seen this message yet (its read pointer is still behind it)? */
+  unreadFor(seat, m) {
+    const p = this._pulse(seat);
+    return m.dseq > (p.read?.[m.device] || 0);
+  }
+  /** Tasks with who claimed them, the restatement, the latest status and the verdict. An unclaimed
+   * task to a live seat that has not read it yet waits for that seat's next turn. */
   tasks(ctx, { open = false } = {}) {
     const who = this.resolve(ctx); const all = this.all().filter((m) => this._visible(who, m));
+    const live = new Set(this.roster().seats.filter((r) => r.seat && r.state === 'live').map((r) => r.seat));
     return all.filter((m) => m.type === 'task').map((t) => {
       const rel = all.filter((m) => m.ref === t.id);
       const claim = rel.find((m) => m.type === 'claim'); const verdict = rel.filter((m) => m.type === 'verdict').at(-1);
-      return { id: t.id, seq: t.seq, from: t.from, operator: t.operator, to: t.to, body: t.body, claimed_by: claim?.from || null, restated: rel.filter((m) => m.type === 'restate').at(-1)?.body || null, status: rel.filter((m) => m.type === 'status').at(-1)?.body || null, verdict: verdict?.body || null, state: verdict ? 'done' : claim ? 'claimed' : 'open' };
+      const state = verdict ? 'done' : claim ? 'claimed' : live.has(t.to) && this.unreadFor(t.to, t) ? 'waiting for next turn' : 'open';
+      return { id: t.id, seq: t.seq, from: t.from, operator: t.operator, to: t.to, body: t.body, claimed_by: claim?.from || null, restated: rel.filter((m) => m.type === 'restate').at(-1)?.body || null, status: rel.filter((m) => m.type === 'status').at(-1)?.body || null, verdict: verdict?.body || null, state };
     }).filter((t) => !open || t.state !== 'done');
   }
 
