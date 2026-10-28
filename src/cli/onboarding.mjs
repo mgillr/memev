@@ -19,10 +19,19 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   add(daemonUp ? 'succeeded' : 'failed', 'Memev running', daemonUp ? 'on this machine (127.0.0.1)' : why ? `${why} (memev doctor)` : 'run memev doctor');
   // apps
   const clients = await import('./clients.mjs');
-  if (firstRun && !flags['no-connect']) clients.connectAll({ env, launcher });
+  if (firstRun && !flags['no-connect']) {
+    // the Claude Code tool consent: a flag, or one question on a terminal (asked once, kept either way)
+    const hasClaude = clients.detect(env, launcher).some((c) => c.id === 'claude-code' && c.found);
+    let allowTools = false;
+    if (hasClaude) {
+      if (flags['allow-tools'] === true) { setAllowTools(env, true); allowTools = true; }
+      else allowTools = await askAllowToolsOnce({ env }).catch(() => false);
+    }
+    clients.connectAll({ env, launcher, allowTools });
+  }
   const found = clients.detect(env, launcher);
   for (const c of found.filter((x) => x.found)) {
-    if (c.connected) { add(firstRun ? 'added' : 'ready', c.name, c.mode === 'hooks' ? 'MCP + session hooks + instructions: memory is loaded and saved automatically' : 'MCP + instructions', { app: c.id }); if (c.manual) add('needs-manual', `${c.name}: one step`, c.manual, { app: c.id, note: true }); }
+    if (c.connected) { let detail = c.mode === 'hooks' ? 'MCP + session hooks + instructions: memory is loaded and saved automatically' : 'MCP + instructions'; if (c.id === 'claude-code') { const at = allowToolsSettings(env); detail += at.enabled ? '; Memev tools are allowed, so no prompt per call' : '; Memev tools: Claude Code prompts before each call, allow them with memev connect claude-code --allow-tools'; } add(firstRun ? 'added' : 'ready', c.name, detail, { app: c.id }); if (c.manual) add('needs-manual', `${c.name}: one step`, c.manual, { app: c.id, note: true }); }
     else if (c.declined) add('skipped', c.name, 'you disconnected it (memev connect ' + c.id + ' to undo)', { app: c.id });
     else {
       // why it is not connected: a file Memev cannot edit is named, with the snippet to paste by hand
@@ -182,6 +191,34 @@ export async function askReportOnce({ env = process.env, ask, input = process.st
   try { output.write(`\n${REPORT_QUESTION}`); a = (await rl.question('Share anonymous milestones? [y/N] ')).trim().toLowerCase(); } finally { rl.close(); }
   const yes = a === 'y' || a === 'yes';
   setReport(env, yes);
+  return yes;
+}
+// ---- the Claude Code tool consent. Off by default; Claude Code prompts before each Memev tool call until it is on.
+export const allowToolsFile = (env = process.env) => path.join(configDir(env), 'allow-tools.json');
+/** { enabled, asked }. A fresh install: off, never asked. */
+export function allowToolsSettings(env = process.env) {
+  const s = readJson(allowToolsFile(env), null) || {};
+  return { enabled: s.enabled === true, asked: s.asked === true };
+}
+const saveAllowTools = (env, s) => writePrivateJson(allowToolsFile(env), s);
+/** Turn it on or off. */
+export function setAllowTools(env, on) {
+  const s = allowToolsSettings(env);
+  saveAllowTools(env, { ...s, enabled: !!on, asked: true });
+  return allowToolsSettings(env);
+}
+export const ALLOW_TOOLS_QUESTION = 'Let Memev call its own tools in Claude Code without a prompt each time?\n  What changes: Memev adds mcp__memev to the allow list in ~/.claude/settings.json, so Claude Code runs Memev tools (recall, remember, checkpoint) without asking you each time.\n  Never changes: your other permissions, or any other app. It is off unless you say yes, and memev disconnect claude-code removes it again.\n';
+/** Asked once, on a terminal only. The answer is kept either way and the question never comes back. `ask` forces (true) or forbids (false) it; input and output are for tests. */
+export async function askAllowToolsOnce({ env = process.env, ask, input = process.stdin, output = process.stdout } = {}) {
+  const s = allowToolsSettings(env);
+  if (s.asked) return s.enabled;
+  if (!(ask ?? (!!input.isTTY && !!output.isTTY))) return s.enabled;
+  const readline = await import('node:readline/promises');
+  const rl = readline.createInterface({ input, output, terminal: false });
+  let a = '';
+  try { output.write(`\n${ALLOW_TOOLS_QUESTION}`); a = (await rl.question('Allow Memev tools in Claude Code? [y/N] ')).trim().toLowerCase(); } finally { rl.close(); }
+  const yes = a === 'y' || a === 'yes';
+  setAllowTools(env, yes);
   return yes;
 }
 async function reportCommand(pos, flags, { root, env }) {

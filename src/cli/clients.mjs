@@ -102,21 +102,37 @@ const text = (file, apply, remove, note) => ({ file, kind: 'text', apply, remove
 const mdBlock = (file) => text(file, (t) => addBlock(t, INSTRUCTIONS), (t) => removeBlock(t));
 
 /** The apps Memev knows. mode: 'hooks' = state injected by hooks; 'instructions' = MCP + instructions only. */
-export function clientDefs(env, bin, platform = process.platform) {
+export function clientDefs(env, bin, platform = process.platform, opts = {}) {
   const { home, appData } = platformDirs(env);
   const win = winSpawn(env, platform);
   const launcher = win ? `"${win.node}" "${win.script}"` : `"${bin}"`;
   const stdio = (id) => win ? { command: win.node, args: [win.script, 'mcp', '--client', id] } : { command: bin, args: ['mcp', '--client', id] };
+  // With consent, Claude Code is told it may call Memev's tools without a prompt each time: mcp__memev in
+  // permissions.allow. Added only when allowTools is set; disconnect always takes it out again.
+  const allowMemev = (j) => {
+    j.permissions = j.permissions && typeof j.permissions === 'object' ? j.permissions : {};
+    j.permissions.allow = Array.isArray(j.permissions.allow) ? j.permissions.allow : [];
+    if (!j.permissions.allow.includes('mcp__memev')) j.permissions.allow.push('mcp__memev');
+    return j;
+  };
+  const unallowMemev = (j) => {
+    if (j.permissions && typeof j.permissions === 'object' && Array.isArray(j.permissions.allow)) {
+      j.permissions.allow = j.permissions.allow.filter((e) => e !== 'mcp__memev' && !String(e).startsWith('mcp__memev__'));
+      if (!j.permissions.allow.length) delete j.permissions.allow;
+      if (!Object.keys(j.permissions).length) delete j.permissions;
+    }
+    return j;
+  };
   const defs = [
     { id: 'claude-code', name: 'Claude Code', mode: 'hooks', detect: () => exists(path.join(home, '.claude')) || exists(path.join(home, '.claude.json')),
       edits: () => [
         json(path.join(home, '.claude.json'), setServer('mcpServers', { type: 'stdio', ...stdio('claude-code') }), delServer('mcpServers')),
-        json(path.join(home, '.claude', 'settings.json'), (j) => setGroupHooks(j, {
+        json(path.join(home, '.claude', 'settings.json'), (j) => (opts.allowTools ? allowMemev : (x) => x)(setGroupHooks(j, {
           SessionStart: { matcher: 'startup|resume|clear|compact', command: hookCmd(launcher, 'session-start', 'claude-code'), timeout: 10 },
           UserPromptSubmit: { command: hookCmd(launcher, 'prompt', 'claude-code'), timeout: 10 },
           PreCompact: { command: hookCmd(launcher, 'pre-compact', 'claude-code'), timeout: 15 },
           Stop: { command: hookCmd(launcher, 'stop', 'claude-code'), timeout: 10 },
-        }), removeGroupHooks),
+        })), (j) => unallowMemev(removeGroupHooks(j))),
         mdBlock(path.join(home, '.claude', 'CLAUDE.md')),
       ] },
     { id: 'codex', name: 'Codex CLI', mode: 'hooks', detect: () => exists(path.join(home, '.codex')),
@@ -190,8 +206,8 @@ function plan(def) {
   return { changes };
 }
 
-export function connect(id, { env = process.env, launcher, dryRun = false, platform = process.platform } = {}) {
-  const def = clientDefs(env, launcher, platform).find((d) => d.id === id);
+export function connect(id, { env = process.env, launcher, dryRun = false, platform = process.platform, allowTools = false } = {}) {
+  const def = clientDefs(env, launcher, platform, { allowTools }).find((d) => d.id === id);
   if (!def) throw new Error(`unknown app: ${id}`);
   const p = plan(def);
   if (p.error) return { id, name: def.name, status: 'needs-manual', reason: `${p.file} ${p.error}`, file: p.file, problem: p.error };
@@ -272,8 +288,8 @@ export function detect(env = process.env, launcher = 'memev', platform = process
 }
 
 /** Connect every app that is installed and not yet connected (and not declined, unless forced). */
-export function connectAll({ env = process.env, launcher, force = false, platform = process.platform } = {}) {
-  return detect(env, launcher, platform).filter((c) => c.found && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
+export function connectAll({ env = process.env, launcher, force = false, platform = process.platform, allowTools = false } = {}) {
+  return detect(env, launcher, platform).filter((c) => c.found && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform, allowTools }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
 }
 
 export function launcherPath(env = process.env) { return path.join(configDir(env), 'bin', process.platform === 'win32' ? 'memev.cmd' : 'memev'); }
@@ -295,7 +311,7 @@ export async function command(cmd, pos, flags, { env, root }) {
     return 0;
   }
   if (cmd === 'connect') {
-    const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force }) : [connect(target, { env, launcher, dryRun: !!flags['dry-run'] })];
+    const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force, allowTools: !!flags['allow-tools'] }) : [connect(target, { env, launcher, dryRun: !!flags['dry-run'], allowTools: !!flags['allow-tools'] })];
     if (!res.length) console.log('No AI apps found. Install one (Claude Code, Codex, Cursor, Gemini CLI, Claude Desktop, Windsurf, VS Code, Zed) and run memev connect again.');
     for (const r of res) {
       if (r.status === 'added') out.ok(`${r.name}: connected (${r.mode === 'hooks' ? 'hooks + MCP + instructions' : 'MCP + instructions'})`);

@@ -10,7 +10,7 @@ connects them, unless you disconnected that app yourself.
 
 | App | What Memev adds | Mode |
 |---|---|---|
-| Claude Code | MCP server in `~/.claude.json`; hooks (SessionStart, UserPromptSubmit, PreCompact, Stop) in `~/.claude/settings.json`; a block in `~/.claude/CLAUDE.md` | hooks |
+| Claude Code | MCP server in `~/.claude.json`; hooks (SessionStart, UserPromptSubmit, PreCompact, Stop) in `~/.claude/settings.json`; a block in `~/.claude/CLAUDE.md`; with consent, `mcp__memev` in `~/.claude/settings.json` `permissions.allow` | hooks |
 | Codex CLI | `[mcp_servers.memev]` in `~/.codex/config.toml`; hooks in `~/.codex/hooks.json`; a block in `~/.codex/AGENTS.md` | hooks (trust once) |
 | Gemini CLI | MCP server and hooks (SessionStart, BeforeAgent, PreCompress, AfterAgent) in `~/.gemini/settings.json`; a block in `~/.gemini/GEMINI.md` | hooks |
 | Cursor | `~/.cursor/mcp.json`; `~/.cursor/hooks.json` | hooks at session start, instructions otherwise |
@@ -27,6 +27,13 @@ does not need to call anything.
 instructions (call `memev_session_start` first, `memev_recall` before answering from memory,
 `memev_checkpoint` before long work ends). Apps that follow server instructions behave much like
 hooks mode; others need you to ask once per session.
+
+**Claude Code tool consent**: the hooks tell Claude to call Memev tools every turn, which would otherwise
+raise an approval prompt. With consent, Memev adds `mcp__memev` to `permissions.allow` in
+`~/.claude/settings.json`, so Claude Code runs Memev's tools without asking each time. Consent is a
+question at `memev init` (on a terminal) or the `--allow-tools` flag on `memev connect claude-code`;
+`memev disconnect claude-code` removes the entry again. It is off unless you opt in, and it never
+touches your other permissions.
 
 Manual steps:
 
