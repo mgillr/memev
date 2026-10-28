@@ -1,8 +1,8 @@
 <div align="center">
 
-<a href="media/memev-tiers.mp4"><img src="media/memev-tiers-poster.png" alt="Memev demo video, 4 min 53 s: how each tier works and how the tiers connect. Click to watch." width="720"></a>
+<a href="media/memev-tiers.mp4"><img src="media/memev-tiers-poster.png" alt="Memev demo video, 4 min 55 s: how each tier works and how the tiers connect. Click to watch." width="720"></a>
 
-<sub><a href="media/memev-tiers.mp4">Watch the demo video</a> (4 min 53 s): how each tier works and how the tiers connect.</sub>
+<sub><a href="media/memev-tiers.mp4">Watch the demo video</a> (4 min 55 s): how each tier works and how the tiers connect.</sub>
 
 <h1>Memev</h1>
 
