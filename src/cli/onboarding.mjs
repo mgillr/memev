@@ -46,6 +46,7 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
     const bus = await import('./bus-cli.mjs');
     let r; try { r = await bus.setupBus({ root, env, clients: connected, flags, ask: firstRun ? undefined : false }); } catch (e) { r = { ok: false, seats: [], operator: null, problems: [e.message] }; }
     if (r.ok) add('succeeded', 'Agent comms bus', `bus/ set up and committed in the vault; ${r.seats.length ? `${r.seats.length} seat(s): ${r.seats.join(', ')}, each joins on its first session` : 'no AI apps yet, each gets a seat when it connects'}`);
+    if (r.ok) add('ready', 'How the bus works', 'apps answer between turns, so a task to an app waits until that app next runs a turn');
     else add('failed', 'Agent comms bus', `${r.problems.join('; ')} (memev doctor --fix)`);
     for (const n of r.notes || []) add('needs-manual', 'Lead AI', n);
     if (r.operator) add('succeeded', 'Lead AI', `${r.operator} leads and coordinates the others, chosen by you (memev bus operator <seat> changes it)`);
