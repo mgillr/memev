@@ -2,6 +2,8 @@
 
 ```sh
 memev github setup                 # or: memev github setup --repo you/my-memory
+memev github setup --host ghe.example.com   # GitHub Enterprise
+memev backup set <git-url>         # any private git remote (self-hosted, file, etc.)
 ```
 
 1. Signs you in to the GitHub CLI if needed (`gh auth login`, browser device code). Memev never sees
