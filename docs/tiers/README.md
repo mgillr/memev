@@ -1,6 +1,6 @@
 # Tiers: how each one is set up
 
-Part of the [Memev documentation](../README.md). Up: the [README](../../README.md#which-tier). Charts for all
+Part of the [Memev documentation](../README.md). Up: the [README](../../README.md). Charts for all
 three tiers: [ARCHITECTURE.md](../ARCHITECTURE.md#the-three-tiers).
 
 > **DRAFT.** Packages and services on these pages are proposals, not offers. A licence sets one

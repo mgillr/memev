@@ -4,11 +4,22 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 export const sha256 = (data) => crypto.createHash('sha256').update(data).digest('hex');
 export const now = () => new Date().toISOString();
 export const stamp = (d = new Date()) => d.toISOString().slice(0, 16).replace('T', ' ') + 'Z';
 export const exists = (p) => { try { fs.accessSync(p); return true; } catch { return false; } };
+
+/**
+ * Run a command without throwing when the binary is missing: ok is false and error holds the message,
+ * so a caller can say what is wrong instead of crashing on a null stdout.
+ */
+export function run(cmd, args = [], opts = {}) {
+  const r = spawnSync(cmd, args, { encoding: 'utf8', ...opts });
+  if (r.error) return { ok: false, status: null, stdout: '', stderr: '', error: r.error.message };
+  return { ok: r.status === 0, status: r.status, stdout: r.stdout || '', stderr: r.stderr || '', error: null };
+}
 
 export function readJson(file, fallback = null) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
