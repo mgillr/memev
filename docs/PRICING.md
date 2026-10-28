@@ -36,17 +36,17 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md#whic
 | Rules for what reaches the AI provider, egress log | | | planned | planned |
 | SCIM, SIEM and audit export, retention, legal hold, high availability | | | | planned |
 
-Personal is sold for what exists today: the Personal core on up to 3 computers, so the AI apps on all of
-them share one memory and one comms bus. A person can connect several cloud AI apps side by side
-(Claude and ChatGPT today, more coming soon) and local coding tools over MCP. A cell marked *planned*
-is not built and is not part of what you pay for. The Personal price is an early-supporter price: it
-stays locked for as long as the subscription runs, and it is labelled that way while sync and the
-relay are planned. Business and Corporate are one model at two scales and are chosen by need
-(a company vault, sign-in, roles, high availability), not by size. Office and Team are not tiers.
-Hosted sync and the hosted relay are not part of Business, because its company server runs on the
-company's own server. Sync, the relay, the company server, sign-in, roles, labels and the egress log
-are planned, not built, and no date is given. See [tiers/](tiers/README.md) for how each tier is set
-up.
+Personal with more computers is sold for what exists today: the free core on up to 3 computers, so the
+AI apps on all of them share one memory and one comms bus. A person can connect several cloud AI apps
+side by side (Claude and ChatGPT today, more coming soon) and local coding tools over MCP. A cell
+marked *planned* is not built and is not part of what you pay for. The Personal with more computers
+price is an early-supporter price: it stays locked for as long as the subscription runs, and it is
+labelled that way while sync and the relay are planned. Business and Corporate are one model at two
+scales and are chosen by need (a company vault, sign-in, roles, high availability), not by size.
+Office and Team are not tiers. Hosted sync and the hosted relay are not part of Business, because its
+company server runs on the company's own server. Sync, the relay, the company server, sign-in, roles,
+labels and the egress log are planned, not built, and no date is given. See [tiers/](tiers/README.md)
+for how each tier is set up.
 
 **Business and Corporate connect to one AI provider** for the whole organisation, either one cloud AI
 service or an on-premises LLM. Business has one company vault; all members' work data syncs into it

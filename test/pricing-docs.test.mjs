@@ -15,12 +15,24 @@ const walk = (d) => fs.readdirSync(path.join(ROOT, d), { withFileTypes: true }).
 const DOCS = ['CHARTER.md', 'SECURITY.md', 'docs/PRICING.md', ...walk('docs/tiers')];
 // Personal $12/month or $120/year. No other tier has a published price, and there is no per-computer add-on.
 const ALLOWED = new Set(['$12/month', '$120/year']);
+// The all-docs scan keeps the wider set: the root README price line and docs/SOLUTIONS.md still carry the CHF
+// equivalents, and both are outside this contract's scope.
+const WIDE_DOCS = ['README.md', 'CHARTER.md', 'SECURITY.md', ...walk('docs')];
+const WIDE_ALLOWED = new Set(['$12/month', '$120/year', 'CHF 10', 'CHF 100']);
 const MONEY = /[$€£]\s?\d[\d,.]*(?:k\b)?(?:\/(?:month|year|day))?|\bCHF\s?\d[\d,.]*|\b\d[\d,.]*\s?(?:USD|EUR|GBP|CHF|dollars?)\b/gi;
 
 test('the docs show no money figure except the list prices', () => {
   const found = [];
   for (const doc of DOCS) {
     read(doc).split('\n').forEach((line, i) => { for (const m of line.matchAll(MONEY)) if (!ALLOWED.has(m[0])) found.push(`${doc}:${i + 1}: ${m[0]}`); });
+  }
+  assert.deepEqual(found, []);
+});
+
+test('the whole docs tree shows no money figure except the list prices and the CHF equivalents', () => {
+  const found = [];
+  for (const doc of WIDE_DOCS) {
+    read(doc).split('\n').forEach((line, i) => { for (const m of line.matchAll(MONEY)) if (!WIDE_ALLOWED.has(m[0])) found.push(`${doc}:${i + 1}: ${m[0]}`); });
   }
   assert.deepEqual(found, []);
 });
