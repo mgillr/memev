@@ -9,7 +9,7 @@ import { performance } from 'node:perf_hooks';
 import { newVault, cleanup, tmpdir, PKG } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
 import { signLicense, loadLicense, verifyLicense, LICENSE_KEYS } from '../src/engine/license.mjs';
-import { seatPolicy } from '../src/engine/entitlements.mjs';
+import { seatPolicy, TIERS } from '../src/engine/entitlements.mjs';
 import { deviceKeygen, signRequest, SeatError } from '../src/engine/devices.mjs';
 import { createServer } from '../src/server/http.mjs';
 import { remoteFetch, deviceKeyFile } from '../src/cli/remote.mjs';
@@ -80,7 +80,7 @@ test('enrolment past the cap is refused, on free and on a licence', async () => 
   const free = await vaultServer(null);
   try {
     assert.equal(free.policy().seats, 1);
-    assert.throws(() => enroll(free, computer('extra'), 'extra'), (e) => e instanceof SeatError && e.message === 'This vault is licensed for 1 computer. Remove one with `memev devices remove <id>` or contact us for more.');
+    assert.throws(() => enroll(free, computer('extra'), 'extra'), (e) => e instanceof SeatError && e.message === `Free covers this computer. Adding more computers is part of Personal (up to ${TIERS.personal.computers} computers). Run memev upgrade to see plans.`);
   } finally { free.close(); }
   const s = await vaultServer(licence({ seats: 3 }));
   try {
@@ -168,7 +168,7 @@ test('Free works with no licence, no network and no setup step', async (t) => {
     // adding another computer on free is refused with the plain message
     const k = deviceKeygen().publicKey;
     const e = sb.run(['devices', 'enroll', '--kind', 'remote-computer', '--label', 'second', '--pubkey', k]);
-    assert.equal(e.code, 1); assert.match(e.out + e.err, /This vault is licensed for 1 computer\. Remove one with `memev devices remove <id>` or contact us for more\./);
+    assert.equal(e.code, 1); assert.match(e.out + e.err, new RegExp(`Free covers this computer\\. Adding more computers is part of Personal \\(up to ${TIERS.personal.computers} computers\\)\\. Run memev upgrade to see plans\\.`));
     // the licence check imports nothing that reaches a network
     for (const f of ['license.mjs', 'entitlements.mjs']) assert.doesNotMatch(fs.readFileSync(path.join(PKG, 'src', 'engine', f), 'utf8'), /node:(http|https|net|dns|tls)|fetch\(/, f);
     assert.deepEqual(Object.keys(LICENSE_KEYS), ['memev-2026-10']);
