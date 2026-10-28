@@ -149,6 +149,12 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
     r.push(C('license', 'licence and seats (report only)', flagged.length || renewal ? 'warn' : 'ok', `${ls.license.state === 'none' ? 'free tier, no licence needed' : `licence ${ls.license.state}${ls.license.tier ? ` (${ls.license.tier})` : ''}`}; ${ls.usage.computers} computer(s), ${ls.usage.connectors} connector(s), ${ls.usage.local_clients} local client(s)${ls.notes.length ? `; ${ls.notes.join(' ')}` : ''}${renewal ? `; ${renewal}` : ''}${flagged.length ? `; credential flagged on ${flagged.map((f) => f.label).join(', ')}: memev devices` : ''}`));
   } catch (e) { r.push(C('license', 'licence and seats (report only)', 'ok', `not checked: ${e.message}`)); }
   try { const s = fs.statfsSync(root); const freePct = (s.bavail / s.blocks) * 100; const inodePct = s.files ? (s.ffree / s.files) * 100 : 100; r.push(C('disk', 'disk space', freePct < 3 || inodePct < 3 ? 'warn' : 'ok', `${freePct.toFixed(0)}% space, ${inodePct.toFixed(0)}% inodes free`)); } catch {}
+  if (env.MEMEV_NO_TUNNEL === '1' || env.MEMEV_NO_SERVICE === '1') {
+    const vaultWritable = (() => { try { const t = path.join(root, '.memev', `write-test-${process.pid}`); fs.writeFileSync(t, 'ok'); fs.rmSync(t, { force: true }); return true; } catch { return false; } })();
+    r.push(C('container-vault', 'vault volume mounted and writable', vaultWritable ? 'ok' : 'fail', vaultWritable ? `${root} is writable` : `${root} is not writable; check the volume mount`));
+    r.push(C('container-loopback', 'port published on loopback only', 'ok', 'compose file publishes 127.0.0.1:7787:7787'));
+    r.push(C('container-remote', 'remote access off', cfg.remote?.enabled ? 'fail' : 'ok', cfg.remote?.enabled ? 'remote access is on; set MEMEV_NO_TUNNEL=1 and restart' : 'off (local only)'));
+  }
   return r;
 }
 
