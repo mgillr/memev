@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Git as the durable, human-readable history. Writes are batched: one commit per quiet period.
-import { spawnSync } from 'node:child_process';
+import { run } from './util.mjs';
 
 export function git(root, args, opts = {}) {
-  const r = spawnSync('git', args, { cwd: root, encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...(opts.env || {}) }, input: opts.input });
-  return { ok: r.status === 0, status: r.status, out: (r.stdout || '').trim(), err: (r.stderr || '').trim() };
+  const r = run('git', args, { cwd: root, env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...(opts.env || {}) }, input: opts.input });
+  return { ok: r.ok, status: r.status, out: r.stdout.trim(), err: r.stderr.trim() || r.error || '' };
 }
 
 // git init -b main needs git 2.28; on older git, fall back to a plain init and move HEAD by hand.
