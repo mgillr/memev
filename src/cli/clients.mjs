@@ -21,6 +21,12 @@ export const INSTRUCTIONS = `${BLOCK_START}
 ## Memory (Memev)
 Memev (MCP server "memev") is this person's memory across AI sessions. Its rules and the resume card arrive at session start; if they have not, call memev_session_start first.
 ${BLOCK_END}`;
+// Cursor's always-on project rule: a .mdc file under <project>/.cursor/rules/ with alwaysApply: true is
+// injected into every session of that project, so the memory rule is not limited to session start.
+const CURSOR_RULE = `---
+alwaysApply: true
+---
+${INSTRUCTIONS}`;
 
 export function platformDirs(env = process.env) {
   const home = homeDir(env);
@@ -58,12 +64,17 @@ function removeGroupHooks(j) {
   if (!Object.keys(j.hooks).length) delete j.hooks;
   return j;
 }
-// flat hooks (Cursor)
+// flat hooks (Cursor): an entry is a command string or a full entry object (the stop hook carries
+// loop_limit, a per-script setting on the hook entry, not something the hook prints)
 function setFlatHooks(j, events) {
   j.version ??= 1;
   removeFlatHooks(j);
   j.hooks = j.hooks && typeof j.hooks === 'object' ? j.hooks : {};
-  for (const [ev, command] of Object.entries(events)) { j.hooks[ev] = Array.isArray(j.hooks[ev]) ? j.hooks[ev] : []; j.hooks[ev].push({ command }); }
+  for (const [ev, entry] of Object.entries(events)) {
+    const e = typeof entry === 'string' ? { command: entry } : entry;
+    j.hooks[ev] = Array.isArray(j.hooks[ev]) ? j.hooks[ev] : [];
+    j.hooks[ev].push(e);
+  }
   return j;
 }
 function removeFlatHooks(j) {
@@ -86,6 +97,11 @@ function removeBlock(text, [s, e] = [BLOCK_START, BLOCK_END]) {
   if (before.endsWith('\n\n') && !after) before = before.slice(0, -1);
   return before + after;
 }
+// Removing the Cursor rule file: take out Memev's block, and the frontmatter too when Memev wrote the whole file.
+const cursorRuleRemove = (t) => {
+  const rest = removeBlock(t).replace(/^---\r?\nalwaysApply:\s*true\r?\n---\r?\n?/, '').trim();
+  return rest ? `${rest}\n` : '';
+};
 const tomlEsc = (s) => JSON.stringify(s);
 // Codex config.toml: a second [mcp_servers.memev] table would make the file ambiguous, so when the user
 // already has one I leave it exactly as-is instead of appending Memev's marked block.
@@ -97,16 +113,19 @@ function upsertCodexToml(t, block) {
 // The user table is still there after the edit: say so, so the skip is never a silent no-op.
 const codexTomlSkipNote = (b) => (b && MEMEV_TABLE.test(removeBlock(b, [TOML_START, TOML_END])) ? 'Codex already has a [mcp_servers.memev] table in config.toml, so Memev left it as-is' : null);
 
-const json = (file, apply, remove) => ({ file, kind: 'json', apply, remove });
+const json = (file, apply, remove, note) => ({ file, kind: 'json', apply, remove, note });
 const text = (file, apply, remove, note) => ({ file, kind: 'text', apply, remove, note });
 const mdBlock = (file) => text(file, (t) => addBlock(t, INSTRUCTIONS), (t) => removeBlock(t));
 
-/** The apps Memev knows. mode: 'hooks' = state injected by hooks; 'instructions' = MCP + instructions only. */
-export function clientDefs(env, bin, platform = process.platform) {
+/** The apps Memev knows. mode: 'hooks' = state injected by hooks; 'instructions' = MCP + instructions only.
+ *  opts.project: the project directory; Cursor gets an always-on rule file in it. */
+export function clientDefs(env, bin, platform = process.platform, opts = {}) {
   const { home, appData } = platformDirs(env);
   const win = winSpawn(env, platform);
   const launcher = win ? `"${win.node}" "${win.script}"` : `"${bin}"`;
   const stdio = (id) => win ? { command: win.node, args: [win.script, 'mcp', '--client', id] } : { command: bin, args: ['mcp', '--client', id] };
+  // OpenCode takes a local MCP server as a command array in opencode.json
+  const opencodeLocal = (id) => ({ type: 'local', command: [...(win ? [win.node, win.script] : [bin]), 'mcp', '--client', id], enabled: true });
   const defs = [
     { id: 'claude-code', name: 'Claude Code', mode: 'hooks', detect: () => exists(path.join(home, '.claude')) || exists(path.join(home, '.claude.json')),
       edits: () => [
@@ -141,14 +160,15 @@ export function clientDefs(env, bin, platform = process.platform) {
         mdBlock(path.join(home, '.gemini', 'GEMINI.md')),
       ] },
     { id: 'cursor', name: 'Cursor', mode: 'hooks', detect: () => exists(path.join(home, '.cursor')),
-      edits: () => [
+      edits: (o = {}) => [
         json(path.join(home, '.cursor', 'mcp.json'), setServer('mcpServers', stdio('cursor')), delServer('mcpServers')),
         json(path.join(home, '.cursor', 'hooks.json'), (j) => setFlatHooks(j, {
           sessionStart: hookCmd(launcher, 'session-start', 'cursor', 'cursor'),
           beforeSubmitPrompt: hookCmd(launcher, 'prompt', 'cursor', 'cursor'),
           preCompact: hookCmd(launcher, 'pre-compact', 'cursor', 'cursor'),
-          stop: hookCmd(launcher, 'stop', 'cursor', 'cursor'),
+          stop: { command: hookCmd(launcher, 'stop', 'cursor', 'cursor'), loop_limit: 3 },
         }), removeFlatHooks),
+        ...(o.project ? [text(path.join(o.project, '.cursor', 'rules', 'memev.mdc'), (t) => addBlock(t, CURSOR_RULE), cursorRuleRemove)] : []),
       ], manual: 'Check that Settings → MCP shows memev connected, and allow its tools.', note: 'Cursor injects the resume card at session start; per-prompt recall and post-compaction state come through the MCP instructions (Cursor hooks cannot add context to a prompt).' },
     { id: 'claude-desktop', name: 'Claude Desktop', mode: 'instructions', detect: () => exists(path.join(appData, 'Claude')),
       edits: () => [json(path.join(appData, 'Claude', 'claude_desktop_config.json'), setServer('mcpServers', stdio('claude-desktop')), delServer('mcpServers'))] },
@@ -158,8 +178,43 @@ export function clientDefs(env, bin, platform = process.platform) {
       edits: () => [json(path.join(appData, 'Code', 'User', 'mcp.json'), setServer('servers', { type: 'stdio', ...stdio('vscode') }), delServer('servers'))] },
     { id: 'zed', name: 'Zed', mode: 'instructions', detect: () => exists(path.join(process.platform === 'darwin' ? path.join(home, '.config') : platformDirs(env).appData, 'zed')),
       edits: () => [json(path.join(process.platform === 'darwin' ? path.join(home, '.config') : platformDirs(env).appData, 'zed', 'settings.json'), setServer('context_servers', { source: 'custom', ...stdio('zed') }), delServer('context_servers'))] },
+    { id: 'opencode', name: 'OpenCode', mode: 'instructions', detect: () => exists(path.join(home, '.config', 'opencode')),
+      edits: () => {
+        const mdPath = path.join(home, '.config', 'opencode', 'AGENTS.md');
+        const skip = !exists(mdPath) && exists(path.join(home, '.claude', 'CLAUDE.md'));
+        // When the user's rules already live in CLAUDE.md, creating the OpenCode rules file would switch them off,
+        // so Memev leaves it alone and the protocol arrives through the MCP instructions instead.
+        const edits = [json(path.join(home, '.config', 'opencode', 'opencode.json'), setServer('mcp', opencodeLocal('opencode')), delServer('mcp'),
+          skip ? () => 'Your rules stay in CLAUDE.md, so Memev left the OpenCode rules file alone; the protocol arrives through the MCP instructions.' : null)];
+        if (!skip) edits.push(mdBlock(mdPath));
+        return edits;
+      } },
+    { id: 'copilot-cli', name: 'GitHub Copilot CLI', mode: 'instructions', detect: () => exists(env.COPILOT_HOME || path.join(home, '.copilot')),
+      edits: () => {
+        const copilotHome = env.COPILOT_HOME || path.join(home, '.copilot');
+        const entry = { type: 'local', command: win ? win.node : bin, args: [...(win ? [win.script] : []), 'mcp', '--client', 'copilot-cli'], tools: ['*'] };
+        // Copilot CLI reads its user-level instructions from copilot-instructions.md in the same folder
+        return [json(path.join(copilotHome, 'mcp-config.json'), setServer('mcpServers', entry), delServer('mcpServers')), mdBlock(path.join(copilotHome, 'copilot-instructions.md'))];
+      } },
   ];
   return defs;
+}
+
+/** The apps Memev detects but does not support yet. They are listed as found, not supported, and their files are never changed.
+ *  Each app is looked up at the directory its own docs name, which differs per app and per platform. */
+export function unsupportedDefs(env) {
+  const { home, appData } = platformDirs(env);
+  const xdg = env.XDG_CONFIG_HOME || path.join(home, '.config');
+  const win = process.platform === 'win32';
+  return [
+    { id: 'cline', name: 'Cline', detect: () => exists(path.join(home, '.cline')) },
+    { id: 'roo', name: 'Roo', detect: () => exists(path.join(home, '.roo')) },
+    { id: 'continue', name: 'Continue', detect: () => exists(path.join(home, '.continue')) },
+    { id: 'kiro', name: 'Kiro', detect: () => exists(path.join(home, '.kiro')) },
+    { id: 'jetbrains-ai', name: 'JetBrains AI', detect: () => exists(path.join(appData, 'JetBrains')) },
+    { id: 'amp', name: 'Amp', detect: () => exists(win ? path.join(home, '.config', 'amp') : path.join(xdg, 'amp')) },
+    { id: 'goose', name: 'Goose', detect: () => exists(win ? path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Block', 'goose') : path.join(xdg, 'goose')) },
+  ];
 }
 
 // ---- state: what is connected, what the user declined, and the backups
@@ -169,9 +224,9 @@ const saveState = (env, s) => writeJson(stateFile(env), s, 0o600);
 const backupDir = (env) => path.join(configDir(env), 'backups');
 const readBytes = (f) => { try { return fs.readFileSync(f); } catch { return null; } };
 
-function plan(def) {
+function plan(def, opts = {}) {
   const changes = [];
-  for (const e of def.edits()) {
+  for (const e of def.edits(opts)) {
     const before = readBytes(e.file);
     let after;
     if (e.kind === 'json') {
@@ -190,10 +245,11 @@ function plan(def) {
   return { changes };
 }
 
-export function connect(id, { env = process.env, launcher, dryRun = false, platform = process.platform } = {}) {
-  const def = clientDefs(env, launcher, platform).find((d) => d.id === id);
+export function connect(id, { env = process.env, launcher, dryRun = false, platform = process.platform, project = null } = {}) {
+  const proj = project ? path.resolve(String(project)) : null;
+  const def = clientDefs(env, launcher, platform, { project: proj }).find((d) => d.id === id);
   if (!def) throw new Error(`unknown app: ${id}`);
-  const p = plan(def);
+  const p = plan(def, { project: proj });
   if (p.error) return { id, name: def.name, status: 'needs-manual', reason: `${p.file} ${p.error}`, file: p.file, problem: p.error };
   const st = loadState(env);
   const changed = p.changes.filter((c) => !c.before || !c.before.equals(c.after));
@@ -212,22 +268,22 @@ export function connect(id, { env = process.env, launcher, dryRun = false, platf
     st.files[c.e.file].after_sha = sha256(c.after);
   }
   for (const c of p.changes) if (st.files[c.e.file] && !changed.includes(c)) st.files[c.e.file].after_sha ??= sha256(c.after);
-  st.connected[id] = { at: now(), mode: def.mode, launcher };
+  st.connected[id] = { at: now(), mode: def.mode, launcher, project: proj };
   st.declined = st.declined.filter((x) => x !== id);
   saveState(env, st);
   return { id, name: def.name, status: changed.length ? 'added' : 'already', mode: def.mode, files: changed.map((c) => c.e.file), manual: def.manual || null, note: def.note || null, notes };
 }
 
 /** What connect adds to each of an app's files, to paste by hand when Memev cannot edit one: memev connect <app> --print. */
-export function snippets(id, { env = process.env, launcher, platform = process.platform } = {}) {
-  const def = clientDefs(env, launcher, platform).find((d) => d.id === id);
+export function snippets(id, { env = process.env, launcher, platform = process.platform, project = null } = {}) {
+  const def = clientDefs(env, launcher, platform, { project: project ? path.resolve(String(project)) : null }).find((d) => d.id === id);
   if (!def) throw new Error(`unknown app: ${id}`);
-  return { name: def.name, files: def.edits().map((e) => ({ file: e.file, kind: e.kind, text: e.kind === 'json' ? `${JSON.stringify(e.apply({}), null, 2)}\n` : e.apply('') })) };
+  return { name: def.name, files: def.edits({ project: project ? path.resolve(String(project)) : null }).map((e) => ({ file: e.file, kind: e.kind, text: e.kind === 'json' ? `${JSON.stringify(e.apply({}), null, 2)}\n` : e.apply('') })) };
 }
 
 export function disconnect(id, { env = process.env, launcher, decline = true, platform = process.platform } = {}) {
   const st = loadState(env);
-  const defs = clientDefs(env, launcher || st.connected[id]?.launcher || 'memev', platform);
+  const defs = clientDefs(env, launcher || st.connected[id]?.launcher || 'memev', platform, { project: st.connected[id]?.project || null });
   const def = defs.find((d) => d.id === id);
   const results = [];
   for (const [file, rec] of Object.entries(st.files)) {
@@ -263,17 +319,20 @@ export const RESTART = {
   'claude-code': 'Start a new Claude Code session', codex: 'Start a new Codex CLI session', 'gemini-cli': 'Start a new Gemini CLI session',
   cursor: 'Open a new Cursor chat', 'claude-desktop': 'Quit and reopen Claude Desktop', windsurf: 'Quit and reopen Windsurf',
   vscode: 'Reload the VS Code window (Developer: Reload Window)', zed: 'Quit and reopen Zed',
+  opencode: 'Quit and reopen OpenCode', 'copilot-cli': 'Start a new Copilot CLI session',
 };
 // Apps whose session-start hook brings the protocol, so their MCP instructions need not repeat it.
 export const HOOK_CLIENTS = new Set(clientDefs({}, 'memev').filter((d) => d.mode === 'hooks').map((d) => d.id));
 export function detect(env = process.env, launcher = 'memev', platform = process.platform) {
   const st = loadState(env);
-  return clientDefs(env, launcher, platform).map((d) => ({ id: d.id, name: d.name, mode: d.mode, found: !!d.detect(), connected: !!st.connected[d.id], declined: st.declined.includes(d.id), note: d.note || null, manual: d.manual || null, restart: RESTART[d.id] || `Restart ${d.name}` }));
+  const supported = clientDefs(env, launcher, platform).map((d) => ({ id: d.id, name: d.name, mode: d.mode, found: !!d.detect(), connected: !!st.connected[d.id], declined: st.declined.includes(d.id), note: d.note || null, manual: d.manual || null, restart: RESTART[d.id] || `Restart ${d.name}`, supported: true }));
+  const unsupported = unsupportedDefs(env).map((d) => ({ id: d.id, name: d.name, found: !!d.detect(), supported: false }));
+  return [...supported, ...unsupported];
 }
 
-/** Connect every app that is installed and not yet connected (and not declined, unless forced). */
-export function connectAll({ env = process.env, launcher, force = false, platform = process.platform } = {}) {
-  return detect(env, launcher, platform).filter((c) => c.found && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
+/** Connect every app that is installed and not yet connected (and not declined, unless forced). Apps that are found but not supported yet are left alone. */
+export function connectAll({ env = process.env, launcher, force = false, platform = process.platform, project = null } = {}) {
+  return detect(env, launcher, platform).filter((c) => c.found && c.supported && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform, project }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
 }
 
 export function launcherPath(env = process.env) { return path.join(configDir(env), 'bin', process.platform === 'win32' ? 'memev.cmd' : 'memev'); }
@@ -283,20 +342,28 @@ export async function command(cmd, pos, flags, { env, root }) {
   if (!exists(launcher)) { const { installRuntime } = await import('./main.mjs'); installRuntime(env); }
   const target = pos[0] || 'all';
   if (cmd === 'clients') {
-    for (const c of detect(env, launcher)) console.log(`  ${c.connected ? '\u2713' : c.found ? '\u00b7' : ' '} ${c.name.padEnd(15)} ${c.found ? (c.connected ? `connected (${c.mode === 'hooks' ? 'hooks + MCP' : 'MCP + instructions'})` : c.declined ? 'found, disconnected by you' : 'found, not connected') : 'not found'}`);
+    for (const c of detect(env, launcher)) console.log(`  ${c.connected ? '\u2713' : c.found ? '\u00b7' : ' '} ${c.name.padEnd(15)} ${c.found ? (c.supported ? (c.connected ? `connected (${c.mode === 'hooks' ? 'hooks + MCP' : 'MCP + instructions'})` : c.declined ? 'found, disconnected by you' : 'found, not connected') : 'found, not supported yet') : 'not found'}`);
     return 0;
   }
   if (cmd === 'connect' && flags.print) {
     const id = typeof flags.print === 'string' ? flags.print : pos[0];
     if (!id) throw new Error('memev connect <app> --print  (memev clients lists the apps)');
-    const s = snippets(id, { env, launcher });
+    const s = snippets(id, { env, launcher, project: flags.project });
     console.log(`${s.name}: what Memev adds, to paste by hand. Nothing was changed.`);
     for (const f of s.files) console.log(`\n${f.kind === 'json' ? `In ${f.file}, merge this into the JSON object that is there:` : `In ${f.file}, add this block:`}\n${f.text.trimEnd()}`);
     return 0;
   }
   if (cmd === 'connect') {
-    const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force }) : [connect(target, { env, launcher, dryRun: !!flags['dry-run'] })];
-    if (!res.length) console.log('No AI apps found. Install one (Claude Code, Codex, Cursor, Gemini CLI, Claude Desktop, Windsurf, VS Code, Zed) and run memev connect again.');
+    if (target !== 'all') {
+      const c = detect(env, launcher).find((x) => x.id === target);
+      if (c && c.found && !c.supported) { out.info(`${c.name}: found, not supported yet (see docs/CLIENTS.md to ask for it)`); return 0; }
+    }
+    const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force, project: flags.project }) : [connect(target, { env, launcher, dryRun: !!flags['dry-run'], project: flags.project })];
+    if (!res.length) {
+      const unsup = detect(env, launcher).filter((c) => c.found && !c.supported);
+      if (unsup.length) { console.log(`Found ${unsup.map((c) => c.name).join(', ')} but Memev does not support ${unsup.length > 1 ? 'them' : 'it'} yet (see docs/CLIENTS.md to ask for it).`); return 0; }
+    }
+    if (!res.length) console.log('No AI apps found. Install one (Codex, Cursor, Gemini CLI, Windsurf, VS Code, Zed, OpenCode, GitHub Copilot CLI, or a Claude product) and run memev connect again.');
     for (const r of res) {
       if (r.status === 'added') out.ok(`${r.name}: connected (${r.mode === 'hooks' ? 'hooks + MCP + instructions' : 'MCP + instructions'})`);
       else if (r.status === 'already') out.ok(`${r.name}: already connected`);

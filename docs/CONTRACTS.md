@@ -1,8 +1,21 @@
 # Contracts
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 A contract is a signed statement of what a piece of work must deliver: tasks, acceptance criteria
 with checks a machine can run, and stop rules. Memev includes a modified copy of Proofline
 (`vendor/attest`, Apache-2.0) for drafting, decomposing and verifying them.
+
+## Opt-in
+
+Contracts are off by default for new installs. When they are off, the Stop hook never blocks on a
+contract. Existing vaults (created before the opt-in) keep contracts on.
+
+```sh
+memev contracts on      # turn contracts on
+memev contracts off     # turn contracts off
+memev contracts status  # show whether contracts are on or off
+```
 
 ## "I have a project, build me X"
 

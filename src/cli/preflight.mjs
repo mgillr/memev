@@ -5,11 +5,10 @@
 // folders) is a parameter, so the checks are tested for darwin, win32 and linux on any machine.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { configDir, exists } from '../engine/util.mjs';
+import { configDir, exists, run as spawn } from '../engine/util.mjs';
 import { config, out } from './common.mjs';
 
-const probe = (cmd, args) => { const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: 15000 }); return { ok: !r.error && r.status === 0, out: `${r.stdout || ''}${r.stderr || ''}`.trim() }; };
+const probe = (cmd, args) => { const r = spawn(cmd, args, { timeout: 15000 }); return { ok: r.ok, out: `${r.stdout}${r.stderr}`.trim() }; };
 
 /** Whether a folder, or the nearest folder above it that exists, can be written to. Writes nothing. */
 export function canWrite(p) {
