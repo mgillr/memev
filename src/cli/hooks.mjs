@@ -7,6 +7,8 @@
 //   stop           → the reply is recorded; the todo list becomes a checkpoint when it changed
 // session-start and prompt also check the comms bus: a heartbeat, a hello the first time, and any
 // new messages or a hold go into context.
+// Cursor's stop hook can only continue the agent with a followup_message, so it is reserved for
+// operator tasks waiting on this seat, and loop_limit keeps the follow-ups from running away.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -108,6 +110,17 @@ export async function runHook(event, flags, env = process.env) {
       if (format === 'claude' && !input.stop_hook_active) {
         const g = await call('contract-gate', {});
         if (g.open?.length) process.stdout.write(JSON.stringify({ decision: 'block', reason: `You signed ${g.open.map((c) => `${c.id} (${c.title})`).join(', ')} and it is not verified yet. Finish the remaining criteria and run memev_contract_verify, or report exactly what blocks you.` }));
+      }
+      if (format === 'cursor') {
+        const u = await call('bus-pulse', { peek: true }).catch(() => null);
+        const waiting = (u?.messages || []).filter((m) => m.type === 'task' && m.operator);
+        if (waiting.length) {
+          const lines = waiting.slice(-3).map((m) => `#${m.seq} ${String(m.body).slice(0, 300)}`);
+          process.stdout.write(JSON.stringify({
+            followup_message: `[Memev] The operator has ${waiting.length} task${waiting.length > 1 ? 's' : ''} waiting for you:\n${lines.join('\n')}\nClaim each (bus_send, type claim, ref = its id), restate it, then do it.`,
+            loop_limit: 3,
+          }));
+        }
       }
     }
     if (tr) st.offset = tr.offset;
