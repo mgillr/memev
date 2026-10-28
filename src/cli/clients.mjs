@@ -107,8 +107,6 @@ export function clientDefs(env, bin, platform = process.platform) {
   const win = winSpawn(env, platform);
   const launcher = win ? `"${win.node}" "${win.script}"` : `"${bin}"`;
   const stdio = (id) => win ? { command: win.node, args: [win.script, 'mcp', '--client', id] } : { command: bin, args: ['mcp', '--client', id] };
-  // OpenCode takes a local MCP server as a command array in opencode.json
-  const opencodeLocal = (id) => ({ type: 'local', command: [...(win ? [win.node, win.script] : [bin]), 'mcp', '--client', id], enabled: true });
   const defs = [
     { id: 'claude-code', name: 'Claude Code', mode: 'hooks', detect: () => exists(path.join(home, '.claude')) || exists(path.join(home, '.claude.json')),
       edits: () => [
@@ -162,7 +160,7 @@ export function clientDefs(env, bin, platform = process.platform) {
       edits: () => [json(path.join(process.platform === 'darwin' ? path.join(home, '.config') : platformDirs(env).appData, 'zed', 'settings.json'), setServer('context_servers', { source: 'custom', ...stdio('zed') }), delServer('context_servers'))] },
     { id: 'opencode', name: 'OpenCode', mode: 'instructions', detect: () => exists(path.join(home, '.config', 'opencode')),
       edits: () => [
-        json(path.join(home, '.config', 'opencode', 'opencode.json'), setServer('mcp', opencodeLocal('opencode')), delServer('mcp')),
+        json(path.join(home, '.config', 'opencode', 'opencode.json'), setServer('mcp', { type: 'local', ...stdio('opencode'), enabled: true }), delServer('mcp')),
         mdBlock(path.join(home, '.config', 'opencode', 'AGENTS.md')),
       ] },
     { id: 'copilot-cli', name: 'GitHub Copilot CLI', mode: 'instructions', detect: () => exists(path.join(home, '.copilot')),
