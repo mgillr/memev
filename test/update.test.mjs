@@ -120,6 +120,9 @@ test('MEM-082 AC04: update is refused when the sha256 does not match', async () 
   const tarball = await makeTarball('9.9.9');
   // a wrong sha256 beside the tarball
   fs.writeFileSync(tarball + '.sha256', `${'0'.repeat(64)}  ${path.basename(tarball)}\n`);
+  // the launcher init wrote, before the refused install
+  const launcher = launcherOf(sb);
+  const before = fs.readFileSync(launcher, 'utf8');
   const lines = [];
   const orig = console.log;
   console.log = (...a) => lines.push(a.join(' '));
@@ -131,6 +134,8 @@ test('MEM-082 AC04: update is refused when the sha256 does not match', async () 
   // the runtime folder was not created
   const dir = path.join(sb.env.MEMEV_CONFIG_DIR, 'runtime', '9.9.9');
   assert.equal(fs.existsSync(dir), false, 'no runtime folder when the sha256 does not match');
+  // the launcher is untouched
+  assert.equal(fs.readFileSync(launcher, 'utf8'), before, 'the launcher does not change when the sha256 does not match');
 });
 
 test('MEM-082 AC05: update is refused when there is no sha256', async () => {
