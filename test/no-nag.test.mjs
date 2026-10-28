@@ -85,7 +85,7 @@ test('MEM-086 AC02: Every plan message is a single line containing one memev com
   // message: one line, no day count, exactly one memev command
   const grace = seatPolicy({ license: { state: 'grace', exp: '2026-01-01', days_left: 3, seats: 4, tier: 'personal' }, devices: [] });
   assert.equal(grace.reason, null, 'a licence in grace refuses nothing, so no reason');
-  const graceNote = 'The licence expired on 2026-01-01 and is in its grace period. Renew it with `memev license install <file>`; after that no computer can be added and added computers can only read.';
+  const graceNote = 'The licence expired on 2026-01-01 and is in its grace period. When it ends, no computer can be added and added computers can only read; renew with `memev license install <file>`.';
   assert.deepEqual(grace.notes, [graceNote], 'the grace note is the only note and names the renewal command');
   assertCommand('grace note', grace.notes[0]);
   // with no licence at all, an added computer may only read: the note and the per-computer

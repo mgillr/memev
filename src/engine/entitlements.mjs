@@ -88,7 +88,7 @@ export function seatPolicy({ license = null, devices = [] } = {}) {
   if (state === 'expired') { canEnroll = false; reason = `The licence for this vault expired on ${license.exp} and its grace period is over. Computers already added can still read, but none can be added. Install a renewed licence (memev license install <file>) or contact us.`; }
   else if (enrolled >= seats) { canEnroll = false; reason = live(license) ? `This vault is licensed for ${plural(seats, 'computer')}. Remove one with \`memev devices remove <id>\` or contact us for more.` : `Free covers this computer. Adding more computers is part of Personal (up to ${TIERS.personal.computers} computers). Run memev upgrade to see plans.`; }
   const notes = [];
-  if (state === 'grace') notes.push(`The licence expired on ${license.exp} and is in its grace period. Renew it with \`memev license install <file>\`; after that no computer can be added and added computers can only read.`);
+  if (state === 'grace') notes.push(`The licence expired on ${license.exp} and is in its grace period. When it ends, no computer can be added and added computers can only read; renew with \`memev license install <file>\`.`);
   if (state === 'invalid' || state === 'not_yet_valid') notes.push(`The installed licence is not used: ${license.reason}. This vault counts as the free tier.`);
   const readOnly = remote.filter((d) => !writable.has(d.id));
   if (readOnly.length) notes.push(`${plural(readOnly.length, 'computer')} can read but not write (${readOnly.map((d) => d.label).join(', ')}): ${live(license) ? 'more computers are enrolled than the licence covers' : 'there is no valid licence'}.`);
