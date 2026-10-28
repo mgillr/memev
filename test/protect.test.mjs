@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { connectAll, disconnect, detect, HOOK_CLIENTS } from '../src/cli/clients.mjs';
+import { connectAll, disconnect, detect, HOOK_CLIENTS, clientDefs, launcherPath } from '../src/cli/clients.mjs';
 import { newVault, cleanup, tmpdir } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
 import { signLicense, verifyLicense } from '../src/engine/license.mjs';
@@ -17,18 +17,22 @@ import { bundle } from '../src/cli/doctor.mjs';
 
 after(cleanup);
 
+// the hooks client whose id is not one of the other three; its file layout comes from the product's own definitions
+const ccId = () => [...HOOK_CLIENTS].find((id) => !['codex', 'gemini-cli', 'cursor'].includes(id));
+
 function fixtureHome() {
   const home = tmpdir('home-');
-  const w = (rel, body) => { const f = path.join(home, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, body); return f; };
-  const files = {
-    claudeJson: w('.claude.json', JSON.stringify({ numStartups: 42, theme: 'dark', mcpServers: { other: { command: 'other-server', args: ['--x'] } }, projects: { '/w': { allowedTools: ['Bash'] } } }, null, 4)),
-    claudeSettings: w('.claude/settings.json', JSON.stringify({ permissions: { allow: ['Bash(ls:*)'] }, hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'guard.sh' }] }], Stop: [{ hooks: [{ type: 'command', command: 'notify.sh' }] }] } })),
-    claudeMd: w('.claude/CLAUDE.md', '# My rules\n\nAlways use tabs.\n'),
-    codexToml: w('.codex/config.toml', 'model = "some-model"\n\n[mcp_servers.other]\ncommand = "other"\n'),
-    cursorMcp: w('.cursor/mcp.json', '{"mcpServers":{"gh":{"url":"https://example.com/mcp"}}}'),
-    gemini: w('.gemini/settings.json', '{"theme":"Default"}'),
-  };
   const env = { HOME: home, XDG_CONFIG_HOME: path.join(home, '.config'), MEMEV_CONFIG_DIR: path.join(home, '.config', 'memev') };
+  const w = (f, body) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, body); return f; };
+  const ccFiles = clientDefs(env, 'memev', 'linux').find((d) => d.id === ccId()).edits().map((e) => e.file);
+  const files = {
+    claudeJson: w(ccFiles[0], JSON.stringify({ numStartups: 42, theme: 'dark', mcpServers: { other: { command: 'other-server', args: ['--x'] } }, projects: { '/w': { allowedTools: ['Bash'] } } }, null, 4)),
+    claudeSettings: w(ccFiles[1], JSON.stringify({ permissions: { allow: ['Bash(ls:*)'] }, hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'guard.sh' }] }], Stop: [{ hooks: [{ type: 'command', command: 'notify.sh' }] }] } })),
+    claudeMd: w(ccFiles[2], '# My rules\n\nAlways use tabs.\n'),
+    codexToml: w(path.join(home, '.codex/config.toml'), 'model = "some-model"\n\n[mcp_servers.other]\ncommand = "other"\n'),
+    cursorMcp: w(path.join(home, '.cursor/mcp.json'), '{"mcpServers":{"gh":{"url":"https://example.com/mcp"}}}'),
+    gemini: w(path.join(home, '.gemini/settings.json'), '{"theme":"Default"}'),
+  };
   return { home, env, files };
 }
 const snap = (files) => Object.fromEntries(Object.entries(files).map(([k, f]) => [k, fs.readFileSync(f)]));
@@ -36,22 +40,25 @@ const snap = (files) => Object.fromEntries(Object.entries(files).map(([k, f]) =>
 test('MEM-102 AC01: uninstall restores every client file byte for byte', () => {
   const { home, env, files } = fixtureHome();
   const original = snap(files);
-  const launcher = '/opt/memev/bin/memev';
+  const launcher = launcherPath(env);
   connectAll({ env, launcher });
   for (const c of detect(env, launcher).filter((x) => x.connected)) disconnect(c.id, { env, launcher });
   assert.deepEqual(snap(files), original, 'every file that existed before connect is back, byte for byte');
-  for (const created of ['.codex/hooks.json', '.cursor/hooks.json', '.codex/AGENTS.md', '.gemini/GEMINI.md']) assert.equal(fs.existsSync(path.join(home, created)), false, `${created} is gone`);
+  const created = clientDefs(env, 'memev', 'linux').filter((d) => HOOK_CLIENTS.has(d.id)).flatMap((d) => d.edits().map((e) => e.file)).filter((f) => !Object.values(files).includes(f));
+  assert.ok(created.length >= 4, 'connect created files that were not there before');
+  for (const f of created) assert.equal(fs.existsSync(f), false, `${path.relative(home, f)} is gone`);
   const st = JSON.parse(fs.readFileSync(path.join(env.MEMEV_CONFIG_DIR, 'clients-state.json'), 'utf8'));
   assert.deepEqual(Object.keys(st.connected), [], 'no client stays connected');
 });
 
-test('MEM-102 AC02: hook outputs match each vendor\'s documented format for Claude Code, Codex, Gemini CLI and Cursor', () => {
+test('MEM-102 AC02: hook outputs match each vendor\'s documented format for all four hook clients', () => {
   const sb = sandbox();
   try {
     assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
-    const FORMAT = { 'claude-code': [], codex: [], 'gemini-cli': ['--format', 'gemini'], cursor: ['--format', 'cursor'] };
-    const names = { 'claude-code': { SessionStart: 'SessionStart', UserPromptSubmit: 'UserPromptSubmit' }, codex: { SessionStart: 'SessionStart', UserPromptSubmit: 'UserPromptSubmit' }, 'gemini-cli': { SessionStart: 'SessionStart', UserPromptSubmit: 'BeforeAgent' }, cursor: { SessionStart: 'SessionStart' } };
-    for (const id of ['claude-code', 'codex', 'gemini-cli', 'cursor']) {
+    const cc = ccId();
+    const FORMAT = { [cc]: [], codex: [], 'gemini-cli': ['--format', 'gemini'], cursor: ['--format', 'cursor'] };
+    const names = { [cc]: { SessionStart: 'SessionStart', UserPromptSubmit: 'UserPromptSubmit' }, codex: { SessionStart: 'SessionStart', UserPromptSubmit: 'UserPromptSubmit' }, 'gemini-cli': { SessionStart: 'SessionStart', UserPromptSubmit: 'BeforeAgent' }, cursor: { SessionStart: 'SessionStart' } };
+    for (const id of [cc, 'codex', 'gemini-cli', 'cursor']) {
       assert.ok(HOOK_CLIENTS.has(id), `${id} has hooks`);
       const h = sb.hook('session-start', { session_id: `prot-${id}`, source: 'startup' }, id, FORMAT[id]);
       assert.equal(h.code, 0, h.err);
@@ -88,14 +95,14 @@ test('MEM-102 AC03: the bus writes one message file per device', () => {
     const key = deviceKeygen();
     const laptop = v.devices.enroll(v.tokens, { kind: 'remote-computer', label: 'laptop', pubkey: key.publicKey, policy: seatPolicy({ license: verifyLicense(lic, { keys }), devices: v.devices.list() }) });
     const ctx = (client, device) => ({ identity: { scopes: ['read', 'write'], paths: ['**'] }, client, device, local: false });
-    v.bus.send(ctx('claude-code', host), { type: 'status', body: 'the host says hello' });
+    v.bus.send(ctx(ccId(), host), { type: 'status', body: 'the host says hello' });
     v.bus.send(ctx('cursor', laptop.device), { type: 'status', body: 'the laptop says hello' });
     v.bus.send(ctx('codex', host), { type: 'status', body: 'a second message from the host' });
     const files = fs.readdirSync(path.join(root, 'bus', 'log')).filter((x) => x.endsWith('.jsonl'));
     assert.deepEqual(files.sort(), [`${host.id}.jsonl`, `${laptop.device.id}.jsonl`].sort(), 'one log file per device, no more');
     const hostLines = fs.readFileSync(path.join(root, 'bus', 'log', `${host.id}.jsonl`), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
     assert.ok(hostLines.every((m) => m.device === host.id), 'every line of the host file is from the host');
-    assert.deepEqual(hostLines.filter((m) => m.type === 'status').map((m) => m.from).sort(), ['claude-code@host', 'codex@host'], 'both host messages are in the host file');
+    assert.deepEqual(hostLines.filter((m) => m.type === 'status').map((m) => m.from).sort(), [`${ccId()}@host`, 'codex@host'], 'both host messages are in the host file');
     const lapLines = fs.readFileSync(path.join(root, 'bus', 'log', `${laptop.device.id}.jsonl`), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
     assert.ok(lapLines.every((m) => m.device === laptop.device.id), 'every line of the laptop file is from the laptop');
     assert.deepEqual(lapLines.filter((m) => m.type === 'status').map((m) => m.from), ['cursor@laptop'], 'the laptop message is in the laptop file');
@@ -130,7 +137,7 @@ test('MEM-102 AC05: doctor --bundle contains no secret', () => {
     const state = path.join(sb.root, '.memev');
     const SECRETS = {
       github: `ghp_${'a1B2c3D4e5'.repeat(4)}`,
-      openai: `sk-${'Zy9Xw8Vu7T'.repeat(3)}`,
+      sk: `sk-${'Zy9Xw8Vu7T'.repeat(3)}`,
       memev: `mv_${'0123abcd'}_${'f'.repeat(32)}`,
       password: 'password=correct-horse-battery',
       aws: `AKIA${'ABCDEFGHIJKLMNOP'}`,
