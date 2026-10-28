@@ -45,7 +45,42 @@ try {
     Write-Error 'tarball has no bin/memev.mjs'
     exit 1
   }
-  & node $bin init @InitArgs
+  $node = $null
+  $cmd = Get-Command node -ErrorAction SilentlyContinue
+  if ($cmd) {
+    $ver = & node --version 2>$null
+    if ($ver -match '^v(\d+)' -and [int]$Matches[1] -ge 22) { $node = $cmd.Source }
+  }
+  if (-not $node) {
+    $specPath = if ($env:MEMEV_NODE_SPEC) { $env:MEMEV_NODE_SPEC } else { Join-Path $PSScriptRoot 'node-runtime.json' }
+    if (-not (Test-Path -LiteralPath $specPath)) { Write-Error 'pinned Node runtime spec is missing'; exit 1 }
+    $spec = Get-Content -LiteralPath $specPath -Raw | ConvertFrom-Json
+    $pin = $spec.platforms.'win-x64'
+    if (-not $pin) { Write-Error 'pinned Node runtime has no entry for win-x64'; exit 1 }
+    $archive = Join-Path $work 'node.pkg'
+    Fetch $pin.url $archive
+    $expectNode = $pin.sha256.ToLower()
+    $actualNode = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLower()
+    if ($actualNode -ne $expectNode) { Write-Error 'SHA-256 does not match'; exit 1 }
+    $ndir = Join-Path $work 'node-src'
+    New-Item -ItemType Directory -Path $ndir | Out-Null
+    Expand-Archive -LiteralPath $archive -DestinationPath $ndir
+    $exe = Get-ChildItem -LiteralPath $ndir -Recurse -Filter node.exe | Select-Object -First 1
+    if (-not $exe) { Write-Error 'runtime archive has no node.exe'; exit 1 }
+    $top = $exe.Directory
+    if ((Split-Path -Leaf $top) -eq 'bin') { $top = $top.Parent }
+    if ($env:MEMEV_CONFIG_DIR) { $nodeCfg = $env:MEMEV_CONFIG_DIR }
+    elseif ($env:XDG_CONFIG_HOME) { $nodeCfg = Join-Path $env:XDG_CONFIG_HOME 'memev' }
+    elseif ($env:APPDATA) { $nodeCfg = Join-Path $env:APPDATA 'memev' }
+    else { $nodeCfg = Join-Path $env:USERPROFILE '.config\memev' }
+    $pinned = Join-Path $nodeCfg 'node\pinned'
+    if (Test-Path -LiteralPath $pinned) { Remove-Item -LiteralPath $pinned -Recurse -Force }
+    New-Item -ItemType Directory -Path (Split-Path $pinned) -Force | Out-Null
+    Move-Item -LiteralPath $top.FullName -Destination $pinned
+    $node = Join-Path $pinned 'node.exe'
+    if (-not (Test-Path -LiteralPath $node)) { $node = Join-Path $pinned 'bin\node.exe' }
+  }
+  & $node $bin init @InitArgs
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   if ($env:MEMEV_CONFIG_DIR) {
     $cfg = $env:MEMEV_CONFIG_DIR
