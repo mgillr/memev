@@ -1,5 +1,7 @@
 # Troubleshooting
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 Start with:
 
 ```sh

@@ -1,5 +1,7 @@
 # Custom module use cases
 
+Part of the [Memev documentation](../README.md). Up: [custom modules](README.md).
+
 > **DRAFT. Every use case here is planned.** Nothing is built or on sale, and there are no dates or
 > prices on this page. Custom module work is for Business and Corporate (both coming) and is quoted per job. See
 > [README.md](README.md) for how to read these as test cases, and [examples/](examples/) for six
@@ -305,7 +307,7 @@ files you run and own.
 
 **What the custom module adds.** A deployment checklist and a check script for the company's own
 environment, which confirm where the data is, that nothing leaves except what the company allows, and
-who can reach the hub. If a hosted option is used instead, the module says clearly that we are then in
+who can reach the company server. If a hosted option is used instead, the module says clearly that we are then in
 the data path as the company's processor and what we can read while serving.
 
 **Example input.** The company runs the check script in its own network.
@@ -316,7 +318,7 @@ the data path as the company's processor and what we can read while serving.
 
 1. With no outside connection allowed, Memev still starts and recalls.
 2. The script reports every outbound connection Memev tries, and there are none by default.
-3. For a hosted setup the report states that the hub can read what it serves.
+3. For a hosted setup the report states that the company server can read what it serves.
 
 ---
 

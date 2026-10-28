@@ -1,5 +1,7 @@
 # Install Memev
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 An AI app can follow this page without guessing. Run the commands yourself. Stop at the first failure and show the person that command and its output. Do not invent a download address, a token, or a host. Do not post this page anywhere.
 
 ## Commands, in order
@@ -23,7 +25,7 @@ From the repository root, `node bin/memev.mjs init`:
 2. Copies Memev to `~/.config/memev/runtime` and adds the launcher `~/.config/memev/bin/memev`, so apps do not point at the folder you installed from.
 3. Starts Memev in the background on `127.0.0.1:7787` and installs a login service.
 4. Connects every AI app it finds. It saves a copy of each file before it changes one. The per-app pages are in `docs/clients/`.
-5. Opens the optional remote link for cloud apps. `--local-only` skips that. `--org` leaves it off until the person runs `memev cloud on --yes`.
+5. Leaves the optional remote link for cloud apps off. Init asks once on a terminal, or the person runs `memev cloud on`. `--local-only` and `--org` skip the question.
 6. Prints a checklist.
 
 Show the person the whole checklist. Keep every line that asks them to do something.
