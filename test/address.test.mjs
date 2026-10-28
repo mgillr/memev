@@ -89,3 +89,37 @@ test('MEM-026 AC02: An address record with a bad signature is ignored', async ()
     moved.server.close();
   }
 });
+
+test('MEM-027 AC01: A joined computer whose host moved prints the clear line from the session-start hook', async () => {
+  const sb = sandbox();
+  // the host moved and this computer has no backup to re-discover from: the saved address is dead
+  joined(sb.env, { url: await closedUrl(), backup: null, pubkey: null });
+  const r = sb.hook('session-start', { session_id: 's1', cwd: sb.home, source: 'startup' });
+  assert.equal(r.code, 0, r.out + r.err);
+  const ctx = JSON.parse(r.out).hookSpecificOutput.additionalContext;
+  assert.match(ctx, /vault address changed/);
+  assert.match(ctx, /memev join --refresh/);
+});
+
+test('MEM-027 AC02: memev join --refresh updates the stored address and the next call succeeds', async () => {
+  const sb = sandbox();
+  initVault(sb.root, { template: path.join(PKG, 'templates', 'vault') });
+  const pubkey = addressKeypair(sb.root).publicKey;
+  const oldUrl = await closedUrl();
+  publishAddressRecord(sb.root, oldUrl);
+  const moved = await listen();
+  try {
+    publishAddressRecord(sb.root, moved.url);
+    joined(sb.env, { url: oldUrl, backup: sb.root, pubkey });
+    const r = await sb.runAsync(['join', '--refresh']);
+    assert.equal(r.code, 0, r.out + r.err);
+    assert.match(r.out, /vault address updated to/);
+    assert.equal(JSON.parse(fs.readFileSync(remoteFile(sb.env), 'utf8')).url, moved.url);
+    const remote = JSON.parse(fs.readFileSync(remoteFile(sb.env), 'utf8'));
+    const call = await remoteFetch(remote, 'mcp', { env: sb.env, timeoutMs: 2000 });
+    assert.equal(call.ok, true, call.text);
+    assert.ok(moved.hits.includes('/mcp'), 'the next call reached the new address');
+  } finally {
+    moved.server.close();
+  }
+});
