@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { git } from '../engine/git.mjs';
 import { commsCheckView, commsCredentialFailure, fileOf, label } from '../engine/bus.mjs';
+import { readJson } from '../engine/util.mjs';
 
 // ---- setting the bus up: init, connect and the doctor share this
 // Every app that is found gets a seat at once. The lead (operator) seat is always the person's
@@ -87,7 +88,7 @@ export async function setupBus({ root, env = process.env, clients = [], flags = 
 
 const USAGE = `memev bus roster [--card] | check [--to SEAT] [--timeout S] | send TO TYPE TEXT [--ref ID] [--release]
           | tail [--n N] [--type T] | since SEQ | tasks [--open] | unread [SEAT] | watch SEAT [--interval S]
-          | operator [SEAT] | rename OLD NEW`;
+          | hello SEAT [--timeout S] | operator [SEAT] | rename OLD NEW`;
 
 async function caller(root, env) {
   if (!isVault(root)) {
@@ -169,6 +170,36 @@ export async function command(cmd, pos, flags, { root, env }) {
       try { const r = await call('bus_unread', { seat }); for (const m of r.messages) console.log(line(m)); if (r.hold) out.warn(`on hold since ${r.hold.since}: ${r.hold.reason}`); if (flags.once) return 0; }
       catch (e) { out.bad(e.message); if (flags.once) return 1; }
       await new Promise((r) => setTimeout(r, every));
+    }
+  }
+  if (sub === 'hello') {
+    // A guided test of the link: post one hello to the seat, then wait for the seat to read it on
+    // its next turn (apps check the bus at the start of every turn) and say so.
+    let seat = pos[1];
+    if (!seat) throw new Error('memev bus hello <seat> [--timeout S]  (memev bus roster lists the seats)');
+    if (seat === 'all') throw new Error('memev bus hello is to one seat, not all; pass the seat name (memev bus roster lists them, or use the operator alias)');
+    // The operator alias is a natural way to test the lead: resolve it to the lead's real seat so
+    // the read check watches the seat that actually reads the hello.
+    if (seat === 'operator') {
+      const r = await call('bus_roster', {});
+      if (!r.operator) throw new Error('no operator seat is set yet; pick the lead with memev bus operator <seat> (memev bus roster lists the seats), then run memev bus hello again');
+      seat = r.operator;
+      out.info(`the operator is ${seat}; sending the hello there`);
+    }
+    const timeoutS = Math.max(1, Math.min(300, Number(flags.timeout) || 60));
+    const m = await call('bus_send', { to: seat, type: 'hello', body: 'hello from the terminal: a guided test of the bus. If you are reading this, the terminal reached your app.' });
+    out.ok(`sent #${m.seq} to ${seat}`);
+    out.info(`what to do in the app: open ${seat} and start a turn (any message); it checks the bus at the start of every turn and will see the hello there`);
+    // On the vault's own computer the pulse file says exactly what the seat has read; from another
+    // computer the roster's last heartbeat is the closest signal.
+    const isRead = isVault(root)
+      ? () => (readJson(path.join(root, 'bus', 'pulse', `${fileOf(seat)}.json`), null)?.read || {})[m.device] >= m.dseq
+      : async () => { const r = await call('bus_roster', {}); const row = (r.seats || []).find((s) => s.seat === seat); return !!row?.last_seen && row.last_seen >= m.ts; };
+    const start = Date.now();
+    for (;;) {
+      if (await isRead()) { out.ok(`${seat} read it ${Math.max(1, Math.round((Date.now() - start) / 1000))} s after you sent it`); return 0; }
+      if (Date.now() - start >= timeoutS * 1000) { out.bad(`${seat} has not read it yet; it is waiting for its next turn (open the app and start a turn, then run memev bus hello ${seat} again)`); return 1; }
+      await new Promise((r) => setTimeout(r, 500));
     }
   }
   if (sub === 'operator') {

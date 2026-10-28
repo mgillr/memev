@@ -84,11 +84,24 @@ From the operator session (Claude Code, say), ask it to:
 - assign a task (`bus_send`, type task, to a seat or all). The assignee claims it (type claim, ref =
   the task id) and restates it in its own words, so you can catch a misunderstanding early. One seat
   claims a task;
-- see the tasks (`bus_tasks`): who claimed what, the restatement, the latest status and the verdict;
+- see the tasks (`bus_tasks`): who claimed what, the restatement, the latest status and the verdict.
+  An unclaimed task to a live seat that has not read it yet is **waiting for next turn**: the app
+  answers between turns, so the task is picked up when that app next runs a turn;
 - put a seat on hold (type hold), and lift it (type hold with `release`).
 
 The same things work from a terminal: `memev bus roster`, `memev bus check`, `memev bus send`,
 `memev bus tasks`, `memev bus tail`.
+
+To test the link to one seat, run `memev bus hello <seat> [--timeout S]`: it posts a single hello
+to that seat, tells you what to do in the app (start a turn; the app checks the bus at the start
+of every turn), and waits until the seat reads it, reporting how long that took. If the seat has
+not read it by the timeout (default 60 s), it exits 1 and says the seat is waiting for its next
+turn. The seat may be the `operator` alias, which is resolved to the lead's real seat first (so
+`memev bus hello operator` is a natural way to test the lead); `all` is refused, because a hello
+is to one seat. On the vault's own computer the read is exact (the seat's pulse says what it has
+read); from another computer there is no pulse to read, so the answer is approximate: the seat's
+last heartbeat after the send is the closest signal, and it can count a heartbeat the seat's own
+send makes.
 
 ## The pulse
 
