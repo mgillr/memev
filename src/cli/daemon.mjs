@@ -69,11 +69,11 @@ export async function ensureDaemon(root, { quiet = false, waitMs = 6000 } = {}) 
   return startDaemon(root, { quiet, waitMs });
 }
 
-export async function startDaemon(root, { quiet = false, waitMs = 6000 } = {}) {
+export async function startDaemon(root, { quiet = false, waitMs = 6000, spawn: spawnProc = spawn } = {}) {
   const logFile = path.join(root, '.memev', 'daemon.log');
   try { if (fs.statSync(logFile).size > 5 * 1024 * 1024) fs.renameSync(logFile, `${logFile}.1`); } catch {}
   const fd = fs.openSync(logFile, 'a', 0o600);
-  const child = spawn(process.execPath, [path.join(PKG, 'src', 'server', 'main.mjs'), '--root', root], { detached: true, stdio: ['ignore', fd, fd], env: process.env });
+  const child = spawnProc(process.execPath, [path.join(PKG, 'src', 'server', 'main.mjs'), '--root', root], { detached: true, stdio: ['ignore', fd, fd], env: process.env, windowsHide: true });
   child.unref(); fs.closeSync(fd);
   const until = Date.now() + waitMs;
   while (Date.now() < until) {
