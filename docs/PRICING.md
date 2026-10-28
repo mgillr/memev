@@ -20,15 +20,19 @@
 | Cloud AI connectors | 5 | 10 | 10 per seat, pooled | based on your requirements | based on your requirements |
 | Vault, recall, graph, contracts, doctor, your own tunnel | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Backup to your own GitHub (one writer) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| One memory for every AI app, and the comms bus between them | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Hosted end-to-end encrypted sync between computers | | planned | planned | | planned, or self-hosted |
 | Hosted encrypted backup and a stable relay address | | planned | planned | | planned, or self-hosted |
-| One shared vault for a team, member keys, provenance | | | planned | ✓ | ✓ |
+| One shared vault for a team over the secure link, provenance | | | ✓ | ✓ | ✓ |
+| Member keys: one key per person, covering their computers | | | planned | planned | planned |
 | Company hub on your server, departments and roles from an org chart | | | | planned | planned |
 | Sign-in with Google Workspace or Microsoft Entra ID | | | | planned | planned |
 | Restricted notes served only to a local model, egress log | | | | planned | planned |
 | SCIM, SIEM and audit export, retention, legal hold, high availability | | | | | planned |
 
-Personal and Team prices are early-supporter prices: the price stays locked for as long as the
+Personal is sold for what exists today: the Free core on up to 3 computers, so the AI apps on all of
+them share one memory and one comms bus. A cell marked *planned* is not built and is not part of what
+you pay for. Personal and Team prices are early-supporter prices: the price stays locked for as long as the
 subscription runs, and it is labelled that way while sync and the relay are planned. Team and
 Business overlap at 10 to 20 people on purpose. You choose by need (a hub, sign-in, roles), not by
 size. Office is not a tier. Hosted sync and the hosted relay are not part of Business, because its
