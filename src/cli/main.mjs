@@ -83,6 +83,10 @@ if [ -n "$N" ] && [ "$N" != "$REC" ]; then
   case "$V" in ''|*[!0-9]*) ;; *) [ "$V" -ge 22 ] && exec "$N" "$JS" "$@" ;; esac
 fi
 [ -x "$REC" ] && exec "$REC" "$JS" "$@"
+if [ "$1" = "hook" ]; then
+  echo "Memev could not start (Node not found); run memev doctor"
+  exit 0
+fi
 echo "memev: no Node.js 22 or newer: node on PATH is missing or older, and $REC is gone. Install Node.js 22 or newer, then run: node \\"$JS\\" doctor --fix" >&2
 exit 127
 `;

@@ -114,6 +114,11 @@ export async function runHook(event, flags, env = process.env) {
     writePrivateJson(stateFile, st);
   } catch (e) {
     if (env.MEMEV_DEBUG) process.stderr.write(`[memev hook ${event}] ${e.message}\n`);
+    const noticeFile = path.join(path.dirname(stateFile), 'notice.txt');
+    if (!fs.existsSync(noticeFile)) {
+      try { fs.mkdirSync(path.dirname(noticeFile), { recursive: true }); fs.writeFileSync(noticeFile, '1'); } catch {}
+      process.stderr.write('Memev could not start (Node not found); run memev doctor\n');
+    }
     if (event === 'session-start') emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev is not reachable right now (${e.message}); run \`memev doctor\`.]`);
   }
   return 0;
