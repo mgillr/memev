@@ -7,7 +7,7 @@
 //   stop           → the reply is recorded; the todo list becomes a checkpoint when it changed
 // session-start and prompt also check the comms bus: a heartbeat, a hello the first time, and any
 // new messages or a hold go into context.
-// Cursor's stop hook can only continue the agent with a followup_message, so it is reserved for
+// Cursor's stop hook can only continue the session with a followup_message, so it is reserved for
 // operator tasks waiting on this seat, and loop_limit keeps the follow-ups from running away.
 import fs from 'node:fs';
 import path from 'node:path';

@@ -41,7 +41,7 @@ to a prompt. Memev works around this in three ways:
   (`alwaysApply: true`), so the memory rule is in every session of that project, not only at session
   start. `memev disconnect cursor` removes the file again.
 - Per-prompt recall and post-compaction state come through the MCP instructions instead of a hook.
-- The stop hook can only continue the agent with a `followup_message`. Memev uses that only for
+- The stop hook can only continue the session with a `followup_message`. Memev uses that only for
   operator tasks waiting on this seat (never for ordinary bus traffic), and sets `loop_limit` so the
   follow-ups cannot run away.
 
