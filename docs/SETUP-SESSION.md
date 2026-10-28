@@ -1,5 +1,7 @@
 # Remote setup session
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 A remote setup session lets the Memev operator finish your setup over a
 secure connection that you start. You run one command with a setup code the
 operator gives you. The command opens an outbound connection to the operator,

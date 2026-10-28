@@ -27,6 +27,7 @@ this folder links back here, and this page links down to every page.
 | [RELAY.md](RELAY.md) | the relay protocol and the `memev cloud relay` client |
 | [GITHUB.md](GITHUB.md) | backup to your own private repository |
 | [DOCKER.md](DOCKER.md) | running Memev in a container |
+| [SETUP-SESSION.md](SETUP-SESSION.md) | the customer-started remote setup session, and how to stop it |
 | [ISOLATION.md](ISOLATION.md) | how this repository is kept separate from earlier work |
 | [THREAT-MODEL.md](THREAT-MODEL.md) | assets, threats and mitigations; also [SECURITY.md](../SECURITY.md) |
 | [SOLUTIONS.md](SOLUTIONS.md) | the problems users report, what Memev does, the check for each |
