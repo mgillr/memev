@@ -2,14 +2,15 @@
 // `memev mcp`: an MCP server on stdio for clients that launch one. It forwards every message to the
 // daemon so there is one writer, and starts the daemon if it is not running.
 import readline from 'node:readline';
-import { clientToken, daemonInfo, config } from './common.mjs';
+import { clientToken, daemonInfo, config, effectiveClient } from './common.mjs';
 import { ensureDaemon } from './daemon.mjs';
 import { fetchOut } from '../engine/net.mjs';
 
 export async function runStdio(root, client) {
+  const who = effectiveClient(client);
   const write = (o) => process.stdout.write(`${JSON.stringify(o)}\n`);
   let ready = null; let token = null;
-  const ready_ = () => (ready ||= ensureDaemon(root, { quiet: true }).then((ok) => { token = clientToken(root, client); return ok; }));
+  const ready_ = () => (ready ||= ensureDaemon(root, { quiet: true }).then((ok) => { token = clientToken(root, who); return ok; }));
   const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
   const inflight = new Set();
   rl.on('line', (line) => {
@@ -20,7 +21,7 @@ export async function runStdio(root, client) {
       if (!ok) { if (msg.id !== undefined) write({ jsonrpc: '2.0', id: msg.id, error: { code: -32000, message: 'Memev daemon is not running and could not be started; run memev doctor' } }); return; }
       const port = daemonInfo(root)?.port || config(root).port;
       try {
-        const r = await fetchOut(`http://127.0.0.1:${port}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'x-memev-client': client }, body: JSON.stringify(msg) });
+        const r = await fetchOut(`http://127.0.0.1:${port}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'x-memev-client': who }, body: JSON.stringify(msg) });
         if (r.status === 202) return;
         const body = await r.text(); if (body) process.stdout.write(`${body.trim()}\n`);
       } catch (e) { if (msg.id !== undefined) write({ jsonrpc: '2.0', id: msg.id, error: { code: -32000, message: `Memev: ${e.message}` } }); }
