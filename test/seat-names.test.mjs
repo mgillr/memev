@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { newVault, cleanup } from './helpers/tmp.mjs';
+import { sandbox } from './helpers/cli.mjs';
 import { Bus, fileOf } from '../src/engine/bus.mjs';
 import { writeJson } from '../src/engine/util.mjs';
 
@@ -125,4 +126,21 @@ test('MEM-094-FIX: after a rename, messages sent to the old name still reach the
     const row = bus.roster().seats.find((r) => r.seat === 'my-app@my-laptop');
     assert.deepEqual(row?.claims, [task.id], 'the roster counts the claim made under the old name as the seat\'s own');
   } finally { v.close(); }
+});
+
+test('MEM-094-INIT: on a computer not named host, init finishes ready and doctor finds each connected app\'s seat', () => {
+  const sb = sandbox();
+  fs.mkdirSync(path.join(sb.home, '.claude'), { recursive: true });
+  const extraEnv = { MEMEV_MACHINE_NAME: 'my-laptop' };
+  try {
+    const init = sb.run(['init', '--port', String(sb.port), '--local-only'], { extraEnv });
+    assert.equal(init.code, 0, init.out + init.err);
+    assert.deepEqual(fs.readdirSync(path.join(sb.root, 'bus', 'seats')), [`${fileOf('claude-code@my-laptop')}.json`]);
+    const doc = sb.run(['doctor'], { extraEnv });
+    assert.match(doc.out, /\u2713 every connected app has a bus seat: 1 app\(s\) seated/, doc.out);
+    // a removed seat is not a seat
+    const f = path.join(sb.root, 'bus', 'seats', `${fileOf('claude-code@my-laptop')}.json`);
+    writeJson(f, { ...JSON.parse(fs.readFileSync(f, 'utf8')), removed: new Date().toISOString() });
+    assert.match(sb.run(['doctor'], { extraEnv }).out, /\u2717 every connected app has a bus seat: no seat for claude-code/);
+  } finally { sb.stop(); }
 });
