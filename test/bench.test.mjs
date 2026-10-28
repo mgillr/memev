@@ -72,9 +72,11 @@ test('MEM-106 AC08: --check fails with a clear message when recall@k is lowered 
 });
 
 test('MEM-106 AC09: --check fails when a token target is breached and names the metric and the contract that owns it', () => {
-  const r = bench([RUN, '--level', 'small', '--check', '--group', 'caps', '--only', 'get', '--metrics', metrics]);
+  // the live run is inside the cap, so the breach is a mutated metric
+  const over = mutate('get-over.json', (m) => { m.max_result_tokens.get = 2600; });
+  const r = bench([RUN, '--level', 'small', '--check', '--group', 'caps', '--only', 'get', '--metrics', over]);
   assert.equal(r.status, 1, r.stdout);
-  assert.match(r.stdout, /FAIL caps\/get max_result_tokens\.get = \d+ > 2500 \(MEM-107: /);
+  assert.match(r.stdout, /FAIL caps\/get max_result_tokens\.get = 2600 > 2500 \(MEM-107: /);
   // and the same check passes once the result is inside the target
   const f = mutate('get-capped.json', (m) => { m.max_result_tokens.get = 2400; m.max_result_tokens.get_chars = 7900; });
   const ok = bench([RUN, '--level', 'small', '--check', '--group', 'caps', '--only', 'get', '--metrics', f]);
