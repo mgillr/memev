@@ -14,7 +14,7 @@ test('MEM-008 AC01: session-start hook with missing Node prints one notice line 
     const script = launcherScript('/nonexistent/node', '/nonexistent/memev.mjs');
     const scriptPath = path.join(tmp, 'launcher.sh');
     fs.writeFileSync(scriptPath, script, { mode: 0o755 });
-    const r = spawnSync('/bin/sh', [scriptPath, 'hook', 'session-start', '--client', 'claude-code'], {
+    const r = spawnSync('/bin/sh', [scriptPath, 'hook', 'session-start', '--client', 'codex'], {
       env: { PATH: '/nonexistent', HOME: tmp },
       encoding: 'utf8',
       timeout: 5000,
@@ -36,7 +36,7 @@ test('MEM-008 AC02: prompt hook that throws prints one notice line once per sess
     const runHook = (prompt) => {
       const r = spawnSync(process.execPath, [
         path.join(new URL('..', import.meta.url).pathname, 'bin', 'memev.mjs'),
-        'hook', 'prompt', '--client', 'claude-code', '--root', badRoot,
+        'hook', 'prompt', '--client', 'codex', '--root', badRoot,
       ], {
         input: JSON.stringify({ session_id: 'ac02-session', prompt }),
         env: { ...sb.env, MEMEV_ROOT: badRoot },
