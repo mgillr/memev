@@ -183,7 +183,7 @@ test('MEM-137 AC08: the copy this contract adds follows the house writing rules'
   const files = ['../src/engine/entitlements.mjs', '../src/cli/licensing.mjs', '../src/cli/doctor.mjs', '../scripts/license/issue.mjs', '../scripts/license-dev.mjs', '../changelog.d/MEM-137.md'];
   for (const f of files) {
     const src = read(f);
-    assert.doesNotMatch(src, /—/, `${f}: em-dash`);
+    assert.doesNotMatch(src, /\u2014/, `${f}: em-dash`);
     assert.doesNotMatch(src, /\b(seamless|robust|powerful|leverage|unlock|cutting[- ]edge)\b/i, `${f}: hype word`);
     assert.doesNotMatch(src, /\bcertified\b/i, `${f}: certified`);
     assert.doesNotMatch(src, /not just\b/i, `${f}: not just`);
