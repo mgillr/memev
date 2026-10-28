@@ -170,7 +170,7 @@ function platformKey() {
 function toolShim(dir) {
   const bin = path.join(dir, 'pathbin');
   fs.mkdirSync(bin);
-  const names = ['cp', 'tar', 'awk', 'mktemp', 'shasum', 'sha256sum', 'uname', 'grep', 'sed', 'tr', 'mkdir', 'rm', 'mv', 'chmod', 'head', 'cat', 'dirname'];
+  const names = ['cp', 'tar', 'gzip', 'awk', 'mktemp', 'shasum', 'sha256sum', 'uname', 'grep', 'sed', 'tr', 'mkdir', 'rm', 'mv', 'chmod', 'head', 'cat', 'dirname'];
   for (const name of names) {
     let src = '';
     try { src = execFileSync('bash', ['-lc', 'command -v ' + name], { encoding: 'utf8' }).trim(); } catch { src = ''; }
