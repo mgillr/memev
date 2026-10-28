@@ -42,8 +42,10 @@ hook); they cannot add context to a prompt. Memev works around this in three way
   start. `memev disconnect cursor` removes the file again.
 - Per-prompt recall and post-compaction state come through the MCP instructions instead of a hook.
 - The stop hook can only continue the session with a `followup_message`. Memev uses that only for
-  operator tasks waiting on this seat (never for ordinary bus traffic), and sets `loop_limit` so the
-  follow-ups cannot run away.
+  operator tasks waiting on this seat (never for ordinary bus traffic), and sets `loop_limit: 3` on
+  the stop entry in `~/.cursor/hooks.json` so the follow-ups cannot run away. The prompt hook only
+  peeks at the bus, so a task that is already waiting when you type is still picked up by the stop
+  hook; the stop hook marks the tasks it followed up on as read.
 
 Cloud apps (claude.ai, ChatGPT, others that take a remote MCP URL) connect through the tunnel; see
 [CLOUD.md](CLOUD.md).

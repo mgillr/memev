@@ -64,12 +64,17 @@ function removeGroupHooks(j) {
   if (!Object.keys(j.hooks).length) delete j.hooks;
   return j;
 }
-// flat hooks (Cursor)
+// flat hooks (Cursor): an entry is a command string or a full entry object (the stop hook carries
+// loop_limit, a per-script setting on the hook entry, not something the hook prints)
 function setFlatHooks(j, events) {
   j.version ??= 1;
   removeFlatHooks(j);
   j.hooks = j.hooks && typeof j.hooks === 'object' ? j.hooks : {};
-  for (const [ev, command] of Object.entries(events)) { j.hooks[ev] = Array.isArray(j.hooks[ev]) ? j.hooks[ev] : []; j.hooks[ev].push({ command }); }
+  for (const [ev, entry] of Object.entries(events)) {
+    const e = typeof entry === 'string' ? { command: entry } : entry;
+    j.hooks[ev] = Array.isArray(j.hooks[ev]) ? j.hooks[ev] : [];
+    j.hooks[ev].push(e);
+  }
   return j;
 }
 function removeFlatHooks(j) {
@@ -159,7 +164,7 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
           sessionStart: hookCmd(launcher, 'session-start', 'cursor', 'cursor'),
           beforeSubmitPrompt: hookCmd(launcher, 'prompt', 'cursor', 'cursor'),
           preCompact: hookCmd(launcher, 'pre-compact', 'cursor', 'cursor'),
-          stop: hookCmd(launcher, 'stop', 'cursor', 'cursor'),
+          stop: { command: hookCmd(launcher, 'stop', 'cursor', 'cursor'), loop_limit: 3 },
         }), removeFlatHooks),
         ...(o.project ? [text(path.join(o.project, '.cursor', 'rules', 'memev.mdc'), (t) => addBlock(t, CURSOR_RULE), cursorRuleRemove)] : []),
       ], manual: 'Check that Settings → MCP shows memev connected, and allow its tools.', note: 'Cursor injects the resume card at session start; per-prompt recall and post-compaction state come through the MCP instructions (Cursor hooks cannot add context to a prompt).' },
