@@ -8,7 +8,7 @@
 // session-start and prompt also check the comms bus: a heartbeat, a hello the first time, and any
 // new messages or a hold go into context.
 // Cursor's stop hook can only continue the session with a followup_message, so it is reserved for
-// operator tasks waiting on this seat. The loop limit is a setting on the stop entry in hooks.json
+// operator tasks waiting for you. The loop limit is a setting on the stop entry in hooks.json
 // (loop_limit, default 5 there), and the hook itself stops following up once loop_count reaches it.
 import fs from 'node:fs';
 import path from 'node:path';
