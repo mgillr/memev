@@ -602,6 +602,10 @@ attachContracts(Vault);
 /** Create a new vault in `root` from the template. Idempotent. Returns the admin token when one is minted. */
 export function initVault(root, { template, port = null } = {}) {
   root = path.resolve(root);
+  const madeRoot = !exists(root);
+  const hadState = exists(path.join(root, STATE));
+  const hadGitignore = exists(path.join(root, '.gitignore'));
+  const hadGitattributes = exists(path.join(root, '.gitattributes'));
   fs.mkdirSync(path.join(root, STATE), { recursive: true, mode: 0o700 });
   try { fs.chmodSync(root, 0o700); } catch {}
   const copy = (src, dst) => { for (const e of fs.readdirSync(src, { withFileTypes: true })) { const s = path.join(src, e.name), d = path.join(dst, e.name); if (e.isDirectory()) { fs.mkdirSync(d, { recursive: true }); copy(s, d); } else if (!exists(d)) fs.copyFileSync(s, d); } };
@@ -613,7 +617,14 @@ export function initVault(root, { template, port = null } = {}) {
   const ga = path.join(root, '.gitattributes'); if (!exists(ga)) fs.writeFileSync(ga, 'memory/**/*.md merge=union\nwork/**/*.md merge=union\n');
   if (!exists(path.join(root, '.git'))) {
     const gi = gitInitMain(root);
-    if (!gi.ok) { fs.rmSync(root, { recursive: true, force: true }); throw new VaultError('git_failed', `git init failed for the vault at ${root}: ${gi.err || `exit ${gi.status}`}`); }
+    if (!gi.ok) {
+      // Never remove a folder that existed before this call, and only remove the paths this call created.
+      if (!hadGitignore) { try { fs.rmSync(gi); } catch {} }
+      if (!hadGitattributes) { try { fs.rmSync(ga); } catch {} }
+      if (!hadState) { try { fs.rmSync(path.join(root, STATE), { recursive: true, force: true }); } catch {} }
+      if (madeRoot) { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} }
+      throw new VaultError('git_failed', `git init failed for the vault at ${root}: ${gi.err || `exit ${gi.status}`}`);
+    }
     if (!git(root, ['config', 'user.email']).out) { git(root, ['config', 'user.name', 'Memev']); git(root, ['config', 'user.email', 'memev@localhost']); }
     git(root, ['add', '-A']); git(root, ['commit', '-q', '-m', 'memev: a new vault']);
   }

@@ -58,3 +58,22 @@ test('MEM-003 AC02: when git init fails outright, init stops with a message nami
   }
   assert.ok(!fs.existsSync(path.join(root, '.git')), 'no half built git repo is left behind');
 });
+
+test('MEM-003 AC02: when git init fails on a folder that already has files, the files that were there before are not removed', () => {
+  const shim = fs.mkdtempSync(path.join(os.tmpdir(), 'gitshim-'));
+  fs.writeFileSync(path.join(shim, 'git'), '#!/bin/sh\nif [ "$1" = "init" ]; then echo "git: init: boom" >&2; exit 1; fi\nexec /usr/bin/false\n', { mode: 0o755 });
+  const root = path.join(tmpdir(), 'vault');
+  fs.mkdirSync(path.join(root, 'my-notes', 'projects'), { recursive: true });
+  const kept = path.join(root, 'my-notes', 'projects', 'thesis.md');
+  fs.writeFileSync(kept, 'my work\n');
+  const prev = process.env.PATH;
+  process.env.PATH = `${shim}:${prev}`;
+  try {
+    assert.throws(() => initVault(root, { template: path.join(PKG, 'templates', 'vault') }), /git/);
+  } finally {
+    process.env.PATH = prev;
+  }
+  assert.ok(fs.existsSync(root), 'the folder that existed before the call is still there');
+  assert.equal(fs.readFileSync(kept, 'utf8'), 'my work\n', 'the file that was there before is still there');
+  assert.ok(!fs.existsSync(path.join(root, '.git')), 'no half built git repo is left behind');
+});
