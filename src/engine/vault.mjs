@@ -25,7 +25,7 @@ export const VERSION = '0.1.0';
 export const STATE = '.memev';
 const KINDS = { decision: 'decisions', gotcha: 'gotchas', fact: 'facts', pattern: 'patterns', win: 'wins', person: 'people', note: 'notes', preference: 'preferences' };
 const PROTECTED = [/^contracts\/signed\//, /^contracts\/keys\//];
-const DEFAULT_CONFIG = { version: 1, port: 7787, remote: { enabled: true, provider: 'auto', rate_per_min: 120 }, sync: { interval_min: 30 }, recall: { per_prompt: true, max_chars: 1500, min_score: 1.0, scope: 'project' }, memory: { ...DEFAULT_GATE }, journal: { enabled: true, max_chars: 2000 }, contracts: { exec_local_only: true } };
+const DEFAULT_CONFIG = { version: 1, port: 7787, remote: { enabled: true, provider: 'auto', rate_per_min: 120 }, sync: { interval_min: 30 }, recall: { per_prompt: true, max_chars: 1500, min_score: 1.0, scope: 'project' }, memory: { ...DEFAULT_GATE }, journal: { enabled: true, max_chars: 2000 }, contracts: { enabled: false, exec_local_only: true } };
 
 export class VaultError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
@@ -43,7 +43,10 @@ export class Vault extends EventEmitter {
 
   open() {
     if (!isVault(this.root)) throw new VaultError('not_a_vault', `${this.root} is not a Memev vault (memev init)`);
-    this.config = { ...DEFAULT_CONFIG, ...readJson(path.join(this.state, 'config.json'), {}) };
+    const fileCfg = readJson(path.join(this.state, 'config.json'), {});
+    this.config = { ...DEFAULT_CONFIG, ...fileCfg };
+    // existing vaults predate the opt-in: contracts stay on for them
+    if (!fileCfg.contracts || fileCfg.contracts.enabled === undefined) this.config.contracts = { ...DEFAULT_CONFIG.contracts, ...fileCfg.contracts, enabled: true };
     this.tokens = new TokenStore(path.join(this.state, 'tokens.json'));
     this.host = hostDevice(this.root);
     this.log = new OpLog(path.join(this.state, 'oplog'), { segmentBytes: this.opts.segmentBytes, snapshotEvery: this.opts.snapshotEvery, fsync: this.opts.fsync ?? true, deviceId: this.host.id }).open();

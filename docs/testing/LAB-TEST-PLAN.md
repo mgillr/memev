@@ -32,10 +32,10 @@ release to catch regressions.
 
 | Lab | Machines | What it tests | Suggested build |
 |---|---|---|---|
-| L1 Free | 1 | one person, one computer, every local feature | one macOS machine (13 or newer) and one Ubuntu 24.04 VM, 2 CPUs, 4 GB RAM, 10 GB disk |
-| L2 Team | 2 or 3 | several computers using one vault through the secure link, per-computer credentials | one host (Ubuntu 24.04 VM or macOS) plus 1 or 2 client VMs; the host needs outbound internet for a quick tunnel, or Tailscale on all of them |
-| L3 Office / Business | about 10 | many computers on one vault, seat counts, `init --org`, path-limited tokens | one host VM (4 CPUs, 8 GB RAM) and 9 clients. Clients can be containers (`node:22` images) on one Docker host; each needs its own credential |
-| L4 Enterprise | 3 or more | an organisation server, a local model server, integrations, egress control | an org server VM (`memev init --org`), a model server (Ollama or vLLM on a GPU box, or a small CPU model for a functional check), a client VM, and a firewall or packet capture point between them and the internet |
+| L1 Personal | 1 | one person, one computer, every local feature | one macOS machine (13 or newer) and one Ubuntu 24.04 VM, 2 CPUs, 4 GB RAM, 10 GB disk |
+| L2 Personal with more computers | 2 or 3 | several computers using one vault through the secure link, per-computer credentials | one host (Ubuntu 24.04 VM or macOS) plus 1 or 2 client VMs; the host needs outbound internet for a quick tunnel, or Tailscale on all of them |
+| L3 Business stand-in | about 10 | many computers on one vault, seat counts, `init --org`, path-limited tokens | one host VM (4 CPUs, 8 GB RAM) and 9 clients. Clients can be containers (`node:22` images) on one Docker host; each needs its own credential |
+| L4 Corporate stand-in | 3 or more | an organisation server, a local model server, integrations, egress control | an org server VM (`memev init --org`), a model server (Ollama or vLLM on a GPU box, or a small CPU model for a functional check), a client VM, and a firewall or packet capture point between them and the internet |
 
 Have ready before you start:
 
@@ -48,7 +48,7 @@ Have ready before you start:
 - A throwaway private GitHub repository and the `gh` CLI, for the backup test only.
 - gitleaks 8.30.1 for the security section (the CI workflow shows the pinned checksum).
 
-What is simulated and what isn't: the Business and Enterprise parts that are planned (company hub
+What is simulated and what isn't: the Business and Corporate parts that are planned (company hub
 with user accounts, sign-in with Google or Entra ID, org chart import, departments and roles,
 labels, local-model routing, egress log, high availability) can't be tested yet. L3 and L4 test
 what exists today on that hardware: one vault on a server, many computers with their own
