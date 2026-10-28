@@ -21,7 +21,7 @@ connects them, unless you disconnected that app yourself.
 | VS Code | `Code/User/mcp.json` | instructions |
 | Zed | `context_servers` in `zed/settings.json` | instructions |
 | OpenCode | `mcp` entry in `~/.config/opencode/opencode.json`; a block in the OpenCode rules file (skipped if the Claude rules file exists and the OpenCode one is missing) | instructions |
-| GitHub Copilot CLI | `mcpServers` entry in `~/.copilot/mcp-config.json` (or `$COPILOT_HOME/mcp-config.json`) | instructions |
+| GitHub Copilot CLI | `mcpServers` entry in `~/.copilot/mcp-config.json` and a block in `~/.copilot/copilot-instructions.md` (in `$COPILOT_HOME` when it is set) | instructions |
 
 **Hooks** mode: the resume card is injected at session start, relevant memories are added to each
 prompt, a checkpoint is written before compaction, and the turn is journaled when it ends. The app
