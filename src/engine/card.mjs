@@ -1,7 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 // The resume card: the session-start state rendered as plain text, short enough to inject into a
 // session's context before its first turn (and again after every compaction).
-import { truncate } from './util.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { truncate, readJson, configDir, homeDir } from './util.mjs';
+
+// The footer for exported artefacts: on only when the user set "footer": true in the vault config.
+export const FOOTER = 'Made with Memev';
+
+/** The vault this process works on: MEMEV_ROOT, the default vault file, or ~/memev. */
+export const currentVault = (env = process.env) => {
+  if (env.MEMEV_ROOT) return path.resolve(env.MEMEV_ROOT);
+  try { const d = fs.readFileSync(path.join(configDir(env), 'default'), 'utf8').trim(); if (d) return d; } catch {}
+  return path.join(homeDir(env), 'memev');
+};
+
+/** True when the user turned the export footer on in the vault config. Off by default. */
+export const footerEnabled = (root = currentVault()) => {
+  try { return !!readJson(path.join(root, '.memev', 'config.json'), {})?.footer; } catch { return false; }
+};
 
 // The rules every session follows, sent once per session: by the session-start hook in apps that have one, otherwise
 // in the MCP instructions. Kept under 200 tokens; PROTOCOL_REVIEW below accounts for every sentence of the longer text
@@ -52,7 +69,7 @@ export const PROTOCOL_REVIEW = [
   { was: "If Memev is unreachable, say so once and continue.", now: "Memev unreachable: say so once, continue." },
 ];
 
-export function renderCard(c, { maxChars = 6000 } = {}) {
+export function renderCard(c, { maxChars = 6000, footer } = {}) {
   const L = ['[Memev resume card]'];
   if (c.project_state?.checkpoints) {
     const s = c.project_state;
@@ -74,7 +91,8 @@ export function renderCard(c, { maxChars = 6000 } = {}) {
   if (c.recent_decisions?.length) { L.push('Recent decisions:'); for (const d of c.recent_decisions) L.push(`  ${d}`); }
   if (c.relevant?.length) { L.push('Relevant memory:'); for (const h of c.relevant) L.push(`  [${h.path}${h.heading ? `#${h.heading}` : ''}] ${truncate(h.snippet, 260)}${h.claims ? ` {${h.claims.map((x) => `${x.claim}: ${x.status}`).join('; ')}}` : ''}`); }
   if (c.north_star) L.push(`About the user: ${truncate(c.north_star.replace(/\s+/g, ' '), 600)}`);
-  return truncate(L.join('\n'), maxChars);
+  const text = truncate(L.join('\n'), maxChars);
+  return (footer ?? footerEnabled()) ? `${text}\n\n${FOOTER}` : text;
 }
 
 export function renderRecall(hits, { maxChars = 1500 } = {}) {
