@@ -121,13 +121,16 @@ export async function runHook(event, flags, env = process.env) {
         const bus = await busP;
         const contractsOn = remote || config(root).contracts?.enabled !== false;
         emit(format, 'UserPromptSubmit', [bus?.text, r?.text, contractsOn && isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
-        // the app times the hook process, not this promise: once the output is written and the state
-        // is saved, end the process, so the calls the budget dropped and the fire-and-forget journal
-        // do not keep it open. The journal is accepted as lost when the vault is slow.
         if (tr) st.offset = tr.offset;
         writePrivateJson(stateFile, st);
-        await new Promise((resolve) => process.stdout.once('drain', resolve));
-        process.exit(0);
+        // the app times the hook process, not this promise: once the output is written and the state
+        // is saved, end the process, so the calls the budget dropped and the fire-and-forget journal
+        // do not keep it open. The journal is accepted as lost when the vault is slow. In-process
+        // callers (the bench harness, the tests) are not the hook, so they just return.
+        if (process.argv[2] === 'hook') {
+          await new Promise((r) => process.stdout.write('', r));
+          process.exit(0);
+        }
       }
     } else if (event === 'pre-compact') {
       await saveCheckpoint('pre-compact');
@@ -158,11 +161,6 @@ export async function runHook(event, flags, env = process.env) {
     writePrivateJson(stateFile, st);
   } catch (e) {
     if (env.MEMEV_DEBUG) process.stderr.write(`[memev hook ${event}] ${e.message}\n`);
-    const noticeFile = path.join(path.dirname(stateFile), 'notice.txt');
-    if (!fs.existsSync(noticeFile)) {
-      try { fs.mkdirSync(path.dirname(noticeFile), { recursive: true }); fs.writeFileSync(noticeFile, '1'); } catch {}
-      process.stderr.write('Memev could not start (Node not found); run memev doctor\n');
-    }
     if (event === 'session-start') {
       if (e?.moved && e.refresh !== false) emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev] vault address changed: the vault did not answer at its saved address. Run \`memev join --refresh\` to fetch the current address, or \`memev doctor\` if the address is right.`);
       // no backup address or no address key: --refresh has nothing to follow, so name the way that works
