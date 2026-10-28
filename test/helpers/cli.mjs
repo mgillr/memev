@@ -18,7 +18,7 @@ export function freePort({ span = 1 } = {}) {
     swept = true;
     for (const d of fs.readdirSync(os.tmpdir())) {
       const m = /^memev-test-ports-(\d+)$/.exec(d);
-      if (m && !alive(Number(m[1]))) fs.rmSync(path.join(os.tmpdir(), d), { recursive: true, force: true });
+      if (m && !alive(Number(m[1]))) { try { fs.rmSync(path.join(os.tmpdir(), d), { recursive: true, force: true }); } catch { /* a folder another user owns stays; its ports simply remain reserved */ } }
     }
   }
   fs.mkdirSync(RESERVED, { recursive: true });
