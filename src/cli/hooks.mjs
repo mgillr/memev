@@ -29,12 +29,15 @@ export function projectOf(cwd) {
 // Output shapes: Claude Code and Codex share one; Gemini CLI uses it with its own event names;
 // Cursor takes { additional_context } at session start only.
 const GEMINI = { SessionStart: 'SessionStart', UserPromptSubmit: 'BeforeAgent' };
+// returns whether anything reached stdout, so a caller can tell a silent format (cursor on a
+// prompt event) from a printed notice
 function emit(format, event, context) {
-  if (!context) return;
-  if (format === 'plain') { process.stdout.write(`${context}\n`); return; }
-  if (format === 'cursor') { if (event === 'SessionStart') process.stdout.write(JSON.stringify({ additional_context: context })); return; }
+  if (!context) return false;
+  if (format === 'plain') { process.stdout.write(`${context}\n`); return true; }
+  if (format === 'cursor') { if (event === 'SessionStart') { process.stdout.write(JSON.stringify({ additional_context: context })); return true; } return false; }
   const name = format === 'gemini' ? GEMINI[event] || event : event;
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: name, additionalContext: context } }));
+  return true;
 }
 
 // A request to build something: the session is reminded to turn it into a signed contract first.
@@ -165,6 +168,15 @@ export async function runHook(event, flags, env = process.env) {
       // no backup address or no address key: --refresh has nothing to follow, so name the way that works
       else if (e?.moved) emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev] the vault did not answer at its saved address, and this computer has no signed address record to follow. On the vault's computer run \`memev invite\`, then here run \`memev join <code>\`; or run \`memev doctor\` if the address is right.`);
       else emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev is not reachable right now (${e.message}); run \`memev doctor\`.]`);
+    } else if (event === 'prompt') {
+      // the mark is per session, beside the session's own state, so a later session sees the notice again;
+      // stop and pre-compact print nothing and leave it unset, so the next prompt still shows the notice
+      const markDir = remote || !isVault(root) ? path.join(configDir(env), 'hooks') : path.dirname(stateFile);
+      const noticeFile = path.join(markDir, `${slug(session, 64)}.notice`);
+      if (!fs.existsSync(noticeFile) && emit(format, 'UserPromptSubmit', `[Memev could not start (${e.message}); run \`memev doctor\`.]`)) {
+        // cursor prints nothing for a prompt event, so the mark is set only when the notice went out
+        try { fs.mkdirSync(markDir, { recursive: true }); fs.writeFileSync(noticeFile, '1'); } catch {}
+      }
     }
   }
   return 0;
