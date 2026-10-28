@@ -18,7 +18,7 @@ export const PAID_FEATURES = ['sync_hosted', 'backup_hosted', 'relay_hosted', 'e
 /** Draft limits per tier (docs/PRICING.md). A licence's own seats and connectors win. */
 export const TIERS = {
   free: { computers: 1, connectors: 5, local_clients: null, services: [] },
-  personal: { computers: 4, connectors: 10, local_clients: null, services: ['sync', 'backup', 'relay'] },
+  personal: { computers: 3, connectors: 10, local_clients: null, services: ['sync', 'backup', 'relay'] },
   team: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team'] },
   office: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team'] },
   business: { computers: null, connectors: null, local_clients: null, services: ['team'] },
@@ -59,7 +59,7 @@ export function seatPolicy({ license = null, devices = [] } = {}) {
   const writable = new Set(live(license) ? remote.slice(0, Math.max(0, seats - 1)).map((d) => d.id) : []);
   let canEnroll = true; let reason = null;
   if (state === 'expired') { canEnroll = false; reason = `The licence for this vault expired on ${license.exp} and its grace period is over. Computers already added can still read, but none can be added. Install a renewed licence (memev license install <file>) or contact us.`; }
-  else if (enrolled >= seats) { canEnroll = false; reason = `This vault is licensed for ${plural(seats, 'computer')}. Remove one with \`memev devices remove <id>\` or contact us for more.`; }
+  else if (enrolled >= seats) { canEnroll = false; reason = live(license) ? `This vault is licensed for ${plural(seats, 'computer')}. Remove one with \`memev devices remove <id>\` or contact us for more.` : `Free covers this computer. Adding more computers is part of Personal (up to ${TIERS.personal.computers} computers). Run memev upgrade to see plans.`; }
   const notes = [];
   if (state === 'grace') notes.push(`The licence expired on ${license.exp}; ${plural(license.days_left, 'day')} of grace left. After that no computer can be added and added computers can only read.`);
   if (state === 'invalid' || state === 'not_yet_valid') notes.push(`The installed licence is not used: ${license.reason}. This vault counts as the free tier.`);
