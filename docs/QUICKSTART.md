@@ -71,6 +71,8 @@ differs:
 - Settings and the `memev.cmd` launcher live in `%APPDATA%\memev`; the vault is `%USERPROFILE%\memev`.
 - On a terminal, init offers to add the launcher folder to your user PATH. Open a new terminal
   afterwards. `memev path remove` takes it off again; `memev uninstall` does not.
+- Apps are registered to run `node.exe` with Memev's runtime script as its first argument, not the
+  `memev.cmd` launcher: a Node app cannot start a `.cmd` file without a shell.
 - The privacy check reads each private file's access list (`icacls`): you, SYSTEM and
   Administrators may have access, no one else.
 - Memev does not start at login on Windows yet. Run `memev start` after you sign in.

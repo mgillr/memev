@@ -1,5 +1,6 @@
 # Memev's own development checks. Kept to one short job on pull requests: Actions minutes are a
-# shared budget. Slow suites (the Docker smoke test, the 170M-token growth bench, the macOS run) are
+# shared budget. Windows (a preview) runs only on a push to main or a release tag, never on a pull
+# request, so pull requests cost no Windows minutes. Slow suites (the Docker smoke test, the 170M-token growth bench, the macOS run) are
 # run locally before merging: scripts/docker-smoke.sh, scripts/growth-bench.mjs.
 # The Memev product never installs workflows into a user's repositories (test/no-ci.test.mjs).
 name: ci
@@ -16,13 +17,29 @@ on:
       - 'CHANGELOG.md'
       - 'Dockerfile'
       - '.github/workflows/**'
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - 'src/**'
+      - 'bin/**'
+      - 'vendor/**'
+      - 'templates/**'
+      - 'test/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'CHANGELOG.md'
+      - 'Dockerfile'
+      - '.github/workflows/**'
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.event.pull_request.number }}
+  # one run per pull request or per ref: a newer push to main cancels the run it supersedes
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
   check:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -46,3 +63,16 @@ jobs:
           echo "${SUM}  gl.tgz" | sha256sum -c -
           tar xzf gl.tgz gitleaks && rm gl.tgz
           ./gitleaks git --redact --no-banner --exit-code 1 .
+  windows:
+    # the parts that differ on Windows: registering apps (node.exe, settings files), hooks, MCP and the doctor.
+    # There are no dependencies and no lockfile, so there is nothing to install.
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: git config --global user.name ci && git config --global user.email ci@example.invalid
+      - run: node --test --test-concurrency=2 test/windows.test.mjs test/clients.test.mjs test/jsonc.test.mjs test/continuity.test.mjs test/protocol-once.test.mjs test/doctor.test.mjs
