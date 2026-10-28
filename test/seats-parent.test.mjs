@@ -1,8 +1,8 @@
 // A CLI that is not the claimed app must not take that app's seat. `memev mcp --client X` resolves
-// the real parent in order: the claim's own marker, the direct parent's process name when it is a
-// known app, a marker of another app, and only then a parent that can be named but not placed.
-// Markers are inherited by every descendant, so they name an ancestor, not the parent; terminal
-// markers (TERM_PROGRAM, ZED_TERM) never relabel the seat at all.
+// the seat in order: the claim's own marker, the direct parent's process name when it is a known
+// app (a parent named claude is the desktop client), the parent's name for a claude-code claim with
+// no CLAUDECODE, and only then the claim. A marker of another app never relabels the seat, it may
+// only confirm the claim it names; terminal markers (TERM_PROGRAM, ZED_TERM) never do either.
 import fs from 'node:fs';
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,20 +12,33 @@ import { sandbox, mcpClient, BIN } from './helpers/cli.mjs';
 after(cleanup);
 
 const state = (roster, seat) => roster.seats.find((s) => s.seat === seat)?.state;
+// A stand-in for a parent app: it renames its own process to claude, then runs the real server as
+// its child with the inherited environment.
+const CLAUDE_PARENT = `
+const fs = require('fs');
+const { spawn } = require('child_process');
+try { fs.writeFileSync('/proc/self/comm', 'claude'); } catch {}
+const child = spawn(process.execPath, process.argv.slice(1), { stdio: 'inherit' });
+child.on('close', (code) => process.exit(code == null ? 1 : code));
+`;
 
 test('MEM-048 AC01: memev mcp --client claude-code under a parent that is not Claude Code does not mark the claude-code seat live', async () => {
   const sb = sandbox();
   try {
     const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
     assert.equal(init.code, 0, init.err + init.out);
-    // the parent is another app (Codex sets CODEX_CLI in its children), not Claude Code
-    const c = mcpClient(sb, 'claude-code', { command: process.execPath, args: [BIN, 'mcp', '--client', 'claude-code'], env: { CODEX_CLI: '1' } });
+    // no marker of the claimed client in the environment, and the parent (this test process) is
+    // not a known app, so the server seats under the parent's name, not the claim
+    const c = mcpClient(sb, 'claude-code', { command: process.execPath, args: [BIN, 'mcp', '--client', 'claude-code'], env: {} });
     const u = (await c.tool('bus_unread', {})).structuredContent;
     await c.close();
-    assert.equal(u.seat, 'codex@host', 'the server seats as the real parent, not the claimed client');
+    assert.notEqual(u.seat, 'claude-code@host', 'the claimed seat is not used');
     const r = JSON.parse(sb.run(['bus', 'roster', '--json']).out);
-    assert.equal(state(r, 'codex@host'), 'live');
+    assert.equal(state(r, u.seat), 'live');
     assert.notEqual(state(r, 'claude-code@host'), 'live', 'the claude-code seat must not be live');
+    let parentName = null;
+    try { parentName = fs.readFileSync(`/proc/${process.pid}/comm`, 'utf8').trim(); } catch {}
+    if (parentName) assert.equal(u.seat, `${parentName}@host`, 'seats under the parent process name');
   } finally { sb.stop(); }
 });
 
@@ -34,7 +47,7 @@ test('MEM-048 AC02: under a real Claude Code parent marker the claude-code seat 
   try {
     const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
     assert.equal(init.code, 0, init.err + init.out);
-    // Claude Code sets CLAUDECODE=1 in the children it launches, so the server seats as claude-code
+    // the desktop client sets CLAUDECODE=1 in the children it launches, so the server seats as claude-code
     const c = mcpClient(sb, 'claude-code', { command: process.execPath, args: [BIN, 'mcp', '--client', 'claude-code'], env: { CLAUDECODE: '1' } });
     const u = (await c.tool('bus_unread', {})).structuredContent;
     await c.close();
@@ -49,7 +62,7 @@ test('MEM-048: a claimed codex keeps codex when its own marker and an inherited 
   try {
     const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
     assert.equal(init.code, 0, init.err + init.out);
-    // Codex launched the server (CODEX_CLI) under a Claude Code ancestor (CLAUDECODE); the claim stands
+    // Codex launched the server (CODEX_CLI) under a desktop-client ancestor (CLAUDECODE); the claim stands
     const c = mcpClient(sb, 'codex', { command: process.execPath, args: [BIN, 'mcp', '--client', 'codex'], env: { CODEX_CLI: '1', CLAUDECODE: '1' } });
     const u = (await c.tool('bus_unread', {})).structuredContent;
     await c.close();
@@ -72,6 +85,55 @@ test('MEM-048: a claimed gemini-cli keeps gemini-cli when GEMINI_CLI and CLAUDEC
     const r = JSON.parse(sb.run(['bus', 'roster', '--json']).out);
     assert.equal(state(r, 'gemini-cli@host'), 'live');
     assert.notEqual(state(r, 'claude-code@host'), 'live');
+  } finally { sb.stop(); }
+});
+
+test('MEM-048: a claimed codex with an inherited CLAUDECODE and a node parent keeps codex', async () => {
+  const sb = sandbox();
+  try {
+    const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
+    assert.equal(init.code, 0, init.err + init.out);
+    // CLAUDECODE is inherited from a desktop-client ancestor, but the claim's own marker is absent
+    // and the parent (this test process) is not a known app, so the claim stands
+    const c = mcpClient(sb, 'codex', { command: process.execPath, args: [BIN, 'mcp', '--client', 'codex'], env: { CLAUDECODE: '1' } });
+    const u = (await c.tool('bus_unread', {})).structuredContent;
+    await c.close();
+    assert.equal(u.seat, 'codex@host', 'an inherited marker of another app never relabels the seat');
+    const r = JSON.parse(sb.run(['bus', 'roster', '--json']).out);
+    assert.equal(state(r, 'codex@host'), 'live');
+    assert.notEqual(state(r, 'claude-code@host'), 'live');
+  } finally { sb.stop(); }
+});
+
+test('MEM-048: gemini-cli, codex and windsurf under a node parent with no own marker keep their claim', async () => {
+  for (const client of ['gemini-cli', 'codex', 'windsurf']) {
+    const sb = sandbox();
+    try {
+      const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
+      assert.equal(init.code, 0, init.err + init.out);
+      // no own marker in the environment, and the parent (this test process) is not a known app
+      const c = mcpClient(sb, client, { command: process.execPath, args: [BIN, 'mcp', '--client', client], env: {} });
+      const u = (await c.tool('bus_unread', {})).structuredContent;
+      await c.close();
+      assert.equal(u.seat, `${client}@host`, `${client} keeps its claim under an unknown parent`);
+      const r = JSON.parse(sb.run(['bus', 'roster', '--json']).out);
+      assert.equal(state(r, `${client}@host`), 'live');
+    } finally { sb.stop(); }
+  }
+});
+
+test('MEM-048: a claimed claude-code under a parent named claude with CLAUDECODE missing seats as claude-code', async () => {
+  const sb = sandbox();
+  try {
+    const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
+    assert.equal(init.code, 0, init.err + init.out);
+    // the parent process is named claude (the desktop client) and CLAUDECODE is missing
+    const c = mcpClient(sb, 'claude-code', { command: process.execPath, args: ['-e', CLAUDE_PARENT, BIN, 'mcp', '--client', 'claude-code'], env: {} });
+    const u = (await c.tool('bus_unread', {})).structuredContent;
+    await c.close();
+    assert.equal(u.seat, 'claude-code@host', 'a parent named claude is the desktop client');
+    const r = JSON.parse(sb.run(['bus', 'roster', '--json']).out);
+    assert.equal(state(r, 'claude-code@host'), 'live');
   } finally { sb.stop(); }
 });
 
@@ -103,24 +165,5 @@ test('MEM-048: a claimed codex keeps codex when ZED_TERM is set', async () => {
     const r = JSON.parse(sb.run(['bus', 'roster', '--json']).out);
     assert.equal(state(r, 'codex@host'), 'live');
     assert.notEqual(state(r, 'zed@host'), 'live');
-  } finally { sb.stop(); }
-});
-
-test('MEM-048: a claimed claude-code with no marker and an unknown parent seats as the parent name, not claude-code', async () => {
-  const sb = sandbox();
-  try {
-    const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
-    assert.equal(init.code, 0, init.err + init.out);
-    // no app marker in the environment, and the parent (this test process) is not a known app
-    const c = mcpClient(sb, 'claude-code', { command: process.execPath, args: [BIN, 'mcp', '--client', 'claude-code'], env: {} });
-    const u = (await c.tool('bus_unread', {})).structuredContent;
-    await c.close();
-    assert.notEqual(u.seat, 'claude-code@host', 'the claim must not be used');
-    const r = JSON.parse(sb.run(['bus', 'roster', '--json']).out);
-    assert.equal(state(r, u.seat), 'live');
-    assert.notEqual(state(r, 'claude-code@host'), 'live');
-    let parentName = null;
-    try { parentName = fs.readFileSync(`/proc/${process.pid}/comm`, 'utf8').trim(); } catch {}
-    if (parentName) assert.equal(u.seat, `${parentName}@host`, 'seats under the parent process name');
   } finally { sb.stop(); }
 });

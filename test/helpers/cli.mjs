@@ -3,7 +3,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync, spawn } from 'node:child_process';
 import { PKG, tmpdir } from './tmp.mjs';
-import { ENV_MARKERS } from '../../src/cli/common.mjs';
 
 export const BIN = path.join(PKG, 'bin', 'memev.mjs');
 // A daemon port for each sandbox. The system hands out a port nothing is listening on, and a file per port
@@ -48,8 +47,9 @@ export function sandbox({ ports = 1 } = {}) {
 // entry: the command and args an app's MCP config holds, to run the server the way that app does.
 // An app launches its own MCP server with its own marker in the environment, so a client that does
 // not control the environment (no entry.env) gets the claimed app's marker; a test that passes
-// entry.env decides the environment itself.
-const OWN_MARKER = Object.fromEntries(Object.entries(ENV_MARKERS).map(([k, id]) => [id, k]));
+// entry.env decides the environment itself. Only the desktop client's marker (CLAUDECODE) is
+// verified to be set by the app, so only it is injected here; the rest are unverified.
+const OWN_MARKER = { 'claude-code': 'CLAUDECODE' };
 export function mcpClient(sb, client, entry = { command: process.execPath, args: [BIN, 'mcp', '--client', client] }) {
   const marker = entry.env || !OWN_MARKER[client] ? {} : { [OWN_MARKER[client]]: '1' };
   const p = spawn(entry.command, entry.args, { env: { ...sb.env, ...marker, ...(entry.env || {}) }, stdio: ['pipe', 'pipe', 'pipe'] });
