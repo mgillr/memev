@@ -1,13 +1,14 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { initVault, Vault } from '../../src/engine/vault.mjs';
 
-export const PKG = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
+export const PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BASE = process.env.MEMEV_TEST_TMP || os.tmpdir();
 const made = [];
 export function tmpdir(prefix = 'memev-') { const d = fs.mkdtempSync(path.join(BASE, prefix)); made.push(d); return d; }
-export function cleanup() { for (const d of made.splice(0)) fs.rmSync(d, { recursive: true, force: true }); }
+export function cleanup() { for (const d of made.splice(0)) fs.rmSync(d, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); }
 export const OWNER = { id: 'test', agent: 'test', scopes: ['read', 'write', 'admin'], paths: ['**'] };
 export function newVault(opts = {}) {
   const root = path.join(tmpdir(), 'vault');

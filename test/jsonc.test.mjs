@@ -37,7 +37,7 @@ const ZED = `// Zed settings
 test('MEM-042 AC01: Connecting Zed to a settings.json that starts with comments succeeds and every original comment line is still present', () => {
   const { home, env, write } = sandbox();
   const f = write(zedFile(home, env), ZED);
-  const r = connect('zed', { env, launcher: LAUNCHER });
+  const r = connect('zed', { env, launcher: LAUNCHER, platform: 'linux' });
   assert.equal(r.status, 'added', JSON.stringify(r));
   const text = fs.readFileSync(f, 'utf8');
   for (const line of comments(ZED)) assert.ok(text.includes(line), `still there: ${line}`);
@@ -49,19 +49,19 @@ test('MEM-042 AC01: Connecting Zed to a settings.json that starts with comments 
   const kept = ZED.split('\n'); let at = 0;
   for (const line of text.split('\n')) if (line === kept[at]) at++;
   assert.equal(at, kept.length, 'the original lines are all present, in their order');
-  assert.equal(connect('zed', { env, launcher: LAUNCHER }).status, 'already', 'a second connect changes nothing');
+  assert.equal(connect('zed', { env, launcher: LAUNCHER, platform: 'linux' }).status, 'already', 'a second connect changes nothing');
 });
 
 test('MEM-042 AC02: Disconnect restores the original bytes when the file was not edited since', () => {
   const { home, env, write } = sandbox();
   const f = write(zedFile(home, env), ZED);
   const before = fs.readFileSync(f);
-  assert.equal(connect('zed', { env, launcher: LAUNCHER }).status, 'added');
+  assert.equal(connect('zed', { env, launcher: LAUNCHER, platform: 'linux' }).status, 'added');
   assert.notDeepEqual(fs.readFileSync(f), before);
   assert.deepEqual(disconnect('zed', { env }).results.map((x) => x.action), ['restored']);
   assert.deepEqual(fs.readFileSync(f), before, 'byte for byte');
   // edited since: Memev takes only its own entry out, and the person's edit and every comment stay
-  connect('zed', { env, launcher: LAUNCHER });
+  connect('zed', { env, launcher: LAUNCHER, platform: 'linux' });
   fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('"buffer_font_size": 15', '"buffer_font_size": 17'));
   disconnect('zed', { env });
   const left = fs.readFileSync(f, 'utf8');
@@ -89,7 +89,7 @@ test('MEM-042 AC03: The same works for Gemini CLI and VS Code settings with comm
 }
 `);
   const before = { gemini: fs.readFileSync(gemini, 'utf8'), vscode: fs.readFileSync(vscode, 'utf8') };
-  for (const id of ['gemini-cli', 'vscode']) assert.equal(connect(id, { env, launcher: LAUNCHER }).status, 'added', id);
+  for (const id of ['gemini-cli', 'vscode']) assert.equal(connect(id, { env, launcher: LAUNCHER, platform: 'linux' }).status, 'added', id);
   const g = fs.readFileSync(gemini, 'utf8'); const v = fs.readFileSync(vscode, 'utf8');
   for (const line of comments(before.gemini)) assert.ok(g.includes(line), line);
   for (const line of comments(before.vscode)) assert.ok(v.includes(line), line);
@@ -111,7 +111,7 @@ test('a file that is not valid even with comments is never rewritten and is repo
   const { home, env, write } = sandbox();
   const f = write(zedFile(home, env), '// half written\n{ "ui_font_size": 16, \n');
   const before = fs.readFileSync(f);
-  const r = connect('zed', { env, launcher: LAUNCHER });
+  const r = connect('zed', { env, launcher: LAUNCHER, platform: 'linux' });
   assert.equal(r.status, 'needs-manual'); assert.match(r.reason, /not valid JSON with comments/);
   assert.deepEqual(fs.readFileSync(f), before);
   assert.throws(() => changeJsonc('// a list\n[1, 2]\n', (j) => j), /not a JSON object/);
