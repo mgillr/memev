@@ -1,5 +1,7 @@
 # Problems and solutions
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 People who use AI memory tools complain about the same things again and again. We collected 205
 public complaints about memory in ChatGPT, Claude, Gemini, Cursor, mem0, Zep, Basic Memory, Glean,
 Microsoft 365 Copilot and others, sorted them into 13 groups, and checked each group against Memev's
@@ -48,7 +50,7 @@ and in git, so a mistake can be undone.
 **Limit.** A restatement in different words gets through (it is flagged as similar, not refused).
 Comparing new memories against what Memev itself showed the session is planned.
 
-**Tier.** Free.
+**Tier.** Personal.
 
 **Done check.** `node --test test/memory-quality.test.mjs` (gate, review dates, inbox, audit).
 
@@ -69,7 +71,7 @@ the current task visible in apps without hooks.
 reason to use Memev at all. Vendors have little reason to build memory that works across their
 competitors' apps.
 
-**Tier.** Free.
+**Tier.** Personal.
 
 **Done check.** `node --test test/continuity.test.mjs`.
 
@@ -81,17 +83,18 @@ to whichever cloud model the app uses.
 **What Memev does.**
 - Built: no telemetry, no runtime dependencies, the daemon listens on `127.0.0.1` only, files are
   readable only by you, and every remote request needs a per-device token and is logged.
-- Built: an organisation install (`memev init --org`) starts with the tunnel off, and switching it on
-  needs `memev cloud on --yes`. Personal installs keep the tunnel on by default, as before.
-- Planned for the Business tier: labels on notes, rules for what each kind of client may receive,
-  pseudonymising names and amounts before they go to a cloud model, and a log of every byte returned
-  to a non-local client.
+- Built: remote access is off by default on every install. `memev init` on a terminal offers it once,
+  with one line on what gets exposed, and `memev cloud on` switches it on. An organisation install
+  (`memev init --org`) needs `memev cloud on --yes`.
+- Planned for Business and Corporate (both coming): labels on notes, rules for what each kind of client may receive,
+  pseudonymising names and amounts before they go to a cloud AI service, and a log of every byte
+  returned to the organisation's AI provider.
 
 **What Memev cannot do.** Once text reaches a cloud model, Memev has no control over it. Protection
 there is a contract with the provider, not a technical guarantee.
 
-**Tier.** Free for the local guarantees; Business and Enterprise for labels, egress rules and the
-egress log.
+**Tier.** Personal for the local guarantees; Business and Corporate (both coming) for labels, egress
+rules and the egress log.
 
 **Done check.** `node --test test/memory-quality.test.mjs` (the `--org` test) and
 `node --test test/http.test.mjs` (remote rules).
@@ -107,7 +110,7 @@ install. A growth benchmark replays 170 million tokens of use: the heap peaks at
 
 **Planned.** A public list of known issues and long soak tests on Windows and Linux.
 
-**Tier.** Free. Business support adds response times.
+**Tier.** Personal. Business support adds response times.
 
 **Done check.** `npm test` and `node --max-old-space-size=256 scripts/growth-bench.mjs`.
 
@@ -123,7 +126,7 @@ vault. It is plain Markdown in git, so you can read it and take it with you.
 **Why it matters for Memev.** Basic Memory and OpenMemory share the idea. Memev's difference is the
 hooks in each app and the tests behind them.
 
-**Tier.** Free.
+**Tier.** Personal.
 
 **Done check.** `node --test test/clients.test.mjs`.
 
@@ -145,7 +148,7 @@ So the value is a guarantee, not a better average.
 **Limit.** Project names written only in non-Latin scripts still map to the same file name; see
 the planned list.
 
-**Tier.** Free.
+**Tier.** Personal.
 
 **Done check.** `node --test test/memory-quality.test.mjs` (project scope test).
 
@@ -157,7 +160,7 @@ the planned list.
 For work that must meet requirements, Memev turns the request into a signed contract with checks
 that run on your machine, and the work counts as done only when the checks pass.
 
-**Tier.** Free.
+**Tier.** Personal.
 
 **Done check.** `node --test test/proofline-flow.test.mjs`.
 
@@ -171,7 +174,7 @@ server Memev depends on. If Memev stopped tomorrow your memory would still be re
 
 **Planned for business buyers.** Source escrow and a written succession plan.
 
-**Tier.** Free; escrow is an Enterprise option.
+**Tier.** Personal; escrow is a Corporate option.
 
 **Done check.** `memev selftest`.
 
@@ -194,7 +197,7 @@ the explanation to the log and git history, so you can see who wrote a memory an
 
 **Planned.** A small read-only web view of the vault.
 
-**Tier.** Free.
+**Tier.** Personal.
 
 **Done check.** `node --test test/memory-quality.test.mjs` (the `why` test).
 
@@ -209,9 +212,9 @@ Microsoft's own guidance calls oversharing the largest risk in a Copilot rollout
   that appear only in notes the token may not read. Before this change those names could leak
   through the graph.
 - Planned: departments, roles and path grants with deny by default, a separate index and graph per
-  scope, and "restricted" notes that only a local model may receive.
+  scope, and "restricted" notes that the organisation's one AI provider does not receive.
 
-**Tier.** Business and Enterprise for roles and scopes.
+**Tier.** Business and Corporate (both coming) for roles and scopes.
 
 **Done check.** `node --test test/memory-quality.test.mjs` (graph path test).
 
@@ -220,13 +223,13 @@ Microsoft's own guidance calls oversharing the largest risk in a Copilot rollout
 **Why it happens.** Self-hosted AI tools often start single-user with authentication off.
 
 **What Memev does.** Built: every computer and app has its own credential, which can be revoked.
-Planned: a company hub, sign-in with Google or Microsoft Entra ID, a member list from an org chart,
+Planned: a company server, sign-in with Google or Microsoft Entra ID, a member list from an org chart,
 and offboarding.
 
-**Tier.** Business and Enterprise.
+**Tier.** Business and Corporate (both coming).
 
-**Done check.** `node --test test/licensing.test.mjs test/seats.test.mjs` (device credentials and keys). The hub has no check yet
-because it does not exist yet.
+**Done check.** `node --test test/licensing.test.mjs test/seats.test.mjs` (device credentials and keys). The company server has no
+check yet because it does not exist yet.
 
 ## 12. Price and access for small companies (9)
 
@@ -234,8 +237,9 @@ because it does not exist yet.
 ignore firms under 50 people.
 
 **What Memev does.** One person on one computer gets all of Memev for free, for good
-([CHARTER.md](../CHARTER.md)). Team, Office, Business and
-Enterprise are priced on request; see [PRICING.md](PRICING.md) and [tiers/](tiers/README.md).
+([CHARTER.md](../CHARTER.md)). Personal with more computers has a set price ($12/month or $120/year, CHF 10 or CHF 100); Business and
+Corporate (both coming) have no public price: contact us. There is no Team tier. See [PRICING.md](PRICING.md)
+and [tiers/](tiers/README.md).
 
 **Tier.** All.
 
@@ -257,7 +261,7 @@ million for mixed scripts.
 
 **Planned.** Optional local embeddings through Ollama, for paraphrases.
 
-**Tier.** Free.
+**Tier.** Personal.
 
 **Done check.** `node --test test/memory-quality.test.mjs` (tokenizer tests).
 
@@ -291,17 +295,17 @@ org chart, sensitive departments kept on a local model, and a log of what leaves
 
 | Item | Tier | Status |
 |---|---|---|
-| Compare new memories against what Memev showed the session (catches restatements) | Free | planned |
-| Count a repeated save as confirmation instead of discarding it | Free | planned |
-| Compaction benchmark across apps | Free | planned |
-| One rules file written into every app's instruction file | Free | planned |
-| Project names in any script (today non-Latin names share a file name) | Free | planned |
-| Local read-only web view | Free | planned |
-| End-to-end encrypted sync between your computers | Personal | planned |
-| Company hub, org chart import, roles and path grants | Business | planned |
-| Sign-in with Google or Microsoft Entra ID, offboarding | Business | planned |
-| Labels, egress rules, egress log, pseudonymising for cloud models | Business | planned |
-| High availability, air-gapped install, SIEM export, retention and legal hold | Enterprise | planned |
+| Compare new memories against what Memev showed the session (catches restatements) | Personal | planned |
+| Count a repeated save as confirmation instead of discarding it | Personal | planned |
+| Compaction benchmark across apps | Personal | planned |
+| One rules file written into every app's instruction file | Personal | planned |
+| Project names in any script (today non-Latin names share a file name) | Personal | planned |
+| Local read-only web view | Personal | planned |
+| End-to-end encrypted sync between your computers | Personal with more computers | planned |
+| Company server, org chart import, roles and path grants | Business and Corporate | planned |
+| Sign-in with Google or Microsoft Entra ID, offboarding | Business and Corporate | planned |
+| Labels, egress rules, egress log, pseudonymising for cloud models | Business and Corporate | planned |
+| High availability, air-gapped install, SIEM export, retention and legal hold | Corporate | planned |
 
 The signed contract for this work, its public key and the receipt from its verification run are
 in [contracts/](../contracts/). It was drafted with `memev contract new` and signed with

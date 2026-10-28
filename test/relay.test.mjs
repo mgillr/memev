@@ -9,6 +9,7 @@ import tls from 'node:tls';
 import { tmpdir, cleanup, PKG } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
 import { initVault, Vault } from '../src/engine/vault.mjs';
+import { readJson, writeJson } from '../src/engine/util.mjs';
 import { signLicense, loadLicense } from '../src/engine/license.mjs';
 import { seatPolicy } from '../src/engine/entitlements.mjs';
 import { deviceKeygen, signRequest } from '../src/engine/devices.mjs';
@@ -28,6 +29,11 @@ const rpc = (name, args) => ({ jsonrpc: '2.0', id: 1, method: 'tools/call', para
 async function rig() {
   const root = path.join(tmpdir(), 'vault'); const keyDir = path.join(root, '..', 'keys');
   initVault(root, { template: path.join(PKG, 'templates', 'vault') });
+  // remote access is off by default; the relay tests exercise the on path, so switch it on as `memev cloud on` would
+  const cfgFile = path.join(root, '.memev', 'config.json');
+  const cfg = readJson(cfgFile, {});
+  cfg.remote = { ...cfg.remote, enabled: true };
+  writeJson(cfgFile, cfg, 0o600);
   const conf = tmpdir('relay-conf-');
   fs.writeFileSync(path.join(conf, 'license.json'), JSON.stringify(signLicense({ v: 1, lid: 'lic_relay029', tier: 'team', services: ['relay'], seats: 3, iat: day(-10), exp: day(300), grace_days: 14 }, vendor.pem, 'test-vendor')));
   const env = { MEMEV_CONFIG_DIR: conf };
@@ -211,4 +217,37 @@ test('MEM-029: the relay is off until the setting says otherwise, and nothing co
     assert.equal(sb.run(['cloud', 'relay', 'off']).code, 0); assert.equal(client.relaySetting(sb.root).enabled, false);
     assert.equal(sb.run(['cloud', 'relay', 'address']).out.trim(), addr, 'the address is kept');
   } finally { sb.stop(); dummy.close(); }
+});
+
+test('MEM-030-FU: a Personal licence in grace still uses the configured relay address', async () => {
+  assert.equal(client.personalActive({ state: 'grace', tier: 'personal' }), true);
+  assert.equal(client.personalActive({ state: 'expired', tier: 'personal' }), false);
+  const sb = sandbox();
+  const url = 'relay://127.0.0.1:9';
+  try {
+    assert.equal(sb.run(['init', '--no-connect', '--local-only']).code, 0);
+    client.setRelay(sb.root, { default_url: url, default_domain: DOMAIN });
+    assert.equal(await client.command(['on'], {}, { root: sb.root, env: sb.env, license: { state: 'grace', tier: 'personal' } }), 0);
+    assert.equal(client.relaySetting(sb.root).url, url);
+    assert.equal(client.relaySetting(sb.root).enabled, true);
+  } finally { sb.stop(); }
+});
+
+test('MEM-030 AC02: The default relay URL is read from config and the client uses it when Personal is active', async () => {
+  const sb = sandbox();
+  const url = 'relay://127.0.0.1:9';
+  try {
+    assert.equal(sb.run(['init', '--no-connect', '--local-only']).code, 0);
+    client.setRelay(sb.root, { default_url: url, default_domain: DOMAIN });
+    await assert.rejects(() => client.command(['on'], {}, { root: sb.root, env: sb.env, license: { state: 'none', tier: null } }), /no relay is built in/);
+    await assert.rejects(() => client.command(['on'], {}, { root: sb.root, env: sb.env, license: { state: 'valid', tier: 'team' } }), /no relay is built in/);
+    assert.equal(await client.command(['on'], {}, { root: sb.root, env: sb.env, license: { state: 'valid', tier: 'personal' } }), 0);
+    const saved = client.relaySetting(sb.root);
+    assert.equal(saved.url, url);
+    assert.equal(saved.domain, DOMAIN);
+    assert.equal(saved.enabled, true);
+    const sup = client.superviseRelay({ config: { remote: { enabled: true, relay: saved } } }, { root: sb.root, port: 1, env: { ...sb.env, MEMEV_NO_TUNNEL: '1' } });
+    sup.stop();
+    assert.equal(client.relaySetting(sb.root).url, url);
+  } finally { sb.stop(); }
 });

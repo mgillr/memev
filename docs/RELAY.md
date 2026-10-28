@@ -1,5 +1,7 @@
 # The relay protocol: a stable address for a vault
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 A vault on your computer needs an address that cloud AI apps and your other computers can use, and the
 address of a quick tunnel changes whenever it restarts. A relay gives the vault one name that stays the
 same. This page is the protocol, the client in `src/cli/relay.mjs` and the relay for development and tests
@@ -99,7 +101,11 @@ cloud-app path is tested with the vault's own certificate.
     memev cloud relay off
 
 The setting is in the vault's `.memev/config.json` under `remote.relay` and is off on every install. With
-it off the daemon opens no connection. `memev cloud relay address` prints the address and works before the
+it off the daemon opens no connection. A Personal licence that is valid, or still in its grace
+period, can omit `--url` and `--domain` when `default_url` and `default_domain` are already in
+that setting. The client uses those. No address is built in. `memev license activate` writes
+them when the licence service reply includes them. Any other licence still has to pass both.
+The hosted relay is planned. `memev cloud relay address` prints the address and works before the
 relay is reachable, so you can give it to an app first. Remote access (`memev cloud on`) must be on, or the
 vault refuses what arrives. The address is kept when you switch the relay off.
 

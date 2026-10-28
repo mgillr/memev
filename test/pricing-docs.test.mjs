@@ -1,5 +1,6 @@
-// Free is free. Personal, Team and Business have the list prices below. Enterprise and every
-// service stay contact us, so no other money figure may appear in the docs.
+// The core is free. Personal with more computers is $12/month or $120/year (CHF 10 or CHF 100), decided 28 October
+// 2026. Business and Corporate have no public price, and neither does any service: contact us. So no other money
+// figure may appear in the docs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -10,9 +11,9 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const walk = (d) => fs.readdirSync(path.join(ROOT, d), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith('.md') ? [path.join(d, e.name)] : []));
 const DOCS = ['README.md', 'CHARTER.md', 'SECURITY.md', ...walk('docs')];
-// Personal $15/month or $144/year. Team $18, $216 and $22. Business $24. No per-computer add-on.
-const ALLOWED = new Set(['$15/month', '$144/year', '$18', '$216', '$22', '$24']);
-const MONEY = /[$€£]\s?\d[\d,.]*(?:k\b)?(?:\/(?:month|year|day))?|\b\d[\d,.]*\s?(?:USD|EUR|GBP|dollars?)\b/gi;
+// Personal $12/month or $120/year, CHF 10 or CHF 100. No other tier has a published price, and there is no per-computer add-on.
+const ALLOWED = new Set(['$12/month', '$120/year', 'CHF 10', 'CHF 100']);
+const MONEY = /[$€£]\s?\d[\d,.]*(?:k\b)?(?:\/(?:month|year|day))?|\bCHF\s?\d[\d,.]*|\b\d[\d,.]*\s?(?:USD|EUR|GBP|CHF|dollars?)\b/gi;
 
 test('the docs show no money figure except the list prices', () => {
   const found = [];
@@ -27,28 +28,26 @@ test('the price row matches the decided tiers', () => {
   assert.deepEqual(row, [
     'Price',
     'free',
-    '$15/month or $144/year',
-    '$18/seat/month billed yearly ($216/seat/year), or $22/seat/month billed monthly. Contact us until member keys ship.',
-    '$24/seat/month billed yearly, setup quoted. Contact us.',
+    '$12/month or $120/year (CHF 10 or CHF 100)',
+    'contact us',
     'contact us',
   ]);
   assert.match(read('docs/PRICING.md'), /up to 3/);
-  assert.doesNotMatch(read('docs/PRICING.md'), /\| Office \|/);
-  assert.match(read('docs/tiers/free.md'), /\$15\/month or \$144\/year/);
+  assert.doesNotMatch(read('docs/PRICING.md'), /\| (Office|Team|Enterprise) \|/);
+  assert.match(read('docs/tiers/free.md'), /\$12\/month or \$120\/year \(CHF 10 or CHF 100\)/);
+  assert.match(read('README.md'), /\$12\/month or \$120\/year \(CHF 10 or CHF 100\)/);
 });
 
-test('MEM-065 AC03: The pricing-docs test checks the Team row has a published price and its unit', () => {
-  const row = read('docs/PRICING.md').split('\n').find((l) => l.startsWith('| Price |')).split('|').map((c) => c.trim()).filter(Boolean);
-  const team = row[3];
-  assert.match(team, /\$18\/seat\/month/);
-  assert.match(team, /\$216\/seat\/year/);
-  assert.match(team, /\$22\/seat\/month/);
+test('the docs carry no price left from before 28 October 2026', () => {
+  const found = [];
+  for (const doc of DOCS) read(doc).split('\n').forEach((l, i) => { if (/\$15\b|\$144\b|\$18\b|\$216\b|\$22\b|\$24\b/.test(l)) found.push(`${doc}:${i + 1}`); });
+  assert.deepEqual(found, []);
 });
 
-test('Business and Enterprise services are quoted', () => {
+test('Business and Corporate services are quoted', () => {
   const pricing = read('docs/PRICING.md');
-  const section = pricing.split('## Services for Business and Enterprise')[1].split('\n## ')[0];
-  assert.match(pricing, /## Services for Business and Enterprise/);
+  const section = pricing.split('## Services for Business and Corporate')[1].split('\n## ')[0];
+  assert.match(pricing, /## Services for Business and Corporate/);
   assert.match(section, /Standard: business-hours support/);
   assert.match(section, /Priority support/);
   assert.match(section, /24\/7 support with a critical-issue response target/);
