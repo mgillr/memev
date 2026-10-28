@@ -12,7 +12,7 @@ import { sha256, readJson, writeJson, writePrivateJson, exists, now, stamp, slug
 import { OpLog } from './oplog.mjs';
 import { RecallIndex, tokenize, sections } from './index.mjs';
 import { TokenStore, allowed } from './tokens.mjs';
-import { CommitQueue, git } from './git.mjs';
+import { CommitQueue, git, gitInitMain } from './git.mjs';
 import { lineSplice, applySplice } from './diff.mjs';
 import { findSecrets, redactSecrets } from './secrets.mjs';
 import { Graph } from './graph.mjs';
@@ -609,7 +609,8 @@ export function initVault(root, { template, port = null } = {}) {
   const gi = path.join(root, '.gitignore'); if (!exists(gi)) fs.writeFileSync(gi, '.memev/\n*.tmp\n');
   const ga = path.join(root, '.gitattributes'); if (!exists(ga)) fs.writeFileSync(ga, 'memory/**/*.md merge=union\nwork/**/*.md merge=union\n');
   if (!exists(path.join(root, '.git'))) {
-    git(root, ['init', '-q', '-b', 'main']);
+    const gi = gitInitMain(root);
+    if (!gi.ok) { fs.rmSync(root, { recursive: true, force: true }); throw new VaultError('git_failed', `git init failed for the vault at ${root}: ${gi.err || `exit ${gi.status}`}`); }
     if (!git(root, ['config', 'user.email']).out) { git(root, ['config', 'user.name', 'Memev']); git(root, ['config', 'user.email', 'memev@localhost']); }
     git(root, ['add', '-A']); git(root, ['commit', '-q', '-m', 'memev: a new vault']);
   }
