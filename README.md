@@ -6,6 +6,8 @@ Run project dev on Claude code and Cursor knows about the context on Tuesday. Me
 apps learn in a folder of plain notes on your own computer, hands the right notes to whichever app
 you open next, and backs everything up to a private GitHub repository that you own.
 
+One memory and one team channel, both on computers you own.
+
 ## How it fits together
 
 ```mermaid
@@ -47,7 +49,8 @@ You need Node 22 or newer and git. Every path below sets up the same thing: it c
 folder, starts Memev, connects the AI apps it finds on your computer and runs a self-test.
 
 Memev runs on macOS and Linux. **Windows (preview):** setup, app connections, hooks and the doctor
-have Windows code paths and tests, but Windows has not had a full lab run yet, and Memev does not
+have Windows code paths and tests, and a Windows job runs them on every change to `main`, but
+Windows has not had a full lab run yet, and Memev does not
 start at login there (run `memev start` after you sign in).
 [docs/QUICKSTART.md](docs/QUICKSTART.md#windows-preview) says what differs.
 

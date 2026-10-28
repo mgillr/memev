@@ -14,6 +14,7 @@ import { PKG, daemonInfo, pidAlive, config, out, clientsFile } from './common.mj
 import { licensingStatus } from './licensing.mjs';
 import { alt443, githubReachable } from './github.mjs';
 import { fileOf, label } from '../engine/bus.mjs';
+import { fetchOut } from '../engine/net.mjs';
 
 const C = (id, title, status, detail = '', fix = null) => ({ id, title, status, detail, fix });
 
@@ -166,7 +167,7 @@ async function twoVaultChecks(root) {
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), 200);
       try {
-        const r = await fetch(`http://127.0.0.1:${port}/healthz`, { signal: ac.signal });
+        const r = await fetchOut(`http://127.0.0.1:${port}/healthz`, { signal: ac.signal });
         const body = await r.json();
         if (body?.ok === true && body.vault_id && body.vault_id !== mine) return body.vault_id;
       } catch { /* closed port or not Memev */ }

@@ -10,6 +10,7 @@ import { TokenStore } from '../engine/tokens.mjs';
 import { configDir, writePrivate, exists } from '../engine/util.mjs';
 import { isVault } from '../engine/vault.mjs';
 import { out } from './common.mjs';
+import { fetchOut } from '../engine/net.mjs';
 
 export function registry(root) {
   const reg = new DeviceRegistry(path.join(root, '.memev', 'devices.json'));
@@ -63,7 +64,7 @@ const explain = (status, body) => {
  * file, and it is verified here, offline, before anything is written. A key the server refuses, an answer that does not
  * verify, an expired licence, or a licence that carries an identity leaves no file. `keys` and `fetchImpl` are for tests.
  */
-export async function activateLicense({ key, endpoint, env = process.env, keys = LICENSE_KEYS, fetchImpl = globalThis.fetch, now = Date.now(), timeoutMs = 15000 }) {
+export async function activateLicense({ key, endpoint, env = process.env, keys = LICENSE_KEYS, fetchImpl = (u, o) => fetchOut(u, o, env), now = Date.now(), timeoutMs = 15000 }) {
   const k = String(key || '').trim();
   if (!k || k.length > 200 || /\s/.test(k)) return { ok: false, reason: 'that does not look like a licence key' };
   if (!endpoint) return { ok: false, reason: 'no licence server is set: pass --server <https url> or set MEMEV_LICENSE_URL' };
