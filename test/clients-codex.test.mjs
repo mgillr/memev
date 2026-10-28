@@ -34,7 +34,7 @@ test('MEM-049 AC02: disconnect leaves a user-added [mcp_servers.memev] table unt
   fs.mkdirSync(path.dirname(toml), { recursive: true });
   fs.writeFileSync(toml, original);
   const env = { HOME: home, XDG_CONFIG_HOME: path.join(home, '.config'), MEMEV_CONFIG_DIR: path.join(home, '.config', 'memev') };
-  const launcher = '/opt/memev/bin/memev';
+  const launcher = '/x/memev';
   connect('codex', { env, launcher });
   assert.equal(fs.readFileSync(toml, 'utf8'), original, 'connect left the user table as-is');
   disconnect('codex', { env });
