@@ -1,6 +1,6 @@
 # Services, rates and response times
 
-Part of the [tiers pages](README.md). Up: the [README](../../README.md#which-tier).
+Part of the [tiers pages](README.md). Up: the [README](../../README.md).
 
 > **DRAFT.** Every policy here is a proposal, not an offer. Services are priced on your requirements:
 > contact us for a quote. See [PRICING.md](../PRICING.md).
