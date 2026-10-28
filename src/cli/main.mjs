@@ -43,6 +43,8 @@ Setup
   memev join <code>                make a key, enrol this computer and connect its apps
   memev join <url> --token T       the same, with a key and a token made ahead of time
   memev license status|activate <key>|install <file>|remove   the licence: how many computers may use this vault
+  memev upgrade                    the plans and what each adds, and how to buy
+  memev plan                       what this vault uses: computers used and allowed, connectors counted
   memev report [on|off|show|send]  the anonymous milestone report: off unless you turn it on; show prints what would be sent
   memev bus roster|check|send|tail|tasks|watch <seat>|operator <seat>   the comms bus between your AI apps
 
@@ -64,7 +66,7 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;

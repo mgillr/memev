@@ -25,6 +25,33 @@ export const TIERS = {
   enterprise: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team', 'sso', 'audit'] },
 };
 
+/**
+ * The plans and what each adds, for `memev upgrade`, in the four tier names the docs use. The
+ * one-computer tier is one computer at a time through your own GitHub. The paid difference is
+ * using several computers at once, with automatic merge from a separately licensed engine. The
+ * comms bus and multi-app memory are in the one-computer tier and are never shown as paid. The
+ * computer and connector numbers are the TIERS values for each plan's tier id, omitted where
+ * TIERS is null. The full table, with the prices, is docs/PRICING.md (draft).
+ */
+/** The count phrase for a TIERS number, empty where TIERS is null. */
+const count = (n, w) => (n === null ? '' : `${n} ${w}${n === 1 ? '' : 's'}`);
+/** The plan line: the non-empty parts, joined with commas. */
+const addsText = (parts) => `${parts.filter(Boolean).join(', ')}.`;
+
+export const PLANS = [
+  { name: 'Personal', tier: 'free', adds: addsText([
+    TIERS.free.computers === null ? '' : `${count(TIERS.free.computers, 'computer')} at a time through your own GitHub`,
+    count(TIERS.free.connectors, 'cloud connector'),
+  ]) },
+  { name: 'Personal with more computers', tier: 'personal', adds: addsText([
+    TIERS.personal.computers === null ? '' : `Up to ${count(TIERS.personal.computers, 'computer')} at once`,
+    count(TIERS.personal.connectors, 'cloud connector'),
+    'with automatic merge from a separately licensed engine',
+  ]) },
+  { name: 'Business', tier: 'business', adds: 'Contact us.' },
+  { name: 'Corporate', tier: 'enterprise', adds: 'Contact us.' },
+];
+
 /** Free-tier behaviour for features: core yes, hosted services no (they do not exist yet). */
 export function can(feature) {
   if (CORE_FEATURES.includes(feature)) return true;
