@@ -8,7 +8,7 @@ import { config } from './common.mjs';
 import { fetchOut } from '../engine/net.mjs';
 import { loadMilestones, recordMilestones, buildReport, MILESTONES } from '../engine/milestones.mjs';
 
-const ICON = { succeeded: '\u2713', added: '+', ready: '\u2713', 'needs-manual': '\u2192', failed: '\u2717', skipped: '-' };
+const ICON = { succeeded: '\u2713', added: '+', ready: '\u2713', 'needs-manual': '\u2192', failed: '\u2717', skipped: '-', unsupported: '\u00b7' };
 
 export async function checklist({ root, env, flags = {}, launcher, daemonUp = null, firstRun = false, platform = process.platform, icacls }) {
   const items = [];
@@ -22,6 +22,7 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   if (firstRun && !flags['no-connect']) clients.connectAll({ env, launcher });
   const found = clients.detect(env, launcher);
   for (const c of found.filter((x) => x.found)) {
+    if (!c.supported) { add('unsupported', c.name, 'found, not supported yet (see docs/CLIENTS.md to ask for it)', { app: c.id }); continue; }
     if (c.connected) { add(firstRun ? 'added' : 'ready', c.name, c.mode === 'hooks' ? 'MCP + session hooks + instructions: memory is loaded and saved automatically' : 'MCP + instructions', { app: c.id }); if (c.manual) add('needs-manual', `${c.name}: one step`, c.manual, { app: c.id, note: true }); }
     else add(c.declined ? 'skipped' : 'needs-manual', c.name, c.declined ? 'you disconnected it (memev connect ' + c.id + ' to undo)' : `memev connect ${c.id}`, { app: c.id });
   }

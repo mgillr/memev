@@ -149,7 +149,7 @@ export function clientDefs(env, bin, platform = process.platform) {
           preCompact: hookCmd(launcher, 'pre-compact', 'cursor', 'cursor'),
           stop: hookCmd(launcher, 'stop', 'cursor', 'cursor'),
         }), removeFlatHooks),
-      ], note: 'Cursor injects the resume card at session start; per-prompt recall and post-compaction state come through the MCP instructions (Cursor hooks cannot add context to a prompt).' },
+      ], manual: 'Check that Settings → MCP shows memev connected, and allow its tools.', note: 'Cursor injects the resume card at session start; per-prompt recall and post-compaction state come through the MCP instructions (Cursor hooks cannot add context to a prompt).' },
     { id: 'claude-desktop', name: 'Claude Desktop', mode: 'instructions', detect: () => exists(path.join(appData, 'Claude')),
       edits: () => [json(path.join(appData, 'Claude', 'claude_desktop_config.json'), setServer('mcpServers', stdio('claude-desktop')), delServer('mcpServers'))] },
     { id: 'windsurf', name: 'Windsurf', mode: 'instructions', detect: () => exists(path.join(home, '.codeium', 'windsurf')),
@@ -160,6 +160,20 @@ export function clientDefs(env, bin, platform = process.platform) {
       edits: () => [json(path.join(process.platform === 'darwin' ? path.join(home, '.config') : platformDirs(env).appData, 'zed', 'settings.json'), setServer('context_servers', { source: 'custom', ...stdio('zed') }), delServer('context_servers'))] },
   ];
   return defs;
+}
+
+/** The apps Memev detects but does not support yet. They are listed as found, not supported, and their files are never changed. */
+export function unsupportedDefs(env) {
+  const { home, appData } = platformDirs(env);
+  return [
+    { id: 'cline', name: 'Cline', detect: () => exists(path.join(appData, 'cline')) },
+    { id: 'roo', name: 'Roo', detect: () => exists(path.join(appData, 'roo')) },
+    { id: 'continue', name: 'Continue', detect: () => exists(path.join(home, '.continue')) },
+    { id: 'kiro', name: 'Kiro', detect: () => exists(path.join(home, '.kiro')) },
+    { id: 'jetbrains-ai', name: 'JetBrains AI', detect: () => exists(path.join(home, '.jetbrains', 'ai')) },
+    { id: 'amp', name: 'Amp', detect: () => exists(path.join(appData, 'amp')) },
+    { id: 'goose', name: 'Goose', detect: () => exists(path.join(appData, 'goose')) },
+  ];
 }
 
 // ---- state: what is connected, what the user declined, and the backups
@@ -261,12 +275,14 @@ export const RESTART = {
 export const HOOK_CLIENTS = new Set(clientDefs({}, 'memev').filter((d) => d.mode === 'hooks').map((d) => d.id));
 export function detect(env = process.env, launcher = 'memev', platform = process.platform) {
   const st = loadState(env);
-  return clientDefs(env, launcher, platform).map((d) => ({ id: d.id, name: d.name, mode: d.mode, found: !!d.detect(), connected: !!st.connected[d.id], declined: st.declined.includes(d.id), note: d.note || null, manual: d.manual || null, restart: RESTART[d.id] || `Restart ${d.name}` }));
+  const supported = clientDefs(env, launcher, platform).map((d) => ({ id: d.id, name: d.name, mode: d.mode, found: !!d.detect(), connected: !!st.connected[d.id], declined: st.declined.includes(d.id), note: d.note || null, manual: d.manual || null, restart: RESTART[d.id] || `Restart ${d.name}`, supported: true }));
+  const unsupported = unsupportedDefs(env).map((d) => ({ id: d.id, name: d.name, found: !!d.detect(), supported: false }));
+  return [...supported, ...unsupported];
 }
 
-/** Connect every app that is installed and not yet connected (and not declined, unless forced). */
+/** Connect every app that is installed and not yet connected (and not declined, unless forced). Apps that are found but not supported yet are left alone. */
 export function connectAll({ env = process.env, launcher, force = false, platform = process.platform } = {}) {
-  return detect(env, launcher, platform).filter((c) => c.found && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
+  return detect(env, launcher, platform).filter((c) => c.found && c.supported && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
 }
 
 export function launcherPath(env = process.env) { return path.join(configDir(env), 'bin', process.platform === 'win32' ? 'memev.cmd' : 'memev'); }
@@ -276,11 +292,19 @@ export async function command(cmd, pos, flags, { env, root }) {
   if (!exists(launcher)) { const { installRuntime } = await import('./main.mjs'); installRuntime(env); }
   const target = pos[0] || 'all';
   if (cmd === 'clients') {
-    for (const c of detect(env, launcher)) console.log(`  ${c.connected ? '\u2713' : c.found ? '\u00b7' : ' '} ${c.name.padEnd(15)} ${c.found ? (c.connected ? `connected (${c.mode === 'hooks' ? 'hooks + MCP' : 'MCP + instructions'})` : c.declined ? 'found, disconnected by you' : 'found, not connected') : 'not found'}`);
+    for (const c of detect(env, launcher)) console.log(`  ${c.connected ? '\u2713' : c.found ? '\u00b7' : ' '} ${c.name.padEnd(15)} ${c.found ? (c.supported ? (c.connected ? `connected (${c.mode === 'hooks' ? 'hooks + MCP' : 'MCP + instructions'})` : c.declined ? 'found, disconnected by you' : 'found, not connected') : 'found, not supported yet') : 'not found'}`);
     return 0;
   }
   if (cmd === 'connect') {
+    if (target !== 'all') {
+      const c = detect(env, launcher).find((x) => x.id === target);
+      if (c && c.found && !c.supported) { out.info(`${c.name}: found, not supported yet (see docs/CLIENTS.md to ask for it)`); return 0; }
+    }
     const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force }) : [connect(target, { env, launcher, dryRun: !!flags['dry-run'] })];
+    if (!res.length) {
+      const unsup = detect(env, launcher).filter((c) => c.found && !c.supported);
+      if (unsup.length) { console.log(`Found ${unsup.map((c) => c.name).join(', ')} but Memev does not support ${unsup.length > 1 ? 'them' : 'it'} yet (see docs/CLIENTS.md to ask for it).`); return 0; }
+    }
     if (!res.length) console.log('No AI apps found. Install one (Claude Code, Codex, Cursor, Gemini CLI, Claude Desktop, Windsurf, VS Code, Zed) and run memev connect again.');
     for (const r of res) {
       if (r.status === 'added') out.ok(`${r.name}: connected (${r.mode === 'hooks' ? 'hooks + MCP + instructions' : 'MCP + instructions'})`);

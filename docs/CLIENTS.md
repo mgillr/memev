@@ -34,6 +34,23 @@ Manual steps:
 - **Cursor** hooks cannot add context to a prompt, only at session start, so per-prompt recall comes
   from the MCP instructions.
 
+## Apps Memev does not support yet
+
+Memev detects these apps and lists them as found, not supported yet. It never changes their files.
+The checklist points to this page until there is a public place to ask for the next one.
+
+| App | Where Memev looks |
+|---|---|
+| Cline | `~/.config/cline` |
+| Roo | `~/.config/roo` |
+| Continue | `~/.continue` |
+| Kiro | `~/.kiro` |
+| JetBrains AI | `~/.jetbrains/ai` |
+| Amp | `~/.config/amp` |
+| Goose | `~/.config/goose` |
+
+On macOS the `~/.config/...` directories are under `~/Library/Application Support`.
+
 Cloud apps (claude.ai, ChatGPT, others that take a remote MCP URL) connect through the tunnel; see
 [CLOUD.md](CLOUD.md).
 
