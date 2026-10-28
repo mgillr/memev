@@ -110,6 +110,6 @@ test('MEM-141 AC08: user-facing copy passes the house writing check', () => {
     assert.doesNotMatch(text, banned, `${f} has banned words`);
     assert.doesNotMatch(text, emoji, `${f} has emoji`);
     assert.doesNotMatch(text, /!/, `${f} has exclamation mark`);
-    assert.doesNotMatch(text, /—/, `${f} has em-dash`);
+    assert.doesNotMatch(text, /\u2014/, `${f} has em-dash`);
   }
 });

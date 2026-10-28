@@ -48,6 +48,6 @@ Step 1: the file `compose.trial.yaml` is in the repository root.
 
 Step 2: `docker compose -f compose.trial.yaml up -d` prints `Container memev-1 Started`. `docker compose -f compose.trial.yaml ps` prints `memev-1  Up  healthy`.
 
-Step 3: `docker compose -f compose.trial.yaml exec memev memev license install /vault/trial.license.json` prints `installed licence <id> (valid) in /home/memev/.config/memev/license.json`.
+Step 3: `docker compose -f compose.trial.yaml exec memev memev license install /vault/trial.license.json` prints `installed licence <id> (valid) in the config directory`.
 
 `scripts/docker-trial-smoke.sh` runs the whole path on a machine with Docker: build, up, wait for healthy, doctor, licence install of a throwaway test licence, down with volumes removed. Run it by hand, not in CI.
