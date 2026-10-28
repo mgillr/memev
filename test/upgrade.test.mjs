@@ -52,7 +52,7 @@ test('MEM-068 AC01: memev plan prints computers used and allowed and connectors 
   assert.doesNotMatch(PROTOCOL + PROTOCOL_POINTER, /Plan: free|used of \d+ allowed|counted \(not limited\)/);
 });
 
-test('MEM-068 AC02: memev upgrade prints Free as one computer at a time through your own GitHub and the paid difference as several computers at once with automatic merge from a separately licensed engine, prints no trial command, and makes no network call', async () => {
+test('MEM-068 AC02: memev upgrade prints Personal as one computer at a time through your own GitHub and the paid difference as several computers at once with automatic merge from a separately licensed engine, prints no trial command, and makes no network call', async () => {
   const src = fs.readFileSync(path.join(PKG, 'src', 'cli', 'upgrade.mjs'), 'utf8');
   assert.doesNotMatch(src, /node:(http|https|net|dns|tls)|fetch\(/);
   const calls = [];
@@ -93,9 +93,9 @@ test('MEM-068: every computer and connector number the plans show equals the TIE
   v.close();
   const out = await capture(() => command('upgrade', [], {}, { root, env: { MEMEV_CONFIG_DIR: tmpdir('conf-') } }));
   for (const p of PLANS) {
-    const line = out.split('\n').find((l) => l.trim().startsWith(p.name));
+    const line = out.split('\n').find((l) => l.trim().startsWith(p.name) && l.includes(p.adds));
     assert.ok(line, `plan line for ${p.name}`);
-    const tier = TIERS[p.name.toLowerCase()];
+    const tier = TIERS[p.tier];
     const comp = line.match(/(\d+)\s+computers?/);
     const conn = line.match(/(\d+)\s+cloud connectors?/);
     if (comp) assert.equal(Number(comp[1]), tier.computers, `${p.name} computer count`);
