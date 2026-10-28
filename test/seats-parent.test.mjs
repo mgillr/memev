@@ -4,23 +4,25 @@
 // no CLAUDECODE, and only then the claim. A marker of another app never relabels the seat, it may
 // only confirm the claim it names; terminal markers (TERM_PROGRAM, ZED_TERM) never do either.
 import fs from 'node:fs';
+import path from 'node:path';
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanup } from './helpers/tmp.mjs';
+import { cleanup, tmpdir } from './helpers/tmp.mjs';
 import { sandbox, mcpClient, BIN } from './helpers/cli.mjs';
 
 after(cleanup);
 
 const state = (roster, seat) => roster.seats.find((s) => s.seat === seat)?.state;
-// A stand-in for a parent app: it renames its own process to claude, then runs the real server as
-// its child with the inherited environment.
-const CLAUDE_PARENT = `
-const fs = require('fs');
+// A stand-in for a parent app: a copy of the node binary under the app's process name runs a
+// script that launches the real server as its child with the inherited environment. Renaming
+// through /proc/self/comm is Linux only, so the named copy of the binary works on every platform.
+const STANDIN = `
 const { spawn } = require('child_process');
-try { fs.writeFileSync('/proc/self/comm', 'claude'); } catch {}
 const child = spawn(process.execPath, process.argv.slice(1), { stdio: 'inherit' });
 child.on('close', (code) => process.exit(code == null ? 1 : code));
 `;
+// A copy of the node binary named after the parent app, so the server's parent has that process name.
+const namedNode = (dir, name) => { const p = path.join(dir, name); fs.copyFileSync(process.execPath, p); fs.chmodSync(p, 0o755); return p; };
 
 test('MEM-048 AC01: memev mcp --client claude-code under a parent that is not Claude Code does not mark the claude-code seat live', async () => {
   const sb = sandbox();
@@ -128,7 +130,7 @@ test('MEM-048: a claimed claude-code under a parent named claude with CLAUDECODE
     const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
     assert.equal(init.code, 0, init.err + init.out);
     // the parent process is named claude (the desktop client) and CLAUDECODE is missing
-    const c = mcpClient(sb, 'claude-code', { command: process.execPath, args: ['-e', CLAUDE_PARENT, BIN, 'mcp', '--client', 'claude-code'], env: {} });
+    const c = mcpClient(sb, 'claude-code', { command: namedNode(tmpdir('parent-'), 'claude'), args: ['-e', STANDIN, BIN, 'mcp', '--client', 'claude-code'], env: {} });
     const u = (await c.tool('bus_unread', {})).structuredContent;
     await c.close();
     assert.equal(u.seat, 'claude-code@host', 'a parent named claude is the desktop client');
