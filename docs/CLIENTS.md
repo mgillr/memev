@@ -18,6 +18,8 @@ connects them, unless you disconnected that app yourself.
 | Windsurf | `~/.codeium/windsurf/mcp_config.json`; a block in `memories/global_rules.md` | instructions |
 | VS Code | `Code/User/mcp.json` | instructions |
 | Zed | `context_servers` in `zed/settings.json` | instructions |
+| OpenCode | `mcp` entry in `~/.config/opencode/opencode.json`; a block in `~/.config/opencode/AGENTS.md` | instructions |
+| GitHub Copilot CLI | `mcpServers` entry in `~/.copilot/mcp.json`; a block in `~/.copilot/AGENTS.md` | instructions |
 
 **Hooks** mode: the resume card is injected at session start, relevant memories are added to each
 prompt, a checkpoint is written before compaction, and the turn is journaled when it ends. The app
