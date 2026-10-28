@@ -25,10 +25,10 @@ Each package is priced on your requirements: contact us for a quote.
 
 | Package | For | Remote timeline |
 |---|---|---|
-| Onboarding, small | Personal or a small team: install, GitHub backup, apps connected, a walkthrough | 1 to 2 days |
+| Onboarding, small | Personal: install, GitHub backup, apps connected, a walkthrough | 1 to 2 days |
 | Business setup | the company hub, sign-in, departments, computers, backup | 2 to 3 weeks |
 | Business setup with a local model | the above plus the model server and the restricted-department rules | 3 to 4 weeks |
-| Enterprise onboarding | discovery, high availability, identity, SIEM, pilot, rollout | 6 to 12 weeks |
+| Corporate onboarding | discovery, high availability, identity, SIEM, pilot, rollout | 6 to 12 weeks |
 | Private deployment | we run and maintain a dedicated hub in your data centre or cloud account | 2 to 4 weeks to start |
 | Compliance pack | data-flow diagrams, records of processing, the security answers your auditors ask for, kept current, once or yearly | 2 to 3 weeks |
 | Workshop | one session for staff, up to 3 hours | |
@@ -41,7 +41,7 @@ Each package is priced on your requirements: contact us for a quote.
 |---|---|---|
 | Community | free | GitHub issues, best effort |
 | Business support | quoted with the tier | e-mail and tickets in business hours, response times below |
-| Named engineer | contact us | one engineer who knows your setup, a monthly review, Enterprise response times |
+| Named engineer | contact us | one engineer who knows your setup, a monthly review, Corporate response times |
 | Embedded engineer | contact us | an engineer working with your team on agreed days each week |
 
 ## Response times
