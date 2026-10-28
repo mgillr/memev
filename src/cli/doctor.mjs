@@ -230,9 +230,10 @@ export async function allChecks({ root, env }) {
   // the reachability probe only runs for a GitHub ssh backup, so a local or HTTPS remote never touches the network here
   const backupRemote = spawnSync('git', ['remote'], { cwd: root, encoding: 'utf8' }).stdout.trim().split('\n')[0];
   if (backupRemote && alt443(spawnSync('git', ['remote', 'get-url', backupRemote], { cwd: root, encoding: 'utf8' }).stdout.trim())) r.push(await githubNetCheck());
-  const { unitPaths } = await import('./service.mjs');
+  const { unitPaths, serviceOff } = await import('./service.mjs');
   const u = unitPaths(env);
-  r.push(C('service', 'starts at login', u.file && exists(u.file) ? 'ok' : 'warn', u.file && exists(u.file) ? u.file : 'not installed: memev service install', u.file && exists(u.file) ? null : { desc: 'install the login service', destructive: false, cmd: 'service' }));
+  if (serviceOff(env)) r.push(C('service', 'starts at login', 'ok', 'off: MEMEV_NO_SERVICE is set'));
+  else r.push(C('service', 'starts at login', u.file && exists(u.file) ? 'ok' : 'warn', u.file && exists(u.file) ? u.file : 'not installed: memev service install', u.file && exists(u.file) ? null : { desc: 'install the login service', destructive: false, cmd: 'service' }));
   return dedupe(r);
 }
 const dedupe = (r) => { const seen = new Set(); return r.filter((c) => (seen.has(c.id) ? false : seen.add(c.id))); };
