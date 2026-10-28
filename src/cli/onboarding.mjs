@@ -7,6 +7,7 @@ import { readJson, writeJson, writePrivateJson, configDir, exists, now } from '.
 import { config } from './common.mjs';
 import { fetchOut } from '../engine/net.mjs';
 import { loadMilestones, recordMilestones, buildReport, MILESTONES } from '../engine/milestones.mjs';
+import { cloudSeat } from './tunnel.mjs';
 
 const ICON = { succeeded: '\u2713', added: '+', ready: '\u2713', 'needs-manual': '\u2192', failed: '\u2717', skipped: '-' };
 
@@ -54,7 +55,9 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   else {
     let st = readJson(path.join(root, '.memev', 'tunnel.json'), null);
     for (let i = 0; firstRun && daemonUp && i < 40 && !st?.url && !/error|no provider|MEMEV_NO_TUNNEL/.test(st?.state || ''); i++) { await new Promise((r) => setTimeout(r, 250)); st = readJson(path.join(root, '.memev', 'tunnel.json'), null); }
-    if (st?.url) add('needs-manual', 'Cloud AI apps (claude.ai, ChatGPT)', `add a custom connector with the URL from: memev cloud url${st.stable ? '' : ' (this address changes when the tunnel restarts; Tailscale gives a stable one)'}`);
+    const seat = cloudSeat(root);
+    if (st?.url && seat) add('ready', 'Cloud AI apps (claude.ai, ChatGPT)', `${seat} is connected (memev cloud connect <app> prints the URL and waits for it)`);
+    else if (st?.url) add('needs-manual', 'Cloud AI apps (claude.ai, ChatGPT)', `add a custom connector with the URL from: memev cloud url${st.stable ? '' : ' (this address changes when the tunnel restarts; Tailscale gives a stable one)'}`);
     else add('needs-manual', 'Cloud AI apps', `remote access is on but the tunnel is ${st?.state || 'starting'}; check memev cloud status, or memev cloud off for local only`);
   }
   // backup
