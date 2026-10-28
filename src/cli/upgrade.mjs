@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-// `memev upgrade` prints the checkout URL stored for this vault. The URL is configuration.
-// Nothing in this file is a payment provider, a price, a sender, or an endpoint.
+// `memev upgrade` and `memev plan`, shown only when asked: the plans and what each adds, how to
+// start a trial or buy, and the usage of this vault. When the vault's config sets a checkout URL,
+// upgrade prints that URL and nothing else. Nothing in this file is a payment provider, a price, a
+// sender, or an endpoint, and it makes no network call.
 import { config } from './common.mjs';
+import { PLANS } from '../engine/entitlements.mjs';
+import { licensingStatus } from './licensing.mjs';
 
 /** The checkout URL from vault config, or an empty string when none is set. */
 export function checkoutUrl(root) {
@@ -9,13 +13,45 @@ export function checkoutUrl(root) {
   return typeof url === 'string' ? url.trim() : '';
 }
 
-export async function command(cmd, pos, flags, { root }) {
-  void cmd; void pos; void flags;
-  const url = checkoutUrl(root);
-  if (!url) {
-    console.log('No checkout URL is set in this vault.');
-    return 1;
+/** The plans and the trial-or-buy lines, as one text block. */
+export function plansText() {
+  const lines = ['Plans (draft; the full table with prices is docs/PRICING.md):'];
+  const width = Math.max(...PLANS.map((p) => p.name.length));
+  for (const p of PLANS) lines.push(`  ${p.name.padEnd(width)} ${p.adds}`);
+  lines.push('What each plan adds is more computers and people sharing the one memory and the one comms bus;');
+  lines.push('on any computer, everything is free and unlimited.');
+  lines.push('');
+  lines.push('Start a trial or buy:');
+  lines.push('  There is no trial: the free tier is the trial. Start it with memev init, no licence, no network.');
+  lines.push('  Buy: open the checkout page and pay there, then run memev license activate <key> with the key it emails.');
+  lines.push("  This vault prints the checkout page's URL when its config sets checkout.url: memev upgrade.");
+  return lines.join('\n');
+}
+
+/** The usage of this vault, as `memev plan` prints it. */
+export function planLines(status) {
+  const l = status.license;
+  return [
+    l.state === 'none' ? 'Plan: free (no licence; the free tier needs none)' : `Plan: ${status.effective_tier} (licence ${l.lid || 'installed'}: ${l.state})`,
+    `Computers: ${status.computers_enrolled} used of ${status.seats_licensed} allowed`,
+    `Cloud connectors: ${status.usage.connectors} counted (not limited)`,
+  ];
+}
+
+export async function command(cmd, pos, flags, { root, env, license = null }) {
+  void pos;
+  if (cmd === 'plan') {
+    const s = licensingStatus({ root, env, license });
+    if (flags.json) {
+      const l = s.license;
+      console.log(JSON.stringify({ plan: s.effective_tier, licence: l.state === 'none' ? null : { lid: l.lid, state: l.state, tier: l.tier }, computers_used: s.computers_enrolled, computers_allowed: s.seats_licensed, connectors_counted: s.usage.connectors }, null, 2));
+      return 0;
+    }
+    for (const line of planLines(s)) console.log(line);
+    return 0;
   }
-  console.log(url);
+  const url = checkoutUrl(root);
+  if (url) { console.log(url); return 0; }
+  console.log(plansText());
   return 0;
 }

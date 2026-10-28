@@ -25,6 +25,19 @@ export const TIERS = {
   enterprise: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team', 'sso', 'audit'] },
 };
 
+/**
+ * The plans and what each adds, for `memev upgrade`. The difference between the plans is how many
+ * computers and people share the one memory and the one comms bus; on any computer, everything is
+ * free and unlimited. The full table, with the prices, is docs/PRICING.md (draft).
+ */
+export const PLANS = [
+  { name: 'Free', adds: '1 computer. The vault, recall, the graph, contracts and the comms bus: every AI app on the computer shares one memory.' },
+  { name: 'Personal', adds: 'Up to 3 computers. The AI apps on all of them share one memory and one comms bus, over the secure link.' },
+  { name: 'Team', adds: '2 to 20 people on one shared vault: 3 computers and 10 cloud connectors per person, pooled. Contact us until member keys ship.' },
+  { name: 'Business', adds: 'From 10 people: 3 computers per seat, pooled. The shared vault works today; the company hub is planned. Contact us.' },
+  { name: 'Enterprise', adds: 'Your requirements, in your data centre or private cloud. Contact us.' },
+];
+
 /** Free-tier behaviour for features: core yes, hosted services no (they do not exist yet). */
 export function can(feature) {
   if (CORE_FEATURES.includes(feature)) return true;
