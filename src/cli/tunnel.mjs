@@ -63,6 +63,9 @@ export const funnelConsent = (cfg) => cfg.remote?.funnelConsent === true;
 export function pickProvider(cfg, env = process.env, { run = spawnSync, whichFn = which } = {}) {
   const want = cfg.remote?.provider || 'auto';
   if (want === 'cloudflare' && cfg.remote?.cloudflare?.name) return 'cloudflare';
+  // A pinned tailscale asks for a funnel, and a funnel needs consent. Without it we fall back to quick.
+  // `auto` keeps the tailnet-only serve, so it is not gated on consent here.
+  if (want === 'tailscale' && !funnelConsent(cfg)) return 'quick';
   if (want === 'tailscale' || want === 'auto') {
     const ts = whichFn('tailscale');
     if (ts) {
