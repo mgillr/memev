@@ -2,7 +2,7 @@
 
 Part of the [Memev documentation](README.md). Written by `node scripts/docs/module-graph.mjs` from the real imports in `bin/` and `src/`; do not edit it by hand. `node scripts/docs/module-graph.mjs --check` (and `test/docs-module-map.test.mjs`) fail when it is out of date. How the parts fit at a higher level: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-52 modules and 212 import edges (55 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
+53 modules and 214 import edges (55 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
 
 ## Layers
 
@@ -23,7 +23,7 @@ flowchart LR
   cli -->|"2"| vendor
   engine -->|"2"| vendor
   server -->|"5"| cli
-  server -->|"10"| engine
+  server -->|"11"| engine
   services -->|"1"| cli
   services -->|"2"| engine
 ```
@@ -91,6 +91,7 @@ flowchart LR
     src_server_http["http.mjs"]
     src_server_main["main.mjs"]
     src_server_mcp["mcp.mjs"]
+    src_server_oauth["oauth.mjs"]
     src_server_relay_dev["relay-dev.mjs"]
   end
   subgraph services["src/services"]
@@ -300,6 +301,7 @@ flowchart LR
   src_server_http --> src_engine_util
   src_server_http --> src_engine_vault
   src_server_http --> src_server_mcp
+  src_server_http --> src_server_oauth
   src_server_main --> src_cli_common
   src_server_main -.-> src_cli_sync
   src_server_main -.-> src_cli_tunnel
@@ -310,6 +312,7 @@ flowchart LR
   src_server_mcp -.-> src_cli_doctor
   src_server_mcp --> src_engine_card
   src_server_mcp --> src_engine_vault
+  src_server_oauth --> src_engine_util
   src_services_providers -.-> src_cli_sync
   src_services_providers --> src_engine_entitlements
   src_services_providers --> src_engine_git
@@ -366,10 +369,11 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 | `src/engine/tokens.mjs` | Capability tokens: mv_<id>_<secret> | `engine/util.mjs` | `cli/common.mjs`, `cli/doctor.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/tunnel.mjs`, `engine/bus.mjs`, `engine/card.mjs`, `engine/vault.mjs` |
 | `src/engine/tournament.mjs` | Tournaments: when there are competing answers (designs, explanations, hypotheses), sessions record head-to-head judgements and Elo ratings sort them | none | `engine/vault.mjs` |
 | `src/engine/tuning.mjs` | Recall tuning from use | `engine/util.mjs` | `cli/sync.mjs`, `engine/vault.mjs` |
-| `src/engine/util.mjs` | Small shared helpers: hashing, atomic files, private files, time, paths | none | `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/common.mjs`, `cli/doctor.mjs`, `cli/github.mjs`, `cli/hooks.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/onboarding.mjs`, `cli/pathsetup.mjs`, `cli/preflight.mjs`, `cli/ready.mjs`, `cli/relay.mjs`, `cli/remote.mjs`, `cli/runner.mjs`, `cli/service.mjs`, `cli/sync.mjs`, `cli/tunnel.mjs`, `engine/bus.mjs`, `engine/card.mjs`, `engine/contracts.mjs`, `engine/devices.mjs`, `engine/graph.mjs`, `engine/index.mjs`, `engine/license.mjs`, `engine/milestones.mjs`, `engine/oplog.mjs`, `engine/tokens.mjs`, `engine/tuning.mjs`, `engine/vault.mjs`, `server/http.mjs`, `server/main.mjs` |
+| `src/engine/util.mjs` | Small shared helpers: hashing, atomic files, private files, time, paths | none | `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/common.mjs`, `cli/doctor.mjs`, `cli/github.mjs`, `cli/hooks.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/onboarding.mjs`, `cli/pathsetup.mjs`, `cli/preflight.mjs`, `cli/ready.mjs`, `cli/relay.mjs`, `cli/remote.mjs`, `cli/runner.mjs`, `cli/service.mjs`, `cli/sync.mjs`, `cli/tunnel.mjs`, `engine/bus.mjs`, `engine/card.mjs`, `engine/contracts.mjs`, `engine/devices.mjs`, `engine/graph.mjs`, `engine/index.mjs`, `engine/license.mjs`, `engine/milestones.mjs`, `engine/oplog.mjs`, `engine/tokens.mjs`, `engine/tuning.mjs`, `engine/vault.mjs`, `server/http.mjs`, `server/main.mjs`, `server/oauth.mjs` |
 | `src/engine/vault.mjs` | The vault: Markdown notes you own, in git, with an append-only operation log as the write-ahead log, a recall index over sections and a memory graph | `engine/bus.mjs`, `engine/contracts.mjs`, `engine/devices.mjs`, `engine/diff.mjs`, `engine/git.mjs`, `engine/graph.mjs`, `engine/index.mjs`, `engine/oplog.mjs`, `engine/quality.mjs`, `engine/secrets.mjs`, `engine/tokens.mjs`, `engine/tournament.mjs`, `engine/tuning.mjs`, `engine/util.mjs` | `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/doctor.mjs`, `cli/hooks.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/ready.mjs`, `cli/runner.mjs`, `server/http.mjs`, `server/main.mjs`, `server/mcp.mjs` |
-| `src/server/http.mjs` | HTTP: the MCP endpoint (/mcp), the hook routes the session hooks call, and a health check | `engine/card.mjs`, `engine/devices.mjs`, `engine/entitlements.mjs`, `engine/license.mjs`, `engine/util.mjs`, `engine/vault.mjs`, `server/mcp.mjs` | `server/main.mjs` |
+| `src/server/http.mjs` | HTTP: the MCP endpoint (/mcp), the hook routes the session hooks call, and a health check | `engine/card.mjs`, `engine/devices.mjs`, `engine/entitlements.mjs`, `engine/license.mjs`, `engine/util.mjs`, `engine/vault.mjs`, `server/mcp.mjs`, `server/oauth.mjs` | `server/main.mjs` |
 | `src/server/main.mjs` | The daemon: one per vault | `cli/common.mjs`, `cli/sync.mjs`, `cli/tunnel.mjs`, `engine/util.mjs`, `engine/vault.mjs`, `server/http.mjs` | `cli/main.mjs` |
 | `src/server/mcp.mjs` | MCP (JSON-RPC 2.0): one handler shared by HTTP (/mcp) and the stdio proxy | `cli/clients.mjs`, `cli/doctor.mjs`, `engine/card.mjs`, `engine/vault.mjs` | `server/http.mjs` |
+| `src/server/oauth.mjs` | OAuth 2.1 for cloud AI apps: dynamic client registration, authorization code with PKCE, a consent page served by this server, refresh and revocation | `engine/util.mjs` | `server/http.mjs` |
 | `src/server/relay-dev.mjs` | A relay for development and tests: it runs on this computer and shows the relay protocol (docs/RELAY.md) end to end | none | none |
 | `src/services/providers.mjs` | Service providers: where sync, remote access and backup come from | `cli/sync.mjs`, `engine/entitlements.mjs`, `engine/git.mjs` | `cli/sync.mjs` |
