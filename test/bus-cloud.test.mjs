@@ -27,12 +27,12 @@ function setup({ cloudTasks = false } = {}) {
   const { v, root } = newVaultWithConfig((cfg) => { cfg.bus = { ...(cfg.bus || {}), cloud_tasks: cloudTasks }; });
   const host = v.devices.get(v.devices.hostId);
   const local = (client) => ({ identity: { scopes: ['read', 'write'], paths: ['**'] }, client, device: host, local: true });
-  v.bus.send(local('claude-code'), { type: 'hello', body: 'hi', seat: 'claude-code@host' });
+  v.bus.send(local('codex'), { type: 'hello', body: 'hi', seat: 'codex@host' });
   v.bus.send(local('cursor'), { type: 'hello', body: 'hi', seat: 'cursor@host' });
-  v.bus.setOperator('claude-code@host');
+  v.bus.setOperator('codex@host');
   const cloud = v.devices.enroll(v.tokens, { kind: 'cloud-connector', label: 'cloud app' });
   const cloudCtx = { identity: { scopes: ['read', 'write'], paths: ['**'] }, client: 'cloud-app', device: cloud.device, local: false };
-  return { v, root, local, cloudCtx, operator: 'claude-code@host', other: 'cursor@host', cloudSeat: 'cloud-app@cloud' };
+  return { v, root, local, cloudCtx, operator: 'codex@host', other: 'cursor@host', cloudSeat: 'cloud-app@cloud' };
 }
 
 test('MEM-059 AC01: a cloud seat posting to a non-operator seat is refused by default', () => {
@@ -48,7 +48,7 @@ test('MEM-059 AC02: a message from a non-operator seat is injected inside an unt
     seat: 'cursor@host', operator: false, hold: null,
     messages: [
       { seq: 1, type: 'task', from: 'cloud-app@cloud', operator: false, to: 'cursor@host', body: long, id: 'abc' },
-      { seq: 2, type: 'status', from: 'claude-code@host', operator: true, to: 'all', body: 'lead says go', id: 'def' },
+      { seq: 2, type: 'status', from: 'codex@host', operator: true, to: 'all', body: 'lead says go', id: 'def' },
     ],
   };
   const text = renderBus(u);
@@ -57,7 +57,7 @@ test('MEM-059 AC02: a message from a non-operator seat is injected inside an unt
   assert.ok(m, 'the body is wrapped in a quote');
   assert.equal(m[1].length, UNTRUSTED_BODY, 'the non-operator body is cut to the cap');
   assert.match(text, /lead says go/, 'the operator body is shown plainly');
-  assert.doesNotMatch(text, /untrusted data from claude-code@host/, 'the operator body is not quoted');
+  assert.doesNotMatch(text, /untrusted data from codex@host/, 'the operator body is not quoted');
 });
 
 test('MEM-059 AC03: with the team setting on, a cloud seat can post a task to a local seat', () => {
