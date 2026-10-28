@@ -24,8 +24,9 @@ Apps that speak OAuth 2.1 use the standard flow instead of a URL with a secret i
 publishes its metadata at `/.well-known/oauth-authorization-server` and
 `/.well-known/oauth-protected-resource`. The app registers itself at `/oauth/register` (dynamic
 client registration) and gets a client id, then starts the authorization code grant with PKCE at
-`/oauth/authorize`. That redirects to a consent page on the vault's machine, where the owner
-approves or denies it. The app exchanges the code at `/oauth/token` for a bearer token it sends as
+ `/oauth/authorize`. A remote app is sent a link to open on the vault's machine, where the consent
+ page is served and the owner approves or denies it; the form carries a one-time value and only works
+ from that page. The app exchanges the code at `/oauth/token` for a bearer token it sends as
 `Authorization: Bearer <token>`, refreshes it with the refresh token, and gives it back at
 `/oauth/revoke`. Each registered client shows up in `memev devices` as a cloud connector. The
 connector URL above stays available for apps that take only a URL.
