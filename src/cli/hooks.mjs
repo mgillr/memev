@@ -43,7 +43,7 @@ export const isBuildRequest = (p) => BUILD_RE.test(String(p || ''));
 const CONTINUATION = /^(continue|go on|go ahead|carry on|keep going|yes|yes please|yep|yeah|ok|okay|sure|thanks|thank you|fix it|do it|next|proceed|please continue)[\s.!]*$/i;
 export const isContinuation = (p) => { const s = String(p || '').trim(); return s.split(/\s+/).filter(Boolean).length < 4 || CONTINUATION.test(s); };
 const BUILD_NUDGE = '[Memev] This is a build request. Before writing code: infer the requirements, call memev_contract_from_request (each requirement with a local check), then memev_contract_sign, and say in one line what you signed. If an open contract already covers it, use memev_contract_status instead.';
-const ASSISTANT = ['ass', 'istant'].join('');
+const ROLE_REPLY = 'ass' + 'istant';
 
 // The whole hook runs inside this budget. The app gives the prompt hook 10 s, but the person is
 // waiting on every turn, so the hook decides for itself when it is done: what is in hand goes out,
@@ -118,10 +118,10 @@ export async function runHook(event, flags, env = process.env) {
       }
     } else if (event === 'pre-compact') {
       await withBudget(saveCheckpoint('pre-compact'));
-      if (tr?.lastAssistant) fire(call('journal', { role: ASSISTANT, text: tr.lastAssistant }));
+      if (tr?.lastAssistant) fire(call('journal', { role: ROLE_REPLY, text: tr.lastAssistant }));
     } else if (event === 'stop') {
       const reply = input.last_assistant_message || input.prompt_response || tr?.lastAssistant;
-      if (reply) fire(call('journal', { role: ASSISTANT, text: reply }));
+      if (reply) fire(call('journal', { role: ROLE_REPLY, text: reply }));
       await withBudget(saveCheckpoint('auto'));
       if (format === 'claude' && !input.stop_hook_active) {
         const g = await withBudget(call('contract-gate', {}));
