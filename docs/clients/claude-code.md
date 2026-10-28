@@ -1,5 +1,7 @@
 # Claude Code
 
+Part of the [Memev documentation](../README.md). Up: [AI apps](../CLIENTS.md), the [README](../../README.md).
+
 Id: `claude-code`
 
 `memev init` connects this app when it finds `~/.claude` or `~/.claude.json`. To connect it yourself:

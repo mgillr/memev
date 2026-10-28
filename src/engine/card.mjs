@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { truncate, readJson, configDir, homeDir } from './util.mjs';
+import { TokenStore, EXPIRY_WARNING_DAYS, expiryWarningLine, expiredWarningLine } from './tokens.mjs';
 
 // The footer for exported artefacts: on only when the user set "footer": true in the vault config.
 export const FOOTER = 'Made with Memev';
@@ -80,10 +81,16 @@ export function syncConflicts(root = currentVault()) {
   } catch { return null; }
 }
 
-export function renderCard(c, { maxChars = 6000, footer } = {}) {
+export function renderCard(c, { maxChars = 6000, footer, root } = {}) {
   const L = ['[Memev resume card]'];
+  // a credential that has expired, or that will expire soon, is said up front, so it is renewed or revoked
+  try {
+    const ts = new TokenStore(path.join(root || currentVault(), '.memev', 'tokens.json'));
+    const lines = [...ts.expired().map((t) => expiredWarningLine(t)), ...ts.expiringWithin(EXPIRY_WARNING_DAYS).map((t) => expiryWarningLine(t))];
+    if (lines.length) L.push(`Credential warnings: ${lines.join('; ')}.`);
+  } catch { /* no vault or no tokens yet */ }
   if (c.operator) {
-    const conflicts = syncConflicts();
+    const conflicts = syncConflicts(root || currentVault());
     if (conflicts?.files?.length) {
       L.push('Sync conflicts (the two computers disagreed; both versions are kept):');
       for (const f of conflicts.conflicts || []) L.push(`  ${f.path}: ${f.how} (memev doctor)`);

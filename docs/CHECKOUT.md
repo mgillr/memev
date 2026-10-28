@@ -1,5 +1,7 @@
 # Checkout
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 > **DRAFT. Not an offer and not in force.** Self-serve checkout is Stripe, in test mode only.
 > Nothing is live. Stripe sells Personal only. Product ids, prices, and the computer cap come from config.
 > The licence email From address comes from deployment config (`MEMEV_LICENCE_FROM`).
