@@ -1,5 +1,7 @@
 # Cloud access
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 Cloud AI apps cannot reach `127.0.0.1`, so Memev opens a tunnel when remote access is on. Remote
 access is off by default, on a personal install as on an organisation one. `memev init` on a
 terminal offers it once; `memev cloud on` turns it on and `memev cloud off` turns it off. An

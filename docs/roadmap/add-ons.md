@@ -1,5 +1,7 @@
 # Planned add-ons and services
 
+Part of the [Memev documentation](../README.md). Up: the [README](../../README.md).
+
 > **DRAFT.** Everything on this page is **planned**. None of it is built, none of it is on sale, and
 > none of it has a date. Personal on one computer is free and nothing here takes anything away from it
 > ([CHARTER.md](../../CHARTER.md)). A price is either **quoted** (we price it on your requirements,
@@ -57,7 +59,7 @@ audit and export parts of this are already on the [tier status table](../tiers/R
 before it lands, preview exactly what would leave before sharing it, and keep a log of what reached
 each cloud AI app. This is a reason to choose Business.
 
-The company hub can read the notes it serves, so we will never call this end-to-end encrypted.
+The company server can read the notes it serves, so we will never call this end-to-end encrypted.
 
 **Tier.** Business and Corporate.
 **Price.** Included in Business and Corporate. Not sold separately.

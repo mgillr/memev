@@ -1,5 +1,7 @@
 # Contracts
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 A contract is a signed statement of what a piece of work must deliver: tasks, acceptance criteria
 with checks a machine can run, and stop rules. Memev includes a modified copy of Proofline
 (`vendor/attest`, Apache-2.0) for drafting, decomposing and verifying them.
