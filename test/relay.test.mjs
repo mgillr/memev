@@ -9,6 +9,7 @@ import tls from 'node:tls';
 import { tmpdir, cleanup, PKG } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
 import { initVault, Vault } from '../src/engine/vault.mjs';
+import { readJson, writeJson } from '../src/engine/util.mjs';
 import { signLicense, loadLicense } from '../src/engine/license.mjs';
 import { seatPolicy } from '../src/engine/entitlements.mjs';
 import { deviceKeygen, signRequest } from '../src/engine/devices.mjs';
@@ -28,6 +29,11 @@ const rpc = (name, args) => ({ jsonrpc: '2.0', id: 1, method: 'tools/call', para
 async function rig() {
   const root = path.join(tmpdir(), 'vault'); const keyDir = path.join(root, '..', 'keys');
   initVault(root, { template: path.join(PKG, 'templates', 'vault') });
+  // remote access is off by default; the relay tests exercise the on path, so switch it on as `memev cloud on` would
+  const cfgFile = path.join(root, '.memev', 'config.json');
+  const cfg = readJson(cfgFile, {});
+  cfg.remote = { ...cfg.remote, enabled: true };
+  writeJson(cfgFile, cfg, 0o600);
   const conf = tmpdir('relay-conf-');
   fs.writeFileSync(path.join(conf, 'license.json'), JSON.stringify(signLicense({ v: 1, lid: 'lic_relay029', tier: 'team', services: ['relay'], seats: 3, iat: day(-10), exp: day(300), grace_days: 14 }, vendor.pem, 'test-vendor')));
   const env = { MEMEV_CONFIG_DIR: conf };

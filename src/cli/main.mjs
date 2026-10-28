@@ -33,8 +33,8 @@ Setup
   memev path add|remove|status     put the memev command on your PATH (a line in your shell's startup file, or your user PATH on
                                    Windows) and take it out again; until it is there, init prints the full path in every hint
   memev status | doctor [--fix] [--bundle]
-  memev cloud on|off|status|url    reach this vault from cloud AI apps through a private tunnel (on by default
-                                   for personal installs, off for --org installs)
+  memev cloud on|off|status|url    reach this vault from cloud AI apps through a private tunnel (off until you
+                                   turn it on, or say yes when init asks on a terminal)
   memev github setup [--host H]    back the vault up to your own private GitHub repository (--host for GitHub Enterprise)
   memev backup set <git-url>       back the vault up to any private git remote (GitHub Enterprise, self-hosted, file)
   memev service install|remove     start Memev at login (systemd or launchd)
@@ -187,7 +187,7 @@ async function run(argv, env) {
       fs.mkdirSync(path.dirname(defaultVaultFile(env)), { recursive: true });
       fs.writeFileSync(defaultVaultFile(env), `${root}\n`);
       const org = !!flags.org || env.MEMEV_PROFILE === 'org';
-      if (flags['local-only'] || org) { const c = config(root); c.remote = { ...c.remote, enabled: false }; if (org) c.profile = 'org'; fs.writeFileSync(path.join(root, '.memev', 'config.json'), `${JSON.stringify(c, null, 2)}\n`, { mode: 0o600 }); }
+      if (flags['local-only'] || org) { const c = config(root); c.remote = { ...c.remote, enabled: false, asked: true }; if (org) c.profile = 'org'; fs.writeFileSync(path.join(root, '.memev', 'config.json'), `${JSON.stringify(c, null, 2)}\n`, { mode: 0o600 }); }
       const rt = installRuntime(env);
       console.log(`${fresh ? 'Created' : 'Found'} your vault at ${root}`);
       if (!process.stdin.isTTY) console.log('A second computer joins this one with memev init --join and an invite from memev invite.');
