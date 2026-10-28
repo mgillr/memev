@@ -23,7 +23,12 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   const found = clients.detect(env, launcher);
   for (const c of found.filter((x) => x.found)) {
     if (c.connected) { add(firstRun ? 'added' : 'ready', c.name, c.mode === 'hooks' ? 'MCP + session hooks + instructions: memory is loaded and saved automatically' : 'MCP + instructions', { app: c.id }); if (c.manual) add('needs-manual', `${c.name}: one step`, c.manual, { app: c.id, note: true }); }
-    else add(c.declined ? 'skipped' : 'needs-manual', c.name, c.declined ? 'you disconnected it (memev connect ' + c.id + ' to undo)' : `memev connect ${c.id}`, { app: c.id });
+    else if (c.declined) add('skipped', c.name, 'you disconnected it (memev connect ' + c.id + ' to undo)', { app: c.id });
+    else {
+      // why it is not connected: a file Memev cannot edit is named, with the snippet to paste by hand
+      let dry = null; try { dry = clients.connect(c.id, { env, launcher, dryRun: true }); } catch { /* reported by memev connect */ }
+      add('needs-manual', c.name, dry?.status === 'needs-manual' && dry.file ? `${dry.file} ${dry.problem}, so Memev cannot add itself there; memev connect ${c.id} --print shows what to paste by hand` : `memev connect ${c.id}`, { app: c.id });
+    }
   }
   // the comms bus: bus/ is in the vault and committed, every connected app has a seat (each joins
   // and says hello on its first session), and the lead is the person's choice, never automatic
@@ -32,6 +37,7 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
     const bus = await import('./bus-cli.mjs');
     let r; try { r = await bus.setupBus({ root, env, clients: connected, flags, ask: firstRun ? undefined : false }); } catch (e) { r = { ok: false, seats: [], operator: null, problems: [e.message] }; }
     if (r.ok) add('succeeded', 'Agent comms bus', `bus/ set up and committed in the vault; ${r.seats.length ? `${r.seats.length} seat(s): ${r.seats.join(', ')}, each joins on its first session` : 'no AI apps yet, each gets a seat when it connects'}`);
+    if (r.ok) add('ready', 'How the bus works', 'apps answer between turns, so a task to an app waits until that app next runs a turn');
     else add('failed', 'Agent comms bus', `${r.problems.join('; ')} (memev doctor --fix)`);
     for (const n of r.notes || []) add('needs-manual', 'Lead AI', n);
     if (r.operator) add('succeeded', 'Lead AI', `${r.operator} leads and coordinates the others, chosen by you (memev bus operator <seat> changes it)`);
@@ -66,6 +72,9 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
     const bad = fileChecks({ root, env, platform, ...(icacls ? { icacls } : {}) }).filter((c) => c.status === 'fail');
     add(bad.length ? 'failed' : 'succeeded', 'Self-test (memev doctor)', bad.length ? bad.map((c) => c.title).join(', ') : 'all checks pass');
   }
+  // contracts: off for new installs, on for existing vaults
+  const contractsOn = cfg.contracts?.enabled !== false;
+  add('ready', 'Contracts', contractsOn ? 'on: the Stop hook blocks while a signed contract is not verified (memev contracts off to turn off)' : 'off: the Stop hook never blocks on a contract (memev contracts on to enable)');
   // the anonymous report: asked once, off unless you say yes
   if (firstRun) await askReportOnce({ env }).catch(() => {});
   const rs = reportSettings(env);
@@ -78,7 +87,7 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
 }
 
 // what can wait: printed under 'Later, optional' whatever its state, so the steps that need you now stay few
-const LATER = /^(Start at login|Cloud AI apps|Backup to your own private GitHub repository|memev command|Anonymous milestone report)\b/;
+const LATER = /^(Start at login|Cloud AI apps|Backup to your own private GitHub repository|memev command|Anonymous milestone report|Contracts)\b/;
 const line = (i) => `  ${ICON[i.status] || '?'} ${i.step}${i.detail ? `: ${i.detail}` : ''}`;
 const list = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
 

@@ -62,3 +62,15 @@ longer needed.
 Remote requests always need a token issued for remote use, are rate limited (120 a minute by
 default) and are logged to `.memev/access.jsonl`. Contract signing and admin routes are local only.
 `memev cloud rotate-key` changes the legacy shared key, for apps that still send it.
+
+## Which computers can join
+
+Joining another computer through the secure link, as on this page, is the paid tier, Personal with
+more computers: the vault refuses to enroll a computer past the number in its licence, and with no
+licence that number is one. Personal on one computer is free and uses one computer at a time. To
+switch computers, back the vault up to your own GitHub repository and let `memev init` on the new
+computer join that backup ([GITHUB.md](GITHUB.md)). Git sync is single-writer backup: a second
+computer that also pushes gets a warning from `memev doctor` that concurrent edits can conflict.
+
+A personal vault never joins a Business or Corporate vault, and a company vault never joins a
+personal one. They have separate identities and keys, with no grants, mounts or mixing.

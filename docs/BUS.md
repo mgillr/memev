@@ -8,8 +8,11 @@ lot from a single session.
 
 There isn't any. `memev init` creates `bus/` in the vault and commits it with everything else, so it
 goes into your own GitHub backup (or local clone) through the normal sync. Every AI app that init or
-`memev connect` finds gets a seat straight away, such as `claude-code@host` or `cursor@host`, and
-the roster shows it as **never joined** until its first heartbeat or hello. Each app joins the first
+`memev connect` finds gets a seat straight away, named after the app and this computer's short name,
+such as `claude-code@my-laptop` or `cursor@my-laptop`, and the roster shows it as **never joined** until
+its first heartbeat or hello. A vault set up before seats used the machine name keeps its older
+`claude-code@host` seats, and `memev bus rename <old> <new>` changes a seat's name; messages sent to the
+old name still reach it. Each app joins the first
 time it opens a session. Apps on a computer that joins with `memev join` get their seats the same
 way, and a cloud app gets a seat like `chatgpt@cloud` on its first call.
 
@@ -81,7 +84,9 @@ From the operator session (Claude Code, say), ask it to:
 - assign a task (`bus_send`, type task, to a seat or all). The assignee claims it (type claim, ref =
   the task id) and restates it in its own words, so you can catch a misunderstanding early. One seat
   claims a task;
-- see the tasks (`bus_tasks`): who claimed what, the restatement, the latest status and the verdict;
+- see the tasks (`bus_tasks`): who claimed what, the restatement, the latest status and the verdict.
+  An unclaimed task to a live seat that has not read it yet is **waiting for next turn**: the app
+  answers between turns, so the task is picked up when that app next runs a turn;
 - put a seat on hold (type hold), and lift it (type hold with `release`).
 
 The same things work from a terminal: `memev bus roster`, `memev bus check`, `memev bus send`,
