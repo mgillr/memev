@@ -35,19 +35,47 @@ test('MEM-044 AC01: with a fake ~/.config/opencode, init connects OpenCode and d
 
 test('MEM-044 AC02: with a fake Copilot CLI config dir, init connects Copilot CLI and disconnect restores its files', () => {
   const { env, w } = fixtureHome();
-  const mcpJson = w('.copilot/mcp.json', JSON.stringify({ mcpServers: { gh: { command: 'gh-mcp', args: ['start'] } } }, null, 2));
-  const agentsMd = w('.copilot/AGENTS.md', '# Copilot rules\n\nBe brief.\n');
-  const original = { mcpJson: fs.readFileSync(mcpJson), agentsMd: fs.readFileSync(agentsMd) };
+  const mcpJson = w('.copilot/mcp-config.json', JSON.stringify({ mcpServers: { gh: { type: 'local', command: 'gh-mcp', args: ['start'], tools: ['*'] } } }, null, 2));
+  const original = { mcpJson: fs.readFileSync(mcpJson) };
   const res = connectAll({ env, launcher: '/x/memev', platform: 'linux' });
   const r = res.find((x) => x.id === 'copilot-cli');
   assert.equal(r.status, 'added');
   assert.equal(detect(env).find((c) => c.id === 'copilot-cli').connected, true);
   const cfg = JSON.parse(fs.readFileSync(mcpJson, 'utf8'));
   assert.ok(cfg.mcpServers.gh, 'the user server stays');
-  assert.deepEqual(cfg.mcpServers.memev, { command: '/x/memev', args: ['mcp', '--client', 'copilot-cli'] });
-  assert.match(fs.readFileSync(agentsMd, 'utf8'), /^# Copilot rules\n\nBe brief\.\n\n<!-- memev:start -->/);
+  assert.deepEqual(cfg.mcpServers.memev, { type: 'local', command: '/x/memev', args: ['mcp', '--client', 'copilot-cli'], tools: ['*'] });
   const d = disconnect('copilot-cli', { env });
-  assert.deepEqual(d.results.map((x) => x.action), ['restored', 'restored']);
-  assert.deepEqual(fs.readFileSync(mcpJson), original.mcpJson, 'mcp.json is back to its original bytes');
-  assert.deepEqual(fs.readFileSync(agentsMd), original.agentsMd, 'AGENTS.md is back to its original bytes');
+  assert.deepEqual(d.results.map((x) => x.action), ['restored']);
+  assert.deepEqual(fs.readFileSync(mcpJson), original.mcpJson, 'mcp-config.json is back to its original bytes');
+});
+
+test('MEM-044 AC02b: Copilot CLI honours COPILOT_HOME', () => {
+  const { env, w } = fixtureHome();
+  const customDir = path.join(env.HOME, 'copilot-custom');
+  fs.mkdirSync(customDir, { recursive: true });
+  const mcpJson = path.join(customDir, 'mcp-config.json');
+  fs.writeFileSync(mcpJson, JSON.stringify({ mcpServers: {} }, null, 2));
+  const original = fs.readFileSync(mcpJson);
+  const res = connectAll({ env: { ...env, COPILOT_HOME: customDir }, launcher: '/x/memev', platform: 'linux' });
+  const r = res.find((x) => x.id === 'copilot-cli');
+  assert.equal(r.status, 'added');
+  const cfg = JSON.parse(fs.readFileSync(mcpJson, 'utf8'));
+  assert.deepEqual(cfg.mcpServers.memev, { type: 'local', command: '/x/memev', args: ['mcp', '--client', 'copilot-cli'], tools: ['*'] });
+  const d = disconnect('copilot-cli', { env: { ...env, COPILOT_HOME: customDir } });
+  assert.deepEqual(d.results.map((x) => x.action), ['restored']);
+  assert.deepEqual(fs.readFileSync(mcpJson), original, 'mcp-config.json is back to its original bytes');
+});
+
+test('MEM-044 AC03: OpenCode skips AGENTS.md when CLAUDE.md exists and AGENTS.md is missing', () => {
+  const { env, w } = fixtureHome();
+  w('.claude/CLAUDE.md', '# Claude rules\n\nBe safe.\n');
+  const opencodeJson = w('.config/opencode/opencode.json', JSON.stringify({ mcp: {} }, null, 2));
+  const res = connectAll({ env, launcher: '/x/memev', platform: 'linux' });
+  const r = res.find((x) => x.id === 'opencode');
+  assert.equal(r.status, 'added');
+  const cfg = JSON.parse(fs.readFileSync(opencodeJson, 'utf8'));
+  assert.deepEqual(cfg.mcp.memev, { type: 'local', command: ['/x/memev', 'mcp', '--client', 'opencode'], enabled: true });
+  assert.equal(fs.existsSync(path.join(env.HOME, '.config', 'opencode', 'AGENTS.md')), false, 'AGENTS.md is not created');
+  const d = disconnect('opencode', { env });
+  assert.deepEqual(d.results.map((x) => x.action), ['restored']);
 });

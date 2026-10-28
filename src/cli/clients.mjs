@@ -179,15 +179,23 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
     { id: 'zed', name: 'Zed', mode: 'instructions', detect: () => exists(path.join(process.platform === 'darwin' ? path.join(home, '.config') : platformDirs(env).appData, 'zed')),
       edits: () => [json(path.join(process.platform === 'darwin' ? path.join(home, '.config') : platformDirs(env).appData, 'zed', 'settings.json'), setServer('context_servers', { source: 'custom', ...stdio('zed') }), delServer('context_servers'))] },
     { id: 'opencode', name: 'OpenCode', mode: 'instructions', detect: () => exists(path.join(home, '.config', 'opencode')),
-      edits: () => [
-        json(path.join(home, '.config', 'opencode', 'opencode.json'), setServer('mcp', opencodeLocal('opencode')), delServer('mcp')),
-        mdBlock(path.join(home, '.config', 'opencode', 'AGENTS.md')),
-      ] },
-    { id: 'copilot-cli', name: 'GitHub Copilot CLI', mode: 'instructions', detect: () => exists(path.join(home, '.copilot')),
-      edits: () => [
-        json(path.join(home, '.copilot', 'mcp.json'), setServer('mcpServers', stdio('copilot-cli')), delServer('mcpServers')),
-        mdBlock(path.join(home, '.copilot', 'AGENTS.md')),
-      ] },
+      edits: () => {
+        const edits = [json(path.join(home, '.config', 'opencode', 'opencode.json'), setServer('mcp', opencodeLocal('opencode')), delServer('mcp'))];
+        const agentsFile = path.join(home, '.config', 'opencode', 'AGENTS.md');
+        if (!exists(agentsFile) && exists(path.join(home, '.claude', 'CLAUDE.md'))) {
+          // Claude rules already live in CLAUDE.md; creating AGENTS.md would switch them off.
+          // MCP instructions carry the protocol instead.
+        } else {
+          edits.push(mdBlock(agentsFile));
+        }
+        return edits;
+      } },
+    { id: 'copilot-cli', name: 'GitHub Copilot CLI', mode: 'instructions', detect: () => exists(env.COPILOT_HOME || path.join(home, '.copilot')),
+      edits: () => {
+        const copilotHome = env.COPILOT_HOME || path.join(home, '.copilot');
+        const entry = { type: 'local', command: win ? win.node : bin, args: [...(win ? [win.script] : []), 'mcp', '--client', 'copilot-cli'], tools: ['*'] };
+        return [json(path.join(copilotHome, 'mcp-config.json'), setServer('mcpServers', entry), delServer('mcpServers'))];
+      } },
   ];
   return defs;
 }
