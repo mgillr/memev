@@ -1,10 +1,17 @@
-# Enterprise
+# Corporate (coming)
 
-> **DRAFT and planned.** Everything specific to this tier is planned; see the
+> **DRAFT and coming.** Everything specific to this tier is planned; see the
 > [status table](README.md#what-is-built-and-what-is-planned).
 
-For organisations with compliance needs: identity sync by SCIM, audit export to a SIEM, retention
-rules, legal hold and high availability, often with several sites or rules about where data may go:
+Corporate is the same model as [Business](business.md) at larger scale: each member has their own
+work vault inside the company plus the shared company vault, and the two interact through promote
+and share up and company knowledge down. An org admin invites members into the company vault. A
+personal or home vault never crosses into it: separate identities and keys, with no grants, mounts or
+mixing. Anyone who leaves loses all vault access: access ends, keys are revoked, devices are
+removed, the local cache is wiped and the work vault stays with the company.
+
+What Corporate adds is scale: identity sync by SCIM, audit export to a SIEM, retention rules, legal
+hold and high availability, often with several sites or rules about where data may go:
 banks, health, law firms, public bodies, defence suppliers. It is chosen by need, not by size.
 
 ```mermaid
