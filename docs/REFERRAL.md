@@ -1,5 +1,7 @@
 # Referral credit: DRAFT
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 > **DRAFT. Not an offer and not in force.** The credit and the mechanism below are decided.
 > The credit is opt-in only, and nothing in it runs until checkout is live.
 

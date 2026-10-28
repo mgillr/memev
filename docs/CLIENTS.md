@@ -1,5 +1,7 @@
 # AI apps
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 `memev connect` (run by `memev init`) registers Memev in each app it detects. Before it changes a
 file it saves a copy in `~/.config/memev/backups/`. `memev disconnect <app>` removes exactly what
 was added: if the file has not changed since, the backup is restored; if you edited it since, only
@@ -51,8 +53,12 @@ The checklist points to this page until there is a public place to ask for the n
 
 On macOS the `~/.config/...` directories are under `~/Library/Application Support`.
 
-Cloud apps (claude.ai, ChatGPT, others that take a remote MCP URL) connect through the tunnel; see
-[CLOUD.md](CLOUD.md).
+Cloud apps (claude.ai, ChatGPT, others that take a remote MCP URL) connect through the tunnel, side by
+side; see [CLOUD.md](CLOUD.md).
+
+One page per app: [Claude Code](clients/claude-code.md), [Codex](clients/codex.md),
+[Gemini CLI](clients/gemini-cli.md), [Cursor](clients/cursor.md), [Claude Desktop](clients/claude-desktop.md),
+[Windsurf](clients/windsurf.md), [VS Code](clients/vscode.md), [Zed](clients/zed.md).
 
 Every app talks to the same daemon. Stdio apps run `memev mcp --client <app>`, a small proxy to the
 daemon, so one process writes the vault.

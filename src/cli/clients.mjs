@@ -193,9 +193,9 @@ function plan(def) {
       let obj = {};
       if (text.trim()) { try { obj = JSON.parse(text); } catch { obj = undefined; } }
       if (obj === undefined) { // comments or trailing commas (VS Code, Zed): change the text in place, so they stay
-        try { after = Buffer.from(changeJsonc(text, e.apply)); } catch (err) { return { error: `${e.file} ${err.message}; add Memev by hand: see docs/CLIENTS.md` }; }
+        try { after = Buffer.from(changeJsonc(text, e.apply)); } catch (err) { return { error: err.message, file: e.file }; }
       } else {
-        if (typeof obj !== 'object' || Array.isArray(obj) || obj === null) return { error: `${e.file} is not a JSON object` };
+        if (typeof obj !== 'object' || Array.isArray(obj) || obj === null) return { error: 'is not a JSON object', file: e.file };
         after = Buffer.from(`${JSON.stringify(e.apply(obj), null, 2)}\n`);
       }
     } else after = Buffer.from(e.apply(before ? before.toString('utf8') : ''));
@@ -208,7 +208,7 @@ export function connect(id, { env = process.env, launcher, dryRun = false, platf
   const def = clientDefs(env, launcher, platform).find((d) => d.id === id);
   if (!def) throw new Error(`unknown app: ${id}`);
   const p = plan(def);
-  if (p.error) return { id, name: def.name, status: 'needs-manual', reason: p.error };
+  if (p.error) return { id, name: def.name, status: 'needs-manual', reason: `${p.file} ${p.error}`, file: p.file, problem: p.error };
   const st = loadState(env);
   const changed = p.changes.filter((c) => !c.before || !c.before.equals(c.after));
   const notes = p.changes.map((c) => (c.e.note ? c.e.note(c.before ? c.before.toString('utf8') : '') : null)).filter(Boolean);
@@ -230,6 +230,13 @@ export function connect(id, { env = process.env, launcher, dryRun = false, platf
   st.declined = st.declined.filter((x) => x !== id);
   saveState(env, st);
   return { id, name: def.name, status: changed.length ? 'added' : 'already', mode: def.mode, files: changed.map((c) => c.e.file), manual: def.manual || null, note: def.note || null, notes };
+}
+
+/** What connect adds to each of an app's files, to paste by hand when Memev cannot edit one: memev connect <app> --print. */
+export function snippets(id, { env = process.env, launcher, platform = process.platform } = {}) {
+  const def = clientDefs(env, launcher, platform).find((d) => d.id === id);
+  if (!def) throw new Error(`unknown app: ${id}`);
+  return { name: def.name, files: def.edits().map((e) => ({ file: e.file, kind: e.kind, text: e.kind === 'json' ? `${JSON.stringify(e.apply({}), null, 2)}\n` : e.apply('') })) };
 }
 
 export function disconnect(id, { env = process.env, launcher, decline = true, platform = process.platform } = {}) {
@@ -295,6 +302,14 @@ export async function command(cmd, pos, flags, { env, root }) {
     for (const c of detect(env, launcher)) console.log(`  ${c.connected ? '\u2713' : c.found ? '\u00b7' : ' '} ${c.name.padEnd(15)} ${c.found ? (c.supported ? (c.connected ? `connected (${c.mode === 'hooks' ? 'hooks + MCP' : 'MCP + instructions'})` : c.declined ? 'found, disconnected by you' : 'found, not connected') : 'found, not supported yet') : 'not found'}`);
     return 0;
   }
+  if (cmd === 'connect' && flags.print) {
+    const id = typeof flags.print === 'string' ? flags.print : pos[0];
+    if (!id) throw new Error('memev connect <app> --print  (memev clients lists the apps)');
+    const s = snippets(id, { env, launcher });
+    console.log(`${s.name}: what Memev adds, to paste by hand. Nothing was changed.`);
+    for (const f of s.files) console.log(`\n${f.kind === 'json' ? `In ${f.file}, merge this into the JSON object that is there:` : `In ${f.file}, add this block:`}\n${f.text.trimEnd()}`);
+    return 0;
+  }
   if (cmd === 'connect') {
     if (target !== 'all') {
       const c = detect(env, launcher).find((x) => x.id === target);
@@ -311,6 +326,7 @@ export async function command(cmd, pos, flags, { env, root }) {
       else if (r.status === 'already') out.ok(`${r.name}: already connected`);
       else if (r.status === 'would-change') out.info(`${r.name}: would change ${r.files.join(', ') || 'nothing'}`);
       else out.bad(`${r.name}: ${r.reason}`);
+      if (r.status === 'needs-manual' && r.file) out.info(`add it by hand: memev connect ${r.id} --print shows what to paste`);
       if (r.manual) out.warn(r.manual);
       for (const n of r.notes || []) out.warn(n);
     }
