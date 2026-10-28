@@ -2,7 +2,7 @@
 // The memev command.
 import fs from 'node:fs';
 import path from 'node:path';
-import { PKG, parseArgs, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, out, tokenExpiryWarnings } from './common.mjs';
+import { PKG, parseArgs, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, saveConfig, out, tokenExpiryWarnings } from './common.mjs';
 import { ensureDaemon, startDaemon, stopDaemon, healthy, choosePort } from './daemon.mjs';
 import { initVault, isVault, VERSION } from '../engine/vault.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
@@ -66,7 +66,7 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs', setup: './setup-remote.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
@@ -286,6 +286,29 @@ async function run(argv, env) {
         return 0;
       }
       throw new Error('memev backup set <git-url> | status');
+    }
+    case 'deployment': {
+      need();
+      const sub = pos[0] || 'show';
+      const cfg = config(root);
+      if (sub === 'show') {
+        const mode = cfg['deployment.mode'] || 'local';
+        console.log(`deployment: ${mode}`);
+        return 0;
+      }
+      if (sub === 'set') {
+        const mode = pos[1];
+        if (mode !== 'local' && mode !== 'container') {
+          console.error(`deployment mode must be local or container, got ${mode || '(none)'}`);
+          return 1;
+        }
+        cfg['deployment.mode'] = mode;
+        saveConfig(root, cfg);
+        console.log(`deployment: ${mode}`);
+        return 0;
+      }
+      console.error('usage: memev deployment show | set <local|container>');
+      return 1;
     }
     default: console.error(`unknown command: ${cmd}\n`); console.log(HELP); return 2;
   }
