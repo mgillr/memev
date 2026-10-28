@@ -12,7 +12,8 @@ after(cleanup);
 function fakeGh(dir, log, host) {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'gh'), `#!/bin/sh
-echo "$@" >> "${log}"
+echo "GH_HOST=$GH_HOST $@" >> "${log}"
+case "$1" in repo|api) case "$*" in *--hostname*) echo "unknown flag: --hostname" >&2; exit 1 ;; esac ;; esac
 case "$1 $2" in
   "auth status") exit 0 ;;
   "api user") echo tester ;;
@@ -35,9 +36,11 @@ test('MEM-099 AC01: github setup --host uses that host for auth, repo and deploy
     assert.equal(r.code, 0, r.out + r.err);
     const calls = fs.readFileSync(log, 'utf8');
     assert.match(calls, /auth status --hostname ghe\.example\.com/);
-    assert.match(calls, /repo view tester\/memev-vault --hostname ghe\.example\.com/);
-    assert.match(calls, /repo create tester\/memev-vault --hostname ghe\.example\.com --private/);
-    assert.match(calls, /repo deploy-key add .*--repo tester\/memev-vault --hostname ghe\.example\.com --allow-write/);
+    // gh has no --hostname on repo, api or deploy-key commands, so the host goes in GH_HOST (the stub refuses the flag there)
+    assert.match(calls, /GH_HOST=ghe\.example\.com repo view tester\/memev-vault/);
+    assert.match(calls, /GH_HOST=ghe\.example\.com repo create tester\/memev-vault --private/);
+    assert.match(calls, /GH_HOST=ghe\.example\.com repo deploy-key add .*--repo tester\/memev-vault --allow-write/);
+    assert.match(calls, /GH_HOST=ghe\.example\.com api user/);
     assert.doesNotMatch(calls, /github\.com/);
     const cfg = JSON.parse(fs.readFileSync(path.join(sb.root, '.memev', 'config.json'), 'utf8'));
     assert.equal(cfg.github.host, 'ghe.example.com');

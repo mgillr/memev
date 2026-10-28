@@ -14,6 +14,8 @@ import { git } from '../engine/git.mjs';
 import { config, saveConfig, out } from './common.mjs';
 
 const sh = (cmd, args, opts = {}) => { const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: opts.timeout || 60000, stdio: opts.inherit ? 'inherit' : 'pipe', env: { ...process.env, ...(opts.env || {}) }, input: opts.input }); return { ok: r.status === 0, out: (r.stdout || '').trim(), err: (r.stderr || '').trim(), status: r.status }; };
+// gh takes the host as GH_HOST: only `gh auth` has a --hostname flag that repo, api and deploy-key commands do not
+const ghOn = (host) => (args, opts = {}) => sh('gh', args, host && host !== 'github.com' ? { ...opts, env: { ...(opts.env || {}), GH_HOST: host } } : opts);
 const has = (bin) => sh(process.platform === 'win32' ? 'where' : 'which', [bin]).ok;
 
 // The file a vault backup pushes. The first line is how init tells a private repository is one of ours.
@@ -27,13 +29,14 @@ const BACKUP_MARKER = '# Your Memev vault';
 export function findMemevBackup(host = 'github.com') {
   if (!has('gh')) return null;
   if (!sh('gh', ['auth', 'status', '--hostname', host]).ok) return null;
-  const list = sh('gh', ['repo', 'list', '--limit', '100', '--json', 'nameWithOwner,isPrivate', '--hostname', host]);
+  const gh = ghOn(host);
+  const list = gh(['repo', 'list', '--limit', '100', '--json', 'nameWithOwner,isPrivate']);
   if (!list.ok || !list.out) return null;
   let repos = [];
   try { repos = JSON.parse(list.out); } catch { return null; }
   for (const repo of repos) {
     if (!repo?.isPrivate || typeof repo.nameWithOwner !== 'string') continue;
-    const file = sh('gh', ['api', `repos/${repo.nameWithOwner}/contents/README.md`, '--jq', '.content', '--hostname', host]);
+    const file = gh(['api', `repos/${repo.nameWithOwner}/contents/README.md`, '--jq', '.content']);
     if (!file.ok || !file.out) continue;
     let text = '';
     try { text = Buffer.from(file.out.replace(/\s/g, ''), 'base64').toString('utf8'); } catch { continue; }
@@ -121,7 +124,7 @@ export async function githubReachable({ probe = tcpProbe } = {}) {
 
 export async function setup({ root, env = process.env, repo = null, flags = {} }) {
   const host = flags.host || 'github.com';
-  const h = host === 'github.com' ? [] : ['--hostname', host];
+  const gh = ghOn(host);
   const steps = [];
   const step = (status, what, detail = '') => { steps.push({ status, what, detail }); (status === 'ok' ? out.ok : status === 'manual' ? out.warn : out.bad)(`${what}${detail ? `: ${detail}` : ''}`); };
   if (!has('gh')) { step('manual', 'GitHub CLI', 'install it from https://cli.github.com and run memev github setup again (or follow docs/GITHUB.md to do it by hand)'); return { ok: false, steps }; }
@@ -132,20 +135,20 @@ export async function setup({ root, env = process.env, repo = null, flags = {} }
     const l = sh('gh', ['auth', 'login', '--hostname', host, '--git-protocol', 'https', '--web', '--scopes', 'repo'], { inherit: true, timeout: 15 * 60000 });
     if (!l.ok) { step('fail', 'GitHub sign-in', 'did not finish'); return { ok: false, steps }; }
   }
-  const login = sh('gh', ['api', 'user', '--jq', '.login', ...h]).out;
+  const login = gh(['api', 'user', '--jq', '.login']).out;
   if (!login) { step('fail', 'GitHub account', 'could not read the signed-in account'); return { ok: false, steps }; }
   step('ok', `Signed in to ${host}`, login);
   const name = repo || `${login}/${slug(path.basename(root), 40)}-vault`;
-  const view = sh('gh', ['repo', 'view', name, ...h, '--json', 'visibility,sshUrl', '--jq', '.visibility + " " + .sshUrl']);
+  const view = gh(['repo', 'view', name, '--json', 'visibility,sshUrl', '--jq', '.visibility + " " + .sshUrl']);
   let sshUrl;
   if (view.ok) {
     const [vis, url] = view.out.split(' ');
     if (vis !== 'PRIVATE') { step('fail', 'Repository', `${name} is ${vis.toLowerCase()}; Memev only backs up to a private repository`); return { ok: false, steps }; }
     sshUrl = url; step('ok', 'Using your private repository', name);
   } else {
-    const c = sh('gh', ['repo', 'create', name, ...h, '--private', '--disable-issues', '--disable-wiki', '--description', 'My Memev vault (private)']);
+    const c = gh(['repo', 'create', name, '--private', '--disable-issues', '--disable-wiki', '--description', 'My Memev vault (private)']);
     if (!c.ok) { step('fail', 'Create repository', c.err.split('\n').pop()); return { ok: false, steps }; }
-    sshUrl = sh('gh', ['repo', 'view', name, ...h, '--json', 'sshUrl', '--jq', '.sshUrl']).out || `git@${host}:${name}.git`;
+    sshUrl = gh(['repo', 'view', name, '--json', 'sshUrl', '--jq', '.sshUrl']).out || `git@${host}:${name}.git`;
     step('ok', 'Created a private repository', name);
   }
   if (flags['remote-url']) sshUrl = flags['remote-url'];
@@ -154,7 +157,7 @@ export async function setup({ root, env = process.env, repo = null, flags = {} }
   const key = path.join(keyDir, `deploy-${slug(name, 60)}`);
   if (!exists(key)) { const k = sh('ssh-keygen', ['-t', 'ed25519', '-N', '', '-C', `memev deploy key (${slug(name, 60)})`, '-f', key, '-q']); if (!k.ok) { step('fail', 'Deploy key', k.err); return { ok: false, steps }; } }
   fs.chmodSync(key, 0o600);
-  const add = sh('gh', ['repo', 'deploy-key', 'add', `${key}.pub`, '--repo', name, ...h, '--allow-write', '--title', `memev (${path.basename(root)})`]);
+  const add = gh(['repo', 'deploy-key', 'add', `${key}.pub`, '--repo', name, '--allow-write', '--title', `memev (${path.basename(root)})`]);
   if (!add.ok && !/already in use|key is already/i.test(add.err)) { step('fail', 'Deploy key', add.err.split('\n').pop()); return { ok: false, steps }; }
   step('ok', 'Deploy key added', 'write access to this one repository only');
   // the vault: remote, ssh key, push guard
