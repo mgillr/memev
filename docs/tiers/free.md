@@ -1,5 +1,8 @@
 # Personal: one computer, free
 
+Part of the [tiers pages](README.md). Up: the [README](../../README.md#which-tier). Architecture chart:
+[ARCHITECTURE.md](../ARCHITECTURE.md#personal).
+
 For one person on one computer at a time. Complete, and never limited ([CHARTER.md](../../CHARTER.md)).
 Switch computers, lose nothing: your notes are backed up to your own GitHub, and a new computer can
 join that backup.
@@ -14,7 +17,7 @@ flowchart LR
         memev <--> vault
     end
     gh[("Your private<br/>GitHub repository")]
-    web["ChatGPT, claude.ai"]
+    web["Cloud AI apps side by side<br/>Claude, ChatGPT, more coming soon"]
     vault -->|push every few minutes| gh
     web -.->|"secure link, per-app token<br/>(memev cloud off to stop)"| memev
 ```
@@ -29,7 +32,8 @@ flowchart LR
 - The comms bus: every AI app on your computer gets a seat, and you can coordinate them from one
   session ([BUS.md](../BUS.md))
 - `memev doctor`
-- The secure link for cloud AI apps (up to 5 connectors counted; nothing is refused)
+- Several cloud AI apps side by side through the secure link, such as Claude and ChatGPT, next to
+  your local coding tools over MCP (up to 5 connectors counted; nothing is refused)
 - Backup to your own private GitHub repository
 
 ## Limits
@@ -68,17 +72,18 @@ link. `memev init --local-only` keeps the secure link off, and the backup stays 
 ## Personal with more computers (draft)
 
 Edit on two machines at once, nothing to resolve. One person, up to 3 computers and 10 cloud AI
-connectors, for $15/month or $144/year. The licence is for that person and cannot be passed on. The
-AI apps on all three computers share one memory and one comms bus, over the secure link, with a key
-for each computer.
+connectors, for $12/month or $120/year (CHF 10 or CHF 100). The licence is for that person and cannot
+be passed on. The AI apps on all three computers share one memory and one comms bus, over the secure
+link, with a key for each computer. The same mix of several cloud AI apps side by side and local coding
+tools over MCP applies on each.
 
-The merging of concurrent edits is done by a separate merge engine. It is licensed on its own terms,
-it is not part of this repository, and Memev calls it as an external component. The free core does
-not contain it.
+The merging of concurrent edits is done by crdt-merge, the convergence engine. It lives in its own
+repository under its own licence, it is not part of this repository, and Memev calls it as an external
+dependency. The free core does not contain it. See [CONVERGENCE.md](../CONVERGENCE.md).
 
 This is an early-supporter price: it stays the same for as long as your subscription runs.
 
-Planned, not built, and not part of the price: merging concurrent edits through the external engine,
+Planned, not built, and not part of the price: merging concurrent edits through the convergence engine,
 end-to-end encrypted sync between the computers, a hosted encrypted backup and a stable address for
 the secure link. With sync, your notes would be encrypted on your computers before they leave, so
 the sync service could not read them or search them for you.

@@ -1,5 +1,7 @@
 # MCP directory entry (draft)
 
+Part of the [Memev documentation](../README.md). Up: the [README](../../README.md).
+
 This is draft text for a directory of MCP servers. It has not been submitted. Do not post it.
 
 ## Listing

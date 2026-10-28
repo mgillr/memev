@@ -1,5 +1,7 @@
 # How Memev compares
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 Memev is a local-first memory and team channel for AI apps. This page states the facts about how
 Memev works and the open standards it builds on, so you can compare its approach with hosted
 alternatives on your own terms.

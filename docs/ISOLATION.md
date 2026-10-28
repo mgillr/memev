@@ -1,5 +1,7 @@
 # Isolation
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 Memev is a new project with its own history. It started from an empty repository.
 
 - It has no git link to any earlier project: no shared commits, no remote, fork, submodule or subtree.
@@ -7,9 +9,11 @@ Memev is a new project with its own history. It started from an empty repository
   Nothing here writes to it: no branches, pull requests, issues, comments, pushes or settings changes.
 - Ideas were re-implemented, not copied. Every file here was written for Memev or vendored with its
   licence (see `vendor/` and `NOTICE`).
-- Memev does not depend on, download from or report to any service run by its author.
-  It has no telemetry. At runtime it uses only Node.js built-ins, git, and (when you switch on
-  remote access) a tunnel program you choose.
+- Memev does not depend on, download from or report to any service run by its author, except what
+  you switch on yourself: `memev license activate` (a licence key out, a signed licence back) and the
+  opt-in milestone report, which is off by default and goes to an address you set. It has no
+  telemetry. At runtime it uses only Node.js built-ins, git, and (when you switch on remote access) a
+  tunnel program you choose.
 - The repository stays private until its owner decides to publish it.
 
 Checks that keep it this way:
