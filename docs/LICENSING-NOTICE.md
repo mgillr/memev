@@ -1,19 +1,18 @@
 # Licensing notice
 
-This notice is the announcement of the decided licence direction (D-14). It is decided, not a
-draft, and it is the announcement: nothing else is posted or announced.
+This notice announces the decided licence direction.
 
 ## The Memev core stays Apache-2.0
 
 The Memev client in this repository stays **Apache-2.0**. Nothing in this repository changes
-licence, and the releases already published stay Apache-2.0.
+licence.
 
 ## The convergence engine lives in its own repository
 
-The crdt-merge convergence engine is not part of this repository. It lives in its own separate
-repository under the Fair Source Licence 1.1 (FSL-1.1) and converts to Apache-2.0 after two
-years. It powers the paid service and the relay layer. That repository is not linked from this
-notice, and no URL for it is given here.
+The convergence engine is not part of this repository. It lives in its own separate repository
+under the Functional Source License 1.1 with Apache 2.0 as the future licence (FSL-1.1-ALv2):
+each version becomes Apache-2.0 two years after it is made available. The engine is never
+vendored into the Memev core.
 
 ## Where the paid value stays
 
