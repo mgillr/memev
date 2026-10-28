@@ -14,6 +14,73 @@ import { now, readJson, writeJson } from '../engine/util.mjs';
 
 export const ADDRESS_FILE = 'address.json';
 
+const JOBS_FILE = path.join('.memev', 'jobs.json');
+
+export function readConflicts(root) {
+  return readJson(path.join(root, JOBS_FILE), {})?.sync?.conflicts || null;
+}
+export function recordConflicts(root, conflicts) {
+  const s = readJson(path.join(root, JOBS_FILE), {});
+  s.sync = { ...(s.sync || {}), ...(conflicts ? { conflicts } : { conflicts: null }) };
+  writeJson(path.join(root, JOBS_FILE), s, 0o600);
+}
+
+/** The lines of a jsonl file that are valid JSON objects with a device and a dseq. */
+function jsonlLines(body) {
+  const out = [];
+  for (const line of String(body ?? '').split('\n')) {
+    if (!line.trim()) continue;
+    try { const m = JSON.parse(line); if (m && typeof m === 'object' && m.device && Number.isInteger(m.dseq)) out.push(line); } catch {}
+  }
+  return out;
+}
+/**
+ * A bus log is append-only, one file per computer: a conflict means both sides appended. Keep every
+ * line from both sides (deduplicated) and sort by device then dseq, the order the bus agrees on.
+ */
+function mergeJsonl(ours, theirs) {
+  const seen = new Set(); const out = [];
+  for (const line of [...jsonlLines(ours), ...jsonlLines(theirs)]) if (!seen.has(line)) { seen.add(line); out.push(line); }
+  const key = (l) => { const m = JSON.parse(l); return `${m.device}\u0000${String(m.dseq).padStart(12, '0')}`; };
+  out.sort((a, b) => key(a).localeCompare(key(b)));
+  return out.join('\n') + (out.length ? '\n' : '');
+}
+
+/**
+ * Resolve the files a merge left conflicted. A bus log keeps both sides' lines; a note keeps both
+ * versions (ours, then theirs, under a marker). Returns the resolved paths and the conflict record.
+ */
+export function resolveConflicts(root, vault) {
+  const st = git(root, ['diff', '--name-only', '--diff-filter=U']);
+  const files = st.out.split('\n').filter(Boolean);
+  const conflicts = files.map((p) => {
+    const abs = path.join(root, ...p.split('/'));
+    let ours = null, theirs = null;
+    try { ours = fs.readFileSync(abs, 'utf8'); } catch {}
+    try { theirs = fs.readFileSync(`${abs}.theirs`, 'utf8'); } catch {}
+    if (p.startsWith('bus/log/') && p.endsWith('.jsonl')) {
+      fs.writeFileSync(abs, mergeJsonl(ours, theirs));
+      return { path: p, kind: 'bus log', how: 'kept every message from both computers' };
+    }
+    const body = `# both versions kept by the sync merge (run memev doctor)\n\n# this computer's version\n${ours ?? ''}\n# the other computer's version\n${theirs ?? ''}\n`;
+    fs.writeFileSync(abs, body);
+    return { path: p, kind: 'note', how: 'kept both versions' };
+  });
+  for (const p of files) {
+    const abs = path.join(root, ...p.split('/'));
+    for (const s of [`${abs}.ours`, `${abs}.theirs`, `${abs}.base`, `${abs}.orig`]) { try { fs.rmSync(s); } catch {} }
+    git(root, ['add', '--', p]);
+  }
+  const m = git(root, ['commit', '-q', '--no-edit', '-m', 'memev: resolve sync conflicts']);
+  if (m.ok) {
+    if (vault) {
+      for (const p of files) if (p.endsWith('.md')) { try { vault.syncFromDisk(p, 'git-pull'); } catch {} }
+      try { vault.commits.flush(); } catch {}
+    }
+  }
+  return { files, conflicts, ok: m.ok };
+}
+
 /** Commit address.json when it is new or changed, so the git backup carries the signed record. */
 export function commitAddressFile(root) {
   const st = git(root, ['status', '--porcelain', '--', ADDRESS_FILE]);
@@ -45,9 +112,18 @@ export function syncOnce(vault, { root }) {
   if (!f.ok && !/couldn't find remote ref/.test(f.err)) { res.error = `fetch: ${f.err.split('\n').pop()}`; return res; }
   if (f.ok) {
     const m = git(root, ['merge', '--no-edit', '-q', `${remote}/${branch}`]);
-    if (!m.ok) { git(root, ['merge', '--abort']); res.error = 'merge conflict: left as is; run memev doctor'; return res; }
-    const changed = git(root, ['diff', '--name-only', before, 'HEAD']).out.split('\n').filter((p) => p.endsWith('.md'));
-    for (const p of changed) if (vault.syncFromDisk(p, 'git-pull')) res.pulled++;
+    if (!m.ok) {
+      const r = resolveConflicts(root, vault);
+      if (!r.ok) { git(root, ['merge', '--abort']); recordConflicts(root, null); res.error = 'merge conflict: left as is; run memev doctor'; return res; }
+      recordConflicts(root, { at: now(), files: r.files, conflicts: r.conflicts });
+      res.conflicts = r.conflicts;
+      const changed = git(root, ['diff', '--name-only', before, 'HEAD']).out.split('\n').filter((p) => p.endsWith('.md'));
+      for (const p of changed) if (vault.syncFromDisk(p, 'git-pull')) res.pulled++;
+    } else {
+      recordConflicts(root, null);
+      const changed = git(root, ['diff', '--name-only', before, 'HEAD']).out.split('\n').filter((p) => p.endsWith('.md'));
+      for (const p of changed) if (vault.syncFromDisk(p, 'git-pull')) res.pulled++;
+    }
   }
   const w = writerCheck(vault, { root }); if (w.warning) res.warning = w.warning; res.writers = w.writers.length;
   commitAddressFile(root);

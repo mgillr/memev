@@ -69,8 +69,23 @@ export const PROTOCOL_REVIEW = [
   { was: "If Memev is unreachable, say so once and continue.", now: "Memev unreachable: say so once, continue." },
 ];
 
+/**
+ * The conflicts a sync merge could not join by itself, from the sync job's state. The operator card
+ * shows them so the person sees what the two computers disagreed on; a card for another seat does not.
+ */
+export function syncConflicts(root = currentVault()) {
+  try {
+    const s = readJson(path.join(root, '.memev', 'jobs.json'), {})?.sync?.conflicts;
+    return s?.files?.length ? s : null;
+  } catch { return null; }
+}
+
 export function renderCard(c, { maxChars = 6000, footer } = {}) {
   const L = ['[Memev resume card]'];
+  if (c.operator && c.conflicts?.files?.length) {
+    L.push('Sync conflicts (the two computers disagreed; both versions are kept):');
+    for (const f of c.conflicts.files) L.push(`  ${f.path}: ${f.how} (memev doctor)`);
+  }
   if (c.project_state?.checkpoints) {
     const s = c.project_state;
     L.push(`Project ${c.project} (last checkpoint ${s.at}):`);

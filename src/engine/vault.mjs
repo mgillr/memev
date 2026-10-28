@@ -485,7 +485,12 @@ export class Vault extends EventEmitter {
     const relevant = task ? this.recall(identity, { query: `${task} ${proj || ''}`, project: proj, limit: 6, client, session }) : [];
     const contracts = this._openContracts();
     const active = this.allNotes('work/active').map((p) => ({ path: p, state: this.projectState(path.posix.basename(p, '.md')) })).filter((x) => x.state?.checkpoints).sort((a, b) => String(b.state.at).localeCompare(String(a.state.at))).slice(0, 5).map((x) => ({ project: path.posix.basename(x.path, '.md'), at: x.state.at, task: x.state.task, doing: x.state.doing }));
-    return { vault: path.basename(this.root), project: proj, north_star: ns && !ns.includes('Write a few lines about yourself') ? truncate(ns.replace(/^---[\s\S]*?\n---\n/, ''), 1500) : null, project_state: state, active_projects: active, recent_decisions: decisions, last_session: lastSession, relevant, open_contracts: contracts };
+    const op = this.bus.operator();
+    const seat = identity?.agent;
+    const isOp = !!(op && (seat === op || identity?.scopes?.includes('admin')));
+    let conflicts = null;
+    if (isOp) { try { conflicts = readJson(path.join(this.state, 'jobs.json'), {})?.sync?.conflicts || null; } catch { conflicts = null; } }
+    return { vault: path.basename(this.root), project: proj, north_star: ns && !ns.includes('Write a few lines about yourself') ? truncate(ns.replace(/^---[\s\S]*?\n---\n/, ''), 1500) : null, project_state: state, active_projects: active, recent_decisions: decisions, last_session: lastSession, relevant, open_contracts: contracts, operator: isOp, conflicts };
   }
   _recentEntries(dir, n) {
     const files = this.allNotes(dir.replace(/\/$/, '')).slice(-2); const out = [];
