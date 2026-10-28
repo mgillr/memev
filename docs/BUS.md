@@ -8,8 +8,11 @@ lot from a single session.
 
 There isn't any. `memev init` creates `bus/` in the vault and commits it with everything else, so it
 goes into your own GitHub backup (or local clone) through the normal sync. Every AI app that init or
-`memev connect` finds gets a seat straight away, such as `claude-code@host` or `cursor@host`, and
-the roster shows it as **never joined** until its first heartbeat or hello. Each app joins the first
+`memev connect` finds gets a seat straight away, named after the app and this computer's short name,
+such as `claude-code@my-laptop` or `cursor@my-laptop`, and the roster shows it as **never joined** until
+its first heartbeat or hello. A vault set up before seats used the machine name keeps its older
+`claude-code@host` seats, and `memev bus rename <old> <new>` changes a seat's name; messages sent to the
+old name still reach it. Each app joins the first
 time it opens a session. Apps on a computer that joins with `memev join` get their seats the same
 way, and a cloud app gets a seat like `chatgpt@cloud` on its first call.
 

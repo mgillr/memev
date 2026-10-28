@@ -1,11 +1,56 @@
-# Business: from 10 people
+# Business (coming)
 
-> **DRAFT and planned.** The company hub, sign-in with Google or Microsoft, departments, labels,
-> pseudonymising and the egress log are not built yet. Several computers can already share one vault
-> through the secure link with a credential each; see the [status table](README.md#what-is-built-and-what-is-planned).
+> **DRAFT and coming.** Business is not built yet: the company vault, the work vaults, the company
+> hub, sign-in with Google or Microsoft, departments, labels, pseudonymising and the egress log are
+> all planned. Several computers can already share one vault through the secure link with a
+> credential each; see the [status table](README.md#what-is-built-and-what-is-planned). A Business
+> trial is planned.
 
-For a company that wants one memory for its staff and their AI apps, on its own server, with
+For a company that wants one memory for its members and their AI apps, on its own server, with
 departments that can't read each other's notes and sensitive work kept on a local model.
+
+Corporate is the same model at larger scale: see [Corporate](corporate.md).
+
+## How it works
+
+Every member has their own work vault inside the company, and the company has a shared company
+vault. The two interact in two directions:
+
+- **Up.** A member promotes or shares a note from their work vault into the company vault.
+- **Down.** Company knowledge in the company vault comes down to each member's apps.
+
+```mermaid
+flowchart TB
+    subgraph company["The company"]
+        cv[("Company vault<br/>shared")]
+        subgraph members["Members"]
+            w1[("Work vault<br/>member 1")]
+            w2[("Work vault<br/>member 2")]
+            w3[("Work vault<br/>member 3")]
+        end
+        w1 -->|"promote or share"| cv
+        w2 -->|"promote or share"| cv
+        w3 -->|"promote or share"| cv
+        cv -->|"company knowledge"| w1
+        cv -->|"company knowledge"| w2
+        cv -->|"company knowledge"| w3
+    end
+    admin["Org admin"] -->|"invites members"| cv
+```
+
+An org admin invites members into the company vault. There is no Team tier: teammates belong here,
+on the business side.
+
+### Personal vaults stay out
+
+A member's personal or home vault never crosses into the company. It has its own identity and keys,
+and the company side has its own. There are no grants, mounts or mixing between them.
+
+### When a member leaves
+
+Someone who leaves the company loses all vault access. Their access ends, their keys are revoked,
+their devices are removed and the local cache on those devices is wiped. The work vault stays with
+the company. Memev cannot recall what the person already read or copied outside it.
 
 ## Worked example: 20 people
 
@@ -15,7 +60,7 @@ A firm of 20: a CEO, a senior leadership team of 3, and Sales (5), Operations (5
 ```mermaid
 flowchart TB
     subgraph office["Your office or your cloud account"]
-        hub["Company hub (planned)<br/>Memev, one vault per department<br/>+ a shared company vault"]
+        hub["Company hub (planned)<br/>Memev, the shared company vault<br/>+ one work vault per member"]
         model["Local model server<br/>Ollama or vLLM"]
         audit[("Egress log (planned)")]
         hub --- audit
@@ -38,8 +83,9 @@ flowchart TB
 
 ### Who sees what
 
-The org chart becomes the permission map (planned). Each department gets its own vault area; a person
-reads their department, the company area and anything granted to them. Nothing is visible by default.
+The org chart becomes the permission map (planned). Each department gets its own area of the company
+vault; a person reads their own work vault, their department, the company area and anything granted
+to them. Nothing is visible by default.
 
 ```mermaid
 flowchart TB
@@ -104,26 +150,31 @@ one. Hardware is yours; see above.
 
 ## What's included
 
-- Everything in Free on every computer
+- Everything in Personal on every computer
+- A work vault for each member and a shared company vault, with promote and share up and company
+  knowledge down (planned)
+- Invites from an org admin into the company vault (planned)
+- Separate identities and keys from any personal vault, with no grants, mounts or mixing (planned)
+- When someone leaves: access ends, keys are revoked, devices are removed, the local cache is wiped
+  and the work vault stays with the company (planned)
 - The company hub on your server (planned)
 - Sign-in with Google Workspace or Microsoft Entra ID, offboarding (planned)
 - Departments, roles and grants from your org chart (planned)
 - Labels, local-model-only routing for restricted notes, pseudonymising, egress log (planned)
 - Backup to your company's GitHub organisation or your own git server (built)
-- 50 cloud AI connectors per 10 computers (counted, not refused)
+- Cloud AI connectors are counted, not refused
 
 ## Limits
 
-- Sold per person, from 10 people. Each person brings 3 computers, pooled into one licence number,
-  so 20 people can enrol 60 computers in any mix. Teams of 10 to 20 that need no hub, sign-in or
-  departments can choose [Team](team.md). For identity sync, SIEM export, retention, legal hold or
-  high availability, see [Enterprise](enterprise.md).
+- Sold per member. How computers are counted for Business is not settled, and no price is stated
+  here: contact us. For identity sync, SIEM export, retention, legal hold or high availability, see
+  [Corporate](corporate.md).
 - Every app on every enrolled computer gets a seat on the comms bus. IT or a team lead can run a
   comms check and hand out tasks from one session; a removed computer drops off the bus.
 - The licence sets how many computers can join the vault. Each one has its own device key, and IT
   frees a seat with `memev devices remove <id>`. Past the count the vault refuses the next one.
 - One hub server. If it is down, each computer keeps working on its own notes and catches up after;
-  a second hub for failover is Enterprise.
+  a second hub for failover is Corporate.
 - The hub decrypts notes to index them, so whoever runs the server can read them.
 - Pseudonymising catches patterns (names it knows, e-mail addresses, amounts). It will miss things,
   which is why restricted departments use the local model instead.
