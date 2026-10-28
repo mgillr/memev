@@ -4,9 +4,10 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { readJson, writeJson, writePrivateJson, configDir, exists, now } from '../engine/util.mjs';
-import { config } from './common.mjs';
+import { config, saveConfig } from './common.mjs';
 import { fetchOut } from '../engine/net.mjs';
 import { loadMilestones, recordMilestones, buildReport, MILESTONES } from '../engine/milestones.mjs';
+import { cloudSeat } from './tunnel.mjs';
 
 const ICON = { succeeded: '\u2713', added: '+', ready: '\u2713', 'needs-manual': '\u2192', failed: '\u2717', skipped: '-' };
 
@@ -37,6 +38,7 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
     const bus = await import('./bus-cli.mjs');
     let r; try { r = await bus.setupBus({ root, env, clients: connected, flags, ask: firstRun ? undefined : false }); } catch (e) { r = { ok: false, seats: [], operator: null, problems: [e.message] }; }
     if (r.ok) add('succeeded', 'Agent comms bus', `bus/ set up and committed in the vault; ${r.seats.length ? `${r.seats.length} seat(s): ${r.seats.join(', ')}, each joins on its first session` : 'no AI apps yet, each gets a seat when it connects'}`);
+    if (r.ok) add('ready', 'How the bus works', 'apps answer between turns, so a task to an app waits until that app next runs a turn');
     else add('failed', 'Agent comms bus', `${r.problems.join('; ')} (memev doctor --fix)`);
     for (const n of r.notes || []) add('needs-manual', 'Lead AI', n);
     if (r.operator) add('succeeded', 'Lead AI', `${r.operator} leads and coordinates the others, chosen by you (memev bus operator <seat> changes it)`);
@@ -48,13 +50,16 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   const u = svc.unitPaths(env);
   if (firstRun && !flags['no-service'] && !env.MEMEV_NO_SERVICE) { const r = await svc.installService({ env, root }); add(r.status, 'Start at login', r.detail); }
   else add(u.file && exists(u.file) ? 'ready' : 'needs-manual', 'Start at login', u.file && exists(u.file) ? u.file : 'memev service install');
-  // cloud
+  // cloud: off by default; on a terminal it is offered once, and the line says what gets exposed
+  if (firstRun) await askCloudOnce({ root }).catch(() => {});
   const cfg = config(root);
-  if (!cfg.remote?.enabled) add('ready', 'Cloud AI apps', cfg.profile === 'org' ? 'remote access is off, as for every organisation install (memev cloud on --yes to enable)' : 'remote access is off (memev cloud on to enable)');
+  if (!cfg.remote?.enabled) add('ready', 'Cloud AI apps', cfg.profile === 'org' ? 'remote access is off, as for every organisation install; memev cloud on --yes shares what recall returns with a cloud AI app' : 'remote access is off; memev cloud on shares what recall returns with a cloud AI app (ChatGPT, claude.ai)');
   else {
     let st = readJson(path.join(root, '.memev', 'tunnel.json'), null);
     for (let i = 0; firstRun && daemonUp && i < 40 && !st?.url && !/error|no provider|MEMEV_NO_TUNNEL/.test(st?.state || ''); i++) { await new Promise((r) => setTimeout(r, 250)); st = readJson(path.join(root, '.memev', 'tunnel.json'), null); }
-    if (st?.url) add('needs-manual', 'Cloud AI apps (claude.ai, ChatGPT)', `add a custom connector with the URL from: memev cloud url${st.stable ? '' : ' (this address changes when the tunnel restarts; Tailscale gives a stable one)'}`);
+    const seat = cloudSeat(root);
+    if (st?.url && seat) add('ready', 'Cloud AI apps (claude.ai, ChatGPT)', `${seat} is connected (memev cloud connect <app> prints the URL and waits for it)`);
+    else if (st?.url) add('needs-manual', 'Cloud AI apps (claude.ai, ChatGPT)', `add a custom connector with the URL from: memev cloud url${st.stable ? '' : ' (this address changes when the tunnel restarts; Tailscale gives a stable one)'}`);
     else add('needs-manual', 'Cloud AI apps', `remote access is on but the tunnel is ${st?.state || 'starting'}; check memev cloud status, or memev cloud off for local only`);
   }
   // backup
@@ -185,6 +190,22 @@ export async function askReportOnce({ env = process.env, ask, input = process.st
   try { output.write(`\n${REPORT_QUESTION}`); a = (await rl.question('Share anonymous milestones? [y/N] ')).trim().toLowerCase(); } finally { rl.close(); }
   const yes = a === 'y' || a === 'yes';
   setReport(env, yes);
+  return yes;
+}
+// ---- cloud access for cloud AI apps. Off by default; offered once on a terminal at init.
+export const CLOUD_QUESTION = 'Use your memory from ChatGPT or claude.ai?\n  What would be shared: what recall returns, to the cloud AI app that asks for it (memev cloud url prints the address and its secret).\n  It is off unless you say yes, and memev cloud off stops it.\n';
+/** Offered once, on a terminal only. A yes turns remote access on and reloads the daemon; the answer is kept either way and the question never comes back. `ask` forces (true) or forbids (false) it; input and output are for tests. */
+export async function askCloudOnce({ root, ask, input = process.stdin, output = process.stdout } = {}) {
+  const cfg = config(root);
+  if (cfg.remote?.enabled || cfg.remote?.asked) return null;
+  if (!(ask ?? (!!input.isTTY && !!output.isTTY))) return null;
+  const readline = await import('node:readline/promises');
+  const rl = readline.createInterface({ input, output, terminal: false });
+  let a = '';
+  try { output.write(`\n${CLOUD_QUESTION}`); a = (await rl.question('Use your memory from ChatGPT or claude.ai? [y/N] ')).trim().toLowerCase(); } finally { rl.close(); }
+  const yes = a === 'y' || a === 'yes';
+  saveConfig(root, { ...cfg, remote: { ...cfg.remote, enabled: yes, asked: true } });
+  if (yes) (await import('./tunnel.mjs')).reloadDaemon(root).catch(() => {});
   return yes;
 }
 async function reportCommand(pos, flags, { root, env }) {
