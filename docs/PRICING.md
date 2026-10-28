@@ -15,7 +15,7 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md#whic
 
 | | Free | Personal with more computers | Business | Corporate |
 |---|---|---|---|---|
-| Price | free | $12/month or $120/year (CHF 10 or CHF 100) | contact us | contact us |
+| Price | free | $12/month or $120/year | contact us | contact us |
 | People | 1 | 1, non-transferable | counted once per organisation | counted once per organisation |
 | Computers using one vault | 1 | up to 3 | counted once per organisation, by computer | counted once per organisation, by computer |
 | Local AI apps on a computer | unlimited | unlimited | unlimited | unlimited |
