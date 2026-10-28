@@ -193,7 +193,8 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
       edits: () => {
         const copilotHome = env.COPILOT_HOME || path.join(home, '.copilot');
         const entry = { type: 'local', command: win ? win.node : bin, args: [...(win ? [win.script] : []), 'mcp', '--client', 'copilot-cli'], tools: ['*'] };
-        return [json(path.join(copilotHome, 'mcp-config.json'), setServer('mcpServers', entry), delServer('mcpServers'))];
+        // Copilot CLI reads its user-level instructions from copilot-instructions.md in the same folder
+        return [json(path.join(copilotHome, 'mcp-config.json'), setServer('mcpServers', entry), delServer('mcpServers')), mdBlock(path.join(copilotHome, 'copilot-instructions.md'))];
       } },
   ];
   return defs;

@@ -94,8 +94,10 @@ test('MEM-011 AC01: with platform win32 injected, every MCP entry registers node
       if (e.kind === 'json') {
         for (const entry of mcpEntries(e.apply({}))) {
           found++;
-          assert.ok(entry.command.endsWith('node.exe'), `${def.id}: command ${entry.command}`);
-          for (const s of [entry.command, ...(entry.args || [])]) assert.ok(!/\.(cmd|bat)$/i.test(s), `${def.id}: ${s}`);
+          // OpenCode takes the command and its arguments as one array; the others split command and args
+          const argv = [].concat(entry.command, entry.args || []);
+          assert.ok(argv[0].endsWith('node.exe'), `${def.id}: command ${argv[0]}`);
+          for (const s of argv) assert.ok(!/\.(cmd|bat)$/i.test(s), `${def.id}: ${s}`);
         }
       } else {
         const t = e.apply('');
