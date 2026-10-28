@@ -1,5 +1,7 @@
 # Metrics
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 How Memev is measured, and what is never measured. Memev has no telemetry: nothing in the product
 reports anything unless you turn on a report that is off by default. The milestones below are worked
 out on your computer and stay there; the counts after them are taken from places that already hold

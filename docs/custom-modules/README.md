@@ -1,5 +1,7 @@
 # Custom modules
 
+Part of the [Memev documentation](../README.md). Up: the [README](../../README.md).
+
 > **DRAFT. Status: planned.** No custom module is built or on sale. This folder describes the kind of
 > work we plan to do, and each page doubles as a test plan.
 

@@ -1,10 +1,12 @@
 # Cloud access
 
-Cloud AI apps cannot reach `127.0.0.1`, so Memev opens a tunnel when remote access is on. On a
-personal install it is on by default; `memev init --local-only` or `memev cloud off` turns it off,
-`memev cloud on` back on. An organisation install (`memev init --org`) starts with it off, and
-`memev cloud on --yes` is needed to switch it on, because whatever recall returns through the tunnel
-goes to the cloud AI app that asked for it.
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
+Cloud AI apps cannot reach `127.0.0.1`, so Memev opens a tunnel when remote access is on. Remote
+access is off by default, on a personal install as on an organisation one. `memev init` on a
+terminal offers it once; `memev cloud on` turns it on and `memev cloud off` turns it off. An
+organisation install (`memev init --org`) needs `memev cloud on --yes`, because whatever recall
+returns through the tunnel goes to the cloud AI app that asked for it.
 
 The tunnel is chosen in this order (`memev cloud use auto|tailscale|cloudflare|quick` to pin one):
 
