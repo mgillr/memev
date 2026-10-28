@@ -15,7 +15,7 @@ memev backup set <git-url>         # any private git remote (self-hosted, file, 
 4. Points the vault's git remote at it, adds a pre-push check that refuses to push to any other
    remote, and pushes.
 
-After that the daemon pushes every few minutes when there are new commits. `memev github status`
+After that the daemon pushes every 30 minutes when there are new commits. `memev github status`
 shows the target; `memev doctor` reports failed pushes.
 
 ## When port 22 is blocked

@@ -23,7 +23,7 @@ flowchart LR
     github[("Your private GitHub repository<br/>backup and history")]
     cloud["AI on the web<br/>ChatGPT, claude.ai"]
     laptop["Your other computers<br/>each with its own key"]
-    vault -- "backup every few minutes" --> github
+    vault -- "backup every 30 minutes" --> github
     cloud -. "optional secure link,<br/>you can switch it off" .-> vault
     laptop -. "the same secure link" .-> vault
 ```
