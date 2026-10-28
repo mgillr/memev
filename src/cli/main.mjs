@@ -43,7 +43,7 @@ Setup
   memev join <code>                make a key, enrol this computer and connect its apps
   memev join <url> --token T       the same, with a key and a token made ahead of time
   memev license status|activate <key>|install <file>|remove   the licence: how many computers may use this vault
-  memev upgrade                    the plans and what each adds, and how to start a trial or buy
+  memev upgrade                    the plans and what each adds, and how to buy
   memev plan                       what this vault uses: computers used and allowed, connectors counted
   memev report [on|off|show|send]  the anonymous milestone report: off unless you turn it on; show prints what would be sent
   memev bus roster|check|send|tail|tasks|watch <seat>|operator <seat>   the comms bus between your AI apps

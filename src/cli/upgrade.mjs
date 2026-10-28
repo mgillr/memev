@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // `memev upgrade` and `memev plan`, shown only when asked: the plans and what each adds, how to
-// start a trial or buy, and the usage of this vault. When the vault's config sets a checkout URL,
-// upgrade prints that URL and nothing else. Nothing in this file is a payment provider, a price, a
-// sender, or an endpoint, and it makes no network call.
+// buy, and the usage of this vault. When the vault's config sets a checkout URL, upgrade prints
+// that URL and nothing else. Nothing in this file is a payment provider, a price, a sender, or an
+// endpoint, and it makes no network call.
 import { config } from './common.mjs';
 import { PLANS } from '../engine/entitlements.mjs';
 import { licensingStatus } from './licensing.mjs';
@@ -13,17 +13,16 @@ export function checkoutUrl(root) {
   return typeof url === 'string' ? url.trim() : '';
 }
 
-/** The plans and the trial-or-buy lines, as one text block. */
+/** The plans and the buy lines, as one text block. */
 export function plansText() {
   const lines = ['Plans (draft; the full table with prices is docs/PRICING.md):'];
   const width = Math.max(...PLANS.map((p) => p.name.length));
   for (const p of PLANS) lines.push(`  ${p.name.padEnd(width)} ${p.adds}`);
-  lines.push('What each plan adds is more computers and people sharing the one memory and the one comms bus;');
-  lines.push('on any computer, everything is free and unlimited.');
+  lines.push('The paid difference is using several computers at once, with automatic merge from a separately licensed engine.');
+  lines.push('On any computer, everything is free and unlimited.');
   lines.push('');
-  lines.push('Start a trial or buy:');
-  lines.push('  There is no trial: the free tier is the trial. Start it with memev init, no licence, no network.');
-  lines.push('  Buy: open the checkout page and pay there, then run memev license activate <key> with the key it emails.');
+  lines.push('Buy:');
+  lines.push('  Open the checkout page and pay there, then run memev license activate <key> with the key it emails.');
   lines.push("  This vault prints the checkout page's URL when its config sets checkout.url: memev upgrade.");
   return lines.join('\n');
 }
