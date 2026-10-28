@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Renders the Memev tiers demo video (motion graphics drawn in code).
 
-Output: memev-tiers.mp4 (1280x720, 30 fps, H.264) and memev-tiers.gif (800 px wide, 10 fps, under 8 MB).
+Output: memev-tiers.mp4 (1280x720, 30 fps, H.264) and memev-tiers.gif (a small inline preview, under 8 MB).
 
 Needs: Python 3.9+, Pillow, ffmpeg on PATH. Nothing else.
 
@@ -11,8 +11,9 @@ Needs: Python 3.9+, Pillow, ffmpeg on PATH. Nothing else.
     python3 make_memev_tiers.py --stills 3,20,60 --out /tmp/demo   # PNG stills at those seconds only
     python3 make_memev_tiers.py --no-gif         # mp4 only
 
-Every word on screen is in this file (see SCENES). The tier names, limits and statuses are the ones in
-docs/PRICING.md and docs/tiers/. Anything not built yet is labelled coming or planned.
+Every word on screen is in this file (see SCENES). It shows no prices. Anything not built yet is labelled
+coming or planned. Caption timing: 2 s plus 0.35 s per word, never under 4 s, then a short pause on each
+scene's summary.
 """
 import argparse
 import math
@@ -24,6 +25,7 @@ from multiprocessing import Pool
 from PIL import Image, ImageDraw, ImageFont
 
 W, H, S, FPS = 1280, 720, 2, 30          # logical size, supersampling factor, frames per second
+GIF_W, GIF_FPS, GIF_COLORS = 720, 8, 32  # the inline preview: small enough for GitHub
 
 # ---- palette: dark navy and slate, teal and amber as the two accents ----
 BG1, BG2 = (9, 15, 28), (17, 27, 48)
@@ -330,27 +332,28 @@ def wrap(cv, s, kind, size, maxw):
 
 
 # ---------------- shared chrome: header, tier tracker, caption bar ----------------
-TRACK = [("Free", TEAL, False), ("Personal", TEAL, False), ("Team", TEAL, False),
-         ("Business", AMBER, True), ("Enterprise", AMBER, True), ("Paid engine", AMBER, False)]
+TRACK = [("Personal", TEAL, False), ("More computers", TEAL, False), ("Business", AMBER, True),
+         ("Corporate", AMBER, True), ("Paid engine", AMBER, False)]
 
 
 def header(cv, title, sub, active, a=1.0):
     cv.text(40, 26, title, "b", 34, TEXT, a)
     cv.text(40, 72, sub, "r", 18, MUTED, a)
     x = 1240
-    for name, col, planned in reversed(TRACK):
+    for idx in range(len(TRACK) - 1, -1, -1):
+        name, col, planned = TRACK[idx]
         w = cv.tw(name, "s", 14) + 24
         x -= w
-        on = TRACK.index((name, col, planned)) in active
+        on = idx in active
         cv.box(x, 32, w, 28, r=14, fill=col if on else BG1, outline=col if on else DIM, width=1.3,
                a=a * (1.0 if on else 0.8), dash=planned and not on)
         cv.text(x + w / 2, 46.5, name, "s", 14, BG1 if on else MUTED, a, "mm")
         x -= 8
 
 
-def caption(cv, caps, t, total_a=1.0):
+def caption(cv, caps, t):
     for (t0, t1, s) in caps:
-        a = min(ap(t, t0, 0.35), 1 - ap(t, t1 - 0.35, 0.35)) * total_a
+        a = min(ap(t, t0, 0.35), 1 - ap(t, t1 - 0.35, 0.35))
         if a <= 0.01:
             continue
         cv.box(40, 618, 1200, 78, r=14, fill=PANEL, outline=BORDER, width=1.3, a=0.95 * a)
@@ -362,56 +365,80 @@ def caption(cv, caps, t, total_a=1.0):
             cv.text(66, y0 + i * lh + lh / 2, ln, "r", 25, TEXT, a, "lm")
 
 
-# ---------------- scenes ----------------
-def scene_title(cv, t):
+def schedule(texts, start=0.5, gap=0.2):
+    """Caption timing: each caption is held for 2 s plus 0.35 s per word, and never under 4 s."""
+    out, t = [], start
+    for s in texts:
+        d = max(4.0, 2.0 + 0.35 * len(s.split()))
+        out.append((t, t + d, s))
+        t += d + gap
+    return out
+
+
+def tick(cv, x, y, a, color=TEAL):
+    cv.circle(x, y, 11, fill=color, a=a)
+    cv.line([(x - 5, y), (x - 1.5, y + 4), (x + 5.5, y - 4)], BG1, 2.4, a)
+
+
+def toggle(cv, x, y, on, a=1.0):
+    """A small on/off switch; on is 0..1."""
+    cv.box(x, y, 44, 22, r=11, fill=lerp_col(DIM, TEAL, on), a=a)
+    cv.circle(x + 11 + 22 * on, y + 11, 8, fill=(255, 255, 255), a=a)
+
+
+def lerp_col(c1, c2, k):
+    return tuple(int(lerp(c1[i], c2[i], k)) for i in range(3))
+
+
+# ---------------- scenes (cs = start time of each caption) ----------------
+def scene_title(cv, t, cs):
     a = ap(t, 0.2, 0.8)
     cv.text(640, 150, "Memev", "b", 104, TEXT, a, "mm")
     cv.box(560, 212, 160 * ap(t, 0.6, 0.8), 4, r=2, fill=TEAL, a=a)
     cv.text(640, 258, "One memory and one team channel, both on computers you own.", "r", 27, MUTED, ap(t, 1.0, 0.8), "mm")
     cv.text(640, 300, "How each tier works, and how the tiers connect", "s", 22, TEAL, ap(t, 1.4, 0.8), "mm")
-    names = [("Free", "one computer", TEAL, False), ("Personal", "up to 3 computers", TEAL, False),
-             ("Team", "2 to 20 people", TEAL, False), ("Business", "coming", AMBER, True),
-             ("Enterprise", "coming", AMBER, True)]
-    x0, w, gap, y = 80, 200, 30, 380
-    for i, (n, s, col, planned) in enumerate(names):
-        t0 = 2.0 + i * 0.55
-        al = ap(t, t0, 0.6)
-        node(cv, x0 + i * (w + gap), y, w, 84, n, s, None, col, al, dash=planned, tsize=22, ssize=16)
-        if i < 4:
-            pts = [(x0 + i * (w + gap) + w, y + 42), (x0 + (i + 1) * (w + gap), y + 42)]
-            flow(cv, pts, t, col, ap(t, t0 + 0.3, 0.5), speed=60, dashed=planned or names[i + 1][3], spacing=20)
-    cv.text(640, 520, "Each tier builds on the one before it.", "r", 20, MUTED, ap(t, 5.2, 0.6), "mm")
+    tiers = [("Personal", "one computer, the free core", TEAL, False), ("Personal", "with more computers", TEAL, False),
+             ("Business", "coming", AMBER, True), ("Corporate", "coming", AMBER, True)]
+    x0, w, gap, y = 40, 270, 40, 390
+    for i, (n, s, col, planned) in enumerate(tiers):
+        al = ap(t, 2.0 + i * 0.55, 0.6)
+        node(cv, x0 + i * (w + gap), y, w, 90, n, s, None, col, al, dash=planned, tsize=24, ssize=17)
+    al = ap(t, 3.2, 0.6)
+    flow(cv, [(x0 + w, y + 45), (x0 + w + gap, y + 45)], t, TEAL, al, speed=60, spacing=20)
+    xw = x0 + 2 * w + 1.5 * gap                      # the wall between personal and work
+    cv.box(xw - 5, y - 14, 10, 118, r=5, fill=PANEL2, outline=AMBER, width=1.6, a=ap(t, 3.6, 0.6))
+    flow(cv, [(x0 + 3 * w + 2 * gap, y + 45), (x0 + 3 * (w + gap), y + 45)], t, AMBER, ap(t, 4.2, 0.6),
+         speed=60, dashed=True, spacing=20)
+    cv.text(640, 530, "Personal and work are separate worlds.", "s", 21, MUTED, ap(t, 5.0, 0.6), "mm")
 
 
-def scene_free(cv, t):
-    cv.box(30, 120, 770, 480, r=18, fill=(14, 23, 41), outline=BORDER, width=1.4, a=ap(t, 0.4))
-    label(cv, 52, 134, "YOUR COMPUTER", ap(t, 0.4))
+def scene_personal(cv, t, cs):
+    c0, c1, c2 = cs
+    cv.box(30, 120, 770, 480, r=18, fill=(14, 23, 41), outline=BORDER, width=1.4, a=ap(t, c0))
+    label(cv, 52, 134, "YOUR COMPUTER", ap(t, c0))
     apps = [("Cursor", 175), ("Codex", 255), ("Gemini CLI", 335)]
-    va = ap(t, 0.8)
-    pulse_v = 0.5 + 0.5 * math.sin(t * 3)
+    va = ap(t, c0 + 0.3)
+    notes_on = c1 + 4.2
     node(cv, 420, 175, 230, 230, "Memev vault", "plain Markdown notes", "vault", TEAL, va,
-         glow=pulse_v * 0.9 if 9.8 < t < 14 else 0, sub2="in ~/memev, kept in git")
+         glow=(0.5 + 0.5 * math.sin(t * 3)) * 0.9 if notes_on < t < notes_on + 3 else 0, sub2="in ~/memev, kept in git")
     cv.chip(535, 372, "Core: Apache-2.0", TEAL, va, 14)
-    if t > 10:
-        for i in range(3):
-            ya = 250 + i * 28
-            k = ap(t, 10.2 + i * 0.5, 0.5)
-            cv.box(444, ya, 192 * 0.0 + 190, 20, r=5, fill=PANEL2, outline=TEAL, width=1.1, a=k)
-            cv.text(454, ya + 10.5, ["a decision, saved", "a fact, saved", "where you left off"][i], "r", 13, TEXT, k, "lm")
+    for i in range(3):
+        ya = 250 + i * 28
+        k = ap(t, notes_on + i * 0.5, 0.5)
+        cv.box(444, ya, 190, 20, r=5, fill=PANEL2, outline=TEAL, width=1.1, a=k)
+        cv.text(454, ya + 10.5, ["a decision, saved", "a fact, saved", "where you left off"][i], "r", 13, TEXT, k, "lm")
     for i, (n, y) in enumerate(apps):
-        al = ap(t, 5.5 + i * 0.25)
+        al = ap(t, c1 + i * 0.25)
         node(cv, 64, y, 190, 58, n, "hooks + MCP", None, TEAL, al, tsize=18, ssize=14)
         yc = y + 29
-        if t > 6.2:
-            f = ap(t, 6.2 + i * 0.2)
+        if t > c1 + 0.7:
+            f = ap(t, c1 + 0.7 + i * 0.2)
             flow(cv, [(254, yc - 6), (420, yc - 6)], t, TEAL, f)
             flow(cv, [(420, yc + 6), (254, yc + 6)], t, MINT, f, phase=20)
-    cv.text(64, 405, "and other AI apps", "r", 15, MUTED, ap(t, 5.9))
-    if t > 6.4:
-        cv.chip(337, 362, "your prompt", TEAL, ap(t, 6.6), 13)
-        cv.chip(337, 390, "matching notes", MINT, ap(t, 6.8), 13)
-    # bus
-    b = ap(t, 14.0)
+    cv.text(64, 405, "and other AI apps", "r", 15, MUTED, ap(t, c1 + 0.4))
+    cv.chip(337, 362, "your prompt", TEAL, ap(t, c1 + 1.2), 13)
+    cv.chip(337, 390, "matching notes", MINT, ap(t, c1 + 1.5), 13)
+    b = ap(t, c1 + 5.5)
     if b > 0:
         cv.box(90, 478, 610, 46, r=12, fill=PANEL2, outline=TEAL, width=1.7, a=b)
         cv.text(110, 501, "Comms bus", "b", 18, TEXT, b, "lm")
@@ -424,8 +451,7 @@ def scene_free(cv, t):
             flow(cv, p, t, TEAL, b, speed=70, rev=True, phase=y + 30, base=False)
         flow(cv, [(535, 478), (535, 405)], t, TEAL, b, speed=60)
         flow(cv, [(535, 405), (535, 478)], t, MINT, b, speed=60, base=False, phase=15)
-    # github
-    g = ap(t, 17.2)
+    g = ap(t, c2)
     if g > 0:
         node(cv, 910, 215, 300, 150, "Your private", "GitHub repository", "repo", TEAL, g, tsize=20, sub2="backup and history")
         cv.chip(1060, 346, "you own it", TEAL, g, 13)
@@ -433,249 +459,334 @@ def scene_free(cv, t):
         cv.chip(780, 262, "backup every few minutes", TEAL, g, 13)
 
 
-def scene_personal(cv, t):
-    A = ap(t, 0.4)
+def scene_more(cv, t, cs):
+    c0, c1, c2 = cs
+    A = ap(t, c0)
     cv.box(30, 122, 360, 320, r=18, fill=(14, 23, 41), outline=BORDER, width=1.4, a=A)
-    label(cv, 50, 136, "COMPUTER 1: THE VAULT'S OWN", A)
-    node(cv, 56, 168, 308, 100, "Memev vault", "the Free core", "vault", TEAL, A, sub2="one memory, one comms bus")
-    node(cv, 56, 332, 308, 80, "Local AI apps", "unlimited, as in Free", "apps", TEAL, A)
+    label(cv, 50, 136, "COMPUTER 1", A)
+    node(cv, 56, 168, 308, 100, "Personal vault", "the same vault, on every computer", "vault", TEAL, A, sub2="one memory, one comms bus", ssize=14)
+    node(cv, 56, 332, 308, 80, "Local AI apps", "as in Personal", "apps", TEAL, A)
     flow(cv, [(210, 268), (210, 332)], t, TEAL, A, speed=60)
     flow(cv, [(210, 332), (210, 268)], t, MINT, A, speed=60, base=False, phase=15)
-    # link
-    lk = ap(t, 4.8)
-    node(cv, 520, 190, 220, 80, "Secure link", "optional", "link", TEAL, lk, tsize=19)
-    flow(cv, [(364, 230), (520, 230)], t, TEAL, lk)
-    flow(cv, [(520, 240), (364, 240)], t, MINT, lk, base=False, phase=10)
-    # other computers
-    for i, (x, nm) in enumerate([(836, "Computer 2"), (1040, "Computer 3")]):
-        al = ap(t, 5.2 + i * 0.5)
+    sw_on = ap(t, c1 + 6.2, 0.5)                    # the person switches the secure link on
+    lk = ap(t, c1 + 3.8)
+    node(cv, 520, 190, 220, 80, "Secure link", "off until you switch it on" if sw_on < 0.5 else "switched on by you", "link", TEAL if sw_on > 0.5 else DIM,
+         lk, dash=sw_on < 0.5, tsize=19, ssize=14)
+    toggle(cv, 690, 200, sw_on, lk)
+    for i, (x, nm) in enumerate([(816, "Computer 2"), (1030, "Computer 3")]):
+        al = ap(t, c1 + i * 0.5)
         node(cv, x, 340, 200, 88, nm, "its own key", "computer", TEAL, al, sub2="signs each request")
-        flow(cv, [(630, 270), (630, 312), (x + 100, 312), (x + 100, 340)], t, TEAL, al, speed=80, phase=i * 30)
-        flow(cv, [(x + 100, 340), (x + 100, 312), (630, 312), (630, 270)], t, MINT, al, speed=80, base=False, phase=40 + i * 30)
-    if t > 6:
-        cv.chip(740, 312, "signed with that computer's key", AMBER, ap(t, 6.4), 13)
-    # cloud
-    cl = ap(t, 9.2)
-    node(cv, 900, 180, 320, 100, "Cloud AI apps", "ChatGPT and other web AI apps", "cloud", TEAL, cl, sub2="up to 10 connectors")
-    flow(cv, [(740, 220), (900, 220)], t, TEAL, cl)
-    flow(cv, [(900, 240), (740, 240)], t, MINT, cl, base=False, phase=30)
-    cv.chip(820, 200, "you can switch it off", TEAL, cl, 12)
-    # relay
-    r = ap(t, 12.8)
+        fa = min(al, sw_on)
+        flow(cv, [(630, 270), (630, 312), (x + 100, 312), (x + 100, 340)], t, TEAL, fa, speed=80, phase=i * 30)
+        flow(cv, [(x + 100, 340), (x + 100, 312), (630, 312), (630, 270)], t, MINT, fa, speed=80, base=False, phase=40 + i * 30)
+        if sw_on < 1:
+            cv.dashed([(630, 270), (630, 312), (x + 100, 312), (x + 100, 340)], DIM, 1.4, 0.7 * al * (1 - sw_on), 6, 6)
+    cl = ap(t, c1 + 3.8)
+    node(cv, 900, 180, 320, 100, "Cloud AI apps", "ChatGPT and other web AI apps", "cloud", TEAL, cl)
+    flow(cv, [(364, 230), (520, 230)], t, TEAL, min(lk, sw_on))
+    flow(cv, [(520, 240), (364, 240)], t, MINT, min(lk, sw_on), base=False, phase=10)
+    flow(cv, [(740, 220), (900, 220)], t, TEAL, min(cl, sw_on))
+    flow(cv, [(900, 240), (740, 240)], t, MINT, min(cl, sw_on), base=False, phase=30)
+    if sw_on < 1:
+        cv.dashed([(364, 235), (520, 235)], DIM, 1.4, 0.7 * lk * (1 - sw_on), 6, 6)
+        cv.dashed([(740, 230), (900, 230)], DIM, 1.4, 0.7 * cl * (1 - sw_on), 6, 6)
+    if t > c1 + 6.2:
+        cv.chip(820, 200, "you can switch it off again", TEAL, ap(t, c1 + 6.6), 12)
+    if t > c1 + 5.4:
+        cv.chip(740, 312, "signed with that computer's key", AMBER, ap(t, c1 + 5.6) * (1 if t > c1 + 6.2 else 0.9), 13)
+    r = ap(t, c2)
     node(cv, 440, 470, 430, 96, "Relay (optional)", "a stable address for the vault", "server", AMBER, r, dash=True,
          sub2="it only forwards bytes it cannot read")
     if r > 0:
         cv.dashed([(580, 270), (580, 470)], AMBER, 1.6, 0.5 * r, 7, 6)
-        cv.chip(1040, 518, "hosted relay, sync and backup: planned", AMBER, ap(t, 15.9), 14, filled=False)
+        cv.chip(1040, 518, "hosted relay and sync: planned", AMBER, ap(t, c2 + 3.0), 14)
 
 
-def scene_team(cv, t):
-    a0 = ap(t, 0.4)
-    node(cv, 50, 200, 240, 100, "Your computer", "your AI apps", "computer", TEAL, a0, sub2="and the vault owner")
-    node(cv, 440, 170, 290, 130, "Shared vault", "one memory for the team", "vault", TEAL, a0,
-         sub2="reached over the secure link", glow=(0.5 + 0.5 * math.sin(t * 3)) * 0.8 if 18.0 < t < 21 else 0)
-    flow(cv, [(290, 240), (440, 240)], t, TEAL, a0)
-    flow(cv, [(440, 255), (290, 255)], t, MINT, a0, base=False, phase=20)
-    pv = ap(t, 18.4)
-    if pv > 0:
-        cv.chip(585, 322, "provenance: who wrote each memory", TEAL, pv, 13)
-    lc = ap(t, 4.6)
-    node(cv, 50, 440, 400, 110, "Counted per person", "3 computers each, pooled", "person", TEAL, lc,
-         sub2="past the count, the next one is refused")
-    # the invite command
-    tm = ap(t, 8.6)
-    if tm > 0:
-        cv.box(440, 104, 470, 42, r=10, fill=(6, 10, 20), outline=BORDER, width=1.4, a=tm)
-        cmd = "$ memev invite --teammate <name>"
-        if t > 15.4:
-            cmd += " --full"
-        cv.text(456, 125, cmd, "m", 17, TEAL, tm, "lm")
-    # bus rail
-    br = ap(t, 12.2)
-    if br > 0:
-        cv.box(844, 190, 14, 185, r=7, fill=PANEL2, outline=TEAL, width=1.6, a=br)
-        cv.chip(851, 165, "Team comms bus", TEAL, br, 13)
-    # teammates
-    for i, (y, nm) in enumerate([(180, "Teammate"), (310, "Another teammate")]):
-        al = ap(t, 9.6 + i * 3.0)
-        node(cv, 940, y, 300, 100, nm, "seats: <app>@<name>-<machine>", "person", TEAL, al, sub2="joined by invite",
-             tsize=19, ssize=13)
-    if tm > 0 and t > 9.0:
-        flow(cv, [(910, 125), (1090, 125), (1090, 180)], t, AMBER, ap(t, 9.2), speed=90, spacing=40)
-        cv.chip(1000, 125, "one-time invite", AMBER, ap(t, 9.6), 12)
-    if br > 0:
-        flow(cv, [(730, 225), (940, 225)], t, TEAL, br)
-        flow(cv, [(940, 237), (730, 237)], t, MINT, br, base=False, phase=25)
-        b2 = ap(t, 12.8)
-        flow(cv, [(851, 345), (940, 345)], t, TEAL, b2, speed=80)
-        flow(cv, [(940, 357), (851, 357)], t, MINT, b2, base=False, phase=30)
-        cv.chip(790, 231, "bus only by default", TEAL, br, 12)
-        fl = ap(t, 13.4)
-        node(cv, 440, 350, 290, 80, "Shared folder", "optional, you pick what is in it", "folder", MINT, fl, tsize=18, ssize=14)
-        flow(cv, [(585, 300), (585, 350)], t, MINT, fl, speed=50, spacing=25)
-        flow(cv, [(730, 415), (900, 415), (900, 405), (940, 405)], t, MINT, fl, dashed=True)
-        flow(cv, [(900, 415), (900, 265), (940, 265)], t, MINT, fl, dashed=True, phase=10)
-    fu = ap(t, 15.6)
-    if fu > 0:
-        flow(cv, [(730, 197), (940, 197)], t, AMBER, fu, speed=100, dashed=True)
-        cv.chip(790, 197, "--full: whole vault", AMBER, fu, 12, mono=True)
+def scene_boundary(cv, t, cs):
+    c0, c1 = cs
+    z = ap(t, c0)
+    cv.box(30, 130, 520, 440, r=18, fill=(14, 23, 41), outline=TEAL, width=1.4, a=z)
+    label(cv, 52, 144, "PERSONAL OR HOME", z, TEAL)
+    node(cv, 70, 200, 300, 100, "Personal vault", "yours, on your computers", "vault", TEAL, z)
+    node(cv, 70, 360, 300, 80, "Your AI apps", "personal accounts", "apps", TEAL, z)
+    flow(cv, [(220, 360), (220, 300)], t, TEAL, z, speed=60)
+    cv.box(730, 130, 520, 440, r=18, fill=(14, 23, 41), outline=AMBER, width=1.4, a=z, dash=True)
+    label(cv, 752, 144, "BUSINESS OR CORPORATE", z, AMBER)
+    cv.chip(1130, 148, "COMING", AMBER, z, 13, filled=True)
+    node(cv, 880, 200, 330, 100, "Work vault", "company-owned", "vault", AMBER, z, dash=True)
+    node(cv, 880, 360, 330, 80, "Company vault", "company-owned", "hub", AMBER, z, dash=True)
+    w = ap(t, c0 + 1.5, 0.8)
+    cv.box(618, 130, 24, 440, r=10, fill=PANEL2, outline=AMBER, width=1.8, a=w)
+    for yy in range(150, 560, 22):
+        cv.line([(622, yy), (638, yy + 12)], AMBER, 1.2, 0.35 * w)
+    cv.chip(630, 112, "hard boundary", AMBER, w, 14, filled=True)
+    f = ap(t, c0 + 2.5)
+    for yy in (250, 400):
+        flow(cv, [(370, yy), (600, yy)], t, TEAL, f, speed=90)
+        flow(cv, [(880, yy), (660, yy)], t, AMBER, f, speed=90, rev=False, phase=40)
+    cv.chip(630, 590, "no grant, no release, no live query", AMBER, ap(t, c0 + 4.0), 14)
+    k = ap(t, c1)
+    for x, col in ((310, TEAL), (1040, AMBER)):
+        cv.chip(x, 500, "own identity", col, k, 14)
+        cv.chip(x + 0, 534, "own keys", col, k, 14)
+    cv.chip(630, 555, "", AMBER, 0.0)
 
 
-def scene_coming(cv, t):
-    for (x, title, sub, items, t0) in [
-        (50, "Business", "from 10 people", ["Company hub on your server", "Departments and roles from an org chart",
-                                            "Sign-in with Google or Microsoft", "Restricted notes for a local model"], 0.4),
-        (680, "Enterprise", "larger or regulated organisations", ["Your data centre or private cloud", "Air-gapped option, high availability",
-                                                 "SIEM and audit export, retention, legal hold"], 4.4)]:
-        al = ap(t, t0)
-        cv.box(x, 140, 550, 340, r=18, fill=(14, 23, 41), outline=AMBER, width=1.6, a=al, dash=True)
-        cv.text(x + 26, 160, title, "b", 30, TEXT, al)
-        cv.text(x + 26, 202, sub, "r", 18, MUTED, al)
-        cv.chip(x + 480, 178, "COMING", AMBER, al * (0.75 + 0.25 * math.sin(t * 3)), 14, filled=True)
-        for i, it in enumerate(items):
-            ia = ap(t, t0 + 0.6 + i * 0.35)
-            y = 255 + i * 52
-            cv.circle(x + 36, y + 12, 5, outline=AMBER, width=1.6, a=ia)
-            cv.text(x + 56, y + 12, it, "r", 21, TEXT, ia, "lm")
-    cv.dashed([(600, 310), (680, 310)], AMBER, 1.8, 0.7 * ap(t, 4.6), 7, 6)
-    cv.text(640, 520, "Planned, not built. Priced on your requirements: contact us.", "s", 20, AMBER, ap(t, 8.4), "mm")
+def scene_business(cv, t, cs):
+    c0, c1, c2 = cs
+    cv.chip(1150, 150, "COMING", AMBER, ap(t, c0), 15, filled=True)
+    for i, (y, nm) in enumerate([(200, "Member A"), (360, "Member B")]):
+        al = ap(t, c0 + i * 0.4)
+        node(cv, 40, y, 230, 100, nm, "AI apps and a computer", "person", TEAL, al, sub2="their own work login", ssize=14)
+        node(cv, 360, y, 250, 100, "Work vault", "company-owned", "vault", AMBER, ap(t, c0 + 0.8 + i * 0.4), dash=True, ssize=14, sub2="one per member")
+        flow(cv, [(270, y + 40), (360, y + 40)], t, TEAL, ap(t, c0 + 1.4), speed=70, spacing=40)
+        flow(cv, [(360, y + 60), (270, y + 60)], t, MINT, ap(t, c0 + 1.4), speed=70, spacing=40, base=False, phase=10)
+    cvl = ap(t, c0 + 3.4)
+    node(cv, 800, 240, 280, 180, "Company vault", "shared, company-owned", "hub", AMBER, cvl, dash=True,
+         glow=(0.5 + 0.5 * math.sin(t * 3)) * 0.8 if c1 + 3 < t < c1 + 6 else 0)
+    up = ap(t, c1)
+    dn = ap(t, c1 + 3.2)
+    flow(cv, [(610, 225), (740, 225), (740, 270), (800, 270)], t, TEAL, up, speed=90, spacing=40)
+    flow(cv, [(800, 300), (680, 300), (680, 255), (610, 255)], t, MINT, dn, speed=90, spacing=40)
+    flow(cv, [(610, 435), (740, 435), (740, 390), (800, 390)], t, TEAL, up, speed=90, spacing=40)
+    flow(cv, [(800, 360), (680, 360), (680, 405), (610, 405)], t, MINT, dn, speed=90, spacing=40)
+    cv.chip(675, 225, "promote or share", TEAL, up, 13)
+    cv.chip(740, 300, "company knowledge", MINT, dn, 13)
+    s = ap(t, c2)
+    if s > 0:
+        cv.text(640, 510, "AN INVITE GIVES", "s", 13, MUTED, s, "mm")
+        for i, (txt, col, mono) in enumerate([("the team bus, by default", TEAL, False),
+                                              ("an optional shared folder", MINT, False),
+                                              ("--full: full vault access, only if asked", AMBER, True)]):
+            a = ap(t, c2 + 0.5 + i * 1.2)
+            x = [250, 640, 1030][i]
+            cv.chip(x, 548, txt, col, a, 15, mono=mono and False)
 
 
-def scene_engine(cv, t):
-    A = ap(t, 0.4)
-    cv.box(40, 140, 560, 380, r=18, fill=(14, 23, 41), outline=BORDER, width=1.4, a=A)
-    label(cv, 62, 156, "MEMEV CORE: THIS REPOSITORY", A)
-    node(cv, 70, 200, 260, 110, "Memev core", "vault, recall, bus", "vault", TEAL, A, sub2="hooks and MCP clients")
-    cv.chip(500, 158, "Apache-2.0", TEAL, A, 14)
-    flow(cv, [(170, 390), (170, 310)], t, TEAL, A, speed=60, spacing=30)
-    flow(cv, [(230, 310), (230, 390)], t, MINT, A, speed=60, spacing=30, base=False, phase=12)
-    node(cv, 70, 390, 260, 96, "AI apps", "any app with hooks or MCP", "apps", TEAL, A, ssize=14)
-    flow(cv, [(200, 390), (200, 372)], t, TEAL, 0.0)
-    e = ap(t, 3.4)
-    node(cv, 810, 215, 400, 130, "Convergence engine", "separate component, paid", "chip", AMBER, e, dash=True,
-         sub2="under its own licence", glow=(0.5 + 0.5 * math.sin(t * 3)) * 0.7 if 3.4 < t < 9 else 0, tsize=22, ssize=16)
-    cv.dashed([(700, 120), (700, 540)], AMBER, 1.6, 0.6 * e, 8, 7)
-    cv.text(700, 560, "outside this repository", "s", 15, AMBER, e, "mm")
+def scene_corporate(cv, t, cs):
+    c0, c1 = cs
+    cv.chip(1150, 150, "COMING", AMBER, ap(t, c0), 15, filled=True)
+    node(cv, 400, 130, 480, 90, "Company vault", "shared, company-owned", "hub", AMBER, ap(t, c0), dash=True)
+    scopes = [(60, "Department A", "a scope: its members and their work vaults"), (470, "Department B", "a scope: its members and their work vaults"),
+              (880, "Project X", "a scope: the people put on the project")]
+    for i, (x, nm, sub) in enumerate(scopes):
+        al = ap(t, c0 + 1.2 + i * 0.6)
+        node(cv, x, 310, 340, 100, nm, sub, "folder", AMBER, al, dash=True, ssize=14)
+        cx = x + 170
+        pts = {0: [(520, 220), (520, 265), (cx, 265), (cx, 310)], 1: [(640, 220), (640, 310)],
+               2: [(760, 220), (760, 265), (cx, 265), (cx, 310)]}[i]
+        flow(cv, pts, t, MINT, al, speed=80, spacing=40)
+        flow(cv, list(reversed(pts)), t, TEAL, al, speed=80, base=False, phase=30, spacing=40)
+    cv.chip(640, 268, "scopes", AMBER, ap(t, c0 + 2.0), 13)
+    p = ap(t, c1)
+    node(cv, 40, 130, 320, 90, "Sign-in provisioning", "adds and removes members", "person", AMBER, p, dash=True, ssize=14)
+    flow(cv, [(200, 220), (200, 310)], t, TEAL, p, speed=70, dashed=True)
+    node(cv, 920, 130, 320, 90, "Audit and retention", "every step on record", "server", AMBER, ap(t, c1 + 1.6), dash=True, ssize=14)
+    flow(cv, [(920, 175), (880, 175)], t, AMBER, ap(t, c1 + 1.8), speed=40, dashed=True, spacing=20)
+    b = ap(t, c1 + 2.6)
+    if b > 0:
+        cv.box(60, 470, 1160, 48, r=12, fill=PANEL2, outline=AMBER, width=1.5, a=b, dash=True)
+        cv.text(84, 494, "Audit log", "b", 18, TEXT, b, "lm")
+        cv.text(190, 494, "who read, wrote, promoted and left, kept under the company's own retention", "r", 15, MUTED, b, "lm")
+        flow(cv, [(60, 540), (1220, 540)], t, AMBER, b * 0.9, speed=60, spacing=90, base=False)
+
+
+def scene_leavers(cv, t, cs):
+    c0, c1 = cs
+    cv.chip(1150, 150, "COMING", AMBER, ap(t, c0), 15, filled=True)
+    m = ap(t, c0)
+    node(cv, 50, 220, 270, 120, "Member leaves", "their work login ends", "person", TEAL, m, sub2="at the company's request")
+    chips = [("Access ended", c0 + 1.6), ("Keys revoked", c0 + 3.4), ("Devices removed", c0 + 5.2), ("Local cache wiped", c0 + 7.0)]
+    pa = ap(t, c0 + 0.6)
+    cv.box(430, 150, 400, 340, r=16, fill=PANEL, outline=AMBER, width=1.6, a=pa)
+    cv.text(456, 178, "Offboarding", "b", 22, TEXT, pa, "lm")
+    for i, (txt, tt) in enumerate(chips):
+        y = 232 + i * 64
+        ia = ap(t, c0 + 0.9 + i * 0.2)
+        cv.circle(472, y, 11, outline=DIM, width=1.6, a=ia)
+        k = ap(t, tt, 0.4)
+        tick(cv, 472, y, k, TEAL)
+        cv.text(498, y - (6 if i == 3 else 0), txt, "s", 21, TEXT if k > 0.5 else MUTED, ia, "lm")
+    cv.text(498, 232 + 3 * 64 + 17, "when that computer next starts or connects", "r", 14, MUTED, ap(t, c0 + 7.0), "lm")
+    done = ap(t, c0 + 7.4, 0.6)
+    flow(cv, [(320, 280), (430, 280)], t, TEAL, m * (1 - done), speed=70, spacing=40)
+    if done > 0:
+        cv.dashed([(320, 280), (430, 280)], DIM, 1.6, 0.8 * done, 6, 6)
+        cv.chip(375, 252, "ended", AMBER, done, 14, filled=True)
+    v = ap(t, c1)
+    node(cv, 930, 220, 300, 120, "Work vault", "stays with the company", "vault", AMBER, v, dash=True,
+         glow=(0.5 + 0.5 * math.sin(t * 3)) * 0.8 if v > 0.9 else 0, sub2="company-owned and kept")
+    flow(cv, [(830, 280), (930, 280)], t, MINT, v, speed=50, spacing=30, dashed=True)
+    cv.chip(1080, 372, "no vault access leaves", TEAL, ap(t, c1 + 1.8), 14)
+
+
+def doc(cv, x, y, w, h, a, lines, color=TEAL, title="Shared note"):
+    cv.box(x, y, w, h, r=12, fill=PANEL, outline=color, width=1.7, a=a)
+    cv.text(x + 16, y + 18, title, "b", 17, TEXT, a, "lm")
+    for i, (txt, col) in enumerate(lines):
+        yy = y + 46 + i * 28
+        cv.box(x + 14, yy, w - 28, 22, r=5, fill=PANEL2, outline=col, width=1.1, a=a)
+        cv.text(x + 24, yy + 11.5, txt, "r", 13, TEXT, a, "lm")
+
+
+def scene_engine(cv, t, cs):
+    c0, c1, c2, c3 = cs
+    a0 = ap(t, c0)
+    merged = ap(t, c1 + 3.0, 0.6)
+    mode_a = ap(t, c0)
+    cv.chip(640, 140, "WITHOUT THE ENGINE" if t < c1 else "WITH THE PAID ENGINE", MUTED if t < c1 else TEAL, mode_a, 14,
+            filled=t >= c1)
+    node(cv, 60, 230, 250, 100, "Computer 1", "edits the note", "computer", TEAL, a0)
+    node(cv, 970, 230, 250, 100, "Computer 2", "or a teammate, at once", "person", TEAL, a0)
+    conflict = ap(t, c0 + 4.0) * (1 - ap(t, c1 - 0.2, 0.4))
+    lines_c = [("A adds a line on the launch", TEAL), ("B adds a line on the budget", MINT)] if merged < 0.5 else [("A adds a line on the launch", TEAL), ("B adds a line on the budget", MINT), ("one note with both changes", TEAL)]
+    doc(cv, 500, 190, 280, 150 if merged < 0.5 else 150, a0, lines_c, color=TEAL if merged > 0.5 else (AMBER if conflict > 0.3 else TEAL))
+    ea = ap(t, c0 + 1.0) * (1 - ap(t, c1 + 3.0, 0.6) * 0)
+    flow(cv, [(310, 270), (500, 270)], t, TEAL, ea, speed=95)
+    flow(cv, [(970, 270), (780, 270)], t, MINT, ea, speed=95)
+    if conflict > 0.01:
+        cv.chip(640, 168, "conflict: fix by hand", AMBER, conflict, 14, filled=True)
+    node(cv, 60, 450, 380, 100, "Free core: git backup", "one writer; a failed merge is left as it is", "repo", TEAL, ap(t, c0 + 2.5) * (0.45 if t >= c1 else 1.0),
+         ssize=14, sub2="run memev doctor")
+    # the engine
+    e = ap(t, c1)
+    node(cv, 500, 450, 380, 100, "Paid engine", "merges every change", "chip", AMBER, e, dash=True, glow=(0.5 + 0.5 * math.sin(t * 3)) * 0.7 if c1 < t < c1 + 6 else 0, sub2="nothing lost, no conflicts", ssize=15)
     if e > 0:
-        flow(cv, [(330, 245), (810, 245)], t, AMBER, ap(t, 4.4), speed=130, spacing=80)
-        flow(cv, [(810, 305), (330, 305)], t, MINT, ap(t, 4.4), speed=130, spacing=80, phase=50)
-        cv.chip(520, 245, "Memev calls it", AMBER, ap(t, 4.8), 14)
-        cv.chip(520, 305, "answer comes back", MINT, ap(t, 5.2), 14)
+        fa = ap(t, c1 + 0.8)
+        flow(cv, [(630, 340), (630, 450)], t, AMBER, fa, speed=70, spacing=40)
+        flow(cv, [(650, 450), (650, 340)], t, MINT, ap(t, c1 + 2.5), speed=70, spacing=40, base=False, phase=20)
+        cv.chip(540, 395, "Memev calls it", AMBER, fa, 13)
+        cv.chip(740, 395, "merged note comes back", MINT, ap(t, c1 + 2.5), 13)
+        back = ap(t, c1 + 4.0)
+        flow(cv, [(500, 300), (310, 300)], t, MINT, back, speed=95)
+        flow(cv, [(780, 300), (970, 300)], t, MINT, back, speed=95)
+        cv.chip(640, 360 + 0, "", AMBER, 0.0)
+        if back > 0.5:
+            tick(cv, 640, 168, ap(t, c1 + 4.2))
+            cv.text(662, 168, "nothing lost", "s", 15, TEAL, ap(t, c1 + 4.2), "lm")
+    fit = ap(t, c2)
+    if fit > 0:
+        cv.text(1050, 428, "WHERE IT FITS", "s", 13, MUTED, fit, "mm")
+        for i, (nm, col, dash) in enumerate([("Personal with more computers", TEAL, False), ("Business (coming)", AMBER, True), ("Corporate (coming)", AMBER, True)]):
+            a = ap(t, c2 + 0.6 + i * 0.9)
+            y = 450 + i * 46
+            cv.box(920, y, 320, 38, r=10, fill=PANEL, outline=col, width=1.5, a=a, dash=dash)
+            cv.text(938, y + 19.5, nm, "s", 16, TEXT, a, "lm")
+            flow(cv, [(880, 500), (900, 500), (900, y + 19), (920, y + 19)], t, AMBER, a, speed=60, spacing=24, dashed=True)
+    sep = ap(t, c3)
+    if sep > 0:
+        cv.box(488, 440, 404, 120, r=14, outline=AMBER, width=1.3, a=0.0)
+        cv.dashed([(470, 425), (470, 575)], AMBER, 1.5, 0.7 * sep, 8, 7)
+        cv.chip(240, 595, "separate component, its own licence, not in this repository", AMBER, sep, 14)
 
 
-COMB = [  # layer, reveal time, caption window start, end
-    ("free", 0.4, 0.5, 4.8), ("personal", 4.9, 5.0, 9.0), ("team", 9.2, 9.3, 13.8),
-    ("engine", 14.0, 14.1, 18.0), ("coming", 18.2, 18.3, 21.4)]
+def scene_combined(cv, t, cs):
+    c0, c1, c2 = cs
+    # personal zone
+    z = ap(t, c0)
+    more = ap(t, c0 + 3.6)
+    cv.box(20, 128, 672, 468, r=18, fill=(14, 23, 41), outline=BORDER, width=1.4, a=z)
+    label(cv, 40, 142, "PERSONAL", z, TEAL)
+    node(cv, 36, 170, 160, 90, "AI apps", "hooks + MCP", None, TEAL, z, tsize=18, ssize=14)
+    node(cv, 270, 170, 190, 110, "Personal vault", "plain Markdown", None, TEAL, z, ssize=14, sub2="and the comms bus", tsize=18)
+    node(cv, 524, 170, 150, 90, "GitHub", "your own backup", None, TEAL, z, tsize=18, ssize=14)
+    flow(cv, [(196, 205), (270, 205)], t, TEAL, z, speed=70, spacing=40)
+    flow(cv, [(270, 225), (196, 225)], t, MINT, z, speed=70, spacing=40, base=False, phase=10)
+    flow(cv, [(460, 225), (524, 225)], t, TEAL, z, speed=70, spacing=40)
+    node(cv, 270, 350, 190, 90, "More computers", "same vault, own keys", None, TEAL, more, tsize=18, ssize=14)
+    flow(cv, [(365, 350), (365, 280)], t, TEAL, more, speed=60, spacing=30)
+    flow(cv, [(385, 280), (385, 350)], t, MINT, more, speed=60, spacing=30, base=False, phase=15)
+    node(cv, 36, 350, 160, 90, "Cloud AI apps", "ChatGPT and more", None, TEAL, more, dash=True, tsize=18, ssize=14)
+    cv.dashed([(196, 395), (270, 395)], DIM, 1.5, 0.8 * more, 6, 6)
+    cv.chip(233, 462, "secure link: off until you switch it on", TEAL, more, 12)
+    # wall and business zone
+    w = ap(t, c1)
+    cv.box(708, 128, 18, 372, r=9, fill=PANEL2, outline=AMBER, width=1.8, a=w)
+    cv.chip(717, 112, "hard boundary", AMBER, w, 13, filled=True)
+    cv.box(742, 128, 514, 468, r=18, fill=(14, 23, 41), outline=AMBER, width=1.4, a=w, dash=True)
+    label(cv, 762, 142, "BUSINESS AND CORPORATE", w, AMBER)
+    cv.chip(1190, 146, "COMING", AMBER, w, 12, filled=True)
+    b = ap(t, c2)
+    node(cv, 762, 175, 200, 90, "Work vaults", "one per member", None, AMBER, b, dash=True, tsize=18, ssize=14)
+    node(cv, 1030, 175, 206, 110, "Company vault", "shared, company-owned", None, AMBER, b, dash=True, tsize=18, ssize=14)
+    flow(cv, [(962, 205), (1030, 205)], t, TEAL, b, speed=60, spacing=30)
+    flow(cv, [(1030, 235), (962, 235)], t, MINT, b, speed=60, spacing=30, base=False, phase=10)
+    cv.chip(996, 190, "promote", TEAL, b, 11)
+    for i, (txt) in enumerate(["Corporate: departments, projects, provisioning", "audit and retention", "Leavers: access, keys and devices revoked,", "cache wiped, work vault stays"]):
+        cv.text(766, 335 + i * 26, ("- " if i in (1, 3) else "") + txt if False else txt, "r", 15, MUTED, ap(t, c2 + 1.0 + i * 0.5), "lm")
+    # the engine
+    e = ap(t, c2 + 3.6)
+    node(cv, 400, 510, 480, 80, "Paid engine", "separate component, own licence, called by Memev", "chip", AMBER, e, dash=True, tsize=18, ssize=14,
+         glow=(0.5 + 0.5 * math.sin(t * 3)) * 0.6 if e > 0.9 else 0)
+    flow(cv, [(400, 550), (365, 550), (365, 440)], t, AMBER, e, speed=70, spacing=40)
+    flow(cv, [(880, 550), (1133, 550), (1133, 285)], t, AMBER, e, speed=70, spacing=40)
+    cv.chip(640, 492, "merges edits from several computers and people", AMBER, e, 12)
 
 
-def scene_combined(cv, t):
-    def lay(name):
-        for (n, rv, c0, c1) in COMB:
-            if n == name:
-                a = ap(t, rv, 0.7)
-                focus = ap(t, c0, 0.3) * (1 - ap(t, c1, 0.4)) if t < 21.6 else 0
-                fin = ap(t, 21.6, 0.5)
-                return a * (0.62 + 0.38 * max(focus, fin)) if a > 0 else 0, focus
-    A, fa = lay("free")
-    cv.box(24, 124, 546, 330, r=18, fill=(14, 23, 41), outline=BORDER, width=1.4, a=A)
-    label(cv, 44, 138, "YOUR COMPUTER", A)
-    node(cv, 44, 170, 180, 110, "AI apps", "hooks + MCP", "apps", TEAL, A, glow=fa * 0.8)
-    node(cv, 300, 170, 240, 150, "Vault", "plain Markdown notes", "vault", TEAL, A, glow=fa * 0.8, sub2="Apache-2.0 core")
-    cv.box(44, 392, 496, 44, r=12, fill=PANEL2, outline=TEAL, width=1.6, a=A)
-    cv.text(62, 414, "Comms bus", "b", 17, TEXT, A, "lm")
-    cv.text(180, 414, "every app has a seat", "r", 14, MUTED, A, "lm")
-    flow(cv, [(224, 220), (300, 220)], t, TEAL, A, speed=70, spacing=50)
-    flow(cv, [(300, 232), (224, 232)], t, MINT, A, speed=70, spacing=50, base=False, phase=10)
-    flow(cv, [(134, 280), (134, 392)], t, TEAL, A, speed=70)
-    flow(cv, [(420, 320), (420, 392)], t, MINT, A, speed=70)
-    # github
-    node(cv, 620, 128, 260, 80, "Your private GitHub", "backup and history", "repo", TEAL, A, tsize=18, ssize=14)
-    flow(cv, [(540, 190), (580, 190), (580, 168), (620, 168)], t, TEAL, A, speed=70, spacing=30)
-    # personal
-    P, fp = lay("personal")
-    node(cv, 620, 244, 260, 80, "Secure link", "optional, or a relay", "link", TEAL, P, glow=fp * 0.8, tsize=18, ssize=14)
-    node(cv, 940, 128, 300, 70, "Cloud AI apps", "web AI apps", "cloud", TEAL, P, glow=fp * 0.8, tsize=18, ssize=14)
-    node(cv, 940, 214, 300, 70, "Your other computers", "up to 3, each with its own key", "computer", TEAL, P, glow=fp * 0.8, tsize=18, ssize=14)
-    flow(cv, [(540, 260), (580, 260), (580, 284), (620, 284)], t, TEAL, P, speed=70, spacing=30)
-    flow(cv, [(880, 284), (910, 284), (910, 163), (940, 163)], t, TEAL, P, speed=80)
-    flow(cv, [(880, 284), (910, 284), (910, 249), (940, 249)], t, TEAL, P, speed=80, phase=20)
-    # team
-    T_, ft = lay("team")
-    node(cv, 940, 308, 300, 80, "Teammates", "bus by default, --full for the vault", "person", TEAL, T_, glow=ft * 0.8, tsize=18, ssize=14)
-    flow(cv, [(880, 296), (910, 296), (910, 348), (940, 348)], t, TEAL, T_, speed=80)
-    flow(cv, [(940, 372), (540, 372)], t, MINT, T_, speed=110, phase=0, spacing=70)
-    flow(cv, [(540, 380), (940, 380)], t, TEAL, T_, speed=110, base=False, spacing=70, phase=30)
-    cv.chip(740, 350, "teammates reach the bus", TEAL, T_, 12)
-    # engine
-    E, fe = lay("engine")
-    node(cv, 940, 456, 300, 90, "Convergence engine", "separate, paid, own licence", "chip", AMBER, E, dash=True, glow=fe * 0.8, tsize=18, ssize=14)
-    flow(cv, [(540, 312), (600, 312), (600, 500), (940, 500)], t, AMBER, E, speed=110, spacing=60)
-    flow(cv, [(940, 516), (620, 516), (620, 330), (540, 330)], t, MINT, E, speed=110, spacing=60, base=False, phase=30)
-    cv.dashed([(790, 440), (790, 560)], AMBER, 1.4, 0.0, 8, 7)
-    cv.chip(770, 480, "called by Memev", AMBER, E, 12)
-    cv.text(1090, 566, "outside this repository", "s", 13, AMBER, E, "mm")
-    # coming
-    C, fc_ = lay("coming")
-    node(cv, 44, 480, 496, 90, "Business and Enterprise", "company hub, roles, sign-in, your data centre", "hub", AMBER, C, dash=True, glow=fc_ * 0.8, tsize=18, ssize=14)
-    cv.chip(470, 498, "COMING", AMBER, C, 13, filled=True)
-    cv.dashed([(300, 480), (300, 436)], AMBER, 1.6, 0.7 * C, 7, 6)
-
-
-def end_card(cv, t):
-    a = ap(t, 21.8, 0.7)
-    if a <= 0:
-        return
-    cv.box(0, 0, W, H, r=0, fill=BG1, a=0.97 * a)
+def end_card(cv, t, cs):
+    a = ap(t, 0.3, 0.7)
     cv.text(640, 250, "Memev", "b", 104, TEXT, a, "mm")
     cv.box(560, 312, 160, 4, r=2, fill=TEAL, a=a)
-    cv.text(640, 362, "One memory and one team channel, both on computers you own.", "r", 27, MUTED, ap(t, 22.2, 0.7), "mm")
-    cv.text(640, 430, "Free, Personal and Team build on today's core. Business and Enterprise are coming.", "s", 22, TEAL, ap(t, 22.8, 0.7), "mm")
-    cv.text(640, 490, "Details: docs/tiers/README.md and docs/PRICING.md (draft)", "m", 18, MUTED, ap(t, 23.4, 0.7), "mm")
+    cv.text(640, 362, "One memory and one team channel, both on computers you own.", "r", 27, MUTED, ap(t, 0.9, 0.7), "mm")
+    cv.text(640, 430, "Personal and work stay in separate worlds.", "s", 22, TEAL, ap(t, 1.6, 0.7), "mm")
+    cv.text(640, 478, "Business and Corporate are coming.", "s", 22, AMBER, ap(t, 2.4, 0.7), "mm")
 
 
 # ---------------- storyboard ----------------
+HOLD = 1.6      # seconds the animation stands still on each scene's summary before the next scene
+
+
+def mk(key, fn, texts, head, active, start=0.5, tail=None):
+    caps = schedule(texts, start)
+    last = caps[-1][1]
+    dur = last + HOLD + 0.2
+    caps[-1] = (caps[-1][0], dur - 0.05, caps[-1][2])
+    return dict(key=key, fn=fn, caps=caps, cs=[c[0] for c in caps], head=head, active=active, dur=dur)
+
+
 SCENES = [
-    dict(key="title", dur=7.0, fn=scene_title, head=None, active=[],
-         caps=[(2.4, 6.8, "Five tiers: Free, Personal, Team, Business and Enterprise. Business and Enterprise are coming.")]),
-    dict(key="free", dur=20.4, fn=scene_free, active=[0],
-         head=("Free", "One person, one computer  \u00b7  free, for good"),
-         caps=[(0.5, 5.4, "Free: one person, one computer. Complete, and never limited."),
-               (5.6, 9.8, "Hooks and MCP hand each app the few notes that match what you ask."),
-               (10.0, 13.8, "Notes are plain Markdown in git. Every change is written to a checksummed log first."),
-               (14.0, 17.0, "Each app gets a seat on the comms bus, so your apps can talk to each other."),
-               (17.2, 20.2, "Backup goes to a private GitHub repository that you own.")]),
-    dict(key="personal", dur=18.6, fn=scene_personal, active=[1],
-         head=("Personal", "One person, up to 3 computers  \u00b7  $15/month or $144/year (draft)"),
-         caps=[(0.5, 4.6, "Personal: the same Free core on up to 3 computers, with one memory and one comms bus."),
-               (4.8, 9.0, "Each added computer makes its own key and signs every request. A copied token is refused."),
-               (9.2, 12.6, "Cloud AI apps reach the vault over the optional secure link. You can switch it off."),
-               (12.8, 15.7, "A relay can give the vault a stable address. It only forwards bytes it cannot read."),
-               (15.9, 18.4, "The hosted relay, sync and backup are planned, not built.")]),
-    dict(key="team", dur=21.6, fn=scene_team, active=[2],
-         head=("Team", "2 to 20 people  \u00b7  contact us until member keys ship"),
-         caps=[(0.5, 4.4, "Team: one shared vault for 2 to 20 people, reached over the secure link."),
-               (4.6, 8.4, "Sold per person: 3 computers each, pooled. Past the count, the vault refuses the next one."),
-               (8.6, 12.0, "A teammate joins with a one-time invite made on the vault's computer."),
-               (12.2, 15.3, "By default a teammate gets the comms bus, plus an optional shared folder."),
-               (15.5, 17.9, "Full vault access only if you pass --full."),
-               (18.0, 21.4, "Provenance shows who wrote each memory. A key for each person is planned.")]),
-    dict(key="coming", dur=11.4, fn=scene_coming, active=[3, 4],
-         head=("Business and Enterprise", "Coming  \u00b7  contact us"),
-         caps=[(0.5, 4.2, "Business, from 10 people: a company hub on your server, with roles and sign-in. Coming."),
-               (4.4, 8.2, "Enterprise: your data centre, an air-gapped option, audit export. Coming."),
-               (8.4, 11.2, "Both are planned, not built, and priced on request.")]),
-    dict(key="engine", dur=11.0, fn=scene_engine, active=[5],
-         head=("The paid convergence engine", "A separate component, under its own licence"),
-         caps=[(0.5, 4.6, "The paid convergence engine is a separate component under its own licence."),
-               (4.8, 10.8, "Memev calls it. It is not part of this repository, and the core stays Apache-2.0.")]),
-    dict(key="combined", dur=26.0, fn=scene_combined, active=[0, 1, 2, 3, 4, 5],
-         head=("How the tiers connect", "Every tier builds on the same local vault and comms bus"),
-         caps=[(0.5, 4.8, "Free: your AI apps, the vault and the bus on one computer, backed up to your own GitHub."),
-               (5.0, 9.0, "Personal: your other computers and cloud AI apps join over the secure link."),
-               (9.3, 13.8, "Team: teammates join the bus by invite. The vault stays yours unless you pass --full."),
-               (14.1, 18.0, "The paid convergence engine is separate. Memev calls it from outside the core."),
-               (18.3, 21.4, "Business and Enterprise: coming. Planned, not built.")]),
+    mk("title", scene_title, ["Personal, Personal with more computers, Business and Corporate. The last two are coming."],
+       None, [], start=2.2),
+    mk("personal", scene_personal,
+       ["Personal: one person, one computer, with the free core.",
+        "Hooks and MCP give each app the notes that match, and a seat on the comms bus.",
+        "Notes are plain Markdown, backed up to a private GitHub repository you own."],
+       ("Personal", "One person, one computer  \u00b7  the free core"), [0]),
+    mk("more", scene_more,
+       ["Personal with more computers: the same personal vault on several computers.",
+        "Each added computer has its own key. They join over the secure link, off until you switch it on.",
+        "A relay can give a stable address. Hosted sync and relay are planned."],
+       ("Personal with more computers", "The same personal vault on several computers"), [1]),
+    mk("boundary", scene_boundary,
+       ["A personal or home vault never crosses into Business or Corporate.",
+        "Separate identities, separate keys, no grant or live query. Someone with both uses two identities."],
+       ("A hard boundary", "Personal and work never meet"), [0, 1]),
+    mk("business", scene_business,
+       ["Business, coming: each member has a company-owned work vault, plus the shared company vault.",
+        "Members promote or share notes up. Company knowledge flows back down.",
+        "An invite gives the team bus by default, plus an optional shared folder. Full access only with --full."],
+       ("Business", "Coming  \u00b7  a work vault for each member, plus the company vault"), [2]),
+    mk("corporate", scene_corporate,
+       ["Corporate, coming: the same model as Business, at larger scale, with departments and projects.",
+        "Sign-in provisioning adds members. Audit and retention keep every step on record."],
+       ("Corporate", "Coming  \u00b7  the Business model at larger scale"), [3]),
+    mk("leavers", scene_leavers,
+       ["When someone leaves, their access, keys and devices are revoked and the local cache is wiped.",
+        "The work vault stays with the company. No one leaves with vault access."],
+       ("When someone leaves", "Coming with Business and Corporate"), [2, 3]),
+    mk("engine", scene_engine,
+       ["Without the engine, git backup has one writer. Concurrent edits can conflict and need fixing by hand.",
+        "The paid engine merges every change automatically. Nothing is lost, and no conflicts to fix by hand.",
+        "It fits Personal with more computers, Business and Corporate.",
+        "A separate component under its own licence, called by Memev, not part of this repository."],
+       ("The paid engine", "Merges changes made in several places at once"), [4]),
+    mk("combined", scene_combined,
+       ["Personal, with more computers on the same vault, backed up to your own GitHub.",
+        "A hard boundary keeps personal and home vaults out of Business and Corporate.",
+        "Business and Corporate (coming) add work vaults and a company vault. The paid engine merges edits."],
+       ("How the tiers connect", "Personal and work stay separate; the engine is called from outside the core"), None),
 ]
+SCENES.append(dict(key="end", fn=end_card, caps=[], cs=[], head=None, active=[], dur=6.0))
 TOTAL = sum(s["dur"] for s in SCENES)
 
 
@@ -688,20 +799,21 @@ def render_at(T):
             sc = s
             break
         t -= s["dur"]
+    ta = min(t, sc["dur"] - HOLD - 0.2)            # the animation clock stops for the summary pause
     cv = Cv()
-    sc["fn"](cv, t)
+    sc["fn"](cv, ta, sc["cs"])
     if sc["head"]:
         active = sc["active"]
-        if sc["key"] == "combined":   # the tier chips light up as each layer joins the diagram
-            order = [(0.4, [0]), (4.9, [1]), (9.2, [2]), (14.0, [5]), (18.2, [3, 4])]
-            active = [i for (rv, ids) in order if t >= rv for i in ids]
+        if active is None:                          # combined: tier chips light up as each layer joins
+            c0, c1, c2 = sc["cs"]
+            active = [i for (rv, ids) in [(c0, [0]), (c0 + 3.6, [1]), (c1, [2, 3]), (c2 + 3.6, [4])] if ta >= rv for i in ids]
         header(cv, sc["head"][0], sc["head"][1], active, ap(t, 0.1, 0.5))
     caption(cv, sc["caps"], t)
-    if sc["key"] == "combined":
-        end_card(cv, t)
     im = cv.im
-    fade = min(ap(t, 0.0, 0.45), 1 - ap(t, sc["dur"] - 0.45, 0.45)) if sc["key"] not in ("title",) else ap(t, 0, 0.6)
-    if sc["key"] == "combined":
+    fade = min(ap(t, 0.0, 0.45), 1 - ap(t, sc["dur"] - 0.45, 0.45))
+    if sc["key"] == "title":
+        fade = ap(t, 0, 0.6) * (1 - ap(t, sc["dur"] - 0.45, 0.45))
+    if sc["key"] == "end":
         fade = ap(t, 0.0, 0.45) * (1 - ap(t, sc["dur"] - 0.8, 0.8))
     if fade < 1:
         im = Image.blend(background(), im, fade)
@@ -717,8 +829,16 @@ def main():
     ap_.add_argument("--out", default=os.path.dirname(os.path.abspath(__file__)))
     ap_.add_argument("--stills", help="comma separated seconds; write PNGs and stop")
     ap_.add_argument("--no-gif", action="store_true")
+    ap_.add_argument("--schedule", action="store_true", help="print each scene's start and length, and stop")
     ap_.add_argument("--workers", type=int, default=os.cpu_count() or 2)
     a = ap_.parse_args()
+    if a.schedule:
+        t = 0.0
+        for s in SCENES:
+            print(f"{t:7.1f}  {s['dur']:5.1f}  {s['key']}")
+            t += s["dur"]
+        print(f"{t:7.1f}  total")
+        return 0
     os.makedirs(a.out, exist_ok=True)
     if a.stills:
         for s in a.stills.split(","):
@@ -741,7 +861,7 @@ def main():
     print(f"{mp4}  {TOTAL:.1f} s")
     if not a.no_gif:
         gif = os.path.join(a.out, "memev-tiers.gif")
-        vf = ("fps=10,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=32:stats_mode=diff[p];"
+        vf = (f"fps={GIF_FPS},scale={GIF_W}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors={GIF_COLORS}:stats_mode=diff[p];"
               "[b][p]paletteuse=dither=none:diff_mode=rectangle")
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", mp4, "-vf", vf, "-loop", "0", gif], check=True)
         print(gif)

@@ -2,7 +2,7 @@
 
 [![Memev demo: how each tier works and how the tiers connect](Demo%20Video/memev-tiers.gif)](Demo%20Video/memev-tiers.mp4)
 
-[Watch the demo video](Demo%20Video/memev-tiers.mp4) (1 min 56 s): how each tier works and how the tiers connect.
+[Watch the demo video](Demo%20Video/memev-tiers.mp4) (3 min 9 s): how each tier works and how the tiers connect.
 
 Memory and recall stack for all of the AI apps you use, local system and cloud.
 
