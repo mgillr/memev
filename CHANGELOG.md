@@ -2,7 +2,6 @@
 
 ## Unreleased
 
-- On Free, enrolling a second computer now says "Free covers this computer. Adding more computers is part of Personal (up to 4 computers). Run memev upgrade to see plans, or start a trial." instead of telling the user to remove a computer that cannot be removed. The computer count comes from the entitlement table, and the text is shown only at that moment, never in the resume card or the AI context.
 - The npm package ships only bin, src, templates, vendor and the published docs: a .npmignore guards the development paths and docs/RELEASING.md is the release checklist. Installing the packed tarball and running `memev init` on a clean machine works.
 - The tier pages follow the final tiers, sold by person and enforced by computer count: Personal is one person on up to 3 computers at an early-supporter price; a new Team page (2 to 20 people, 3 computers and 10 cloud connectors per person, pooled; contact us until member keys ship); Business is from 10 people per seat; Enterprise is chosen for compliance needs, not size. The status table lists the hosted backup, the hosted relay and member keys as planned.
 - Windows is stated as a preview in the README and the quickstart, with what differs there: where Memev keeps its files, the user PATH, the access-list privacy check and no start at login yet. The lab plan has a Windows 11 section (T-WIN-01 to T-WIN-09).
