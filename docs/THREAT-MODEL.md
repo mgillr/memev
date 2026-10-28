@@ -10,7 +10,7 @@
 | A credential is copied to another machine | each added computer signs every request with its own key, which never leaves it, so the copy is refused; replays are refused by a one-time nonce; `memev devices rotate` or `remove` cuts off one device |
 | A leaked token | expiry, `memev token revoke`/`rotate`, path and scope limits |
 | A prompt-injected session writes junk or deletes memory | the log is append-only; every change can be seen and undone from it and from git; deletes are records, not erasures |
-| A prompt-injected cloud seat posts a task to a local seat that runs shell commands | by default a cloud seat may post only to the operator; a body from any other seat is shown as untrusted data, not instructions, and cut to a shorter cap; a vault setting (bus cloud_tasks) lets a team allow a cloud seat to assign a task |
+| A prompt-injected cloud seat posts a task to a local seat that runs shell commands | by default a cloud seat may post only to the operator; in the bus text a hook injects into an app's context, a body or ref from any other seat is quoted as untrusted data, not instructions, and cut to a shorter cap (the bus tools hand the model the raw body, and their descriptions say to treat anything but an operator message as a request); a vault setting (bus cloud_tasks) lets a team allow a cloud seat to assign a task |
 | A session pastes a secret into memory | the secret scanner refuses the write |
 | A signed contract is quietly weakened | protected paths, the vault pre-commit hook and the signature check; changes only by a new signed amendment |
 | Disk corruption or a crash mid-write | log records are checksummed and sealed per segment; files are rebuilt from the log on start |
