@@ -59,26 +59,82 @@ export class Bus {
   }
 
   // ---- seats
-  /** The seat name for an app on a device: claude-code@host, cursor@laptop, chatgpt@cloud. */
+  /** The short name of this vault's own computer: the host device's label, so seats read my-app@my-laptop. */
+  machineName() {
+    const host = this.devices.get(this.devices.hostId);
+    return label(host?.label || 'this computer');
+  }
+  /** The seat name for an app on a device: my-app@my-laptop, cursor@laptop, chatgpt@cloud. */
   seatName(client, device) {
-    if (!device || device.kind === 'host' || device.kind === 'local-client') return `${label(client)}@host`;
+    if (!device || device.kind === 'host' || device.kind === 'local-client') return `${label(client)}@${this.machineName()}`;
     if (device.kind === 'cloud-connector') return `${label(device.label)}@cloud`;
     return `${label(client)}@${label(device.label)}`;
   }
-  seat(name) { return readJson(this._p('seats', `${fileOf(name)}.json`), null); }
+  /** The seat this app uses on this computer: its machine-name seat, or an older '@host' seat when one already exists. */
+  ownSeatName(client, device) {
+    const fresh = this.seatName(client, device);
+    if (this.seat(fresh)) return fresh;
+    if (!device || device.kind === 'host' || device.kind === 'local-client') {
+      const legacy = `${label(client)}@host`;
+      if (legacy !== fresh && this.seat(legacy)) return legacy;
+    }
+    return fresh;
+  }
+  /** True when the machine part of a seat name is this vault's own computer (or the older 'host' word). */
+  _onHost(seat) {
+    const at = String(seat).split('@');
+    if (at.length < 2) return false;
+    const machine = at[1].split('/')[0];
+    return machine === 'host' || machine === this.machineName();
+  }
+  seat(name) {
+    const rec = readJson(this._p('seats', `${fileOf(name)}.json`), null);
+    if (rec) return rec;
+    for (const s of this.seats()) if ((s.renamed_from || []).includes(name)) return s;
+    return null;
+  }
   seats() {
     let f; try { f = fs.readdirSync(this._p('seats')); } catch { return []; }
     return f.filter((x) => x.endsWith('.json')).map((x) => readJson(this._p('seats', x), null)).filter((s) => s?.seat).sort((a, b) => a.seat.localeCompare(b.seat));
   }
   /** Give an app a seat (at init, when an app is connected, or on its first call). */
   register({ client, device, project = null, seat = null }) {
-    const name = seat || this.seatName(client, device);
+    const name = seat || this.ownSeatName(client, device);
     if (!SEAT_RE.test(name)) throw new BusError('bad_request', `not a seat name: ${name}`);
     const cur = this.seat(name);
     if (cur && !cur.removed) return cur;
-    const rec = { seat: name, client: label(client), device: device.id, device_kind: device.kind, device_label: device.kind === 'host' ? 'host' : device.label, project: project || null, created: now(), joined: cur?.joined || null, removed: null };
+    const rec = { seat: name, client: label(client), device: device.id, device_kind: device.kind, device_label: device.label, project: project || null, created: now(), joined: cur?.joined || null, removed: null };
     fs.mkdirSync(this._p('seats'), { recursive: true });
     writeJson(this._p('seats', `${fileOf(name)}.json`), rec); this.commit(this._rel('seats', `${fileOf(name)}.json`));
+    return rec;
+  }
+  /** Rename a seat: the record, its pulse and its history follow it, and the old name still finds it. */
+  renameSeat(oldName, newName) {
+    const rec = this.seat(oldName);
+    if (!rec) throw new BusError('not_found', `no seat ${oldName}; memev bus roster lists them`);
+    if (rec.removed) throw new BusError('not_found', `no seat ${oldName}; it was removed from the bus`);
+    if (oldName === newName) return rec;
+    if (!SEAT_RE.test(newName)) throw new BusError('bad_request', `not a seat name: ${newName}`);
+    const clash = this.seat(newName);
+    if (clash && clash.seat !== rec.seat) throw new BusError('conflict', `seat ${newName} already exists`);
+    const from = rec.seat;
+    rec.seat = newName;
+    rec.renamed_from = [...new Set([...(rec.renamed_from || []), from])];
+    fs.mkdirSync(this._p('seats'), { recursive: true });
+    const oldF = this._p('seats', `${fileOf(from)}.json`);
+    const newF = this._p('seats', `${fileOf(newName)}.json`);
+    if (oldF !== newF && fs.existsSync(oldF)) fs.renameSync(oldF, newF);
+    writeJson(newF, rec);
+    this.commit(this._rel('seats', `${fileOf(newName)}.json`));
+    if (oldF !== newF) this.commit(this._rel('seats', `${fileOf(from)}.json`));
+    const pOld = this._p('pulse', `${fileOf(from)}.json`);
+    const pNew = this._p('pulse', `${fileOf(newName)}.json`);
+    if (fs.existsSync(pOld)) {
+      fs.mkdirSync(this._p('pulse'), { recursive: true });
+      fs.renameSync(pOld, pNew);
+      this.commit(this._rel('pulse', `${fileOf(newName)}.json`));
+      this.commit(this._rel('pulse', `${fileOf(from)}.json`));
+    }
     return rec;
   }
   operator() { return readJson(this._p('operator.json'), null)?.seat || null; }
@@ -98,8 +154,8 @@ export class Bus {
     const c = String(choice || '').trim().toLowerCase();
     if (!c) return null;
     if (this.seat(c)) return c;
-    const host = `${label(c)}@host`;
-    return this.seat(host) ? host : null;
+    const own = this.ownSeatName(c, this.devices.get(this.devices.hostId));
+    return this.seat(own) ? own : null;
   }
   /**
    * bus_set_operator: an AI passes on the person's answer to "which AI should lead?". It only works
@@ -136,15 +192,16 @@ export class Bus {
     const dev = ctx.device || this.devices.get(this.devices.hostId);
     const computer = dev?.kind === 'local-client' ? this.devices.get(this.devices.hostId) : dev;
     if (!computer || computer.status !== 'active') throw new BusError('forbidden', 'this computer was removed from the vault, so it is off the bus');
-    const own = this.seatName(ctx.client, computer);
+    const own = this.ownSeatName(ctx.client, computer);
     let name = seat || own;
     if (seat) {
       // the terminal on the vault's computer may act for any seat on that computer (memev bus watch)
       const rec = this.seat(seat);
-      const mine = ctx.cli && ctx.local ? (rec ? rec.device === computer.id : seat.endsWith('@host') || seat.includes('@host/')) : rec ? rec.device === computer.id : seat.split('/')[0] === own;
+      const mine = ctx.cli && ctx.local ? (rec ? rec.device === computer.id : this._onHost(seat)) : rec ? rec.device === computer.id : seat.split('/')[0] === own;
       if (!mine) throw new BusError('forbidden', `${seat} belongs to another app or computer; you can only post as your own seat (${own})`);
     }
     let rec = this.seat(name);
+    if (rec && rec.seat !== name) name = rec.seat; // the seat was renamed: post under its current name
     if (rec?.removed) throw new BusError('forbidden', `${name} was removed from the bus`);
     if (!rec) rec = this.register({ client: ctx.client, device: computer, project, seat: name });
     if (this.devices.get(rec.device)?.status !== 'active') throw new BusError('forbidden', 'this computer was removed from the vault, so it is off the bus');

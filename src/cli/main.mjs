@@ -67,6 +67,38 @@ Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', bus: './bus-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
+const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+/**
+ * The launcher every app runs on macOS and Linux. It uses node from PATH when that is Node 22 or newer, and otherwise
+ * the Node recorded at install, so a Node upgrade that removes the old binary does not stop Memev in every app.
+ */
+export function launcherScript(node, target) {
+  return `#!/bin/sh
+# node from PATH when it is Node 22 or newer, otherwise the Node recorded at install
+REC=${sq(node)}
+JS=${sq(target)}
+N=$(command -v node 2>/dev/null)
+if [ -n "$N" ] && [ "$N" != "$REC" ]; then
+  V=$("$N" --version 2>/dev/null); V=\${V#v}; V=\${V%%.*}
+  case "$V" in ''|*[!0-9]*) ;; *) [ "$V" -ge 22 ] && exec "$N" "$JS" "$@" ;; esac
+fi
+[ -x "$REC" ] && exec "$REC" "$JS" "$@"
+echo "memev: no Node.js 22 or newer: node on PATH is missing or older, and $REC is gone. Install Node.js 22 or newer, then run: node \\"$JS\\" doctor --fix" >&2
+exit 127
+`;
+}
+
+/** The Node to record: its name on PATH when that is this same Node (a link such as /usr/local/bin/node outlives an upgrade), else this binary. */
+export function recordedNode(env = process.env) {
+  const real = (f) => { try { return fs.realpathSync(f); } catch { return null; } };
+  for (const d of String(env.PATH || '').split(path.delimiter)) {
+    const f = d && path.join(d, 'node');
+    if (!f || !fs.existsSync(f)) continue;
+    return real(f) === real(process.execPath) ? f : process.execPath; // the first node on PATH decides
+  }
+  return process.execPath;
+}
+
 export function installRuntime(env = process.env) {
   const dir = path.join(configDir(env), 'runtime', VERSION);
   if (path.resolve(PKG) !== path.resolve(dir)) {
@@ -77,7 +109,7 @@ export function installRuntime(env = process.env) {
   fs.mkdirSync(bin, { recursive: true });
   const target = path.join(dir, 'bin', 'memev.mjs');
   if (process.platform === 'win32') fs.writeFileSync(path.join(bin, 'memev.cmd'), `@"${process.execPath}" "${target}" %*\r\n`);
-  else writeAtomic(path.join(bin, 'memev'), `#!/bin/sh\nexec "${process.execPath}" "${target}" "$@"\n`, 0o755);
+  else writeAtomic(path.join(bin, 'memev'), launcherScript(recordedNode(env), target), 0o755);
   return { dir, launcher: path.join(bin, process.platform === 'win32' ? 'memev.cmd' : 'memev') };
 }
 
