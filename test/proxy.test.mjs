@@ -22,8 +22,9 @@ async function proxy({ tunnelTo = null } = {}) {
   const server = http.createServer((req, res) => {
     seen.push(`${req.method} ${req.url}`);
     if (req.url.endsWith('/moved')) { res.writeHead(302, { location: '/here' }); return res.end(); }
+    if (req.url.endsWith('/away')) { res.writeHead(302, { location: 'http://elsewhere.invalid/landing' }); return res.end(); }
     let body = ''; req.on('data', (d) => { body += d; });
-    req.on('end', () => { res.writeHead(200, { 'x-proxy-auth': req.headers['proxy-authorization'] || '' }); res.end(`via proxy ${req.url}${body ? ` ${body}` : ''}`); });
+    req.on('end', () => { res.writeHead(200, { 'x-proxy-auth': req.headers['proxy-authorization'] || '', 'x-sent': sent(req.headers) }); res.end(`via proxy ${req.url}${body ? ` ${body}` : ''}`); });
   });
   server.on('connect', (req, socket) => {
     seen.push(`CONNECT ${req.url}`);
@@ -35,10 +36,12 @@ async function proxy({ tunnelTo = null } = {}) {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   return { url: `http://127.0.0.1:${server.address().port}`, seen, close: () => new Promise((r) => { for (const x of tunnels) x.destroy(); server.closeAllConnections(); server.close(r); }) };
 }
-// requests that go direct are answered here instead of leaving the machine
-async function catchingDirect(fn) {
+// the request headers a redirect hop must drop or keep, as the server received them
+const sent = (h) => JSON.stringify(Object.fromEntries(['authorization', 'cookie', 'proxy-authorization', 'content-type', 'x-keep'].filter((k) => k in h).map((k) => [k, h[k]])));
+// requests that go direct are answered here instead of leaving the machine; `headers` gets the headers each one carried
+async function catchingDirect(fn, headers = []) {
   const real = globalThis.fetch; const direct = [];
-  globalThis.fetch = async (u) => { direct.push(String(u)); return new Response('direct'); };
+  globalThis.fetch = async (u, o = {}) => { direct.push(String(u)); headers.push(Object.fromEntries(new Headers(o.headers))); return new Response('direct'); };
   try { await fn(); } finally { globalThis.fetch = real; }
   return direct;
 }
@@ -111,6 +114,26 @@ test('through the proxy: credentials, a body, redirects, and TLS to the server i
     assert.ok(hello.includes(Buffer.from('example.invalid')), 'for the server name');
     assert.equal(hello.includes(Buffer.from('/secure')), false, 'the path stays inside TLS');
   } finally { await t.close(); await new Promise((r) => server.close(r)); }
+});
+
+test('a redirect to another origin drops the credentials and a POST turned GET drops its body headers, as fetch does', async () => {
+  const p = await proxy();
+  const env = { HTTP_PROXY: p.url };
+  const headers = { Authorization: 'Bearer t0', Cookie: 'c=1', 'x-keep': 'k' };
+  const got = async (r) => { await r.text(); return JSON.parse(r.headers.get('x-sent')); };
+  try {
+    assert.deepEqual(await got(await fetchOut('http://example.invalid/moved', { headers }, env)), { authorization: 'Bearer t0', cookie: 'c=1', 'x-keep': 'k' }, 'the same origin keeps them');
+    const away = await fetchOut('http://example.invalid/away', { headers }, env);
+    assert.deepEqual(await got(away), { 'x-keep': 'k' }, 'another origin gets no credentials');
+    const post = await fetchOut('http://example.invalid/moved', { method: 'POST', body: 'x=1', headers: { ...headers, 'content-type': 'text/plain' } }, env);
+    assert.deepEqual(await got(post), { authorization: 'Bearer t0', cookie: 'c=1', 'x-keep': 'k' }, 'the GET after a 302 carries no body headers');
+    assert.deepEqual(p.seen, ['GET http://example.invalid/moved', 'GET http://example.invalid/here', 'GET http://example.invalid/away', 'GET http://elsewhere.invalid/landing', 'POST http://example.invalid/moved', 'GET http://example.invalid/here']);
+    // a next hop that goes direct (NO_PROXY) is plain fetch, which sees it as a first request, so it is cleaned here too
+    const carried = [];
+    const direct = await catchingDirect(() => fetchOut('http://example.invalid/away', { headers: { ...headers, 'Proxy-Authorization': 'Basic x' } }, { ...env, NO_PROXY: 'elsewhere.invalid' }), carried);
+    assert.deepEqual(direct, ['http://elsewhere.invalid/landing']);
+    assert.deepEqual(carried, [{ 'x-keep': 'k' }]);
+  } finally { await p.close(); }
 });
 
 test('https through the proxy end to end: the response, the Host header, a redirect, and certificate checks stay on', async (t) => {
