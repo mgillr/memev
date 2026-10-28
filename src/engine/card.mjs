@@ -70,6 +70,17 @@ export const PROTOCOL_REVIEW = [
   { was: "If Memev is unreachable, say so once and continue.", now: "Memev unreachable: say so once, continue." },
 ];
 
+/**
+ * The conflicts a sync merge could not join by itself, from the sync job's state. The operator card
+ * shows them so the person sees what the two computers disagreed on; a card for another seat does not.
+ */
+export function syncConflicts(root = currentVault()) {
+  try {
+    const s = readJson(path.join(root, '.memev', 'jobs.json'), {})?.sync?.conflicts;
+    return s?.files?.length ? s : null;
+  } catch { return null; }
+}
+
 export function renderCard(c, { maxChars = 6000, footer, root } = {}) {
   const L = ['[Memev resume card]'];
   // a credential that has expired, or that will expire soon, is said up front, so it is renewed or revoked
@@ -78,6 +89,13 @@ export function renderCard(c, { maxChars = 6000, footer, root } = {}) {
     const lines = [...ts.expired().map((t) => expiredWarningLine(t)), ...ts.expiringWithin(EXPIRY_WARNING_DAYS).map((t) => expiryWarningLine(t))];
     if (lines.length) L.push(`Credential warnings: ${lines.join('; ')}.`);
   } catch { /* no vault or no tokens yet */ }
+  if (c.operator) {
+    const conflicts = syncConflicts(root || currentVault());
+    if (conflicts?.files?.length) {
+      L.push('Sync conflicts (the two computers disagreed; both versions are kept):');
+      for (const f of conflicts.conflicts || []) L.push(`  ${f.path}: ${f.how}${f.copy ? `; the other computer's version is ${f.copy}` : ''} (memev doctor)`);
+    }
+  }
   if (c.project_state?.checkpoints) {
     const s = c.project_state;
     L.push(`Project ${c.project} (last checkpoint ${s.at}):`);
