@@ -9,7 +9,7 @@ after(cleanup);
 
 const TS = '/fake/tailscale';
 const PORT = 41999;
-const RUNNING = { status: 0, stdout: JSON.stringify({ BackendState: 'Running', Self: { DNSName: 'machine.tailnet.ts.net.' } }) };
+const RUNNING = { ok: true, status: 0, stdout: JSON.stringify({ BackendState: 'Running', Self: { DNSName: 'machine.tailnet.ts.net.' } }) };
 const whichFn = (bin) => (bin === 'tailscale' ? TS : null);
 const vault = (remote) => ({ config: { remote } });
 // A funnel command is one that changes the funnel: opens it (--yes) or turns it off. `funnel status`
@@ -22,8 +22,8 @@ function fakeRun({ existing = false } = {}) {
   const run = (cmd, args) => {
     recorded.push([cmd, ...args]);
     if (args[0] === 'status') return RUNNING;
-    if (args[0] === 'funnel' && args[1] === 'status') return { status: existing ? 0 : 1, stdout: '' };
-    return { status: 0, stdout: '', stderr: '' };
+    if (args[0] === 'funnel' && args[1] === 'status') return { ok: existing, status: existing ? 0 : 1, stdout: '' };
+    return { ok: true, status: 0, stdout: '', stderr: '' };
   };
   return { run, recorded };
 }

@@ -10,8 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
-import { spawn, spawnSync } from 'node:child_process';
-import { configDir, readJson, writePrivate, writePrivateJson, writeJson, randomToken, now, exists } from '../engine/util.mjs';
+import { spawn } from 'node:child_process';
+import { configDir, readJson, writePrivate, writePrivateJson, writeJson, randomToken, now, exists, run as runCmd } from '../engine/util.mjs';
 import { tunnelKeyFile, tunnelKey, config, saveConfig, clientToken, adminToken, api, out } from './common.mjs';
 import { publishAddressRecord } from './sync.mjs';
 import { fetchOut } from '../engine/net.mjs';
@@ -31,7 +31,7 @@ export const CLOUDFLARED = {
   },
 };
 
-const which = (bin) => { const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', [bin], { encoding: 'utf8' }); return r.status === 0 ? r.stdout.split(/\r?\n/)[0].trim() : null; };
+const which = (bin) => { const r = runCmd(process.platform === 'win32' ? 'where' : 'which', [bin]); return r.ok ? r.stdout.split(/\r?\n/)[0].trim() : null; };
 export function ensureTunnelKey(root) { let k = tunnelKey(root); if (!k) { k = randomToken(24); writePrivate(tunnelKeyFile(root), `${k}\n`); } return k; }
 const stateFile = (root) => path.join(root, '.memev', 'tunnel.json');
 export const tunnelState = (root) => readJson(stateFile(root), null);
@@ -50,7 +50,7 @@ export async function cloudflaredPath(env = process.env, { download = true } = {
   const got = crypto.createHash('sha256').update(buf).digest('hex');
   if (got !== pin[1]) throw new Error(`cloudflared checksum mismatch (got ${got.slice(0, 12)}…); not using it`);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  if (pin[0].endsWith('.tgz')) { const tgz = path.join(dir, 'c.tgz'); fs.writeFileSync(tgz, buf); spawnSync('tar', ['xzf', tgz, '-C', dir]); fs.rmSync(tgz); }
+  if (pin[0].endsWith('.tgz')) { const tgz = path.join(dir, 'c.tgz'); fs.writeFileSync(tgz, buf); runCmd('tar', ['xzf', tgz, '-C', dir]); fs.rmSync(tgz); }
   else fs.writeFileSync(bin, buf, { mode: 0o755 });
   fs.chmodSync(bin, 0o755);
   return bin;
@@ -60,7 +60,7 @@ export async function cloudflaredPath(env = process.env, { download = true } = {
 // opens a funnel on its own: a funnel exposes this machine to the public internet, so it needs a yes.
 export const funnelConsent = (cfg) => cfg.remote?.funnelConsent === true;
 
-export function pickProvider(cfg, env = process.env, { run = spawnSync, whichFn = which } = {}) {
+export function pickProvider(cfg, env = process.env, { run = runCmd, whichFn = which } = {}) {
   const want = cfg.remote?.provider || 'auto';
   if (want === 'cloudflare' && cfg.remote?.cloudflare?.name) return 'cloudflare';
   // A pinned tailscale asks for a funnel, and a funnel needs consent. Without it we fall back to quick.
@@ -68,12 +68,7 @@ export function pickProvider(cfg, env = process.env, { run = spawnSync, whichFn 
   if (want === 'tailscale' && !funnelConsent(cfg)) return 'quick';
   if (want === 'tailscale' || want === 'auto') {
     const ts = whichFn('tailscale');
-    if (ts) {
-      const s = run(ts, ['status', '--json'], { encoding: 'utf8', timeout: 3000 });
-      try {
-        if (JSON.parse(s.stdout).BackendState === 'Running') return 'tailscale';
-      } catch {}
-    }
+    if (ts) { const s = run(ts, ['status', '--json'], { timeout: 3000 }); if (s.ok) { try { if (JSON.parse(s.stdout).BackendState === 'Running') return 'tailscale'; } catch {} } }
     if (want === 'tailscale') return null;
   }
   if (want === 'cloudflare' && !cfg.remote?.cloudflare?.name) return null;
@@ -81,22 +76,22 @@ export function pickProvider(cfg, env = process.env, { run = spawnSync, whichFn 
 }
 
 // Every command Memev runs against Tailscale Funnel goes through here, so the tests can see and control
-// each one. `run` is the command executor (defaults to spawnSync). A funnel that already exists for the
-// port is never changed or removed: Memev only manages the funnel it created itself.
-export function tailscaleFunnel({ ts, port, run = spawnSync }) {
-  const alreadyConfigured = () => run(ts, ['funnel', 'status', String(port)], { encoding: 'utf8', timeout: 5000 }).status === 0;
-  const url = () => { const st = JSON.parse(run(ts, ['status', '--json'], { encoding: 'utf8' }).stdout); return `https://${String(st.Self.DNSName).replace(/\.$/, '')}`; };
+// each one. `run` is the command executor (defaults to the guarded run helper). A funnel that already
+// exists for the port is never changed or removed: Memev only manages the funnel it created itself.
+export function tailscaleFunnel({ ts, port, run = runCmd }) {
+  const alreadyConfigured = () => run(ts, ['funnel', 'status', String(port)], { timeout: 5000 }).ok;
+  const url = () => { const st = JSON.parse(run(ts, ['status', '--json']).stdout); return `https://${String(st.Self.DNSName).replace(/\.$/, '')}`; };
   return {
     alreadyConfigured,
     // Bring the funnel up only when there is not already one for this port. Returns the address.
-    up() { if (alreadyConfigured()) return url(); const r = run(ts, ['funnel', '--bg', '--yes', String(port)], { encoding: 'utf8', timeout: 20000 }); if (r.status !== 0) throw new Error((r.stderr || r.stdout).trim().split('\n').pop()); return url(); },
+    up() { if (alreadyConfigured()) return url(); const r = run(ts, ['funnel', '--bg', '--yes', String(port)], { timeout: 20000 }); if (!r.ok) throw new Error(r.error || (r.stderr || r.stdout).trim().split('\n').pop()); return url(); },
     // Turn the funnel off only when Memev created it (no pre-existing funnel for the port).
     down() { if (alreadyConfigured()) return; run(ts, ['funnel', '--bg', String(port), 'off'], { timeout: 10000 }); },
   };
 }
 
 /** The daemon side: keep the tunnel up while remote access is on. */
-export function supervise(vault, { root, port, run = spawnSync, whichFn = which }) {
+export function supervise(vault, { root, port, run = runCmd, whichFn = which }) {
   let child = null, stopped = false, backoff = 1000, timer = null;
   const env = process.env;
   const write = (s) => writeJson(stateFile(root), { ...s, updated: now() }, 0o600);
@@ -115,17 +110,20 @@ export function supervise(vault, { root, port, run = spawnSync, whichFn = which 
           const f = tailscaleFunnel({ ts, port, run });
           // A funnel that already exists for the port is left alone: Memev only manages the one it opens.
           if (f.alreadyConfigured()) {
-            const st = JSON.parse(run(ts, ['status', '--json'], { encoding: 'utf8' }).stdout);
-            const url = `https://${String(st.Self.DNSName).replace(/\.$/, '')}`;
+            const st = run(ts, ['status', '--json']);
+            if (!st.ok) throw new Error(st.error || (st.stderr || st.stdout).trim().split('\n').pop() || 'tailscale status failed');
+            const url = `https://${String(JSON.parse(st.stdout).Self.DNSName).replace(/\.$/, '')}`;
             write({ enabled: true, provider, url, stable: true, state: 'up (existing funnel left as is)' }); log(`up at ${url} (existing funnel left as is)`); return;
           }
           const url = f.up();
           write({ enabled: true, provider, url, stable: true, state: 'up' }); log(`up at ${url}`); return;
         }
-        const r = run(ts, ['serve', '--bg', String(port)], { encoding: 'utf8', timeout: 20000 });
-        if (r.status !== 0) throw new Error((r.stderr || r.stdout).trim().split('\n').pop());
-        const st = JSON.parse(run(ts, ['status', '--json'], { encoding: 'utf8' }).stdout);
-        const url = `https://${String(st.Self.DNSName).replace(/\.$/, '')}`;
+        const r = run(ts, ['serve', '--bg', String(port)], { timeout: 20000 });
+        if (!r.ok) throw new Error(r.error || (r.stderr || r.stdout).trim().split('\n').pop() || `tailscale serve failed (exit ${r.status})`);
+        const st = run(ts, ['status', '--json']);
+        if (!st.ok) throw new Error(st.error || (st.stderr || st.stdout).trim().split('\n').pop() || 'tailscale status failed');
+        const parsed = JSON.parse(st.stdout);
+        const url = `https://${String(parsed.Self.DNSName).replace(/\.$/, '')}`;
         write({ enabled: true, provider, url, stable: true, state: 'up' }); log(`up at ${url}`); return;
       }
       const bin = await cloudflaredPath(env);
@@ -165,7 +163,8 @@ export function supervise(vault, { root, port, run = spawnSync, whichFn = which 
           if (funnelConsent(vault.config)) {
             tailscaleFunnel({ ts, port, run }).down();
           } else {
-            run(ts, ['serve', '--bg', '--https=443', 'off'], { timeout: 10000 });
+            const r = run(ts, ['serve', '--bg', '--https=443', 'off'], { timeout: 10000 });
+            if (!r.ok) log(`tailscale serve off failed: ${r.error || (r.stderr || r.stdout).trim()}`);
           }
         }
       }

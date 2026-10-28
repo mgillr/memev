@@ -6,12 +6,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { spawnSync } from 'node:child_process';
-import { homeDir, configDir, exists, writeAtomic } from '../engine/util.mjs';
+import { homeDir, configDir, exists, writeAtomic, run as spawn } from '../engine/util.mjs';
 import { resolveRoot, out } from './common.mjs';
 import { launcherPath } from './clients.mjs';
 
-const run = (cmd, args) => { const r = spawnSync(cmd, args, { encoding: 'utf8', timeout: 15000 }); return { ok: r.status === 0, out: `${r.stdout || ''}${r.stderr || ''}`.trim() }; };
+const run = (cmd, args) => { const r = spawn(cmd, args, { timeout: 15000 }); return { ok: r.ok, out: `${r.stdout}${r.stderr}`.trim() }; };
 const LABEL = 'dev.memev.daemon';
 // launchctl, systemctl and schtasks act on the whole user account, not on the HOME in use, so with MEMEV_NO_SERVICE set
 // (tests and sandboxes set it) Memev never calls them: a sandbox must not replace the person's own login service
