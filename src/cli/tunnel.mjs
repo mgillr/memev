@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Remote access for cloud AI apps, on by default, one command to switch off (`memev cloud off`).
 // Providers, best first:
-//   tailscale   `tailscale funnel` on this machine: a stable https name on your tailnet
+//   tailscale   `tailscale serve` on this machine: a stable https name, tailnet only (never Funnel)
 //   cloudflare  a named Cloudflare tunnel you configured (`memev cloud use cloudflare --name N --hostname H`): stable
 //   quick       a Cloudflare quick tunnel: no account, but the address changes when it restarts
 // The daemon supervises the tunnel, restarts it with backoff and records the current address.
@@ -14,6 +14,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { configDir, readJson, writePrivate, writePrivateJson, writeJson, randomToken, now, exists, run } from '../engine/util.mjs';
 import { tunnelKeyFile, tunnelKey, config, saveConfig, clientToken, adminToken, api, out } from './common.mjs';
 import { publishAddressRecord } from './sync.mjs';
+import { fetchOut } from '../engine/net.mjs';
 
 export const CLOUDFLARED = {
   version: '2026.10.4',
@@ -40,7 +41,7 @@ export async function cloudflaredPath(env = process.env, { download = true } = {
   if (exists(bin)) return bin;
   if (!download || env.MEMEV_NO_DOWNLOAD) return null;
   const url = `https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED.version}/${pin[0]}`;
-  const r = await fetch(url); if (!r.ok) throw new Error(`download failed: ${r.status}`);
+  const r = await fetchOut(url, {}, env); if (!r.ok) throw new Error(`download failed: ${r.status}`);
   const buf = Buffer.from(await r.arrayBuffer());
   const got = crypto.createHash('sha256').update(buf).digest('hex');
   if (got !== pin[1]) throw new Error(`cloudflared checksum mismatch (got ${got.slice(0, 12)}…); not using it`);
@@ -78,7 +79,7 @@ export function supervise(vault, { root, port }) {
     try {
       if (provider === 'tailscale') {
         const ts = which('tailscale');
-        const r = spawnSync(ts, ['funnel', '--bg', '--yes', String(port)], { encoding: 'utf8', timeout: 20000 });
+        const r = spawnSync(ts, ['serve', '--bg', String(port)], { encoding: 'utf8', timeout: 20000 });
         if (r.status !== 0) throw new Error((r.stderr || r.stdout).trim().split('\n').pop());
         const st = JSON.parse(spawnSync(ts, ['status', '--json'], { encoding: 'utf8' }).stdout);
         const url = `https://${String(st.Self.DNSName).replace(/\.$/, '')}`;
@@ -113,7 +114,7 @@ export function supervise(vault, { root, port }) {
   function halt() {
     clearTimeout(timer);
     if (child) { child.removeAllListeners('exit'); child.kill(); child = null; }
-    if (tunnelState(root)?.provider === 'tailscale') { const ts = which('tailscale'); if (ts) spawnSync(ts, ['funnel', '--bg', String(port), 'off'], { timeout: 10000 }); }
+    if (tunnelState(root)?.provider === 'tailscale') { const ts = which('tailscale'); if (ts) spawnSync(ts, ['serve', '--bg', '--https=443', 'off'], { timeout: 10000 }); }
   }
   start();
   // the relay (off unless the setting is on) is kept up beside the tunnel; see relay.mjs and docs/RELAY.md

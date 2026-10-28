@@ -23,6 +23,11 @@ and show me the checklist it prints."
    `--org` (an install for an organisation) leaves it off until `memev cloud on --yes`,
 6. prints a checklist: what is connected, what needs one click from you, and how to back up to GitHub.
 
+Run `memev ready`, then open a new session or chat in each connected app. It prints "<app> joined at
+HH:MM" as each one starts, and "Ready: <app> and <app> share one memory" once one app recalls a
+memory another one saved: ask one to remember something and another about it. `--timeout SECONDS`
+(default 600) sets how long it waits; it exits non-zero and names the apps that did not join.
+
 Open a new session in any connected app. It starts with a short resume card: what you were doing,
 what is next, recent decisions. Work as usual. Memev saves a checkpoint before compaction and at the
 end of each turn; each prompt gets the few memories that match it.
@@ -66,6 +71,8 @@ differs:
 - Settings and the `memev.cmd` launcher live in `%APPDATA%\memev`; the vault is `%USERPROFILE%\memev`.
 - On a terminal, init offers to add the launcher folder to your user PATH. Open a new terminal
   afterwards. `memev path remove` takes it off again; `memev uninstall` does not.
+- Apps are registered to run `node.exe` with Memev's runtime script as its first argument, not the
+  `memev.cmd` launcher: a Node app cannot start a `.cmd` file without a shell.
 - The privacy check reads each private file's access list (`icacls`): you, SYSTEM and
   Administrators may have access, no one else.
 - Memev does not start at login on Windows yet. Run `memev start` after you sign in.

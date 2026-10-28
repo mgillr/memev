@@ -8,6 +8,7 @@ import { initVault, isVault, VERSION } from '../engine/vault.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
 import { writeAtomic, configDir } from '../engine/util.mjs';
 import { renderCard } from '../engine/card.mjs';
+import { fetchOut } from '../engine/net.mjs';
 
 const HELP = `memev ${VERSION}: one memory shared by every AI session you run
 
@@ -26,6 +27,7 @@ Setup
   memev disconnect [client|all]    remove it again, restoring the app's config
   memev uninstall [--purge]        disconnect everything and stop; --purge also removes the service files
   memev clients                    which AI apps are installed and connected
+  memev ready [--timeout S]        wait for each connected app's first session, then for two of them to share a memory
   memev preflight [--port N]       check this computer first: Node 22 or newer, git, the port, a folder to write to
                                    (init runs it before it writes anything and stops with the fix for your system)
   memev path add|remove|status     put the memev command on your PATH (a line in your shell's startup file, or your user PATH on
@@ -33,7 +35,8 @@ Setup
   memev status | doctor [--fix] [--bundle]
   memev cloud on|off|status|url    reach this vault from cloud AI apps through a private tunnel (on by default
                                    for personal installs, off for --org installs)
-  memev github setup               back the vault up to your own private GitHub repository
+  memev github setup [--host H]    back the vault up to your own private GitHub repository (--host for GitHub Enterprise)
+  memev backup set <git-url>       back the vault up to any private git remote (GitHub Enterprise, self-hosted, file)
   memev service install|remove     start Memev at login (systemd or launchd)
   memev devices [enroll|remove|rotate|rename|keygen]   computers and apps using this vault, each with its own credential
   memev invite [--ttl SECONDS]     print a one-time code, link and QR code so another computer can join
@@ -61,9 +64,41 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', bus: './bus-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', bus: './bus-cli.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
+const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+/**
+ * The launcher every app runs on macOS and Linux. It uses node from PATH when that is Node 22 or newer, and otherwise
+ * the Node recorded at install, so a Node upgrade that removes the old binary does not stop Memev in every app.
+ */
+export function launcherScript(node, target) {
+  return `#!/bin/sh
+# node from PATH when it is Node 22 or newer, otherwise the Node recorded at install
+REC=${sq(node)}
+JS=${sq(target)}
+N=$(command -v node 2>/dev/null)
+if [ -n "$N" ] && [ "$N" != "$REC" ]; then
+  V=$("$N" --version 2>/dev/null); V=\${V#v}; V=\${V%%.*}
+  case "$V" in ''|*[!0-9]*) ;; *) [ "$V" -ge 22 ] && exec "$N" "$JS" "$@" ;; esac
+fi
+[ -x "$REC" ] && exec "$REC" "$JS" "$@"
+echo "memev: no Node.js 22 or newer: node on PATH is missing or older, and $REC is gone. Install Node.js 22 or newer, then run: node \\"$JS\\" doctor --fix" >&2
+exit 127
+`;
+}
+
+/** The Node to record: its name on PATH when that is this same Node (a link such as /usr/local/bin/node outlives an upgrade), else this binary. */
+export function recordedNode(env = process.env) {
+  const real = (f) => { try { return fs.realpathSync(f); } catch { return null; } };
+  for (const d of String(env.PATH || '').split(path.delimiter)) {
+    const f = d && path.join(d, 'node');
+    if (!f || !fs.existsSync(f)) continue;
+    return real(f) === real(process.execPath) ? f : process.execPath; // the first node on PATH decides
+  }
+  return process.execPath;
+}
+
 export function installRuntime(env = process.env) {
   const dir = path.join(configDir(env), 'runtime', VERSION);
   if (path.resolve(PKG) !== path.resolve(dir)) {
@@ -74,7 +109,7 @@ export function installRuntime(env = process.env) {
   fs.mkdirSync(bin, { recursive: true });
   const target = path.join(dir, 'bin', 'memev.mjs');
   if (process.platform === 'win32') fs.writeFileSync(path.join(bin, 'memev.cmd'), `@"${process.execPath}" "${target}" %*\r\n`);
-  else writeAtomic(path.join(bin, 'memev'), `#!/bin/sh\nexec "${process.execPath}" "${target}" "$@"\n`, 0o755);
+  else writeAtomic(path.join(bin, 'memev'), launcherScript(recordedNode(env), target), 0o755);
   return { dir, launcher: path.join(bin, process.platform === 'win32' ? 'memev.cmd' : 'memev') };
 }
 
@@ -219,7 +254,7 @@ async function run(argv, env) {
     }
     case 'claims': {
       need(); const { Vault } = await import('../engine/vault.mjs');
-      if (await healthy(root)) { const r = await fetch(`http://127.0.0.1:${daemonInfo(root).port}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${clientToken(root, 'cli')}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'memev_claims', arguments: { status: flags.status, subject: flags.subject } } }) }); console.log((await r.json()).result.content[0].text); return 0; }
+      if (await healthy(root)) { const r = await fetchOut(`http://127.0.0.1:${daemonInfo(root).port}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${clientToken(root, 'cli')}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'memev_claims', arguments: { status: flags.status, subject: flags.subject } } }) }); console.log((await r.json()).result.content[0].text); return 0; }
       const v = new Vault(root, { git: false }).open(); try { json(v.claims({ agent: 'cli', scopes: ['read'], paths: ['**'] }, { status: flags.status, subject: flags.subject })); } finally { v.close(); } return 0;
     }
     case 'token': {
@@ -231,6 +266,25 @@ async function run(argv, env) {
       throw new Error('memev token list|issue|revoke|rotate');
     }
     case 'admin-token': need(); console.log(adminToken(root) || '(none)'); return 0;
+    case 'backup': {
+      const sub = pos[0] || 'status';
+      if (sub === 'set') {
+        const url = pos[1];
+        if (!url) throw new Error('memev backup set <git-url>');
+        const { git } = await import('../engine/git.mjs');
+        if (git(root, ['remote', 'get-url', 'origin']).ok) git(root, ['remote', 'set-url', 'origin', url]); else git(root, ['remote', 'add', 'origin', url]);
+        const cfg = config(root); cfg.backup = { remote: url }; saveConfig(root, cfg);
+        console.log(`Backup remote set to ${url}`);
+        return 0;
+      }
+      if (sub === 'status') {
+        const { git } = await import('../engine/git.mjs');
+        const url = git(root, ['remote', 'get-url', 'origin']).out;
+        console.log(url ? `Backing up to ${url}` : 'Not set up: memev backup set <git-url>');
+        return 0;
+      }
+      throw new Error('memev backup set <git-url> | status');
+    }
     default: console.error(`unknown command: ${cmd}\n`); console.log(HELP); return 2;
   }
 }

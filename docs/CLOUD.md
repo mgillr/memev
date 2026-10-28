@@ -8,7 +8,7 @@ goes to the cloud AI app that asked for it.
 
 The tunnel is chosen in this order (`memev cloud use auto|tailscale|cloudflare|quick` to pin one):
 
-1. **Tailscale Funnel** if `tailscale` is installed and logged in: a stable `https://<machine>.<tailnet>.ts.net` address.
+1. **Tailscale serve** if `tailscale` is installed and logged in: a stable `https://<machine>.<tailnet>.ts.net` address, reachable only from your tailnet (Memev never opens a Funnel).
 2. **A named Cloudflare tunnel** if you set one up: `memev cloud use cloudflare --name <tunnel> --hostname <host>`.
 3. **A Cloudflare quick tunnel**: no account, works anywhere, but the address changes when it restarts.
    Memev downloads a pinned `cloudflared` release and checks its SHA-256 before running it.

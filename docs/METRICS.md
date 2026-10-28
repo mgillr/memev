@@ -80,9 +80,11 @@ lands, at the licence endpoint, because that is the only place that sees it.
   (`issued` or `refused`). Counts are per licence id and per day.
 - What is not counted: licence checks. A licence is verified on the computer against the vendor
   public key, offline, so day-to-day use never reaches the endpoint and cannot be counted there.
-- Where the counts are kept, and who operates the endpoint, is for the owner to decide. Until that
-  is decided the client has no built-in endpoint address (`--server` or `MEMEV_LICENSE_URL`), so
-  there is nothing to count against yet.
+- Where the counts are kept: beside the licence endpoint, and run by the owner with it. The
+  endpoint URL comes from configuration (`--server` or `MEMEV_LICENSE_URL`); this repository holds
+  no address, host, or IP. The milestone report works the same way: its URL comes from
+  configuration (`MEMEV_REPORT_URL`) and there is no built-in address, so until one is set nothing
+  is sent.
 
 The queries, written for a table `activations(licence_id, day, result)`:
 

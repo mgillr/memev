@@ -1,0 +1,9 @@
+# The published package is defined by the "files" allowlist in package.json.
+# This file is a second guard so development-only paths never ship, even if that list changes.
+test/
+scripts/
+contracts/
+.github/
+docs/BENCH.md
+*.tgz
+.proofline/

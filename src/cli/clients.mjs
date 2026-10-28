@@ -7,10 +7,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { configDir, homeDir, exists, readJson, writeJson, writeAtomic, sha256, now } from '../engine/util.mjs';
+import { VERSION } from '../engine/vault.mjs';
+import { changeJsonc } from '../engine/jsonc.mjs';
 import { out } from './common.mjs';
 
 const BLOCK_START = '<!-- memev:start -->', BLOCK_END = '<!-- memev:end -->';
 const TOML_START = '# memev:start', TOML_END = '# memev:end';
+// A table header line in a Codex config.toml. [mcp_servers.memev.x] is a different table and does not match.
+const MEMEV_TABLE = /^\[mcp_servers\.memev\]/m;
 // The block written into CLAUDE.md, AGENTS.md, GEMINI.md and the like. It repeats no rule: the rules come once per
 // session, from the session-start hook or the MCP instructions (src/engine/card.mjs).
 export const INSTRUCTIONS = `${BLOCK_START}
@@ -25,7 +29,14 @@ export function platformDirs(env = process.env) {
 }
 
 const isOurs = (cmd) => typeof cmd === 'string' && /memev/.test(cmd) && / hook /.test(cmd);
-const hookCmd = (launcher, event, client, format) => `"${launcher}" hook ${event} --client ${client}${format ? ` --format ${format}` : ''}`;
+const hookCmd = (launcher, event, client, format) => `${launcher} hook ${event} --client ${client}${format ? ` --format ${format}` : ''}`;
+
+// Since Node's CVE-2024-27980 fix, a Node app cannot spawn a .cmd file without a shell. On win32 the
+// registered command is the absolute node.exe with the runtime script as its first argument, never the
+// memev.cmd launcher.
+const winSpawn = (env, platform) => platform === 'win32'
+  ? { node: path.join(path.dirname(process.execPath), 'node.exe'), script: path.join(configDir(env), 'runtime', VERSION, 'bin', 'memev.mjs') }
+  : null;
 
 // matcher-group hooks (Claude Code, Codex, Gemini CLI)
 function setGroupHooks(j, events) {
@@ -76,15 +87,26 @@ function removeBlock(text, [s, e] = [BLOCK_START, BLOCK_END]) {
   return before + after;
 }
 const tomlEsc = (s) => JSON.stringify(s);
+// Codex config.toml: a second [mcp_servers.memev] table would make the file ambiguous, so when the user
+// already has one I leave it exactly as-is instead of appending Memev's marked block.
+function upsertCodexToml(t, block) {
+  const base = removeBlock(t, [TOML_START, TOML_END]);
+  if (MEMEV_TABLE.test(base)) return base;
+  return addBlock(base, block, [TOML_START, TOML_END]);
+}
+// The user table is still there after the edit: say so, so the skip is never a silent no-op.
+const codexTomlSkipNote = (b) => (b && MEMEV_TABLE.test(removeBlock(b, [TOML_START, TOML_END])) ? 'Codex already has a [mcp_servers.memev] table in config.toml, so Memev left it as-is' : null);
 
 const json = (file, apply, remove) => ({ file, kind: 'json', apply, remove });
-const text = (file, apply, remove) => ({ file, kind: 'text', apply, remove });
+const text = (file, apply, remove, note) => ({ file, kind: 'text', apply, remove, note });
 const mdBlock = (file) => text(file, (t) => addBlock(t, INSTRUCTIONS), (t) => removeBlock(t));
 
 /** The apps Memev knows. mode: 'hooks' = state injected by hooks; 'instructions' = MCP + instructions only. */
-export function clientDefs(env, launcher) {
+export function clientDefs(env, bin, platform = process.platform) {
   const { home, appData } = platformDirs(env);
-  const stdio = (id) => ({ command: launcher, args: ['mcp', '--client', id] });
+  const win = winSpawn(env, platform);
+  const launcher = win ? `"${win.node}" "${win.script}"` : `"${bin}"`;
+  const stdio = (id) => win ? { command: win.node, args: [win.script, 'mcp', '--client', id] } : { command: bin, args: ['mcp', '--client', id] };
   const defs = [
     { id: 'claude-code', name: 'Claude Code', mode: 'hooks', detect: () => exists(path.join(home, '.claude')) || exists(path.join(home, '.claude.json')),
       edits: () => [
@@ -99,7 +121,7 @@ export function clientDefs(env, launcher) {
       ] },
     { id: 'codex', name: 'Codex CLI', mode: 'hooks', detect: () => exists(path.join(home, '.codex')),
       edits: () => [
-        text(path.join(home, '.codex', 'config.toml'), (t) => addBlock(t, `${TOML_START}\n[mcp_servers.memev]\ncommand = ${tomlEsc(launcher)}\nargs = ["mcp", "--client", "codex"]\n${TOML_END}`, [TOML_START, TOML_END]), (t) => removeBlock(t, [TOML_START, TOML_END])),
+        text(path.join(home, '.codex', 'config.toml'), (t) => upsertCodexToml(t, `${TOML_START}\n[mcp_servers.memev]\ncommand = ${tomlEsc(win ? win.node : bin)}\nargs = [${[...(win ? [win.script] : []), 'mcp', '--client', 'codex'].map(tomlEsc).join(', ')}]\n${TOML_END}`), (t) => removeBlock(t, [TOML_START, TOML_END]), codexTomlSkipNote),
         json(path.join(home, '.codex', 'hooks.json'), (j) => setGroupHooks(j, {
           SessionStart: { matcher: 'startup|resume|clear|compact', command: hookCmd(launcher, 'session-start', 'codex'), timeout: 10 },
           UserPromptSubmit: { command: hookCmd(launcher, 'prompt', 'codex'), timeout: 10 },
@@ -127,7 +149,7 @@ export function clientDefs(env, launcher) {
           preCompact: hookCmd(launcher, 'pre-compact', 'cursor', 'cursor'),
           stop: hookCmd(launcher, 'stop', 'cursor', 'cursor'),
         }), removeFlatHooks),
-      ], note: 'Cursor injects the resume card at session start; per-prompt recall and post-compaction state come through the MCP instructions (Cursor hooks cannot add context to a prompt).' },
+      ], manual: 'Check that Settings → MCP shows memev connected, and allow its tools.', note: 'Cursor injects the resume card at session start; per-prompt recall and post-compaction state come through the MCP instructions (Cursor hooks cannot add context to a prompt).' },
     { id: 'claude-desktop', name: 'Claude Desktop', mode: 'instructions', detect: () => exists(path.join(appData, 'Claude')),
       edits: () => [json(path.join(appData, 'Claude', 'claude_desktop_config.json'), setServer('mcpServers', stdio('claude-desktop')), delServer('mcpServers'))] },
     { id: 'windsurf', name: 'Windsurf', mode: 'instructions', detect: () => exists(path.join(home, '.codeium', 'windsurf')),
@@ -153,24 +175,30 @@ function plan(def) {
     const before = readBytes(e.file);
     let after;
     if (e.kind === 'json') {
+      const text = before ? before.toString('utf8') : '';
       let obj = {};
-      if (before && before.toString('utf8').trim()) { try { obj = JSON.parse(before.toString('utf8')); } catch { return { error: `${e.file} is not plain JSON (comments?); add Memev by hand: see docs/CLIENTS.md` }; } }
-      if (typeof obj !== 'object' || Array.isArray(obj) || obj === null) return { error: `${e.file} is not a JSON object` };
-      after = Buffer.from(`${JSON.stringify(e.apply(obj), null, 2)}\n`);
+      if (text.trim()) { try { obj = JSON.parse(text); } catch { obj = undefined; } }
+      if (obj === undefined) { // comments or trailing commas (VS Code, Zed): change the text in place, so they stay
+        try { after = Buffer.from(changeJsonc(text, e.apply)); } catch (err) { return { error: `${e.file} ${err.message}; add Memev by hand: see docs/CLIENTS.md` }; }
+      } else {
+        if (typeof obj !== 'object' || Array.isArray(obj) || obj === null) return { error: `${e.file} is not a JSON object` };
+        after = Buffer.from(`${JSON.stringify(e.apply(obj), null, 2)}\n`);
+      }
     } else after = Buffer.from(e.apply(before ? before.toString('utf8') : ''));
     changes.push({ e, before, after });
   }
   return { changes };
 }
 
-export function connect(id, { env = process.env, launcher, dryRun = false } = {}) {
-  const def = clientDefs(env, launcher).find((d) => d.id === id);
+export function connect(id, { env = process.env, launcher, dryRun = false, platform = process.platform } = {}) {
+  const def = clientDefs(env, launcher, platform).find((d) => d.id === id);
   if (!def) throw new Error(`unknown app: ${id}`);
   const p = plan(def);
   if (p.error) return { id, name: def.name, status: 'needs-manual', reason: p.error };
   const st = loadState(env);
   const changed = p.changes.filter((c) => !c.before || !c.before.equals(c.after));
-  if (dryRun) return { id, name: def.name, status: 'would-change', files: changed.map((c) => c.e.file) };
+  const notes = p.changes.map((c) => (c.e.note ? c.e.note(c.before ? c.before.toString('utf8') : '') : null)).filter(Boolean);
+  if (dryRun) return { id, name: def.name, status: 'would-change', files: changed.map((c) => c.e.file), notes };
   for (const c of changed) {
     const rec = st.files[c.e.file];
     if (rec && c.before && sha256(c.before) !== rec.after_sha) rec.stale_backup = true; // edited since: never roll those edits back
@@ -187,12 +215,12 @@ export function connect(id, { env = process.env, launcher, dryRun = false } = {}
   st.connected[id] = { at: now(), mode: def.mode, launcher };
   st.declined = st.declined.filter((x) => x !== id);
   saveState(env, st);
-  return { id, name: def.name, status: changed.length ? 'added' : 'already', mode: def.mode, files: changed.map((c) => c.e.file), manual: def.manual || null, note: def.note || null };
+  return { id, name: def.name, status: changed.length ? 'added' : 'already', mode: def.mode, files: changed.map((c) => c.e.file), manual: def.manual || null, note: def.note || null, notes };
 }
 
-export function disconnect(id, { env = process.env, launcher, decline = true } = {}) {
+export function disconnect(id, { env = process.env, launcher, decline = true, platform = process.platform } = {}) {
   const st = loadState(env);
-  const defs = clientDefs(env, launcher || st.connected[id]?.launcher || 'memev');
+  const defs = clientDefs(env, launcher || st.connected[id]?.launcher || 'memev', platform);
   const def = defs.find((d) => d.id === id);
   const results = [];
   for (const [file, rec] of Object.entries(st.files)) {
@@ -204,7 +232,11 @@ export function disconnect(id, { env = process.env, launcher, decline = true } =
     } else if (cur && def) {
       const e = def.edits().find((x) => x.file === file);
       let next;
-      if (e.kind === 'json') { try { next = `${JSON.stringify(e.remove(JSON.parse(cur.toString('utf8'))), null, 2)}\n`; } catch { results.push({ file, action: 'needs-manual' }); continue; } }
+      if (e.kind === 'json') {
+        const text = cur.toString('utf8'); let obj;
+        try { obj = JSON.parse(text); } catch {}
+        try { next = obj === undefined ? changeJsonc(text, e.remove) : `${JSON.stringify(e.remove(obj), null, 2)}\n`; } catch { results.push({ file, action: 'needs-manual' }); continue; }
+      }
       else next = e.remove(cur.toString('utf8'));
       if (!rec.existed && (next.trim() === '{}' || next.trim() === '')) fs.rmSync(file, { force: true });
       else writeAtomic(file, next, fs.statSync(file).mode & 0o777);
@@ -227,14 +259,14 @@ export const RESTART = {
 };
 // Apps whose session-start hook brings the protocol, so their MCP instructions need not repeat it.
 export const HOOK_CLIENTS = new Set(clientDefs({}, 'memev').filter((d) => d.mode === 'hooks').map((d) => d.id));
-export function detect(env = process.env, launcher = 'memev') {
+export function detect(env = process.env, launcher = 'memev', platform = process.platform) {
   const st = loadState(env);
-  return clientDefs(env, launcher).map((d) => ({ id: d.id, name: d.name, mode: d.mode, found: !!d.detect(), connected: !!st.connected[d.id], declined: st.declined.includes(d.id), note: d.note || null, manual: d.manual || null, restart: RESTART[d.id] || `Restart ${d.name}` }));
+  return clientDefs(env, launcher, platform).map((d) => ({ id: d.id, name: d.name, mode: d.mode, found: !!d.detect(), connected: !!st.connected[d.id], declined: st.declined.includes(d.id), note: d.note || null, manual: d.manual || null, restart: RESTART[d.id] || `Restart ${d.name}` }));
 }
 
 /** Connect every app that is installed and not yet connected (and not declined, unless forced). */
-export function connectAll({ env = process.env, launcher, force = false } = {}) {
-  return detect(env, launcher).filter((c) => c.found && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
+export function connectAll({ env = process.env, launcher, force = false, platform = process.platform } = {}) {
+  return detect(env, launcher, platform).filter((c) => c.found && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
 }
 
 export function launcherPath(env = process.env) { return path.join(configDir(env), 'bin', process.platform === 'win32' ? 'memev.cmd' : 'memev'); }
@@ -256,10 +288,11 @@ export async function command(cmd, pos, flags, { env, root }) {
       else if (r.status === 'would-change') out.info(`${r.name}: would change ${r.files.join(', ') || 'nothing'}`);
       else out.bad(`${r.name}: ${r.reason}`);
       if (r.manual) out.warn(r.manual);
+      for (const n of r.notes || []) out.warn(n);
     }
     const ids = res.filter((r) => ['added', 'already'].includes(r.status)).map((r) => r.id);
     if (ids.length && !flags['dry-run']) await seatOnBus({ root, env, ids, flags });
-    return res.some((r) => r.status === 'failed') ? 1 : 0;
+    return res.some((r) => r.status === 'failed' || (target !== 'all' && r.status === 'needs-manual')) ? 1 : 0;
   }
   if (cmd === 'disconnect' || cmd === 'uninstall') {
     const st = loadState(env);

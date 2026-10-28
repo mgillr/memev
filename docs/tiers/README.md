@@ -23,6 +23,8 @@ sign-in, departments and roles), not by size.
 
 Services, remote and onsite work, travel and response times are in [services.md](services.md).
 
+Planned add-ons and services, and the custom module use cases, are in [the add-ons roadmap](../roadmap/add-ons.md).
+
 ## What is built and what is planned
 
 | Part | Status | Notes |
