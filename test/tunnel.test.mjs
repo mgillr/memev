@@ -47,4 +47,6 @@ test('MEM-028 AC01: with a stubbed tailscale, enabling computer access runs tail
   const calls = fs.readFileSync(log, 'utf8').split('\n').map((l) => l.trim()).filter(Boolean);
   assert.ok(calls.some((l) => l.startsWith('serve')), `expected a "tailscale serve" call, got: ${calls.join(' | ')}`);
   assert.ok(!calls.some((l) => l.startsWith('funnel')), `must never call "tailscale funnel", got: ${calls.join(' | ')}`);
+  assert.ok(!calls.some((l) => l.includes('--shutdown')), `serve has no --shutdown flag, got: ${calls.join(' | ')}`);
+  assert.ok(calls.some((l) => l === 'serve --bg --https=443 off'), `stopping must turn off the one serve listener it started, got: ${calls.join(' | ')}`);
 });

@@ -114,7 +114,7 @@ export function supervise(vault, { root, port }) {
   function halt() {
     clearTimeout(timer);
     if (child) { child.removeAllListeners('exit'); child.kill(); child = null; }
-    if (tunnelState(root)?.provider === 'tailscale') { const ts = which('tailscale'); if (ts) spawnSync(ts, ['serve', '--bg', '--shutdown'], { timeout: 10000 }); }
+    if (tunnelState(root)?.provider === 'tailscale') { const ts = which('tailscale'); if (ts) spawnSync(ts, ['serve', '--bg', '--https=443', 'off'], { timeout: 10000 }); }
   }
   start();
   // the relay (off unless the setting is on) is kept up beside the tunnel; see relay.mjs and docs/RELAY.md
