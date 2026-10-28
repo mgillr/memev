@@ -181,12 +181,12 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
     { id: 'opencode', name: 'OpenCode', mode: 'instructions', detect: () => exists(path.join(home, '.config', 'opencode')),
       edits: () => {
         const edits = [json(path.join(home, '.config', 'opencode', 'opencode.json'), setServer('mcp', opencodeLocal('opencode')), delServer('mcp'))];
-        const agentsFile = path.join(home, '.config', 'opencode', 'AGENTS.md');
-        if (!exists(agentsFile) && exists(path.join(home, '.claude', 'CLAUDE.md'))) {
-          // Claude rules already live in CLAUDE.md; creating AGENTS.md would switch them off.
+        const mdPath = path.join(home, '.config', 'opencode', 'AGENTS.md');
+        if (!exists(mdPath) && exists(path.join(home, '.claude', 'CLAUDE.md'))) {
+          // Rules already live in CLAUDE.md; creating the OpenCode rules file would switch them off.
           // MCP instructions carry the protocol instead.
         } else {
-          edits.push(mdBlock(agentsFile));
+          edits.push(mdBlock(mdPath));
         }
         return edits;
       } },
@@ -336,7 +336,7 @@ export async function command(cmd, pos, flags, { env, root }) {
   }
   if (cmd === 'connect') {
     const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force, project: flags.project }) : [connect(target, { env, launcher, dryRun: !!flags['dry-run'], project: flags.project })];
-    if (!res.length) console.log('No AI apps found. Install one (Claude Code, Codex, Cursor, Gemini CLI, Claude Desktop, Windsurf, VS Code, Zed, OpenCode, GitHub Copilot CLI) and run memev connect again.');
+    if (!res.length) console.log('No AI apps found. Install one (Codex, Cursor, Gemini CLI, Windsurf, VS Code, Zed, OpenCode, GitHub Copilot CLI, or a Claude product) and run memev connect again.');
     for (const r of res) {
       if (r.status === 'added') out.ok(`${r.name}: connected (${r.mode === 'hooks' ? 'hooks + MCP + instructions' : 'MCP + instructions'})`);
       else if (r.status === 'already') out.ok(`${r.name}: already connected`);
