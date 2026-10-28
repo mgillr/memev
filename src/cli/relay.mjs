@@ -202,8 +202,20 @@ export function relayFetch(address, { relay, path: p = '/', method = 'GET', head
 
 // ---- the setting and the daemon side
 export const relaySetting = (root) => ({ enabled: false, url: null, domain: null, default_url: null, default_domain: null, ...(config(root).remote?.relay || {}) });
-/** A Personal licence that is currently valid. The free tier and every other tier are not. */
-export const personalActive = (license) => license?.state === 'valid' && license.tier === 'personal';
+/** A Personal licence that is valid or still in its grace period. The free tier and every other tier are not. */
+export const personalActive = (license) => (license?.state === 'valid' || license?.state === 'grace') && license.tier === 'personal';
+
+/** Store a relay address the licence service sent beside the signed licence. An address that is missing or not a relay URL is left untouched. */
+export function applyRelayDefault(root, relay) {
+  if (!relay || typeof relay !== 'object') return false;
+  const url = typeof relay.default_url === 'string' ? relay.default_url.trim() : '';
+  const domain = typeof relay.default_domain === 'string' ? relay.default_domain.trim() : '';
+  if (!url || !domain) return false;
+  try { parseRelayUrl(url); } catch { return false; }
+  if (!/^[a-z0-9.-]+$/i.test(domain)) return false;
+  setRelay(root, { default_url: url, default_domain: domain });
+  return true;
+}
 export function setRelay(root, patch) { const c = config(root); c.remote = { ...c.remote, relay: { ...relaySetting(root), ...patch } }; saveConfig(root, c); return c.remote.relay; }
 export const relayState = (root) => readJson(relayStateFile(root), null);
 
