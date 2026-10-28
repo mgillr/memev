@@ -43,3 +43,11 @@ test('MEM-078 AC03: memev service remove deletes the task', async () => {
   const t = del.args.indexOf('/tn');
   assert.ok(t > -1 && del.args[t + 1] === 'Memev Daemon', 'it deletes the memev task');
 });
+
+test('MEM-078: the task command quotes the launcher and the vault folder so a path with spaces still starts', async () => {
+  const calls = [];
+  await installService({ env: { ...process.env, USERNAME: 'rider' }, root: 'C:\\Users\\A B\\vault', platform: 'win32', run: stubRun(calls) });
+  const create = calls.find((c) => c.cmd === 'schtasks' && c.args[0] === 'create');
+  const tr = create.args[create.args.indexOf('/tr') + 1];
+  assert.match(tr, /^"[^"]+memev\.cmd" serve --root "C:\\Users\\A B\\vault"$|^"[^"]+memev" serve --root "C:\\Users\\A B\\vault"$/);
+});

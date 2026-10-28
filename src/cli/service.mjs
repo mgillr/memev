@@ -61,7 +61,7 @@ export async function installService({ env = process.env, root, activate = true,
   const launcher = launcherPath(env);
   if (kind === 'schtasks') {
     const user = env.USERNAME || env.USER || os.userInfo().username;
-    const r = runCmd('schtasks', ['create', '/tn', TASK, '/tr', `"${launcher} serve --root ${root}"`, '/sc', 'onlogon', '/ru', user, '/f']);
+    const r = runCmd('schtasks', ['create', '/tn', TASK, '/tr', `"${launcher}" serve --root "${root}"`, '/sc', 'onlogon', '/ru', user, '/f']);
     return r.ok ? { status: 'added', detail: `Task Scheduler entry "${TASK}" starts the daemon at logon for ${user}` } : { status: 'needs-manual', detail: `task creation failed: ${r.out.split('\n')[0]}` };
   }
   writeAtomic(file, renderUnit(kind, { launcher, root, logFile: path.join(root, '.memev', 'daemon.log') }), 0o644);
