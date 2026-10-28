@@ -5,8 +5,8 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
-import { sandbox } from './helpers/cli.mjs';
+import { spawn, spawnSync } from 'node:child_process';
+import { sandbox, BIN } from './helpers/cli.mjs';
 import { tmpdir, cleanup } from './helpers/tmp.mjs';
 import { fixFor } from '../src/cli/preflight.mjs';
 
@@ -79,4 +79,25 @@ test('MEM-100 AC02: second vault (T-FAIL-15): a second vault never passes for th
     assert.match(doc.out, /two vaults on this computer/, doc.out);
     assert.ok(doc.out.includes(A.vault_id) && doc.out.includes(B.vault_id), doc.out);
   } finally { b.stop(); a.stop(); }
+});
+
+test('MEM-100 AC02: node-upgrade (T-FAIL-16): with the Node that ran init removed, apps still reach Memev through the launcher and doctor names the Node it uses', { skip: process.platform === 'win32' && 'POSIX launcher' }, () => {
+  const sb = sandbox();
+  const old = path.join(tmpdir('oldnode-'), 'node'); // a Node that is its own file, as nvm, fnm, Volta or a Homebrew Cellar leaves it
+  try { fs.linkSync(process.execPath, old); } catch { fs.copyFileSync(process.execPath, old); fs.chmodSync(old, 0o755); }
+  const launcher = path.join(sb.env.MEMEV_CONFIG_DIR, 'bin', 'memev');
+  const app = (args) => spawnSync(launcher, args, { env: sb.env, encoding: 'utf8', timeout: 60000 });
+  try {
+    const r = spawnSync(old, [BIN, 'init', '--port', String(sb.port), ...INIT], { env: { ...sb.env, PATH: path.dirname(old) + path.delimiter + sb.env.PATH }, encoding: 'utf8', timeout: 60000 });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    sb.stop();
+    fs.rmSync(path.dirname(old), { recursive: true, force: true }); // the upgrade removes the old Node
+    // what an app does through the launcher: start Memev, save a memory, recall it
+    const start = app(['start']);
+    assert.equal(start.status, 0, start.stdout + start.stderr);
+    assert.equal(app(['remember', 'after the upgrade the kettle note is still saved']).status, 0);
+    assert.match(app(['recall', 'kettle note upgrade']).stdout, /kettle note/);
+    const doc = sb.run(['doctor']);
+    assert.match(doc.out, /✓ stable launcher installed: .* runs .*node \(v\d+\.\d+\.\d+\), found on PATH/, doc.out);
+  } finally { sb.stop(); }
 });

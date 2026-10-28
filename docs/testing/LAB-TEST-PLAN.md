@@ -341,8 +341,8 @@ the tests that need a second computer. Seats are `<app>@host` on the vault's com
 | T-FAIL-13 | licence file with a future issue date, an expired date inside the grace period, and past it | not yet valid (the vault counts as free); grace (computers can still be added); expired (no computer can be added, added ones read only). The host vault keeps reading and writing in every case |
 
 T-FAIL-07 and T-FAIL-14 to T-FAIL-19 are the failure paths found in the review. `test/fail-paths.test.mjs` runs
-T-FAIL-07, T-FAIL-14 and T-FAIL-15 on every pull request; the others need a second computer, a proxy, another
-Node or Windows, so they are run here by hand (`test/proxy.test.mjs` and the windows-latest job cover parts of
+T-FAIL-07 and T-FAIL-14 to T-FAIL-16 on every pull request; the others need a second computer, a proxy or
+Windows, so they are run here by hand (`test/proxy.test.mjs` and the windows-latest job cover parts of
 T-FAIL-18 and T-FAIL-19).
 
 ## 10. Windows 11 (preview)
