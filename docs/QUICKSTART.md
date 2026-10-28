@@ -1,5 +1,7 @@
 # Quickstart
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 You need Node 22 or newer and git.
 
 In a copy of the Memev repository:
@@ -17,10 +19,11 @@ and show me the checklist it prints."
 1. creates the vault in `~/memev` (choose another place with `--root DIR`),
 2. copies Memev to a stable place (`~/.config/memev/runtime`) and adds a launcher at
    `~/.config/memev/bin/memev`, so your apps never point into the folder you installed from,
-3. starts the Memev daemon on `127.0.0.1:7787` and installs a login service (systemd or launchd),
+3. starts the Memev daemon on `127.0.0.1:7787` and installs a login service (systemd, launchd, or a
+   Task Scheduler entry on Windows),
 4. connects every AI app it finds (see [CLIENTS.md](CLIENTS.md)), backing up each file it changes,
-5. opens a private tunnel for cloud apps (see [CLOUD.md](CLOUD.md)); `--local-only` skips it, and
-   `--org` (an install for an organisation) leaves it off until `memev cloud on --yes`,
+5. leaves the private tunnel for cloud apps off (see [CLOUD.md](CLOUD.md)); init asks once on a terminal,
+   or `memev cloud on` turns it on; `--local-only` and `--org` (an install for an organisation) skip the question,
 6. prints a checklist: what is connected, what needs one click from you, and how to back up to GitHub.
 
 Run `memev ready`, then open a new session or chat in each connected app. It prints "<app> joined at
@@ -45,6 +48,7 @@ memev card --project api           # the resume card an app would see
 memev claims --status fact         # what the graph holds as established
 memev doctor                       # check everything; --fix repairs what it can
 memev clients                      # which apps are connected
+memev bus hello <seat>             # guided test: post a hello and wait for the app to read it
 memev cloud status                 # remote access
 memev github setup                 # back the vault up to a private GitHub repo
 ```
@@ -53,9 +57,11 @@ memev github setup                 # back the vault up to a private GitHub repo
 
 ```
 ~/memev/
-  memory/        decisions, facts, the north star (month files: memory/2026-10.md)
+  memory/        the north star, and decisions, facts and other kinds, one file per month
+                 (memory/decisions/2026-10.md)
   work/active/   one file per project: current task, done, doing, next
-  journal/       one file per session: what was asked and answered
+  work/sessions/ one file per session: what was asked and answered
+  bus/           the comms bus: seats, messages, heartbeats (see BUS.md)
   contracts/     signed contracts
   .memev/        the log, index, graph, tokens and config (not in git)
 ```
@@ -75,7 +81,8 @@ differs:
   `memev.cmd` launcher: a Node app cannot start a `.cmd` file without a shell.
 - The privacy check reads each private file's access list (`icacls`): you, SYSTEM and
   Administrators may have access, no one else.
-- Memev does not start at login on Windows yet. Run `memev start` after you sign in.
+- Memev starts at login through a per-user Task Scheduler entry (`memev service install`, which init
+  runs). If that cannot be created, init says so; run `memev start` after you sign in.
 
 If something breaks, `memev doctor` shows what and how to fix it; include its output when you
 report a problem.

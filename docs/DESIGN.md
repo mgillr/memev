@@ -1,5 +1,7 @@
 # Design
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 **One writer.** The daemon is the only process that writes the vault. App integrations (`memev mcp`,
 hooks, the CLI) talk to it over HTTP on `127.0.0.1`.
 

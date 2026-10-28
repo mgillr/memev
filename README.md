@@ -1,16 +1,37 @@
-# Memev
+<div align="center">
 
-[![Memev demo: how each tier works and how the tiers connect](Demo%20Video/memev-tiers.gif)](Demo%20Video/memev-tiers.mp4)
+<a href="media/memev-tiers.mp4"><img src="media/memev-tiers-poster.png" alt="Memev demo video, 4 min 55 s: how each tier works and how the tiers connect. Click to watch." width="720"></a>
 
-[Watch the demo video](Demo%20Video/memev-tiers.mp4) (1 min 56 s): how each tier works and how the tiers connect.
+<sub><a href="media/memev-tiers.mp4">Watch the demo video</a> (4 min 55 s): how each tier works and how the tiers connect.</sub>
 
-Memory and recall stack for all of the AI apps you use, local system and cloud.
+<h1>Memev</h1>
 
-Run project dev on Claude code and Cursor knows about the context on Tuesday. Memev keeps what your AI
-apps learn in a folder of plain notes on your own computer, hands the right notes to whichever app
-you open next, and backs everything up to a private GitHub repository that you own.
+<p><strong>One memory for every AI app you use, on your own computer.</strong><br>
+Memory and recall for local coding tools and cloud AI apps alike.</p>
 
-One memory and one team channel, both on computers you own.
+<p>
+<img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue">
+<img alt="Node 22 or newer" src="https://img.shields.io/badge/node-%3E%3D22-brightgreen">
+<img alt="Speaks MCP" src="https://img.shields.io/badge/protocol-MCP-informational">
+<img alt="No runtime dependencies" src="https://img.shields.io/badge/runtime%20dependencies-none-success">
+</p>
+
+<p>
+<a href="docs/QUICKSTART.md">Quickstart</a> &middot;
+<a href="docs/README.md">Documentation</a> &middot;
+<a href="docs/ARCHITECTURE.md">Architecture</a> &middot;
+<a href="docs/tiers/README.md">Tiers</a> &middot;
+<a href="CHANGELOG.md">Changelog</a>
+</p>
+
+<p>Start a project in Claude Code on Monday, and Cursor knows the context on Tuesday.<br>
+Memev keeps what your AI apps learn in a folder of plain notes on your own computer,<br>
+hands the right notes to whichever app you open next, and backs everything up to<br>
+a private GitHub repository that you own.</p>
+
+<p><strong>One memory and one team channel, both on computers you own.</strong></p>
+
+</div>
 
 ## How it fits together
 
@@ -25,10 +46,10 @@ flowchart LR
         bus --- vault
     end
     github[("Your private GitHub repository<br/>backup and history")]
-    cloud["AI on the web<br/>ChatGPT, claude.ai"]
+    cloud["Cloud AI apps side by side<br/>Claude, ChatGPT, more coming soon"]
     laptop["Your other computers<br/>each with its own key"]
     vault -- "backup every few minutes" --> github
-    cloud -. "optional secure link,<br/>you can switch it off" .-> vault
+    cloud -. "optional secure link,<br/>off until you switch it on" .-> vault
     laptop -. "the same secure link" .-> vault
 ```
 
@@ -54,9 +75,9 @@ folder, starts Memev, connects the AI apps it finds on your computer and runs a 
 
 Memev runs on macOS and Linux. **Windows (preview):** setup, app connections, hooks and the doctor
 have Windows code paths and tests, and a Windows job runs them on every change to `main`, but
-Windows has not had a full lab run yet, and Memev does not
-start at login there (run `memev start` after you sign in).
-[docs/QUICKSTART.md](docs/QUICKSTART.md#windows-preview) says what differs.
+Windows has not had a full lab run yet. Memev starts at login there through a per-user Task Scheduler
+entry that `memev service install` creates. [docs/QUICKSTART.md](docs/QUICKSTART.md#windows-preview) says
+what differs.
 
 | Path | Who it's for | What happens on its own |
 |---|---|---|
@@ -91,25 +112,65 @@ one saved.
 
 ## Which tier?
 
-| | Free | Business (planned) | Enterprise (planned) |
-|---|---|---|---|
-| For | one person, one computer | a company with 10 to 20 computers | larger or regulated organisations |
-| Runs on | your computer | your company server, optional local AI model | your data centre, high availability, air-gapped option |
-| Price | free, for good | contact us | contact us |
-| Support | GitHub issues | business hours, response times by priority | named or embedded engineer |
+| | Personal | Personal with more computers | Business (coming) | Corporate (coming) |
+|---|---|---|---|---|
+| For | one person, one computer at a time | one person, several computers at once | a company: all members' work data in one company vault that the company can see and search | the same model as Business, at larger scale, with one main corporate vault |
+| AI apps | several cloud AI apps side by side (Claude, ChatGPT; more coming soon) and local coding tools via MCP | the same, on each computer | ONE AI provider for the organisation: one cloud AI service or an on-premises LLM | the same, with an air-gapped option |
+| Runs on | your computer, backed up to your own GitHub | your computers | your company server | your data centre, high availability, air-gapped option |
+| Two computers | one at a time: switch computers, lose nothing | edit on two machines at once, nothing to resolve (planned) | coming | coming |
+| Price | free, for good | $12/month or $120/year (CHF 10 or CHF 100), early-supporter price | contact us | contact us |
+| Trial | not needed | none | 5 members and 10 computers (planned); a sales-assisted pilot for on-premises, air-gapped or compliance-led organisations | a sales-assisted pilot (planned) |
+| Support | GitHub issues | priority support | business hours, response times by priority | named or embedded engineer |
 
-Free is complete and is never limited ([CHARTER.md](CHARTER.md)). The company server, sign-in with
-Google or Microsoft, and department permissions are planned, not built. See
-[docs/tiers/](docs/tiers/README.md) for what each tier includes, how it is set up, its limits and a
-worked 20-computer example. Business and Enterprise, and the services around them, are priced on
-your requirements: contact us.
+**Personal is free and complete** ([CHARTER.md](CHARTER.md)). It is one computer at a time, and you
+move between computers through your own GitHub. Switch computers, lose nothing. Today git sync is
+single-writer backup: if a second computer also pushes the same vault, `memev doctor` warns that
+concurrent edits can conflict. Nothing is blocked, and a merge that conflicts is left for you. You
+can connect several cloud AI apps side by side, such as Claude and ChatGPT (more are coming soon),
+next to your local coding tools over MCP.
+
+**Personal with more computers is the paid tier**: edit on two machines at once, nothing to resolve.
+That merging is done by crdt-merge, the paid convergence engine; see
+[The paid core: crdt-merge](#the-paid-core-crdt-merge). It is planned, not built yet.
+
+**Business and Corporate are the same model at different scale, and both are coming.** Every
+member's computer syncs its work data into one vault: one company vault for Business, one main
+corporate vault for Corporate. The company can see and search everything in it. Each organisation
+connects to **one AI provider**, either one cloud AI service or an on-premises LLM, over MCP. Members
+keep private work outside Memev. An org admin invites members into the company vault; there is no
+Team tier. A personal or home vault never crosses into a company: separate identities and keys, with
+no grants, mounts or mixing. Anyone who leaves a company loses all vault access: access ends, keys
+are revoked, devices are removed and the local cache is wiped. Licences count once per organisation,
+by person and by computer. The Business trial is planned: 5 members and 10 computers, self-serve for
+one hosted cloud AI provider; on-premises, air-gapped and compliance-led organisations get a
+sales-assisted pilot.
+
+See [docs/tiers/](docs/tiers/README.md) for what each tier includes, how it is set up, its limits and
+a worked 20-person example, and [the architecture charts](docs/ARCHITECTURE.md#the-three-tiers) for
+Personal, Business and Corporate side by side. Business and Corporate, and the services around them,
+have no public price: contact us.
+
+## The paid core: crdt-merge
+
+The Memev core is open source (Apache-2.0) and free, and it stays that way. The convergence engine,
+**crdt-merge**, with its merge strategies, lives in its own repository under its original licence
+(currently BSL 1.1). It is never vendored into Memev: Memev calls it as an external dependency.
+
+It powers the paid features:
+
+- **Automatic merge across several computers at once** (Personal with more computers).
+- **Team and business vault convergence** (Business and Corporate, both coming).
+
+Free users get one computer at a time through their own GitHub. Nothing is overwritten, and when two
+copies conflict both versions are kept. Only licence information passes between an install and our side,
+never vault data. See [docs/CONVERGENCE.md](docs/CONVERGENCE.md).
 
 ## What you get
 
 Your notes are plain Markdown in `~/memev`, kept in git. Every change is written to a checksummed
 log first, so a crash or a bad edit can't lose anything. Claude Code, Codex, Gemini CLI, Cursor,
-Claude Desktop, Windsurf, VS Code and Zed all use the same notes, and ChatGPT and claude.ai can too
-through the optional secure link.
+Claude Desktop, Windsurf, VS Code and Zed all use the same notes, and cloud AI apps such as Claude and
+ChatGPT can too, side by side, through the optional secure link.
 
 Your AI apps can also talk to each other. Each one gets a seat on a comms bus kept in the vault,
 joins on its own, and keeps a heartbeat, so from one Claude Code session you can see who is there,
@@ -124,24 +185,31 @@ prints exactly what it would send ([docs/METRICS.md](docs/METRICS.md)).
 
 ## Documentation
 
+Everything is indexed in [docs/README.md](docs/README.md), from this page down to each module and back
+up. The main pages:
+
 | | |
 |---|---|
 | [Quickstart](docs/QUICKSTART.md) | install, first session, everyday commands |
+| [Architecture](docs/ARCHITECTURE.md) | what runs today, and the Personal, Business and Corporate charts |
+| [Module map](docs/MODULES.md) | every module and what imports what, generated from the code |
 | [AI apps](docs/CLIENTS.md) | what is changed in each app, hooks vs instructions, undoing it |
-| [Cloud access](docs/CLOUD.md) | the secure link, connector URLs, other computers, turning it off |
+| [Cloud access](docs/CLOUD.md) | the secure link, connector URLs, other computers, turning it on |
 | [Comms bus](docs/BUS.md) | how your AI apps talk to each other, the roster and comms checks |
 | [GitHub backup](docs/GITHUB.md) | `memev github setup` |
 | [Docker](docs/DOCKER.md) | running Memev in a container |
-| [Tiers and setup](docs/tiers/README.md) | Free, Business and Enterprise, and the services around them (draft) |
+| [Tiers and setup](docs/tiers/README.md) | Personal, Personal with more computers, Business and Corporate, and the services around them (draft) |
+| [The paid core: crdt-merge](docs/CONVERGENCE.md) | what is open, what is paid, what passes between an install and us |
+| [Pricing (draft)](docs/PRICING.md) | the Personal price; Business and Corporate on request; the computer limit |
 | [Problems and solutions](docs/SOLUTIONS.md) | what users complain about and what Memev does about it |
 | [Contracts](docs/CONTRACTS.md) | signed, immutable work contracts |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | `memev doctor` and common fixes |
 | [Lab test plan](docs/testing/LAB-TEST-PLAN.md) | every test to run in a lab before a release, with expected results |
 | [Security](SECURITY.md) and [threat model](docs/THREAT-MODEL.md) | |
 | [Charter](CHARTER.md) | the free tier is never limited |
-| [Pricing (draft)](docs/PRICING.md) | Free and Personal prices; everything else on request; the computer limit |
 | [Design](docs/DESIGN.md) | log, index, graph, recall, scale |
 | [Hands-off runtime](docs/MAPPING.md) | everything Memev does without being asked |
+| [Developing Memev](docs/DEVELOPING.md) | tests, the leak scan, changelog notes, regenerating the module map |
 
 ## For developers
 
@@ -149,8 +217,11 @@ Memev is a local MCP server over a Markdown vault. Each session starts with a re
 prompt gets the most relevant notes (in apps with hooks), and state is saved before a compaction.
 The graph holds entities, links and claims with a status (fact, theory, conjecture) and provenance.
 Recall is BM25 over note sections, filtered by project and permissions before ranking. Node 22,
-nothing else. See [docs/DESIGN.md](docs/DESIGN.md).
+nothing else. See [docs/DESIGN.md](docs/DESIGN.md), the [module map](docs/MODULES.md) and
+[docs/DEVELOPING.md](docs/DEVELOPING.md).
 
 ## License
 
-Apache-2.0. Includes a modified copy of Proofline (Apache-2.0); see [NOTICE](NOTICE).
+Apache-2.0. Includes a modified copy of Proofline (Apache-2.0); see [NOTICE](NOTICE). The crdt-merge
+convergence engine is a separate project under its own licence and is not part of this repository; see
+[docs/LICENSING-NOTICE.md](docs/LICENSING-NOTICE.md).
