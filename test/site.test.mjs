@@ -142,7 +142,7 @@ test('MEM-140 AC02: business covers Business and Corporate, no price, capabiliti
   assert.ok(!/\$\d/.test(html), 'business shows no price');
   assert.ok(/planned/.test(html) && /coming/.test(html), 'capabilities are labelled planned or coming');
   assert.ok(text.includes('cloud ai service'), 'cloud-hosted option is described');
-  assert.ok(text.includes('on-premises llm'), 'on-prem option is described');
+  assert.ok(text.includes('local model'), 'on-prem option is described');
 });
 
 test('MEM-140 AC03: trial states the free parts, the paid setup, the two paths and the terms', () => {
