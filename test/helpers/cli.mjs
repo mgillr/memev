@@ -47,7 +47,7 @@ export function sandbox({ ports = 1 } = {}) {
 // entry: the command and args an app's MCP config holds, to run the server the way that app does.
 // An app launches its own MCP server with its own marker in the environment, so a client that does
 // not control the environment (no entry.env) gets the claimed app's marker; a test that passes
-// entry.env decides the environment itself. Only the desktop client's marker (CLAUDECODE) is
+// entry.env decides the environment itself. Only claude-code's marker (CLAUDECODE) is
 // verified to be set by the app, so only it is injected here; the rest are unverified.
 const OWN_MARKER = { 'claude-code': 'CLAUDECODE' };
 export function mcpClient(sb, client, entry = { command: process.execPath, args: [BIN, 'mcp', '--client', client] }) {

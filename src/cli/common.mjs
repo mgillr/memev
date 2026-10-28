@@ -58,15 +58,17 @@ export function pidAlive(pid) { if (!pid) return false; try { process.kill(pid, 
 // in its children is inherited by every descendant, so it names an ancestor, not the parent, and it
 // may only confirm the claim it names: a marker of another app never relabels the seat. I resolve in
 // order: the claim's own marker, then the direct parent's process name when it is a known app (a
-// parent named claude is the desktop client), then, for a claude-code claim with no CLAUDECODE and a
-// parent I can read, the parent's name, and only then the claim. Only claude-code takes that
-// parent-name fallback; codex, gemini-cli and windsurf under an unknown parent (such as node) keep
-// their claim. Terminals set markers too (TERM_PROGRAM, ZED_TERM); they only wrap, so they never
-// relabel the seat. CLAUDECODE is set by the desktop client in the children it launches; CODEX_CLI,
-// GEMINI_CLI and WINDSURF_CLI are unverified, I could not confirm those apps set them.
+// parent named claude is the claude-code CLI binary), then, for a claude-code claim with no
+// CLAUDECODE and a parent I can read, the parent's name, and only then the claim. Only claude-code
+// takes that parent-name fallback; codex, gemini-cli and windsurf under an unknown parent (such as
+// node) keep their claim. Terminals set markers too (TERM_PROGRAM, ZED_TERM); they only wrap, so
+// they never relabel the seat. CLAUDECODE is set by claude-code in the children it launches;
+// CODEX_CLI, GEMINI_CLI and WINDSURF_CLI are unverified, I could not confirm those apps set them.
 export const ENV_MARKERS = { CLAUDECODE: 'claude-code', CODEX_CLI: 'codex', GEMINI_CLI: 'gemini-cli', WINDSURF_CLI: 'windsurf' };
 const MARKER_OF = Object.fromEntries(Object.entries(ENV_MARKERS).map(([k, id]) => [id, k]));
 const KNOWN_APPS = new Set(['claude-code', 'codex', 'gemini-cli', 'cursor', 'claude-desktop', 'windsurf']);
+// Keyed by the parent's raw process name, case-sensitive: the claude-code CLI binary is named
+// claude, the desktop app's binary is named Claude, and only the former maps to claude-code.
 const PARENT_NAME_AS_APP = { claude: 'claude-code' };
 const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
 
@@ -79,7 +81,7 @@ export function parentProcName(ppid = process.ppid) {
 }
 
 /** The client to seat as: the claim when its own marker stands, else a known app that launched us
- *  (a parent named claude is the desktop client), else the parent's name when the claim is
+ *  (a parent named claude is the claude-code CLI binary), else the parent's name when the claim is
  *  claude-code, CLAUDECODE is absent and I can read the parent, else the claim. A marker of another
  *  app never relabels the seat; it may only confirm the claim it names. */
 export function effectiveClient(claimed, env = process.env, ppid = process.ppid) {
@@ -88,8 +90,8 @@ export function effectiveClient(claimed, env = process.env, ppid = process.ppid)
   if (own && env[own]) return want;
   const name = parentProcName(ppid);
   if (name) {
+    if (PARENT_NAME_AS_APP[name]) return PARENT_NAME_AS_APP[name];
     const id = norm(name);
-    if (PARENT_NAME_AS_APP[id]) return PARENT_NAME_AS_APP[id];
     if (KNOWN_APPS.has(id)) return id;
   }
   if (want === 'claude-code' && !env.CLAUDECODE && name) return norm(name);
