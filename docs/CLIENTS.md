@@ -15,7 +15,7 @@ connects them, unless you disconnected that app yourself.
 | Claude Code | MCP server in `~/.claude.json`; hooks (SessionStart, UserPromptSubmit, PreCompact, Stop) in `~/.claude/settings.json`; a block in `~/.claude/CLAUDE.md` | hooks |
 | Codex CLI | `[mcp_servers.memev]` in `~/.codex/config.toml`; hooks in `~/.codex/hooks.json`; a block in `~/.codex/AGENTS.md` | hooks (trust once) |
 | Gemini CLI | MCP server and hooks (SessionStart, BeforeAgent, PreCompress, AfterAgent) in `~/.gemini/settings.json`; a block in `~/.gemini/GEMINI.md` | hooks |
-| Cursor | `~/.cursor/mcp.json`; `~/.cursor/hooks.json` | hooks at session start, instructions otherwise |
+| Cursor | `~/.cursor/mcp.json`; `~/.cursor/hooks.json`; with `--project`, an always-on rule in `<project>/.cursor/rules/memev.mdc` | hooks at session start, instructions otherwise |
 | Claude Desktop | `claude_desktop_config.json` | instructions |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json`; a block in `memories/global_rules.md` | instructions |
 | VS Code | `Code/User/mcp.json` | instructions |
@@ -35,6 +35,19 @@ Manual steps:
 - **Codex** asks you to trust new hooks once: open `/hooks` in Codex and trust the Memev entries.
 - **Cursor** hooks cannot add context to a prompt, only at session start, so per-prompt recall comes
   from the MCP instructions.
+
+**Cursor's hook limits.** Cursor hooks can only add context at session start (the `sessionStart`
+hook); they cannot add context to a prompt. Memev works around this in three ways:
+
+- `memev connect cursor --project <dir>` writes an always-on rule to `<dir>/.cursor/rules/memev.mdc`
+  (`alwaysApply: true`), so the memory rule is in every session of that project, not only at session
+  start. `memev disconnect cursor` removes the file again.
+- Per-prompt recall and post-compaction state come through the MCP instructions instead of a hook.
+- The stop hook can only continue the session with a `followup_message`. Memev uses that only for
+  operator tasks waiting for you (never for ordinary bus traffic), and sets `loop_limit: 3` on
+  the stop entry in `~/.cursor/hooks.json` so the follow-ups cannot run away. The prompt hook only
+  peeks at the bus, so a task that is already waiting when you type is still picked up by the stop
+  hook; the stop hook marks the tasks it followed up on as read.
 
 Cloud apps (claude.ai, ChatGPT, others that take a remote MCP URL) connect through the tunnel, side by
 side; see [CLOUD.md](CLOUD.md).
