@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { connect, disconnect } from '../src/cli/clients.mjs';
 import { tmpdir, cleanup } from './helpers/tmp.mjs';
+import { sandbox } from './helpers/cli.mjs';
 after(cleanup);
 
 function fixtureHome({ withSettings = true } = {}) {
@@ -53,4 +54,30 @@ test('a consented connect keeps the user\'s own allow entries, and a later user 
   const after = JSON.parse(fs.readFileSync(files.claudeSettings, 'utf8'));
   assert.equal(after.model, 'opus', 'the user edit made after connect stays');
   assert.deepEqual(after.permissions.allow, ['Bash(ls:*)'], 'only the Memev tool entry is removed, the user entry stays');
+});
+
+test('MEM-051: a yes stored at init survives disconnect, the next connect puts the entry back, and the checklist agrees with settings.json', () => {
+  const sb = sandbox();
+  try {
+    fs.mkdirSync(path.join(sb.home, '.claude'), { recursive: true });
+    const settings = path.join(sb.home, '.claude', 'settings.json');
+    const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--allow-tools']);
+    assert.equal(init.code, 0, init.out + init.err);
+    let cs = JSON.parse(fs.readFileSync(settings, 'utf8'));
+    assert.ok(cs.permissions.allow.includes('mcp__memev'), 'init with consent writes the entry');
+    assert.match(init.out, /Claude Code:.*Memev tools are allowed, so no prompt per call/);
+    const off = sb.run(['disconnect', 'claude-code']);
+    assert.equal(off.code, 0, off.out + off.err);
+    assert.equal(fs.existsSync(settings), false, 'disconnect removes the file Memev created, entry and all');
+    assert.equal(sb.run(['onboarding']).out.includes('Memev tools are allowed'), false, 'no allow claim while the entry is gone');
+    const again = sb.run(['connect', 'claude-code']);
+    assert.equal(again.code, 0, again.out + again.err);
+    cs = JSON.parse(fs.readFileSync(settings, 'utf8'));
+    assert.ok(cs.permissions.allow.includes('mcp__memev'), 'the next connect honours the stored yes');
+    const ob = sb.run(['onboarding']);
+    const line = ob.out.split('\n').find((l) => l.includes('Claude Code') && l.includes('Memev tools'));
+    assert.ok(line, ob.out);
+    assert.match(line, /Memev tools are allowed, so no prompt per call/);
+    assert.equal(ob.out.includes('prompts before each call'), false, 'settings.json and the checklist agree');
+  } finally { sb.stop(); }
 });

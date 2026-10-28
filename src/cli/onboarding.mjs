@@ -31,7 +31,7 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   }
   const found = clients.detect(env, launcher);
   for (const c of found.filter((x) => x.found)) {
-    if (c.connected) { let detail = c.mode === 'hooks' ? 'MCP + session hooks + instructions: memory is loaded and saved automatically' : 'MCP + instructions'; if (c.id === 'claude-code') { const at = allowToolsSettings(env); detail += at.enabled ? '; Memev tools are allowed, so no prompt per call' : '; Memev tools: Claude Code prompts before each call, allow them with memev connect claude-code --allow-tools'; } add(firstRun ? 'added' : 'ready', c.name, detail, { app: c.id }); if (c.manual) add('needs-manual', `${c.name}: one step`, c.manual, { app: c.id, note: true }); }
+    if (c.connected) { let detail = c.mode === 'hooks' ? 'MCP + session hooks + instructions: memory is loaded and saved automatically' : 'MCP + instructions'; if (c.id === 'claude-code') { const allowed = clients.claudeToolsAllowed(env); detail += allowed ? '; Memev tools are allowed, so no prompt per call' : '; Memev tools: Claude Code prompts before each call, allow them with memev connect claude-code --allow-tools'; } add(firstRun ? 'added' : 'ready', c.name, detail, { app: c.id }); if (c.manual) add('needs-manual', `${c.name}: one step`, c.manual, { app: c.id, note: true }); }
     else if (c.declined) add('skipped', c.name, 'you disconnected it (memev connect ' + c.id + ' to undo)', { app: c.id });
     else {
       // why it is not connected: a file Memev cannot edit is named, with the snippet to paste by hand

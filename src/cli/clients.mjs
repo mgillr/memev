@@ -178,6 +178,13 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
   return defs;
 }
 
+/** Whether Claude Code's settings.json allows Memev's tools right now (mcp__memev in permissions.allow). */
+export function claudeToolsAllowed(env = process.env) {
+  const { home } = platformDirs(env);
+  const j = readJson(path.join(home, '.claude', 'settings.json'), null);
+  return !!(j && j.permissions && Array.isArray(j.permissions.allow) && j.permissions.allow.includes('mcp__memev'));
+}
+
 // ---- state: what is connected, what the user declined, and the backups
 const stateFile = (env) => path.join(configDir(env), 'clients-state.json');
 const loadState = (env) => readJson(stateFile(env), { version: 1, connected: {}, declined: [], files: {} });
@@ -311,7 +318,11 @@ export async function command(cmd, pos, flags, { env, root }) {
     return 0;
   }
   if (cmd === 'connect') {
-    const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force, allowTools: !!flags['allow-tools'] }) : [connect(target, { env, launcher, dryRun: !!flags['dry-run'], allowTools: !!flags['allow-tools'] })];
+    // the stored consent (the init question or an earlier --allow-tools) keeps applying: a plain connect
+    // re-adds mcp__memev after a disconnect, and the flag still forces it on
+    const stored = (await import('./onboarding.mjs')).allowToolsSettings(env).enabled;
+    const allowTools = flags['allow-tools'] === undefined ? stored : !!flags['allow-tools'];
+    const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force, allowTools }) : [connect(target, { env, launcher, dryRun: !!flags['dry-run'], allowTools })];
     if (!res.length) console.log('No AI apps found. Install one (Claude Code, Codex, Cursor, Gemini CLI, Claude Desktop, Windsurf, VS Code, Zed) and run memev connect again.');
     for (const r of res) {
       if (r.status === 'added') out.ok(`${r.name}: connected (${r.mode === 'hooks' ? 'hooks + MCP + instructions' : 'MCP + instructions'})`);
