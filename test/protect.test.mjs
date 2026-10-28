@@ -67,7 +67,7 @@ test('MEM-102 AC02: hook outputs match each vendor\'s documented format for all 
       if (id === 'cursor') {
         assert.equal(typeof j.additional_context, 'string', 'Cursor gets { additional_context } at session start');
         assert.ok(j.additional_context.length > 0, 'and it carries the context');
-        assert.equal(j.hookSpecificOutput, undefined, 'Cursor does not get the Claude shape');
+        assert.equal(j.hookSpecificOutput, undefined, 'Cursor does not get the hookSpecificOutput shape');
       } else {
         assert.ok(j.hookSpecificOutput, `${id} gets { hookSpecificOutput }`);
         assert.equal(j.hookSpecificOutput.hookEventName, names[id].SessionStart, `${id} names its own event`);
