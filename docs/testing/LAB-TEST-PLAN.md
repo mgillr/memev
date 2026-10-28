@@ -326,13 +326,24 @@ the tests that need a second computer. Seats are `<app>@host` on the vault's com
 | T-FAIL-04 | change a byte inside a sealed log segment in `.memev/oplog/` | `memev doctor` reports the log as tampered |
 | T-FAIL-05 | delete `.memev/index.jsonl` | the index is rebuilt; recall gives the same results |
 | T-FAIL-06 | fill the disk to 100% and save a memory | a clear error; no corrupt note; works again after freeing space |
-| T-FAIL-07 | port 7787 taken by another program, then `memev init` | a clear failure; `memev init --port 7790` works |
+| T-FAIL-07 | port in use: port 7787 taken by another program (for example `python3 -m http.server 7787`), then `memev init` | one line says the port is in use and which port Memev uses instead; the port is saved; `memev doctor` exits 0; the other program still has 7787 |
 | T-FAIL-08 | take the network down while the tunnel is on | local apps keep working; `memev cloud status` shows the tunnel down; it recovers when the network comes back |
 | T-FAIL-09 | backup remote unreachable, or its deploy key removed | writes keep working; `memev doctor` shows the git error |
 | T-FAIL-10 | run every hook with no vault (`MEMEV_ROOT=/nonexistent memev hook session-start --client claude-code < /dev/null`) | exit 0 and a message: hooks never break an app session |
 | T-FAIL-11 | a second computer pushing the same vault through git | a warning about a second writer, not a block |
 | T-FAIL-12 | reboot during a long session | the next session starts with the last checkpoint |
+| T-FAIL-14 | no-git: on a computer without git, `memev init` | it stops before writing anything, says git was not found, and prints the install command for this system; nothing is left in the home folder; after installing git, `memev init` completes and `memev doctor` exits 0 |
+| T-FAIL-15 | second-vault: a second vault's daemon already on the port (another user, or `memev init --root ~/other`), then `memev init` | the new vault takes another port and never reports the other daemon as its own; each `/healthz` names its own vault id; notes saved in one are not recalled in the other; `memev doctor` in the first vault warns that there are two vaults and names both ids |
+| T-FAIL-16 | node-upgrade: install Memev, then upgrade Node so the old binary is gone (`brew upgrade node`, or `nvm install` a new version and `nvm uninstall` the old one), then `memev status` and a new session in each app | Memev still runs with the Node on PATH; `memev doctor` shows which Node the launcher uses; no app loses memory or the bus without a message |
+| T-FAIL-17 | second-computer: on a second computer, `memev init` without joining | it asks whether this is the first computer or one being added, and points to `memev join <invite>`; after joining, both computers see the same notes and the same bus |
+| T-FAIL-18 | proxy: behind an HTTP proxy that blocks direct traffic, with `HTTPS_PROXY` (and `NO_PROXY` for local hosts) set | the cloudflared download, joining and licence activation go through the proxy; hosts in `NO_PROXY` go direct; a redirect to another host carries no credentials |
+| T-FAIL-19 | windows: on the Windows 11 VM in section 10, `memev init`, then `memev doctor` | every app entry runs node.exe, never a .cmd file; the self-test passes without the Unix file-mode check; the windows-latest CI run on main is green |
 | T-FAIL-13 | licence file with a future issue date, an expired date inside the grace period, and past it | not yet valid (the vault counts as free); grace (computers can still be added); expired (no computer can be added, added ones read only). The host vault keeps reading and writing in every case |
+
+T-FAIL-07 and T-FAIL-14 to T-FAIL-19 are the failure paths found in the review. `test/fail-paths.test.mjs` runs
+T-FAIL-07 and T-FAIL-14 to T-FAIL-16 on every pull request; the others need a second computer, a proxy or
+Windows, so they are run here by hand (`test/proxy.test.mjs` and the windows-latest job cover parts of
+T-FAIL-18 and T-FAIL-19).
 
 ## 10. Windows 11 (preview)
 

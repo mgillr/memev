@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Remote access for cloud AI apps, on by default, one command to switch off (`memev cloud off`).
 // Providers, best first:
-//   tailscale   `tailscale funnel` on this machine: a stable https name on your tailnet
+//   tailscale   `tailscale serve` on this machine: a stable https name, tailnet only (never Funnel)
 //   cloudflare  a named Cloudflare tunnel you configured (`memev cloud use cloudflare --name N --hostname H`): stable
 //   quick       a Cloudflare quick tunnel: no account, but the address changes when it restarts
 // The daemon supervises the tunnel, restarts it with backoff and records the current address.
