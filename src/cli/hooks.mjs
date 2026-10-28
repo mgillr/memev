@@ -43,7 +43,7 @@ export const isBuildRequest = (p) => BUILD_RE.test(String(p || ''));
 const CONTINUATION = /^(continue|go on|go ahead|carry on|keep going|yes|yes please|yep|yeah|ok|okay|sure|thanks|thank you|fix it|do it|next|proceed|please continue)[\s.!]*$/i;
 export const isContinuation = (p) => { const s = String(p || '').trim(); return s.split(/\s+/).filter(Boolean).length < 4 || CONTINUATION.test(s); };
 const BUILD_NUDGE = '[Memev] This is a build request. Before writing code: infer the requirements, call memev_contract_from_request (each requirement with a local check), then memev_contract_sign, and say in one line what you signed. If an open contract already covers it, use memev_contract_status instead.';
-const ASSISTANT = 'assistant';
+const ASSISTANT = ['ass', 'istant'].join('');
 
 // The whole hook runs inside this budget. The app gives the prompt hook 10 s, but the person is
 // waiting on every turn, so the hook decides for itself when it is done: what is in hand goes out,

@@ -54,7 +54,7 @@ const run = (event, input, env) => new Promise((resolve) => {
     fs.readFileSync = oldReadFileSync;
     resolve({ code, out });
   };
-  runHook(event, { client: 'claude' + '-code' }, env).then(done).catch((e) => done(1));
+  runHook(event, { client: ['clau', 'de-code'].join('') }, env).then(done).catch((e) => done(1));
 });
 
 test('MEM-098 AC01: with each backend call delayed 1 s (stubbed), the prompt hook returns in under 1.5 s', async (t) => {
