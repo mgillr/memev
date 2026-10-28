@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import { configDir, homeDir, readJson, writePrivateJson, exists } from '../engine/util.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
 import { fetchOut } from '../engine/net.mjs';
@@ -52,6 +53,42 @@ export function tunnelKey(root) { try { return fs.readFileSync(tunnelKeyFile(roo
 export const daemonInfo = (root) => readJson(path.join(root, STATE, 'daemon.json'), null);
 
 export function pidAlive(pid) { if (!pid) return false; try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } }
+
+// `memev mcp --client X` must not take X's seat when it was not launched by X. A marker an app sets
+// in its children is inherited by every descendant, so it names an ancestor, not the parent. The
+// claim's own marker therefore stands first, then the direct parent's process name, then a marker of
+// another app, and only then a parent we can name but not place. When that parent is a name I cannot
+// place, a claim with a marker of its own that is absent seats as the parent's name, and a claim with
+// no marker of its own (cursor, claude-desktop) keeps the claim. Terminals set markers too
+// (TERM_PROGRAM, ZED_TERM); they only wrap, so they never relabel the seat.
+// CLAUDECODE is set by Claude Code in the children it launches; CODEX_CLI, GEMINI_CLI and
+// WINDSURF_CLI are unverified, I could not confirm those apps set them.
+export const ENV_MARKERS = { CLAUDECODE: 'claude-code', CODEX_CLI: 'codex', GEMINI_CLI: 'gemini-cli', WINDSURF_CLI: 'windsurf' };
+const MARKER_OF = Object.fromEntries(Object.entries(ENV_MARKERS).map(([k, id]) => [id, k]));
+const KNOWN_APPS = new Set(['claude-code', 'codex', 'gemini-cli', 'cursor', 'claude-desktop', 'windsurf']);
+const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+
+/** The name of the parent process, or null when it cannot be read. */
+export function parentProcName(ppid = process.ppid) {
+  if (!ppid) return null;
+  try { const c = fs.readFileSync(`/proc/${ppid}/comm`, 'utf8').trim(); if (c) return c; } catch {}
+  try { const o = execFileSync('ps', ['-o', 'comm=', '-p', String(ppid)], { encoding: 'utf8', timeout: 1500 }).trim(); if (o) return o.split('/').pop(); } catch {}
+  return null;
+}
+
+/** The client to seat as: the claim when its own marker stands, else a known app that launched us,
+ *  else a marker of another app, else the parent's name when I can read it and the claim has a
+ *  marker that is absent, else the claim. */
+export function effectiveClient(claimed, env = process.env, ppid = process.ppid) {
+  const want = norm(claimed);
+  const own = MARKER_OF[want];
+  if (own && env[own]) return want;
+  const name = parentProcName(ppid);
+  if (name) { const id = norm(name); if (KNOWN_APPS.has(id)) return id; }
+  for (const [k, id] of Object.entries(ENV_MARKERS)) if (env[k]) return id;
+  if (name) return own ? norm(name) : want;
+  return want;
+}
 
 export async function api(root, route, { method = 'POST', body = null, token = null, timeoutMs = 3000, port = null } = {}) {
   const p = port || daemonInfo(root)?.port || config(root).port;
