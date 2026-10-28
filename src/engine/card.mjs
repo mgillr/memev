@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { truncate, readJson, configDir, homeDir } from './util.mjs';
+import { TokenStore, EXPIRY_WARNING_DAYS, expiryWarningLine } from './tokens.mjs';
 
 // The footer for exported artefacts: on only when the user set "footer": true in the vault config.
 export const FOOTER = 'Made with Memev';
@@ -69,8 +70,13 @@ export const PROTOCOL_REVIEW = [
   { was: "If Memev is unreachable, say so once and continue.", now: "Memev unreachable: say so once, continue." },
 ];
 
-export function renderCard(c, { maxChars = 6000, footer } = {}) {
+export function renderCard(c, { maxChars = 6000, footer, root } = {}) {
   const L = ['[Memev resume card]'];
+  // a credential that will expire soon is said up front, so it is renewed before it stops working
+  try {
+    const soon = new TokenStore(path.join(root || currentVault(), '.memev', 'tokens.json')).expiringWithin(EXPIRY_WARNING_DAYS);
+    if (soon.length) L.push(`Credentials expiring soon: ${soon.map((t) => expiryWarningLine(t)).join('; ')}.`);
+  } catch { /* no vault or no tokens yet */ }
   if (c.project_state?.checkpoints) {
     const s = c.project_state;
     L.push(`Project ${c.project} (last checkpoint ${s.at}):`);

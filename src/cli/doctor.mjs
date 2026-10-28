@@ -11,6 +11,7 @@ import { readJson, writeJson, exists, sha256, configDir, homeDir, now } from '..
 import { redactSecrets, findSecrets } from '../engine/secrets.mjs';
 import { VERSION, isVault } from '../engine/vault.mjs';
 import { PKG, daemonInfo, pidAlive, config, out, clientsFile } from './common.mjs';
+import { TokenStore, EXPIRY_WARNING_DAYS, expiryWarningLine } from '../engine/tokens.mjs';
 import { licensingStatus } from './licensing.mjs';
 import { alt443, githubReachable } from './github.mjs';
 import { label } from '../engine/bus.mjs';
@@ -107,6 +108,8 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   const names = ['tokens.json', 'admin.json', 'clients.json', 'tunnel-key.txt', 'config.json'];
   const mine = privateFiles({ state, names, env, platform, icacls });
   r.push(C('permissions', 'private files are private', mine.loose.length ? 'fail' : mine.unknown ? 'warn' : 'ok', mine.loose.length ? `readable by others: ${mine.loose.join(', ')}` : mine.detail, mine.loose.length ? mine.fix : null));
+  const soon = new TokenStore(path.join(state, 'tokens.json')).expiringWithin(EXPIRY_WARNING_DAYS).map((t) => expiryWarningLine(t));
+  r.push(C('token-expiry', 'credentials do not silently expire', soon.length ? 'warn' : 'ok', soon.length ? soon.join('; ') : `no credential expires within ${EXPIRY_WARNING_DAYS} days`));
   if (vault) {
     const v = vault.log.verify();
     r.push(C('oplog', 'operation log intact', v.ok ? 'ok' : 'fail', v.ok ? `${v.ops} ops in ${v.segments} segment(s), every seal and chain verified` : v.errors.slice(0, 3).join('; ')));

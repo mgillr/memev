@@ -2,7 +2,7 @@
 // The memev command.
 import fs from 'node:fs';
 import path from 'node:path';
-import { PKG, parseArgs, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, out } from './common.mjs';
+import { PKG, parseArgs, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, out, tokenExpiryWarnings } from './common.mjs';
 import { ensureDaemon, startDaemon, stopDaemon, healthy, choosePort } from './daemon.mjs';
 import { initVault, isVault, VERSION } from '../engine/vault.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
@@ -235,7 +235,7 @@ async function run(argv, env) {
       need(); const up = await healthy(root);
       if (!up) { console.log(`Vault ${root}: daemon not running (memev start)`); return 1; }
       const s = await api(root, '/v1/status', { method: 'GET', token: clientToken(root, 'cli') });
-      if (flags.json) json(s.json); else { const j = s.json; console.log(`Memev ${j.version} · ${root}\n  log: ${j.oplog.seq} ops in ${j.oplog.segments} segment(s) · index: ${j.index.notes} notes / ${j.index.sections} sections · graph: ${j.graph.entities} entities, ${j.graph.claims} claims · heap ${j.memory.heap_mb} MB`); }
+      if (flags.json) json(s.json); else { const j = s.json; console.log(`Memev ${j.version} · ${root}\n  log: ${j.oplog.seq} ops in ${j.oplog.segments} segment(s) · index: ${j.index.notes} notes / ${j.index.sections} sections · graph: ${j.graph.entities} entities, ${j.graph.claims} claims · heap ${j.memory.heap_mb} MB`); for (const w of tokenExpiryWarnings(root)) console.log(`  ! ${w}`); }
       return 0;
     }
     case 'mcp': {
