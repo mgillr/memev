@@ -75,6 +75,9 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
     const bad = fileChecks({ root, env, platform, ...(icacls ? { icacls } : {}) }).filter((c) => c.status === 'fail');
     add(bad.length ? 'failed' : 'succeeded', 'Self-test (memev doctor)', bad.length ? bad.map((c) => c.title).join(', ') : 'all checks pass');
   }
+  // contracts: off for new installs, on for existing vaults
+  const contractsOn = cfg.contracts?.enabled !== false;
+  add('ready', 'Contracts', contractsOn ? 'on: the Stop hook blocks while a signed contract is not verified (memev contracts off to turn off)' : 'off: the Stop hook never blocks on a contract (memev contracts on to enable)');
   // the anonymous report: asked once, off unless you say yes
   if (firstRun) await askReportOnce({ env }).catch(() => {});
   const rs = reportSettings(env);
@@ -87,7 +90,7 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
 }
 
 // what can wait: printed under 'Later, optional' whatever its state, so the steps that need you now stay few
-const LATER = /^(Start at login|Cloud AI apps|Backup to your own private GitHub repository|memev command|Anonymous milestone report)\b/;
+const LATER = /^(Start at login|Cloud AI apps|Backup to your own private GitHub repository|memev command|Anonymous milestone report|Contracts)\b/;
 const line = (i) => `  ${ICON[i.status] || '?'} ${i.step}${i.detail ? `: ${i.detail}` : ''}`;
 const list = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs.at(-1)}`);
 
