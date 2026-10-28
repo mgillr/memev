@@ -4,6 +4,7 @@
 import readline from 'node:readline';
 import { clientToken, daemonInfo, config } from './common.mjs';
 import { ensureDaemon } from './daemon.mjs';
+import { fetchOut } from '../engine/net.mjs';
 
 export async function runStdio(root, client) {
   const write = (o) => process.stdout.write(`${JSON.stringify(o)}\n`);
@@ -19,7 +20,7 @@ export async function runStdio(root, client) {
       if (!ok) { if (msg.id !== undefined) write({ jsonrpc: '2.0', id: msg.id, error: { code: -32000, message: 'Memev daemon is not running and could not be started; run memev doctor' } }); return; }
       const port = daemonInfo(root)?.port || config(root).port;
       try {
-        const r = await fetch(`http://127.0.0.1:${port}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'x-memev-client': client }, body: JSON.stringify(msg) });
+        const r = await fetchOut(`http://127.0.0.1:${port}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'x-memev-client': client }, body: JSON.stringify(msg) });
         if (r.status === 202) return;
         const body = await r.text(); if (body) process.stdout.write(`${body.trim()}\n`);
       } catch (e) { if (msg.id !== undefined) write({ jsonrpc: '2.0', id: msg.id, error: { code: -32000, message: `Memev: ${e.message}` } }); }
