@@ -94,7 +94,12 @@ To test the link to one seat, run `memev bus hello <seat> [--timeout S]`: it pos
 to that seat, tells you what to do in the app (start a turn; the app checks the bus at the start
 of every turn), and waits until the seat reads it, reporting how long that took. If the seat has
 not read it by the timeout (default 60 s), it exits 1 and says the seat is waiting for its next
-turn.
+turn. The seat may be the `operator` alias, which is resolved to the lead's real seat first (so
+`memev bus hello operator` is a natural way to test the lead); `all` is refused, because a hello
+is to one seat. On the vault's own computer the read is exact (the seat's pulse says what it has
+read); from another computer there is no pulse to read, so the answer is approximate: the seat's
+last heartbeat after the send is the closest signal, and it can count a heartbeat the seat's own
+send makes.
 
 ## The pulse
 

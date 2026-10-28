@@ -60,3 +60,35 @@ test('MEM-032 AC02: memev bus hello --timeout N exits non-zero and says waiting 
     assert.match(r.out, /waiting for its next turn/);
   } finally { sb.stop(); }
 });
+
+test('MEM-032 AC01: memev bus hello operator resolves the alias to the lead seat and reports when it is read', async () => {
+  const sb = setUp(); // init --lead claude-code@host, so the operator is claude-code@host
+  const c = mcpClient(sb, 'claude-code');
+  try {
+    const hello = runHello(sb, ['operator', '--timeout', '20']);
+    // wait until the hello is on the bus addressed to the lead's real seat
+    for (let i = 0; i < 100 && !JSON.parse(sb.run(['bus', 'tail', '--json', '--type', 'hello']).out).some((m) => m.to === 'claude-code@host'); i++) await sleep(200);
+    // the lead's next turn: it checks the bus first, the way every turn does
+    const u = (await c.tool('bus_unread', {})).structuredContent;
+    assert.ok(u.messages.some((m) => m.type === 'hello' && m.to === 'claude-code@host' && m.operator), 'the lead sees the hello on its next turn');
+    const r = await hello;
+    assert.equal(r.code, 0, r.out + r.err);
+    assert.match(r.out, /the operator is claude-code@host/);
+    assert.match(r.out, /sent #\d+ to claude-code@host/);
+    assert.match(r.out, /claude-code@host read it \d+ s after you sent it/);
+    // the hello went to the resolved seat, not the literal alias
+    const hellos = JSON.parse(sb.run(['bus', 'tail', '--json', '--type', 'hello']).out).filter((m) => m.to === 'claude-code@host');
+    assert.equal(hellos.length, 1, JSON.stringify(hellos, null, 1));
+  } finally { await c.close(); sb.stop(); }
+});
+
+test('MEM-032 AC01: memev bus hello all is refused, because a hello is to one seat', async () => {
+  const sb = setUp();
+  try {
+    const r = await runHello(sb, ['all', '--timeout', '2']);
+    assert.equal(r.code, 1, r.out + r.err);
+    assert.match(r.out + r.err, /one seat, not all/);
+    // nothing was posted: no hello of any kind reached the bus
+    assert.equal(JSON.parse(sb.run(['bus', 'tail', '--json', '--type', 'hello']).out).length, 0);
+  } finally { sb.stop(); }
+});

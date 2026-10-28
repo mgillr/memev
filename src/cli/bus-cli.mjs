@@ -175,8 +175,17 @@ export async function command(cmd, pos, flags, { root, env }) {
   if (sub === 'hello') {
     // A guided test of the link: post one hello to the seat, then wait for the seat to read it on
     // its next turn (apps check the bus at the start of every turn) and say so.
-    const seat = pos[1];
+    let seat = pos[1];
     if (!seat) throw new Error('memev bus hello <seat> [--timeout S]  (memev bus roster lists the seats)');
+    if (seat === 'all') throw new Error('memev bus hello is to one seat, not all; pass the seat name (memev bus roster lists them, or use the operator alias)');
+    // The operator alias is a natural way to test the lead: resolve it to the lead's real seat so
+    // the read check watches the seat that actually reads the hello.
+    if (seat === 'operator') {
+      const r = await call('bus_roster', {});
+      if (!r.operator) throw new Error('no operator seat is set yet; pick the lead with memev bus operator <seat> (memev bus roster lists the seats), then run memev bus hello again');
+      seat = r.operator;
+      out.info(`the operator is ${seat}; sending the hello there`);
+    }
     const timeoutS = Math.max(1, Math.min(300, Number(flags.timeout) || 60));
     const m = await call('bus_send', { to: seat, type: 'hello', body: 'hello from the terminal: a guided test of the bus. If you are reading this, the terminal reached your app.' });
     out.ok(`sent #${m.seq} to ${seat}`);
