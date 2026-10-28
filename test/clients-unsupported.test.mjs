@@ -1,6 +1,7 @@
 // Apps Memev detects but does not support yet are listed as found, not supported yet, and their files are never changed.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { sandbox } from './helpers/cli.mjs';
@@ -48,22 +49,37 @@ test('MEM-046 AC01: with fake config dirs for Cline, Continue and Goose, the che
   } finally { sb.stop(); }
 });
 
-test('MEM-046 AC02: no config file of an unsupported app is modified', () => {
+// Hashes every file in a folder tree (relative path plus bytes), so a new file written beside the
+// planted ones, or a changed or removed one, changes the hash.
+function hashTree(dir) {
+  const h = crypto.createHash('sha256');
+  const walk = (d) => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else { h.update(path.relative(dir, p) + '\0'); h.update(fs.readFileSync(p)); }
+    }
+  };
+  walk(dir);
+  return h.digest('hex');
+}
+
+test('MEM-046 AC02: no file in an unsupported app folder is modified, added or removed', () => {
   const sb = sandbox();
   try {
     const dirs = appDirs(sb);
-    const files = {};
     for (const id of Object.keys(dirs)) {
-      const f = path.join(dirs[id], 'settings.json');
-      fs.mkdirSync(path.dirname(f), { recursive: true });
-      fs.writeFileSync(f, JSON.stringify({ app: id, theme: 'dark', key: 'value' }, null, 2));
-      files[id] = f;
+      fs.mkdirSync(path.join(dirs[id], 'sub'), { recursive: true });
+      fs.writeFileSync(path.join(dirs[id], 'settings.json'), JSON.stringify({ app: id, theme: 'dark', key: 'value' }, null, 2));
+      fs.writeFileSync(path.join(dirs[id], 'notes.txt'), `notes for ${id}`);
+      fs.writeFileSync(path.join(dirs[id], 'sub', 'inner.json'), '{"nested":true}');
     }
-    const before = Object.fromEntries(Object.entries(files).map(([k, f]) => [k, fs.readFileSync(f)]));
+    const before = Object.fromEntries(Object.entries(dirs).map(([k, d]) => [k, hashTree(d)]));
     const r = sb.run(['init', '--port', String(sb.port), '--local-only']);
     assert.equal(r.code, 0, r.out + r.err);
-    const after = Object.fromEntries(Object.entries(files).map(([k, f]) => [k, fs.readFileSync(f)]));
-    assert.deepEqual(after, before, 'the config files of unsupported apps are byte for byte the same');
+    connectAll({ env: sb.env, launcher: '/x/memev' });
+    const after = Object.fromEntries(Object.entries(dirs).map(([k, d]) => [k, hashTree(d)]));
+    assert.deepEqual(after, before, 'every file and subfolder of each unsupported app is byte for byte the same');
     const st = fs.existsSync(path.join(sb.env.MEMEV_CONFIG_DIR, 'clients-state.json'))
       ? JSON.parse(fs.readFileSync(path.join(sb.env.MEMEV_CONFIG_DIR, 'clients-state.json'), 'utf8'))
       : { connected: {}, files: {} };

@@ -54,15 +54,17 @@ hook); they cannot add context to a prompt. Memev works around this in three way
 Memev detects these apps and lists them as found, not supported yet. It never changes their files.
 The checklist points to this page until there is a public place to ask for the next one.
 
-| App | Where Memev looks |
-|---|---|
-| Cline | `~/.cline/` |
-| Roo | `~/.roo/` on Linux and macOS, `%USERPROFILE%\.roo` on Windows |
-| Continue | `~/.continue` |
-| Kiro | `~/.kiro` |
-| JetBrains AI | `~/.config/JetBrains` on Linux, `~/Library/Application Support/JetBrains` on macOS, `%APPDATA%\JetBrains` on Windows |
-| Amp | `~/.config/amp` on macOS and Linux, `%USERPROFILE%\.config\amp` on Windows |
-| Goose | `~/.config/goose` on macOS and Linux, `%APPDATA%\Block\goose` on Windows |
+Each lookup directory is the one the app's own docs name, cited in the last column.
+
+| App | Where Memev looks | Docs |
+|---|---|---|
+| Cline | `~/.cline/` | [config](https://docs.cline.bot/getting-started/config) |
+| Roo | `~/.roo/` on Linux and macOS, `%USERPROFILE%\.roo` on Windows | [custom instructions](https://docs.roocode.com/features/custom-instructions) |
+| Continue | `~/.continue` | [config file](https://docs.continue.dev/customization/config-file) |
+| Kiro | `~/.kiro` | [CLI chat configuration](https://kiro.dev/docs/cli/chat/configuration/) |
+| JetBrains AI | `~/.config/JetBrains` on Linux, `~/Library/Application Support/JetBrains` on macOS, `%APPDATA%\JetBrains` on Windows | [settings and plugins](https://www.jetbrains.com/help/idea/settings-and-plugins.html) |
+| Amp | `~/.config/amp` on macOS and Linux, `%USERPROFILE%\.config\amp` on Windows | [manual](https://ampcode.com/manual) |
+| Goose | `~/.config/goose` on macOS and Linux, `%APPDATA%\Block\goose` on Windows | [config files](https://goose-docs.ai/docs/guides/config-files) |
 
 Cloud apps (claude.ai, ChatGPT, others that take a remote MCP URL) connect through the tunnel, side by
 side; see [CLOUD.md](CLOUD.md).
