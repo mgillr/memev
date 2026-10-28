@@ -1,6 +1,6 @@
 // The MCP tool list marks each read-only tool with annotations.readOnlyHint so a cloud app that
-// only allows read and fetch (ChatGPT Plus and Pro developer mode) can still use it, and a write
-// tool never carries the hint. The per-plan matrix in docs/CLOUD.md says which plans allow what.
+// gates what a connector may do can still use the safe tools, and a write tool never carries the
+// hint. The per-plan matrix in docs/CLOUD.md says which plans allow what, with the source pages.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -44,6 +44,8 @@ test('MEM-057 AC02: CLOUD.md has the plan matrix naming Plus and Business', () =
   const md = fs.readFileSync(path.join(PKG, 'docs', 'CLOUD.md'), 'utf8');
   assert.match(md, /Plus/, 'the matrix names the Plus plan');
   assert.match(md, /Business/, 'the matrix names the Business plan');
-  assert.match(md, /Other cloud app/, 'the matrix covers the other cloud app');
+  assert.match(md, /claude\.ai/, 'the matrix names claude.ai');
+  assert.match(md, /platform\.openai\.com\/docs\/guides\/developer-mode/, 'the sources name the developer mode guide');
+  assert.match(md, /help\.openai\.com\/en\/articles\/12584461-developer-mode-and-mcp-apps-in-chatgpt-beta/, 'the sources name the developer mode and MCP apps help article');
   assert.match(md, /\d{4}-\d{2}-\d{2}/, 'the matrix carries the date it was checked');
 });
