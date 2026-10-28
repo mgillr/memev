@@ -45,8 +45,8 @@ not built.
 ## Trial path
 
 The self-serve Business trial (planned) fits cloud-hosted with hosted-api or mixed. It is free,
-with no card, and the workspace is provisioned self-serve. The flow is in docs/CLOUD-TRIAL.md,
-which ships with the trial page.
+with no card, and the workspace is provisioned self-serve. The flow is in docs/CLOUD-TRIAL.md
+(coming).
 
 ## Status
 
