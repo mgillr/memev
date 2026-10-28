@@ -9,12 +9,12 @@ import tls from 'node:tls';
 import { tmpdir, cleanup, PKG } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
 import { initVault, Vault } from '../src/engine/vault.mjs';
+import { readJson, writeJson } from '../src/engine/util.mjs';
 import { signLicense, loadLicense } from '../src/engine/license.mjs';
 import { seatPolicy } from '../src/engine/entitlements.mjs';
 import { deviceKeygen, signRequest } from '../src/engine/devices.mjs';
 import { createServer } from '../src/server/http.mjs';
 import * as client from '../src/cli/relay.mjs';
-import { personalActive } from '../src/cli/relay.mjs';
 import { createRelay, idOf as devIdOf, controlMessage as devControl, acceptMessage as devAccept } from '../src/server/relay-dev.mjs';
 after(cleanup);
 
@@ -29,6 +29,11 @@ const rpc = (name, args) => ({ jsonrpc: '2.0', id: 1, method: 'tools/call', para
 async function rig() {
   const root = path.join(tmpdir(), 'vault'); const keyDir = path.join(root, '..', 'keys');
   initVault(root, { template: path.join(PKG, 'templates', 'vault') });
+  // remote access is off by default; the relay tests exercise the on path, so switch it on as `memev cloud on` would
+  const cfgFile = path.join(root, '.memev', 'config.json');
+  const cfg = readJson(cfgFile, {});
+  cfg.remote = { ...cfg.remote, enabled: true };
+  writeJson(cfgFile, cfg, 0o600);
   const conf = tmpdir('relay-conf-');
   fs.writeFileSync(path.join(conf, 'license.json'), JSON.stringify(signLicense({ v: 1, lid: 'lic_relay029', tier: 'team', services: ['relay'], seats: 3, iat: day(-10), exp: day(300), grace_days: 14 }, vendor.pem, 'test-vendor')));
   const env = { MEMEV_CONFIG_DIR: conf };
@@ -215,8 +220,8 @@ test('MEM-029: the relay is off until the setting says otherwise, and nothing co
 });
 
 test('MEM-030-FU: a Personal licence in grace still uses the configured relay address', async () => {
-  assert.equal(personalActive({ state: 'grace', tier: 'personal' }), true);
-  assert.equal(personalActive({ state: 'expired', tier: 'personal' }), false);
+  assert.equal(client.personalActive({ state: 'grace', tier: 'personal' }), true);
+  assert.equal(client.personalActive({ state: 'expired', tier: 'personal' }), false);
   const sb = sandbox();
   const url = 'relay://127.0.0.1:9';
   try {

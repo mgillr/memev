@@ -7,10 +7,13 @@
 //   stop           → the reply is recorded; the todo list becomes a checkpoint when it changed
 // session-start and prompt also check the comms bus: a heartbeat, a hello the first time, and any
 // new messages or a hold go into context.
+// Cursor's stop hook can only continue the session with a followup_message, so it is reserved for
+// operator tasks waiting for you. The loop limit is a setting on the stop entry in hooks.json
+// (loop_limit, default 5 there), and the hook itself stops following up once loop_count reaches it.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { api, clientToken, resolveRoot } from './common.mjs';
+import { api, clientToken, resolveRoot, config } from './common.mjs';
 import { ensureDaemon } from './daemon.mjs';
 import { scanTranscript, todosToCheckpoint } from './transcript.mjs';
 import { readJson, writePrivateJson, sha256, slug, configDir } from '../engine/util.mjs';
@@ -43,11 +46,12 @@ export const isBuildRequest = (p) => BUILD_RE.test(String(p || ''));
 const CONTINUATION = /^(continue|go on|go ahead|carry on|keep going|yes|yes please|yep|yeah|ok|okay|sure|thanks|thank you|fix it|do it|next|proceed|please continue)[\s.!]*$/i;
 export const isContinuation = (p) => { const s = String(p || '').trim(); return s.split(/\s+/).filter(Boolean).length < 4 || CONTINUATION.test(s); };
 const BUILD_NUDGE = '[Memev] This is a build request. Before writing code: infer the requirements, call memev_contract_from_request (each requirement with a local check), then memev_contract_sign, and say in one line what you signed. If an open contract already covers it, use memev_contract_status instead.';
-const ROLE_REPLY = 'ass' + 'istant';
 
-// The whole hook runs inside this budget. The app gives the prompt hook 10 s, but the person is
-// waiting on every turn, so the hook decides for itself when it is done: what is in hand goes out,
-// whatever is still in flight is dropped.
+// The prompt hook runs inside this budget. The app gives it 10 s, but the person is waiting on
+// every turn, so the hook decides for itself when it is done: what is in hand goes out, whatever is
+// still in flight is dropped. The other hooks keep their own timeouts: the stop hook's contract gate
+// is a safety check that must not fail open under load, and the pre-compact checkpoint must land
+// before the context is cut.
 const HOOK_BUDGET_MS = 1500;
 export async function runHook(event, flags, env = process.env) {
   const format = flags.format || 'claude';
@@ -60,8 +64,6 @@ export async function runHook(event, flags, env = process.env) {
   const remote = !isVault(root) ? loadRemote(env) : null; // this computer uses a vault elsewhere (memev join)
   const stateFile = remote ? path.join(configDir(env), 'hooks', `${slug(session, 64)}.json`) : path.join(root, '.memev', 'hooks', `${slug(session, 64)}.json`);
   const st = readJson(stateFile, { offset: 0, todos: null });
-  const budget = Number(env.MEMEV_HOOK_BUDGET_MS) > 0 ? Number(env.MEMEV_HOOK_BUDGET_MS) : HOOK_BUDGET_MS;
-  const deadline = Date.now() + budget;
   try {
     let call;
     if (remote) call = (route, body) => remoteFetch(remote, `v1/${route}`, { body: { session, project, ...body }, env, headers: { 'x-memev-client': client }, timeoutMs: 8000 }).then((r) => { if (!r.ok) throw new Error(`${route}: ${r.status}`); return r.json; });
@@ -70,13 +72,6 @@ export async function runHook(event, flags, env = process.env) {
       const token = clientToken(root, client);
       call = (route, body) => api(root, `/v1/${route}`, { body: { session, project, ...body }, token, timeoutMs: 4000 }).then((r) => { if (!r.ok) throw new Error(`${route}: ${r.status}`); return r.json; });
     }
-    // The calls that go out together share the budget: each one gets whatever is left, and when the
-    // budget runs out the ones still in flight are dropped, so the hook returns what it has.
-    const withBudget = (p) => new Promise((resolve, reject) => {
-      const t = setTimeout(() => reject(new Error('budget exceeded')), Math.max(1, deadline - Date.now()));
-      p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
-    });
-    const fire = (p) => { p.catch(() => {}); return null; }; // no result is wanted; it must not hold the hook
     const tr = input.transcript_path ? scanTranscript(input.transcript_path, { fromOffset: st.offset }) : null;
     const saveCheckpoint = async (source) => {
       const cp = todosToCheckpoint(tr?.todos);
@@ -90,12 +85,12 @@ export async function runHook(event, flags, env = process.env) {
       // a compaction or a clear empties the context; a resume brings the earlier conversation back, card included
       if (source === 'compact' || source === 'clear') { st.injected = []; st.card = null; }
       const fresh = source !== 'compact' && source !== 'resume'; // startup or clear: a new context, so the rules as well
-      const r = await withBudget(call('session-start', { task: null }));
+      const r = await call('session-start', { task: null });
       // whether the person still has to pick a lead: only at a fresh start, and only until the setup session has asked
       // (bus/operator.json records it)
       const asked = remote ? null : readJson(path.join(root, 'bus', 'operator.json'), null)?.asked;
-      const bus = await withBudget(call('bus-pulse', { lead: fresh && !(typeof asked === 'string' && asked) })).catch(() => null);
-      fire(call('journal', { role: 'event', text: `session ${source} (${client}${project ? `, ${project}` : ''})` }));
+      const bus = await call('bus-pulse', { lead: fresh && !(typeof asked === 'string' && asked) }).catch(() => null);
+      await call('journal', { role: 'event', text: `session ${source} (${client}${project ? `, ${project}` : ''})` }).catch(() => {});
       // the card goes in when the context does not hold it: at a fresh start, after a compaction, or when it changed
       const card = sha256(String(r.text || ''));
       const parts = [fresh ? r.protocol || PROTOCOL : '', fresh || card !== st.card ? r.text : '', bus?.text || ''].filter(Boolean);
@@ -108,30 +103,66 @@ export async function runHook(event, flags, env = process.env) {
         // never the same item twice in a session: the route leaves out what this session was already given
         // recall and the bus pulse go out at the same time, and the journal is fire-and-forget: the
         // person is waiting on the turn, and the journal can land after the hook has answered
+        const budget = Number(env.MEMEV_HOOK_BUDGET_MS) > 0 ? Number(env.MEMEV_HOOK_BUDGET_MS) : HOOK_BUDGET_MS;
+        const deadline = Date.now() + budget;
+        // each call gets whatever is left of the budget, and when it runs out the ones still in
+        // flight are dropped, so the hook returns what it has
+        const withBudget = (p) => new Promise((resolve, reject) => {
+          const t = setTimeout(() => reject(new Error('budget exceeded')), Math.max(1, deadline - Date.now()));
+          p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+        });
         const recallP = isContinuation(prompt) ? null : withBudget(call('recall', { query: prompt.slice(0, 1000), limit: 4, exclude: st.injected || [] })).catch(() => null);
-        const busP = withBudget(call('bus-pulse', {})).catch(() => null);
-        fire(call('journal', { role: 'user', text: prompt }));
+        // Cursor cannot show prompt context anyway, so it only peeks: a task that is already waiting
+        // when the person types must stay unread for the stop hook's follow-up, not be swallowed here
+        const busP = withBudget(call('bus-pulse', { peek: format === 'cursor' })).catch(() => null);
+        call('journal', { role: 'user', text: prompt }).catch(() => {}); // no result is wanted; it must not hold the hook
         const r = await recallP;
         if (r?.hits?.length) st.injected = [...new Set([...(st.injected || []), ...r.hits.map((h) => `${h.path}#${h.heading || ''}`)])].slice(-500);
         const bus = await busP;
-        emit(format, 'UserPromptSubmit', [bus?.text, r?.text, isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
+        const contractsOn = remote || config(root).contracts?.enabled !== false;
+        emit(format, 'UserPromptSubmit', [bus?.text, r?.text, contractsOn && isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
+        // the app times the hook process, not this promise: once the output is written and the state
+        // is saved, end the process, so the calls the budget dropped and the fire-and-forget journal
+        // do not keep it open. The journal is accepted as lost when the vault is slow.
+        if (tr) st.offset = tr.offset;
+        writePrivateJson(stateFile, st);
+        await new Promise((resolve) => process.stdout.once('drain', resolve));
+        process.exit(0);
       }
     } else if (event === 'pre-compact') {
-      await withBudget(saveCheckpoint('pre-compact'));
-      if (tr?.lastAssistant) fire(call('journal', { role: ROLE_REPLY, text: tr.lastAssistant }));
+      await saveCheckpoint('pre-compact');
+      if (tr?.lastAssistant) await call('journal', { role: 'assistant', text: tr.lastAssistant });
     } else if (event === 'stop') {
       const reply = input.last_assistant_message || input.prompt_response || tr?.lastAssistant;
-      if (reply) fire(call('journal', { role: ROLE_REPLY, text: reply }));
-      await withBudget(saveCheckpoint('auto'));
-      if (format === 'claude' && !input.stop_hook_active) {
-        const g = await withBudget(call('contract-gate', {}));
+      if (reply) await call('journal', { role: 'assistant', text: reply });
+      await saveCheckpoint('auto');
+      if (format === 'claude' && !input.stop_hook_active && (remote || config(root).contracts?.enabled !== false)) {
+        const g = await call('contract-gate', {});
         if (g.open?.length) process.stdout.write(JSON.stringify({ decision: 'block', reason: `You signed ${g.open.map((c) => `${c.id} (${c.title})`).join(', ')} and it is not verified yet. Finish the remaining criteria and run memev_contract_verify, or report exactly what blocks you.` }));
+      }
+      // loop_count 3 is the loop_limit set on the stop entry in hooks.json: at that point Cursor
+      // would loop anyway, so the hook stops following up
+      if (format === 'cursor' && Number(input.loop_count ?? 0) < 3) {
+        const u = await call('bus-pulse', { peek: true }).catch(() => null);
+        const waiting = (u?.messages || []).filter((m) => m.type === 'task' && m.operator);
+        if (waiting.length) {
+          await call('bus-pulse', {}).catch(() => null); // the follow-up claims these tasks, so they are read
+          const lines = waiting.slice(-3).map((m) => `#${m.seq} ${String(m.body).slice(0, 300)}`);
+          process.stdout.write(JSON.stringify({
+            followup_message: `[Memev] The operator has ${waiting.length} task${waiting.length > 1 ? 's' : ''} waiting for you:\n${lines.join('\n')}\nClaim each (bus_send, type claim, ref = its id), restate it, then do it.`,
+          }));
+        }
       }
     }
     if (tr) st.offset = tr.offset;
     writePrivateJson(stateFile, st);
   } catch (e) {
     if (env.MEMEV_DEBUG) process.stderr.write(`[memev hook ${event}] ${e.message}\n`);
+    const noticeFile = path.join(path.dirname(stateFile), 'notice.txt');
+    if (!fs.existsSync(noticeFile)) {
+      try { fs.mkdirSync(path.dirname(noticeFile), { recursive: true }); fs.writeFileSync(noticeFile, '1'); } catch {}
+      process.stderr.write('Memev could not start (Node not found); run memev doctor\n');
+    }
     if (event === 'session-start') emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev is not reachable right now (${e.message}); run \`memev doctor\`.]`);
   }
   return 0;

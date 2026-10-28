@@ -1,5 +1,7 @@
 # Lab test plan
 
+Part of the [Memev documentation](../README.md). Up: the [README](../../README.md).
+
 This is the full test plan for Memev in a lab. Someone who has never seen Memev should be able to
 run every test from this page and the two scripts in `scripts/lab/`. Where a feature is not built
 yet, the test says **expect: not available**. Record what you see; don't fill in an expected result
@@ -32,10 +34,10 @@ release to catch regressions.
 
 | Lab | Machines | What it tests | Suggested build |
 |---|---|---|---|
-| L1 Free | 1 | one person, one computer, every local feature | one macOS machine (13 or newer) and one Ubuntu 24.04 VM, 2 CPUs, 4 GB RAM, 10 GB disk |
-| L2 Team | 2 or 3 | several computers using one vault through the secure link, per-computer credentials | one host (Ubuntu 24.04 VM or macOS) plus 1 or 2 client VMs; the host needs outbound internet for a quick tunnel, or Tailscale on all of them |
-| L3 Office / Business | about 10 | many computers on one vault, seat counts, `init --org`, path-limited tokens | one host VM (4 CPUs, 8 GB RAM) and 9 clients. Clients can be containers (`node:22` images) on one Docker host; each needs its own credential |
-| L4 Enterprise | 3 or more | an organisation server, a local model server, integrations, egress control | an org server VM (`memev init --org`), a model server (Ollama or vLLM on a GPU box, or a small CPU model for a functional check), a client VM, and a firewall or packet capture point between them and the internet |
+| L1 Personal | 1 | one person, one computer, every local feature | one macOS machine (13 or newer) and one Ubuntu 24.04 VM, 2 CPUs, 4 GB RAM, 10 GB disk |
+| L2 Personal with more computers | 2 or 3 | several computers using one vault through the secure link, per-computer credentials | one host (Ubuntu 24.04 VM or macOS) plus 1 or 2 client VMs; the host needs outbound internet for a quick tunnel, or Tailscale on all of them |
+| L3 Business stand-in | about 10 | many computers on one vault, seat counts, `init --org`, path-limited tokens | one host VM (4 CPUs, 8 GB RAM) and 9 clients. Clients can be containers (`node:22` images) on one Docker host; each needs its own credential |
+| L4 Corporate stand-in | 3 or more | an organisation server, a local model server, integrations, egress control | an org server VM (`memev init --org`), a model server (Ollama or vLLM on a GPU box, or a small CPU model for a functional check), a client VM, and a firewall or packet capture point between them and the internet |
 
 Have ready before you start:
 
@@ -48,9 +50,10 @@ Have ready before you start:
 - A throwaway private GitHub repository and the `gh` CLI, for the backup test only.
 - gitleaks 8.30.1 for the security section (the CI workflow shows the pinned checksum).
 
-What is simulated and what isn't: the Business and Enterprise parts that are planned (company hub
-with user accounts, sign-in with Google or Entra ID, org chart import, departments and roles,
-labels, local-model routing, egress log, high availability) can't be tested yet. L3 and L4 test
+What is simulated and what isn't: the Business and Corporate parts that are planned (company server
+with user accounts and admin console, one AI provider per organisation, sign-in with Google or Entra
+ID, org chart import, departments and roles, labels, egress log, high availability, the crdt-merge
+convergence engine) can't be tested yet. L3 and L4 test
 what exists today on that hardware: one vault on a server, many computers with their own
 credentials, path-limited tokens standing in for departments, remote access off, and no traffic
 leaving the server.
@@ -96,7 +99,7 @@ folder first (for example `mkdir ~/.cursor`) and run `memev connect <id>`.
 | T-REG-08 | Zed (`zed`) | `context_servers` in `zed/settings.json` | instructions | as T-REG-05 |
 | T-REG-09 | Disconnect | `memev disconnect <id>` for each, with no edits in between | | each file restored byte for byte (`cmp` against the backup or a copy you made before init) |
 | T-REG-10 | Disconnect after a user edit | edit an app config after connect, then disconnect | | only the Memev entries go; your edit stays |
-| T-REG-11 | A config with comments | add a comment to a JSON config Memev would change, then connect | | the file is not rewritten; the checklist reports a manual step |
+| T-REG-11 | A config with comments | add a comment to a JSON config Memev would change, then connect | | Memev's entry is added in place and every comment and the layout survive; `memev disconnect` gives back the original text |
 | T-REG-12 | A new app later | with the daemon running, create a new app folder and wait up to 30 minutes, or restart the daemon | | the new app is connected without a command; an app you disconnected yourself is not reconnected |
 | T-REG-13 | Doctor, healthy | `memev doctor` | | exit 0; every check is ✓ or a warning with its fix |
 | T-REG-14 | Doctor, broken | stop the daemon, or delete a note file, then `memev doctor`, then `memev doctor --fix` | | first run exits 1 and names the problem; `--fix` repairs it; a second `doctor` exits 0 |
@@ -236,7 +239,7 @@ number. One computer needs no licence. The lab licences are in the handoff pack 
 |---|---|---|
 | T-FEAT-37 | `memev init --org` on the L3 or L4 server | organisation profile, remote access off (T-CMD-09) |
 | T-FEAT-38 | stand-in for departments: write synthetic notes under `dept/sales/`, `dept/finance/`, `dept/hr/`, issue one token per department with `--paths`, and recall from each | each token sees only its own folder, in recall and in the graph |
-| T-FEAT-39 | org chart import, departments and roles, sign-in with Google or Entra ID, company hub with user accounts | expect: not available (planned) |
+| T-FEAT-39 | org chart import, departments and roles, sign-in with Google or Entra ID, company server with user accounts, admin console | expect: not available (planned) |
 | T-FEAT-40 | `memev_graph` and `memev_explain` between two entities in the same department | the path between them and the notes behind it |
 
 ### 6.10 No telemetry
@@ -254,9 +257,9 @@ number. One computer needs no licence. The lab licences are in the handoff pack 
 | ID | Step | Expected |
 |---|---|---|
 | T-FEAT-46 | L4: org server with `init --org`, no backup set up; block all outbound traffic at the firewall except DNS; use it from a client for an hour | everything works; the firewall log shows nothing from the server leaving |
-| T-FEAT-47 | licence checks | made offline, on the machine. There is no licence server and nothing is sent to check a licence. With outbound blocked, `memev license status` still works |
-| T-FEAT-48 | the local model server: point the client's AI app at the local model (Ollama or vLLM) and use Memev from it | Memev works the same; recall stays on the LAN. Memev itself doesn't call any model |
-| T-FEAT-49 | restricted notes served only to a local model, labels, egress log, pseudonymising | expect: not available (planned) |
+| T-FEAT-47 | licence checks | made offline, on the machine. Nothing is sent to check a licence. Only `memev license activate <key>` contacts the licence endpoint you configure, once. With outbound blocked, `memev license status` still works |
+| T-FEAT-48 | the on-premises LLM option: point the client's AI app at the local model (Ollama or vLLM) and use Memev from it | Memev works the same; recall stays on the LAN. Memev itself doesn't call any model |
+| T-FEAT-49 | rules for what reaches the AI provider, labels, egress log, pseudonymising, merging by crdt-merge | expect: not available (planned) |
 | T-FEAT-50 | integrations: run a vendor's MCP server (for example a ticketing or database one) next to Memev in the same app | both work side by side. Connectors that bring that data into the vault: expect: not available (planned) |
 
 ### 6.12 Comms bus and pulse
@@ -355,7 +358,7 @@ vault in `$env:USERPROFILE\memev`.
 | ID | Step | Expected |
 |---|---|---|
 | T-WIN-01 | `npm test` in the clone | record the pass and fail counts and the name of every failing test; report each failure as an issue with this id |
-| T-WIN-02 | `node bin/memev.mjs init`, answer yes to the PATH question | vault in `$env:USERPROFILE\memev`, daemon on `127.0.0.1:7787`, checklist printed, self-test passes; "Start at login" is listed as a manual step |
+| T-WIN-02 | `node bin/memev.mjs init`, answer yes to the PATH question | vault in `$env:USERPROFILE\memev`, daemon on `127.0.0.1:7787`, checklist printed, self-test passes; "Start at login" reports a per-user Task Scheduler entry (`schtasks`), or a manual step if it could not be created |
 | T-WIN-03 | open a new PowerShell window, then `memev --version` and `reg query HKCU\Environment /v Path` | `0.1.0`; the user PATH holds `$env:APPDATA\memev\bin`, which holds `memev.cmd` |
 | T-WIN-04 | connect Claude Code, Codex, Gemini CLI and Cursor (create `.claude`, `.codex`, `.gemini` and `.cursor` under `$env:USERPROFILE` first for apps that are not installed); read each file listed in section 4 | every MCP and hook command runs `node.exe` with `$env:APPDATA\memev\runtime\<version>\bin\memev.mjs` as its first argument, never a `.cmd` file; in each installed app a new session starts with the resume card |
 | T-WIN-05 | `memev doctor` | exit 0; the private files check passes |
