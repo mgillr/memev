@@ -15,15 +15,36 @@ export const CORE_FEATURES = ['vault', 'recall', 'graph', 'contracts', 'doctor',
 /** Paid add-ons: hosted services and multi-computer or team use. Only extra computers exist so far. */
 export const PAID_FEATURES = ['sync_hosted', 'backup_hosted', 'relay_hosted', 'extra_computers', 'team_vault', 'sso', 'audit_export'];
 
-/** Draft limits per tier (docs/PRICING.md). A licence's own seats and connectors win. */
+/** Draft limits per tier (docs/PRICING.md). A licence's own seats and connectors win.
+ * personal_more and corporate are the ids new licences use; personal and enterprise are the ids
+ * older licences carry, and they keep exactly these limits. */
 export const TIERS = {
   free: { computers: 1, connectors: 5, local_clients: null, services: [] },
   personal: { computers: 3, connectors: 10, local_clients: null, services: ['sync', 'backup', 'relay'] },
+  personal_more: { computers: 3, connectors: 10, local_clients: null, services: ['sync', 'backup', 'relay'] },
   team: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team'] },
   office: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team'] },
   business: { computers: null, connectors: null, local_clients: null, services: ['team'] },
   enterprise: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team', 'sso', 'audit'] },
+  corporate: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team', 'sso', 'audit'] },
 };
+
+/** The names the tiers go by in what people read, the four names of the docs (docs/tiers/README.md).
+ * The ids of older licences read as the name of the tier they are. */
+export const TIER_LABELS = {
+  free: 'Personal',
+  personal: 'Personal with more computers',
+  personal_more: 'Personal with more computers',
+  team: 'Business',
+  office: 'Business',
+  business: 'Business',
+  enterprise: 'Corporate',
+  corporate: 'Corporate',
+  founder: 'Founder',
+};
+
+/** The name a tier id goes by in printed output; an id that is not in the table reads as itself. */
+export const tierLabel = (id) => TIER_LABELS[id] || String(id);
 
 /**
  * The plans and what each adds, for `memev upgrade`, in the four tier names the docs use. The
@@ -86,13 +107,14 @@ export function seatPolicy({ license = null, devices = [] } = {}) {
   const writable = new Set(live(license) ? remote.slice(0, Math.max(0, seats - 1)).map((d) => d.id) : []);
   let canEnroll = true; let reason = null;
   if (state === 'expired') { canEnroll = false; reason = `The licence for this vault expired on ${license.exp} and its grace period is over. Computers already added can still read, but none can be added. Install a renewed licence (memev license install <file>) or contact us.`; }
-  else if (enrolled >= seats) { canEnroll = false; reason = live(license) ? `This vault is licensed for ${plural(seats, 'computer')}. Remove one with \`memev devices remove <id>\` or contact us for more.` : `Free covers this computer. Adding more computers is part of Personal (up to ${TIERS.personal.computers} computers). Run memev upgrade to see plans.`; }
+  else if (enrolled >= seats) { canEnroll = false; reason = live(license) ? `This vault is licensed for ${plural(seats, 'computer')}. Remove one with \`memev devices remove <id>\` or contact us for more.` : `Personal covers this computer. Adding more computers is part of Personal with more computers (up to ${TIERS.personal.computers} computers). Run memev upgrade to see plans.`; }
   const notes = [];
   if (state === 'grace') notes.push(`The licence expired on ${license.exp}; ${plural(license.days_left, 'day')} of grace left. After that no computer can be added and added computers can only read.`);
-  if (state === 'invalid' || state === 'not_yet_valid') notes.push(`The installed licence is not used: ${license.reason}. This vault counts as the free tier.`);
+  if (state === 'invalid' || state === 'not_yet_valid') notes.push(`The installed licence is not used: ${license.reason}. This vault counts as Personal.`);
   const readOnly = remote.filter((d) => !writable.has(d.id));
   if (readOnly.length) notes.push(`${plural(readOnly.length, 'computer')} can read but not write (${readOnly.map((d) => d.label).join(', ')}): ${live(license) ? 'more computers are enrolled than the licence covers' : 'there is no valid licence'}.`);
-  return { enforcement: ENFORCEMENT, tier: live(license) ? license.tier : 'free', state, seats, enrolled, can_enroll: canEnroll, reason, writable, read_only: readOnly.map((d) => d.id), notes };
+  const tier = live(license) ? license.tier : 'free';
+  return { enforcement: ENFORCEMENT, tier, tier_label: tierLabel(tier), state, seats, enrolled, can_enroll: canEnroll, reason, writable, read_only: readOnly.map((d) => d.id), notes };
 }
 
 /** Why a computer may only read, or null when it may write. */
@@ -111,6 +133,6 @@ export function report({ license = null, seats, devices = [] }) {
   const limits = limitsFor(license);
   const policy = seatPolicy({ license, devices });
   const notes = [...policy.notes];
-  if (limits.connectors !== null && seats.connectors > limits.connectors) notes.push(`${seats.connectors} cloud AI connectors are active; the ${limits.tier} tier covers ${limits.connectors}. Connectors are reported, not limited.`);
-  return { enforcement: ENFORCEMENT, effective_tier: policy.tier, licensed_tier: limits.tier, limits, usage: seats, seats_licensed: policy.seats, computers_enrolled: policy.enrolled, can_enroll: policy.can_enroll, enroll_refused: policy.reason, read_only: policy.read_only, notes, blocked: false };
+  if (limits.connectors !== null && seats.connectors > limits.connectors) notes.push(`${seats.connectors} cloud AI connectors are active; the ${tierLabel(limits.tier)} tier covers ${limits.connectors}. Connectors are reported, not limited.`);
+  return { enforcement: ENFORCEMENT, effective_tier: policy.tier, tier_label: tierLabel(policy.tier), licensed_tier: limits.tier, limits, usage: seats, seats_licensed: policy.seats, computers_enrolled: policy.enrolled, can_enroll: policy.can_enroll, enroll_refused: policy.reason, read_only: policy.read_only, notes, blocked: false };
 }

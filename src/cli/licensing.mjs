@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadLicense, verifyLicense, licenseFile, extraFields, LICENSE_KEYS } from '../engine/license.mjs';
-import { report, seatPolicy } from '../engine/entitlements.mjs';
+import { report, seatPolicy, tierLabel } from '../engine/entitlements.mjs';
 import { DeviceRegistry, hostDevice, deviceKeygen } from '../engine/devices.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
 import { configDir, writePrivate, exists } from '../engine/util.mjs';
@@ -98,7 +98,7 @@ export async function command(cmd, pos, flags, { root, env, license = null }) {
       const s = licensingStatus({ root, env, license });
       if (flags.json) { console.log(JSON.stringify(s, null, 2)); return 0; }
       const l = s.license;
-      console.log(l.state === 'none' ? 'Licence: none. The free tier needs none: everything on this computer is free and unlimited.' : `Licence ${l.lid || ''}: ${l.state}${l.tier ? ` · ${l.tier}` : ''}${l.seats ? ` · ${l.seats} computer(s)` : ''}${l.connectors != null ? ` · ${l.connectors} connector(s)` : ''} · ${l.reason}`);
+      console.log(l.state === 'none' ? 'Licence: Personal, no licence needed. Everything on this computer is free and unlimited.' : `Licence ${l.lid || ''}: licence ${l.state}${l.tier ? ` (${tierLabel(l.tier)})` : ''}${l.seats ? ` · ${l.seats} computer(s)` : ''}${l.connectors != null ? ` · ${l.connectors} connector(s)` : ''} · ${l.reason}`);
       if (s.renewal) console.log(s.renewal);
       console.log(s.computers_enrolled > s.seats_licensed
         ? `Computers: ${s.computers_enrolled} enrolled, but the licence covers ${s.seats_licensed}; the others can read but not write, and none can be added. This computer is never limited.`
@@ -121,7 +121,7 @@ export async function command(cmd, pos, flags, { root, env, license = null }) {
       if (!r.ok) { out.bad(`not activated: ${r.reason}`); return 1; }
       out.ok(`activated licence ${r.license.lid} (${r.state}) in ${r.file}; it is checked on this computer from now on, with no network`); return 0;
     }
-    if (sub === 'remove') { fs.rmSync(licenseFile(env), { force: true }); out.ok('licence removed; nothing changes for the free tier'); return 0; }
+    if (sub === 'remove') { fs.rmSync(licenseFile(env), { force: true }); out.ok('licence removed; nothing changes for Personal'); return 0; }
     throw new Error('memev license status [--json] | activate <key> | install <file> | remove');
   }
   // devices
@@ -141,8 +141,10 @@ export async function command(cmd, pos, flags, { root, env, license = null }) {
     for (const d of reg.list()) console.log(`  ${d.status === 'active' ? (d.kind === 'host' ? '*' : ' ') : 'x'} ${d.id}  ${d.kind.padEnd(16)} ${String(d.label).padEnd(20)} ${d.last_seen ? `seen ${d.last_seen.slice(0, 16)}` : 'not seen yet'}${d.pubkey ? ' · key' : ''}${d.flags?.length ? ` · ${d.flags.map((f) => f.type).join(', ')}` : ''}`);
     console.log(`Computers: ${seats.computers} · cloud connectors: ${seats.connectors} · local clients: ${seats.local_clients} (active in the last ${seats.active_days} days)`);
     for (const f of seats.flagged) out.warn(`${f.label} (${f.id}): ${f.flags.join(', ')}; memev devices rotate ${f.id} if its credential was copied`);
-    const s = report({ license: license ?? loadLicense({ env }), seats, devices: reg.list() });
+    const lic = license ?? loadLicense({ env });
+    const s = report({ license: lic, seats, devices: reg.list() });
     console.log(`Seats: ${s.computers_enrolled} of ${s.seats_licensed} computers${s.can_enroll ? '' : ' (no more can be added)'}`);
+    console.log(lic.state === 'none' ? 'Personal, no licence needed' : `licence ${lic.state}${lic.tier ? ` (${tierLabel(lic.tier)})` : ''}`);
     for (const n of s.notes) out.info(n);
     return 0;
   }

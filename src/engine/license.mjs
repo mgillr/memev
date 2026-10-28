@@ -22,7 +22,12 @@ export const LICENSE_KEYS = {
   'memev-2026-10': 'MCowBQYDK2VwAyEALBLRg3jHHn5jy7zhSkuLm5nSFsun1qp8X7tGedNQIbw=',
 };
 
-export const TIER_NAMES = ['personal', 'team', 'office', 'business', 'enterprise', 'founder'];
+/** The tier ids a licence may carry. personal_more and corporate are the ids new licences use;
+ * personal, team, office and enterprise are the ids older licences carry, and they still verify. */
+export const TIER_NAMES = ['personal', 'personal_more', 'team', 'office', 'business', 'enterprise', 'corporate', 'founder'];
+
+/** The id new licences use for a tier: the older ids read as their newer one, the rest as themselves. */
+export const canonicalTier = (id) => ({ personal: 'personal_more', team: 'business', office: 'business', enterprise: 'corporate' }[id] || id);
 const DAY = 86400e3;
 const SKEW_MS = DAY; // a licence issued "tomorrow" by a clock a little ahead still verifies
 
