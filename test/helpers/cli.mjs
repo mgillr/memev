@@ -18,7 +18,7 @@ export function freePort({ span = 1 } = {}) {
     swept = true;
     for (const d of fs.readdirSync(os.tmpdir())) {
       const m = /^memev-test-ports-(\d+)$/.exec(d);
-      if (m && !alive(Number(m[1]))) try { fs.rmSync(path.join(os.tmpdir(), d), { recursive: true, force: true }); } catch {}
+      if (m && !alive(Number(m[1]))) { try { fs.rmSync(path.join(os.tmpdir(), d), { recursive: true, force: true }); } catch {} } // a folder another user left behind stays
     }
   }
   fs.mkdirSync(RESERVED, { recursive: true });
@@ -53,9 +53,15 @@ export function sandbox({ ports = 1 } = {}) {
   const stop = () => run(['stop']);
   return { home, env, port, run, runAsync, hook, stop, root: env.MEMEV_ROOT };
 }
-// entry: the command and args an app's MCP config holds, to run the server the way that app does
+// entry: the command and args an app's MCP config holds, to run the server the way that app does.
+// An app launches its own MCP server with its own marker in the environment, so a client that does
+// not control the environment (no entry.env) gets the claimed app's marker; a test that passes
+// entry.env decides the environment itself. Only claude-code's marker (CLAUDECODE) is
+// verified to be set by the app, so only it is injected here; the rest are unverified.
+const OWN_MARKER = { 'claude-code': 'CLAUDECODE' };
 export function mcpClient(sb, client, entry = { command: process.execPath, args: [BIN, 'mcp', '--client', client] }) {
-  const p = spawn(entry.command, entry.args, { env: sb.env, stdio: ['pipe', 'pipe', 'pipe'] });
+  const marker = entry.env || !OWN_MARKER[client] ? {} : { [OWN_MARKER[client]]: '1' };
+  const p = spawn(entry.command, entry.args, { env: { ...sb.env, ...marker, ...(entry.env || {}) }, stdio: ['pipe', 'pipe', 'pipe'] });
   let buf = ''; const waiting = new Map(); let id = 0;
   p.stdout.on('data', (d) => { buf += d; let i; while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); if (!line.trim()) continue; const m = JSON.parse(line); waiting.get(m.id)?.(m); waiting.delete(m.id); } });
   const request = (method, params) => new Promise((resolve) => { const n = ++id; waiting.set(n, resolve); p.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: n, method, params })}\n`); });

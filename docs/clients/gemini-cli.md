@@ -1,5 +1,7 @@
 # Gemini CLI
 
+Part of the [Memev documentation](../README.md). Up: [AI apps](../CLIENTS.md), the [README](../../README.md).
+
 Id: `gemini-cli`
 
 `memev init` connects this app when it finds `~/.gemini`. To connect it yourself:

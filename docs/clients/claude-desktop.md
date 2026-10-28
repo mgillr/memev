@@ -1,5 +1,7 @@
 # Claude Desktop
 
+Part of the [Memev documentation](../README.md). Up: [AI apps](../CLIENTS.md), the [README](../../README.md).
+
 Id: `claude-desktop`
 
 `memev init` connects this app when it finds the Claude Desktop config folder. To connect it yourself:
