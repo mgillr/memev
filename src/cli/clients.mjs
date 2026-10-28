@@ -162,17 +162,20 @@ export function clientDefs(env, bin, platform = process.platform) {
   return defs;
 }
 
-/** The apps Memev detects but does not support yet. They are listed as found, not supported, and their files are never changed. */
+/** The apps Memev detects but does not support yet. They are listed as found, not supported, and their files are never changed.
+ *  Each app is looked up at the directory its own docs name, which differs per app and per platform. */
 export function unsupportedDefs(env) {
   const { home, appData } = platformDirs(env);
+  const xdg = env.XDG_CONFIG_HOME || path.join(home, '.config');
+  const win = process.platform === 'win32';
   return [
-    { id: 'cline', name: 'Cline', detect: () => exists(path.join(appData, 'cline')) },
-    { id: 'roo', name: 'Roo', detect: () => exists(path.join(appData, 'roo')) },
+    { id: 'cline', name: 'Cline', detect: () => exists(path.join(home, '.cline')) },
+    { id: 'roo', name: 'Roo', detect: () => exists(path.join(home, '.roo')) },
     { id: 'continue', name: 'Continue', detect: () => exists(path.join(home, '.continue')) },
     { id: 'kiro', name: 'Kiro', detect: () => exists(path.join(home, '.kiro')) },
-    { id: 'jetbrains-ai', name: 'JetBrains AI', detect: () => exists(path.join(home, '.jetbrains', 'ai')) },
-    { id: 'amp', name: 'Amp', detect: () => exists(path.join(appData, 'amp')) },
-    { id: 'goose', name: 'Goose', detect: () => exists(path.join(appData, 'goose')) },
+    { id: 'jetbrains-ai', name: 'JetBrains AI', detect: () => exists(path.join(appData, 'JetBrains')) },
+    { id: 'amp', name: 'Amp', detect: () => exists(win ? path.join(home, '.config', 'amp') : path.join(xdg, 'amp')) },
+    { id: 'goose', name: 'Goose', detect: () => exists(win ? path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'Block', 'goose') : path.join(xdg, 'goose')) },
   ];
 }
 

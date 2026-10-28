@@ -43,15 +43,13 @@ The checklist points to this page until there is a public place to ask for the n
 
 | App | Where Memev looks |
 |---|---|
-| Cline | `~/.config/cline` |
-| Roo | `~/.config/roo` |
+| Cline | `~/.cline/` |
+| Roo | `~/.roo/` on Linux and macOS, `%USERPROFILE%\.roo` on Windows |
 | Continue | `~/.continue` |
 | Kiro | `~/.kiro` |
-| JetBrains AI | `~/.jetbrains/ai` |
-| Amp | `~/.config/amp` |
-| Goose | `~/.config/goose` |
-
-On macOS the `~/.config/...` directories are under `~/Library/Application Support`.
+| JetBrains AI | `~/.config/JetBrains` on Linux, `~/Library/Application Support/JetBrains` on macOS, `%APPDATA%\JetBrains` on Windows |
+| Amp | `~/.config/amp` on macOS and Linux, `%USERPROFILE%\.config\amp` on Windows |
+| Goose | `~/.config/goose` on macOS and Linux, `%APPDATA%\Block\goose` on Windows |
 
 Cloud apps (claude.ai, ChatGPT, others that take a remote MCP URL) connect through the tunnel, side by
 side; see [CLOUD.md](CLOUD.md).
