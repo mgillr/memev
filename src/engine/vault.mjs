@@ -43,9 +43,10 @@ export class Vault extends EventEmitter {
 
   open() {
     if (!isVault(this.root)) throw new VaultError('not_a_vault', `${this.root} is not a Memev vault (memev init)`);
-    this.config = { ...DEFAULT_CONFIG, ...readJson(path.join(this.state, 'config.json'), {}) };
+    const fileCfg = readJson(path.join(this.state, 'config.json'), {});
+    this.config = { ...DEFAULT_CONFIG, ...fileCfg };
     // existing vaults predate the opt-in: contracts stay on for them
-    if (this.config.contracts && this.config.contracts.enabled === undefined) this.config.contracts = { ...DEFAULT_CONFIG.contracts, ...this.config.contracts, enabled: true };
+    if (!fileCfg.contracts || fileCfg.contracts.enabled === undefined) this.config.contracts = { ...DEFAULT_CONFIG.contracts, ...fileCfg.contracts, enabled: true };
     this.tokens = new TokenStore(path.join(this.state, 'tokens.json'));
     this.host = hostDevice(this.root);
     this.log = new OpLog(path.join(this.state, 'oplog'), { segmentBytes: this.opts.segmentBytes, snapshotEvery: this.opts.snapshotEvery, fsync: this.opts.fsync ?? true, deviceId: this.host.id }).open();

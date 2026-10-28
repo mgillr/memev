@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { sandbox, mcpClient } from './helpers/cli.mjs';
-import { cleanup } from './helpers/tmp.mjs';
+import { cleanup, tmpdir } from './helpers/tmp.mjs';
+import { Vault } from '../src/engine/vault.mjs';
 
 function fresh() {
   const sb = sandbox();
@@ -99,4 +100,16 @@ test('MEM-052 AC03: memev contracts on restores the nudge and the Stop gate', as
     const sOut = s.out ? JSON.parse(s.out) : {};
     assert.equal(sOut.decision, 'block', `the Stop hook blocks while a contract is open:\n${s.out}`);
   } finally { sb.stop(); cleanup(); }
+});
+
+test('MEM-052 AC01b: Vault.open treats a config with no contracts key as contracts on', () => {
+  const root = tmpdir('vault-');
+  try {
+    fs.mkdirSync(path.join(root, '.memev'), { recursive: true });
+    const cfg = { version: 1, port: 7787 };
+    fs.writeFileSync(path.join(root, '.memev', 'config.json'), JSON.stringify(cfg));
+    const v = new Vault(root, { git: false });
+    v.open();
+    assert.equal(v.config.contracts.enabled, true, 'a config with no contracts key means contracts on');
+  } finally { cleanup(); }
 });
