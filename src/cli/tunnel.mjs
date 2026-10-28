@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Remote access for cloud AI apps, on by default, one command to switch off (`memev cloud off`).
+// Remote access for cloud AI apps, off by default, one command to switch on (`memev cloud on`).
 // Providers, best first:
 //   tailscale   `tailscale serve` on this machine: a stable https name, tailnet only (never Funnel)
 //   cloudflare  a named Cloudflare tunnel you configured (`memev cloud use cloudflare --name N --hostname H`): stable
@@ -15,6 +15,10 @@ import { configDir, readJson, writePrivate, writePrivateJson, writeJson, randomT
 import { tunnelKeyFile, tunnelKey, config, saveConfig, clientToken, adminToken, api, out } from './common.mjs';
 import { publishAddressRecord } from './sync.mjs';
 import { fetchOut } from '../engine/net.mjs';
+import { loadLicense } from '../engine/license.mjs';
+import { limitsFor } from '../engine/entitlements.mjs';
+import { TOKEN_RE } from '../engine/tokens.mjs';
+import { qrText } from '../../vendor/qr.mjs';
 
 export const CLOUDFLARED = {
   version: '2026.10.4',
@@ -177,7 +181,41 @@ export function connectorInfo(root, client = 'cloud') {
   return { url: st.url, stable: !!st.stable, connector_url: `${st.url}/c/${token}/mcp`, mcp_url: `${st.url}/mcp`, headers: { Authorization: `Bearer ${token}` } };
 }
 
-async function reloadDaemon(root) { const t = adminToken(root); if (!t) return false; try { return (await api(root, '/v1/reload', { token: t })).ok; } catch { return false; } }
+/** The name of a cloud seat on the bus (any `<app>@cloud`, or the one for `app`), or null. A removed seat is gone. */
+export function cloudSeat(root, app = null) {
+  const dir = path.join(root, 'bus', 'seats');
+  let files; try { files = fs.readdirSync(dir); } catch { return null; }
+  for (const f of files) {
+    if (!f.endsWith('.json')) continue;
+    const rec = readJson(path.join(dir, f), null);
+    if (!rec?.seat || rec.removed) continue;
+    if (app ? rec.seat === `${app}@cloud` : /@cloud$/.test(rec.seat)) return rec.seat;
+  }
+  return null;
+}
+
+/** The plan note: the number of connectors the tier covers, or "not capped" only when the tier has no number. */
+export function planNote(limits) {
+  return limits.connectors == null ? 'cloud connectors not capped' : `${limits.connectors} cloud connectors covered`;
+}
+
+/** The wait for `memev cloud connect` in ms: a positive number of seconds, 120 when the flag is missing or not a number. */
+export function connectTimeoutMs(flags) {
+  return Math.max(1, Number(flags.timeout) || 120) * 1000;
+}
+
+/** True once the device that holds this token has been seen since `start`.
+    Every request through the connector, MCP calls included, updates the device's last_seen, so this
+    catches an app that never touches the bus. A seat from before `start` does not count. */
+export function deviceSeenSince(root, token, start) {
+  const id = TOKEN_RE.exec(String(token || '').trim())?.[1];
+  if (!id) return false;
+  const reg = readJson(path.join(root, '.memev', 'devices.json'), null);
+  const d = reg?.devices && Object.values(reg.devices).find((x) => x.token_id === id);
+  return !!(d?.last_seen && Date.parse(d.last_seen) >= start);
+}
+
+export async function reloadDaemon(root) { const t = adminToken(root); if (!t) return false; try { return (await api(root, '/v1/reload', { token: t })).ok; } catch { return false; } }
 
 export async function command(cmd, pos, flags, { root, env = process.env }) {
   const sub = pos[0] || 'status'; const cfg = config(root);
@@ -212,5 +250,35 @@ export async function command(cmd, pos, flags, { root, env = process.env }) {
     } else console.log('  memev cloud url prints the connector URL (it contains a secret).');
     return 0;
   }
-  throw new Error('memev cloud on|off|status|url|use|relay|rotate-key');
+  if (sub === 'connect') {
+    const app = pos[1];
+    if (!['chatgpt', 'claude'].includes(app)) throw new Error('memev cloud connect chatgpt|claude');
+    const st = tunnelState(root);
+    if (!cfg.remote?.enabled) { console.log('Remote access is off. Turn it on first: memev cloud on'); return 1; }
+    if (!st?.url) { console.log(`The tunnel has no address yet (${st?.state || 'not started'}); check memev cloud status`); return 1; }
+    const token = clientToken(root, app, { remote: true });
+    const url = `${st.url}/c/${token}/mcp`;
+    const name = app === 'claude' ? 'claude.ai' : 'ChatGPT';
+    const limits = limitsFor(loadLicense({ env }));
+    console.log(`Connect ${name} to this vault.`);
+    console.log(`Plan: ${limits.tier} (${planNote(limits)})`);
+    console.log(`Connector URL (add as a custom connector in ${name}): ${url}`);
+    console.log('Treat the connector URL like a password. Revoke it with memev token revoke <id>.');
+    console.log('Or scan the QR code:');
+    console.log(qrText(url));
+    const timeoutMs = connectTimeoutMs(flags);
+    const start = Date.now();
+    for (;;) {
+      if (deviceSeenSince(root, token, start)) {
+        const seat = cloudSeat(root, app);
+        console.log(seat
+          ? `  \u2713 ${app}@cloud is on the bus; ${name} is connected`
+          : `  \u2713 ${name} is connected (it takes the ${app}@cloud seat on its first bus message)`);
+        return 0;
+      }
+      if (Date.now() - start >= timeoutMs) { console.log(`  \u2192 no ${app}@cloud seat after ${Math.round(timeoutMs / 1000)}s; in ${name}, add the connector URL as a custom connector and start a chat that uses it, then run memev cloud connect ${app} again`); return 1; }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+  throw new Error('memev cloud on|off|status|url|use|relay|rotate-key|connect');
 }

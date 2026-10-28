@@ -1,5 +1,7 @@
 # The relay protocol: a stable address for a vault
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 A vault on your computer needs an address that cloud AI apps and your other computers can use, and the
 address of a quick tunnel changes whenever it restarts. A relay gives the vault one name that stays the
 same. This page is the protocol, the client in `src/cli/relay.mjs` and the relay for development and tests

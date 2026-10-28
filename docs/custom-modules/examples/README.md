@@ -1,5 +1,7 @@
 # Walk-throughs
 
+Part of the [Memev documentation](../../README.md). Up: the [README](../../README.md).
+
 > **Example. Planned.** Six short walk-throughs of a company using a shared memory. Steps marked
 > *today* work now; steps marked *planned* do not exist yet. Each ends in acceptance checks.
 
