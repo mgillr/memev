@@ -1,5 +1,7 @@
 # The comms bus
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 Every AI app using your vault can talk to the others through it. Claude Code on your desk, Cursor on
 your laptop and ChatGPT through the secure link all read and post on one bus, and you can run the
 lot from a single session.
