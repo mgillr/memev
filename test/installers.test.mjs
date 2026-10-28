@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
@@ -156,5 +156,225 @@ test('install.sh restarts the daemon from the installed copy', async () => {
     }
     fs.rmSync(home, { recursive: true, force: true });
     fs.rmSync(out, { recursive: true, force: true });
+  }
+});
+
+function platformKey() {
+  if (process.platform === 'linux' && process.arch === 'x64') return 'linux-x64';
+  if (process.platform === 'linux' && process.arch === 'arm64') return 'linux-arm64';
+  if (process.platform === 'darwin' && process.arch === 'arm64') return 'darwin-arm64';
+  if (process.platform === 'darwin' && process.arch === 'x64') return 'darwin-x64';
+  throw new Error('no pinned runtime for ' + process.platform + ' ' + process.arch);
+}
+
+function toolShim(dir) {
+  const bin = path.join(dir, 'pathbin');
+  fs.mkdirSync(bin);
+  const names = ['cp', 'tar', 'gzip', 'awk', 'mktemp', 'shasum', 'sha256sum', 'uname', 'grep', 'sed', 'tr', 'mkdir', 'rm', 'mv', 'chmod', 'head', 'cat', 'dirname'];
+  for (const name of names) {
+    let src = '';
+    try { src = execFileSync('bash', ['-lc', 'command -v ' + name], { encoding: 'utf8' }).trim(); } catch { src = ''; }
+    if (src) fs.symlinkSync(src, path.join(bin, name));
+  }
+  return bin;
+}
+
+test('MEM-041 AC02: the pinned runtime lists a SHA-256 per platform', () => {
+  const spec = JSON.parse(fs.readFileSync(path.join(root, 'scripts', 'node-runtime.json'), 'utf8'));
+  const platforms = spec.platforms;
+  assert.ok(platforms && Object.keys(platforms).length > 0);
+  for (const [name, pin] of Object.entries(platforms)) {
+    assert.match(pin.sha256, /^[0-9a-f]{64}$/, name);
+    assert.match(pin.url, /^https:\/\/nodejs\.org\/dist\/v22\.23\.4\//, name);
+  }
+});
+
+test('MEM-041 AC01: install.sh with no node on PATH downloads the pinned runtime from the URL in node-runtime.json (stubbed) and verifies its checksum', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-node-'));
+  const home = path.join(dir, 'home');
+  fs.mkdirSync(home);
+  try {
+    const key = platformKey();
+    const committed = JSON.parse(fs.readFileSync(path.join(root, 'scripts', 'node-runtime.json'), 'utf8'));
+    const topName = 'node-v22.23.4-' + key;
+    const binDir = path.join(dir, topName, 'bin');
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, 'node'), [
+      '#!/bin/bash',
+      'if [ "$1" = "--version" ]; then echo v22.23.4; exit 0; fi',
+      'printf "%s\\n" "$0" > "$MEMEV_INSTALL_MARKER"',
+      'mkdir -p "$HOME/.config/memev/bin"',
+      'printf "%s\\n" "#!/bin/bash" "exit 0" > "$HOME/.config/memev/bin/memev"',
+      'chmod +x "$HOME/.config/memev/bin/memev"',
+      'exit 0',
+      '',
+    ].join('\n'), { mode: 0o755 });
+    const archive = path.join(dir, 'node.tgz');
+    execFileSync('tar', ['-czf', archive, '-C', dir, topName]);
+    const good = sha256(archive);
+    const specPath = path.join(dir, 'node-runtime.json');
+    const spec = { version: committed.version, platforms: {} };
+    spec.platforms[key] = { url: committed.platforms[key].url, sha256: good };
+    fs.writeFileSync(specPath, JSON.stringify(spec));
+    const log = path.join(dir, 'fetch.log');
+    const fetchStub = path.join(dir, 'fetch-stub');
+    fs.writeFileSync(fetchStub, '#!/bin/bash\nprintf "%s\\n" "$1" > "$MEMEV_NODE_FETCH_LOG"\ncp "$MEMEV_NODE_FAKE_TGZ" "$2"\n', { mode: 0o755 });
+    const pkg = path.join(dir, 'package', 'bin');
+    fs.mkdirSync(pkg, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'package', 'package.json'), '{"type":"module"}\n');
+    fs.writeFileSync(path.join(pkg, 'memev.mjs'), 'process.exit(0)\n');
+    const tarball = path.join(dir, 'memev.tgz');
+    execFileSync('tar', ['-czf', tarball, '-C', dir, 'package']);
+    fs.writeFileSync(tarball + '.sha256', sha256(tarball) + '  memev.tgz\n');
+    const marker = path.join(dir, 'marker');
+    const env = {
+      HOME: home,
+      PATH: toolShim(dir),
+      TMPDIR: os.tmpdir(),
+      MEMEV_INSTALL_MARKER: marker,
+      MEMEV_NODE_SPEC: specPath,
+      MEMEV_NODE_FETCH: fetchStub,
+      MEMEV_NODE_FETCH_LOG: log,
+      MEMEV_NODE_FAKE_TGZ: archive,
+    };
+    execFileSync('/bin/bash', [path.join(root, 'scripts', 'install.sh'), 'file://' + tarball], { env, timeout: 20000 });
+    assert.equal(fs.readFileSync(log, 'utf8').trim(), committed.platforms[key].url);
+    const used = fs.readFileSync(marker, 'utf8').trim();
+    assert.equal(fs.existsSync(used), true);
+    assert.match(used, /\/node\/v22\.23\.4\/bin\/node$/);
+
+    spec.platforms[key].sha256 = '0000000000000000000000000000000000000000000000000000000000000000';
+    fs.writeFileSync(specPath, JSON.stringify(spec));
+    const bad = path.join(dir, 'marker-bad');
+    let failed = false;
+    try {
+      execFileSync('/bin/bash', [path.join(root, 'scripts', 'install.sh'), 'file://' + tarball], {
+        env: { ...env, MEMEV_INSTALL_MARKER: bad, MEMEV_CONFIG_DIR: path.join(dir, 'cfg-bad') },
+        timeout: 20000,
+      });
+    } catch (e) {
+      failed = true;
+      assert.match(`${e.stdout || ''}${e.stderr || ''}`, /SHA-256 does not match/);
+    }
+    assert.equal(failed, true);
+    assert.equal(fs.existsSync(bad), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+function pinsBetween(text, open, close) {
+  const start = text.indexOf(open);
+  const end = text.indexOf(close, start + open.length);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  return JSON.parse(text.slice(start + open.length, end));
+}
+
+test('the installer scripts carry the same pins as node-runtime.json', () => {
+  const file = JSON.parse(fs.readFileSync(path.join(root, 'scripts', 'node-runtime.json'), 'utf8'));
+  const sh = fs.readFileSync(path.join(root, 'scripts', 'install.sh'), 'utf8');
+  const ps = fs.readFileSync(path.join(root, 'scripts', 'install.ps1'), 'utf8');
+  const fromSh = pinsBetween(sh, "<<'END_NODE_RUNTIME'\n", '\nEND_NODE_RUNTIME');
+  const fromPs = pinsBetween(ps, 'function Embedded-RuntimeSpec {\n  @\'\n', '\n\'@');
+  assert.deepEqual(fromSh, file);
+  assert.deepEqual(fromPs, file);
+});
+
+test('piped install.sh uses the built-in pin with no node on PATH and no spec file', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-pipe-'));
+  const home = path.join(dir, 'home');
+  const cwd = path.join(dir, 'empty');
+  fs.mkdirSync(home);
+  fs.mkdirSync(cwd);
+  try {
+    const key = platformKey();
+    const committed = JSON.parse(fs.readFileSync(path.join(root, 'scripts', 'node-runtime.json'), 'utf8'));
+    const pkg = path.join(dir, 'package', 'bin');
+    fs.mkdirSync(pkg, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'package', 'package.json'), '{"type":"module"}\n');
+    fs.writeFileSync(path.join(pkg, 'memev.mjs'), 'process.exit(0)\n');
+    const tarball = path.join(dir, 'memev.tgz');
+    execFileSync('tar', ['-czf', tarball, '-C', dir, 'package']);
+    fs.writeFileSync(tarball + '.sha256', sha256(tarball) + '  memev.tgz\n');
+    const archive = path.join(dir, 'not-the-runtime');
+    fs.writeFileSync(archive, 'not a node runtime\n');
+    const log = path.join(dir, 'fetch.log');
+    const fetchStub = path.join(dir, 'fetch-stub');
+    fs.writeFileSync(fetchStub, '#!/bin/bash\nprintf "%s\\n" "$1" > "$MEMEV_NODE_FETCH_LOG"\ncp "$MEMEV_NODE_FAKE_TGZ" "$2"\n', { mode: 0o755 });
+    const script = fs.readFileSync(path.join(root, 'scripts', 'install.sh'));
+    const result = spawnSync('/bin/bash', ['-s', '--', 'file://' + tarball], {
+      input: script,
+      cwd,
+      encoding: 'utf8',
+      timeout: 20000,
+      env: {
+        HOME: home,
+        PATH: toolShim(dir),
+        TMPDIR: os.tmpdir(),
+        MEMEV_NODE_FETCH: fetchStub,
+        MEMEV_NODE_FETCH_LOG: log,
+        MEMEV_NODE_FAKE_TGZ: archive,
+      },
+    });
+    assert.equal(fs.readFileSync(log, 'utf8').trim(), committed.platforms[key].url);
+    assert.notEqual(result.status, 0);
+    assert.match(`${result.stdout || ''}${result.stderr || ''}`, /SHA-256 does not match/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a second install reuses the pinned runtime when its version matches', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-reuse-'));
+  const home = path.join(dir, 'home');
+  fs.mkdirSync(home);
+  try {
+    const key = platformKey();
+    const committed = JSON.parse(fs.readFileSync(path.join(root, 'scripts', 'node-runtime.json'), 'utf8'));
+    const topName = 'node-v22.23.4-' + key;
+    const binDir = path.join(dir, topName, 'bin');
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.writeFileSync(path.join(binDir, 'node'), [
+      '#!/bin/bash',
+      'if [ "$1" = "--version" ]; then echo v22.23.4; exit 0; fi',
+      'mkdir -p "$HOME/.config/memev/bin"',
+      'printf "%s\\n" "#!/bin/bash" "exit 0" > "$HOME/.config/memev/bin/memev"',
+      'chmod +x "$HOME/.config/memev/bin/memev"',
+      'exit 0',
+      '',
+    ].join('\n'), { mode: 0o755 });
+    const archive = path.join(dir, 'node.tgz');
+    execFileSync('tar', ['-czf', archive, '-C', dir, topName]);
+    const specPath = path.join(dir, 'node-runtime.json');
+    const spec = { version: committed.version, platforms: {} };
+    spec.platforms[key] = { url: committed.platforms[key].url, sha256: sha256(archive) };
+    fs.writeFileSync(specPath, JSON.stringify(spec));
+    const pkg = path.join(dir, 'package', 'bin');
+    fs.mkdirSync(pkg, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'package', 'package.json'), '{"type":"module"}\n');
+    fs.writeFileSync(path.join(pkg, 'memev.mjs'), 'process.exit(0)\n');
+    const tarball = path.join(dir, 'memev.tgz');
+    execFileSync('tar', ['-czf', tarball, '-C', dir, 'package']);
+    fs.writeFileSync(tarball + '.sha256', sha256(tarball) + '  memev.tgz\n');
+    const log = path.join(dir, 'fetch.log');
+    const fetchStub = path.join(dir, 'fetch-stub');
+    fs.writeFileSync(fetchStub, '#!/bin/bash\nprintf "%s\\n" "$1" > "$MEMEV_NODE_FETCH_LOG"\ncp "$MEMEV_NODE_FAKE_TGZ" "$2"\n', { mode: 0o755 });
+    const env = {
+      HOME: home,
+      PATH: toolShim(dir),
+      TMPDIR: os.tmpdir(),
+      MEMEV_NODE_SPEC: specPath,
+      MEMEV_NODE_FETCH: fetchStub,
+      MEMEV_NODE_FETCH_LOG: log,
+      MEMEV_NODE_FAKE_TGZ: archive,
+    };
+    execFileSync('/bin/bash', [path.join(root, 'scripts', 'install.sh'), 'file://' + tarball], { env, timeout: 20000 });
+    fs.writeFileSync(log, 'STILL\n');
+    execFileSync('/bin/bash', [path.join(root, 'scripts', 'install.sh'), 'file://' + tarball], { env, timeout: 20000 });
+    assert.equal(fs.readFileSync(log, 'utf8'), 'STILL\n');
+    assert.equal(fs.existsSync(path.join(home, '.config', 'memev', 'node', 'v22.23.4', 'bin', 'node')), true);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
