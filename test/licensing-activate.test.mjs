@@ -10,6 +10,8 @@ import { spawn } from 'node:child_process';
 import { tmpdir, cleanup, PKG } from './helpers/tmp.mjs';
 import { signLicense, loadLicense, licenseFile } from '../src/engine/license.mjs';
 import { activateLicense, licenseEndpoint } from '../src/cli/licensing.mjs';
+import { relaySetting } from '../src/cli/relay.mjs';
+import { sandbox } from './helpers/cli.mjs';
 after(cleanup);
 
 const BIN = path.join(PKG, 'bin', 'memev.mjs');
@@ -39,6 +41,20 @@ const cli = (args, e) => new Promise((resolve) => {
   const p = spawn(process.execPath, [BIN, ...args], { env: { PATH: process.env.PATH, HOME: e.MEMEV_CONFIG_DIR, ...e } });
   let o = '', er = ''; p.stdout.on('data', (d) => { o += d; }); p.stderr.on('data', (d) => { er += d; });
   p.on('close', (code) => resolve({ code, out: o, err: er }));
+});
+
+test('MEM-030-FU: activation stores the relay address from the licence service reply', async () => {
+  const sb = sandbox();
+  const srv = await licenceServer({ answer: () => ({ license: signLicense(fields(), pem, 'test-vendor'), relay: { default_url: 'relay://127.0.0.1:9', default_domain: 'relay.test' } }) });
+  try {
+    assert.equal(sb.run(['init', '--no-connect', '--local-only']).code, 0);
+    const r = await activateLicense({ key: 'GOOD-KEY-0001', endpoint: srv.url, env: sb.env, keys, root: sb.root });
+    assert.equal(r.ok, true, r.reason);
+    const saved = relaySetting(sb.root);
+    assert.equal(saved.default_url, 'relay://127.0.0.1:9');
+    assert.equal(saved.default_domain, 'relay.test');
+    assert.equal(saved.enabled, false);
+  } finally { await srv.close(); sb.stop(); }
 });
 
 test('MEM-063 AC01: against a local test licence server, activate stores a licence that verifies offline with the network disabled', async () => {
