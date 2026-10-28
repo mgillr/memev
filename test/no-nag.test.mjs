@@ -5,7 +5,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { sandbox, mcpClient } from './helpers/cli.mjs';
 import { cleanup } from './helpers/tmp.mjs';
-import { seatPolicy, CORE_FEATURES, can, limitsFor } from '../src/engine/entitlements.mjs';
+import { seatPolicy, readOnlyReason, CORE_FEATURES, can, limitsFor } from '../src/engine/entitlements.mjs';
 
 let sb;
 const contextOf = (out) => { const j = JSON.parse(out || '{}'); return j.hookSpecificOutput?.additionalContext ?? ''; };
@@ -56,25 +56,47 @@ test('MEM-086 AC01: No hook, resume card or MCP tool output contains plan, price
 });
 
 // A plan message is what Memev says when the plan limits an action: the reason enrollment is
-// refused. The principle: one line, one memev command, no countdown.
+// refused, a note about the licence, or why a computer may only read. The principle: one line,
+// no countdown, and a message that tells the person what to do names exactly one memev command.
 const COUNTDOWN = /\b(expires|ends)\s+in\b/i;
 const COUNTDOWN2 = /\b\d+\s+(day|days|hour|hours|minute|minutes|week|weeks|month|months)\b[^.]*\b(left|remaining|to go|before|until)\b/i;
 const isCountdown = (s) => COUNTDOWN.test(s) || COUNTDOWN2.test(s);
 const memevCommands = (s) => (s.match(/\bmemev [a-z][a-z_-]*/g) || []);
+const assertShape = (label, msg) => {
+  assert.equal(typeof msg, 'string', `${label}: a plan message is given`);
+  assert.equal(msg.includes('\n'), false, `${label}: the plan message is a single line`);
+  assert.equal(isCountdown(msg), false, `${label}: no countdown (${msg})`);
+  assert.ok(memevCommands(msg).length <= 1, `${label}: at most one memev command (${msg})`);
+};
+const assertCommand = (label, msg) => {
+  assertShape(label, msg);
+  assert.equal(memevCommands(msg).length, 1, `${label}: exactly one memev command (${msg})`);
+};
 
 test('MEM-086 AC02: Every plan message is a single line containing one memev command and no countdown', () => {
-  // the two plan-limit messages: the licence is expired, or the seat count is reached
+  // the two enrollment refusals: the licence is expired, or the seat count is reached
   const expired = seatPolicy({ license: { state: 'expired', exp: '2026-01-01' }, devices: [] });
   const seats = seatPolicy({ license: { state: 'valid', seats: 1, tier: 'free' }, devices: [] });
   assert.equal(expired.can_enroll, false, 'an expired licence refuses enrollment');
   assert.equal(seats.can_enroll, false, 'a full seat count refuses enrollment');
-  for (const [label, p] of [['expired licence', expired], ['full seat count', seats]]) {
-    const msg = p.reason;
-    assert.equal(typeof msg, 'string', `${label}: a reason is given`);
-    assert.equal(msg.includes('\n'), false, `${label}: the plan message is a single line`);
-    assert.equal(memevCommands(msg).length, 1, `${label}: exactly one memev command (${msg})`);
-    assert.equal(isCountdown(msg), false, `${label}: no countdown (${msg})`);
-  }
+  assertCommand('expired licence', expired.reason);
+  assertCommand('full seat count', seats.reason);
+  // a licence in grace still allows enrollment, so the reason is null and the notes carry the
+  // message: one line, no day count, exactly one memev command
+  const grace = seatPolicy({ license: { state: 'grace', exp: '2026-01-01', days_left: 3, seats: 4, tier: 'personal' }, devices: [] });
+  assert.equal(grace.reason, null, 'a licence in grace refuses nothing, so no reason');
+  const graceNote = 'The licence expired on 2026-01-01 and is in its grace period. Renew it with `memev license install <file>`; after that no computer can be added and added computers can only read.';
+  assert.deepEqual(grace.notes, [graceNote], 'the grace note is the only note and names the renewal command');
+  assertCommand('grace note', grace.notes[0]);
+  // with no licence at all, an added computer may only read: the note and the per-computer
+  // reason stay one line with no countdown
+  const laptop = { id: 'd1', kind: 'remote-computer', status: 'active', label: 'laptop', created: '2026-01-01' };
+  const nolicense = seatPolicy({ license: null, devices: [laptop] });
+  assert.equal(nolicense.can_enroll, false, 'with no licence the second computer is refused');
+  assertCommand('no licence, full count', nolicense.reason);
+  assert.deepEqual(nolicense.notes, ['1 computer can read but not write (laptop): there is no valid licence.'], 'the read-only note says why');
+  for (const n of nolicense.notes) assertShape('read-only note', n);
+  assertShape('read-only reason', readOnlyReason(nolicense, laptop));
 });
 
 test('MEM-086 AC03: Every single-computer feature works with no licence', async () => {
