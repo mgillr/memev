@@ -35,7 +35,8 @@ Setup
   memev status | doctor [--fix] [--bundle]
   memev cloud on|off|status|url    reach this vault from cloud AI apps through a private tunnel (on by default
                                    for personal installs, off for --org installs)
-  memev github setup               back the vault up to your own private GitHub repository
+  memev github setup [--host H]    back the vault up to your own private GitHub repository (--host for GitHub Enterprise)
+  memev backup set <git-url>       back the vault up to any private git remote (GitHub Enterprise, self-hosted, file)
   memev service install|remove     start Memev at login (systemd or launchd)
   memev devices [enroll|remove|rotate|rename|keygen]   computers and apps using this vault, each with its own credential
   memev invite [--ttl SECONDS]     print a one-time code, link and QR code so another computer can join
@@ -233,6 +234,25 @@ async function run(argv, env) {
       throw new Error('memev token list|issue|revoke|rotate');
     }
     case 'admin-token': need(); console.log(adminToken(root) || '(none)'); return 0;
+    case 'backup': {
+      const sub = pos[0] || 'status';
+      if (sub === 'set') {
+        const url = pos[1];
+        if (!url) throw new Error('memev backup set <git-url>');
+        const { git } = await import('../engine/git.mjs');
+        if (git(root, ['remote', 'get-url', 'origin']).ok) git(root, ['remote', 'set-url', 'origin', url]); else git(root, ['remote', 'add', 'origin', url]);
+        const cfg = config(root); cfg.backup = { remote: url }; saveConfig(root, cfg);
+        console.log(`Backup remote set to ${url}`);
+        return 0;
+      }
+      if (sub === 'status') {
+        const { git } = await import('../engine/git.mjs');
+        const url = git(root, ['remote', 'get-url', 'origin']).out;
+        console.log(url ? `Backing up to ${url}` : 'Not set up: memev backup set <git-url>');
+        return 0;
+      }
+      throw new Error('memev backup set <git-url> | status');
+    }
     default: console.error(`unknown command: ${cmd}\n`); console.log(HELP); return 2;
   }
 }
