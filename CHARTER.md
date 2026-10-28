@@ -4,9 +4,9 @@
    recall, the graph, contracts, the doctor, every local AI app, cloud AI connectors through your own
    tunnel, and backup to your own GitHub. No feature that works for free today will be taken away,
    capped, slowed or put behind a prompt to pay.
-2. **Paid means hosted services and multi-computer or team use, around the core, never pieces of
+2. **Paid means hosted services and multi-computer or company use, around the core, never pieces of
    it.** Money comes from things that cost money to run (hosted sync, hosted backup, a stable relay
-   address) or that only organisations need (several computers on one vault, shared team vaults,
+   address) or that only organisations need (several computers on one vault, company vaults,
    SSO, audit export). They are added next to the free tier; nothing is removed from it to make room.
 3. **Your vault never talks to us.** Memev has no telemetry. A licence is a signed file checked on
    your computer without the network. Only a hosted service you switch on talks to its server, and
