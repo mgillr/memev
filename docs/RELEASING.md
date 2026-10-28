@@ -22,7 +22,7 @@ A checklist for cutting a release of the `memev` npm package.
 
 `node scripts/release-tarball.mjs --out DIR` writes the release tarball and a `.sha256` file next to it. The tarball is the set `npm pack` publishes.
 
-`scripts/install.sh <tarball-url>` downloads that tarball and the `.sha256` file beside the same URL, checks the SHA-256, and runs `memev init`. A local check uses a `file://` URL. The script has no download address built in. `scripts/install.ps1 <tarball-url>` does the same on Windows and checks the hash with `Get-FileHash`.
+`scripts/install.sh <tarball-url>` fetches that tarball and the `.sha256` file beside the same URL, checks the SHA-256, runs `memev init`, and restarts from the installed copy. The URL must be https or a file URL. A local check uses a `file://` URL. The script has no download address built in. `scripts/install.ps1 <tarball-url>` does the same on Windows and checks the hash with `Get-FileHash`.
 
 ## Publish
 

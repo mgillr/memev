@@ -19,12 +19,17 @@ trap 'rm -rf "$work"' EXIT
 fetch() {
   dest=$1
   from=$2
-  case "$from" in
+  low=$(printf '%s' "$from" | tr '[:upper:]' '[:lower:]')
+  case "$low" in
     file://*)
-      cp "${from#file://}" "$dest"
+      cp "${from:7}" "$dest"
+      ;;
+    https://*)
+      curl --proto '=https' --tlsv1.2 -fsSL "$from" -o "$dest"
       ;;
     *)
-      curl -fsSL "$from" -o "$dest"
+      echo "URL must be https or a file URL" >&2
+      exit 1
       ;;
   esac
 }
@@ -54,3 +59,16 @@ if [ -z "$bin" ]; then
   exit 1
 fi
 node "$bin" init "$@"
+if [ -n "${MEMEV_CONFIG_DIR:-}" ]; then
+  cfg=$MEMEV_CONFIG_DIR
+elif [ -n "${XDG_CONFIG_HOME:-}" ]; then
+  cfg=$XDG_CONFIG_HOME/memev
+else
+  cfg=${HOME:?}/.config/memev
+fi
+launcher=$cfg/bin/memev
+if [ ! -f "$launcher" ]; then
+  echo "installed launcher is missing" >&2
+  exit 1
+fi
+"$launcher" restart
