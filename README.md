@@ -24,7 +24,7 @@ flowchart LR
     cloud["AI on the web<br/>ChatGPT, claude.ai"]
     laptop["Your other computers<br/>each with its own key"]
     vault -- "backup every few minutes" --> github
-    cloud -. "optional secure link,<br/>you can switch it off" .-> vault
+    cloud -. "optional secure link,<br/>off until you switch it on" .-> vault
     laptop -. "the same secure link" .-> vault
 ```
 
@@ -124,7 +124,7 @@ prints exactly what it would send ([docs/METRICS.md](docs/METRICS.md)).
 |---|---|
 | [Quickstart](docs/QUICKSTART.md) | install, first session, everyday commands |
 | [AI apps](docs/CLIENTS.md) | what is changed in each app, hooks vs instructions, undoing it |
-| [Cloud access](docs/CLOUD.md) | the secure link, connector URLs, other computers, turning it off |
+| [Cloud access](docs/CLOUD.md) | the secure link, connector URLs, other computers, turning it on |
 | [Comms bus](docs/BUS.md) | how your AI apps talk to each other, the roster and comms checks |
 | [GitHub backup](docs/GITHUB.md) | `memev github setup` |
 | [Docker](docs/DOCKER.md) | running Memev in a container |
