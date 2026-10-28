@@ -47,7 +47,7 @@ Setup
   memev bus roster|check|send|tail|tasks|watch <seat>|operator <seat>   the comms bus between your AI apps
 
 Daily
-  memev recall <query> [--project P] [--all-projects]  |  memev card [--project P]
+  memev recall <query> [--project P] [--all-projects]  |  memev card [--project P] [--aider]
   memev remember <text> [--kind decision] [--why W] [--review-by DATE|DAYS] [--force]
   memev why <query> [--item path#heading] [--project P]   why recall returned what it did
   memev review [list|keep|drop|reset] [items] [--days N]  the inbox of flagged and short-lived memories
@@ -121,7 +121,7 @@ export async function main(argv, env = process.env) {
 
 async function run(argv, env) {
   const [cmd = 'help', ...rest] = argv;
-  const { flags, pos } = parseArgs(rest, ['help', 'yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects', 'release', 'open', 'once']);
+  const { flags, pos } = parseArgs(rest, ['help', 'yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects', 'release', 'open', 'once', 'aider']);
   const root = resolveRoot(flags.root, env);
   const need = () => { if (!isVault(root)) throw new Error(`no vault at ${root}; run memev init`); };
   const json = (o) => console.log(JSON.stringify(o, null, 2));
@@ -249,7 +249,12 @@ async function run(argv, env) {
       if (cmd === 'recall') { const r = await call('recall', { query: pos.join(' '), limit: Number(flags.limit || 6), project: flags.project, all_projects: !!flags['all-projects'] }); flags.json ? json(r.hits) : console.log(r.text || 'Nothing found.'); }
       if (cmd === 'remember') json(await call('remember', { text: pos.join(' '), kind: flags.kind, project: flags.project, why: flags.why, review_by: flags['review-by'], force: !!flags.force }));
       if (cmd === 'checkpoint') json(await call('checkpoint', { project: flags.project, task: flags.task, done: list(flags.done), doing: flags.doing, next: list(flags.next), files: list(flags.files), source: 'cli' }));
-      if (cmd === 'card') { const r = await call('session-start', { project: flags.project, task: flags.task || pos.join(' ') || null }); console.log(flags.json ? JSON.stringify(r.card, null, 2) : renderCard(r.card)); }
+      if (cmd === 'card') {
+        const r = await call('session-start', { project: flags.project, task: flags.task || pos.join(' ') || null });
+        const cardText = renderCard(r.card);
+        console.log(flags.json ? JSON.stringify(r.card, null, 2) : cardText);
+        if (flags.aider) { const { aiderHandoff } = await import('./clients.mjs'); const h = aiderHandoff({ env, cardText }); out.ok(`Aider: resume card written to ${h.conventions} and added to the read list in ${h.conf}`); }
+      }
       return 0;
     }
     case 'claims': {

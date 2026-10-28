@@ -101,6 +101,56 @@ const json = (file, apply, remove) => ({ file, kind: 'json', apply, remove });
 const text = (file, apply, remove, note) => ({ file, kind: 'text', apply, remove, note });
 const mdBlock = (file) => text(file, (t) => addBlock(t, INSTRUCTIONS), (t) => removeBlock(t));
 
+// Aider has no MCP and no hooks, so the hand-off is a conventions file that .aider.conf.yml lists under
+// `read:`, which Aider reads into context at session start. The YAML is edited as text: no parser dependency.
+const AIDER_READ_KEY = /^read:\s*$/;
+const unquote = (s) => { s = s.trim(); if (s.length > 1 && ((s[0] === '"' && s.endsWith('"')) || (s[0] === "'" && s.endsWith("'")))) return s.slice(1, -1); return s; };
+/** The conventions file this Memev install writes for Aider (in the Memev config dir, so it is ours to remove). */
+export const AIDER_CONVENTIONS = (env = process.env) => path.join(configDir(env), 'aider-conventions.md');
+/** The Aider user config that carries the `read:` list. */
+export const AIDER_CONF = (env = process.env) => path.join(homeDir(env), '.aider.conf.yml');
+/** The `read:` list lines that point at this install's conventions file. */
+export function aiderReadEntries(confText, conv = AIDER_CONVENTIONS()) {
+  const out = []; let inRead = false;
+  for (const line of (confText || '').split('\n')) {
+    if (AIDER_READ_KEY.test(line)) { inRead = true; continue; }
+    if (!inRead) continue;
+    if (/^\S/.test(line)) { inRead = false; continue; } // a new top-level key ends the list
+    const m = /^\s*-\s*(.*)$/.exec(line);
+    if (m && unquote(m[1]) === conv) out.push(line);
+  }
+  return out;
+}
+/** Add the conventions file to the `read:` list once; a second call changes nothing. */
+export function addAiderRead(confText, conv = AIDER_CONVENTIONS()) {
+  const text = confText || '';
+  if (aiderReadEntries(text, conv).length) return text;
+  const lines = text.split('\n');
+  const i = lines.findIndex((l) => AIDER_READ_KEY.test(l));
+  if (i < 0) {
+    const body = text.trim() ? `${text.replace(/\n*$/, '')}\n\n` : '';
+    return `${body}read:\n  - ${conv}\n`;
+  }
+  let last = i;
+  for (let j = i + 1; j < lines.length; j++) { if (/^\S/.test(lines[j])) break; if (/^\s*-\s*/.test(lines[j])) last = j; }
+  lines.splice(last + 1, 0, `  - ${conv}`);
+  return lines.join('\n');
+}
+/** Remove the conventions file from the `read:` list; a second call changes nothing. */
+export function removeAiderRead(confText, conv = AIDER_CONVENTIONS()) {
+  const out = []; let inRead = false;
+  for (const line of (confText || '').split('\n')) {
+    if (AIDER_READ_KEY.test(line)) { inRead = true; out.push(line); continue; }
+    if (inRead) {
+      if (/^\S/.test(line)) { inRead = false; out.push(line); continue; }
+      const m = /^\s*-\s*(.*)$/.exec(line);
+      if (m && unquote(m[1]) === conv) continue;
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
 /** The apps Memev knows. mode: 'hooks' = state injected by hooks; 'instructions' = MCP + instructions only. */
 export function clientDefs(env, bin, platform = process.platform) {
   const { home, appData } = platformDirs(env);
@@ -225,8 +275,41 @@ export function snippets(id, { env = process.env, launcher, platform = process.p
   return { name: def.name, files: def.edits().map((e) => ({ file: e.file, kind: e.kind, text: e.kind === 'json' ? `${JSON.stringify(e.apply({}), null, 2)}\n` : e.apply('') })) };
 }
 
+/**
+ * Write the resume card to Aider's conventions file and make sure .aider.conf.yml reads it. Aider has no MCP,
+ * so this is the whole hand-off. Idempotent: the card file is rewritten to the current card, the read entry
+ * is added once. `memev disconnect aider` removes both (restoring the config if it had other content).
+ */
+export function aiderHandoff({ env = process.env, cardText } = {}) {
+  const conv = AIDER_CONVENTIONS(env);
+  const conf = AIDER_CONF(env);
+  const st = loadState(env);
+  const cardFile = cardText.endsWith('\n') ? cardText : `${cardText}\n`;
+  const ensure = (file, before) => {
+    if (st.files[file]) { if (before && sha256(before) !== st.files[file].after_sha) st.files[file].stale_backup = true; return; }
+    let backup = null;
+    if (before) { fs.mkdirSync(backupDir(env), { recursive: true, mode: 0o700 }); backup = path.join(backupDir(env), `aider-${sha256(file).slice(0, 8)}-${path.basename(file)}.${Date.now()}.bak`); fs.writeFileSync(backup, before, { mode: 0o600 }); }
+    st.files[file] = { client: 'aider', kind: 'text', existed: !!before, before_sha: before ? sha256(before) : null, backup, at: now() };
+  };
+  const convBefore = readBytes(conv);
+  ensure(conv, convBefore);
+  writeAtomic(conv, cardFile, 0o644);
+  st.files[conv].after_sha = sha256(Buffer.from(cardFile));
+  const confBefore = readBytes(conf);
+  const confText = confBefore ? confBefore.toString('utf8') : '';
+  const confAfter = addAiderRead(confText, conv);
+  ensure(conf, confBefore);
+  if (confAfter !== confText) { let mode = 0o644; try { mode = fs.statSync(conf).mode & 0o777; } catch {} writeAtomic(conf, confAfter, mode); }
+  st.files[conf].after_sha = sha256(Buffer.from(confAfter));
+  st.connected['aider'] = { at: now(), mode: 'instructions', launcher: 'memev' };
+  st.declined = st.declined.filter((x) => x !== 'aider');
+  saveState(env, st);
+  return { conventions: conv, conf, added: confAfter !== confText };
+}
+
 export function disconnect(id, { env = process.env, launcher, decline = true, platform = process.platform } = {}) {
   const st = loadState(env);
+  if (id === 'aider') return disconnectAider(env, st, decline);
   const defs = clientDefs(env, launcher || st.connected[id]?.launcher || 'memev', platform);
   const def = defs.find((d) => d.id === id);
   const results = [];
@@ -255,6 +338,34 @@ export function disconnect(id, { env = process.env, launcher, decline = true, pl
   if (decline && !st.declined.includes(id)) st.declined.push(id);
   saveState(env, st);
   return { id, results };
+}
+
+/** Tear down the Aider hand-off: the conventions file is Memev's, so it is removed; the config is restored
+ * to its original bytes when unchanged, otherwise only the read entry is taken out. */
+function disconnectAider(env, st, decline) {
+  const conv = AIDER_CONVENTIONS(env);
+  const conf = AIDER_CONF(env);
+  const remove = (file) => (file === conf ? (t) => removeAiderRead(t, conv) : () => '');
+  const results = [];
+  for (const [file, rec] of Object.entries(st.files)) {
+    if (rec.client !== 'aider') continue;
+    const cur = readBytes(file);
+    if (cur && sha256(cur) === rec.after_sha && !rec.stale_backup) {
+      if (rec.existed) { writeAtomic(file, fs.readFileSync(rec.backup), fs.statSync(file).mode & 0o777); results.push({ file, action: 'restored' }); }
+      else { fs.rmSync(file, { force: true }); results.push({ file, action: 'removed' }); }
+    } else if (cur) {
+      let next;
+      try { next = remove(file)(cur.toString('utf8')); } catch { results.push({ file, action: 'needs-manual' }); continue; }
+      if (!rec.existed && next.trim() === '') fs.rmSync(file, { force: true });
+      else writeAtomic(file, next, fs.statSync(file).mode & 0o777);
+      results.push({ file, action: 'memev entries removed (the file changed since, so the rest was kept)' });
+    } else results.push({ file, action: 'gone already' });
+    delete st.files[file];
+  }
+  delete st.connected['aider'];
+  if (decline && !st.declined.includes('aider')) st.declined.push('aider');
+  saveState(env, st);
+  return { id: 'aider', results };
 }
 
 // What each app needs before it uses Memev: apps load MCP servers and hooks when a session starts, so the
