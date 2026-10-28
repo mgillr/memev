@@ -25,7 +25,7 @@ const snap = (files) => Object.fromEntries(Object.entries(files).map(([k, f]) =>
 test('connect merges into existing configs, keeps every other key, and is idempotent', () => {
   const { home, env, files } = fixtureHome();
   const launcher = '/opt/memev/bin/memev';
-  const res = connectAll({ env, launcher });
+  const res = connectAll({ env, launcher, platform: 'linux' }); // the win32 form is covered in windows.test.mjs
   assert.deepEqual(res.map((r) => `${r.id}:${r.status}`).sort(), ['claude-code:added', 'codex:added', 'cursor:added', 'gemini-cli:added']);
   const cj = JSON.parse(fs.readFileSync(files.claudeJson, 'utf8'));
   assert.equal(cj.numStartups, 42); assert.ok(cj.mcpServers.other); assert.deepEqual(cj.mcpServers.memev.args, ['mcp', '--client', 'claude-code']);
@@ -40,7 +40,7 @@ test('connect merges into existing configs, keeps every other key, and is idempo
   assert.ok(fs.existsSync(path.join(home, '.codex', 'hooks.json')));
   assert.ok(JSON.parse(fs.readFileSync(path.join(home, '.cursor', 'hooks.json'), 'utf8')).hooks.sessionStart);
   const before = snap(files);
-  const again = connectAll({ env, launcher });
+  const again = connectAll({ env, launcher, platform: 'linux' });
   assert.ok(again.every((r) => r.status === 'already'));
   assert.deepEqual(snap(files), before, 'a second connect changes nothing');
 });
@@ -68,13 +68,12 @@ test('when the user edited a file after connect, disconnect removes only Memev e
   assert.ok(md.includes('New rule added later.')); assert.ok(!md.includes('memev:start'));
 });
 
-test('a config with comments is never rewritten; it is reported for a manual step', () => {
+test('a config with comments is edited in place and keeps its comment', () => {
   const { env, files } = fixtureHome();
   fs.writeFileSync(files.cursorMcp, '// my servers\n{"mcpServers":{}}\n');
-  const before = fs.readFileSync(files.cursorMcp);
   const r = connect('cursor', { env, launcher: '/x/memev' });
-  assert.equal(r.status, 'needs-manual');
-  assert.deepEqual(fs.readFileSync(files.cursorMcp), before);
+  assert.equal(r.status, 'added');
+  assert.match(fs.readFileSync(files.cursorMcp, 'utf8'), /^\/\/ my servers\n\{"mcpServers":\{\n  "memev": \{/);
 });
 
 test('re-detection connects a newly installed app but not one the user disconnected', () => {

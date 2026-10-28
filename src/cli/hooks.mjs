@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { api, clientToken, resolveRoot } from './common.mjs';
+import { api, clientToken, resolveRoot, config } from './common.mjs';
 import { ensureDaemon } from './daemon.mjs';
 import { scanTranscript, todosToCheckpoint } from './transcript.mjs';
 import { readJson, writePrivateJson, sha256, slug, configDir } from '../engine/util.mjs';
@@ -72,14 +72,21 @@ export async function runHook(event, flags, env = process.env) {
       return false;
     };
     if (event === 'session-start') {
-      if (input.source === 'compact' || input.source === 'clear') st.injected = []; // the context no longer holds them
+      const source = input.source || 'startup';
+      // a compaction or a clear empties the context; a resume brings the earlier conversation back, card included
+      if (source === 'compact' || source === 'clear') { st.injected = []; st.card = null; }
+      const fresh = source !== 'compact' && source !== 'resume'; // startup or clear: a new context, so the rules as well
       const r = await call('session-start', { task: null });
-      // whether the person still has to pick a lead: only until the setup session has asked (bus/operator.json records it)
+      // whether the person still has to pick a lead: only at a fresh start, and only until the setup session has asked
+      // (bus/operator.json records it)
       const asked = remote ? null : readJson(path.join(root, 'bus', 'operator.json'), null)?.asked;
-      const bus = await call('bus-pulse', { lead: !(typeof asked === 'string' && asked) }).catch(() => null);
-      await call('journal', { role: 'event', text: `session ${input.source || 'start'} (${client}${project ? `, ${project}` : ''})` }).catch(() => {});
-      const lead = input.source === 'compact' ? 'The context was just compacted. The card below is the saved state: continue from "In progress" and do not redo anything listed as done.\n\n' : '';
-      emit(format, 'SessionStart', `${lead}${r.protocol || PROTOCOL}\n\n${r.text}${bus?.text ? `\n\n${bus.text}` : ''}`);
+      const bus = await call('bus-pulse', { lead: fresh && !(typeof asked === 'string' && asked) }).catch(() => null);
+      await call('journal', { role: 'event', text: `session ${source} (${client}${project ? `, ${project}` : ''})` }).catch(() => {});
+      // the card goes in when the context does not hold it: at a fresh start, after a compaction, or when it changed
+      const card = sha256(String(r.text || ''));
+      const parts = [fresh ? r.protocol || PROTOCOL : '', fresh || card !== st.card ? r.text : '', bus?.text || ''].filter(Boolean);
+      st.card = card;
+      emit(format, 'SessionStart', parts.join('\n\n'));
     } else if (event === 'prompt') {
       const prompt = String(input.prompt || input.user_prompt || '').trim();
       if (prompt) {
@@ -89,7 +96,8 @@ export async function runHook(event, flags, env = process.env) {
         if (r?.hits?.length) st.injected = [...new Set([...(st.injected || []), ...r.hits.map((h) => `${h.path}#${h.heading || ''}`)])].slice(-500);
         const bus = await call('bus-pulse', {}).catch(() => null);
         await call('journal', { role: 'user', text: prompt });
-        emit(format, 'UserPromptSubmit', [bus?.text, r?.text, isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
+        const contractsOn = remote || config(root).contracts?.enabled !== false;
+        emit(format, 'UserPromptSubmit', [bus?.text, r?.text, contractsOn && isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
       }
     } else if (event === 'pre-compact') {
       await saveCheckpoint('pre-compact');
@@ -98,7 +106,7 @@ export async function runHook(event, flags, env = process.env) {
       const reply = input.last_assistant_message || input.prompt_response || tr?.lastAssistant;
       if (reply) await call('journal', { role: 'assistant', text: reply });
       await saveCheckpoint('auto');
-      if (format === 'claude' && !input.stop_hook_active) {
+      if (format === 'claude' && !input.stop_hook_active && (remote || config(root).contracts?.enabled !== false)) {
         const g = await call('contract-gate', {});
         if (g.open?.length) process.stdout.write(JSON.stringify({ decision: 'block', reason: `You signed ${g.open.map((c) => `${c.id} (${c.title})`).join(', ')} and it is not verified yet. Finish the remaining criteria and run memev_contract_verify, or report exactly what blocks you.` }));
       }

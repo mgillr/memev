@@ -37,14 +37,29 @@ export function hookMinScore(vault) {
 }
 const pastWork = (p) => p.startsWith('work/sessions/') || p.startsWith('contracts/drafts/');
 // In a container the host's requests arrive from the bridge gateway. MEMEV_TRUST_GATEWAY=1 (set by the
-// image, whose port is published on the host's loopback only) treats private-range peers as local.
-const PRIVATE = /^(::ffff:)?(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/;
+// image, whose port is published on the host's loopback only) trusts that one address as local:
+// MEMEV_GATEWAY, or the default route's gateway read from /proc/net/route. Any other peer, even in a
+// private range, is remote.
+function defaultGateway() {
+  try {
+    for (const line of fs.readFileSync('/proc/net/route', 'utf8').split('\n').slice(1)) {
+      const f = line.trim().split(/\s+/);
+      if (f[1] === '00000000') {
+        const g = parseInt(f[2], 16);
+        return `${g & 0xff}.${(g >> 8) & 0xff}.${(g >> 16) & 0xff}.${(g >> 24) & 0xff}`;
+      }
+    }
+  } catch {}
+  return null;
+}
 export function isDirectLocal(req) {
-  const peer = req.socket.remoteAddress;
-  if (!LOOPBACK.has(peer) && !(process.env.MEMEV_TRUST_GATEWAY === '1' && PRIVATE.test(peer || ''))) return false;
+  const peer = String(req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+  const gw = process.env.MEMEV_TRUST_GATEWAY === '1' ? (process.env.MEMEV_GATEWAY || defaultGateway()) : null;
+  const fromGateway = !!gw && peer === gw;
+  if (!LOOPBACK.has(peer) && !fromGateway) return false;
   if (PROXY_HEADERS.some((h) => req.headers[h] !== undefined)) return false;
   const host = String(req.headers.host || '').replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
-  return ['127.0.0.1', 'localhost', '::1'].includes(host) || process.env.MEMEV_TRUST_GATEWAY === '1';
+  return fromGateway || ['127.0.0.1', 'localhost', '::1'].includes(host);
 }
 
 class Buckets {

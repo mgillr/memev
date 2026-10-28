@@ -10,6 +10,7 @@ import path from 'node:path';
 import { configDir, readJson, writePrivate, writePrivateJson, exists } from '../engine/util.mjs';
 import { signRequest, decodeInvite, deviceKeygen, verifyAddressRecord } from '../engine/devices.mjs';
 import { out } from './common.mjs';
+import { fetchOut } from '../engine/net.mjs';
 
 export const remoteFile = (env = process.env) => path.join(configDir(env), 'remote.json');
 export const deviceKeyFile = (env = process.env) => path.join(configDir(env), 'keys', 'device-ed25519.pem');
@@ -22,7 +23,7 @@ async function remoteOnce(remote, route, { method = 'POST', body = null, env = p
   const text = body === null ? '' : typeof body === 'string' ? body : JSON.stringify(body);
   const ac = new AbortController(); const t = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const r = await fetch(u, { method, signal: ac.signal, headers: { 'content-type': 'application/json', 'user-agent': 'memev-remote', authorization: `Bearer ${remote.token}`, ...signRequest(key, { method, path: u.pathname, body: text }), ...headers }, body: method === 'GET' ? undefined : text });
+    const r = await fetchOut(u, { method, signal: ac.signal, headers: { 'content-type': 'application/json', 'user-agent': 'memev-remote', authorization: `Bearer ${remote.token}`, ...signRequest(key, { method, path: u.pathname, body: text }), ...headers }, body: method === 'GET' ? undefined : text }, env);
     const res = await r.text(); let json = null; try { json = JSON.parse(res); } catch {}
     return { ok: r.ok, status: r.status, json, text: res };
   } finally { clearTimeout(t); }
@@ -76,7 +77,7 @@ async function joinWithCode(code, flags, { env }) {
   const url = decoded.address.replace(/\/+$/, '');
   let res;
   try {
-    const r = await fetch(`${url}/v1/invite-redeem`, { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'memev-remote' }, body: JSON.stringify({ code, pubkey: pub, label: os.hostname() || 'laptop' }) });
+    const r = await fetchOut(`${url}/v1/invite-redeem`, { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'memev-remote' }, body: JSON.stringify({ code, pubkey: pub, label: os.hostname() || 'laptop' }) }, env);
     const text = await r.text(); let json = null; try { json = JSON.parse(text); } catch {}
     res = { ok: r.ok, status: r.status, json, text };
   } catch (e) { out.bad(`the vault did not answer: ${e.message}`); return 1; }

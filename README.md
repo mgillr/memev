@@ -1,10 +1,16 @@
 # Memev
 
+[![Memev demo: how each tier works and how the tiers connect](Demo%20Video/memev-tiers.gif)](Demo%20Video/memev-tiers.mp4)
+
+[Watch the demo video](Demo%20Video/memev-tiers.mp4) (3 min 9 s): how each tier works and how the tiers connect.
+
 Memory and recall stack for all of the AI apps you use, local system and cloud.
 
 Run project dev on Claude code and Cursor knows about the context on Tuesday. Memev keeps what your AI
 apps learn in a folder of plain notes on your own computer, hands the right notes to whichever app
 you open next, and backs everything up to a private GitHub repository that you own.
+
+One memory and one team channel, both on computers you own.
 
 ## How it fits together
 
@@ -47,7 +53,8 @@ You need Node 22 or newer and git. Every path below sets up the same thing: it c
 folder, starts Memev, connects the AI apps it finds on your computer and runs a self-test.
 
 Memev runs on macOS and Linux. **Windows (preview):** setup, app connections, hooks and the doctor
-have Windows code paths and tests, but Windows has not had a full lab run yet, and Memev does not
+have Windows code paths and tests, and a Windows job runs them on every change to `main`, but
+Windows has not had a full lab run yet, and Memev does not
 start at login there (run `memev start` after you sign in).
 [docs/QUICKSTART.md](docs/QUICKSTART.md#windows-preview) says what differs.
 
@@ -77,6 +84,10 @@ For a global `memev` command, run `npm install -g . && memev init` there instead
 After setup, two things may need you: one browser sign-in for the GitHub backup
 (`memev github setup`), and a click in apps that ask before they trust a new tool. The checklist
 says which. Details are in [docs/QUICKSTART.md](docs/QUICKSTART.md).
+
+To see it work, run `memev ready` and open a new session in each app. It prints each app as it
+joins, then "Ready: <app> and <app> share one memory" once one of them recalls something another
+one saved.
 
 ## Which tier?
 

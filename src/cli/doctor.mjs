@@ -12,7 +12,10 @@ import { redactSecrets, findSecrets } from '../engine/secrets.mjs';
 import { VERSION, isVault } from '../engine/vault.mjs';
 import { PKG, daemonInfo, pidAlive, config, out, clientsFile } from './common.mjs';
 import { licensingStatus } from './licensing.mjs';
-import { fileOf, label } from '../engine/bus.mjs';
+import { alt443, githubReachable } from './github.mjs';
+import { label } from '../engine/bus.mjs';
+import { fetchOut } from '../engine/net.mjs';
+import { fixFor } from './preflight.mjs';
 
 const C = (id, title, status, detail = '', fix = null) => ({ id, title, status, detail, fix });
 
@@ -71,6 +74,26 @@ export function privateFiles({ state, names, env = process.env, platform = proce
   return { loose, unknown: true, detail: `${state} is outside your user profile and icacls is not available to check it; keep the vault under ${home}`, fix: null };
 }
 
+/**
+ * The Node the launcher runs, decided the way the launcher decides: node from PATH when it is 22 or newer, else the
+ * recorded one. A launcher from before that rule, and the Windows one, only ever run the recorded Node.
+ */
+export function launcherNode(file, env = process.env) {
+  const text = fs.readFileSync(file, 'utf8');
+  const rec = /^REC='((?:[^']|'\\'')*)'$/m.exec(text)?.[1].replace(/'\\''/g, "'") ?? /^(?:exec |@)"([^"]+)"/m.exec(text)?.[1] ?? null;
+  const version = (f) => { const r = spawnSync(f, ['--version'], { encoding: 'utf8', timeout: 10000 }); return r.status === 0 ? r.stdout.trim() : null; };
+  let onPath = null, onPathVersion = null;
+  if (/^REC=/m.test(text)) {
+    onPath = String(env.PATH || '').split(path.delimiter).filter(Boolean).map((d) => path.join(d, 'node')).find((f) => exists(f)) || null;
+    if (onPath && onPath !== rec) {
+      onPathVersion = version(onPath);
+      if (Number(/^v?(\d+)/.exec(onPathVersion || '')?.[1]) >= 22) return { node: onPath, version: onPathVersion, from: 'PATH', recorded: rec };
+    }
+  }
+  if (rec && exists(rec)) return { node: rec, version: version(rec), from: 'recorded', recorded: rec };
+  return { node: null, recorded: rec, onPath, onPathVersion };
+}
+
 /** Checks that only need the files (safe inside the daemon too). */
 export function fileChecks({ root, env = process.env, vault = null, platform = process.platform, icacls = runIcacls, license = null }) {
   const r = [];
@@ -99,7 +122,11 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   const clients = readJson(path.join(configDir(env), 'clients-state.json'), { connected: {}, files: {} });
   r.push(...busChecks({ root, vault, connected: Object.keys(clients.connected || {}) }));
   const launcher = path.join(configDir(env), 'bin', process.platform === 'win32' ? 'memev.cmd' : 'memev');
-  r.push(C('launcher', 'stable launcher installed', exists(launcher) ? 'ok' : 'warn', exists(launcher) ? launcher : 'missing: apps cannot start Memev', exists(launcher) ? null : { desc: 'reinstall the launcher', destructive: false, cmd: 'runtime' }));
+  const ln = exists(launcher) ? launcherNode(launcher, env) : null;
+  if (!ln) r.push(C('launcher', 'stable launcher installed', 'warn', 'missing: apps cannot start Memev', { desc: 'reinstall the launcher', destructive: false, cmd: 'runtime' }));
+  else if (ln.node) r.push(C('launcher', 'stable launcher installed', 'ok', `${launcher} runs ${ln.node}${ln.version ? ` (${ln.version})` : ''}${ln.from === 'PATH' ? ', found on PATH' : ''}`));
+  else r.push(C('launcher', 'stable launcher installed', 'fail', `${launcher} finds no Node.js 22 or newer: ${ln.onPath ? `node on PATH is ${ln.onPathVersion || 'not runnable'}` : 'no node on PATH'}, and the recorded ${ln.recorded || 'Node'} is gone`,
+    { desc: `${fixFor('node', platform)} Then run memev doctor --fix to point the launcher at it.`, destructive: false, cmd: 'runtime' }));
   const missing = Object.entries(clients.files || {}).filter(([f]) => { try { return !fs.readFileSync(f, 'utf8').includes('memev'); } catch { return true; } }).map(([f, rec]) => rec.client);
   const ids = Object.keys(clients.connected || {});
   r.push(C('apps', 'AI apps connected', ids.length ? (missing.length ? 'warn' : 'ok') : 'warn', ids.length ? `${ids.join(', ')}${missing.length ? `; entries missing for ${[...new Set(missing)].join(', ')}` : ''}` : 'none yet', ids.length && !missing.length ? null : { desc: 'connect every installed app again', destructive: false, cmd: 'connect' }));
@@ -128,11 +155,25 @@ export function busChecks({ root, vault = null, connected = [] }) {
   const has = (f) => exists(path.join(root, 'bus', f));
   const folder = has('config.json') && has('operator.json') && has('log');
   r.push(C('bus-files', 'comms bus folder in the vault', folder ? 'ok' : 'fail', folder ? 'bus/ (committed with the vault)' : 'bus/ is missing from the vault', folder ? null : vault ? { desc: 'set bus/ up again', destructive: false, run: () => vault.bus.ensure(vault.host.id) } : { desc: 'set bus/ up again', destructive: false, cmd: 'bus' }));
-  const missing = connected.filter((id) => { const f = path.join(root, 'bus', 'seats', `${fileOf(`${label(id)}@host`)}.json`); const rec = readJson(f, null); return !rec || rec.removed; });
+  // each connected app's seat on this computer, whatever it is called: <app>@<machine>, an older <app>@host, or a new name
+  let seats = [];
+  try { seats = fs.readdirSync(path.join(root, 'bus', 'seats')).filter((f) => f.endsWith('.json')).map((f) => readJson(path.join(root, 'bus', 'seats', f), null)).filter(Boolean); } catch { /* no seats yet */ }
+  const missing = connected.filter((id) => !seats.some((s) => s.client === label(id) && s.device_kind === 'host' && !s.removed));
   r.push(C('bus-seats', 'every connected app has a bus seat', missing.length ? 'fail' : 'ok', missing.length ? `no seat for ${missing.join(', ')}` : `${connected.length} app(s) seated`, missing.length ? { desc: 'seat them', destructive: false, cmd: 'bus' } : null));
   const lead = readJson(path.join(root, 'bus', 'operator.json'), null)?.seat || null;
   r.push(C('bus-lead', 'lead AI chosen', lead ? 'ok' : 'warn', lead ? `${lead} leads the others` : 'needs you: no lead AI chosen yet; pick the AI that leads and coordinates the others with memev bus operator <seat> (memev bus roster lists the seats)'));
   return r;
+}
+
+/**
+ * Whether GitHub can be reached for the git backup: port 22 first, then ssh.github.com on 443.
+ * A failing check carries the fix. probe is injectable so tests never touch the network.
+ */
+export async function githubNetCheck({ probe } = {}) {
+  const net = await githubReachable({ probe });
+  return C('github-net', 'GitHub reachable for the backup', net.ok ? 'ok' : 'fail',
+    net.ok ? `reachable at ${net.open.join(', ')}` : 'neither github.com:22 nor ssh.github.com:443 answers, so the backup cannot push',
+    net.ok ? null : { desc: 'fix the network, or push over HTTPS with a fine-grained token for that one repository (docs/GITHUB.md)', destructive: false });
 }
 
 /** The next ports above this vault. A second vault started because the preferred port was taken lands here. */
@@ -154,7 +195,7 @@ async function twoVaultChecks(root) {
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), 200);
       try {
-        const r = await fetch(`http://127.0.0.1:${port}/healthz`, { signal: ac.signal });
+        const r = await fetchOut(`http://127.0.0.1:${port}/healthz`, { signal: ac.signal });
         const body = await r.json();
         if (body?.ok === true && body.vault_id && body.vault_id !== mine) return body.vault_id;
       } catch { /* closed port or not Memev */ }
@@ -189,9 +230,13 @@ export async function allChecks({ root, env }) {
     r.push(...fileChecks({ root, env, vault: null }));
   } else r.push(...fileChecks({ root, env, vault }));
   if (vault) vault.close();
-  const { unitPaths } = await import('./service.mjs');
+  // the reachability probe only runs for a GitHub ssh backup, so a local or HTTPS remote never touches the network here
+  const backupRemote = spawnSync('git', ['remote'], { cwd: root, encoding: 'utf8' }).stdout.trim().split('\n')[0];
+  if (backupRemote && alt443(spawnSync('git', ['remote', 'get-url', backupRemote], { cwd: root, encoding: 'utf8' }).stdout.trim())) r.push(await githubNetCheck());
+  const { unitPaths, serviceOff } = await import('./service.mjs');
   const u = unitPaths(env);
-  r.push(C('service', 'starts at login', u.file && exists(u.file) ? 'ok' : 'warn', u.file && exists(u.file) ? u.file : 'not installed: memev service install', u.file && exists(u.file) ? null : { desc: 'install the login service', destructive: false, cmd: 'service' }));
+  if (serviceOff(env)) r.push(C('service', 'starts at login', 'ok', 'off: MEMEV_NO_SERVICE is set'));
+  else r.push(C('service', 'starts at login', u.file && exists(u.file) ? 'ok' : 'warn', u.file && exists(u.file) ? u.file : 'not installed: memev service install', u.file && exists(u.file) ? null : { desc: 'install the login service', destructive: false, cmd: 'service' }));
   return dedupe(r);
 }
 const dedupe = (r) => { const seen = new Set(); return r.filter((c) => (seen.has(c.id) ? false : seen.add(c.id))); };

@@ -10,6 +10,8 @@ import { TokenStore } from '../engine/tokens.mjs';
 import { configDir, writePrivate, exists } from '../engine/util.mjs';
 import { isVault } from '../engine/vault.mjs';
 import { out } from './common.mjs';
+import { applyRelayDefault } from './relay.mjs';
+import { fetchOut } from '../engine/net.mjs';
 
 export function registry(root) {
   const reg = new DeviceRegistry(path.join(root, '.memev', 'devices.json'));
@@ -63,7 +65,7 @@ const explain = (status, body) => {
  * file, and it is verified here, offline, before anything is written. A key the server refuses, an answer that does not
  * verify, an expired licence, or a licence that carries an identity leaves no file. `keys` and `fetchImpl` are for tests.
  */
-export async function activateLicense({ key, endpoint, env = process.env, keys = LICENSE_KEYS, fetchImpl = globalThis.fetch, now = Date.now(), timeoutMs = 15000 }) {
+export async function activateLicense({ key, endpoint, env = process.env, keys = LICENSE_KEYS, fetchImpl = (u, o) => fetchOut(u, o, env), now = Date.now(), timeoutMs = 15000, root = null }) {
   const k = String(key || '').trim();
   if (!k || k.length > 200 || /\s/.test(k)) return { ok: false, reason: 'that does not look like a licence key' };
   if (!endpoint) return { ok: false, reason: 'no licence server is set: pass --server <https url> or set MEMEV_LICENSE_URL' };
@@ -75,6 +77,8 @@ export async function activateLicense({ key, endpoint, env = process.env, keys =
   if (body.length > MAX_LICENSE_BYTES) return { ok: false, reason: 'the licence server sent an answer that is too large' };
   if (!res.ok) return { ok: false, reason: `the licence server refused the key: ${explain(res.status, body)}` };
   let l; try { l = JSON.parse(body); } catch { return { ok: false, reason: 'the licence server did not send a licence file' }; }
+  let relay = null;
+  if (l && typeof l === 'object' && !Array.isArray(l) && l.relay && typeof l.relay === 'object') relay = { default_url: l.relay.default_url, default_domain: l.relay.default_domain };
   if (l && typeof l === 'object' && !Array.isArray(l) && l.license && typeof l.license === 'object' && !l.lid) l = l.license;
   const extra = extraFields(l);
   if (extra.length) return { ok: false, reason: `the licence carries more than a licence may (${extra.join(', ')}); not installed` };
@@ -83,7 +87,8 @@ export async function activateLicense({ key, endpoint, env = process.env, keys =
   const file = licenseFile(env);
   fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
   writePrivate(file, `${JSON.stringify(l, null, 2)}\n`);
-  return { ok: true, license: l, state: v.state, file };
+  if (root && relay) applyRelayDefault(root, relay);
+  return { ok: true, license: l, state: v.state, file, relay };
 }
 
 export async function command(cmd, pos, flags, { root, env, license = null }) {
@@ -112,7 +117,7 @@ export async function command(cmd, pos, flags, { root, env, license = null }) {
     }
     if (sub === 'activate') {
       const key = pos[1]; if (!key) throw new Error('memev license activate <key> [--server URL]');
-      const r = await activateLicense({ key, endpoint: licenseEndpoint({ flags, env }), env });
+      const r = await activateLicense({ key, endpoint: licenseEndpoint({ flags, env }), env, root });
       if (!r.ok) { out.bad(`not activated: ${r.reason}`); return 1; }
       out.ok(`activated licence ${r.license.lid} (${r.state}) in ${r.file}; it is checked on this computer from now on, with no network`); return 0;
     }
