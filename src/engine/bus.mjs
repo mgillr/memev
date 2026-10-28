@@ -64,7 +64,7 @@ export class Bus {
     const host = this.devices.get(this.devices.hostId);
     return label(host?.label || 'this computer');
   }
-  /** The seat name for an app on a device: my-app@my-laptop, cursor@laptop, chatgpt@cloud. */
+  /** The seat name for an app on a device: my-app@my-laptop, cursor@laptop, chatgpt@cloud. A teammate's computer is enrolled as <name>-<machine>, so its seats read <app>@<name>-<machine>. */
   seatName(client, device) {
     if (!device || device.kind === 'host' || device.kind === 'local-client') return `${label(client)}@${this.machineName()}`;
     if (device.kind === 'cloud-connector') return `${label(device.label)}@cloud`;
@@ -349,11 +349,11 @@ export class Bus {
       else if (s.joined && p.last_seen) state = ago(p.last_seen, at) <= this.liveMin ? 'live' : 'stale';
       const claims = all.filter((m) => m.type === 'claim' && names.includes(m.from) && !all.some((v) => v.type === 'verdict' && v.ref === m.ref)).map((m) => m.ref);
       const status = all.filter((m) => m.type === 'status' && names.includes(m.from) && !m.check).at(-1);
-      return { seat: s.seat, client: s.client, device: s.device, device_label: dev?.label || s.device_label, device_kind: dev?.kind || s.device_kind, state, operator: op === s.seat, last_seen: p.last_seen || null, minutes_since: p.last_seen ? ago(p.last_seen, at) : null, last_message: last ? { seq: last.seq, type: last.type, ts: last.ts, body: last.body.slice(0, 120) } : null, hold: this.holdOn(s.seat, all), claims, status: status ? status.body.slice(0, 160) : null, project: s.project };
+      return { seat: s.seat, client: s.client, device: s.device, device_label: dev?.label || s.device_label, device_kind: dev?.kind || s.device_kind, teammate: dev?.teammate || null, state, operator: op === s.seat, last_seen: p.last_seen || null, minutes_since: p.last_seen ? ago(p.last_seen, at) : null, last_message: last ? { seq: last.seq, type: last.type, ts: last.ts, body: last.body.slice(0, 120) } : null, hold: this.holdOn(s.seat, all), claims, status: status ? status.body.slice(0, 160) : null, project: s.project };
     });
     // licensed computers with no app on the bus yet
     const seated = new Set(rows.map((r) => r.device));
-    for (const d of this.devices.list().filter((x) => x.kind === 'remote-computer' && !seated.has(x.id))) rows.push({ seat: null, client: null, device: d.id, device_label: d.label, device_kind: d.kind, state: d.status === 'active' ? 'never joined' : 'removed', operator: false, last_seen: null, minutes_since: null, last_message: null, hold: null, claims: [], status: null, project: null });
+    for (const d of this.devices.list().filter((x) => x.kind === 'remote-computer' && !seated.has(x.id))) rows.push({ seat: null, client: null, device: d.id, device_label: d.label, device_kind: d.kind, teammate: d.teammate || null, state: d.status === 'active' ? 'never joined' : 'removed', operator: false, last_seen: null, minutes_since: null, last_message: null, hold: null, claims: [], status: null, project: null });
     return { live_minutes: this.liveMin, operator: op, seats: rows, ...(op ? {} : { lead_needed: LEAD_NEEDED }) };
   }
   reasonFor(row) {
