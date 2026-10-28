@@ -1,5 +1,7 @@
 # Licensing notice
 
+Part of the [Memev documentation](README.md). Related: [CONVERGENCE.md](CONVERGENCE.md), [PRICING.md](PRICING.md).
+
 This notice announces the decided licence direction.
 
 ## The Memev core stays Apache-2.0

@@ -150,7 +150,7 @@ checked on this computer against the vendor public key before it is stored. A ke
 an answer that does not verify, an expired licence, or a licence that carries a name, e-mail or machine
 leaves no file, and the command prints why. After that the licence is checked offline, as above.
 
-- **Personal:** one computer, no licence, no network needed.
+- **Free:** one computer, no licence, no network needed.
 - **Personal with more computers:** as in the table, with the number of computers in the licence.
 - **Business and Corporate:** the number of computers in the licence, issued once per organisation.
 
