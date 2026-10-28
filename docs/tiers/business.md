@@ -93,6 +93,17 @@ Organisations that need an on-premises LLM, an air-gapped install or a complianc
 sales-assisted pilot instead. Both are planned, as is Business itself. Business has no public price:
 contact us.
 
+## Where it runs: cloud-hosted or on your own servers
+
+| | Cloud-hosted | On your own servers |
+|---|---|---|
+| Who runs the server | the operator, on a host the operator manages | you, on your own servers |
+| Where AI provider calls go | your own AI apps call a hosted provider with your own keys | your own AI apps call a model inside your environment |
+| Which trial path | the self-serve Business trial, free with no card (planned) | the sales-assisted pilot, size set by order form, term starts at licence install (planned) |
+| Status | planned, no date | the server and the container image are built; the Business trial is planned |
+
+The two pages: [deploy-cloud.md](../deploy-cloud.md) and [deploy-on-prem.md](../deploy-on-prem.md).
+
 ## Worked example: 20 people
 
 A firm of 20: a CEO, a senior leadership team of 3, and Sales (5), Operations (5), Finance (2), HR
