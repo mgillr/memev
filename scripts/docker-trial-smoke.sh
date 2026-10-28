@@ -1,14 +1,14 @@
 #!/bin/sh
 set -eu
 
+# Clean up on any exit so every run removes the container and volumes
+trap 'docker compose -f compose.trial.yaml down -v' EXIT
+
 # Build the image
 docker compose -f compose.trial.yaml build
 
 # Start the container
 docker compose -f compose.trial.yaml up -d
-
-# Clean up on any exit so every run removes the container and volumes
-trap 'docker compose -f compose.trial.yaml down -v' EXIT
 
 # Wait for healthy; exit 1 when the container is not healthy within the wait
 healthy=0
@@ -37,7 +37,12 @@ if [ -n "${1:-}" ]; then
   docker compose -f compose.trial.yaml exec memev memev license install /vault/trial.license.json
 else
   docker compose -f compose.trial.yaml exec memev sh -c "echo '{}' > /vault/trial.license.json"
-  docker compose -f compose.trial.yaml exec memev memev license install /vault/trial.license.json || true
+  if out=$(docker compose -f compose.trial.yaml exec -T memev memev license install /vault/trial.license.json 2>&1); then
+    echo "an unsigned licence was installed" >&2
+    exit 1
+  fi
+  echo "$out" | grep -q "not installed:" || { echo "$out" >&2; exit 1; }
+  echo "unsigned licence correctly refused"
 fi
 
 # Stop and remove volumes (the trap also runs this; it is idempotent)

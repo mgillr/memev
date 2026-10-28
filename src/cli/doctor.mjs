@@ -152,8 +152,8 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   if (env.MEMEV_CONTAINER === '1') {
     const vaultWritable = (() => { try { const t = path.join(root, '.memev', `write-test-${process.pid}`); fs.writeFileSync(t, 'ok'); fs.rmSync(t, { force: true }); return true; } catch { return false; } })();
     r.push(C('container-vault', 'vault volume mounted and writable', vaultWritable ? 'ok' : 'fail', vaultWritable ? `${root} is writable` : `${root} is not writable; check the volume mount`));
-    r.push(C('container-loopback', 'port published on loopback only', 'ok', 'the host port mapping is not visible from inside the container; check it on the host with: docker compose -f compose.trial.yaml port memev 7787'));
-    r.push(C('container-remote', 'remote access off', cfg.remote?.enabled ? 'warn' : 'ok', cfg.remote?.enabled ? 'remote access is on; set MEMEV_NO_TUNNEL=1 and restart' : 'off (local only)'));
+    r.push(C('container-loopback', 'host port (check it on the host)', 'ok', 'the host port mapping is not visible from inside the container; check it on the host with: docker compose -f compose.trial.yaml port memev 7787'));
+    r.push(C('container-remote', 'remote access off', cfg.remote?.enabled ? 'warn' : 'ok', cfg.remote?.enabled ? 'remote access is on in the vault config; run memev cloud off in the container' : 'off (local only)'));
   }
   return r;
 }

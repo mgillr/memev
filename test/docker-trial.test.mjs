@@ -44,6 +44,9 @@ test('MEM-141 AC02: image has healthcheck and labels', () => {
   assert.match(df, /org\.opencontainers\.image\.licenses/);
   assert.match(df, /org\.opencontainers\.image\.version/);
   assert.match(df, /ARG MEMEV_VERSION=/);
+  const argMatch = /ARG MEMEV_VERSION=(\S+)/.exec(df);
+  assert.ok(argMatch, 'ARG MEMEV_VERSION has a default');
+  assert.equal(argMatch[1], pkgJson.version, 'ARG default equals package.json version');
   assert.match(df, /org\.opencontainers\.image\.version="\$\{MEMEV_VERSION\}"/);
   assert.doesNotMatch(df, /org\.opencontainers\.image\.licence="/);
   assert.doesNotMatch(df, /org\.opencontainers\.image\.url/);
@@ -52,11 +55,11 @@ test('MEM-141 AC02: image has healthcheck and labels', () => {
 
 test('MEM-141 AC03: doctor runs inside the container and reports container facts', () => {
   const sb = sandbox();
-  sb.run(['init', '--local-only', '--no-connect']);
+  sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
   const r = sb.run(['doctor'], { extraEnv: { MEMEV_CONTAINER: '1' } });
   assert.equal(r.code, 0);
   assert.match(r.out, /vault volume mounted and writable/);
-  assert.match(r.out, /port published on loopback only/);
+  assert.match(r.out, /host port \(check it on the host\)/);
   assert.match(r.out, /host port mapping is not visible from inside the container/);
   assert.match(r.out, /docker compose -f compose\.trial\.yaml port memev 7787/);
   assert.match(r.out, /remote access off/);
@@ -111,6 +114,16 @@ test('MEM-141 AC07: publishing needs owner go and docs say build locally', () =>
   assert.match(doc, /docker compose -f compose\.trial\.yaml build/);
   const cl = fs.readFileSync(changelog, 'utf8');
   assert.match(cl, /owner go/);
+});
+
+test('MEM-141 AC03: doctor without MEMEV_CONTAINER prints no container lines', () => {
+  const sb = sandbox();
+  sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
+  const r = sb.run(['doctor']);
+  assert.doesNotMatch(r.out, /vault volume mounted and writable/);
+  assert.doesNotMatch(r.out, /host port \(check it on the host\)/);
+  assert.doesNotMatch(r.out, /remote access off/);
+  sb.stop();
 });
 
 test('MEM-141 AC08: user-facing copy passes the house writing check', () => {
