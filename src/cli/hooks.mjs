@@ -12,19 +12,18 @@
 // (loop_limit, default 5 there), and the hook itself stops following up once loop_count reaches it.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { api, clientToken, resolveRoot, config } from './common.mjs';
 import { ensureDaemon } from './daemon.mjs';
 import { scanTranscript, todosToCheckpoint } from './transcript.mjs';
-import { readJson, writePrivateJson, sha256, slug, configDir } from '../engine/util.mjs';
+import { readJson, writePrivateJson, sha256, slug, configDir, run } from '../engine/util.mjs';
 import { isVault } from '../engine/vault.mjs';
 import { PROTOCOL } from '../engine/card.mjs';
 
 function readStdin() { try { return fs.readFileSync(0, 'utf8'); } catch { return ''; } }
 export function projectOf(cwd) {
   if (!cwd) return null;
-  const r = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', timeout: 1500 });
-  return slug(path.basename(r.status === 0 && r.stdout.trim() ? r.stdout.trim() : cwd));
+  const r = run('git', ['rev-parse', '--show-toplevel'], { cwd, timeout: 1500 });
+  return slug(path.basename(r.ok && r.stdout.trim() ? r.stdout.trim() : cwd));
 }
 
 // Output shapes: Claude Code and Codex share one; Gemini CLI uses it with its own event names;
@@ -133,7 +132,12 @@ export async function runHook(event, flags, env = process.env) {
     writePrivateJson(stateFile, st);
   } catch (e) {
     if (env.MEMEV_DEBUG) process.stderr.write(`[memev hook ${event}] ${e.message}\n`);
-    if (event === 'session-start') emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev is not reachable right now (${e.message}); run \`memev doctor\`.]`);
+    if (event === 'session-start') {
+      if (e?.moved && e.refresh !== false) emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev] vault address changed: the vault did not answer at its saved address. Run \`memev join --refresh\` to fetch the current address, or \`memev doctor\` if the address is right.`);
+      // no backup address or no address key: --refresh has nothing to follow, so name the way that works
+      else if (e?.moved) emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev] the vault did not answer at its saved address, and this computer has no signed address record to follow. On the vault's computer run \`memev invite\`, then here run \`memev join <code>\`; or run \`memev doctor\` if the address is right.`);
+      else emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev is not reachable right now (${e.message}); run \`memev doctor\`.]`);
+    }
   }
   return 0;
 }
