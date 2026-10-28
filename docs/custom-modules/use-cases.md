@@ -1,7 +1,7 @@
 # Custom module use cases
 
 > **DRAFT. Every use case here is planned.** Nothing is built or on sale, and there are no dates or
-> prices on this page. Custom module work is for Business and Enterprise and is quoted per job. See
+> prices on this page. Custom module work is for Business and Corporate (both coming) and is quoted per job. See
 > [README.md](README.md) for how to read these as test cases, and [examples/](examples/) for six
 > walk-throughs.
 
