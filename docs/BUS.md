@@ -90,6 +90,12 @@ From the operator session (Claude Code, say), ask it to:
 The same things work from a terminal: `memev bus roster`, `memev bus check`, `memev bus send`,
 `memev bus tasks`, `memev bus tail`.
 
+To test the link to one seat, run `memev bus hello <seat> [--timeout S]`: it posts a single hello
+to that seat, tells you what to do in the app (start a turn; the app checks the bus at the start
+of every turn), and waits until the seat reads it, reporting how long that took. If the seat has
+not read it by the timeout (default 60 s), it exits 1 and says the seat is waiting for its next
+turn.
+
 ## The pulse
 
 Each seat sends a heartbeat whenever it checks for unread messages. Apps with hooks (Claude Code,
