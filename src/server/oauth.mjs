@@ -11,6 +11,8 @@ const ACCESS_TTL_S = 3600;
 const REFRESH_TTL_DAYS = 30;
 const CODE_TTL_S = 300;
 const SCOPES = ['read', 'write'];
+// open registration must not grow oauth.json without limit: the oldest clients are dropped first
+export const MAX_CLIENTS = 50;
 // the same note paths a cloud connector token gets (src/engine/devices.mjs)
 const PATHS = ['memory/**', 'work/**', 'contracts/**', 'bus/**'];
 
@@ -19,11 +21,18 @@ export class OAuthError extends Error {
 }
 
 const s256 = (verifier) => crypto.createHash('sha256').update(String(verifier)).digest('base64url');
+// the seat name an OAuth app takes on the bus: its registered client name, normalised (ChatGPT -> chatgpt)
+export const agentName = (name) => String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'app';
 
 export class OAuthStore {
   constructor(file) { this.file = file; this.data = readJson(file, null) || { version: 1, clients: {}, codes: {}, access: {}, refresh: {} }; this.mtime = this._mtime(); }
   _mtime() { try { const s = fs.statSync(this.file); return `${s.ino}:${s.mtimeMs}:${s.size}`; } catch { return ''; } }
-  save() { writePrivateJson(this.file, this.data); this.mtime = this._mtime(); }
+  /** Expired consent codes are dropped on every write, so the file does not keep them. */
+  _gc() {
+    const t = Date.now();
+    for (const r of Object.values(this.data.codes)) if (t - Date.parse(r.created) > CODE_TTL_S * 1000) delete this.data.codes[r.code];
+  }
+  save() { this._gc(); writePrivateJson(this.file, this.data); this.mtime = this._mtime(); }
   /** Another process may have registered or revoked: pick that up before answering. */
   fresh() { if (this._mtime() !== this.mtime) { this.data = readJson(this.file, null) || this.data; this.mtime = this._mtime(); } }
 
@@ -36,12 +45,22 @@ export class OAuthStore {
     const wanted = (typeof scope === 'string' ? scope.split(/\s+/) : []).filter((s) => SCOPES.includes(s));
     const id = `oc_${randomToken(12)}`;
     this.data.clients[id] = { id, name: String(client_name || 'Unnamed client').slice(0, 60), redirect_uris: uris, scopes: wanted.length ? wanted : ['read', 'write'], created: now() };
+    const oldest = Object.values(this.data.clients).sort((a, b) => a.created.localeCompare(b.created) || a.id.localeCompare(b.id));
+    for (const c of oldest.slice(0, Math.max(0, oldest.length - MAX_CLIENTS))) this._dropClient(c.id);
     this.save();
     const c = this.data.clients[id];
     return { client_id: c.id, client_name: c.name, redirect_uris: c.redirect_uris, scope: c.scopes.join(' '), grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'], token_endpoint_auth_method: 'none' };
   }
 
   client(id) { this.fresh(); return this.data.clients[String(id || '')] || null; }
+
+  /** A dropped client loses its codes and its token pairs at once. */
+  _dropClient(id) {
+    delete this.data.clients[id];
+    for (const [code, r] of Object.entries(this.data.codes)) if (r.client_id === id) delete this.data.codes[code];
+    for (const [tok, r] of Object.entries(this.data.access)) if (r.client_id === id) { delete this.data.access[tok]; if (this.data.refresh[r.refresh]) delete this.data.refresh[r.refresh]; }
+    for (const [tok, r] of Object.entries(this.data.refresh)) if (r.client_id === id) delete this.data.refresh[tok];
+  }
 
   /** Start the authorization: validate the request and hold the code until the consent page approves it. */
   authorize({ client_id, redirect_uri, code_challenge, code_challenge_method, scope, state }) {
@@ -52,7 +71,8 @@ export class OAuthStore {
     const scopes = (scope ? String(scope).split(/\s+/) : c.scopes).filter((s) => SCOPES.includes(s));
     if (!scopes.length) throw new OAuthError('invalid_scope', 'no supported scope was requested');
     const code = randomToken(24);
-    this.data.codes[code] = { code, client_id: c.id, redirect_uri: String(redirect_uri), challenge: code_challenge, scopes, state: String(state || ''), created: now(), approved: false };
+    // a one-time value the consent page must send back: knowing the code alone is not enough to approve
+    this.data.codes[code] = { code, consent: randomToken(16), client_id: c.id, redirect_uri: String(redirect_uri), challenge: code_challenge, scopes, state: String(state || ''), created: now(), approved: false };
     this.save();
     return { code, client: c, scopes };
   }
@@ -66,10 +86,11 @@ export class OAuthStore {
     return r;
   }
 
-  /** The consent page's answer: approve or deny the held code. */
-  consent(code, { approve } = {}) {
+  /** The consent page's answer: approve or deny the held code. The page's one-time value must come back. */
+  consent(code, { approve, consent } = {}) {
     const r = this.pending(code);
     if (!r) throw new OAuthError('invalid_grant', 'unknown or expired consent code');
+    if (!consent || String(consent) !== r.consent) throw new OAuthError('invalid_request', 'the consent value is missing or does not match the page');
     r.approved = !!approve;
     this.save();
     return r;
@@ -131,14 +152,15 @@ export class OAuthStore {
     const r = this.data.access[t];
     if (!r) return null;
     if (Date.parse(r.expires) < Date.now()) { delete this.data.access[t]; this.save(); return null; }
-    return { id: r.id, scopes: r.scopes, paths: PATHS, remote: true, expires: r.expires, note: 'cloud connector (oauth)' };
+    const c = this.data.clients[r.client_id];
+    return { id: r.id, agent: agentName(c?.name), scopes: r.scopes, paths: PATHS, remote: true, expires: r.expires, note: 'cloud connector (oauth)' };
   }
 }
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-/** The local consent page: who is asking, for what, and the allow/deny form. */
-export function consentPage({ client, scopes, code, state }) {
+/** The local consent page: who is asking, for what, where the code goes, and the allow/deny form. */
+export function consentPage({ client, scopes, code, state, consent, redirectHost }) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -154,9 +176,11 @@ button { padding: 0.5rem 1.25rem; margin-right: 0.5rem; font-size: 1rem; }
 <body>
 <h1>Allow ${esc(client?.name || 'this client')}?</h1>
 <p>${esc(client?.name || 'This client')} wants to access this Memev vault with: <strong>${esc(scopes.join(', '))}</strong>.</p>
+<p>The code goes to <strong>${esc(redirectHost || 'the app')}</strong>.</p>
 <p>The access token lasts an hour and can be revoked at any time.</p>
 <form method="post" action="/oauth/consent">
 <input type="hidden" name="code" value="${esc(code)}">
+<input type="hidden" name="consent" value="${esc(consent || '')}">
 <input type="hidden" name="state" value="${esc(state)}">
 <button type="submit" name="decision" value="approve">Allow</button>
 <button type="submit" name="decision" value="deny">Deny</button>

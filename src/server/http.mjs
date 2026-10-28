@@ -6,7 +6,9 @@
 // X-Memev-Key header (the tunnel key) or a connector URL (/c/<token>/mcp). Remote requests are rate
 // limited and audited. Unauthenticated routes are GET /healthz, which says {"ok":true} (and, to a
 // direct local caller, the vault's id), and POST /v1/invite-redeem, which enrolls one computer
-// from a one-time invite code.
+// from a one-time invite code. The OAuth setup routes (register, authorize, token, revoke) are open
+// to remote callers but pass the same remote-off check, rate limit and audit log; the consent page
+// is served and accepted only on the vault's own machine.
 // Another computer must sign every request with its own device key; a cloud connector credential
 // must not be used from a computer. Computers over the licence's seat count, or on a lapsed
 // licence, can read but not write (src/engine/entitlements.mjs).
@@ -118,9 +120,22 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
     try {
       // a local caller also gets the vault's id, so the CLI can tell this vault's daemon from another one on the same port
       if (req.method === 'GET' && url.pathname === '/healthz') return send(200, local ? { ok: true, name: 'memev', version: VERSION, vault_id: vault.config?.vault_id ?? null } : { ok: true });
+      let token = null; let route = url.pathname;
+      const cm = /^\/c\/(mv_[0-9a-f]{8}_[0-9a-f]{32,})(\/.*)$/.exec(url.pathname);
+      if (cm) { token = cm[1]; route = cm[2]; }
+      else { const a = String(req.headers.authorization || ''); if (a.startsWith('Bearer ')) token = a.slice(7).trim(); }
+      if (!local) {
+        if (!vault.config.remote?.enabled) return send(403, { error: 'remote_off', error_description: 'remote access is switched off on this vault (memev cloud on)' });
+        const ipKey = sha256(String(req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress)).slice(0, 16);
+        if (!limiter.take(`ip:${ipKey}`) || (token && !limiter.take(`t:${token.slice(3, 11)}`))) return send(429, { error: 'rate_limited' }, { 'retry-after': '30' });
+        fs.appendFile(audit, `${JSON.stringify({ ts: now(), ip: ipKey, route: route.slice(0, 64), method: req.method, token: token ? token.slice(3, 11) : null })}\n`, () => {});
+      }
       // OAuth 2.1 for cloud AI apps: discovery, dynamic client registration, authorization code
-      // with PKCE and a consent page served here, token, refresh and revocation. These setup routes
-      // stay open to remote callers; /mcp itself still needs remote access on and a valid credential.
+      // with PKCE, token, refresh and revocation. A remote caller passes the same remote-off check,
+      // rate limit and audit log as every other route. The consent page is served and accepted only
+      // on the vault's own machine, where the owner approves; /mcp still needs a valid credential.
+      const port = server.address()?.port;
+      const localConsent = (code) => `http://127.0.0.1:${port}/oauth/consent?code=${encodeURIComponent(code || '')}`;
       const issuer = `${local ? 'http' : 'https'}://${String(req.headers.host || 'localhost')}`;
       if (req.method === 'GET' && url.pathname === '/.well-known/oauth-authorization-server') {
         return send(200, {
@@ -149,7 +164,8 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
         if (q.get('response_type') !== 'code') return send(400, { error: 'unsupported_response_type', error_description: 'response_type must be code' });
         try {
           const { code } = oauth.authorize({ client_id: q.get('client_id'), redirect_uri: q.get('redirect_uri'), code_challenge: q.get('code_challenge'), code_challenge_method: q.get('code_challenge_method'), scope: q.get('scope'), state: q.get('state') });
-          return send(302, '', { location: `/oauth/consent?code=${code}` });
+          // a remote browser stays on the tunnel host, so it gets the link to open on the vault's machine
+          return send(302, '', { location: local ? `/oauth/consent?code=${code}` : localConsent(code) });
         } catch (e) {
           const redir = q.get('redirect_uri');
           if (redir && /^https?:/i.test(redir)) { const u = new URL(redir); u.searchParams.set('error', e instanceof OAuthError ? e.code : 'invalid_request'); if (q.get('state')) u.searchParams.set('state', q.get('state')); return send(302, '', { location: u.toString() }); }
@@ -157,21 +173,31 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
         }
       }
       if (req.method === 'GET' && url.pathname === '/oauth/consent') {
+        if (!local) return send(403, `Consent is approved on the computer that holds the vault, not through the tunnel. Open this link on that computer: ${localConsent(url.searchParams.get('code'))}`);
         const rec = oauth.pending(url.searchParams.get('code'));
         if (!rec) return send(400, 'unknown or expired consent code');
-        return send(200, consentPage({ client: oauth.client(rec.client_id), scopes: rec.scopes, code: rec.code, state: rec.state }), { 'content-type': 'text/html; charset=utf-8' });
+        let host = null; try { host = new URL(rec.redirect_uri).hostname; } catch { host = null; }
+        return send(200, consentPage({ client: oauth.client(rec.client_id), scopes: rec.scopes, code: rec.code, state: rec.state, consent: rec.consent, redirectHost: host }), { 'content-type': 'text/html; charset=utf-8' });
       }
       if (req.method === 'POST' && url.pathname === '/oauth/consent') {
+        if (!local) return send(403, 'Consent is approved on the computer that holds the vault, not through the tunnel. Open the consent link on that computer.');
+        // a form posted from another origin (a phishing page) must not be able to approve
+        const origin = req.headers.origin;
+        if (origin !== undefined) {
+          let own = false;
+          try { const o = new URL(String(origin)); own = o.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(o.hostname) && o.port === String(port); } catch { own = false; }
+          if (!own) return send(403, 'the consent form only works from this vault\'s own consent page');
+        }
         const form = new URLSearchParams((await getBody()) || '');
         const decision = form.get('decision');
         if (!['approve', 'deny'].includes(decision)) return send(400, { error: 'invalid_request', error_description: 'decision must be approve or deny' });
         try {
-          const rec = oauth.consent(form.get('code'), { approve: decision === 'approve' });
+          const rec = oauth.consent(form.get('code'), { approve: decision === 'approve', consent: form.get('consent') });
           const u = new URL(rec.redirect_uri);
           if (rec.approved) u.searchParams.set('code', rec.code); else u.searchParams.set('error', 'access_denied');
           if (rec.state) u.searchParams.set('state', rec.state);
           return send(302, '', { location: u.toString() });
-        } catch (e) { return send(400, { error: e.code, error_description: e.message }); }
+        } catch (e) { return send(e instanceof OAuthError ? e.status : 400, { error: e.code, error_description: e.message }); }
       }
       if (req.method === 'POST' && url.pathname === '/oauth/token') {
         const form = new URLSearchParams((await getBody()) || '');
@@ -185,16 +211,6 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
         const form = new URLSearchParams((await getBody()) || '');
         oauth.revoke(form.get('token'));
         return send(200, {});
-      }
-      let token = null; let route = url.pathname;
-      const cm = /^\/c\/(mv_[0-9a-f]{8}_[0-9a-f]{32,})(\/.*)$/.exec(url.pathname);
-      if (cm) { token = cm[1]; route = cm[2]; }
-      else { const a = String(req.headers.authorization || ''); if (a.startsWith('Bearer ')) token = a.slice(7).trim(); }
-      if (!local) {
-        if (!vault.config.remote?.enabled) return send(403, { error: 'remote_off', error_description: 'remote access is switched off on this vault (memev cloud on)' });
-        const ipKey = sha256(String(req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress)).slice(0, 16);
-        if (!limiter.take(`ip:${ipKey}`) || (token && !limiter.take(`t:${token.slice(3, 11)}`))) return send(429, { error: 'rate_limited' }, { 'retry-after': '30' });
-        fs.appendFile(audit, `${JSON.stringify({ ts: now(), ip: ipKey, route: route.slice(0, 64), method: req.method, token: token ? token.slice(3, 11) : null })}\n`, () => {});
       }
       if (req.method === 'POST' && route === '/v1/invite-redeem') {
         let body; try { body = JSON.parse((await getBody()) || '{}'); } catch { return send(400, { error: 'bad_json', error_description: 'the body is not json' }); }
