@@ -47,6 +47,41 @@ test('MEM-054 AC03: the checklist offers memev cloud on in one line that says wh
   } finally { sb.stop(); cleanup(); }
 });
 
+test('init --local-only: the cloud question is not asked and remote stays off', async () => {
+  const sb = sandbox();
+  try {
+    const r = sb.run(['init', '--port', String(sb.port), '--local-only'], { input: 'y\n' });
+    assert.equal(r.code, 0, r.out + r.err);
+    assert.doesNotMatch(r.out, /Use your memory from ChatGPT or claude\.ai\? \[y\/N\]/);
+    const cfg = cfgOf(sb.root);
+    assert.equal(cfg.remote.enabled, false, 'remote stays off');
+    assert.equal(cfg.remote.asked, true, 'the answer is kept, so the question never comes back');
+    // on a terminal the question is still not asked, and a yes cannot turn remote on
+    const out = sink();
+    assert.equal(await askCloudOnce({ root: sb.root, ask: true, input: answers('y\n'), output: out }), null);
+    assert.equal(out.text(), '');
+    assert.equal(cfgOf(sb.root).remote.enabled, false);
+  } finally { sb.stop(); cleanup(); }
+});
+
+test('init --org: the cloud question is not asked and remote stays off', async () => {
+  const sb = sandbox();
+  try {
+    const r = sb.run(['init', '--port', String(sb.port), '--org'], { input: 'y\n' });
+    assert.equal(r.code, 0, r.out + r.err);
+    assert.doesNotMatch(r.out, /Use your memory from ChatGPT or claude\.ai\? \[y\/N\]/);
+    const cfg = cfgOf(sb.root);
+    assert.equal(cfg.profile, 'org');
+    assert.equal(cfg.remote.enabled, false, 'remote stays off');
+    assert.equal(cfg.remote.asked, true, 'the answer is kept, so the question never comes back');
+    // on a terminal the question is still not asked, and a yes cannot turn remote on
+    const out = sink();
+    assert.equal(await askCloudOnce({ root: sb.root, ask: true, input: answers('y\n'), output: out }), null);
+    assert.equal(out.text(), '');
+    assert.equal(cfgOf(sb.root).remote.enabled, false);
+  } finally { sb.stop(); cleanup(); }
+});
+
 test('the terminal question asks once: yes turns remote access on, and it is never asked again', async () => {
   const root = path.join(tmpdir(), 'vault');
   initVault(root, { template: path.join(PKG, 'templates', 'vault') });
