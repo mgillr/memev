@@ -49,13 +49,6 @@ test('MEM-052 AC02: with contracts off, the prompt hook adds no nudge and the St
       assert.ok(!s.isError, JSON.stringify(s));
     } finally { await mcp.close(); }
 
-    // prompt hook: a build request gets no nudge
-    const p = sb.hook('prompt', { ...base, prompt: 'I have a project, build me a CLI that greets people' });
-    assert.equal(p.code, 0, p.err);
-    const pOut = p.out ? JSON.parse(p.out) : {};
-    const pCtx = pOut.hookSpecificOutput?.additionalContext || '';
-    assert.ok(!pCtx.includes('memev_contract_from_request'), `no contract nudge when contracts are off:\n${pCtx}`);
-
     // stop hook: never blocks, even with an open contract for this session
     const s = sb.hook('stop', { ...base, last_assistant_message: 'done' });
     assert.equal(s.code, 0, s.err);
@@ -93,13 +86,6 @@ test('MEM-052 AC03: memev contracts on restores the nudge and the Stop gate', as
       const s = await mcp.tool('memev_contract_sign', { id: contractId, session: sess });
       assert.ok(!s.isError, JSON.stringify(s));
     } finally { await mcp.close(); }
-
-    // prompt hook: a build request gets the nudge
-    const p = sb.hook('prompt', { ...base, prompt: 'I have a project, build me a CLI that greets people' });
-    assert.equal(p.code, 0, p.err);
-    const pOut = p.out ? JSON.parse(p.out) : {};
-    const pCtx = pOut.hookSpecificOutput?.additionalContext || '';
-    assert.ok(pCtx.includes('memev_contract_from_request'), `the contract nudge is back when contracts are on:\n${pCtx}`);
 
     // stop hook: blocks while the contract is open
     const s = sb.hook('stop', { ...base, last_assistant_message: 'done' });

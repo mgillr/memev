@@ -73,7 +73,7 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
   }
   // contracts: off for new installs, on for existing vaults
   const contractsOn = cfg.contracts?.enabled !== false;
-  add('ready', 'Contracts', contractsOn ? 'on: build requests get a contract nudge, and the Stop hook blocks while a signed contract is not verified (memev contracts off to turn off)' : 'off: build requests get no nudge, and the Stop hook never blocks on a contract (memev contracts on to enable)');
+  add('ready', 'Contracts', contractsOn ? 'on: the Stop hook blocks while a signed contract is not verified (memev contracts off to turn off)' : 'off: the Stop hook never blocks on a contract (memev contracts on to enable)');
   // the anonymous report: asked once, off unless you say yes
   if (firstRun) await askReportOnce({ env }).catch(() => {});
   const rs = reportSettings(env);

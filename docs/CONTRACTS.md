@@ -6,9 +6,8 @@ with checks a machine can run, and stop rules. Memev includes a modified copy of
 
 ## Opt-in
 
-Contracts are off by default for new installs. When they are off, build requests get no contract
-nudge and the Stop hook never blocks on a contract. Existing vaults (created before the opt-in)
-keep contracts on.
+Contracts are off by default for new installs. When they are off, the Stop hook never blocks on a
+contract. Existing vaults (created before the opt-in) keep contracts on.
 
 ```sh
 memev contracts on      # turn contracts on
