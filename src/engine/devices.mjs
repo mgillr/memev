@@ -55,7 +55,7 @@ export class DeviceRegistry {
   saveSoon() { if (!this.dirty) return; if (this._mtime() !== this.mtime) { this.fresh(); this.dirty = false; return; } this.save(); }
 
   ensureHost(host) {
-    if (!this.data.devices[host.id]) { this.data.devices[host.id] = { id: host.id, kind: 'host', label: os.hostname().split('.')[0].slice(0, 40) || 'this computer', status: 'active', created: now(), first_seen: now(), last_seen: now(), token_id: null, pubkey: null, flags: [] }; this.save(); }
+    if (!this.data.devices[host.id]) { this.data.devices[host.id] = { id: host.id, kind: 'host', label: process.env.MEMEV_MACHINE_NAME || os.hostname().split('.')[0].slice(0, 40) || 'this computer', status: 'active', created: now(), first_seen: now(), last_seen: now(), token_id: null, pubkey: null, flags: [] }; this.save(); }
     this.hostId = host.id;
     return this.data.devices[host.id];
   }
