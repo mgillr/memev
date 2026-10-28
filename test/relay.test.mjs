@@ -14,7 +14,6 @@ import { seatPolicy } from '../src/engine/entitlements.mjs';
 import { deviceKeygen, signRequest } from '../src/engine/devices.mjs';
 import { createServer } from '../src/server/http.mjs';
 import * as client from '../src/cli/relay.mjs';
-import { personalActive } from '../src/cli/relay.mjs';
 import { createRelay, idOf as devIdOf, controlMessage as devControl, acceptMessage as devAccept } from '../src/server/relay-dev.mjs';
 after(cleanup);
 
@@ -215,8 +214,8 @@ test('MEM-029: the relay is off until the setting says otherwise, and nothing co
 });
 
 test('MEM-030-FU: a Personal licence in grace still uses the configured relay address', async () => {
-  assert.equal(personalActive({ state: 'grace', tier: 'personal' }), true);
-  assert.equal(personalActive({ state: 'expired', tier: 'personal' }), false);
+  assert.equal(client.personalActive({ state: 'grace', tier: 'personal' }), true);
+  assert.equal(client.personalActive({ state: 'expired', tier: 'personal' }), false);
   const sb = sandbox();
   const url = 'relay://127.0.0.1:9';
   try {
