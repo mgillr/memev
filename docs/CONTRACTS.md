@@ -50,6 +50,20 @@ memev gate [--workdir DIR]   # exit 1 while an open contract for DIR does not ve
 memev contract hook [DIR]    # optional: a local git pre-push hook in DIR that runs memev gate
 ```
 
+## Remote signing and local approval
+
+A contract can be signed from a remote origin (through the tunnel). The signed contract records
+its origin. While a remote-signed contract is not yet approved, its command criteria are blocked
+on this machine: `memev_contract_verify` reports them as BLOCKED, and the resume card does not
+solicit a verify. A local operator approves it with:
+
+```sh
+memev contract approve <id>  # allow a remote-signed contract's commands to run here
+```
+
+After approval, the contract verifies normally. File-existence and grep criteria are always
+confined to the vault root; paths that escape it are refused.
+
 ## Immutability and versions
 
 Once signed a contract cannot change:

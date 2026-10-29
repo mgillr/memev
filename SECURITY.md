@@ -12,7 +12,10 @@ not open a public issue.
   rotated or removed alone. An added computer must also sign every request with its own Ed25519
   key, made on that computer and never sent anywhere; the signature covers the method, path, time,
   a one-time nonce and the body, so a copied config or a replayed request is refused. Remote
-  requests are rate limited and logged. Admin and contract-signing routes are local only.
+   requests are rate limited and logged. Admin routes are local only. Contract signing is available
+   remotely, but a contract signed from a remote origin records that origin, and its command
+   criteria do not run on this machine until a local operator approves it with
+   `memev contract approve <id>`.
 - Writes are scanned for secrets (keys, tokens, private keys) and refused unless explicitly allowed.
   Comms bus messages are scanned the same way and always refused.
 - The comms bus is files in the vault (`bus/`). It travels only with the vault: to your own git
