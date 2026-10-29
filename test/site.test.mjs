@@ -141,8 +141,14 @@ test('MEM-140 AC02: business covers Business and Corporate, no price, capabiliti
   assert.ok(text.includes('contact us'), 'business says contact us');
   assert.ok(!/\$\d/.test(html), 'business shows no price');
   assert.ok(/planned/.test(html) && /coming/.test(html), 'capabilities are labelled planned or coming');
-  assert.ok(text.includes('cloud ai service'), 'cloud-hosted option is described');
-  assert.ok(text.includes('local model'), 'on-prem option is described');
+  const cloudDoc = read(path.join(PKG, 'docs', 'deploy-cloud.md'));
+  const cloudPhrase = /The vault server runs on a host the operator manages/.exec(cloudDoc);
+  assert.ok(cloudPhrase, 'the cloud doc states where the vault server runs');
+  assert.ok(text.includes(cloudPhrase[0].toLowerCase()), 'business page describes the cloud-hosted option in the doc\'s words');
+  const onPremDoc = read(path.join(PKG, 'docs', 'deploy-on-prem.md'));
+  const onPremPhrase = /The vault server runs on your own servers/.exec(onPremDoc);
+  assert.ok(onPremPhrase, 'the on-prem doc states where the vault server runs');
+  assert.ok(text.includes(onPremPhrase[0].toLowerCase()), 'business page describes the on-prem option in the doc\'s words');
 });
 
 test('MEM-140 AC03: trial states the free parts, the paid setup, the two paths and the terms', () => {

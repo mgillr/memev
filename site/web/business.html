@@ -57,10 +57,21 @@
     <li>Cloud AI connectors are counted, not refused</li>
   </ul>
   <h2>Where it runs</h2>
-  <p>The company server runs on the company's own server, in your office or your cloud account.
-  Notes stay on your server and computers, and in your git backup. With a local model as the one
-  provider, notes never leave your network. Only licence information passes between your
-  install and ours, never vault data.</p>
+  <p>There are two options, and the choice is recorded in the vault config.</p>
+  <h3>Cloud-hosted <span class="tag">planned</span></h3>
+  <p>For teams that use an external hosted AI provider, or a mix of hosted and local models. You do
+  not run the server; the operator does. The vault server runs on a host the operator manages, and
+  your computers and AI apps connect to it. Calls to an AI provider are made by your own AI apps,
+  with your own keys, and Memev holds no provider keys and makes no model calls. Your own git
+  backup remains possible, and export always works. The service is planned and has no date.</p>
+  <h3>On-prem</h3>
+  <p>For teams with an internal model, strict data residency, or a compliance-led or air-gapped
+  organisation. You run the server; nothing of yours runs on a host you do not control. The vault
+  server runs on your own servers, and any internal model stays inside your environment. Memev
+  holds no provider keys and makes no model calls. You run the vault server in a container with
+  the image and compose file in this repository. In an air-gapped install the one AI provider is
+  a model inside your environment, and only licence information passes between your install and
+  ours, never vault data.</p>
   <h2>Corporate</h2>
   <span class="tag">coming</span>
   <p>Corporate is the same model at larger scale and with stricter control. There is one main
