@@ -100,7 +100,7 @@ contact us.
 | Who runs the server | the operator, on a host the operator manages | you, on your own servers |
 | Where AI provider calls go | your own AI apps call a hosted provider with your own keys | your own AI apps call a model inside your environment |
 | Which trial path | the self-serve Business trial, free with no card (planned) | the sales-assisted pilot, size set by order form, term starts at licence install (planned) |
-| Status | planned, no date | the server and the container image are built; the Business trial is planned |
+| Status | planned, no date | the vault server and its container image (docs/DOCKER.md) are built; the company server and the Business trial are planned |
 
 The two pages: [deploy-cloud.md](../deploy-cloud.md) and [deploy-on-prem.md](../deploy-on-prem.md).
 
