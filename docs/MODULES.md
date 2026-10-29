@@ -2,7 +2,7 @@
 
 Part of the [Memev documentation](README.md). Written by `node scripts/docs/module-graph.mjs` from the real imports in `bin/` and `src/`; do not edit it by hand. `node scripts/docs/module-graph.mjs --check` (and `test/docs-module-map.test.mjs`) fail when it is out of date. How the parts fit at a higher level: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-55 modules and 226 import edges (57 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
+55 modules and 227 import edges (58 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
 
 ## Layers
 
@@ -117,6 +117,7 @@ flowchart LR
   src_cli_clients --> src_cli_common
   src_cli_clients -.-> src_cli_daemon
   src_cli_clients -.-> src_cli_main
+  src_cli_clients -.-> src_cli_onboarding
   src_cli_clients -.-> src_cli_remote
   src_cli_clients -.-> src_cli_service
   src_cli_clients --> src_engine_jsonc
@@ -340,7 +341,7 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 |---|---|---|---|
 | `bin/memev.mjs` | The `memev` command: calls `main` in `cli/main.mjs` | `cli/main.mjs` | none |
 | `src/cli/bus-cli.mjs` | `memev bus …`: the comms bus from a terminal | `cli/common.mjs`, `cli/daemon.mjs`, `cli/remote.mjs`, `engine/bus.mjs`, `engine/devices.mjs`, `engine/git.mjs`, `engine/util.mjs`, `engine/vault.mjs` | `cli/clients.mjs`, `cli/doctor.mjs`, `cli/main.mjs`, `cli/onboarding.mjs` |
-| `src/cli/clients.mjs` | Zero-touch registration in AI apps | `cli/bus-cli.mjs`, `cli/common.mjs`, `cli/daemon.mjs`, `cli/main.mjs`, `cli/remote.mjs`, `cli/service.mjs`, `engine/jsonc.mjs`, `engine/util.mjs`, `engine/vault.mjs` | `cli/contracts-cli.mjs`, `cli/doctor.mjs`, `cli/main.mjs`, `cli/onboarding.mjs`, `cli/ready.mjs`, `cli/remote.mjs`, `cli/service.mjs`, `cli/sync.mjs`, `server/mcp.mjs` |
+| `src/cli/clients.mjs` | Zero-touch registration in AI apps | `cli/bus-cli.mjs`, `cli/common.mjs`, `cli/daemon.mjs`, `cli/main.mjs`, `cli/onboarding.mjs`, `cli/remote.mjs`, `cli/service.mjs`, `engine/jsonc.mjs`, `engine/util.mjs`, `engine/vault.mjs` | `cli/contracts-cli.mjs`, `cli/doctor.mjs`, `cli/main.mjs`, `cli/onboarding.mjs`, `cli/ready.mjs`, `cli/remote.mjs`, `cli/service.mjs`, `cli/sync.mjs`, `server/mcp.mjs` |
 | `src/cli/common.mjs` | Shared CLI plumbing: where the vault is, the client tokens, talking to the daemon | `engine/net.mjs`, `engine/tokens.mjs`, `engine/util.mjs` | `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/contracts-cli.mjs`, `cli/daemon.mjs`, `cli/doctor.mjs`, `cli/github.mjs`, `cli/hooks.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/mcp-stdio.mjs`, `cli/memory-cli.mjs`, `cli/onboarding.mjs`, `cli/pathsetup.mjs`, `cli/preflight.mjs`, `cli/relay.mjs`, `cli/remote.mjs`, `cli/service.mjs`, `cli/tunnel.mjs`, `cli/update.mjs`, `cli/upgrade.mjs`, `server/main.mjs` |
 | `src/cli/contracts-cli.mjs` | `memev contract …`, `memev verify`, `memev gate`: the same operations the MCP tools offer, from a terminal | `cli/clients.mjs`, `cli/common.mjs`, `cli/daemon.mjs`, `engine/card.mjs` | `cli/main.mjs` |
 | `src/cli/daemon.mjs` | Start, stop and find the daemon | `cli/common.mjs` | `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/contracts-cli.mjs`, `cli/doctor.mjs`, `cli/hooks.mjs`, `cli/main.mjs`, `cli/mcp-stdio.mjs`, `cli/memory-cli.mjs`, `cli/onboarding.mjs`, `cli/preflight.mjs`, `cli/ready.mjs`, `cli/update.mjs` |
@@ -353,7 +354,7 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 | `src/cli/main.mjs` | The memev command | `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/common.mjs`, `cli/contracts-cli.mjs`, `cli/daemon.mjs`, `cli/deployment.mjs`, `cli/doctor.mjs`, `cli/github.mjs`, `cli/hooks.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/mcp-stdio.mjs`, `cli/memory-cli.mjs`, `cli/onboarding.mjs`, `cli/pathsetup.mjs`, `cli/preflight.mjs`, `cli/ready.mjs`, `cli/remote.mjs`, `cli/runner.mjs`, `cli/service.mjs`, `cli/tunnel.mjs`, `cli/update.mjs`, `cli/upgrade.mjs`, `engine/card.mjs`, `engine/git.mjs`, `engine/net.mjs`, `engine/tokens.mjs`, `engine/util.mjs`, `engine/vault.mjs`, `server/main.mjs` | `memev.mjs`, `cli/clients.mjs`, `cli/doctor.mjs`, `cli/remote.mjs`, `cli/update.mjs` |
 | `src/cli/mcp-stdio.mjs` | `memev mcp`: an MCP server on stdio for clients that launch one | `cli/common.mjs`, `cli/daemon.mjs`, `engine/net.mjs` | `cli/main.mjs` |
 | `src/cli/memory-cli.mjs` | `memev why`, `memev review` and `memev audit`: the same operations as the memev_why, memev_review and memev_audit tools, from a terminal, through the... | `cli/common.mjs`, `cli/daemon.mjs` | `cli/main.mjs` |
-| `src/cli/onboarding.mjs` | The onboarding checklist: what Memev did, what is ready, and the few things only you can do | `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/common.mjs`, `cli/daemon.mjs`, `cli/doctor.mjs`, `cli/pathsetup.mjs`, `cli/service.mjs`, `cli/tunnel.mjs`, `engine/git.mjs`, `engine/milestones.mjs`, `engine/net.mjs`, `engine/util.mjs` | `cli/main.mjs` |
+| `src/cli/onboarding.mjs` | The onboarding checklist: what Memev did, what is ready, and the few things only you can do | `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/common.mjs`, `cli/daemon.mjs`, `cli/doctor.mjs`, `cli/pathsetup.mjs`, `cli/service.mjs`, `cli/tunnel.mjs`, `engine/git.mjs`, `engine/milestones.mjs`, `engine/net.mjs`, `engine/util.mjs` | `cli/clients.mjs`, `cli/main.mjs` |
 | `src/cli/pathsetup.mjs` | Getting the memev command on PATH | `cli/common.mjs`, `engine/util.mjs` | `cli/main.mjs`, `cli/onboarding.mjs` |
 | `src/cli/preflight.mjs` | `memev preflight`: what this machine allows | `cli/common.mjs`, `cli/daemon.mjs`, `cli/service.mjs`, `cli/tunnel.mjs`, `engine/util.mjs` | `cli/doctor.mjs`, `cli/main.mjs` |
 | `src/cli/ready.mjs` | `memev ready`: the end of setup, seen from the apps | `cli/clients.mjs`, `cli/daemon.mjs`, `engine/util.mjs`, `engine/vault.mjs` | `cli/main.mjs` |
