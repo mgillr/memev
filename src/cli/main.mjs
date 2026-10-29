@@ -66,7 +66,7 @@ Daily
   memev compact [--dry-run]        measure and shrink the vault: archive sealed op-log segments and move old
                                     journal sessions out of the index; --dry-run only prints the size report
   memev checkpoint --project P [--task T] [--done a,b] [--doing x] [--next c,d]
-  memev claims [--status fact]  |  memev contract status|from-request|new|sign|verify|list|amend|decompose|hook
+  memev claims [--status fact]  |  memev contract status|from-request|new|sign|approve|verify|list|amend|decompose|hook
   memev verify [id]  |  memev gate [--workdir DIR]   check signed contracts on this machine (never CI)
   memev token issue|list|revoke|rotate
   memev start | stop | restart | serve

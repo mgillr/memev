@@ -2,7 +2,7 @@
 # shared budget. Windows (a preview) runs only on a push to main or a release tag, never on a pull
 # request, so pull requests cost no Windows minutes. Slow suites (the Docker smoke test, the 170M-token growth bench, the macOS run) are
 # run locally before merging: scripts/docker-smoke.sh, scripts/growth-bench.mjs.
-# The Memev product never installs workflows into a user's repositories (test/no-ci.test.mjs).
+# The Memev product never installs workflows into a user's repositories.
 name: ci
 on:
   pull_request:
@@ -15,6 +15,8 @@ on:
       - 'scripts/**'
       - 'package.json'
       - 'CHANGELOG.md'
+      - 'changelog.d/**'
+      - 'docs/**'
       - 'Dockerfile'
       - '.github/workflows/**'
   push:
