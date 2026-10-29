@@ -2,6 +2,7 @@
 // `memev compact`: measure the vault from disk and, when not a dry run, archive sealed op-log
 // segments and move old journal sessions out of the index. Nothing is deleted.
 import { Vault } from '../engine/vault.mjs';
+import { daemonInfo, pidAlive, out } from './common.mjs';
 
 const fmt = (n) => `${n} bytes`;
 
@@ -13,6 +14,13 @@ function printReport(o) {
 }
 
 export async function command(cmd, pos, flags, { root }) {
+  // A running daemon keeps appending through its open segment file; compacting underneath it would
+  // orphan the records it writes after the archive rename, so compact works on a stopped vault only.
+  const info = daemonInfo(root);
+  if (info && pidAlive(info.pid)) {
+    out.bad('Memev is running for this vault, and compact works on a stopped vault. Run memev stop, then memev compact, then memev start.');
+    return 1;
+  }
   const v = new Vault(root, { git: false }).open();
   const rep = v.compact({ dryRun: !!flags['dry-run'] });
   v.close();

@@ -633,8 +633,9 @@ export class Vault extends EventEmitter {
 
   /**
    * Move journal session files older than `journal.retention_days` out of the index into work/archive.
-   * The files are renamed, not deleted, and stay readable at their old path (see _read). Returns the
-   * number of files moved.
+   * The files are renamed, not deleted, and stay readable at their old path (see _read). When the vault
+   * is a git repository the move is a git mv committed on its own, so the archive reaches the backup
+   * and the working tree stays clean. Returns the number of files moved.
    */
   _journalRetention() {
     const days = Number(this.config.journal?.retention_days ?? 90);
@@ -642,20 +643,32 @@ export class Vault extends EventEmitter {
     const srcDir = this.abs('work/sessions');
     let ents = [];
     try { ents = fs.readdirSync(srcDir, { withFileTypes: true }); } catch { return 0; }
+    const hasGit = exists(path.join(this.root, '.git'));
     let moved = 0;
+    const paths = [];
     for (const e of ents) {
       if (!e.isFile() || !e.name.endsWith('.md')) continue;
       const m = /^(\d{4}-\d{2}-\d{2})/.exec(e.name);
       let age = m ? Date.parse(m[1]) : NaN;
       if (Number.isNaN(age)) { try { age = fs.statSync(path.join(srcDir, e.name)).mtimeMs; } catch { continue; } }
       if (age >= cutoff) continue;
-      const to = this.abs(`work/archive/sessions/${e.name}`);
-      fs.mkdirSync(path.dirname(to), { recursive: true });
-      fs.renameSync(path.join(srcDir, e.name), to);
-      this.index.remove(`work/sessions/${e.name}`);
+      const from = `work/sessions/${e.name}`, to = `work/archive/sessions/${e.name}`;
+      fs.mkdirSync(path.dirname(this.abs(to)), { recursive: true });
+      // git mv when the vault is a repository, so the move reaches the backup; a plain rename when it is not
+      const tracked = hasGit && git(this.root, ['mv', '--', from, to]).ok;
+      if (!tracked) fs.renameSync(this.abs(from), this.abs(to));
+      paths.push(tracked ? [from, to] : [to]);
+      this.index.remove(from);
       moved++;
     }
-    if (moved) this.index.save();
+    if (moved) {
+      this.index.save();
+      if (hasGit) {
+        const all = paths.flat();
+        git(this.root, ['add', '-A', '--', ...all]);
+        if (!git(this.root, ['diff', '--cached', '--quiet', '--', ...all]).ok) git(this.root, ['commit', '-q', '-m', `memev: archive ${moved} journal sessions`]);
+      }
+    }
     return moved;
   }
 

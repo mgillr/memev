@@ -5,6 +5,8 @@ import path from 'node:path';
 import { newVault, cleanup, OWNER, PKG } from './helpers/tmp.mjs';
 import { sha256 } from '../src/engine/util.mjs';
 import { command } from '../src/cli/compact.mjs';
+import { Vault } from '../src/engine/vault.mjs';
+import { git } from '../src/engine/git.mjs';
 after(cleanup);
 
 // Capture what a command writes to stdout.
@@ -97,4 +99,51 @@ test('REV-024 AC05: TROUBLESHOOTING documents memev compact', () => {
   const doc = fs.readFileSync(path.join(PKG, 'docs', 'TROUBLESHOOTING.md'), 'utf8');
   assert.ok(/memev\s+compact/.test(doc), 'the troubleshooting guide mentions memev compact');
   assert.ok(/dry.run/i.test(doc), 'it explains the dry run');
+});
+
+test('REV-024: compact refuses while the daemon runs, and the dry run does too, and neither changes the log', async () => {
+  const { root, v } = newVault({ segmentBytes: 512 });
+  for (let i = 0; i < 60; i++) v.append(OWNER, { path: `memory/n${i}.md`, text: `note ${i} ${'x'.repeat(60)}\n` });
+  const oplogDir = path.join(root, '.memev', 'oplog');
+  const readAll = () => ({
+    manifest: fs.readFileSync(path.join(oplogDir, 'manifest.json'), 'utf8'),
+    segs: fs.readdirSync(oplogDir).filter((f) => f.endsWith('.jsonl')).sort().map((f) => fs.readFileSync(path.join(oplogDir, f), 'utf8')).join('|'),
+  });
+  const before = readAll();
+  // Simulate a running daemon: daemon.json names a live pid (this process).
+  fs.writeFileSync(path.join(root, '.memev', 'daemon.json'), JSON.stringify({ pid: process.pid, port: 7787, bind: '127.0.0.1', started: new Date().toISOString(), root }));
+  try {
+    let rc;
+    const out1 = await capture(async () => { rc = await command('compact', [], {}, { root }); });
+    assert.equal(rc, 1, 'compact refuses while the daemon runs');
+    assert.ok(out1.includes('stopped vault') && out1.includes('memev stop'), `the refusal names the fix, got: ${out1}`);
+    let dry;
+    await capture(async () => { dry = await command('compact', [], { 'dry-run': true }, { root }); });
+    assert.equal(dry, 1, 'the dry run refuses too');
+  } finally {
+    fs.rmSync(path.join(root, '.memev', 'daemon.json'), { force: true });
+  }
+  assert.deepEqual(readAll(), before, 'the manifest and segments are unchanged');
+  v.close();
+});
+
+test('REV-024: journal retention moves the session files with git and commits the move, leaving the vault repo clean', () => {
+  const { root, v } = newVault();
+  fs.mkdirSync(path.join(root, 'work', 'sessions'), { recursive: true });
+  const oldP = `work/sessions/${day(120)}-test-gitretained.md`;
+  fs.writeFileSync(path.join(root, oldP), `# Session gitretained\n\ngitretained session text\n`);
+  // Commit the session first so it is tracked in the vault's git repo.
+  git(root, ['add', '-A', '--', oldP]);
+  git(root, ['commit', '-q', '-m', 'test: add session']);
+  v.recover();
+  v.reindexAll();
+  v.compact();
+  const status = git(root, ['status', '--porcelain']).out;
+  assert.equal(status, '', `the vault repo is clean after compaction, got: ${JSON.stringify(status)}`);
+  const subjects = git(root, ['log', '--format=%s', '-n', '5']).out.split('\n');
+  assert.ok(subjects.some((s) => /^memev: archive \d+ journal sessions$/.test(s)), `the move is committed, log: ${subjects.join(' | ')}`);
+  assert.ok(fs.existsSync(path.join(root, 'work', 'archive', 'sessions', path.basename(oldP))), 'the file is in work/archive');
+  const got = v.get(OWNER, oldP);
+  assert.ok(got.body.includes('gitretained'), 'the retained session is still readable at its old path');
+  v.close();
 });
