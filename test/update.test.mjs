@@ -13,9 +13,11 @@ import { stopDaemon } from '../src/cli/daemon.mjs';
 import { VERSION } from '../src/engine/vault.mjs';
 import { sha256 } from '../src/engine/util.mjs';
 
-after(() => cleanup());
+const sbs = [];
+after(() => { for (const sb of sbs) sb.stop(); cleanup(); });
 
 const launcherOf = (sb) => path.join(sb.env.MEMEV_CONFIG_DIR, 'bin', 'memev');
+const newSb = () => { const sb = sandbox(); sbs.push(sb); return sb; };
 
 // A local tarball with the shape npm publishes (package/ at the top) and a version of its own.
 async function makeTarball(version, { withSha = true } = {}) {
@@ -63,7 +65,7 @@ function setUpdate(root, update) {
 }
 
 test('MEM-082 AC01: memev update from a local test tarball installs the new runtime and the launcher points to it', async () => {
-  const sb = sandbox();
+  const sb = newSb();
   assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
   const tarball = makeReleaseTarball('9.9.9');
   const r = sb.run(['update', tarball]);
@@ -85,7 +87,7 @@ test('MEM-082 AC01: memev update from a local test tarball installs the new runt
 });
 
 test('MEM-082 AC02: With the check off (default), doctor and status make no network call', async () => {
-  const sb = sandbox();
+  const sb = newSb();
   assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
   // a static file that names a newer version, but the check is off (the default)
   const vf = path.join(sb.root, 'version.txt');
@@ -105,7 +107,7 @@ test('MEM-082 AC02: With the check off (default), doctor and status make no netw
 });
 
 test('MEM-082 AC03: With the check on and a newer version in the static file, doctor and status show one update available line', async () => {
-  const sb = sandbox();
+  const sb = newSb();
   assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
   const vf = path.join(sb.root, 'version.txt');
   fs.writeFileSync(vf, '9.9.9\n');
@@ -130,7 +132,7 @@ test('MEM-082 AC03: With the check on and a newer version in the static file, do
 });
 
 test('MEM-082 AC04: update is refused when the sha256 does not match', async () => {
-  const sb = sandbox();
+  const sb = newSb();
   assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
   const tarball = await makeTarball('9.9.9');
   // a wrong sha256 beside the tarball
@@ -154,7 +156,7 @@ test('MEM-082 AC04: update is refused when the sha256 does not match', async () 
 });
 
 test('MEM-082 AC05: update is refused when there is no sha256', async () => {
-  const sb = sandbox();
+  const sb = newSb();
   assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
   const tarball = await makeTarball('9.9.9', { withSha: false });
   const lines = [];
@@ -171,7 +173,7 @@ test('MEM-082 AC05: update is refused when there is no sha256', async () => {
 });
 
 test('MEM-082 AC06: update accepts a --sha256 flag when the tarball has no .sha256 file', async () => {
-  const sb = sandbox();
+  const sb = newSb();
   assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
   const tarball = await makeTarball('9.9.9', { withSha: false });
   const { sha256 } = await import('../src/engine/util.mjs');
@@ -190,7 +192,7 @@ test('MEM-082 AC06: update accepts a --sha256 flag when the tarball has no .sha2
 });
 
 test('MEM-082 AC07: update restarts the daemon with the new version when it is running', async () => {
-  const sb = sandbox();
+  const sb = newSb();
   assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
   const start = sb.run(['start']);
   assert.equal(start.code, 0, start.out);
@@ -209,7 +211,7 @@ test('MEM-082 AC07: update restarts the daemon with the new version when it is r
 });
 
 test('MEM-082 AC08: update prints a restart instruction when the daemon is not running', async () => {
-  const sb = sandbox();
+  const sb = newSb();
   assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
   // make sure the daemon is not running
   await stopDaemon(sb.root);
@@ -226,7 +228,7 @@ test('MEM-082 AC08: update prints a restart instruction when the daemon is not r
 });
 
 test('MEM-082 AC09: updateLine only warns for numerically newer versions', async () => {
-  const sb = sandbox();
+  const sb = newSb();
   assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
   const vf = path.join(sb.root, 'version.txt');
   setUpdate(sb.root, { version_file: vf, check: true });
@@ -247,7 +249,7 @@ test('MEM-082 AC10: the reported VERSION is the version in package.json', () => 
 });
 
 test('MEM-082 AC11: update refuses a tarball whose version is not major.minor.patch', async () => {
-  const sb = sandbox();
+  const sb = newSb();
   assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
   const tarball = await makeTarball('not-a-version');
   const launcher = launcherOf(sb);
