@@ -167,9 +167,10 @@ export class OperatorStub {
         try { this._pending.resolve(JSON.parse(body.toString('utf8'))); } catch {}
         this._pending = null;
       } else {
-        const nonce = body.subarray(0, 12);
-        const ct = body.subarray(12, body.length - 16);
+        const ct = body.subarray(0, body.length - 16);
         const tag = body.subarray(body.length - 16);
+        const nonce = Buffer.alloc(12);
+        nonce.writeBigUInt64BE(BigInt(this.c2oN), 4);
         const d = crypto.createDecipheriv('aes-256-gcm', this.c2oKey, nonce);
         d.setAuthTag(tag);
         let pt;

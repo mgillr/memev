@@ -188,9 +188,9 @@ export class SetupChannel {
         } catch { this._fail('bad handshake frame'); return; }
         this._pending = null;
       } else {
-        const nonce = body.subarray(0, 12);
-        const ct = body.subarray(12, body.length - 16);
+        const ct = body.subarray(0, body.length - 16);
         const tag = body.subarray(body.length - 16);
+        const nonce = gcmNonce(this.o2cN);
         const d = crypto.createDecipheriv('aes-256-gcm', this.o2cKey, nonce);
         d.setAuthTag(tag);
         let pt;
@@ -227,6 +227,8 @@ export class SetupChannel {
   }
 
   wipe() {
+    this.c2oKey?.fill(0);
+    this.o2cKey?.fill(0);
     this.c2oKey = null;
     this.o2cKey = null;
     this.secret = null;
