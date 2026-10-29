@@ -234,6 +234,21 @@ export function deviceKeygen() {
 const invitePath = (root) => path.join(root, '.memev', 'invites.json');
 export const inviteHash = (secret) => sha256(String(secret));
 
+/**
+ * The backup value in an invite is handed to git fetch as the remote, so it must be a remote git
+ * can name: an https or ssh URL, a user@host:path remote, or an absolute local path. Anything
+ * else (including anything that starts with a dash, which git would read as an option) is refused.
+ */
+export function assertBackupRemote(value) {
+  const v = String(value ?? '');
+  const ok = /^https?:\/\/[^\s/]+/.test(v)
+    || /^ssh:\/\/[^\s@]+(:\d+)?(\/|\?|$)/.test(v)
+    || /^[^\s@]+@[^\s@]+:[^\s]*[A-Za-z0-9._][^\s]*/.test(v)
+    || v.startsWith('/');
+  if (!ok) throw new Error('the invite backup is not a valid git remote (an https or ssh URL, a user@host:path remote, or an absolute local path)');
+  return v;
+}
+
 export function encodeInvite({ address, secret, pubkey = undefined, backup = undefined }) {
   const o = { a: address, s: secret };
   if (pubkey) o.k = pubkey;
@@ -244,7 +259,8 @@ export function decodeInvite(code) {
   let o;
   try { o = JSON.parse(Buffer.from(String(code), 'base64url').toString('utf8')); } catch { throw new Error('bad invite code'); }
   if (!o || typeof o.a !== 'string' || typeof o.s !== 'string' || !o.a || !o.s) throw new Error('bad invite code');
-  return { address: o.a, secret: o.s, pubkey: typeof o.k === 'string' && o.k ? o.k : null, backup: typeof o.b === 'string' && o.b ? o.b : null };
+  const backup = typeof o.b === 'string' && o.b ? assertBackupRemote(o.b) : null;
+  return { address: o.a, secret: o.s, pubkey: typeof o.k === 'string' && o.k ? o.k : null, backup };
 }
 
 function loadInvites(root) { return readJson(invitePath(root), null) || { version: 1, invites: {} }; }

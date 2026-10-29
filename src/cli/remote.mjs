@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { configDir, readJson, writePrivate, writePrivateJson, exists } from '../engine/util.mjs';
-import { signRequest, decodeInvite, deviceKeygen, verifyAddressRecord } from '../engine/devices.mjs';
+import { signRequest, decodeInvite, deviceKeygen, verifyAddressRecord, assertBackupRemote } from '../engine/devices.mjs';
 import { out } from './common.mjs';
 import { fetchOut } from '../engine/net.mjs';
 
@@ -34,6 +34,7 @@ async function remoteOnce(remote, route, { method = 'POST', body = null, env = p
 function backupAddress(remote) {
   const backup = remote?.backup;
   if (!backup || typeof backup !== 'string') return null;
+  try { assertBackupRemote(backup); } catch { return null; }
   const file = path.join(backup, 'address.json');
   if (!exists(file)) return null;
   return readJson(file, null);
@@ -50,9 +51,12 @@ export const backupCacheDir = (env = process.env) => path.join(configDir(env), '
 export function fetchBackupAddress(remote, env = process.env, { timeoutMs = 30000 } = {}) {
   const backup = remote?.backup;
   if (!backup || typeof backup !== 'string') return { ok: false, error: 'no backup is recorded for this vault' };
+  // a remote.json written by an earlier version may hold a value this one would not accept; check
+  // again here, before any git process starts, and not only when the invite was decoded
+  try { assertBackupRemote(backup); } catch (e) { return { ok: false, error: e.message }; }
   if (exists(path.join(backup, 'address.json'))) return { ok: true, rec: backupAddress(remote) };
   const dir = backupCacheDir(env);
-  const run = (args) => spawnSync('git', args, { cwd: dir, encoding: 'utf8', timeout: timeoutMs, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+  const run = (args) => spawnSync('git', args, { cwd: dir, encoding: 'utf8', timeout: timeoutMs, env: { ...env, GIT_TERMINAL_PROMPT: '0' } });
   const last = (r) => (r.stderr || '').trim().split('\n').pop();
   if (!exists(path.join(dir, 'HEAD'))) {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -63,7 +67,8 @@ export function fetchBackupAddress(remote, env = process.env, { timeoutMs = 3000
   // at a branch that does not exist, so try the usual branch names after it
   let f = null;
   for (const ref of ['HEAD', 'main', 'master']) {
-    f = run(['fetch', '-q', '--depth', '1', backup, ref]);
+    // --end-of-options keeps git from reading the remote as an option, even if a value slipped past the check above
+    f = run(['fetch', '-q', '--depth', '1', '--end-of-options', backup, ref]);
     if (f.status === 0 || !/couldn't find remote ref/.test(f.stderr || '')) break;
   }
   if (f.status !== 0) return { ok: false, error: f.error?.code === 'ETIMEDOUT' ? 'the fetch timed out' : (last(f) || 'git fetch failed') };
