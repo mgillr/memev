@@ -677,3 +677,47 @@ Memev already contains more than simple note retrieval, including a local Markdo
 Audit both implementations and test them against the same workloads: recall relevance and latency, write performance, storage growth, duplicate/conflicting memories, concurrent and offline writes, convergence, crash recovery, resource use, and migration. Record the results and make an explicit architecture decision to retain Memev's implementation, reuse a bounded Hivevault component, or migrate to one implementation. Document the API/data boundary, licensing/dependency implications, migration and rollback. Maintain one canonical authority for each kind of project state and memory; do not create two competing recall, graph, or merge pipelines.
 
 Keep the free core useful and define paid entitlements precisely. Multi-device convergence, hosted sync/backup, team administration, and other paid capabilities must be labelled accurately as implemented, planned, or unavailable. Pricing documents do not prove implementation. Define upgrade/downgrade behaviour and ensure users retain access to their local notes and export options if a paid service or subscription ends.
+
+
+
+## Mandatory repository-wide contract reconciliation — current, in-progress, and queued work
+
+The audit must compare the complete agreed Scope One against all relevant work in the current Memev repository, not only the new handoff or a list of missing features. This includes the current implementation and runtime wiring, every existing contract, every contract currently in progress, every queued/planned contract, and relevant issues, pull requests, branches, local work, or partially completed changes accessible to the team.
+
+### Required inventory before assigning new work
+
+Create a single dated inventory with one row per requirement and contract/work item. Include:
+- Stable contract or work-item ID and canonical source/link.
+- Requirement(s) and intended user outcome covered.
+- Evidence-based status: queued, ready, in progress, blocked, implemented-awaiting-verification, verified, superseded, cancelled, or unknown.
+- Current owner and last known activity; explicitly identify unowned work.
+- Scope, acceptance criteria, verification commands, and required evidence.
+- Dependencies, affected modules/interfaces, overlaps, and conflicts with other contracts.
+- Implementation evidence in the current codebase and tests; distinguish code that exists from code that is wired, reachable, and actually verified.
+- Risks, blockers, decisions required, and next action.
+
+Inspect the current repository baseline, working tree and branches available to the team, repository instructions, source files, package scripts, tests, CI/release configuration, contract stores and receipts, existing issues/PRs, and project planning documents. Query connected GitHub issues and pull requests where access permits, but do not assume GitHub issues contain the complete queue: contracts may be stored in the vault, repository files, project boards, another branch, or an engineer's working tree. Ask each current contract owner to confirm the state of work not visible in the shared repository. Mark inaccessible sources and unknown statuses explicitly; never invent an inventory or silently treat unavailable records as empty.
+
+### Reconciliation procedure
+
+1. Freeze the baseline for the audit. Record repository, branch and commit; capture working-tree state and identify uncommitted or in-flight changes before proposing replacements. Do not overwrite or discard active work.
+2. Inventory all existing and planned contracts. Separate outstanding/open contracts, work in progress, queued work, completed-but-unverified work, and verified work. Follow supersession links and amendments so old signed contracts are not mistakenly treated as active or deleted from the audit trail.
+3. Map requirements to implementation and work. For each agreed Scope One requirement, identify existing implementation, tests and evidence, plus every related contract/item. Classify it as EXISTS_AND_VERIFIED, EXISTS_BUT_INCOMPLETE, DOCUMENTED_ONLY, MISSING, CONFLICTING, or UNKNOWN.
+4. Detect duplicates and gaps. Identify requirements with no owner or contract; overlapping contracts; multiple owners changing the same interface; queued work that duplicates already implemented capabilities; dependencies that cannot be satisfied; stale contracts; tests that prove only isolated behaviour; and code that exists but is not wired into the real user journey.
+5. Reconcile rather than restart. For each item, record one explicit disposition: KEEP, INTEGRATE, EXTEND, REPAIR, RESEQUENCE, MERGE, SUPERSEDE, CANCEL_WITH_APPROVAL, or NEW. Preserve immutable signed-contract history; use the documented amendment/supersession process rather than silently editing or deleting signed contracts. Do not cancel, replace, or rewrite another owner's active work without coordination and recorded authority.
+6. Build a dependency-aware execution plan. Order work by prerequisites and integration risk. Assign one accountable owner per contract, explicit interfaces and module boundaries, measurable acceptance criteria, test commands, evidence requirements, and recovery/rollback approach. Identify parallel work only where ownership and interfaces do not conflict.
+7. Resolve uncertainty before broad implementation. Produce the baseline report, full contract inventory, requirement-to-code-to-contract reconciliation matrix, dependency graph, overlap/conflict register, owner confirmations, and sequenced backlog. Surface decisions needed from the product owner instead of making silent scope cuts.
+8. Keep the inventory live. Update status and evidence as contracts change or work merges. Every new or amended contract must reference the Scope One requirement(s) it closes, its dependencies, owner, acceptance checks, and integration point. Completed work is not closed until verified against its criteria and integrated with the system.
+
+### Mandatory audit deliverables
+
+- Repository baseline and accessible-source limitations.
+- Complete inventory of current code capabilities and verification evidence.
+- Contract register covering all outstanding, in-progress, queued, completed-unverified, and verified work.
+- Traceability matrix: Scope One requirement → implementation/module → contract(s)/owner → dependencies → tests/evidence → status.
+- Duplicate/overlap, missing-owner, dependency, stale-work, and interface-conflict register.
+- Reconciled and sequenced backlog with explicit dispositions and owner assignments.
+- Product-owner decision list for scope, architecture, priority, or cancellation decisions.
+- End-to-end acceptance plan showing how all contracts combine into the finished system.
+
+Do not start a competing implementation plan until this reconciliation is complete. Do not report the audit as complete merely because a GitHub issue search returned no results. The repository, contract store, active work, queued plan, and owner-held work must all be considered, with gaps in visibility clearly documented. This audit is the starting point for delivering the whole agreed Scope One system; it is not a reason to reduce that scope to an MVP.
