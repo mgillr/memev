@@ -33,6 +33,8 @@ Setup
   memev path add|remove|status     put the memev command on your PATH (a line in your shell's startup file, or your user PATH on
                                    Windows) and take it out again; until it is there, init prints the full path in every hint
   memev status | doctor [--fix] [--bundle]
+  memev deployment [set --mode M --ai T]   where this vault runs and what kind of AI provider it uses,
+                                    and the trial path that fits; set writes the choice into the vault config
   memev cloud on|off|status|url    reach this vault from cloud AI apps through a private tunnel (off until you
                                    turn it on, or say yes when init asks on a terminal)
   memev github setup [--host H]    back the vault up to your own private GitHub repository (--host for GitHub Enterprise)
@@ -69,7 +71,7 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', runner: './runner.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs', setup: './setup-remote.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', deployment: './deployment.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', runner: './runner.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs', setup: './setup-remote.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
@@ -88,6 +90,27 @@ if [ -n "$N" ] && [ "$N" != "$REC" ]; then
   case "$V" in ''|*[!0-9]*) ;; *) [ "$V" -ge 22 ] && exec "$N" "$JS" "$@" ;; esac
 fi
 [ -x "$REC" ] && exec "$REC" "$JS" "$@"
+if [ "$1" = "hook" ] && [ "$2" = "session-start" ]; then
+  # the app expects JSON on stdout for a hook, so the notice goes out the same way the hook's own
+  # output does: plain for --format plain, { additional_context } for cursor, hookSpecificOutput otherwise
+  FMT=claude
+  prev=
+  for a in "$@"; do
+    [ "$prev" = --format ] && FMT=$a
+    case $a in --format=*) FMT=\${a#--format=} ;; esac
+    prev=$a
+  done
+  MSG="Memev could not start (Node not found); run memev doctor"
+  case "$FMT" in
+    plain) echo "$MSG" ;;
+    cursor) printf '{"additional_context":"%s"}' "$MSG" ;;
+    *) printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}' "$MSG" ;;
+  esac
+  exit 0
+fi
+if [ "$1" = "hook" ]; then
+  exit 0
+fi
 echo "memev: no Node.js 22 or newer: node on PATH is missing or older, and $REC is gone. Install Node.js 22 or newer, then run: node \\"$JS\\" doctor --fix" >&2
 exit 127
 `;
@@ -210,8 +233,13 @@ async function run(argv, env) {
       return up ? 0 : 1;
     }
     case 'container': {
-      // the image's entry point: create the vault on first run, print how to connect, then serve
+      // the image's entry point: create the vault on first run, run the container doctor checks, print how to connect, then serve
       if (!isVault(root)) { initVault(root, { template: path.join(PKG, 'templates', 'vault') }); console.log(`Created a vault in ${root}`); }
+      if (env.MEMEV_CONTAINER === '1') {
+        const { fileChecks } = await import('./doctor.mjs');
+        const checks = fileChecks({ root, env }).filter((x) => x.id.startsWith('container-'));
+        for (const c of checks.filter((x) => x.status === 'fail' || x.status === 'warn')) console.log(`doctor: ${c.status} ${c.title}: ${c.detail}`);
+      }
       console.log(`Connect an app: http://127.0.0.1:${config(root).port || 7787}/mcp with the header Authorization: Bearer <token>; get a token with: docker compose exec memev memev token issue <app-name>`);
       await import('../server/main.mjs'); return new Promise(() => {});
     }
@@ -289,29 +317,6 @@ async function run(argv, env) {
         return 0;
       }
       throw new Error('memev backup set <git-url> | status');
-    }
-    case 'deployment': {
-      need();
-      const sub = pos[0] || 'show';
-      const cfg = config(root);
-      if (sub === 'show') {
-        const mode = cfg['deployment.mode'] || 'local';
-        console.log(`deployment: ${mode}`);
-        return 0;
-      }
-      if (sub === 'set') {
-        const mode = pos[1];
-        if (mode !== 'local' && mode !== 'container') {
-          console.error(`deployment mode must be local or container, got ${mode || '(none)'}`);
-          return 1;
-        }
-        cfg['deployment.mode'] = mode;
-        saveConfig(root, cfg);
-        console.log(`deployment: ${mode}`);
-        return 0;
-      }
-      console.error('usage: memev deployment show | set <local|container>');
-      return 1;
     }
     default: console.error(`unknown command: ${cmd}\n`); console.log(HELP); return 2;
   }
