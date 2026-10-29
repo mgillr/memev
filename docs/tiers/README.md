@@ -21,7 +21,7 @@ company vault.
 | AI apps and models | several cloud AI apps side by side (Claude, ChatGPT; more coming soon) and local coding tools via MCP | the same, on each computer | ONE AI provider for the organisation: one cloud AI service or an on-premises LLM, over MCP (coming) | the same, with an air-gapped on-premises option (coming) |
 | Two computers | one at a time: you switch computers through your own GitHub. Git sync is single-writer backup, so a second computer that pushes gets a warning that concurrent edits can conflict | at once: edit on two machines, nothing to resolve. The crdt-merge convergence engine, in its own repository and called as an external dependency, does the merging (planned) | coming | coming |
 | Price | free | $12/month or $120/year, early-supporter price | contact us | contact us |
-| Trial | not needed | none | 5 members and 10 computers, self-serve for one hosted cloud AI provider; a sales-assisted pilot for on-premises, air-gapped or compliance-led organisations (planned) | a sales-assisted pilot (planned) |
+| Trial | no Personal trial | no Personal trial | time-limited trial: 5 members and 10 computers, 14 days with one 14-day extension; self-serve for hosted AI providers or a mix, a sales-assisted pilot for on-premises, air-gapped or compliance-led organisations (planned); the terms: [BUSINESS-TRIAL.md](../BUSINESS-TRIAL.md) | a sales-assisted pilot (planned) |
 | Setup | you, in minutes | you, in minutes on each computer | remote, 2 to 4 weeks | remote or onsite, 6 to 12 weeks |
 | Support | GitHub issues | priority support | business hours by priority (support plan quoted with the tier) | named or embedded engineer |
 | Status | built | built; the convergence engine, hosted sync, backup and relay planned | coming | coming |
@@ -79,7 +79,7 @@ copied outside Memev.
 | Company knowledge comes back down to members' apps | planned | from the company vault to each member's apps |
 | One AI provider per organisation, over MCP | planned | one cloud AI service or an on-premises LLM, Business and Corporate |
 | Company admin console that sees and searches everything | planned | the admin view of the company vault |
-| Business trial: 5 members and 10 computers | planned | self-serve for one hosted cloud AI provider; a sales-assisted pilot for on-premises, air-gapped or compliance-led organisations |
+| Business trial: 5 members and 10 computers, 14 days with one 14-day extension | planned | self-serve for hosted AI providers or a mix, a sales-assisted pilot for on-premises, air-gapped or compliance-led organisations; the terms are in [BUSINESS-TRIAL.md](../BUSINESS-TRIAL.md) |
 | Separate identities and keys for personal and company vaults | planned | no grants, mounts or mixing between them |
 | Leaving a company: access ends, keys revoked, devices removed, local cache wiped | planned | what the member synced stays in the company vault |
 | Invites from an org admin into the company vault | planned | the only way a teammate joins; there is no Team tier |
