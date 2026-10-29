@@ -7,9 +7,9 @@
 // second writer gets a warning (in memev doctor and jobs.json). The warning never blocks anything.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { git } from '../engine/git.mjs';
-import { gitVia443, cloneOffer } from './github.mjs';
+import { gitVia443, alt443, cloneOffer } from './github.mjs';
 import { signAddressRecord } from '../engine/devices.mjs';
 import { now, readJson, writeJson } from '../engine/util.mjs';
 import { resolveMerge } from '../engine/merge.mjs';
@@ -199,7 +199,10 @@ export function publishAddressRecord(root, url) {
   return { url, committed };
 }
 
-export function syncOnce(vault, { root, license, keys, at } = {}) {
+// The sync, step by step: local git work runs here, and each network step (fetch, push) is yielded to
+// the caller, which runs it blocking (syncOnce), blocking with a deadline (syncOnceWithin, at daemon
+// stop) or off the event loop with a timeout (syncOnceAsync, the daemon's start and interval syncs).
+function* syncSteps(vault, { root, license, keys, at } = {}) {
   const fc = vault.commits.flush();
   const remote = git(root, ['remote']).out.split('\n').filter(Boolean)[0];
   const res = { at: now(), remote: remote || null, pulled: 0, pushed: false, error: null };
@@ -209,7 +212,7 @@ export function syncOnce(vault, { root, license, keys, at } = {}) {
   const before = git(root, ['rev-parse', 'HEAD']).out;
   const branch = git(root, ['rev-parse', '--abbrev-ref', 'HEAD']).out || 'main';
   const url = git(root, ['remote', 'get-url', remote]).out;
-  const f = gitVia443(root, ['fetch', '-q', remote, branch], remote, url);
+  const f = yield { args: ['fetch', '-q', remote, branch], remote, url };
   if (!f.ok && !/couldn't find remote ref/.test(f.err)) { res.error = `fetch: ${f.err.split('\n').pop()}`; return res; }
   if (f.ok) {
     // a backup holding a different vault (no common history) is never merged into this one: name the cause and the clone
@@ -231,9 +234,86 @@ export function syncOnce(vault, { root, license, keys, at } = {}) {
   }
   const w = writerCheck(vault, { root }); if (w.warning) res.warning = w.warning; res.writers = w.writers.length;
   commitAddressFile(root);
-  const p = gitVia443(root, ['push', '-q', remote, `HEAD:${branch}`], remote, url);
+  const p = yield { args: ['push', '-q', remote, `HEAD:${branch}`], remote, url };
   res.pushed = p.ok; if (!p.ok) res.error = `push: ${p.err.split('\n').pop()}`;
   return res;
+}
+
+const NET_TIMEOUT_MS = 60000;   // one fetch or push in the background; a dropped port 22 hangs about 75 s
+export const STOP_SYNC_MS = 3000; // the last sync at stop, inside the 5 s memev stop waits before SIGKILL
+
+/** The sync, run blocking: memev sync and the sync provider. */
+export function syncOnce(vault, opts = {}) {
+  const g = syncSteps(vault, opts);
+  let r = g.next();
+  while (!r.done) r = g.next(gitVia443(opts.root, r.value.args, r.value.remote, r.value.url));
+  return r.value;
+}
+
+/** A git network command, blocking but bounded: the remote URL, then the 443 form when the first fails fast. */
+function gitWithin(root, { args, remote, url }, deadline) {
+  const run = (dest) => {
+    const ms = deadline - Date.now();
+    if (ms <= 0) return { ok: false, err: 'no time left', timedOut: true };
+    const r = spawnSync('git', args.map((a) => (a === remote ? dest : a)), { cwd: root, encoding: 'utf8', timeout: ms, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+    const timedOut = r.error?.code === 'ETIMEDOUT';
+    return { ok: r.status === 0 && !timedOut, err: timedOut ? 'timed out' : String(r.stderr || r.error?.message || '').trim(), timedOut };
+  };
+  const p = run(remote);
+  const alt = alt443(url);
+  return p.ok || p.timedOut || !alt ? p : run(alt);
+}
+
+/** The sync with a deadline, for the daemon's stop: what does not finish in time is left to the next start. */
+export function syncOnceWithin(vault, { ms = STOP_SYNC_MS, ...opts } = {}) {
+  const deadline = Date.now() + ms;
+  const g = syncSteps(vault, opts);
+  let r = g.next();
+  while (!r.done) {
+    const out = gitWithin(opts.root, r.value, deadline);
+    if (out.timedOut) { g.return(); return { at: now(), pushed: false, error: `the sync did not finish in ${ms / 1000} s; the next start syncs it` }; }
+    r = g.next(out);
+  }
+  return r.value;
+}
+
+/** A git network command off the event loop, in its own process group so a timeout or a stop ends ssh too. */
+function gitAsync(root, args, { timeoutMs = NET_TIMEOUT_MS, live = null } = {}) {
+  return new Promise((resolve) => {
+    const group = process.platform !== 'win32';
+    const child = spawn('git', args, { cwd: root, detached: group, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+    if (live) live.child = child;
+    let out = '', err = '', timedOut = false;
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { err += d; });
+    const t = setTimeout(() => { timedOut = true; endGit(child); }, timeoutMs);
+    const done = (code, e = null) => { clearTimeout(t); if (live?.child === child) live.child = null; resolve({ ok: code === 0 && !timedOut, status: code, out: out.trim(), err: timedOut ? `timed out after ${timeoutMs / 1000} s` : (e?.message || err.trim()) }); };
+    child.on('error', (e) => done(null, e));
+    child.on('close', (code) => done(code));
+  });
+}
+
+/** End a git process and its ssh: SIGTERM, so git removes its lock files on the way out. */
+function endGit(child) {
+  if (!child || child.exitCode !== null) return;
+  try { if (process.platform !== 'win32') process.kill(-child.pid, 'SIGTERM'); else child.kill('SIGTERM'); } catch { try { child.kill('SIGTERM'); } catch {} }
+}
+
+/** The sync off the event loop: the daemon keeps answering while fetch and push wait on the network. */
+export async function syncOnceAsync(vault, { timeoutMs = NET_TIMEOUT_MS, live = null, ...opts } = {}) {
+  const g = syncSteps(vault, opts);
+  let r = g.next();
+  while (!r.done) {
+    const { args, remote, url } = r.value;
+    let out = await gitAsync(opts.root, args, { timeoutMs, live });
+    const alt = alt443(url);
+    // a github.com remote that fails or hangs (port 22 dropped) is tried again through ssh.github.com:443
+    if (!out.ok && !live?.stopped && alt) out = await gitAsync(opts.root, args.map((a) => (a === remote ? alt : a)), { timeoutMs, live });
+    // the daemon stopped while this waited: the stop runs its own last sync, so this one ends here
+    if (live?.stopped) { g.return(); return { stopped: true }; }
+    r = g.next(out);
+  }
+  return r.value;
 }
 
 export const WRITERS_DIR = '.memev-writers';
@@ -261,11 +341,18 @@ export function supervise(vault, { root }) {
   const timers = [];
   const state = path.join(root, '.memev', 'jobs.json');
   const record = (k, v) => { const s = readJson(state, {}); s[k] = v; writeJson(state, s, 0o600); };
-  const every = (min, fn, name) => { const run = async () => { try { record(name, { at: now(), ...(await fn()) }); } catch (e) { record(name, { at: now(), error: e.message }); } }; timers.push(setInterval(run, Math.max(1, min) * 60000)); timers.at(-1).unref?.(); return run; };
-  every(vault.config.sync?.interval_min ?? 30, async () => {
+  // what the daemon's stop records is the last word: a background run that ends after it records nothing
+  const live = { child: null, stopped: false };
+  const every = (min, fn, name) => { const run = async () => { const at = now(); try { const v = await fn(); if (!live.stopped) record(name, { at, ...v }); } catch (e) { if (!live.stopped) record(name, { at, error: e.message }); } }; timers.push(setInterval(run, Math.max(1, min) * 60000)); timers.at(-1).unref?.(); return run; };
+  let running = false;
+  const syncRun = every(vault.config.sync?.interval_min ?? 5, async () => {
+    if (running) return { skipped: 'the previous sync is still running' };
     const { selectProvider } = await import('../services/providers.mjs');
     const p = selectProvider('sync', { root, config: vault.config });
-    return p ? { provider: p.id, ...(await p.run(vault, { root })) } : { provider: null, skipped: 'no sync provider (memev github setup)' };
+    if (!p) return { provider: null, skipped: 'no sync provider (memev github setup)' };
+    running = true;
+    // git's network steps run off the event loop, so a slow remote never stalls the daemon's answers
+    try { return { provider: p.id, ...(await (p.id === 'git' ? syncOnceAsync(vault, { root, live }) : p.run(vault, { root }))) }; } finally { running = false; }
   }, 'sync');
   const redetect = every(vault.config.clients?.recheck_min ?? 30, async () => {
     if (vault.config.clients?.auto_connect === false) return { skipped: 'auto_connect is off' };
@@ -278,6 +365,23 @@ export function supervise(vault, { root }) {
     return { added };
   }, 'redetect');
   const tune = every(24 * 60, async () => { const { tuneRecall } = await import('../engine/tuning.mjs'); return tuneRecall(vault); }, 'tuning');
-  if (process.env.MEMEV_NO_BACKGROUND !== '1') { setTimeout(redetect, 5000).unref?.(); setTimeout(tune, 15000).unref?.(); }
-  return { stop() { for (const t of timers) clearInterval(t); }, reload() {} };
+  let startSync = null;
+  if (process.env.MEMEV_NO_BACKGROUND !== '1') {
+    // one sync when the daemon starts, before the first interval, so a fresh machine backs up at once
+    startSync = setTimeout(syncRun, 0); startSync.unref?.();
+    setTimeout(redetect, 5000).unref?.();
+    setTimeout(tune, 15000).unref?.();
+  }
+  return {
+    stop() {
+      live.stopped = true;
+      for (const t of timers) clearInterval(t);
+      if (startSync) clearTimeout(startSync);
+      endGit(live.child);
+      // one last commit and push before the vault closes, so a note written moments before stop is in the backup;
+      // bounded, so memev stop never has to kill the daemon, and what does not fit is left to the next start
+      try { record('sync', { at: now(), shutdown: true, ...syncOnceWithin(vault, { root }) }); } catch (e) { record('sync', { at: now(), shutdown: true, error: e.message }); }
+    },
+    reload() {}
+  };
 }

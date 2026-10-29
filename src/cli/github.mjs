@@ -3,7 +3,7 @@
 //   1. sign in with GitHub's device flow (through the GitHub CLI: a code to type at github.com/login/device)
 //   2. create a private repository (or use one you name)
 //   3. give this machine a deploy key that can push to that one repository and nothing else
-//   4. point the vault at it, push, and let the daemon sync it every 30 minutes
+//   4. point the vault at it, push, and let the daemon sync it every 5 minutes
 // After step 3 Memev never uses your GitHub sign-in again; `gh auth logout` is safe.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -215,9 +215,9 @@ export async function setup({ root, env = process.env, repo = null, flags = {} }
     return { ok: false, steps, repo: name };
   }
   const p = pushBackup(root, { upstream: true, quiet: false, remote: 'origin' });
-  if (!p.ok) { step('manual', 'First push', `${p.error} (Memev retries every 30 minutes)`); return { ok: false, steps, repo: name }; }
+  if (!p.ok) { step('manual', 'First push', `${p.error} (Memev retries every 5 minutes)`); return { ok: false, steps, repo: name }; }
   const via = p.via && p.via !== sshUrl ? ` via ${p.via.replace('ssh://git@', '')}` : '';
-  step('ok', 'Vault pushed', `${name}${via} (synced every ${cfg.sync?.interval_min ?? 30} minutes)`);
+  step('ok', 'Vault pushed', `${name}${via} (synced every ${cfg.sync?.interval_min ?? 5} minutes)`);
   console.log('Memev does not use your GitHub sign-in from here on; you can run gh auth logout.');
   return { ok: true, steps, repo: name };
 }
