@@ -237,7 +237,7 @@ check yet because it does not exist yet.
 ignore firms under 50 people.
 
 **What Memev does.** One person on one computer gets all of Memev for free, for good
-([CHARTER.md](../CHARTER.md)). Personal with more computers has a set price ($12/month or $120/year, CHF 10 or CHF 100); Business and
+([CHARTER.md](../CHARTER.md)). Personal with more computers has a set price ($12/month or $120/year (CHF 10 or CHF 100)); Business and
 Corporate (both coming) have no public price: contact us. There is no Team tier. See [PRICING.md](PRICING.md)
 and [tiers/](tiers/README.md).
 
