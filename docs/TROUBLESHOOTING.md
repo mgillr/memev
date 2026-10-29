@@ -25,5 +25,6 @@ The same checks are available to an AI session as the `memev_doctor` MCP tool.
 | A note was edited by hand | nothing to do: Memev imports the change into its log |
 | The vault looks wrong after a crash | `memev doctor`: the log is checked against the files and anything missing is rebuilt from the log |
 | GitHub pushes fail | `memev doctor` shows the git error; check the deploy key still exists in the repository |
+| The vault is taking up too much space | `memev compact --dry-run` measures the op-log, journal, index and git objects from disk; `memev compact` archives the sealed op-log segments and moves old journal sessions out of the index (nothing is deleted, and the old sessions stay readable) |
 
 To undo everything: `memev uninstall` (your vault stays).

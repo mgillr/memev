@@ -7,7 +7,8 @@ Part of the [tiers pages](README.md). Up: the [README](../../README.md). Archite
 > server, sign-in with Google or Microsoft, departments, labels, pseudonymising and the egress log are
 > all planned. Several computers can already share one vault through the secure link with a
 > credential each; see the [status table](README.md#what-is-built-and-what-is-planned). A Business
-> trial is planned.
+> trial is planned: 5 members and 10 computers, 14 days with one 14-day extension. The terms are in
+> [BUSINESS-TRIAL.md](../BUSINESS-TRIAL.md).
 
 For a company that wants one memory for its members and their AI apps, on its own server, with the
 company able to see and search what its members' AI apps have learned.
@@ -87,11 +88,25 @@ the company vault. Memev cannot recall what the person already read or copied ou
 
 ### Licence and trial
 
-A licence counts once per organisation, by person and by computer. The Business trial is 5 members
-and 10 computers. It is self-serve when the organisation uses a single hosted cloud AI provider.
+A licence counts once per organisation, by person and by computer. The Business trial is a
+time-limited trial: 5 members and 10 computers, 14 days with one 14-day extension. It is self-serve
+when the organisation uses hosted AI providers, or a mix of hosted providers and local tools.
 Organisations that need an on-premises LLM, an air-gapped install or a compliance-led rollout get a
-sales-assisted pilot instead. Both are planned, as is Business itself. Business has no public price:
+sales-assisted pilot instead, sized from the order form, with the term starting when the licence is
+installed. Both paths are planned, as is Business itself. The full terms, the cost model and what
+happens at the end: [BUSINESS-TRIAL.md](../BUSINESS-TRIAL.md). Business has no public price:
 contact us.
+
+## Where it runs: cloud-hosted or on your own servers
+
+| | Cloud-hosted | On your own servers |
+|---|---|---|
+| Who runs the server | the operator, on a host the operator manages | you, on your own servers |
+| Where AI provider calls go | your own AI apps call a hosted provider with your own keys | your own AI apps call a model inside your environment |
+| Which trial path | the self-serve Business trial, free with no card (planned) | the sales-assisted pilot, size set by order form, term starts at licence install (planned) |
+| Status | planned, no date | the vault server and its container image (docs/DOCKER.md) are built; the company server and the Business trial are planned |
+
+The two pages: [deploy-cloud.md](../deploy-cloud.md) and [deploy-on-prem.md](../deploy-on-prem.md).
 
 ## Worked example: 20 people
 
@@ -212,8 +227,8 @@ yours; see above.
 ## Limits
 
 - A licence counts once per organisation, by person and by computer. The trial is 5 members and 10
-  computers. There is no public price: contact us. For identity sync, SIEM export, retention, legal
-  hold or high availability, see [Corporate](corporate.md).
+  computers, 14 days with one 14-day extension. There is no public price: contact us. For identity
+  sync, SIEM export, retention, legal hold or high availability, see [Corporate](corporate.md).
 - Every app on every enrolled computer gets a seat on the comms bus. IT or a team lead can run a
   comms check and hand out tasks from one session; a removed computer drops off the bus.
 - Each computer has its own device key, and IT frees a computer with `memev devices remove <id>`.
