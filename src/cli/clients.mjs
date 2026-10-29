@@ -103,16 +103,25 @@ const mdBlock = (file) => text(file, (t) => addBlock(t, INSTRUCTIONS), (t) => re
 
 // Aider has no MCP and no hooks, so the hand-off is a conventions file that .aider.conf.yml lists under
 // `read:`, which Aider reads into context at session start. The YAML is edited as text: no parser dependency.
+// The read: key comes in three shapes: a block list, a single value (read: FILE) and a flow list
+// (read: [a, b]). The two one-line shapes are rewritten into a block list so every file stays listed.
 const AIDER_READ_KEY = /^read:\s*$/;
+const AIDER_READ_FLOW = /^read:\s*\[(.*)\]\s*$/;
+const AIDER_READ_SCALAR = /^read:\s*(\S.*)$/;
 const unquote = (s) => { s = s.trim(); if (s.length > 1 && ((s[0] === '"' && s.endsWith('"')) || (s[0] === "'" && s.endsWith("'")))) return s.slice(1, -1); return s; };
+const flowItems = (s) => s.split(',').map(unquote).filter(Boolean);
 /** The conventions file this Memev install writes for Aider (in the Memev config dir, so it is ours to remove). */
 export const AIDER_CONVENTIONS = (env = process.env) => path.join(configDir(env), 'aider-conventions.md');
 /** The Aider user config that carries the `read:` list. */
 export const AIDER_CONF = (env = process.env) => path.join(homeDir(env), '.aider.conf.yml');
-/** The `read:` list lines that point at this install's conventions file. */
+/** The `read:` lines that point at this install's conventions file, in any of the three shapes. */
 export function aiderReadEntries(confText, conv = AIDER_CONVENTIONS()) {
   const out = []; let inRead = false;
   for (const line of (confText || '').split('\n')) {
+    const flow = AIDER_READ_FLOW.exec(line);
+    if (flow) { inRead = false; if (flowItems(flow[1]).includes(conv)) out.push(line); continue; }
+    const scalar = AIDER_READ_SCALAR.exec(line);
+    if (scalar) { inRead = false; if (unquote(scalar[1]) === conv) out.push(line); continue; }
     if (AIDER_READ_KEY.test(line)) { inRead = true; continue; }
     if (!inRead) continue;
     if (/^\S/.test(line)) { inRead = false; continue; } // a new top-level key ends the list
@@ -121,25 +130,45 @@ export function aiderReadEntries(confText, conv = AIDER_CONVENTIONS()) {
   }
   return out;
 }
-/** Add the conventions file to the `read:` list once; a second call changes nothing. */
+/** Add the conventions file to the `read:` list once; a second call changes nothing. A one-line read:
+ * (a single value or a flow list) is rewritten into a block list that keeps every file already there. */
 export function addAiderRead(confText, conv = AIDER_CONVENTIONS()) {
   const text = confText || '';
   if (aiderReadEntries(text, conv).length) return text;
   const lines = text.split('\n');
-  const i = lines.findIndex((l) => AIDER_READ_KEY.test(l));
+  const i = lines.findIndex((l) => AIDER_READ_KEY.test(l) || AIDER_READ_FLOW.test(l) || AIDER_READ_SCALAR.test(l));
   if (i < 0) {
     const body = text.trim() ? `${text.replace(/\n*$/, '')}\n\n` : '';
     return `${body}read:\n  - ${conv}\n`;
+  }
+  const flow = AIDER_READ_FLOW.exec(lines[i]);
+  const scalar = flow ? null : AIDER_READ_SCALAR.exec(lines[i]);
+  if (flow || scalar) {
+    const theirs = flow ? flowItems(flow[1]) : [unquote(scalar[1])];
+    lines.splice(i, 1, 'read:', ...[...theirs, conv].map((f) => `  - ${f}`));
+    return lines.join('\n');
   }
   let last = i;
   for (let j = i + 1; j < lines.length; j++) { if (/^\S/.test(lines[j])) break; if (/^\s*-\s*/.test(lines[j])) last = j; }
   lines.splice(last + 1, 0, `  - ${conv}`);
   return lines.join('\n');
 }
-/** Remove the conventions file from the `read:` list; a second call changes nothing. */
+/** Remove the conventions file from the `read:` list; a second call changes nothing. Only our path is
+ * taken out: a one-line read: that holds other files is left alone, and one that holds only ours drops. */
 export function removeAiderRead(confText, conv = AIDER_CONVENTIONS()) {
   const out = []; let inRead = false;
   for (const line of (confText || '').split('\n')) {
+    const flow = AIDER_READ_FLOW.exec(line);
+    if (flow) {
+      inRead = false;
+      const items = flowItems(flow[1]);
+      if (!items.includes(conv)) { out.push(line); continue; }
+      const rest = items.filter((f) => f !== conv);
+      if (rest.length) out.push(`read: [${rest.join(', ')}]`);
+      continue;
+    }
+    const scalar = AIDER_READ_SCALAR.exec(line);
+    if (scalar) { inRead = false; if (unquote(scalar[1]) !== conv) out.push(line); continue; }
     if (AIDER_READ_KEY.test(line)) { inRead = true; out.push(line); continue; }
     if (inRead) {
       if (/^\S/.test(line)) { inRead = false; out.push(line); continue; }
