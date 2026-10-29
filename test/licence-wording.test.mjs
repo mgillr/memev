@@ -35,9 +35,9 @@ test('public text carries no directions for getting round the computer limit', (
   assert.deepEqual(found, []);
 });
 
-test('the licence terms stay stated: Free needs no licence, the plan sets the computers, grace then read-only', () => {
+test('the licence terms stay stated: Personal needs no licence, the plan sets the computers, grace then read-only', () => {
   const pricing = fs.readFileSync(path.join(ROOT, 'docs/PRICING.md'), 'utf8');
-  assert.match(pricing, /\*\*Free:\*\* one computer, no licence/);
+  assert.match(pricing, /\*\*Personal:\*\* one computer, no licence/);
   assert.match(pricing, /the plan sets how many computers can join/);
   assert.match(pricing, /grace period \(14 days unless the licence says otherwise\)/);
   assert.match(pricing, /can read but not write/);
