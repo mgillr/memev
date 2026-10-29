@@ -28,7 +28,7 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
       if (flags['allow-tools'] === true) { setAllowTools(env, true); allowTools = true; }
       else allowTools = await askAllowToolsOnce({ env }).catch(() => false);
     }
-    clients.connectAll({ env, launcher, allowTools });
+    clients.connectAll({ env, launcher, allowTools: allowTools || undefined });
   }
   const found = clients.detect(env, launcher);
   for (const c of found.filter((x) => x.found)) {
@@ -219,7 +219,7 @@ export function setAllowTools(env, on) {
   saveAllowTools(env, { ...s, enabled: !!on, asked: true });
   return allowToolsSettings(env);
 }
-export const ALLOW_TOOLS_QUESTION = 'Let Memev call its own tools in Claude Code without a prompt each time?\n  What changes: Memev adds mcp__memev to the allow list in ~/.claude/settings.json, so Claude Code runs Memev tools (recall, remember, checkpoint) without asking you each time.\n  Never changes: your other permissions, or any other app. It is off unless you say yes, and memev disconnect claude-code removes it again.\n';
+export const ALLOW_TOOLS_QUESTION = 'Let Memev call its own tools in Claude Code without a prompt each time?\n  What changes: Memev adds the Memev memory tools (recall, remember, checkpoint, status, why) to the allow list in ~/.claude/settings.json, so Claude Code runs them without asking you each time. The write and contract tools still prompt.\n  Never changes: your other permissions, or any other app. It is off unless you say yes, and memev disconnect claude-code removes them again.\n';
 /** Asked once, on a terminal only. The answer is kept either way and the question never comes back. `ask` forces (true) or forbids (false) it; input and output are for tests. */
 export async function askAllowToolsOnce({ env = process.env, ask, input = process.stdin, output = process.stdout } = {}) {
   const s = allowToolsSettings(env);

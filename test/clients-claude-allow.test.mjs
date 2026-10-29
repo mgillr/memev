@@ -2,10 +2,13 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { connect, disconnect } from '../src/cli/clients.mjs';
+import { connect, disconnect, MEMEV_TOOLS } from '../src/cli/clients.mjs';
 import { tmpdir, cleanup } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
 after(cleanup);
+
+const hasTools = (allow) => MEMEV_TOOLS.every((t) => Array.isArray(allow) && allow.includes(t));
+const noTools = (allow) => MEMEV_TOOLS.every((t) => !Array.isArray(allow) || !allow.includes(t));
 
 function fixtureHome({ withSettings = true } = {}) {
   const home = tmpdir('home-');
@@ -25,10 +28,10 @@ test('MEM-051 AC01: connect claude-code --allow-tools adds mcp__memev; disconnec
   const launcher = '/x/memev';
   connect('claude-code', { env, launcher, allowTools: true });
   const after = fs.readFileSync(settingsPath(env), 'utf8');
-  assert.match(after, /mcp__memev/, 'mcp__memev is written into settings.json');
-  assert.ok(JSON.parse(after).permissions.allow.includes('mcp__memev'), 'mcp__memev is in permissions.allow after a consented connect');
+  assert.match(after, /mcp__memev/, 'the mcp__memev tool entries are written into settings.json');
+  assert.ok(hasTools(JSON.parse(after).permissions.allow), 'the Memev memory tools are in permissions.allow after a consented connect');
   disconnect('claude-code', { env });
-  assert.equal(fs.existsSync(settingsPath(env)), false, 'the file Memev created is gone, so mcp__memev is gone, on disconnect');
+  assert.equal(fs.existsSync(settingsPath(env)), false, 'the file Memev created is gone, so the mcp__memev entries are gone, on disconnect');
 });
 
 test('MEM-051 AC02: without consent, permissions.allow is not changed', () => {
@@ -45,8 +48,8 @@ test('a consented connect keeps the user\'s own allow entries, and a later user 
   const launcher = '/x/memev';
   connect('claude-code', { env, launcher, allowTools: true });
   let cs = JSON.parse(fs.readFileSync(files.claudeSettings, 'utf8'));
-  assert.ok(cs.permissions.allow.includes('Bash(ls:*)'), 'the user entry stays next to mcp__memev');
-  assert.ok(cs.permissions.allow.includes('mcp__memev'));
+  assert.ok(cs.permissions.allow.includes('Bash(ls:*)'), 'the user entry stays next to the Memev tools');
+  assert.ok(hasTools(cs.permissions.allow), 'the Memev memory tools are added next to the user entry');
   // the user edits the file after connect, so disconnect cannot restore the backup
   cs.model = 'opus';
   fs.writeFileSync(files.claudeSettings, JSON.stringify(cs, null, 2));
@@ -64,7 +67,7 @@ test('MEM-051: a yes stored at init survives disconnect, the next connect puts t
     const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--allow-tools']);
     assert.equal(init.code, 0, init.out + init.err);
     let cs = JSON.parse(fs.readFileSync(settings, 'utf8'));
-    assert.ok(cs.permissions.allow.includes('mcp__memev'), 'init with consent writes the entry');
+    assert.ok(hasTools(cs.permissions.allow), 'init with consent writes the entries');
     assert.match(init.out, /Claude Code:.*Memev tools are allowed, so no prompt per call/);
     const off = sb.run(['disconnect', 'claude-code']);
     assert.equal(off.code, 0, off.out + off.err);
@@ -73,11 +76,31 @@ test('MEM-051: a yes stored at init survives disconnect, the next connect puts t
     const again = sb.run(['connect', 'claude-code']);
     assert.equal(again.code, 0, again.out + again.err);
     cs = JSON.parse(fs.readFileSync(settings, 'utf8'));
-    assert.ok(cs.permissions.allow.includes('mcp__memev'), 'the next connect honours the stored yes');
+    assert.ok(hasTools(cs.permissions.allow), 'the next connect honours the stored yes');
     const ob = sb.run(['onboarding']);
     const line = ob.out.split('\n').find((l) => l.includes('Claude Code') && l.includes('Memev tools'));
     assert.ok(line, ob.out);
     assert.match(line, /Memev tools are allowed, so no prompt per call/);
     assert.equal(ob.out.includes('prompts before each call'), false, 'settings.json and the checklist agree');
+  } finally { sb.stop(); }
+});
+
+test('MEM-051: a stored yes can be taken back with --no-allow-tools, and a later plain connect does not add it back', () => {
+  const sb = sandbox();
+  try {
+    fs.mkdirSync(path.join(sb.home, '.claude'), { recursive: true });
+    const settings = path.join(sb.home, '.claude', 'settings.json');
+    const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--allow-tools']);
+    assert.equal(init.code, 0, init.out + init.err);
+    let cs = JSON.parse(fs.readFileSync(settings, 'utf8'));
+    assert.ok(hasTools(cs.permissions.allow), 'init with consent writes the entries');
+    const off = sb.run(['connect', 'claude-code', '--no-allow-tools']);
+    assert.equal(off.code, 0, off.out + off.err);
+    cs = JSON.parse(fs.readFileSync(settings, 'utf8'));
+    assert.ok(noTools(cs.permissions && cs.permissions.allow), '--no-allow-tools removes the entries');
+    const plain = sb.run(['connect', 'claude-code']);
+    assert.equal(plain.code, 0, plain.out + plain.err);
+    cs = JSON.parse(fs.readFileSync(settings, 'utf8'));
+    assert.ok(noTools(cs.permissions && cs.permissions.allow), 'a later plain connect does not add the entries back');
   } finally { sb.stop(); }
 });
