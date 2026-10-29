@@ -246,7 +246,7 @@ export function supervise(vault, { root }) {
   const state = path.join(root, '.memev', 'jobs.json');
   const record = (k, v) => { const s = readJson(state, {}); s[k] = v; writeJson(state, s, 0o600); };
   const every = (min, fn, name) => { const run = async () => { try { record(name, { at: now(), ...(await fn()) }); } catch (e) { record(name, { at: now(), error: e.message }); } }; timers.push(setInterval(run, Math.max(1, min) * 60000)); timers.at(-1).unref?.(); return run; };
-  every(vault.config.sync?.interval_min ?? 30, async () => {
+  const syncRun = every(vault.config.sync?.interval_min ?? 5, async () => {
     const { selectProvider } = await import('../services/providers.mjs');
     const p = selectProvider('sync', { root, config: vault.config });
     return p ? { provider: p.id, ...(await p.run(vault, { root })) } : { provider: null, skipped: 'no sync provider (memev github setup)' };
@@ -262,6 +262,20 @@ export function supervise(vault, { root }) {
     return { added };
   }, 'redetect');
   const tune = every(24 * 60, async () => { const { tuneRecall } = await import('../engine/tuning.mjs'); return tuneRecall(vault); }, 'tuning');
-  if (process.env.MEMEV_NO_BACKGROUND !== '1') { setTimeout(redetect, 5000).unref?.(); setTimeout(tune, 15000).unref?.(); }
-  return { stop() { for (const t of timers) clearInterval(t); }, reload() {} };
+  let startSync = null;
+  if (process.env.MEMEV_NO_BACKGROUND !== '1') {
+    // one sync when the daemon starts, before the first interval, so a fresh machine backs up at once
+    startSync = setTimeout(syncRun, 0); startSync.unref?.();
+    setTimeout(redetect, 5000).unref?.();
+    setTimeout(tune, 15000).unref?.();
+  }
+  return {
+    stop() {
+      for (const t of timers) clearInterval(t);
+      if (startSync) clearTimeout(startSync);
+      // one last commit and push before the vault closes, so a note written moments before stop is in the backup
+      try { record('sync', { at: now(), ...syncOnce(vault, { root }) }); } catch (e) { record('sync', { at: now(), error: e.message }); }
+    },
+    reload() {}
+  };
 }
