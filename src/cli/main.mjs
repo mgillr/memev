@@ -174,7 +174,18 @@ async function run(argv, env) {
         const { join } = await import('./remote.mjs');
         return join(invite ? [invite] : [], flags, { env });
       }
-      if (!isVault(root) && process.stdin.isTTY && process.stdout.isTTY) {
+      // the free second-computer path: clone an existing backup with plain git, no GitHub CLI
+      if (flags.from) {
+        const { cloneFromUrl, isMemevBackup } = await import('./github.mjs');
+        const cloned = cloneFromUrl(flags.from, root);
+        if (!cloned.ok) { console.log(`Could not clone ${flags.from}: ${cloned.err.split('\n').pop()}. Init did not create a new vault.`); return 1; }
+        if (!isMemevBackup(root)) {
+          try { fs.rmSync(root, { recursive: true, force: true }); } catch {}
+          console.log(`${flags.from} is not a Memev vault backup (its README is not a Memev vault). Init did not create a new vault.`);
+          return 1;
+        }
+      }
+      if (!flags.from && !isVault(root) && process.stdin.isTTY && process.stdout.isTTY) {
         const readline = await import('node:readline/promises');
         const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
         const answer = (await rl.question('Is this the first computer, or are you adding this one to an existing vault? [first/joining] ')).trim().toLowerCase();
