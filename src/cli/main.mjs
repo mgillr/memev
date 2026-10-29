@@ -41,7 +41,9 @@ Setup
   memev backup set <git-url>       back the vault up to any private git remote (GitHub Enterprise, self-hosted, file)
   memev service install|remove     start Memev at login (systemd or launchd)
   memev devices [enroll|remove|rotate|rename|keygen]   computers and apps using this vault, each with its own credential
-  memev invite [--ttl SECONDS]     print a one-time code, link and QR code so another computer can join
+  memev invite [--ttl SECONDS] [--local]   print a one-time code, link and QR code so another computer can join
+                                       (refuses without a reachable address: turn the secure link on with memev cloud on; --local mints the
+                                       loopback address for a computer that shares this machine, and says so)
   memev join <code>                make a key, enrol this computer and connect its apps
   memev join <url> --token T       the same, with a key and a token made ahead of time
   memev join --refresh             fetch the vault's current address from the signed record in the backup
@@ -149,7 +151,7 @@ export async function main(argv, env = process.env) {
 
 async function run(argv, env) {
   const [cmd = 'help', ...rest] = argv;
-  const { flags, pos } = parseArgs(rest, ['help', 'yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects', 'release', 'open', 'once', 'refresh']);
+  const { flags, pos } = parseArgs(rest, ['help', 'yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects', 'release', 'open', 'once', 'refresh', 'local']);
   const root = resolveRoot(flags.root, env);
   const need = () => { if (!isVault(root)) throw new Error(`no vault at ${root}; run memev init`); };
   const json = (o) => console.log(JSON.stringify(o, null, 2));
