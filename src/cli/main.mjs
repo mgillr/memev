@@ -90,6 +90,27 @@ if [ -n "$N" ] && [ "$N" != "$REC" ]; then
   case "$V" in ''|*[!0-9]*) ;; *) [ "$V" -ge 22 ] && exec "$N" "$JS" "$@" ;; esac
 fi
 [ -x "$REC" ] && exec "$REC" "$JS" "$@"
+if [ "$1" = "hook" ] && [ "$2" = "session-start" ]; then
+  # the app expects JSON on stdout for a hook, so the notice goes out the same way the hook's own
+  # output does: plain for --format plain, { additional_context } for cursor, hookSpecificOutput otherwise
+  FMT=claude
+  prev=
+  for a in "$@"; do
+    [ "$prev" = --format ] && FMT=$a
+    case $a in --format=*) FMT=\${a#--format=} ;; esac
+    prev=$a
+  done
+  MSG="Memev could not start (Node not found); run memev doctor"
+  case "$FMT" in
+    plain) echo "$MSG" ;;
+    cursor) printf '{"additional_context":"%s"}' "$MSG" ;;
+    *) printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}' "$MSG" ;;
+  esac
+  exit 0
+fi
+if [ "$1" = "hook" ]; then
+  exit 0
+fi
 echo "memev: no Node.js 22 or newer: node on PATH is missing or older, and $REC is gone. Install Node.js 22 or newer, then run: node \\"$JS\\" doctor --fix" >&2
 exit 127
 `;
@@ -212,8 +233,13 @@ async function run(argv, env) {
       return up ? 0 : 1;
     }
     case 'container': {
-      // the image's entry point: create the vault on first run, print how to connect, then serve
+      // the image's entry point: create the vault on first run, run the container doctor checks, print how to connect, then serve
       if (!isVault(root)) { initVault(root, { template: path.join(PKG, 'templates', 'vault') }); console.log(`Created a vault in ${root}`); }
+      if (env.MEMEV_CONTAINER === '1') {
+        const { fileChecks } = await import('./doctor.mjs');
+        const checks = fileChecks({ root, env }).filter((x) => x.id.startsWith('container-'));
+        for (const c of checks.filter((x) => x.status === 'fail' || x.status === 'warn')) console.log(`doctor: ${c.status} ${c.title}: ${c.detail}`);
+      }
       console.log(`Connect an app: http://127.0.0.1:${config(root).port || 7787}/mcp with the header Authorization: Bearer <token>; get a token with: docker compose exec memev memev token issue <app-name>`);
       await import('../server/main.mjs'); return new Promise(() => {});
     }

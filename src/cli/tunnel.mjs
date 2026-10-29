@@ -10,8 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
-import { spawn, spawnSync } from 'node:child_process';
-import { configDir, readJson, writePrivate, writePrivateJson, writeJson, randomToken, now, exists } from '../engine/util.mjs';
+import { spawn } from 'node:child_process';
+import { configDir, readJson, writePrivate, writePrivateJson, writeJson, randomToken, now, exists, run } from '../engine/util.mjs';
 import { tunnelKeyFile, tunnelKey, config, saveConfig, clientToken, adminToken, api, out } from './common.mjs';
 import { publishAddressRecord } from './sync.mjs';
 import { fetchOut } from '../engine/net.mjs';
@@ -31,7 +31,7 @@ export const CLOUDFLARED = {
   },
 };
 
-const which = (bin) => { const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', [bin], { encoding: 'utf8' }); return r.status === 0 ? r.stdout.split(/\r?\n/)[0].trim() : null; };
+const which = (bin) => { const r = run(process.platform === 'win32' ? 'where' : 'which', [bin]); return r.ok ? r.stdout.split(/\r?\n/)[0].trim() : null; };
 export function ensureTunnelKey(root) { let k = tunnelKey(root); if (!k) { k = randomToken(24); writePrivate(tunnelKeyFile(root), `${k}\n`); } return k; }
 const stateFile = (root) => path.join(root, '.memev', 'tunnel.json');
 export const tunnelState = (root) => readJson(stateFile(root), null);
@@ -50,7 +50,7 @@ export async function cloudflaredPath(env = process.env, { download = true } = {
   const got = crypto.createHash('sha256').update(buf).digest('hex');
   if (got !== pin[1]) throw new Error(`cloudflared checksum mismatch (got ${got.slice(0, 12)}…); not using it`);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  if (pin[0].endsWith('.tgz')) { const tgz = path.join(dir, 'c.tgz'); fs.writeFileSync(tgz, buf); spawnSync('tar', ['xzf', tgz, '-C', dir]); fs.rmSync(tgz); }
+  if (pin[0].endsWith('.tgz')) { const tgz = path.join(dir, 'c.tgz'); fs.writeFileSync(tgz, buf); run('tar', ['xzf', tgz, '-C', dir]); fs.rmSync(tgz); }
   else fs.writeFileSync(bin, buf, { mode: 0o755 });
   fs.chmodSync(bin, 0o755);
   return bin;
@@ -61,7 +61,7 @@ export function pickProvider(cfg, env = process.env) {
   if (want === 'cloudflare' && cfg.remote?.cloudflare?.name) return 'cloudflare';
   if (want === 'tailscale' || want === 'auto') {
     const ts = which('tailscale');
-    if (ts) { const s = spawnSync(ts, ['status', '--json'], { encoding: 'utf8', timeout: 3000 }); try { if (JSON.parse(s.stdout).BackendState === 'Running') return 'tailscale'; } catch {} }
+    if (ts) { const s = run(ts, ['status', '--json'], { timeout: 3000 }); if (s.ok) { try { if (JSON.parse(s.stdout).BackendState === 'Running') return 'tailscale'; } catch {} } }
     if (want === 'tailscale') return null;
   }
   if (want === 'cloudflare' && !cfg.remote?.cloudflare?.name) return null;
@@ -83,10 +83,12 @@ export function supervise(vault, { root, port }) {
     try {
       if (provider === 'tailscale') {
         const ts = which('tailscale');
-        const r = spawnSync(ts, ['serve', '--bg', String(port)], { encoding: 'utf8', timeout: 20000 });
-        if (r.status !== 0) throw new Error((r.stderr || r.stdout).trim().split('\n').pop());
-        const st = JSON.parse(spawnSync(ts, ['status', '--json'], { encoding: 'utf8' }).stdout);
-        const url = `https://${String(st.Self.DNSName).replace(/\.$/, '')}`;
+        const r = run(ts, ['serve', '--bg', String(port)], { timeout: 20000 });
+        if (!r.ok) throw new Error(r.error || (r.stderr || r.stdout).trim().split('\n').pop() || `tailscale serve failed (exit ${r.status})`);
+        const st = run(ts, ['status', '--json']);
+        if (!st.ok) throw new Error(st.error || (st.stderr || st.stdout).trim().split('\n').pop() || 'tailscale status failed');
+        const parsed = JSON.parse(st.stdout);
+        const url = `https://${String(parsed.Self.DNSName).replace(/\.$/, '')}`;
         write({ enabled: true, provider, url, stable: true, state: 'up' }); log(`up at ${url}`); return;
       }
       const bin = await cloudflaredPath(env);
@@ -118,7 +120,7 @@ export function supervise(vault, { root, port }) {
   function halt() {
     clearTimeout(timer);
     if (child) { child.removeAllListeners('exit'); child.kill(); child = null; }
-    if (tunnelState(root)?.provider === 'tailscale') { const ts = which('tailscale'); if (ts) spawnSync(ts, ['serve', '--bg', '--https=443', 'off'], { timeout: 10000 }); }
+    if (tunnelState(root)?.provider === 'tailscale') { const ts = which('tailscale'); if (ts) { const r = run(ts, ['serve', '--bg', '--https=443', 'off'], { timeout: 10000 }); if (!r.ok) log(`tailscale serve off failed: ${r.error || (r.stderr || r.stdout).trim()}`); } }
   }
   start();
   // the relay (off unless the setting is on) is kept up beside the tunnel; see relay.mjs and docs/RELAY.md
