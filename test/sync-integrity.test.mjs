@@ -5,7 +5,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { newVault, cleanup, tmpdir } from './helpers/tmp.mjs';
+import { newVault, cleanup, tmpdir, OWNER } from './helpers/tmp.mjs';
 import { syncOnce } from '../src/cli/sync.mjs';
 import { git, CommitQueue } from '../src/engine/git.mjs';
 
@@ -144,5 +144,22 @@ test('REV-005 AC04: a failed commit stays pending, is retried, and syncOnce repo
   assert.equal(res.pushed, false, 'syncOnce does not claim pushed when the commit failed');
   assert.ok(res.error, `syncOnce reports the commit failure: ${res.error}`);
   assert.ok(v.commits.pending.has('notes/x.md'), 'the note stays pending for the next sync');
+  v.close();
+});
+
+test('REV-005 AC04: an edit undone before the flush leaves nothing pending and syncOnce reports no error', () => {
+  const { v, root } = newVault();
+  fs.mkdirSync(path.join(root, 'notes'), { recursive: true });
+  // a note already in HEAD
+  v.write(OWNER, { path: 'notes/x.md', body: 'v0\n' });
+  v.commits.flush();
+  assert.equal(git(root, ['status', '--porcelain', '--', 'notes/x.md']).out, '', 'the note is committed to HEAD');
+  // an edit and its undo before the flush: the disk equals HEAD again, but the path is still pending
+  v.write(OWNER, { path: 'notes/x.md', body: 'v1\n' });
+  v.write(OWNER, { path: 'notes/x.md', body: 'v0\n' });
+  assert.ok(v.commits.pending.has('notes/x.md'), 'the note is pending before the flush');
+  const res = syncOnce(v, { root });
+  assert.equal(res.error, null, `an edit undone before the flush is not a commit failure: ${res.error}`);
+  assert.equal(v.commits.pending.size, 0, 'nothing stays pending after the flush');
   v.close();
 });

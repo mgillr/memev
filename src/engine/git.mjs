@@ -32,6 +32,9 @@ export class CommitQueue {
     const paths = [...this.pending.keys()]; const clients = new Set([...this.pending.values()].flatMap((s) => [...s]));
     const a = git(this.root, ['add', '-A', '--', ...paths]);
     if (!a.ok) return a;
+    // an edit undone before the flush (or a path a merge already committed) leaves nothing to commit; drop it
+    // instead of failing every flush on "nothing to commit"
+    if (git(this.root, ['diff', '--cached', '--quiet', '--', ...paths]).ok) { this.pending.clear(); return null; }
     const subject = paths.length === 1 ? `memev: ${paths[0]}` : `memev: ${paths.length} notes`;
     const body = clients.size ? `\n\nMemev-Client: ${[...clients].sort().join(', ')}` : '';
     const r = git(this.root, ['commit', '-q', '-m', `${subject}${body}`]);
