@@ -5,15 +5,15 @@
 // signature offline against the public key in src/engine/license.mjs and never calls home.
 //
 //   node scripts/license/issue.mjs --key /path/outside/repo/memev-license-ed25519.pem \
-//        --tier team --seats 12 [--exp 2027-11-15|none] [--grace 14] [--iat 2026-11-01] \
+//        --tier personal_more --seats 12 [--exp 2027-11-15|none] [--grace 14] [--iat 2026-11-01] \
 //        [--services sync,backup,relay] [--connectors N] [--lid lic_…] [--out FILE]
 //
 // The key must live outside this repository (the script refuses a path inside it), and it is never
-// printed. The free tier needs no licence, so the script does not issue one for it.
+// printed. Personal needs no licence, so the script does not issue one for it.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { signLicense, verifyLicense, LICENSE_KEYS, TIER_NAMES } from '../../src/engine/license.mjs';
+import { signLicense, verifyLicense, LICENSE_KEYS, TIER_NAMES, canonicalTier } from '../../src/engine/license.mjs';
 
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 const argv = process.argv.slice(2);
@@ -22,7 +22,10 @@ const inside = (p) => { const r = path.relative(REPO, path.resolve(p)); return !
 const fail = (m, code = 2) => { console.error(m); process.exit(code); };
 const day = /^\d{4}-\d{2}-\d{2}$/;
 
-if (argv.includes('--help') || !argv.length) fail('usage: issue.mjs --key FILE --tier personal|team|office|business|enterprise|founder --seats N [--exp DATE|none] [--grace DAYS] [--out FILE]');
+if (argv.includes('--help') || !argv.length) fail('usage: issue.mjs --key FILE --tier personal_more|business|corporate|founder --seats N [--exp DATE|none] [--grace DAYS] [--out FILE]');
+const tier = String(arg('tier', ''));
+if (tier === 'free') fail('Personal needs no licence');
+if (!TIER_NAMES.includes(tier)) fail('--tier must be one of personal_more, business, corporate or founder (the older ids personal, team, office and enterprise are still accepted)');
 const keyFile = arg('key'); if (!keyFile) fail('--key is required');
 if (inside(keyFile)) fail(`refusing to read a private key from inside the repository (${path.resolve(keyFile)}); keep it outside`);
 const st = fs.statSync(keyFile);
@@ -33,9 +36,6 @@ try { pub = crypto.createPublicKey(pem).export({ type: 'spki', format: 'der' }).
 const kid = Object.keys(LICENSE_KEYS).find((k) => LICENSE_KEYS[k] === pub);
 if (!kid) fail('this key is not the vendor key built into memev (src/engine/license.mjs); a licence signed with it would be rejected');
 
-const tier = String(arg('tier', ''));
-if (tier === 'free') fail('the free tier needs no licence');
-if (!TIER_NAMES.includes(tier)) fail(`--tier must be one of ${TIER_NAMES.filter((t) => t !== 'free').join(', ')}`);
 const seats = Number(arg('seats'));
 if (!Number.isInteger(seats) || seats < 1) fail('--seats must be a whole number of computers, 1 or more (the vault computer counts as one)');
 const exp = arg('exp', null); const iat = arg('iat', new Date().toISOString().slice(0, 10));
@@ -50,6 +50,8 @@ const fields = {
 const lic = signLicense(fields, pem, kid);
 const check = verifyLicense(lic);
 if (check.state === 'invalid') fail(`self-check failed: ${check.reason}`, 1);
+const newer = canonicalTier(tier);
+if (newer !== tier) console.error(`new licences for this tier use the id ${newer}`);
 const text = `${JSON.stringify(lic, null, 2)}\n`;
 const outFile = arg('out');
 if (outFile) {
