@@ -86,6 +86,8 @@ export class OpLog {
 
   get manifestPath() { return path.join(this.dir, 'manifest.json'); }
   get snapshotPath() { return path.join(this.dir, 'snapshot.json'); }
+  /** Where a segment's file lives: the log directory, or the archive folder once it has been archived. */
+  _segFile(seg) { return path.join(this.dir, seg.archived ? path.join('archive', seg.name) : seg.name); }
 
   open() {
     fs.mkdirSync(this.dir, { recursive: true, mode: 0o700 });
@@ -101,7 +103,7 @@ export class OpLog {
     }
     // replay only what the snapshot does not cover: the tail of its segment and any later segment
     for (let i = fromSeg; i < this.manifest.segments.length; i++) {
-      const seg = this.manifest.segments[i], file = path.join(this.dir, seg.name);
+      const seg = this.manifest.segments[i], file = this._segFile(seg);
       let good = i === fromSeg ? fromOff : 0;
       for (const [line, off] of readLines(file, good)) {
         let rec; try { rec = JSON.parse(line); } catch { break; }
@@ -159,6 +161,27 @@ export class OpLog {
     this._saveManifest(); this.snapshot();
   }
 
+  /**
+   * Move every sealed segment into the archive folder. Nothing is deleted: the file is renamed, its
+   * hash stays pinned in the manifest, and iterate() and verify() read it back from the archive.
+   * Returns the number of segments moved.
+   */
+  archiveSealed() {
+    const arch = path.join(this.dir, 'archive');
+    let moved = 0;
+    for (const seg of this.manifest.segments) {
+      if (!seg.sealed || seg.archived) continue;
+      const from = path.join(this.dir, seg.name);
+      if (!fs.existsSync(from)) continue;
+      fs.mkdirSync(arch, { recursive: true });
+      fs.renameSync(from, path.join(arch, seg.name));
+      seg.archived = true;
+      moved++;
+    }
+    if (moved) { this._saveManifest(); this.snapshot(); }
+    return moved;
+  }
+
   snapshot() {
     writeJson(this.snapshotPath, { version: 1, seq: this.seq, hlc: formatHlc(this.clock), at: now(), active: { name: this.active.name, offset: this.active.bytes }, heads: Object.fromEntries(this.heads) }, 0o600);
     this._saveManifest();
@@ -171,7 +194,7 @@ export class OpLog {
   *iterate({ fromSeq = 1, path: only = null, raw = false } = {}) {
     for (const seg of this.manifest.segments) {
       if (seg.last && seg.last < fromSeq) continue;
-      for (const [line] of readLines(path.join(this.dir, seg.name))) {
+      for (const [line] of readLines(this._segFile(seg))) {
         if (!line) continue;
         if (raw) { yield line; continue; }
         const rec = JSON.parse(line);
@@ -186,7 +209,7 @@ export class OpLog {
   verify() {
     const errors = []; const last = new Map(); let ops = 0, prevSeq = 0;
     for (const seg of this.manifest.segments) {
-      const file = path.join(this.dir, seg.name);
+      const file = this._segFile(seg);
       if (seg.sealed && seg.sha256 && hashFile(file) !== seg.sha256) errors.push(`${seg.name}: sealed hash does not match`);
       for (const [line] of readLines(file)) {
         if (!line) continue;
