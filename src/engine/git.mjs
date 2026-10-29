@@ -30,12 +30,13 @@ export class CommitQueue {
     clearTimeout(this.timer); this.timer = null;
     if (!this.pending.size) return null;
     const paths = [...this.pending.keys()]; const clients = new Set([...this.pending.values()].flatMap((s) => [...s]));
-    this.pending.clear();
-    git(this.root, ['add', '-A', '--', ...paths]);
+    const a = git(this.root, ['add', '-A', '--', ...paths]);
+    if (!a.ok) return a;
     const subject = paths.length === 1 ? `memev: ${paths[0]}` : `memev: ${paths.length} notes`;
     const body = clients.size ? `\n\nMemev-Client: ${[...clients].sort().join(', ')}` : '';
     const r = git(this.root, ['commit', '-q', '-m', `${subject}${body}`]);
-    if (r.ok) this.commits++;
+    // keep the paths pending on failure so the next flush retries them; only a committed flush drops them
+    if (r.ok) { this.pending.clear(); this.commits++; }
     return r;
   }
 }

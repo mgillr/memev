@@ -93,9 +93,10 @@ function conflictCopyPath(root, p) {
  * are never combined. Returns the resolved paths and the conflict record.
  */
 export function resolveConflicts(root, vault) {
-  const st = git(root, ['diff', '--name-only', '--diff-filter=U']);
+  // core.quotePath=false so non-ASCII paths come back as the real path, not a quoted octal string
+  const st = git(root, ['-c', 'core.quotePath=false', 'diff', '--name-only', '--diff-filter=U']);
   const files = st.out.split('\n').filter(Boolean);
-  const adds = [...files];
+  const adds = [];
   const conflicts = files.map((p) => {
     const abs = path.join(root, ...p.split('/'));
     const ours = stageContent(root, 2, p);
@@ -103,12 +104,30 @@ export function resolveConflicts(root, vault) {
     if (p.startsWith('bus/log/') && p.endsWith('.jsonl')) {
       const merged = mergeJsonl(ours, theirs);
       fs.writeFileSync(abs, merged.text);
+      adds.push(p);
       const how = merged.renumbered.length
         ? `kept every message from both computers; renumbered ${merged.renumbered.length} duplicate message(s) so every id stays unique`
         : 'kept every message from both computers';
       return { path: p, kind: 'bus log', how, ...(merged.renumbered.length ? { renumbered: merged.renumbered } : {}) };
     }
-    fs.writeFileSync(abs, ours ?? '');
+    if (ours === null) {
+      // this computer deleted the note; keep it removed and hold the other version whole in a conflict copy
+      git(root, ['rm', '-q', '--', p]);
+      let copy = null;
+      if (theirs !== null) {
+        copy = conflictCopyPath(root, p);
+        // git rm can take the note's folder with it; put it back before writing the copy
+        fs.mkdirSync(path.join(root, ...copy.split('/').slice(0, -1)), { recursive: true });
+        fs.writeFileSync(path.join(root, ...copy.split('/')), theirs);
+        adds.push(copy);
+      }
+      return { path: p, kind: 'note', how: theirs !== null
+        ? 'this computer deleted the note and the other computer edited it, so the note stays removed and the other version is kept in a conflict copy'
+        : 'both computers deleted the note', ...(copy ? { copy } : {}) };
+    }
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, ours);
+    adds.push(p);
     let copy = null;
     if (theirs !== null) {
       copy = conflictCopyPath(root, p);
@@ -167,9 +186,11 @@ export function publishAddressRecord(root, url) {
 }
 
 export function syncOnce(vault, { root }) {
-  vault.commits.flush();
+  const fc = vault.commits.flush();
   const remote = git(root, ['remote']).out.split('\n').filter(Boolean)[0];
   const res = { at: now(), remote: remote || null, pulled: 0, pushed: false, error: null };
+  // a failed commit means the note is not in the backup; say so instead of claiming pushed
+  if (fc && !fc.ok) { res.error = `commit: ${fc.err.split('\n').pop()}`; return res; }
   if (!remote) return res;
   const before = git(root, ['rev-parse', 'HEAD']).out;
   const branch = git(root, ['rev-parse', '--abbrev-ref', 'HEAD']).out || 'main';
@@ -184,11 +205,11 @@ export function syncOnce(vault, { root }) {
       const prev = pruneConflicts(root);
       recordConflicts(root, { at: now(), files: [...new Set([...(prev?.files || []), ...r.files])], conflicts: [...(prev?.conflicts || []), ...r.conflicts] });
       res.conflicts = r.conflicts;
-      const changed = git(root, ['diff', '--name-only', before, 'HEAD']).out.split('\n').filter((p) => p.endsWith('.md'));
+      const changed = git(root, ['-c', 'core.quotePath=false', 'diff', '--name-only', before, 'HEAD']).out.split('\n').filter((p) => p.endsWith('.md'));
       for (const p of changed) if (vault.syncFromDisk(p, 'git-pull')) res.pulled++;
     } else {
       pruneConflicts(root);
-      const changed = git(root, ['diff', '--name-only', before, 'HEAD']).out.split('\n').filter((p) => p.endsWith('.md'));
+      const changed = git(root, ['-c', 'core.quotePath=false', 'diff', '--name-only', before, 'HEAD']).out.split('\n').filter((p) => p.endsWith('.md'));
       for (const p of changed) if (vault.syncFromDisk(p, 'git-pull')) res.pulled++;
     }
   }
