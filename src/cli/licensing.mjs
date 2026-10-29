@@ -152,6 +152,10 @@ export function installLicense({ file, env = process.env, keys = LICENSE_KEYS, n
 
   const cur = readLicenseRaw({ env });
   const converted = !isTrial(l) && isTrial(cur);
+  // an expired file never replaces a live licence (a wrong file would otherwise end a live trial)
+  if (v.state === 'expired' && cur && ['valid', 'grace'].includes(verifyLicense(cur, { keys, now }).state)) {
+    return { ok: false, reason: 'that licence has expired and the installed licence is live; nothing was changed' };
+  }
 
   // a trial over a live paid licence is refused
   if (isTrial(l) && cur && !isTrial(cur) && ['valid', 'grace'].includes(verifyLicense(cur, { keys, now }).state)) {
@@ -210,7 +214,7 @@ export async function command(cmd, pos, flags, { root, env, license = null }) {
       const r = installLicense({ file: src, env, root: isVault(root) ? root : null });
       if (!r.ok) { out.bad(`not installed: ${r.reason}`); return 1; }
       out.ok(r.converted
-        ? `converted the trial to a paid licence ${r.license.lid} (${r.state}) in ${r.file}; the vault is unchanged and the merge engine runs at the next sync`
+        ? `converted the trial to a paid licence ${r.license.lid} (${r.state}) in ${r.file}; the vault is unchanged`
         : `installed licence ${r.license.lid} (${r.state}) in ${r.file}`);
       return 0;
     }

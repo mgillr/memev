@@ -1,5 +1,5 @@
 // MEM-133: a paid licence installed over a trial converts in place. No restart, no vault change,
-// no re-enrolment, and the merge engine resumes at the next sync.
+// no re-enrolment.
 
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -226,4 +226,53 @@ test('MEM-133 AC06: the user-facing copy stays plain, with no hype words, no em-
       assert.ok(!/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(s), `${f} copy has an emoji: ${s}`);
     }
   }
+});
+
+test('MEM-133 review 1: an expired licence file is refused over a live licence, and the live trial stays installed', () => {
+  const env = { MEMEV_CONFIG_DIR: tmpdir('convert6-conf-') };
+  const now = Date.parse('2026-03-05T00:00:00Z');
+  const trial = signLicense({ v: 1, lid: 'lic_trial0008', tier: 'business', services: ['merge'], seats: 4, iat: '2026-03-01', exp: '2026-03-15', grace_days: 7, trial: true, org: 'org_acme0006' }, vendor.pem, 'test-vendor');
+  const expired = signLicense({ v: 1, lid: 'lic_paidold01', tier: 'business', services: ['merge'], seats: 3, iat: '2024-02-01', exp: '2025-02-01', grace_days: 7 }, vendor.pem, 'test-vendor');
+  const trialFile = path.join(tmpdir('convert6-t-'), 'licence.json');
+  const expiredFile = path.join(tmpdir('convert6-e-'), 'licence.json');
+  fs.writeFileSync(trialFile, JSON.stringify(trial));
+  fs.writeFileSync(expiredFile, JSON.stringify(expired));
+
+  const t0 = installLicense({ file: trialFile, env, keys: vendor.keys, now });
+  assert.equal(t0.ok, true, t0.reason);
+
+  const r = installLicense({ file: expiredFile, env, keys: vendor.keys, now });
+  assert.equal(r.ok, false, 'an expired file is refused over a live licence');
+  assert.match(r.reason, /expired/);
+
+  const lic = loadLicense({ env, keys: vendor.keys, now });
+  assert.equal(lic.lid, 'lic_trial0008', 'the live trial stays installed');
+  assert.equal(lic.state, 'valid');
+  const rec = readTrialRecord(env)['org_acme0006'];
+  assert.equal(rec.ended, null, 'the trial is not ended');
+  assert.equal(rec.converted_to, null);
+});
+
+test('MEM-133 review 2: a conversion without the merge service does not resume it, and no user-facing line claims it does', () => {
+  const { root, v } = newVault();
+  const env = { MEMEV_CONFIG_DIR: tmpdir('convert7-conf-') };
+  const now = Date.parse('2026-01-25T00:00:00Z');
+  const trial = signLicense({ v: 1, lid: 'lic_trial0009', tier: 'business', services: ['merge'], seats: 4, iat: '2026-01-01', exp: '2026-01-15', grace_days: 7, trial: true, org: 'org_acme0007' }, vendor.pem, 'test-vendor');
+  const paid = signLicense({ v: 1, lid: 'lic_paid0009', tier: 'business', services: [], seats: 3, iat: '2026-01-01', exp: '2027-01-01', grace_days: 7 }, vendor.pem, 'test-vendor');
+  const trialFile = path.join(tmpdir('convert7-t-'), 'licence.json');
+  const paidFile = path.join(tmpdir('convert7-p-'), 'licence.json');
+  fs.writeFileSync(trialFile, JSON.stringify(trial));
+  fs.writeFileSync(paidFile, JSON.stringify(paid));
+
+  const t0 = installLicense({ file: trialFile, env, keys: vendor.keys, now, root });
+  assert.equal(t0.ok, true, t0.reason);
+  const r = installLicense({ file: paidFile, env, keys: vendor.keys, now, root });
+  assert.equal(r.ok, true, r.reason);
+  assert.equal(r.converted, true);
+  assert.equal(r.merge.resumes, false, 'a licence without the merge service does not resume the merge engine');
+
+  // the copy the CLI prints makes no claim about the merge engine (the CLI takes the production key, so the line is checked over the file)
+  const lits = stringLiterals(fs.readFileSync(path.join(process.cwd(), 'src', 'cli', 'licensing.mjs'), 'utf8'));
+  assert.ok(!lits.some((s) => s.includes('merge engine')), 'no user-facing line claims the merge engine runs');
+  v.close();
 });
