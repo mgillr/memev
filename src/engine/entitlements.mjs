@@ -12,8 +12,9 @@ export const ENFORCEMENT = 'computers';
 
 /** Everything local is free and unlimited, for everyone. */
 export const CORE_FEATURES = ['vault', 'recall', 'graph', 'contracts', 'doctor', 'local_clients', 'own_tunnel', 'git_backup', 'cloud_connectors'];
-/** Paid add-ons: hosted services and multi-computer or team use. Only extra computers exist so far. */
-export const PAID_FEATURES = ['sync_hosted', 'backup_hosted', 'relay_hosted', 'extra_computers', 'team_vault', 'sso', 'audit_export'];
+/** Paid add-ons: hosted services and multi-computer or team use. The merge engine is a paid
+ * add-on too; it is never part of the core. */
+export const PAID_FEATURES = ['sync_hosted', 'backup_hosted', 'relay_hosted', 'extra_computers', 'team_vault', 'sso', 'audit_export', 'merge_engine'];
 
 /** Draft limits per tier (docs/PRICING.md). A licence's own seats and connectors win. */
 export const TIERS = {
@@ -113,4 +114,35 @@ export function report({ license = null, seats, devices = [] }) {
   const notes = [...policy.notes];
   if (limits.connectors !== null && seats.connectors > limits.connectors) notes.push(`${seats.connectors} cloud AI connectors are active; the ${limits.tier} tier covers ${limits.connectors}. Connectors are reported, not limited.`);
   return { enforcement: ENFORCEMENT, effective_tier: policy.tier, licensed_tier: limits.tier, limits, usage: seats, seats_licensed: policy.seats, computers_enrolled: policy.enrolled, can_enroll: policy.can_enroll, enroll_refused: policy.reason, read_only: policy.read_only, notes, blocked: false };
+}
+
+/**
+ * Whether the licence allows the merge engine. A paid licence that carries the merge service may
+ * use it while valid or in its grace period. A trial licence may use it only while valid, not in
+ * grace. A licence without the merge service, or one that is not usable, never may.
+ */
+export function engineAllowed(license) {
+  if (!license) return false;
+  if (license.state !== 'valid' && license.state !== 'grace') return false;
+  if (!Array.isArray(license.services) || !license.services.includes('merge')) return false;
+  if (license.trial === true && license.state !== 'valid') return false;
+  return true;
+}
+
+/**
+ * The merge engine is a separate, externally licensed component, not included in this repository.
+ * This repository holds no merge algorithm. When the engine is not installed there is no provider.
+ */
+export function mergeProvider() {
+  return null;
+}
+
+/**
+ * Resolve a merge conflict. With no engine installed the provider is null and the default keeps
+ * both sides, so nothing is dropped. This is a plain fallback, not a merge algorithm.
+ */
+export function resolveMerge(a, b) {
+  const provider = mergeProvider();
+  if (provider) return provider.resolve(a, b);
+  return { resolved: false, keepBoth: true, text: `${a}\n${b}` };
 }
