@@ -52,6 +52,18 @@ test('the price row matches the decided tiers', () => {
   assert.match(read('README.md'), /\$12\/month or \$120\/year/);
 });
 
+test('MEM-065 AC03: PRICING.md carries no Team row and no Team price, says a team of people buys Business by contacting us, and Business and Corporate stay contact us', () => {
+  const pricing = read('docs/PRICING.md');
+  assert.doesNotMatch(pricing, /\|\s*Team\s*\|/, 'PRICING.md carries a Team tier row');
+  for (const line of pricing.split('\n')) if (/\bTeam\b/.test(line)) assert.doesNotMatch(line, MONEY, `a Team price on: ${line}`);
+  const teamLine = pricing.split('\n').find((l) => /team of people buys Business/i.test(l));
+  assert.ok(teamLine, 'PRICING.md says a team of people buys Business');
+  assert.match(teamLine, /contacts? us/i);
+  const row = pricing.split('\n').find((l) => l.startsWith('| Price |')).split('|').map((c) => c.trim()).filter(Boolean);
+  assert.match(row[3], /contact us/);
+  assert.match(row[4], /contact us/);
+});
+
 test('the docs carry no price left from before 28 October 2026', () => {
   const stale = new RegExp([15, 144, 18, 216, 22, 24].map((n) => '\\$' + n + '\\b').join('|'));
   const found = [];
