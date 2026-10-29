@@ -44,9 +44,12 @@ function emit(format, event, context) {
 const BUILD_RE = /\b(i have a (new )?project|build (me|us)\b|(build|make|create|write|implement|develop|set up) (me |us )?(an? |the )?[\w -]{0,40}\b(app|application|tool|cli|api|service|site|website|bot|library|script|feature|game|dashboard|server|extension|plugin|pipeline))/i;
 export const isBuildRequest = (p) => BUILD_RE.test(String(p || ''));
 // A prompt that only moves the conversation on: under 4 words, or a continuation phrase. Recall has nothing to match
-// it against, so the hook does not recall for it.
+// it against, so the hook does not recall for it. The count is script-aware: scripts written without spaces
+// (Japanese, Chinese, Thai) are segmented into words, so a sentence in one is not one word.
 const CONTINUATION = /^(continue|go on|go ahead|carry on|keep going|yes|yes please|yep|yeah|ok|okay|sure|thanks|thank you|fix it|do it|next|proceed|please continue)[\s.!]*$/i;
-export const isContinuation = (p) => { const s = String(p || '').trim(); return s.split(/\s+/).filter(Boolean).length < 4 || CONTINUATION.test(s); };
+const WORDS = new Intl.Segmenter(undefined, { granularity: 'word' });
+const wordCount = (s) => { let n = 0; for (const seg of WORDS.segment(s)) if (seg.isWordLike) n++; return n; };
+export const isContinuation = (p) => { const s = String(p || '').trim(); return wordCount(s) < 4 || CONTINUATION.test(s); };
 const BUILD_NUDGE = '[Memev] This is a build request. Before writing code: infer the requirements, call memev_contract_from_request (each requirement with a local check), then memev_contract_sign, and say in one line what you signed. If an open contract already covers it, use memev_contract_status instead.';
 
 // The prompt hook runs inside this budget. The app gives it 10 s, but the person is waiting on
