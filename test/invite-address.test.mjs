@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { sandbox } from './helpers/cli.mjs';
 import { cleanup } from './helpers/tmp.mjs';
+import { command } from '../src/cli/invite.mjs';
 
 after(() => cleanup());
 
@@ -42,14 +43,25 @@ test('REV-020 AC01: an install that answered no to cloud access (asked and not e
   } finally { sb.stop(); }
 });
 
-test('REV-020 AC02: with the link on, the invite carries the tunnel address', () => {
+test('REV-020 AC02: with the link on, the invite carries the tunnel address', async () => {
   const sb = sandbox();
   try {
     const init = sb.run(['init', '--port', String(sb.port), '--no-connect']);
     assert.equal(init.code, 0, init.err + init.out);
     fs.writeFileSync(path.join(sb.root, '.memev', 'tunnel.json'), JSON.stringify({ enabled: true, provider: 'tailscale', url: 'https://rev020.example.com', stable: true, state: 'up' }), { mode: 0o600 });
-    const inv = sb.run(['invite']);
-    assert.equal(inv.code, 0, inv.err + inv.out);
+    // a licence that allows more computers, so the seat policy lets the code through
+    const lic = { state: 'valid', tier: 'personal', seats: 3, exp: '2027-01-01' };
+    const logs = [];
+    const origLog = console.log;
+    console.log = (...args) => logs.push(args.join(' '));
+    let rc;
+    try {
+      rc = await command(null, null, {}, { root: sb.root, env: sb.env, license: lic });
+    } finally {
+      console.log = origLog;
+    }
+    const inv = { code: rc, out: logs.join('\n') };
+    assert.equal(inv.code, 0, inv.out);
     const code = (inv.out.match(/^code: (\S+)$/m) || [])[1];
     assert.ok(code, inv.out);
     assert.match(inv.out, new RegExp(`^link: https://rev020\\.example\\.com/i/${code}$`, 'm'));
@@ -57,13 +69,24 @@ test('REV-020 AC02: with the link on, the invite carries the tunnel address', ()
   } finally { sb.stop(); }
 });
 
-test('REV-020 AC03: memev invite --local mints the loopback address for a computer that shares this machine and says so', () => {
+test('REV-020 AC03: memev invite --local mints the loopback address for a computer that shares this machine and says so', async () => {
   const sb = sandbox();
   try {
     const init = sb.run(['init', '--port', String(sb.port), '--no-connect']);
     assert.equal(init.code, 0, init.err + init.out);
-    const inv = sb.run(['invite', '--local']);
-    assert.equal(inv.code, 0, inv.err + inv.out);
+    // a licence that allows more computers, so the seat policy lets the code through
+    const lic = { state: 'valid', tier: 'personal', seats: 3, exp: '2027-01-01' };
+    const logs = [];
+    const origLog = console.log;
+    console.log = (...args) => logs.push(args.join(' '));
+    let rc;
+    try {
+      rc = await command(null, null, { local: true }, { root: sb.root, env: sb.env, license: lic });
+    } finally {
+      console.log = origLog;
+    }
+    const inv = { code: rc, out: logs.join('\n') };
+    assert.equal(inv.code, 0, inv.out);
     const code = (inv.out.match(/^code: (\S+)$/m) || [])[1];
     assert.ok(code, inv.out);
     assert.match(inv.out, new RegExp(`^link: http://127\\.0\\.0\\.1:${sb.port}/i/${code}$`, 'm'));
