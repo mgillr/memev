@@ -5,6 +5,7 @@ import path from 'node:path';
 import { readJson } from '../engine/util.mjs';
 import { mintInvite } from '../engine/devices.mjs';
 import { isVault } from '../engine/vault.mjs';
+import { memberInviteGuard, identityFromConfig } from '../engine/identity.mjs';
 import { qrText } from '../../vendor/qr.mjs';
 
 export function vaultAddress(root) {
@@ -23,4 +24,14 @@ export async function command(_cmd, _pos, flags, { root }) {
   console.log(`link: ${minted.link}`);
   console.log(qrText(minted.link));
   return 0;
+}
+
+/**
+ * A member invite (a person joining the company) is refused on a vault with no organisation, and
+ * refused when redeemed from a personal identity; a refused invite counts toward nothing. The
+ * computer enrolment code above is a different thing and is unchanged.
+ */
+export function memberInvite(root, identity) {
+  const cfg = readJson(path.join(root, '.memev', 'config.json'), {});
+  return memberInviteGuard({ vault: cfg, identity: identity ?? identityFromConfig(cfg) });
 }
