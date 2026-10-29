@@ -10,7 +10,14 @@ returns through the tunnel goes to the cloud AI app that asked for it.
 
 The tunnel is chosen in this order (`memev cloud use auto|tailscale|cloudflare|quick` to pin one):
 
-1. **Tailscale serve** if `tailscale` is installed and logged in: a stable `https://<machine>.<tailnet>.ts.net` address, reachable only from your tailnet (Memev never opens a Funnel).
+1. **Tailscale** if `tailscale` is installed and logged in: a stable `https://<machine>.<tailnet>.ts.net`
+   address. The default is `tailscale serve`, reachable only from your tailnet, and choosing the
+   provider (`memev cloud use tailscale`) keeps it that way. A Funnel opens the machine to the
+   public internet, so Memev never opens one on its own: `memev cloud funnel on --yes` is the
+   explicit consent that switches it on, and `memev cloud funnel off` withdraws it. Memev uses https
+   port 443 on the machine. If something else already serves or funnels that port, Memev leaves it
+   exactly as it is, with or without consent: it does not start its own tunnel there, never turns
+   that one off, and `memev cloud status` says the port is in use.
 2. **A named Cloudflare tunnel** if you set one up: `memev cloud use cloudflare --name <tunnel> --hostname <host>`.
 3. **A Cloudflare quick tunnel**: no account, works anywhere, but the address changes when it restarts.
    Memev downloads a pinned `cloudflared` release and checks its SHA-256 before running it.
