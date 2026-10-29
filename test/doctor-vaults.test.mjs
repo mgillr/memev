@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
+import { execFileSync } from 'node:child_process';
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { sandbox } from './helpers/cli.mjs';
@@ -53,4 +54,24 @@ test('MEM-021 AC02: doctor shows no such warning with a single vault', async () 
     assert.equal(doc.code, 0, doc.out);
     assert.equal(/two vaults on this computer/.test(doc.out), false, doc.out);
   } finally { sb.stop(); await release(); }
+});
+
+test('MEM-021: doctor warns with the join fix when the configured backup remote belongs to a different vault', () => {
+  const sb = sandbox();
+  try {
+    assert.equal(sb.run(['init', '--port', String(sb.port), '--no-connect']).code, 0);
+    const mine = idsOf(sb.root);
+    // a backup whose signed address record names another vault id, pointed at as this vault's backup remote
+    const otherBackup = path.join(sb.home, 'other-backup');
+    fs.mkdirSync(otherBackup, { recursive: true });
+    fs.writeFileSync(path.join(otherBackup, 'address.json'), JSON.stringify({ v: 1, url: 'https://example.invalid/backup', vault_id: 'other-vault-0000', at: '2026-01-01T00:00:00Z', pubkey: 'x' }));
+    execFileSync('git', ['remote', 'add', 'origin', otherBackup], { cwd: sb.root, encoding: 'utf8' });
+    const doc = sb.run(['doctor']);
+    assert.match(doc.out, /backup belongs to a different vault/, doc.out);
+    assert.match(doc.out, new RegExp(mine));
+    assert.match(doc.out, /other-vault-0000/);
+    assert.match(doc.out, /memev init --join/);
+  } finally {
+    sb.stop();
+  }
 });
