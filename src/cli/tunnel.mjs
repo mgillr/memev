@@ -75,21 +75,27 @@ export function pickProvider(cfg, env = process.env, { run = runCmd, whichFn = w
   return 'quick';
 }
 
-// Every command Memev runs against Tailscale Funnel goes through here, so the tests can see and control
-// each one. `run` is the command executor (defaults to the guarded run helper). A funnel that already
-// exists for the port is never changed or removed: Memev only manages the funnel it created itself.
-export function tailscaleFunnel({ ts, port, run = runCmd }) {
-  const alreadyConfigured = () => run(ts, ['funnel', 'status', String(port)], { timeout: 5000 }).ok;
-  const url = () => { const st = JSON.parse(run(ts, ['status', '--json']).stdout); return `https://${String(st.Self.DNSName).replace(/\.$/, '')}`; };
-  return {
-    alreadyConfigured,
-    // Bring the funnel up only when there is not already one for this port. Returns the address.
-    up() { if (alreadyConfigured()) return url(); const r = run(ts, ['funnel', '--bg', '--yes', String(port)], { timeout: 20000 }); if (!r.ok) throw new Error(r.error || (r.stderr || r.stdout).trim().split('\n').pop()); return url(); },
-    // Turn the funnel off. Only call this for a funnel Memev opened itself (the tunnel state
-    // records that); a pre-existing funnel for the port is never touched.
-    down() { const r = run(ts, ['funnel', '--bg', String(port), 'off'], { timeout: 10000 }); if (!r.ok) log(`tailscale funnel off failed: ${r.error || (r.stderr || r.stdout).trim()}`); },
-  };
+// What Tailscale serves on https 443 of this machine now, the port Memev's tunnel uses. `tailscale serve status
+// --json` prints the serve config (TCP, Web, AllowFunnel) and exits 0 even when there is none ("{}" or "null");
+// there is no per-port status, so this is the one source of truth. `run` is the command executor, so the tests
+// can answer each call the way the real CLI does.
+export function tailscale443({ ts, port, run = runCmd }) {
+  const fail = (r, what) => new Error(r.error || (r.stderr || r.stdout).trim().split('\n').pop() || `${what} failed (exit ${r.status})`);
+  const st = run(ts, ['status', '--json'], { timeout: 5000 });
+  if (!st.ok) throw fail(st, 'tailscale status');
+  const host = String(JSON.parse(st.stdout).Self.DNSName).replace(/\.$/, '');
+  const r = run(ts, ['serve', 'status', '--json'], { timeout: 5000 });
+  if (!r.ok) throw fail(r, 'tailscale serve status');
+  const sc = JSON.parse(r.stdout.trim() || '{}') || {};
+  const hp = `${host}:443`;
+  const handlers = sc.Web?.[hp]?.Handlers || {};
+  const target = Object.keys(handlers).length === 1 ? /^(?:https?:\/\/)?(?:127\.0\.0\.1|localhost):(\d+)\/?$/.exec(handlers['/']?.Proxy || '')?.[1] : undefined;
+  return { url: `https://${host}`, used: !!(sc.Web?.[hp] || sc.TCP?.['443']), funnel: sc.AllowFunnel?.[hp] === true, toUs: target === String(port) };
 }
+
+// Memev's own config on 443: it proxies to this vault's port and the last tunnel state says Memev started it. A
+// state from before funnels (provider tailscale, no mode) was a serve, since Memev never opened a funnel then.
+const ownConfig = (t, prev) => t.toUs && (prev?.mode === 'serve' || prev?.mode === 'funnel' || (prev?.provider === 'tailscale' && !prev?.mode && !t.funnel));
 
 /** The daemon side: keep the tunnel up while remote access is on. */
 export function supervise(vault, { root, port, run = runCmd, whichFn = which }) {
@@ -106,26 +112,19 @@ export function supervise(vault, { root, port, run = runCmd, whichFn = which }) 
     try {
       if (provider === 'tailscale') {
         const ts = whichFn('tailscale');
-        // A funnel needs an explicit yes; without consent the tailnet-only serve is what comes up.
-        if (funnelConsent(vault.config)) {
-          const f = tailscaleFunnel({ ts, port, run });
-          // A funnel that already exists for the port is left alone: Memev only manages the one it opens.
-          if (f.alreadyConfigured()) {
-            const st = run(ts, ['status', '--json']);
-            if (!st.ok) throw new Error(st.error || (st.stderr || st.stdout).trim().split('\n').pop() || 'tailscale status failed');
-            const url = `https://${String(JSON.parse(st.stdout).Self.DNSName).replace(/\.$/, '')}`;
-            write({ enabled: true, provider, url, stable: true, state: 'up (existing funnel left as is)' }); log(`up at ${url} (existing funnel left as is)`); return;
-          }
-          const url = f.up();
-          write({ enabled: true, provider, url, stable: true, state: 'up', mode: 'funnel' }); log(`up at ${url}`); return;
+        const t = tailscale443({ ts, port, run });
+        // Anything on https 443 that Memev did not start is left exactly as it is, with or without consent:
+        // `tailscale serve` or `funnel` would replace that handler, and serve would also drop its funnel.
+        if (t.used && !ownConfig(t, tunnelState(root))) {
+          write({ enabled: true, provider, url: null, state: 'https 443 is used by another serve or funnel on this machine; Memev left it as is' });
+          log('https 443 is used by another serve or funnel on this machine; left as is'); return;
         }
-        const r = run(ts, ['serve', '--bg', String(port)], { timeout: 20000 });
-        if (!r.ok) throw new Error(r.error || (r.stderr || r.stdout).trim().split('\n').pop() || `tailscale serve failed (exit ${r.status})`);
-        const st = run(ts, ['status', '--json']);
-        if (!st.ok) throw new Error(st.error || (st.stderr || st.stdout).trim().split('\n').pop() || 'tailscale status failed');
-        const parsed = JSON.parse(st.stdout);
-        const url = `https://${String(parsed.Self.DNSName).replace(/\.$/, '')}`;
-        write({ enabled: true, provider, url, stable: true, state: 'up', mode: 'serve' }); log(`up at ${url}`); return;
+        // A funnel needs an explicit yes (memev cloud funnel on). Without it the tailnet-only serve comes up,
+        // which also drops a funnel Memev opened before the consent was withdrawn.
+        const mode = funnelConsent(vault.config) ? 'funnel' : 'serve';
+        const r = run(ts, mode === 'funnel' ? ['funnel', '--bg', '--yes', String(port)] : ['serve', '--bg', String(port)], { timeout: 20000 });
+        if (!r.ok) throw new Error(r.error || (r.stderr || r.stdout).trim().split('\n').pop() || `tailscale ${mode} failed (exit ${r.status})`);
+        write({ enabled: true, provider, url: t.url, stable: true, state: 'up', mode }); log(`up at ${t.url}${mode === 'funnel' ? ' (public funnel)' : ''}`); return;
       }
       const bin = await cloudflaredPath(env);
       if (!bin) throw new Error('cloudflared is not installed and could not be downloaded');
@@ -156,20 +155,13 @@ export function supervise(vault, { root, port, run = runCmd, whichFn = which }) 
   function halt() {
     clearTimeout(timer);
     if (child) { child.removeAllListeners('exit'); child.kill(); child = null; }
-    if (tunnelState(root)?.provider === 'tailscale') {
+    // Only what Memev started is turned off: the state records it as mode serve or funnel. A config Memev
+    // left as is has no mode. Turning off the https 443 handler also clears its funnel (Tailscale drops
+    // AllowFunnel when no handler is left on the port), so one command covers both.
+    const st = tunnelState(root);
+    if (st?.provider === 'tailscale' && (st.mode === 'serve' || st.mode === 'funnel')) {
       const ts = whichFn('tailscale');
-      if (ts) {
-        // A pre-existing funnel is never turned off; only the tunnel Memev started is, and the
-        // state records whether that was a funnel Memev opened or a tailnet-only serve.
-        if (tunnelState(root)?.state !== 'up (existing funnel left as is)') {
-          if (tunnelState(root)?.mode === 'funnel') {
-            tailscaleFunnel({ ts, port, run }).down();
-          } else {
-            const r = run(ts, ['serve', '--bg', '--https=443', 'off'], { timeout: 10000 });
-            if (!r.ok) log(`tailscale serve off failed: ${r.error || (r.stderr || r.stdout).trim()}`);
-          }
-        }
-      }
+      if (ts) { const r = run(ts, ['serve', '--bg', '--https=443', 'off'], { timeout: 10000 }); if (!r.ok) log(`tailscale ${st.mode} off failed: ${r.error || (r.stderr || r.stdout).trim()}`); }
     }
   }
   start();
