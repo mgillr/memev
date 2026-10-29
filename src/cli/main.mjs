@@ -13,14 +13,16 @@ import { fetchOut } from '../engine/net.mjs';
 const HELP = `memev ${VERSION}: one memory shared by every AI session you run
 
 Setup
-  memev init [--root DIR] [--join CODE] [--local-only] [--org] [--no-connect] [--port N] [--lead SEAT]
-                                   create the vault, start it, connect your AI apps and seat them on the comms bus
-                                   (--join CODE adds this computer to an existing vault and creates none here.
-                                   On a terminal, init asks: first computer, or joining. If GitHub is signed in
-                                   and a private backup's README is a Memev vault, init offers to join that
-                                   vault before it creates a new one. With no GitHub CLI, or signed out, init
-                                   makes no GitHub call. Without a terminal it
-                                   creates a vault and says how a second computer uses memev init --join.
+  memev init [--root DIR] [--join CODE] [--from URL] [--local-only] [--org] [--no-connect] [--port N] [--lead SEAT]
+                                    create the vault, start it, connect your AI apps and seat them on the comms bus
+                                    (--join CODE adds this computer to an existing vault and creates none here.
+                                    --from URL clones an existing vault backup with plain git, no GitHub CLI, so a
+                                    second computer joins the vault instead of creating a new one.
+                                    On a terminal, init asks: first computer, or joining. If GitHub is signed in
+                                    and a private backup's README is a Memev vault, init offers to join that
+                                    vault before it creates a new one. With no GitHub CLI, or signed out, init
+                                    makes no GitHub call. Without a terminal it
+                                    creates a vault and says how a second computer uses memev init --join.
                                    --org: an organisation install; remote access starts off. --lead or MEMEV_LEAD
                                    picks the AI that leads the others; on a terminal init asks, otherwise none is set)
   memev connect [client|all]       register Memev in an AI app (MCP, hooks, instructions); backs up first
@@ -76,7 +78,7 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', deployment: './deployment.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', runner: './runner.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', update: './update.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs', compact: './compact.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', deployment: './deployment.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', runner: './runner.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', update: './update.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs', compact: './compact.mjs', setup: './setup-remote.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
@@ -179,7 +181,24 @@ async function run(argv, env) {
         const { join } = await import('./remote.mjs');
         return join(invite ? [invite] : [], flags, { env });
       }
-      if (!isVault(root) && process.stdin.isTTY && process.stdout.isTTY) {
+      // the free second-computer path: clone an existing backup with plain git, no GitHub CLI
+      let fromUrl = null;
+      if (flags.from !== undefined && typeof flags.from !== 'string') {
+        console.log('memev init --from <git-url> needs a git URL. Example: memev init --from git@github.com:you/vault.git');
+        return 1;
+      }
+      if (flags.from) {
+        const { cloneFromUrl, isMemevBackup } = await import('./github.mjs');
+        const cloned = cloneFromUrl(flags.from, root);
+        if (!cloned.ok) { console.log(`Could not clone ${flags.from}: ${cloned.err.split('\n').pop()}. Init did not create a new vault.`); return 1; }
+        if (!isMemevBackup(root)) {
+          try { fs.rmSync(root, { recursive: true, force: true }); } catch {}
+          console.log(`${flags.from} is not a Memev vault backup (its README is not a Memev vault). Init did not create a new vault.`);
+          return 1;
+        }
+        fromUrl = flags.from;
+      }
+      if (!flags.from && !isVault(root) && process.stdin.isTTY && process.stdout.isTTY) {
         const readline = await import('node:readline/promises');
         const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
         const answer = (await rl.question('Is this the first computer, or are you adding this one to an existing vault? [first/joining] ')).trim().toLowerCase();
@@ -220,8 +239,12 @@ async function run(argv, env) {
       const org = !!flags.org || env.MEMEV_PROFILE === 'org';
       if (flags['local-only'] || org) { const c = config(root); c.remote = { ...c.remote, enabled: false, asked: true }; if (org) c.profile = 'org'; fs.writeFileSync(path.join(root, '.memev', 'config.json'), `${JSON.stringify(c, null, 2)}\n`, { mode: 0o600 }); }
       const rt = installRuntime(env);
-      console.log(`${fresh ? 'Created' : 'Found'} your vault at ${root}`);
-      if (!process.stdin.isTTY) console.log('A second computer joins this one with memev init --join and an invite from memev invite.');
+      if (fromUrl) {
+        console.log(`Cloned your vault from ${fromUrl} into ${root}`);
+      } else {
+        console.log(`${fresh ? 'Created' : 'Found'} your vault at ${root}`);
+        if (!process.stdin.isTTY) console.log('A second computer joins this one with memev init --join and an invite from memev invite.');
+      }
       if (r.admin) console.log(`  Admin token saved to ${path.join(root, '.memev', 'admin.json')} (only this user can read it)`);
       // a port held by another program: take the next free one, and save it before any app is pointed at it
       const wanted = Number(config(root).port) || 7787;
