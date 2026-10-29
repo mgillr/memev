@@ -1,0 +1,12 @@
+{
+  "companyName": "Example Company",
+  "webHost": "web.example.invalid",
+  "landingHost": "www.example.invalid",
+  "memoraUrl": "https://memora.example.invalid/",
+  "memevUrl": "https://web.example.invalid/",
+  "contactAddress": "info@example.invalid",
+  "postalAddress": "Example Street 1, 10000 Example City, example.com",
+  "phone": "+00 000 000 000 (example.com)",
+  "formAction": "mailto:info@example.invalid",
+  "videoPath": "../media/memev-tiers.mp4"
+}
