@@ -21,7 +21,7 @@ Keep project knowledge consistent across AI sessions, and give supported agents 
 </p>
 
 <p>
-<img src="docs/assets/memev-demo.gif" alt="Tell Claude, Cursor knows: shared context in action" width="480">
+<img src="docs/assets/demo.gif" alt="Tell Claude, Cursor knows: shared context in action" width="480">
 </p>
 
 <p>
