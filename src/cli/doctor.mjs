@@ -12,7 +12,7 @@ import { redactSecrets, findSecrets } from '../engine/secrets.mjs';
 import { VERSION, isVault } from '../engine/vault.mjs';
 import { PKG, daemonInfo, pidAlive, config, out, clientsFile, tokenExpiryWarnings } from './common.mjs';
 import { EXPIRY_WARNING_DAYS } from '../engine/tokens.mjs';
-import { licensingStatus } from './licensing.mjs';
+import { licensingStatus, licencePhrase } from './licensing.mjs';
 import { alt443, githubReachable } from './github.mjs';
 import { label } from '../engine/bus.mjs';
 import { fetchOut } from '../engine/net.mjs';
@@ -156,7 +156,7 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
     const ls = licensingStatus({ root, env, vault, license });
     const flagged = ls.usage.flagged || [];
     const renewal = ls.renewal;
-    r.push(C('license', 'licence and seats (report only)', flagged.length || renewal ? 'warn' : 'ok', `${ls.license.state === 'none' ? 'free tier, no licence needed' : `licence ${ls.license.state}${ls.license.tier ? ` (${ls.license.tier})` : ''}`}; ${ls.usage.computers} computer(s), ${ls.usage.connectors} connector(s), ${ls.usage.local_clients} local client(s)${ls.notes.length ? `; ${ls.notes.join(' ')}` : ''}${renewal ? `; ${renewal}` : ''}${flagged.length ? `; credential flagged on ${flagged.map((f) => f.label).join(', ')}: memev devices` : ''}`));
+    r.push(C('license', 'licence and seats (report only)', flagged.length || renewal ? 'warn' : 'ok', `${licencePhrase(ls.license)}; ${ls.usage.computers} computer(s), ${ls.usage.connectors} connector(s), ${ls.usage.local_clients} local client(s)${ls.notes.length ? `; ${ls.notes.join(' ')}` : ''}${renewal ? `; ${renewal}` : ''}${flagged.length ? `; credential flagged on ${flagged.map((f) => f.label).join(', ')}: memev devices` : ''}`));
   } catch (e) { r.push(C('license', 'licence and seats (report only)', 'ok', `not checked: ${e.message}`)); }
   try { const s = fs.statfsSync(root); const freePct = (s.bavail / s.blocks) * 100; const inodePct = s.files ? (s.ffree / s.files) * 100 : 100; r.push(C('disk', 'disk space', freePct < 3 || inodePct < 3 ? 'warn' : 'ok', `${freePct.toFixed(0)}% space, ${inodePct.toFixed(0)}% inodes free`)); } catch {}
   const upd = updateLine(root, env);
