@@ -255,7 +255,7 @@ export function assertBackupRemote(value) {
   if ((m = /^(?:([^@/:\s]+)@)?([^/:\s]+):(.+)$/.exec(v))) {
     if (m[2].startsWith('-') || (m[1] || '').startsWith('-')) bad();
     // "scheme:value" without a slash (e.g. "http:bad") is not a remote git can name
-    if (!m[3].includes('/') && !m[1]) bad();
+    if (!m[1] && /^(?:https?|ssh|git|git\+ssh|ssh\+git|file|ftps?)$/i.test(m[2])) bad();
     return v;
   }
   bad();

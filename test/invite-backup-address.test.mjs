@@ -36,11 +36,12 @@ test('REV-001 AC01: a backup value that begins with a dash or is not an accepted
 test('REV-001 AC02: an https URL, an ssh URL, a user@host:path remote and an absolute local path are accepted as backup values, and an option-shaped value is not', () => {
   for (const good of ['https://example.com/vault.git', 'ssh://git@example.com:2222/v.git', 'git@example.com:v.git', '/var/backups/vault.git',
     'ssh://git@github.com/org/repo.git', 'ssh://git@ssh.github.com:443/org/repo.git', 'ssh://host/srv/repo.git',
-    'user@gitea.local:team/vault.git', 'https://git.example.com:8443/team/vault.git', 'http://10.0.0.5/vault.git',
+    'user@gitea.invalid:team/vault.git', 'https://git.example.com:8443/team/vault.git', 'http://10.0.0.5/vault.git',
     'file:///srv/backups/vault.git', 'file://localhost/srv/backups/vault.git', 'file:///etc',
     'git://git.example.org/vault.git', 'gh-work:org/vault.git', 'backupbox:repos/vault.git',
-    '/Volumes/My Drive/vault.git', 'C:/Users/u/vault.git', 'C:\\Users\\u\\vault.git',
-    'https://u:tok@git.example.org/vault.git', 'git+ssh://git@host/x.git']) {
+    '/Volumes/My Drive/vault.git', 'C:/vaults/vault.git', 'C:\\vaults\\vault.git',
+    'https://u:tok@example.org/vault.git', 'git+ssh://git@host/x.git',
+    'backupbox:vault.git', 'myserver:memev-backup.git']) {
     const d = decodeInvite(code(good));
     assert.equal(d.backup, good, `${good} was accepted`);
     assert.equal(assertBackupRemote(good), good);
