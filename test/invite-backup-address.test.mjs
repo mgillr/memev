@@ -16,7 +16,9 @@ after(() => cleanup());
 const code = (backup) => encodeInvite({ address: 'http://127.0.0.1:9', secret: 's', backup });
 
 test('REV-001 AC01: a backup value that begins with a dash or is not an accepted remote shape is refused by decodeInvite and by join: nothing is saved and no git process is started', () => {
-  for (const bad of ['--upload-pack=touch /tmp/rev001-pwned', '-u', 'http://', 'relative/path', 'http:bad', 'ssh://', 'user@host', 'user@host:/']) {
+  for (const bad of ['--upload-pack=touch /tmp/rev001-pwned', '-u', 'http://', 'relative/path', 'http:bad', 'ssh://', 'user@host',
+    '--upload-pack=touch_pwned@host:x', '-oProxyCommand=evil@host:repo', '-u@h:p',
+    'ssh://-oProxyCommand=evil/repo', 'https://-oevil/x', 'ssh://-ouser@host/x', 'user@-host:x']) {
     assert.throws(() => decodeInvite(code(bad)), /not a valid git remote/, `decodeInvite refused ${JSON.stringify(bad)}`);
     assert.throws(() => assertBackupRemote(bad), /not a valid git remote/);
   }
@@ -31,7 +33,9 @@ test('REV-001 AC01: a backup value that begins with a dash or is not an accepted
 });
 
 test('REV-001 AC02: an https URL, an ssh URL, a user@host:path remote and an absolute local path are accepted as backup values, and an option-shaped value is not', () => {
-  for (const good of ['https://example.com/vault.git', 'ssh://git@example.com:2222/v.git', 'git@example.com:v.git', '/var/backups/vault.git']) {
+  for (const good of ['https://example.com/vault.git', 'ssh://git@example.com:2222/v.git', 'git@example.com:v.git', '/var/backups/vault.git',
+    'ssh://git@github.com/org/repo.git', 'ssh://git@ssh.github.com:443/org/repo.git', 'ssh://host/srv/repo.git',
+    'user@gitea.local:team/vault.git', 'https://git.example.com:8443/team/vault.git', 'http://10.0.0.5/vault.git']) {
     const d = decodeInvite(code(good));
     assert.equal(d.backup, good, `${good} was accepted`);
     assert.equal(assertBackupRemote(good), good);
