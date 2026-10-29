@@ -31,3 +31,23 @@ cannot see your apps or your login session. For cloud access, run the tunnel on 
 (`cloudflared tunnel --url http://127.0.0.1:7787`) and use a token issued with `--remote`.
 
 `memev selftest` inside the image checks a throwaway vault end to end; `scripts/docker-smoke.sh` runs the full container check.
+
+## Trial setup
+
+The trial is free and runs on your own machine. The convergence engine is a separate component under its own licence and is not part of the image. The image is not published to a registry yet; build it locally with `docker compose -f compose.trial.yaml build`.
+
+Three steps to a running trial:
+
+1. Get the compose file. Copy `compose.trial.yaml` from the repository, or set `MEMEV_IMAGE` to a prebuilt image name.
+2. Start it. Run `docker compose -f compose.trial.yaml up -d`. The port is published on `127.0.0.1:7787` only. Wait for the health check to pass: `docker compose -f compose.trial.yaml ps` shows `healthy`.
+3. Copy the licence into the volume and install it. Copy the signed licence file into the container with `docker compose -f compose.trial.yaml cp trial.license.json memev:/vault/trial.license.json`, then run `docker compose -f compose.trial.yaml exec memev memev license install /vault/trial.license.json`. The licence file is a signed JSON document; the free tier needs no licence, but installing one records the trial.
+
+Expected output for each step:
+
+Step 1: the file `compose.trial.yaml` is in the repository root.
+
+Step 2: `docker compose -f compose.trial.yaml up -d` prints `Container memev-1 Started`. `docker compose -f compose.trial.yaml ps` prints `memev-1  Up  healthy`.
+
+Step 3: `docker compose -f compose.trial.yaml cp trial.license.json memev:/vault/trial.license.json` copies the file into the volume. `docker compose -f compose.trial.yaml exec memev memev license install /vault/trial.license.json` prints `installed licence <lid> (<state>) in <path>`.
+
+`scripts/docker-trial-smoke.sh` runs the whole path on a machine with Docker: build, up, wait for healthy, doctor, licence install of a throwaway test licence, down with volumes removed. Run it by hand, not in CI.
