@@ -31,7 +31,7 @@ test('REV-001 AC01: a backup value that begins with a dash or is not an accepted
 });
 
 test('REV-001 AC02: an https URL, an ssh URL, a user@host:path remote and an absolute local path are accepted as backup values, and an option-shaped value is not', () => {
-  for (const good of ['https://example.com/vault.git', 'ssh://git@example.com:2222/v.git', 'git@example.com:v.git', '/home/user/vault.git']) {
+  for (const good of ['https://example.com/vault.git', 'ssh://git@example.com:2222/v.git', 'git@example.com:v.git', '/var/backups/vault.git']) {
     const d = decodeInvite(code(good));
     assert.equal(d.backup, good, `${good} was accepted`);
     assert.equal(assertBackupRemote(good), good);
