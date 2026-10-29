@@ -1,5 +1,7 @@
 # Releasing Memev
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 A checklist for cutting a release of the `memev` npm package.
 
 ## Before you tag

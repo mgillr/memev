@@ -1,5 +1,7 @@
 # Windsurf
 
+Part of the [Memev documentation](../README.md). Up: [AI apps](../CLIENTS.md), the [README](../../README.md).
+
 Id: `windsurf`
 
 `memev init` connects this app when it finds `~/.codeium/windsurf`. To connect it yourself:

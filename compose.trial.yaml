@@ -1,0 +1,17 @@
+services:
+  memev:
+    image: ${MEMEV_IMAGE:-memev:trial}
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7787:7787"
+    volumes:
+      - memev-vault:/vault
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7787/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+volumes:
+  memev-vault:

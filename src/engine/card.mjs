@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { truncate, readJson, configDir, homeDir } from './util.mjs';
+import { TokenStore, EXPIRY_WARNING_DAYS, expiryWarningLine, expiredWarningLine } from './tokens.mjs';
 
 // The footer for exported artefacts: on only when the user set "footer": true in the vault config.
 export const FOOTER = 'Made with Memev';
@@ -69,8 +70,32 @@ export const PROTOCOL_REVIEW = [
   { was: "If Memev is unreachable, say so once and continue.", now: "Memev unreachable: say so once, continue." },
 ];
 
-export function renderCard(c, { maxChars = 6000, footer } = {}) {
+/**
+ * The conflicts a sync merge could not join by itself, from the sync job's state. The operator card
+ * shows them so the person sees what the two computers disagreed on; a card for another seat does not.
+ */
+export function syncConflicts(root = currentVault()) {
+  try {
+    const s = readJson(path.join(root, '.memev', 'jobs.json'), {})?.sync?.conflicts;
+    return s?.files?.length ? s : null;
+  } catch { return null; }
+}
+
+export function renderCard(c, { maxChars = 6000, footer, root } = {}) {
   const L = ['[Memev resume card]'];
+  // a credential that has expired, or that will expire soon, is said up front, so it is renewed or revoked
+  try {
+    const ts = new TokenStore(path.join(root || currentVault(), '.memev', 'tokens.json'));
+    const lines = [...ts.expired().map((t) => expiredWarningLine(t)), ...ts.expiringWithin(EXPIRY_WARNING_DAYS).map((t) => expiryWarningLine(t))];
+    if (lines.length) L.push(`Credential warnings: ${lines.join('; ')}.`);
+  } catch { /* no vault or no tokens yet */ }
+  if (c.operator) {
+    const conflicts = syncConflicts(root || currentVault());
+    if (conflicts?.files?.length) {
+      L.push('Sync conflicts (the two computers disagreed; both versions are kept):');
+      for (const f of conflicts.conflicts || []) L.push(`  ${f.path}: ${f.how}${f.copy ? `; the other computer's version is ${f.copy}` : ''} (memev doctor)`);
+    }
+  }
   if (c.project_state?.checkpoints) {
     const s = c.project_state;
     L.push(`Project ${c.project} (last checkpoint ${s.at}):`);

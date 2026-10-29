@@ -1,5 +1,7 @@
 # Problems and solutions
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 People who use AI memory tools complain about the same things again and again. We collected 205
 public complaints about memory in ChatGPT, Claude, Gemini, Cursor, mem0, Zep, Basic Memory, Glean,
 Microsoft 365 Copilot and others, sorted them into 13 groups, and checked each group against Memev's
@@ -81,11 +83,12 @@ to whichever cloud model the app uses.
 **What Memev does.**
 - Built: no telemetry, no runtime dependencies, the daemon listens on `127.0.0.1` only, files are
   readable only by you, and every remote request needs a per-device token and is logged.
-- Built: an organisation install (`memev init --org`) starts with the tunnel off, and switching it on
-  needs `memev cloud on --yes`. Personal installs keep the tunnel on by default, as before.
+- Built: remote access is off by default on every install. `memev init` on a terminal offers it once,
+  with one line on what gets exposed, and `memev cloud on` switches it on. An organisation install
+  (`memev init --org`) needs `memev cloud on --yes`.
 - Planned for Business and Corporate (both coming): labels on notes, rules for what each kind of client may receive,
-  pseudonymising names and amounts before they go to a cloud model, and a log of every byte returned
-  to a non-local client.
+  pseudonymising names and amounts before they go to a cloud AI service, and a log of every byte
+  returned to the organisation's AI provider.
 
 **What Memev cannot do.** Once text reaches a cloud model, Memev has no control over it. Protection
 there is a contract with the provider, not a technical guarantee.
@@ -209,7 +212,7 @@ Microsoft's own guidance calls oversharing the largest risk in a Copilot rollout
   that appear only in notes the token may not read. Before this change those names could leak
   through the graph.
 - Planned: departments, roles and path grants with deny by default, a separate index and graph per
-  scope, and "restricted" notes that only a local model may receive.
+  scope, and "restricted" notes that the organisation's one AI provider does not receive.
 
 **Tier.** Business and Corporate (both coming) for roles and scopes.
 
@@ -220,13 +223,13 @@ Microsoft's own guidance calls oversharing the largest risk in a Copilot rollout
 **Why it happens.** Self-hosted AI tools often start single-user with authentication off.
 
 **What Memev does.** Built: every computer and app has its own credential, which can be revoked.
-Planned: a company hub, sign-in with Google or Microsoft Entra ID, a member list from an org chart,
+Planned: a company server, sign-in with Google or Microsoft Entra ID, a member list from an org chart,
 and offboarding.
 
 **Tier.** Business and Corporate (both coming).
 
-**Done check.** `node --test test/licensing.test.mjs test/seats.test.mjs` (device credentials and keys). The hub has no check yet
-because it does not exist yet.
+**Done check.** `node --test test/licensing.test.mjs test/seats.test.mjs` (device credentials and keys). The company server has no
+check yet because it does not exist yet.
 
 ## 12. Price and access for small companies (9)
 
@@ -234,8 +237,8 @@ because it does not exist yet.
 ignore firms under 50 people.
 
 **What Memev does.** One person on one computer gets all of Memev for free, for good
-([CHARTER.md](../CHARTER.md)). Personal with more computers has a set price; Business and
-Corporate (both coming) are priced on request. There is no Team tier. See [PRICING.md](PRICING.md)
+([CHARTER.md](../CHARTER.md)). Personal with more computers has a set price ($12/month or $120/year, CHF 10 or CHF 100); Business and
+Corporate (both coming) have no public price: contact us. There is no Team tier. See [PRICING.md](PRICING.md)
 and [tiers/](tiers/README.md).
 
 **Tier.** All.
@@ -299,7 +302,7 @@ org chart, sensitive departments kept on a local model, and a log of what leaves
 | Project names in any script (today non-Latin names share a file name) | Personal | planned |
 | Local read-only web view | Personal | planned |
 | End-to-end encrypted sync between your computers | Personal with more computers | planned |
-| Company hub, org chart import, roles and path grants | Business and Corporate | planned |
+| Company server, org chart import, roles and path grants | Business and Corporate | planned |
 | Sign-in with Google or Microsoft Entra ID, offboarding | Business and Corporate | planned |
 | Labels, egress rules, egress log, pseudonymising for cloud models | Business and Corporate | planned |
 | High availability, air-gapped install, SIEM export, retention and legal hold | Corporate | planned |

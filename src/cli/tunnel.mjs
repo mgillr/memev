@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Remote access for cloud AI apps, on by default, one command to switch off (`memev cloud off`).
+// Remote access for cloud AI apps, off by default, one command to switch on (`memev cloud on`).
 // Providers, best first:
 //   tailscale   `tailscale serve` on this machine: a stable https name, tailnet only (never Funnel)
 //   cloudflare  a named Cloudflare tunnel you configured (`memev cloud use cloudflare --name N --hostname H`): stable
@@ -10,11 +10,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
-import { spawn, spawnSync } from 'node:child_process';
-import { configDir, readJson, writePrivate, writePrivateJson, writeJson, randomToken, now, exists } from '../engine/util.mjs';
+import { spawn } from 'node:child_process';
+import { configDir, readJson, writePrivate, writePrivateJson, writeJson, randomToken, now, exists, run } from '../engine/util.mjs';
 import { tunnelKeyFile, tunnelKey, config, saveConfig, clientToken, adminToken, api, out } from './common.mjs';
 import { publishAddressRecord } from './sync.mjs';
 import { fetchOut } from '../engine/net.mjs';
+import { loadLicense } from '../engine/license.mjs';
+import { limitsFor } from '../engine/entitlements.mjs';
+import { TOKEN_RE } from '../engine/tokens.mjs';
+import { qrText } from '../../vendor/qr.mjs';
 
 export const CLOUDFLARED = {
   version: '2026.10.4',
@@ -27,7 +31,7 @@ export const CLOUDFLARED = {
   },
 };
 
-const which = (bin) => { const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', [bin], { encoding: 'utf8' }); return r.status === 0 ? r.stdout.split(/\r?\n/)[0].trim() : null; };
+const which = (bin) => { const r = run(process.platform === 'win32' ? 'where' : 'which', [bin]); return r.ok ? r.stdout.split(/\r?\n/)[0].trim() : null; };
 export function ensureTunnelKey(root) { let k = tunnelKey(root); if (!k) { k = randomToken(24); writePrivate(tunnelKeyFile(root), `${k}\n`); } return k; }
 const stateFile = (root) => path.join(root, '.memev', 'tunnel.json');
 export const tunnelState = (root) => readJson(stateFile(root), null);
@@ -46,7 +50,7 @@ export async function cloudflaredPath(env = process.env, { download = true } = {
   const got = crypto.createHash('sha256').update(buf).digest('hex');
   if (got !== pin[1]) throw new Error(`cloudflared checksum mismatch (got ${got.slice(0, 12)}…); not using it`);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  if (pin[0].endsWith('.tgz')) { const tgz = path.join(dir, 'c.tgz'); fs.writeFileSync(tgz, buf); spawnSync('tar', ['xzf', tgz, '-C', dir]); fs.rmSync(tgz); }
+  if (pin[0].endsWith('.tgz')) { const tgz = path.join(dir, 'c.tgz'); fs.writeFileSync(tgz, buf); run('tar', ['xzf', tgz, '-C', dir]); fs.rmSync(tgz); }
   else fs.writeFileSync(bin, buf, { mode: 0o755 });
   fs.chmodSync(bin, 0o755);
   return bin;
@@ -57,7 +61,7 @@ export function pickProvider(cfg, env = process.env) {
   if (want === 'cloudflare' && cfg.remote?.cloudflare?.name) return 'cloudflare';
   if (want === 'tailscale' || want === 'auto') {
     const ts = which('tailscale');
-    if (ts) { const s = spawnSync(ts, ['status', '--json'], { encoding: 'utf8', timeout: 3000 }); try { if (JSON.parse(s.stdout).BackendState === 'Running') return 'tailscale'; } catch {} }
+    if (ts) { const s = run(ts, ['status', '--json'], { timeout: 3000 }); if (s.ok) { try { if (JSON.parse(s.stdout).BackendState === 'Running') return 'tailscale'; } catch {} } }
     if (want === 'tailscale') return null;
   }
   if (want === 'cloudflare' && !cfg.remote?.cloudflare?.name) return null;
@@ -79,10 +83,12 @@ export function supervise(vault, { root, port }) {
     try {
       if (provider === 'tailscale') {
         const ts = which('tailscale');
-        const r = spawnSync(ts, ['serve', '--bg', String(port)], { encoding: 'utf8', timeout: 20000 });
-        if (r.status !== 0) throw new Error((r.stderr || r.stdout).trim().split('\n').pop());
-        const st = JSON.parse(spawnSync(ts, ['status', '--json'], { encoding: 'utf8' }).stdout);
-        const url = `https://${String(st.Self.DNSName).replace(/\.$/, '')}`;
+        const r = run(ts, ['serve', '--bg', String(port)], { timeout: 20000 });
+        if (!r.ok) throw new Error(r.error || (r.stderr || r.stdout).trim().split('\n').pop() || `tailscale serve failed (exit ${r.status})`);
+        const st = run(ts, ['status', '--json']);
+        if (!st.ok) throw new Error(st.error || (st.stderr || st.stdout).trim().split('\n').pop() || 'tailscale status failed');
+        const parsed = JSON.parse(st.stdout);
+        const url = `https://${String(parsed.Self.DNSName).replace(/\.$/, '')}`;
         write({ enabled: true, provider, url, stable: true, state: 'up' }); log(`up at ${url}`); return;
       }
       const bin = await cloudflaredPath(env);
@@ -114,7 +120,7 @@ export function supervise(vault, { root, port }) {
   function halt() {
     clearTimeout(timer);
     if (child) { child.removeAllListeners('exit'); child.kill(); child = null; }
-    if (tunnelState(root)?.provider === 'tailscale') { const ts = which('tailscale'); if (ts) spawnSync(ts, ['serve', '--bg', '--https=443', 'off'], { timeout: 10000 }); }
+    if (tunnelState(root)?.provider === 'tailscale') { const ts = which('tailscale'); if (ts) { const r = run(ts, ['serve', '--bg', '--https=443', 'off'], { timeout: 10000 }); if (!r.ok) log(`tailscale serve off failed: ${r.error || (r.stderr || r.stdout).trim()}`); } }
   }
   start();
   // the relay (off unless the setting is on) is kept up beside the tunnel; see relay.mjs and docs/RELAY.md
@@ -129,7 +135,41 @@ export function connectorInfo(root, client = 'cloud') {
   return { url: st.url, stable: !!st.stable, connector_url: `${st.url}/c/${token}/mcp`, mcp_url: `${st.url}/mcp`, headers: { Authorization: `Bearer ${token}` } };
 }
 
-async function reloadDaemon(root) { const t = adminToken(root); if (!t) return false; try { return (await api(root, '/v1/reload', { token: t })).ok; } catch { return false; } }
+/** The name of a cloud seat on the bus (any `<app>@cloud`, or the one for `app`), or null. A removed seat is gone. */
+export function cloudSeat(root, app = null) {
+  const dir = path.join(root, 'bus', 'seats');
+  let files; try { files = fs.readdirSync(dir); } catch { return null; }
+  for (const f of files) {
+    if (!f.endsWith('.json')) continue;
+    const rec = readJson(path.join(dir, f), null);
+    if (!rec?.seat || rec.removed) continue;
+    if (app ? rec.seat === `${app}@cloud` : /@cloud$/.test(rec.seat)) return rec.seat;
+  }
+  return null;
+}
+
+/** The plan note: the number of connectors the tier covers, or "not capped" only when the tier has no number. */
+export function planNote(limits) {
+  return limits.connectors == null ? 'cloud connectors not capped' : `${limits.connectors} cloud connectors covered`;
+}
+
+/** The wait for `memev cloud connect` in ms: a positive number of seconds, 120 when the flag is missing or not a number. */
+export function connectTimeoutMs(flags) {
+  return Math.max(1, Number(flags.timeout) || 120) * 1000;
+}
+
+/** True once the device that holds this token has been seen since `start`.
+    Every request through the connector, MCP calls included, updates the device's last_seen, so this
+    catches an app that never touches the bus. A seat from before `start` does not count. */
+export function deviceSeenSince(root, token, start) {
+  const id = TOKEN_RE.exec(String(token || '').trim())?.[1];
+  if (!id) return false;
+  const reg = readJson(path.join(root, '.memev', 'devices.json'), null);
+  const d = reg?.devices && Object.values(reg.devices).find((x) => x.token_id === id);
+  return !!(d?.last_seen && Date.parse(d.last_seen) >= start);
+}
+
+export async function reloadDaemon(root) { const t = adminToken(root); if (!t) return false; try { return (await api(root, '/v1/reload', { token: t })).ok; } catch { return false; } }
 
 export async function command(cmd, pos, flags, { root, env = process.env }) {
   const sub = pos[0] || 'status'; const cfg = config(root);
@@ -163,5 +203,35 @@ export async function command(cmd, pos, flags, { root, env = process.env }) {
     } else console.log('  memev cloud url prints the connector URL (it contains a secret).');
     return 0;
   }
-  throw new Error('memev cloud on|off|status|url|use|relay|rotate-key');
+  if (sub === 'connect') {
+    const app = pos[1];
+    if (!['chatgpt', 'claude'].includes(app)) throw new Error('memev cloud connect chatgpt|claude');
+    const st = tunnelState(root);
+    if (!cfg.remote?.enabled) { console.log('Remote access is off. Turn it on first: memev cloud on'); return 1; }
+    if (!st?.url) { console.log(`The tunnel has no address yet (${st?.state || 'not started'}); check memev cloud status`); return 1; }
+    const token = clientToken(root, app, { remote: true });
+    const url = `${st.url}/c/${token}/mcp`;
+    const name = app === 'claude' ? 'claude.ai' : 'ChatGPT';
+    const limits = limitsFor(loadLicense({ env }));
+    console.log(`Connect ${name} to this vault.`);
+    console.log(`Plan: ${limits.tier} (${planNote(limits)})`);
+    console.log(`Connector URL (add as a custom connector in ${name}): ${url}`);
+    console.log('Treat the connector URL like a password. Revoke it with memev token revoke <id>.');
+    console.log('Or scan the QR code:');
+    console.log(qrText(url));
+    const timeoutMs = connectTimeoutMs(flags);
+    const start = Date.now();
+    for (;;) {
+      if (deviceSeenSince(root, token, start)) {
+        const seat = cloudSeat(root, app);
+        console.log(seat
+          ? `  \u2713 ${app}@cloud is on the bus; ${name} is connected`
+          : `  \u2713 ${name} is connected (it takes the ${app}@cloud seat on its first bus message)`);
+        return 0;
+      }
+      if (Date.now() - start >= timeoutMs) { console.log(`  \u2192 no ${app}@cloud seat after ${Math.round(timeoutMs / 1000)}s; in ${name}, add the connector URL as a custom connector and start a chat that uses it, then run memev cloud connect ${app} again`); return 1; }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+  throw new Error('memev cloud on|off|status|url|use|relay|rotate-key|connect');
 }

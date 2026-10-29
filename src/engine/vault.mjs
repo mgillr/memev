@@ -12,7 +12,7 @@ import { sha256, readJson, writeJson, writePrivateJson, exists, now, stamp, slug
 import { OpLog } from './oplog.mjs';
 import { RecallIndex, tokenize, sections } from './index.mjs';
 import { TokenStore, allowed } from './tokens.mjs';
-import { CommitQueue, git } from './git.mjs';
+import { CommitQueue, git, gitInitMain } from './git.mjs';
 import { lineSplice, applySplice } from './diff.mjs';
 import { findSecrets, redactSecrets } from './secrets.mjs';
 import { Graph } from './graph.mjs';
@@ -25,7 +25,7 @@ export const VERSION = '0.1.0';
 export const STATE = '.memev';
 const KINDS = { decision: 'decisions', gotcha: 'gotchas', fact: 'facts', pattern: 'patterns', win: 'wins', person: 'people', note: 'notes', preference: 'preferences' };
 const PROTECTED = [/^contracts\/signed\//, /^contracts\/keys\//];
-const DEFAULT_CONFIG = { version: 1, port: 7787, remote: { enabled: true, provider: 'auto', rate_per_min: 120 }, sync: { interval_min: 30 }, recall: { per_prompt: true, max_chars: 1500, min_score: 1.0, scope: 'project' }, memory: { ...DEFAULT_GATE }, journal: { enabled: true, max_chars: 2000 }, contracts: { enabled: false, exec_local_only: true } };
+const DEFAULT_CONFIG = { version: 1, port: 7787, remote: { enabled: false, provider: 'auto', rate_per_min: 120 }, sync: { interval_min: 30 }, recall: { per_prompt: true, max_chars: 1500, min_score: 1.0, scope: 'project' }, memory: { ...DEFAULT_GATE }, journal: { enabled: true, max_chars: 2000 }, contracts: { enabled: false, exec_local_only: true } };
 
 export class VaultError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
@@ -602,6 +602,18 @@ attachContracts(Vault);
 /** Create a new vault in `root` from the template. Idempotent. Returns the admin token when one is minted. */
 export function initVault(root, { template, port = null } = {}) {
   root = path.resolve(root);
+  const madeRoot = !exists(root);
+  const madeGit = !exists(path.join(root, '.git'));
+  if (madeGit) {
+    // git init runs first, before anything is written, so a failure never leaves a half built vault.
+    if (madeRoot) fs.mkdirSync(root, { recursive: true });
+    const init = gitInitMain(root);
+    if (!init.ok) {
+      if (madeRoot) { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} }
+      else { try { fs.rmSync(path.join(root, '.git'), { recursive: true, force: true }); } catch {} }
+      throw new VaultError('git_failed', `git init failed for the vault at ${root}: ${init.err || `exit ${init.status}`}`);
+    }
+  }
   fs.mkdirSync(path.join(root, STATE), { recursive: true, mode: 0o700 });
   try { fs.chmodSync(root, 0o700); } catch {}
   const copy = (src, dst) => { for (const e of fs.readdirSync(src, { withFileTypes: true })) { const s = path.join(src, e.name), d = path.join(dst, e.name); if (e.isDirectory()) { fs.mkdirSync(d, { recursive: true }); copy(s, d); } else if (!exists(d)) fs.copyFileSync(s, d); } };
@@ -611,8 +623,7 @@ export function initVault(root, { template, port = null } = {}) {
   else if (port) { const c = readJson(cfgFile); c.port = port; writeJson(cfgFile, c, 0o600); }
   const gi = path.join(root, '.gitignore'); if (!exists(gi)) fs.writeFileSync(gi, '.memev/\n*.tmp\n');
   const ga = path.join(root, '.gitattributes'); if (!exists(ga)) fs.writeFileSync(ga, 'memory/**/*.md merge=union\nwork/**/*.md merge=union\n');
-  if (!exists(path.join(root, '.git'))) {
-    git(root, ['init', '-q', '-b', 'main']);
+  if (madeGit) {
     if (!git(root, ['config', 'user.email']).out) { git(root, ['config', 'user.name', 'Memev']); git(root, ['config', 'user.email', 'memev@localhost']); }
     git(root, ['add', '-A']); git(root, ['commit', '-q', '-m', 'memev: a new vault']);
   }

@@ -1,5 +1,7 @@
 # Services, rates and response times
 
+Part of the [tiers pages](README.md). Up: the [README](../../README.md).
+
 > **DRAFT.** Every policy here is a proposal, not an offer. Services are priced on your requirements:
 > contact us for a quote. See [PRICING.md](../PRICING.md).
 
@@ -26,13 +28,14 @@ Each package is priced on your requirements: contact us for a quote.
 | Package | For | Remote timeline |
 |---|---|---|
 | Onboarding, small | Personal: install, GitHub backup, apps connected, a walkthrough | 1 to 2 days |
-| Business setup | the company hub, sign-in, departments, computers, backup | 2 to 3 weeks |
-| Business setup with a local model | the above plus the model server and the restricted-department rules | 3 to 4 weeks |
+| Business setup | the company server, sign-in, departments, computers, backup | 2 to 3 weeks |
+| Business setup with an on-premises LLM | the above plus the model server, connected as the organisation's one AI provider, and the rules for what reaches it | 3 to 4 weeks |
+| Sales-assisted pilot | Business or Corporate for an organisation that needs an on-premises LLM, an air-gapped install or a compliance-led rollout (planned) | |
 | Corporate onboarding | discovery, high availability, identity, SIEM, pilot, rollout | 6 to 12 weeks |
-| Private deployment | we run and maintain a dedicated hub in your data centre or cloud account | 2 to 4 weeks to start |
+| Private deployment | we run and maintain a dedicated company server in your data centre or cloud account | 2 to 4 weeks to start |
 | Compliance pack | data-flow diagrams, records of processing, the security answers your auditors ask for, kept current, once or yearly | 2 to 3 weeks |
 | Workshop | one session for staff, up to 3 hours | |
-| Admin training day | a full day for the people who run the hub | |
+| Admin training day | a full day for the people who run the company server | |
 | Custom development | connectors, integrations, features | quoted per job |
 
 ## Support plans
@@ -51,11 +54,11 @@ agreed otherwise.
 
 | Priority | Example | Business support | Named or embedded engineer |
 |---|---|---|---|
-| 1, outage | the hub is down for everyone | 4 business hours | 1 hour, around the clock |
+| 1, outage | the company server is down for everyone | 4 business hours | 1 hour, around the clock |
 | 2, fault | recall fails for a department | 1 business day | 4 hours |
 | 3, question | how do I set up a contractor | 3 business days | 1 business day |
 
-There is no uptime guarantee for a hub you run yourself. For a private deployment we run, the
+There is no uptime guarantee for a company server you run yourself. For a private deployment we run, the
 uptime target is agreed in the contract.
 
 ## Onsite work and travel (draft policy)
@@ -70,7 +73,7 @@ billed on top:
 | Meals and incidentals | at cost with receipts, or a daily allowance agreed in advance |
 | Cancellation | free up to 10 working days before; after that, booked travel that can't be refunded is charged |
 
-Example: installing a Business hub with a local model onsite takes about two days for one engineer,
+Example: installing a Business company server with an on-premises LLM onsite takes about two days for one engineer,
 with a travel day each way. The quote covers the package, the two onsite days and the two travel
 days; travel and expenses come on top at cost.
 
