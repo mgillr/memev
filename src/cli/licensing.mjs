@@ -103,7 +103,7 @@ export async function command(cmd, pos, flags, { root, env, license = null }) {
       const s = licensingStatus({ root, env, license });
       if (flags.json) { console.log(JSON.stringify(s, null, 2)); return 0; }
       const l = s.license;
-      console.log(l.state === 'none' ? 'Licence: Personal, no licence needed. Everything on this computer is free and unlimited.' : `Licence ${l.lid || ''}: licence ${l.state}${l.tier ? ` (${tierLabel(l.tier)})` : ''}${l.seats ? ` · ${l.seats} computer(s)` : ''}${l.connectors != null ? ` · ${l.connectors} connector(s)` : ''} · ${l.reason}`);
+      console.log(l.state === 'none' ? 'Licence: Personal, no licence needed (the free tier). Everything on this computer is free and unlimited.' : `Licence ${l.lid || ''}: licence ${l.state}${l.tier ? ` (${tierLabel(l.tier)})` : ''}${l.seats ? ` · ${l.seats} computer(s)` : ''}${l.connectors != null ? ` · ${l.connectors} connector(s)` : ''} · ${l.reason}`);
       if (s.renewal) console.log(s.renewal);
       console.log(s.computers_enrolled > s.seats_licensed
         ? `Computers: ${s.computers_enrolled} enrolled, but the licence covers ${s.seats_licensed}; the others can read but not write, and none can be added. This computer is never limited.`
