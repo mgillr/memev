@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Business: one company vault for your members' AI apps</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="name" href="index.html">Memev</a>
+    <nav>
+      <a href="personal.html">Personal</a>
+      <a href="business.html">Business</a>
+      <a href="trial.html">Trial</a>
+      <a href="video.html">Video</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+  </div>
+</header>
+<main>
+  <h1>Business</h1>
+  <span class="tag">coming</span>
+  <p>For a company that wants one memory for its members and their AI apps, on its own server, with
+  the company able to see and search what its members' AI apps have learned. Business is not built
+  yet: the company vault, the admin console, the company server, sign-in, departments, labels,
+  pseudonymising and the egress log are all planned. A Business trial is planned.</p>
+  <h2>How it works</h2>
+  <p>Every member's computer runs Memev and the member's local AI tools, which reach it over MCP.
+  The work data of all members syncs into one company vault. The company can see and search
+  everything in it through the company admin console. Members keep private work outside Memev.</p>
+  <p>The organisation connects to one AI provider: either one cloud AI service or a local model the
+  organisation runs itself. The connection is over MCP. It is one provider for the whole
+  organisation, not one per member.</p>
+  <h2>What is included</h2>
+  <ul>
+    <li>Everything in Personal on every computer</li>
+    <li>One company vault that all members' work data syncs into, with company knowledge coming back
+    down to members' apps <span class="tag">planned</span></li>
+    <li>A company admin console that sees and searches everything in the company vault
+    <span class="tag">planned</span></li>
+    <li>One AI provider for the organisation, a cloud AI service or a local model the organisation
+    runs itself, connected over MCP <span class="tag">planned</span></li>
+    <li>Merging of members' edits by the convergence engine, which lives in its own repository and
+    is called as an external dependency <span class="tag">planned</span></li>
+    <li>Invites from an org admin into the company vault <span class="tag">planned</span></li>
+    <li>Separate identities and keys from any personal vault, with no grants, mounts or mixing
+    <span class="tag">planned</span></li>
+    <li>When someone leaves: access ends, keys are revoked, devices are removed, the local cache is
+    wiped and what they synced stays in the company vault <span class="tag">planned</span></li>
+    <li>Sign-in with Google Workspace or Microsoft Entra ID, offboarding <span class="tag">planned</span></li>
+    <li>Departments, roles and grants from your org chart <span class="tag">planned</span></li>
+    <li>Labels, rules for what reaches the AI provider, pseudonymising, egress log
+    <span class="tag">planned</span></li>
+    <li>Backup to your company's GitHub organisation or your own git server <span class="tag">built</span></li>
+    <li>Cloud AI connectors are counted, not refused</li>
+  </ul>
+  <h2>Where it runs</h2>
+  <p>There are two options, and the choice is recorded in the vault config.</p>
+  <h3>Cloud-hosted <span class="tag">planned</span></h3>
+  <p>For teams that use an external hosted AI provider, or a mix of hosted and local models. You do
+  not run the server; the operator does. The vault server runs on a host the operator manages, and
+  your computers and AI apps connect to it. Calls to an AI provider are made by your own AI apps,
+  with your own keys, and Memev holds no provider keys and makes no model calls. Your own git
+  backup remains possible, and export always works. The service is planned and has no date.</p>
+  <h3>On-prem</h3>
+  <p>For teams with an internal model, strict data residency, or a compliance-led or air-gapped
+  organisation. You run the server; nothing of yours runs on a host you do not control. The vault
+  server runs on your own servers, and any internal model stays inside your environment. Memev
+  holds no provider keys and makes no model calls. You run the vault server in a container with
+  the image and compose file in this repository. In an air-gapped install the one AI provider is
+  a model inside your environment, and only licence information passes between your install and
+  ours, never vault data.</p>
+  <h2>Corporate</h2>
+  <span class="tag">coming</span>
+  <p>Corporate is the same model at larger scale and with stricter control. There is one main
+  corporate vault, and the organisation can be air-gapped. What Corporate adds is scale: identity
+  sync by SCIM, audit export to a SIEM, retention rules, legal hold and high availability, often
+  with several sites or rules about where data may go. It is chosen by need, not by size.
+  Everything specific to this tier is planned.</p>
+  <h2>Price</h2>
+  <p>Business has no public price: contact us. Corporate has no public price: contact us. A quote
+  is priced on your requirements and covers the subscription, setup, the support plan and training
+  if you want it.</p>
+</main>
+<footer class="site">
+  <div class="wrap">
+    <p>{{companyName}}. <a href="privacy.html">Privacy</a> and <a href="imprint.html">imprint</a>.
+    <a href="contact.html">Contact</a>.</p>
+  </div>
+</footer>
+</body>
+</html>
