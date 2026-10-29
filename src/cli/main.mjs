@@ -2,7 +2,7 @@
 // The memev command.
 import fs from 'node:fs';
 import path from 'node:path';
-import { PKG, parseArgs, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, out, tokenExpiryWarnings } from './common.mjs';
+import { PKG, parseArgs, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, saveConfig, out, tokenExpiryWarnings } from './common.mjs';
 import { ensureDaemon, startDaemon, stopDaemon, healthy, choosePort } from './daemon.mjs';
 import { initVault, isVault, VERSION } from '../engine/vault.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
@@ -64,6 +64,7 @@ Daily
   memev verify [id]  |  memev gate [--workdir DIR]   check signed contracts on this machine (never CI)
   memev token issue|list|revoke|rotate
   memev start | stop | restart | serve
+  memev update <tarball> [--sha256 HEX]   install a new version from a release tarball
 
 Integration (called by AI apps)
   memev mcp --client NAME           MCP over stdio
@@ -71,7 +72,7 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', deployment: './deployment.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', runner: './runner.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', deployment: './deployment.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', runner: './runner.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', update: './update.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
@@ -268,7 +269,7 @@ async function run(argv, env) {
       need(); const up = await healthy(root);
       if (!up) { console.log(`Vault ${root}: daemon not running (memev start)`); return 1; }
       const s = await api(root, '/v1/status', { method: 'GET', token: clientToken(root, 'cli') });
-      if (flags.json) json(s.json); else { const j = s.json; console.log(`Memev ${j.version} · ${root}\n  log: ${j.oplog.seq} ops in ${j.oplog.segments} segment(s) · index: ${j.index.notes} notes / ${j.index.sections} sections · graph: ${j.graph.entities} entities, ${j.graph.claims} claims · heap ${j.memory.heap_mb} MB`); for (const w of tokenExpiryWarnings(root)) console.log(`  ! ${w}`); }
+      if (flags.json) json(s.json); else { const j = s.json; console.log(`Memev ${j.version} · ${root}\n  log: ${j.oplog.seq} ops in ${j.oplog.segments} segment(s) · index: ${j.index.notes} notes / ${j.index.sections} sections · graph: ${j.graph.entities} entities, ${j.graph.claims} claims · heap ${j.memory.heap_mb} MB`); for (const w of tokenExpiryWarnings(root)) console.log(`  ! ${w}`); const { updateLine } = await import('./update.mjs'); const u = updateLine(root, env); if (u) console.log(`  ${u}`); }
       return 0;
     }
     case 'mcp': {
