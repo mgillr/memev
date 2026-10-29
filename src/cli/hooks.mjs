@@ -89,9 +89,13 @@ export async function runHook(event, flags, env = process.env) {
       const fresh = source !== 'compact' && source !== 'resume'; // startup or clear: a new context, so the rules as well
       const r = await call('session-start', { task: null });
       // whether the person still has to pick a lead: only at a fresh start, and only until the setup session has asked
-      // (bus/operator.json records it)
-      const asked = remote ? null : readJson(path.join(root, 'bus', 'operator.json'), null)?.asked;
-      const bus = await call('bus-pulse', { lead: fresh && !(typeof asked === 'string' && asked) }).catch(() => null);
+      // (bus/operator.json records it). The first fresh start is the setup session; it marks itself as having asked.
+      const opFile = remote ? null : path.join(root, 'bus', 'operator.json');
+      const op = opFile ? readJson(opFile, null) : null;
+      const asked = op?.asked;
+      const isSetup = fresh && !(typeof asked === 'string' && asked);
+      if (isSetup && opFile) { const { markLeadAsked } = await import('../engine/bus.mjs'); markLeadAsked(root); }
+      const bus = await call('bus-pulse', { lead: isSetup }).catch(() => null);
       await call('journal', { role: 'event', text: `session ${source} (${client}${project ? `, ${project}` : ''})` }).catch(() => {});
       // the card goes in when the context does not hold it: at a fresh start, after a compaction, or when it changed
       const card = sha256(String(r.text || ''));

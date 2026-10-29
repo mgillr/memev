@@ -414,6 +414,15 @@ export class Bus {
   }
 }
 
+/** Record that the setup session has asked which AI should lead, so other sessions get a quiet line instead of the question. */
+export function markLeadAsked(root) {
+  const f = path.join(root, BUS_DIR, 'operator.json');
+  const op = readJson(f, null) || {};
+  if (op.asked) return;
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  writeJson(f, { ...op, asked: now() });
+}
+
 /** answered, ready (answers on its next turn), not opened yet, or a rejected credential. */
 export function commsMark(row) {
   const reason = String(row.reason || '');
