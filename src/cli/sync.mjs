@@ -12,6 +12,8 @@ import { git } from '../engine/git.mjs';
 import { gitVia443 } from './github.mjs';
 import { signAddressRecord } from '../engine/devices.mjs';
 import { now, readJson, writeJson } from '../engine/util.mjs';
+import { resolveMerge } from '../engine/merge.mjs';
+import { licenseFile } from '../engine/license.mjs';
 
 export const ADDRESS_FILE = 'address.json';
 
@@ -24,6 +26,11 @@ export function recordConflicts(root, conflicts) {
   const s = readJson(path.join(root, JOBS_FILE), {});
   s.sync = { ...(s.sync || {}), ...(conflicts ? { conflicts } : { conflicts: null }) };
   writeJson(path.join(root, JOBS_FILE), s, 0o600);
+}
+
+/** The installed licence as the signed object, or null when there is none (the free tier). */
+function rawLicense(env = process.env) {
+  try { return JSON.parse(fs.readFileSync(licenseFile(env), 'utf8')); } catch { return null; }
 }
 
 /** The lines of a jsonl file that are valid JSON objects with a device and a dseq. */
@@ -92,7 +99,7 @@ function conflictCopyPath(root, p) {
  * path and the other computer's version whole in a conflict copy next to it, so the two versions
  * are never combined. Returns the resolved paths and the conflict record.
  */
-export function resolveConflicts(root, vault) {
+export function resolveConflicts(root, vault, opts = {}) {
   const st = git(root, ['diff', '--name-only', '--diff-filter=U']);
   const files = st.out.split('\n').filter(Boolean);
   const adds = [...files];
@@ -108,6 +115,12 @@ export function resolveConflicts(root, vault) {
         : 'kept every message from both computers';
       return { path: p, kind: 'bus log', how, ...(merged.renumbered.length ? { renumbered: merged.renumbered } : {}) };
     }
+    let logLine = null;
+    const res = resolveMerge({ a: ours, b: theirs, base: stageContent(root, 1, p), license: opts.license, config: vault?.config, keys: opts.keys, now: opts.now, log: (l) => { logLine = l; } });
+    if (res.resolved) {
+      fs.writeFileSync(abs, res.text);
+      return { path: p, kind: 'note', how: 'merged by the merge engine' };
+    }
     fs.writeFileSync(abs, ours ?? '');
     let copy = null;
     if (theirs !== null) {
@@ -115,7 +128,7 @@ export function resolveConflicts(root, vault) {
       fs.writeFileSync(path.join(root, ...copy.split('/')), theirs);
       adds.push(copy);
     }
-    return { path: p, kind: 'note', how: theirs !== null ? 'kept both versions as separate files' : "kept this computer's version; the other computer deleted the note", ...(copy ? { copy } : {}) };
+    return { path: p, kind: 'note', how: theirs !== null ? 'kept both versions as separate files' : "kept this computer's version; the other computer deleted the note", ...(copy ? { copy } : {}), ...(logLine ? { reason: logLine } : {}) };
   });
   for (const p of adds) git(root, ['add', '--', p]);
   const m = git(root, ['commit', '-q', '--no-edit', '-m', 'memev: resolve sync conflicts']);
@@ -166,7 +179,7 @@ export function publishAddressRecord(root, url) {
   return { url, committed };
 }
 
-export function syncOnce(vault, { root }) {
+export function syncOnce(vault, { root, license, keys, at } = {}) {
   vault.commits.flush();
   const remote = git(root, ['remote']).out.split('\n').filter(Boolean)[0];
   const res = { at: now(), remote: remote || null, pulled: 0, pushed: false, error: null };
@@ -179,7 +192,7 @@ export function syncOnce(vault, { root }) {
   if (f.ok) {
     const m = git(root, ['merge', '--no-edit', '-q', `${remote}/${branch}`]);
     if (!m.ok) {
-      const r = resolveConflicts(root, vault);
+      const r = resolveConflicts(root, vault, { license: license === undefined ? rawLicense() : license, keys, now: at });
       if (!r.ok) { git(root, ['merge', '--abort']); res.error = 'merge conflict: left as is; run memev doctor'; return res; }
       const prev = pruneConflicts(root);
       recordConflicts(root, { at: now(), files: [...new Set([...(prev?.files || []), ...r.files])], conflicts: [...(prev?.conflicts || []), ...r.conflicts] });
