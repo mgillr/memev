@@ -122,12 +122,13 @@ test('MEM-129 AC07: the user-facing copy of issue.mjs and the changelog note pas
   const hype = /\b(seamless|robust|powerful|leverage|unlock|cutting[- ]edge)\b/i;
   const notJust = /not just .+ but\b/i;
   const emoji = /\p{Extended_Pictographic}/u;
+  const emdash = new RegExp(String.fromCharCode(0x2014));
   for (const s of copy) {
     assert.doesNotMatch(s, hype, 'hype in: ' + s);
     assert.doesNotMatch(s, notJust, 'not-just framing in: ' + s);
     assert.doesNotMatch(s, emoji, 'emoji in: ' + s);
     assert.doesNotMatch(s, /!/, 'exclamation in: ' + s);
-    assert.doesNotMatch(s, /—/, 'em-dash in: ' + s);
+    assert.doesNotMatch(s, emdash, 'em-dash in: ' + s);
     assert.doesNotMatch(s, /\bcertified\b/i, 'certified in: ' + s);
   }
 });
