@@ -4,12 +4,12 @@
 // comes from the vault config, so nothing is sent anywhere unless it is turned on.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { configDir, exists, writeAtomic, sha256 } from '../engine/util.mjs';
 import { config } from './common.mjs';
 import { VERSION } from '../engine/vault.mjs';
 import { installRuntime, launcherScript, recordedNode } from './main.mjs';
-import { stopDaemon, startDaemon, healthy } from './daemon.mjs';
+import { healthy } from './daemon.mjs';
 
 /** The static version file the opt-in check reads, from the vault config. Empty when it is not set. */
 export function versionFile(root) {
@@ -90,6 +90,7 @@ export function installFromTarball(tarball, env = process.env, { sha256: expecte
     if (!exists(path.join(top, 'package.json'))) top = path.join(work, 'src');
     const pkg = JSON.parse(fs.readFileSync(path.join(top, 'package.json'), 'utf8'));
     const ver = pkg.version || VERSION;
+    if (!parseVer(ver)) throw new Error(`invalid version in tarball: ${ver} (want major.minor.patch)`);
     const dir = path.join(cfgDir, 'runtime', ver);
     fs.mkdirSync(dir, { recursive: true });
     for (const d of ['bin', 'src', 'templates', 'vendor']) if (exists(path.join(top, d))) fs.cpSync(path.join(top, d), path.join(dir, d), { recursive: true, force: true });
@@ -115,9 +116,11 @@ export async function command(cmd, pos, flags, { root, env }) {
   const r = installFromTarball(tarball, env, { sha256: flags.sha256 || null });
   console.log(`Installed memev ${r.version} at ${r.dir}; the launcher now runs it.`);
   if (await healthy(root)) {
-    await stopDaemon(root);
-    await startDaemon(root);
-    console.log('Daemon restarted with the new version.');
+    // restart through the new launcher, the way the installers do, so the daemon runs the new code
+    // instead of the old code that ran this update
+    const res = spawnSync(r.launcher, ['restart', '--root', root], { env, stdio: 'inherit' });
+    if (res.status === 0) console.log(`Daemon restarted; it now runs memev ${r.version}.`);
+    else console.log('Run memev restart to use the new version.');
   } else {
     console.log('Run memev restart to use the new version.');
   }

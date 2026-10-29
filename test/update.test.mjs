@@ -11,6 +11,7 @@ import { cleanup, tmpdir, PKG } from './helpers/tmp.mjs';
 import { command, updateLine, checkEnabled, latestVersion } from '../src/cli/update.mjs';
 import { stopDaemon } from '../src/cli/daemon.mjs';
 import { VERSION } from '../src/engine/vault.mjs';
+import { sha256 } from '../src/engine/util.mjs';
 
 after(() => cleanup());
 
@@ -34,6 +35,26 @@ async function makeTarball(version, { withSha = true } = {}) {
   return t;
 }
 
+// A release-shaped tarball: a full copy of this package with its own version, so the installed runtime
+// really runs and reports that version.
+function makeReleaseTarball(version) {
+  const d = tmpdir('release-');
+  const top = path.join(d, 'package');
+  fs.mkdirSync(top, { recursive: true });
+  for (const x of ['bin', 'src', 'templates', 'vendor']) fs.cpSync(path.join(PKG, x), path.join(top, x), { recursive: true });
+  for (const f of ['package.json', 'LICENSE', 'NOTICE']) fs.copyFileSync(path.join(PKG, f), path.join(top, f));
+  const pj = path.join(top, 'package.json');
+  const pkg = JSON.parse(fs.readFileSync(pj, 'utf8'));
+  pkg.version = version;
+  fs.writeFileSync(pj, `${JSON.stringify(pkg, null, 2)}\n`);
+  const vault = path.join(top, 'src', 'engine', 'vault.mjs');
+  fs.writeFileSync(vault, fs.readFileSync(vault, 'utf8').replace(/export const VERSION = '[^']*'/, `export const VERSION = '${version}'`));
+  const t = path.join(d, `memev-${version}.tgz`);
+  spawnSync('tar', ['-czf', t, '-C', d, 'package'], { encoding: 'utf8' });
+  fs.writeFileSync(t + '.sha256', `${sha256(fs.readFileSync(t))}  ${path.basename(t)}\n`);
+  return t;
+}
+
 function setUpdate(root, update) {
   const file = path.join(root, '.memev', 'config.json');
   const cfg = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -44,26 +65,20 @@ function setUpdate(root, update) {
 test('MEM-082 AC01: memev update from a local test tarball installs the new runtime and the launcher points to it', async () => {
   const sb = sandbox();
   assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
-  const tarball = await makeTarball('9.9.9');
-  const lines = [];
-  const orig = console.log;
-  console.log = (...a) => lines.push(a.join(' '));
-  try {
-    assert.equal(await command('update', [tarball], {}, { root: sb.root, env: sb.env }), 0);
-  } finally {
-    console.log = orig;
-  }
+  const tarball = makeReleaseTarball('9.9.9');
+  const r = sb.run(['update', tarball]);
+  assert.equal(r.code, 0, r.out + r.err);
   // the new runtime is a fresh folder under the config dir, holding the tarball's files
   const dir = path.join(sb.env.MEMEV_CONFIG_DIR, 'runtime', '9.9.9');
   assert.ok(fs.existsSync(path.join(dir, 'bin', 'memev.mjs')), 'the new runtime folder holds the installed files');
-  assert.match(fs.readFileSync(path.join(dir, 'bin', 'memev.mjs'), 'utf8'), /memev 9\.9\.9/);
+  assert.match(fs.readFileSync(path.join(dir, 'src', 'engine', 'vault.mjs'), 'utf8'), /export const VERSION = '9\.9\.9'/);
   // the launcher points at the new runtime
   const launcher = fs.readFileSync(launcherOf(sb), 'utf8');
   assert.match(launcher, new RegExp(`JS='${path.join(dir, 'bin', 'memev.mjs').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`), 'the launcher points at the new runtime');
   // the launcher runs the new version
-  const r = spawnSync(launcherOf(sb), ['--version'], { env: { ...sb.env }, encoding: 'utf8', timeout: 30000 });
-  assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /memev 9\.9\.9/);
+  const v = spawnSync(launcherOf(sb), ['--version'], { env: { ...sb.env }, encoding: 'utf8', timeout: 30000 });
+  assert.equal(v.status, 0, v.stdout + v.stderr);
+  assert.match(v.stdout, /9\.9\.9/);
   // the install is local: the module fetches nothing
   const src = fs.readFileSync(path.join(PKG, 'src', 'cli', 'update.mjs'), 'utf8');
   assert.doesNotMatch(src, /fetchOut|https?:\/\/\S+|node:(http|https|net|dns|tls)/);
@@ -174,21 +189,23 @@ test('MEM-082 AC06: update accepts a --sha256 flag when the tarball has no .sha2
   assert.ok(fs.existsSync(path.join(dir, 'bin', 'memev.mjs')), 'the new runtime folder holds the installed files');
 });
 
-test('MEM-082 AC07: update restarts the daemon when it is running', async () => {
+test('MEM-082 AC07: update restarts the daemon with the new version when it is running', async () => {
   const sb = sandbox();
   assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
   const start = sb.run(['start']);
   assert.equal(start.code, 0, start.out);
-  const tarball = await makeTarball('9.9.9');
-  const lines = [];
-  const orig = console.log;
-  console.log = (...a) => lines.push(a.join(' '));
-  try {
-    assert.equal(await command('update', [tarball], {}, { root: sb.root, env: sb.env }), 0);
-  } finally {
-    console.log = orig;
-  }
-  assert.ok(lines.some((l) => l.includes('Daemon restarted')), lines.join('\n'));
+  // before the update, the daemon runs this version
+  const before = sb.run(['status']);
+  assert.equal(before.code, 0, before.out);
+  assert.match(before.out, new RegExp(`Memev ${VERSION}`), before.out);
+  const tarball = makeReleaseTarball('9.9.9');
+  const r = sb.run(['update', tarball]);
+  assert.equal(r.code, 0, r.out + r.err);
+  assert.ok(r.out.includes('Daemon restarted'), r.out);
+  // the daemon now runs the new version: /v1/status reports it
+  const after = sb.run(['status']);
+  assert.equal(after.code, 0, after.out);
+  assert.match(after.out, /Memev 9\.9\.9/, after.out);
 });
 
 test('MEM-082 AC08: update prints a restart instruction when the daemon is not running', async () => {
@@ -222,4 +239,28 @@ test('MEM-082 AC09: updateLine only warns for numerically newer versions', async
   // a numerically newer version shows a line
   fs.writeFileSync(vf, '9.9.9\n');
   assert.ok(updateLine(sb.root, sb.env), 'a line for a newer version');
+});
+
+test('MEM-082 AC10: the reported VERSION is the version in package.json', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(PKG, 'package.json'), 'utf8'));
+  assert.equal(VERSION, pkg.version, 'the version the CLI reports is the package version');
+});
+
+test('MEM-082 AC11: update refuses a tarball whose version is not major.minor.patch', async () => {
+  const sb = sandbox();
+  assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
+  const tarball = await makeTarball('not-a-version');
+  const launcher = launcherOf(sb);
+  const before = fs.readFileSync(launcher, 'utf8');
+  const lines = [];
+  const orig = console.log;
+  console.log = (...a) => lines.push(a.join(' '));
+  try {
+    await assert.rejects(command('update', [tarball], {}, { root: sb.root, env: sb.env }), /invalid version/);
+  } finally {
+    console.log = orig;
+  }
+  // no runtime folder was created, and the launcher is untouched
+  assert.equal(fs.existsSync(path.join(sb.env.MEMEV_CONFIG_DIR, 'runtime', 'not-a-version')), false, 'no runtime folder for an invalid version');
+  assert.equal(fs.readFileSync(launcher, 'utf8'), before, 'the launcher does not change when the version is invalid');
 });
