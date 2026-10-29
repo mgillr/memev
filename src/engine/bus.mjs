@@ -455,6 +455,20 @@ export class Bus {
   }
 }
 
+/** The one line other sessions get while no lead is set and the setup session has asked: it overrides the protocol's ask rule. */
+export const LEAD_ASKED_LINE = 'The lead AI is not chosen yet. The person was already asked at setup, so do not ask again; `memev bus operator <seat>` sets it.';
+/** The suggestion the setup session gets with the question: its own seat, for the person to accept or not. */
+export const leadSuggestion = (seat) => `Suggested: ${seat} (the app in this session, which ran first after setup). The person decides.`;
+
+/** Record that the setup session has asked which AI should lead, so other sessions get a quiet line instead of the question. */
+export function markLeadAsked(root) {
+  const f = path.join(root, BUS_DIR, 'operator.json');
+  const op = readJson(f, null) || {};
+  if (op.asked) return;
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  writeJson(f, { ...op, asked: now() });
+}
+
 /** answered, ready (answers on its next turn), not opened yet, or a rejected credential. */
 export function commsMark(row) {
   const reason = String(row.reason || '');

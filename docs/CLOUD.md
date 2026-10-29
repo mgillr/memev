@@ -76,8 +76,11 @@ Apps set up before per-device credentials still send `X-Memev-Key`; it keeps wor
 longer needed.
 
 Remote requests always need a token issued for remote use, are rate limited (120 a minute by
-default) and are logged to `.memev/access.jsonl`. Contract signing and admin routes are local only.
-`memev cloud rotate-key` changes the legacy shared key, for apps that still send it.
+default) and are logged to `.memev/access.jsonl`. Admin routes are local only. Contract signing is
+available remotely; a contract signed from a remote origin records that origin, and its command
+criteria do not run on this machine until a local operator approves it with
+`memev contract approve <id>`. `memev cloud rotate-key` changes the legacy shared key, for apps
+that still send it.
 
 ## Which computers can join
 

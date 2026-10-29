@@ -2,8 +2,6 @@
 // and offers the upgrade or the trial; with no trial left it prints no code at all.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
 import { cleanup } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
 import { command } from '../src/cli/invite.mjs';
@@ -15,12 +13,12 @@ test('MEM-025 AC01: On Free with no trial available, memev invite prints the pla
   try {
     const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
     assert.equal(init.code, 0, init.err + init.out);
-    // A started trial leaves a record in the vault; while it is present no trial may be started.
-    fs.writeFileSync(path.join(sb.root, '.memev', 'trial.json'), JSON.stringify({ lid: 'lic_trial001', iat: '2026-01-01', exp: '2026-02-01', days: 30 }));
+    // A fresh Free vault has no licence and no trial started, so no trial is available to offer.
     const inv = sb.run(['invite']);
     assert.equal(inv.code, 1, inv.out + inv.err);
     assert.match(inv.out, /Personal covers this computer/);
     assert.match(inv.out, /memev upgrade/);
+    assert.match(inv.out, /docs\/GITHUB\.md/);
     assert.doesNotMatch(inv.out, /^code: /m);
   } finally { sb.stop(); }
 });
@@ -36,7 +34,7 @@ test('MEM-025 AC02: With a licence that allows more computers, memev invite prin
     console.log = (...args) => logs.push(args.join(' '));
     let code;
     try {
-      code = await command(null, null, { ttl: '600' }, { root: sb.root, env: sb.env, license: lic });
+      code = await command(null, null, { ttl: '600', local: true }, { root: sb.root, env: sb.env, license: lic });
     } finally {
       console.log = origLog;
     }

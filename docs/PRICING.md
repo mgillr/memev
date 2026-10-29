@@ -6,8 +6,9 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 > **DRAFT. Not an offer and not in force.** The list below is the current table (decided 28 October
 > 2026). The Memev core is free. Self-serve checkout is Personal only, through Stripe, in test mode
 > first. The checkout program reads product ids, prices and the computer cap from config. Business and
-> Corporate have no public price: contact us. Hosted features are planned, with no date. A Business
-> trial is planned (see below). What the licence enforces today is how many computers can use one
+> Corporate have no public price: contact us. Hosted features are planned, with no date. There is no
+> Personal trial; Business has a time-limited trial (planned, see below). What the licence enforces
+> today is how many computers can use one
 > vault. One computer with no licence gets the Personal tier ([CHARTER.md](../CHARTER.md)). The Memev core
 > is licensed under Apache-2.0 and stays that way ([LICENSING-NOTICE.md](LICENSING-NOTICE.md)).
 
@@ -20,7 +21,7 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 | Computers using one vault | 1 | up to 3 | counted once per organisation, by computer | counted once per organisation, by computer |
 | Local AI apps on a computer | unlimited | unlimited | unlimited | unlimited |
 | Cloud AI connectors | 5 | 10 | based on your requirements | based on your requirements |
-| Trial | not needed | none | 5 members and 10 computers, 14 days with one 14-day extension, planned | sales-assisted pilot, planned |
+| Trial | no Personal trial | no Personal trial | time-limited trial: 5 members and 10 computers, 14 days with one 14-day extension (planned), see [BUSINESS-TRIAL.md](BUSINESS-TRIAL.md) | sales-assisted pilot (planned) |
 | Vault, recall, graph, contracts, doctor, your own tunnel | ✓ | ✓ | ✓ | ✓ |
 | Backup to your own GitHub (one writer) | ✓ | ✓ | ✓ | ✓ |
 | One memory for every AI app, and the comms bus between them | ✓ | ✓ | ✓ | ✓ |
@@ -56,9 +57,11 @@ Corporate has one main corporate vault.
 **Licences count once per organisation, by person and by computer.** Today the vault counts
 computers only; counting people is planned with Business.
 
-**Business trial (planned):** 5 members and 10 computers, 14 days with one 14-day extension,
-self-serve for an organisation that uses a single hosted cloud AI provider. Organisations that are
-on-premises, air-gapped or led by compliance get a sales-assisted pilot instead.
+**Business trial (planned):** a time-limited trial, 5 members and 10 computers, 14 days with one
+14-day extension. Self-serve for an organisation that uses hosted AI providers, or a mix of hosted
+providers and local tools; a sales-assisted pilot for organisations that are on-premises,
+air-gapped or led by compliance. The terms, the two paths and what happens at the end:
+[BUSINESS-TRIAL.md](BUSINESS-TRIAL.md).
 
 **The paid engine.** The features marked *crdt-merge* rest on the convergence engine crdt-merge, which
 lives in its own repository and is called by Memev as an external dependency. See
