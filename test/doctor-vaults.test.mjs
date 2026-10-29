@@ -33,6 +33,15 @@ test('MEM-021 AC01: doctor shows a warning naming both vault ids when a second l
 
 // Tests run side by side, and doctor looks for another vault on the 99 ports above its own, where another test's daemon
 // would read as a second vault. The test holds those ports with listeners of its own, which never answer as Memev.
+async function rangeFree(port) {
+  for (let p = port + 1; p < Math.min(port + 100, 65536); p++) {
+    const s = net.createServer();
+    const free = await new Promise((r) => { s.once('error', () => r(false)); s.listen(p, '127.0.0.1', () => { s.close(() => r(true)); }); });
+    if (!free) return false;
+  }
+  return true;
+}
+
 async function holdPortsAbove(port) {
   const held = [];
   const release = () => Promise.all(held.map((s) => new Promise((r) => s.close(r))));
@@ -46,7 +55,10 @@ async function holdPortsAbove(port) {
 
 test('MEM-021 AC02: doctor shows no such warning with a single vault', async () => {
   let sb, release = null;
-  for (let i = 0; i < 5 && !release; i++) { sb = sandbox(); release = await holdPortsAbove(sb.port); }
+  for (let i = 0; i < 20 && !release; i++) {
+    sb = sandbox();
+    if (await rangeFree(sb.port)) release = await holdPortsAbove(sb.port);
+  }
   assert.ok(release, 'the 99 ports above the vault are held for this test');
   try {
     assert.equal(sb.run(['init', '--port', String(sb.port), '--no-connect']).code, 0);
