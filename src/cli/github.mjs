@@ -50,6 +50,18 @@ export function cloneBackup(repo, root) {
   return sh('gh', ['repo', 'clone', repo, root]);
 }
 
+/** Clone a git URL into root with plain git, no GitHub CLI. The caller decides what to do with it. */
+export function cloneFromUrl(url, root) {
+  root = path.resolve(root);
+  fs.mkdirSync(path.dirname(root), { recursive: true });
+  return sh('git', ['clone', '-q', '--', url, root]);
+}
+
+/** True when root is a clone of a Memev vault backup: its README starts with the marker. */
+export function isMemevBackup(root) {
+  try { return fs.readFileSync(path.join(root, 'README.md'), 'utf8').startsWith(BACKUP_MARKER); } catch { return false; }
+}
+
 // The hook accepts the repository's ssh URL and, when the network blocks port 22, its ssh-over-443 form.
 export const PRE_PUSH = (url) => {
   const alt = alt443(url);
@@ -98,6 +110,36 @@ export function pushBackup(root, { upstream = false, quiet = true, remote = null
   const args = upstream ? ['push', '-u', remote, `HEAD:${branch}`] : (quiet ? ['push', '-q', remote, `HEAD:${branch}`] : ['push', remote, `HEAD:${branch}`]);
   const p = gitVia443(root, args, remote, url);
   return { ok: p.ok, via: p.via, error: p.ok ? null : `push: ${p.err.split('\n').pop()}` };
+}
+
+/**
+ * True when the remote's history shares no common ancestor with this vault: a fresh vault pointed
+ * at a repository that already holds a different Memev vault. null when the remote could not be read.
+ */
+export function unrelatedHistory(root, remote) {
+  const f = git(root, ['fetch', '-q', remote]);
+  if (!f.ok) return null;
+  const heads = git(root, ['branch', '-r', '--list', `${remote}/*`]).out.split('\n').map((s) => s.trim()).filter(Boolean);
+  if (!heads.length) return false; // an empty remote has nothing to be unrelated to
+  for (const h of heads) if (git(root, ['merge-base', 'HEAD', h]).ok) return false;
+  return true;
+}
+
+/** The line that offers the clone instead of a push, when the target holds an unrelated vault. */
+export function cloneOffer(url) {
+  return `The target already holds a Memev vault with an unrelated history, so Memev will not push over it. On this computer, clone it instead: memev init --from ${url}`;
+}
+
+/**
+ * Take back everything setup set for the GitHub backup: the origin remote, the deploy-key ssh
+ * command, the pre-push hook, and cfg.github. Called when the target holds an unrelated vault, so
+ * no background sync runs against it.
+ */
+export function undoGithub(root) {
+  git(root, ['remote', 'remove', 'origin']);
+  git(root, ['config', '--unset', 'core.sshCommand']);
+  try { fs.rmSync(path.join(root, '.git', 'hooks', 'pre-push'), { force: true }); } catch {}
+  const cfg = config(root); if (cfg.github) { delete cfg.github; saveConfig(root, cfg); }
 }
 
 // A TCP connect with a short timeout: true when the host answers. Injectable so tests never touch the network.
@@ -164,6 +206,14 @@ export async function setup({ root, env = process.env, repo = null, flags = {} }
   git(root, ['config', 'core.sshCommand', `ssh -i "${key}" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new`]);
   fs.writeFileSync(path.join(root, '.git', 'hooks', 'pre-push'), PRE_PUSH(sshUrl), { mode: 0o755 });
   const cfg = config(root); cfg.github = { repo: name, remote: sshUrl, key: path.basename(key), host }; saveConfig(root, cfg);
+  // a fresh vault pointed at a repository that already holds a different vault: do not push over it,
+  // and take back the remote, key, hook and config so no background sync runs against it
+  const ur = unrelatedHistory(root, 'origin');
+  if (ur === true) {
+    undoGithub(root);
+    step('manual', 'Unrelated history', cloneOffer(sshUrl));
+    return { ok: false, steps, repo: name };
+  }
   const p = pushBackup(root, { upstream: true, quiet: false, remote: 'origin' });
   if (!p.ok) { step('manual', 'First push', `${p.error} (Memev retries every 30 minutes)`); return { ok: false, steps, repo: name }; }
   const via = p.via && p.via !== sshUrl ? ` via ${p.via.replace('ssh://git@', '')}` : '';
