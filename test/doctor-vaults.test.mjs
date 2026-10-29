@@ -33,22 +33,21 @@ test('MEM-021 AC01: doctor shows a warning naming both vault ids when a second l
 });
 
 // Tests run side by side, and doctor looks for another vault on the 99 ports above its own, where another test's daemon
-// would read as a second vault. The test holds those ports with listeners of its own, which never answer as Memev.
+// would read as a second vault. The sandbox reserves 100 ports in a row, so no other test daemon can be in the range.
+// The test also holds those ports with listeners of its own, which never answer as Memev.
 async function holdPortsAbove(port) {
   const held = [];
   const release = () => Promise.all(held.map((s) => new Promise((r) => s.close(r))));
   for (let p = port + 1; p < Math.min(port + 100, 65536); p++) {
     const s = net.createServer((c) => c.destroy());
-    if (!(await new Promise((r) => { s.once('error', () => r(false)); s.listen(p, '127.0.0.1', () => r(true)); }))) { await release(); return null; }
-    held.push(s);
+    if (await new Promise((r) => { s.once('error', () => r(false)); s.listen(p, '127.0.0.1', () => r(true)); })) held.push(s);
   }
   return release;
 }
 
 test('MEM-021 AC02: doctor shows no such warning with a single vault', async () => {
-  let sb, release = null;
-  for (let i = 0; i < 5 && !release; i++) { sb = sandbox(); release = await holdPortsAbove(sb.port); }
-  assert.ok(release, 'the 99 ports above the vault are held for this test');
+  const sb = sandbox({ ports: 100 });
+  const release = await holdPortsAbove(sb.port);
   try {
     assert.equal(sb.run(['init', '--port', String(sb.port), '--no-connect']).code, 0);
     const doc = sb.run(['doctor']);
