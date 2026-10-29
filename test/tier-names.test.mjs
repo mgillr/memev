@@ -1,6 +1,6 @@
 // MEM-137: the tier names people read are the four names from the docs, the licence tooling
 // takes the new ids, and the older ids still verify with the same limits.
-import test from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -28,8 +28,11 @@ const captureLog = async (fn) => {
   try { await fn(); } finally { console.log = orig; }
   return lines.join('\n');
 };
+const sbs = [];
+after(() => { for (const sb of sbs) sb.stop(); });
 const initSandbox = () => {
   const sb = sandbox();
+  sbs.push(sb);
   assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
   return sb;
 };
