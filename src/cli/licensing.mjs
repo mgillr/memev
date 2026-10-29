@@ -7,7 +7,8 @@ import { loadLicense, verifyLicense, licenseFile, extraFields, LICENSE_KEYS } fr
 import { report, seatPolicy, tierLabel } from '../engine/entitlements.mjs';
 import { DeviceRegistry, hostDevice, deviceKeygen } from '../engine/devices.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
-import { configDir, writePrivate, exists } from '../engine/util.mjs';
+import { configDir, writePrivate, exists, readJson } from '../engine/util.mjs';
+import { installGuard, identityFromConfig } from '../engine/identity.mjs';
 import { isVault } from '../engine/vault.mjs';
 import { Bus } from '../engine/bus.mjs';
 import { CommitQueue } from '../engine/git.mjs';
@@ -68,6 +69,16 @@ const explain = (status, body) => {
 };
 
 /**
+ * A trial licence installs only on a business-class identity, into a vault with an organisation. The
+ * vault's config is the source of both; a missing vault is a personal one. A licence that is not a
+ * trial is not guarded here.
+ */
+function trialInstallGuard(license, root) {
+  const cfg = root ? readJson(path.join(root, '.memev', 'config.json'), {}) : {};
+  return installGuard({ license, identity: identityFromConfig(cfg), vault: cfg });
+}
+
+/**
  * Activate a key: one call to the licence endpoint sends the key and nothing else, the answer is the signed licence
  * file, and it is verified here, offline, before anything is written. A key the server refuses, an answer that does not
  * verify, an expired licence, or a licence that carries an identity leaves no file. `keys` and `fetchImpl` are for tests.
@@ -91,6 +102,8 @@ export async function activateLicense({ key, endpoint, env = process.env, keys =
   if (extra.length) return { ok: false, reason: `the licence carries more than a licence may (${extra.join(', ')}); not installed` };
   const v = verifyLicense(l, { keys, now });
   if (v.state === 'invalid' || v.state === 'expired') return { ok: false, reason: `the licence does not install: ${v.reason}` };
+  const g = trialInstallGuard(l, root);
+  if (!g.ok) return { ok: false, reason: g.reason };
   const file = licenseFile(env);
   fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
   writePrivate(file, `${JSON.stringify(l, null, 2)}\n`);
@@ -119,6 +132,8 @@ export async function command(cmd, pos, flags, { root, env, license = null }) {
       const src = pos[1]; if (!src) throw new Error('memev license install <file>');
       const l = JSON.parse(fs.readFileSync(src, 'utf8')); const v = verifyLicense(l);
       if (v.state === 'invalid') { out.bad(`not installed: ${v.reason}`); return 1; }
+      const g = trialInstallGuard(l, root);
+      if (!g.ok) { out.bad(`not installed: ${g.reason}`); return 1; }
       fs.mkdirSync(configDir(env), { recursive: true }); writePrivate(licenseFile(env), `${JSON.stringify(l, null, 2)}\n`);
       out.ok(`installed licence ${l.lid} (${v.state}) in ${licenseFile(env)}`); return 0;
     }
