@@ -17,6 +17,14 @@ Keep project knowledge consistent across AI sessions, and give supported agents 
 </p>
 
 <p>
+<code>npm install -g . && memev init</code>
+</p>
+
+<p>
+<img src="docs/assets/memev-demo.gif" alt="Tell Claude, Cursor knows: shared context in action" width="480">
+</p>
+
+<p>
 <a href="docs/QUICKSTART.md">Quickstart</a> &middot;
 <a href="docs/README.md">Documentation</a> &middot;
 <a href="docs/ARCHITECTURE.md">Architecture</a> &middot;
@@ -79,13 +87,16 @@ Memev keeps project context available without making you copy the same backgroun
 ## Install
 
 You need Node 22 or newer and git. Every path below sets up the same thing: it creates your notes
-folder, starts Memev, connects the AI apps it finds on your computer and runs a self-test.
+folder, starts Memev, connects the AI apps it finds on your computer and runs a self-test. The
+command at the top of this page is the npm path; the rest of this section covers the other paths.
 
 Memev runs on macOS and Linux. **Windows (preview):** setup, app connections, hooks and the doctor
 have Windows code paths and tests, and a Windows job runs them on every change to `main`, but
 Windows has not had a full lab run yet. Memev starts at login there through a per-user Task Scheduler
 entry that `memev service install` creates. [docs/QUICKSTART.md](docs/QUICKSTART.md#windows-preview) says
 what differs.
+
+### All the install paths
 
 | Path | Who it's for | What happens on its own |
 |---|---|---|
