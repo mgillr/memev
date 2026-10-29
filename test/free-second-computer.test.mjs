@@ -40,14 +40,14 @@ test('REV-006 AC02: memev init --from clones a backup with no GitHub CLI and cre
   const noGh = (process.env.PATH || '').split(path.delimiter).filter((d) => path.resolve(d) !== path.resolve(path.dirname(which('gh')))).join(path.delimiter);
 
   const sb = sandbox();
+  const root = path.join(tmpdir('second-'), 'vault');
   try {
-    const root = path.join(tmpdir('second-'), 'vault');
     sb.run(['init', '--from', backup, '--root', root, '--port', String(sb.port)], { extraEnv: { PATH: bin + path.delimiter + noGh } });
     // the vault has the backup's content
     assert.equal(fs.readFileSync(path.join(root, 'notes', 'hello.md'), 'utf8'), 'the kettle is blue\n');
     // the vault is a descendant of the backup, so no new vault was created
     assert.equal(g(root, ['merge-base', '--is-ancestor', backupHead, 'HEAD']).status, 0, 'the vault keeps the backup git history');
-  } finally { sb.stop(); cleanup(); }
+  } finally { sb.run(['stop', '--root', root]); sb.stop(); cleanup(); }
 });
 
 test('REV-006 AC03: setup on an unrelated-history target offers the clone and takes back what it set, and a sync names the cause', () => {
