@@ -14,7 +14,13 @@ COPY vendor ./vendor
 RUN ln -s /opt/memev/bin/memev.mjs /usr/local/bin/memev && chmod +x /opt/memev/bin/memev.mjs \
  && mkdir -p /vault && chown memev:memev /vault
 USER memev
+ARG MEMEV_VERSION=0.1.0
+LABEL org.opencontainers.image.title="memev" \
+  org.opencontainers.image.description="One local memory shared by every AI session you run: an MCP server over a git-backed Markdown vault you own." \
+  org.opencontainers.image.licenses="Apache-2.0" \
+  org.opencontainers.image.version="${MEMEV_VERSION}"
 ENV HOME=/home/memev MEMEV_ROOT=/vault MEMEV_BIND=0.0.0.0 MEMEV_TRUST_GATEWAY=1 MEMEV_NO_TUNNEL=1 MEMEV_NO_SERVICE=1
+ENV MEMEV_CONTAINER=1
 VOLUME ["/vault"]
 EXPOSE 7787
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:7787/healthz || exit 1
