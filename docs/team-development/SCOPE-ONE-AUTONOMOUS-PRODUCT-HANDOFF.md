@@ -32,6 +32,7 @@ This document distinguishes existing capabilities from proposed Scope One work. 
 10. **Low setup friction:** guided install, client health checks, sensible defaults, automatic supported registration, and actionable diagnostics.
 11. **Local-first and least privilege:** retain existing security boundaries; remote sharing and access remain controlled.
 12. **Measure outcomes:** validate lower time-to-delivery, less rework, reliable recovery, and fewer false completion claims.
+13. **Command-centre clarity:** expose progress, agents, communications, plans, changes, outstanding work, and deliverables through coherent views over one canonical state—not separate dashboards with competing truths.
 
 ## 2. Target user experience
 
@@ -67,6 +68,69 @@ The product runs the agreed tests and acceptance checks, checks deployment healt
 
 ### Step F — Pause, resume, or change direction
 The user can say “pause,” “continue,” “change the colour scheme,” or “stop deployment.” Pause prevents new task dispatch and requests cooperative cancellation of in-flight work where supported. State is checkpointed. On resume, the product reconstructs canonical state and continues from the last safe point. If a client cannot cancel an in-flight action, report that limitation accurately.
+
+## Command-and-control centre — the product's primary interface
+
+The command centre is not an optional admin panel. It is the primary user-facing product surface and the layer that makes the complex coordination architecture feel simple. Technical mechanisms run in the background; the user sees progress, decisions, deliverables, and trustworthy evidence.
+
+### Default landing view: one clear answer to "What's happening?"
+
+The first screen should answer, without technical knowledge:
+- **Project outcome:** what the system is trying to deliver.
+- **Overall status:** planning, working, waiting for me, verifying, delivered, or blocked.
+- **Progress and next milestone:** what has been completed, what is active, and what happens next.
+- **Needs my attention:** only real decisions, missing access, material ambiguity, or a blocker the system cannot resolve safely.
+- **Latest deliverable/evidence:** working output, tests or checks completed, and anything not yet verified.
+
+Use plain language and progressive disclosure. Avoid exposing raw event streams, protocol names, vector clocks, task IDs, or infrastructure details on the default screen. Those belong in an optional technical view.
+
+### Navigation and views
+
+Keep a small, consistent navigation model. Names are provisional, but the user jobs are required:
+
+1. **Overview** — project health, progress, next milestone, recent activity, and the one most important action if one is needed.
+2. **Agents** — visual roster of available agents and tools, their role/capability, current assignment, state (idle, working, waiting, verifying, blocked, offline), last meaningful update, and relevant output. Show why an agent is waiting or blocked. Do not imply that a displayed agent is connected or active unless the runtime confirms it.
+3. **Comms** — a readable view of agent-to-agent and system communications, linked to tasks and decisions. Default to a human-readable timeline/thread, with filters by agent, task, time, and event type. Clearly distinguish a message, a proposed action, a decision, and a verified event. Sensitive content and credentials must be redacted; permissions govern who can inspect messages.
+4. **Roadmap** — milestones and dependencies with status and forecast where supportable. Selecting a milestone opens the associated scope, tasks, deliverables, and blockers. Do not invent dates or present estimates as guarantees.
+5. **Project plan / Work** — scoped deliverables, task breakdown, ownership, dependencies, acceptance criteria, and current status. Keep it outcome-oriented by default; expose technical task detail on demand.
+6. **Changes** — append-only, attributable history of scope changes, plan edits, decisions, agent handoffs, artifacts, and verification results. Show what changed, why, who or what initiated it, and which verification was invalidated by the change.
+7. **Outstanding work** — remaining tasks, blockers, retries, unresolved conflicts, missing evidence, and decisions waiting for the user. Prioritize by impact and dependency, not just recency.
+8. **Deliverables** — generated files, code, reports, deployments or other outputs, each with version, provenance, validation status, and a direct way to open or export it.
+9. **Settings / Connections** — supported integrations, connection health, granted permissions, privacy controls, and a guided repair flow. Keep setup to a minimum and explain permissions in terms of what they allow the product to do.
+
+These views should be different projections of the same canonical project/task/event data, not separate sources of truth. A task update should flow through to Overview, Roadmap, Agents, Changes, and Outstanding work without manual duplication.
+
+### The interaction model
+
+- A persistent, natural-language **"Tell the system what you want to achieve"** entry point starts a project or changes direction.
+- The user can click any status, milestone, agent, communication, task, or deliverable to drill into the evidence and context behind it.
+- A single **Needs your decision** queue collects only meaningful approval requests. Each request states the choice, why it matters, the recommended option, consequences, and what can proceed while waiting.
+- The system updates the plan as work evolves, records the reason for changes, and makes material scope changes visible before they silently alter the promised outcome.
+- Pause, resume, and cancel are easy to find. Explain whether cancellation is confirmed, what work stopped, and what may still be running in external tools.
+- Notifications should be useful and sparse: material milestones, decisions required, genuine blockers, and delivery. Routine internal agent chatter should not interrupt the user.
+
+### Visual and operational design principles
+
+- Make the interface feel calm, responsive, and trustworthy—not like a wall of logs or a DevOps console.
+- Show the next useful action, not every internal action.
+- Use status labels with consistent meanings across all views.
+- Every progress claim should trace back to a state transition or event; every "verified" label should link to evidence.
+- Provide accessible desktop and mobile layouts; the core experience must work without requiring users to read a dense graph.
+- The comms bus visualisation is a **human-readable observability view**, not the bus itself. The bus and its durable events must continue to work when the UI is closed.
+- A graph/network view can be an optional advanced view, but never the only way to understand work.
+- The interface must remain useful for one agent as well as many; don't make multi-agent complexity the product's prerequisite.
+
+### Dashboard acceptance criteria
+
+- A first-time non-technical user can identify project status, next milestone, outstanding user decisions, blockers, and latest deliverable without onboarding from an engineer.
+- Clicking a milestone or task reveals dependencies, owner, acceptance criteria, latest events, and verification evidence.
+- The Agents view reports actual runtime status and does not fabricate activity.
+- The Comms view can filter and trace messages to the tasks/decisions they concern while respecting access controls and redacting secrets.
+- Changes show scope/plan history and identify affected verification when scope or artifacts change.
+- Outstanding work is derived from canonical state and includes blocked work, unresolved conflicts, and missing evidence.
+- UI status remains consistent with backend state after refresh, process restart, and reconnection.
+- Closing the dashboard does not stop autonomous execution; reopening it reconstructs the current state from durable project data.
+- A user can start from a natural-language goal and reach the first meaningful plan without needing to configure agents, protocols, or infrastructure manually.
 
 ## 3. Autonomy model and human gates
 
@@ -317,7 +381,7 @@ Scope One is complete only when a reproducible demo proves:
 
 **Exit gate:** no false verified state in the required test matrix.
 
-### Phase 6 — End-to-end demo and product validation
+### Phase 6 — Command centre, end-to-end demo, and product validation
 - Demonstrate a user idea flowing through scope approval, multi-agent execution, pause/resume, a failed check, recovery, and verified delivery.
 - Compare against a baseline without coordination.
 - Measure time-to-resume, duplicate assignments, repeated work, missed requirements, verification failures, human interventions, and completion accuracy.
