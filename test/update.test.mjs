@@ -73,7 +73,7 @@ test('MEM-082 AC01: memev update from a local test tarball installs the new runt
   // the new runtime is a fresh folder under the config dir, holding the tarball's files
   const dir = path.join(sb.env.MEMEV_CONFIG_DIR, 'runtime', '9.9.9');
   assert.ok(fs.existsSync(path.join(dir, 'bin', 'memev.mjs')), 'the new runtime folder holds the installed files');
-  assert.match(fs.readFileSync(path.join(dir, 'src', 'engine', 'vault.mjs'), 'utf8'), /export const VERSION = '9\.9\.9'/);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).version, '9.9.9', 'the installed runtime package.json carries the release version');
   // the launcher points at the new runtime
   const launcher = fs.readFileSync(launcherOf(sb), 'utf8');
   assert.match(launcher, new RegExp(`JS='${path.join(dir, 'bin', 'memev.mjs').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`), 'the launcher points at the new runtime');

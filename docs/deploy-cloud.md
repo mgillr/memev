@@ -48,6 +48,8 @@ The self-serve Business trial (planned) fits cloud-hosted with hosted-api or mix
 with no card, and the workspace is provisioned self-serve. The flow is in docs/CLOUD-TRIAL.md
 (coming).
 
+The full trial terms are in [BUSINESS-TRIAL.md](BUSINESS-TRIAL.md).
+
 ## Status
 
 The service is planned and has no date. The command above works today and records the choice in

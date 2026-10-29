@@ -50,3 +50,5 @@ size is set by order form and the term starts at licence install. The trial lice
 free, and installing it yourself with the container image is free. Setup done by the operator is
 a paid service, quoted per the rate card in [services.md](tiers/services.md). The operator is
 named in the order form.
+
+The full trial terms are in [BUSINESS-TRIAL.md](BUSINESS-TRIAL.md).
