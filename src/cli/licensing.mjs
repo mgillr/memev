@@ -9,6 +9,8 @@ import { DeviceRegistry, hostDevice, deviceKeygen } from '../engine/devices.mjs'
 import { TokenStore } from '../engine/tokens.mjs';
 import { configDir, writePrivate, exists, readJson, writePrivateJson } from '../engine/util.mjs';
 import { isVault } from '../engine/vault.mjs';
+import { Bus } from '../engine/bus.mjs';
+import { CommitQueue } from '../engine/git.mjs';
 import { out } from './common.mjs';
 import { applyRelayDefault } from './relay.mjs';
 import { fetchOut } from '../engine/net.mjs';
@@ -256,6 +258,16 @@ export async function command(cmd, pos, flags, { root, env, license = null }) {
   }
   if (sub === 'remove' || sub === 'revoke') { const d = reg.remove(tokens, pos[1]); out.ok(`removed ${d.label} (${d.id}); its token no longer works${d.kind === 'remote-computer' ? ' and its seat is free' : ''}`); return 0; }
   if (sub === 'rotate') { const r = reg.rotate(tokens, pos[1]); console.log(`New token for ${r.device.label} (shown once; the old one stopped working):\n${r.token}`); return 0; }
-  if (sub === 'rename') { const d = reg.rename(pos[1], pos.slice(2).join(' ')); out.ok(`${d.id} is now "${d.label}"`); return 0; }
+  if (sub === 'rename') {
+    const d = reg.rename(pos[1], pos.slice(2).join(' '));
+    // A computer's label is part of its seats' names: move every seat on it with it, so its history,
+    // tasks and lead follow, and its old seat names still find the seats.
+    const q = new CommitQueue(root, { delayMs: 0 });
+    const bus = new Bus({ root, devices: reg, commit: (p) => q.add(p, 'bus') });
+    bus.renameDeviceSeats(d.id);
+    q.flush();
+    out.ok(`${d.id} is now "${d.label}"`);
+    return 0;
+  }
   throw new Error('memev devices [list|enroll --kind remote-computer --pubkey KEY|cloud-connector|local-client --label NAME|remove ID|rotate ID|rename ID NAME|keygen]');
 }
