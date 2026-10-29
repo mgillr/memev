@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { git } from '../engine/git.mjs';
-import { gitVia443 } from './github.mjs';
+import { gitVia443, cloneOffer } from './github.mjs';
 import { signAddressRecord } from '../engine/devices.mjs';
 import { now, readJson, writeJson } from '../engine/util.mjs';
 
@@ -198,6 +198,8 @@ export function syncOnce(vault, { root }) {
   const f = gitVia443(root, ['fetch', '-q', remote, branch], remote, url);
   if (!f.ok && !/couldn't find remote ref/.test(f.err)) { res.error = `fetch: ${f.err.split('\n').pop()}`; return res; }
   if (f.ok) {
+    // a backup holding a different vault (no common history) is never merged into this one: name the cause and the clone
+    if (!git(root, ['merge-base', 'HEAD', `${remote}/${branch}`]).ok) { res.error = `unrelated history: ${cloneOffer(url)}`; return res; }
     const m = git(root, ['merge', '--no-edit', '-q', `${remote}/${branch}`]);
     if (!m.ok) {
       const r = resolveConflicts(root, vault);
