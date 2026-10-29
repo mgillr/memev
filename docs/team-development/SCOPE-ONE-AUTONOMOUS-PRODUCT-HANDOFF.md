@@ -6,6 +6,85 @@
 **Reviewed baseline:** `main` at `76b1ce698140983c874036088ab50d3d2b0e3e00`  
 **Audience:** Product owner, architecture, implementation, integration, QA, and future builders
 
+## Mandatory takeover protocol — audit, reconcile, contract, then build
+
+This is the first instruction for the agent or developer taking over Scope One. Do not treat this handoff as a greenfield build spec. The repository, code, tests, current development contracts, issues/PRs, and in-flight work are the evidence of what exists and what remains.
+
+### Required sequence
+
+1. **Establish the real baseline.** Inspect the current branch/commit, working tree, repository instructions, source tree, package scripts, CI, tests, issues/PRs, existing development contracts, and recorded in-progress work. Do not assume the baseline SHA elsewhere in this document is still current.
+2. **Inventory existing development contracts.** Find outstanding, accepted, blocked, completed, superseded, and unowned contracts relevant to Memev and Scope One. Record IDs, owners, status, scope, dependencies, acceptance criteria, touched modules, and evidence. Do not create a duplicate contract for already-owned or delivered work.
+3. **Audit code and integration.** Trace each requirement to implementation, runtime wiring, and tests—not just filenames or documentation. Classify each as EXISTS_AND_VERIFIED, EXISTS_BUT_INCOMPLETE, DOCUMENTED_ONLY, MISSING, CONFLICTING, or UNKNOWN. A partial function does not prove end-to-end integration.
+4. **Build a requirement reconciliation matrix.** For every requirement, record the user outcome, code/test evidence, existing contract and owner, gap, dependencies, proposed disposition (KEEP, INTEGRATE, EXTEND, REPAIR, REPLACE, or NEW), required tests, and acceptance evidence.
+5. **Decompose into development contracts.** Every contract must define objective, scope and exclusions, interfaces, modules, dependencies, one accountable owner, invariants, failure modes, security implications, compatibility/migration, test plan, measurable acceptance criteria, closure evidence, and rollback/recovery. Link dependencies explicitly.
+6. **Resolve ownership and sequencing.** Amend existing contracts rather than cloning them. Define file/API boundaries and coordinate shared changes. Parallel implementation begins only when interfaces and ownership are clear.
+7. **Report the plan before broad implementation.** Provide the baseline report, contract inventory, reconciliation matrix, dependency map, proposed contract amendments/new contracts, risks, and unresolved product-owner decisions. Resolve engineering details from repository evidence wherever possible.
+8. **Build in vertical slices.** Deliver the smallest complete end-to-end flow first. Integrate existing components and add regression tests; do not build isolated panels or duplicate subsystems before the delivery path works.
+9. **Verify integration.** Run unit, integration, regression, security, packaging, and end-to-end checks appropriate to the slice. Test restart/recovery, duplicate dispatch, stale lead, permission boundaries, local workspace safety, GitHub operations, and evidence-backed completion. Record exact commands/results; never claim unrun tests passed.
+10. **Maintain the record.** Update contracts, ownership, dependencies, evidence, known limitations, and handoff docs. A contract closes only when acceptance criteria are met and evidence is linked.
+
+### Non-negotiable engineering rules
+
+- **No duplicate work:** search existing code, contracts, issues, branches, PRs, and tests before opening work or changing a module.
+- **No partial integration:** where a requirement overlaps existing capability, prove the complete end-to-end behaviour and contract only the missing integration seams.
+- **One source of truth:** do not create competing project state, lead authority, permissions, task ownership, or verification stores without a documented decision and migration plan.
+- **Evidence-based status:** distinguish code that exists, is wired into runtime, passes tests, and has been verified end to end.
+- **Safe changes:** preserve user files, repository history, compatibility, and data. Replacements/removals require rationale, migration, and rollback.
+- **Unknown means unknown:** cite paths, symbols, test names, contract IDs, and commits. If evidence is inaccessible, mark it UNKNOWN rather than guessing.
+
+### Required takeover deliverables
+
+Before broad implementation, create or update the repository's established equivalents of:
+
+1. Baseline and existing-contract inventory.
+2. Requirement-to-code/test reconciliation matrix.
+3. Contract dependency map with ownership and safe sequencing.
+4. Contract backlog containing amended existing contracts and only genuinely new contracts.
+5. Risk and decision register.
+6. Vertical-slice delivery plan with tests and definition of done.
+
+The audit is not the final outcome: once the plan is reconciled and accepted under repository governance, proceed with implementation and report verified progress.
+
+## Release and installation readiness — no broken first-run experience
+
+Deployability is a required product deliverable, not post-launch polish. A user or lead agent must be able to install Memev using documented, tested methods, verify the installation, connect the supported tools, and start a real project without guessing or relying on undocumented developer knowledge.
+
+### Required distribution and install paths
+
+- **npm:** define the supported package name, versioning, build/publish workflow, package contents, executable entry points, supported Node.js versions and operating systems, and clean-machine install smoke test. Publish only after the release gate passes.
+- **Docker:** provide a maintained Dockerfile and, where useful, Compose configuration; publish versioned images and a clear pull/run example; document persistent data, ports, environment variables, permissions, health checks, upgrades, and safe shutdown. Test the published image, not only a local build.
+- **Source installation:** document prerequisites and exact commands for clone/install/build/test/run. Test from a clean checkout with no untracked developer files.
+- **Supported agent-led setup:** provide an agent instruction/runbook that lets the chosen lead agent inspect prerequisites, select a supported installation path, install or start Memev, verify health, configure only user-approved access, and report the outcome. The agent must not claim success without checking the actual installed version and running health/smoke tests.
+- **Local development and upgrades:** document development setup, configuration, data persistence, upgrade/rollback, backup/recovery, and uninstall. Clearly label any experimental or unsupported paths.
+- **Release documentation:** publish a concise quick start, full installation guide, configuration reference, troubleshooting guide, supported-platform matrix, and versioned release notes. Commands must match the actual shipped version.
+
+### Release engineering and CI gates
+
+- Establish one reproducible build and test process used locally and in CI. Pin or constrain supported runtime/dependency versions and commit lockfiles where appropriate.
+- CI must run lint/static checks where configured, unit and integration tests, build/package validation, CLI smoke tests, container build and runtime smoke tests, and security/secret checks.
+- Test installation from the published npm package and published Docker image in a clean environment after publishing to a release candidate/staging tag; verify package contents and executable permissions.
+- Test first-run configuration with no existing data, upgrade from the previous supported version, persistent data across container restart, invalid/missing configuration, unavailable provider, expired GitHub authorization, and graceful failure/recovery.
+- Validate that published instructions work copy-paste as written. A release must not depend on private files, a developer's local environment, undeclared secrets, or unpublished build artifacts.
+- Use semantic versions and immutable release tags; produce checksums/provenance where practical. Never publish secrets, local configuration, private test fixtures, or unintended repository contents.
+- Keep credentials out of agent instructions, environment dumps, logs, images, and package artifacts. Agent-led installation must request permission before privileged operations and must not weaken local security controls.
+- Make releases repeatable and recoverable. Define release owner, release checklist, failure/rollback steps, and a post-release verification record.
+
+### Agent installation contract
+
+The lead-agent instruction must be provider-neutral and version-aware. It must tell the agent to: identify the user's OS and supported runtime; explain the chosen installation path; obtain permission for required actions; install the pinned/stable release; verify the installed version and health endpoint/CLI check; run a minimal end-to-end smoke test; configure only connections explicitly approved by the user; and report exact results and any limitation. If a step fails, the agent must diagnose and recover or stop safely—not repeat destructive commands or announce success.
+
+### Release acceptance criteria
+
+- Every advertised install method has been executed successfully in a clean environment using the published artifact.
+- npm package installs and its documented executable runs on each claimed supported platform/runtime.
+- Published Docker image starts, passes its health check, preserves configured data across restart, and follows documented configuration and permission requirements.
+- A clean source checkout builds and passes the documented test suite without relying on local developer state.
+- The lead agent can follow the installation runbook, verify the result, and clearly report success or failure without hard-coded provider assumptions.
+- Quick-start commands, package versions, image tags, environment variables, ports, and prerequisites match the actual release.
+- CI and release records provide traceable evidence; failed mandatory gates block publication.
+- Upgrade, backup/recovery, and rollback instructions are tested for the supported release path.
+- No release is called production-ready while a mandatory advertised installation path is broken or unverified.
+
 ## Executive decision
 
 Scope One is the first end-to-end implementation of a **provider-neutral autonomous project-delivery system** built on Memev's existing foundation. It is not a new memory product and must not duplicate capabilities already implemented or described in Memev.
