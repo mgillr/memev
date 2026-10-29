@@ -230,6 +230,19 @@ async function twoVaultChecks(root) {
   return [C('two-vaults', 'one vault on this computer', 'warn', `two vaults on this computer: this one is ${mine} and another is ${ids.join(', ')}. Join that vault instead of keeping two: memev init --join`)];
 }
 
+/**
+ * The vault id a local backup remote carries in its signed address record (address.json, committed with the
+ * backup). Null when the remote is not a local path (a git URL would need the network) or carries no readable
+ * record, so the doctor never reaches for the network to answer it.
+ */
+function backupVaultId(url) {
+  if (!url || !path.isAbsolute(url) || !exists(url)) return null;
+  const id = (text) => { try { const rec = JSON.parse(text); return rec && typeof rec.vault_id === 'string' ? rec.vault_id : null; } catch { return null; } };
+  try { const t = id(fs.readFileSync(path.join(url, 'address.json'), 'utf8')); if (t) return t; } catch { /* not a work tree */ }
+  const r = run('git', ['--git-dir', url, 'show', 'HEAD:address.json'], { timeout: 5000 });
+  return r.ok ? id(r.stdout) : null;
+}
+
 export async function allChecks({ root, env }) {
   const r = [];
   const info = daemonInfo(root);
@@ -256,7 +269,11 @@ export async function allChecks({ root, env }) {
   const backupRemote = remoteR.ok ? remoteR.stdout.trim().split('\n')[0] : '';
   if (backupRemote) {
     const urlR = run('git', ['remote', 'get-url', backupRemote], { cwd: root });
-    if (urlR.ok && alt443(urlR.stdout.trim())) r.push(await githubNetCheck());
+    const url = urlR.ok ? urlR.stdout.trim() : '';
+    if (url && alt443(url)) r.push(await githubNetCheck());
+    const theirs = backupVaultId(url);
+    const mine = config(root).vault_id;
+    if (theirs && mine && theirs !== mine) r.push(C('backup-vault', 'backup belongs to this vault', 'warn', `the backup belongs to a different vault: this one is ${mine} and the backup is ${theirs}. Two vaults per user are not supported. Join that vault instead of keeping two: memev init --join`));
   }
   const { unitPaths, serviceOff } = await import('./service.mjs');
   const u = unitPaths(env);
