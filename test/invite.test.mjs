@@ -16,7 +16,7 @@ test('MEM-023 AC01: memev invite prints a code that encodes the vault address an
   try {
     const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
     assert.equal(init.code, 0, init.err + init.out);
-    const inv = sb.run(['invite', '--ttl', '600']);
+    const inv = sb.run(['invite', '--ttl', '600', '--local']);
     assert.equal(inv.code, 0, inv.err + inv.out);
     const code = (inv.out.match(/^code: (\S+)/m) || [])[1];
     assert.ok(code, inv.out);

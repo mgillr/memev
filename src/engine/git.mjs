@@ -7,6 +7,15 @@ export function git(root, args, opts = {}) {
   return { ok: r.ok, status: r.status, out: r.stdout.trim(), err: r.stderr.trim() || r.error || '' };
 }
 
+// git init -b main needs git 2.28; on older git, fall back to a plain init and move HEAD by hand.
+export function gitInitMain(root) {
+  let r = git(root, ['init', '-q', '-b', 'main']);
+  if (r.ok) return r;
+  r = git(root, ['init', '-q']);
+  if (!r.ok) return r;
+  return git(root, ['symbolic-ref', 'HEAD', 'refs/heads/main']);
+}
+
 export class CommitQueue {
   constructor(root, { delayMs = 400, enabled = true } = {}) { this.root = root; this.delayMs = delayMs; this.enabled = enabled; this.pending = new Map(); this.timer = null; this.commits = 0; }
   add(p, client) {
@@ -21,12 +30,16 @@ export class CommitQueue {
     clearTimeout(this.timer); this.timer = null;
     if (!this.pending.size) return null;
     const paths = [...this.pending.keys()]; const clients = new Set([...this.pending.values()].flatMap((s) => [...s]));
-    this.pending.clear();
-    git(this.root, ['add', '-A', '--', ...paths]);
+    const a = git(this.root, ['add', '-A', '--', ...paths]);
+    if (!a.ok) return a;
+    // an edit undone before the flush (or a path a merge already committed) leaves nothing to commit; drop it
+    // instead of failing every flush on "nothing to commit"
+    if (git(this.root, ['diff', '--cached', '--quiet', '--', ...paths]).ok) { this.pending.clear(); return null; }
     const subject = paths.length === 1 ? `memev: ${paths[0]}` : `memev: ${paths.length} notes`;
     const body = clients.size ? `\n\nMemev-Client: ${[...clients].sort().join(', ')}` : '';
     const r = git(this.root, ['commit', '-q', '-m', `${subject}${body}`]);
-    if (r.ok) this.commits++;
+    // keep the paths pending on failure so the next flush retries them; only a committed flush drops them
+    if (r.ok) { this.pending.clear(); this.commits++; }
     return r;
   }
 }

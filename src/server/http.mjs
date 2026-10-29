@@ -6,7 +6,9 @@
 // X-Memev-Key header (the tunnel key) or a connector URL (/c/<token>/mcp). Remote requests are rate
 // limited and audited. Unauthenticated routes are GET /healthz, which says {"ok":true} (and, to a
 // direct local caller, the vault's id), and POST /v1/invite-redeem, which enrolls one computer
-// from a one-time invite code.
+// from a one-time invite code. The OAuth setup routes (register, authorize, token, revoke) are open
+// to remote callers but pass the same remote-off check, rate limit and audit log; the consent page
+// is served and accepted only on the vault's own machine.
 // Another computer must sign every request with its own device key; a cloud connector credential
 // must not be used from a computer. Computers over the licence's seat count, or on a lapsed
 // licence, can read but not write (src/engine/entitlements.mjs).
@@ -17,6 +19,7 @@ import { seatPolicy, readOnlyReason } from '../engine/entitlements.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { handle } from './mcp.mjs';
+import { OAuthStore, OAuthError, consentPage } from './oauth.mjs';
 import { VaultError, VERSION } from '../engine/vault.mjs';
 import { timingSafeEqualHex, sha256, now, slug } from '../engine/util.mjs';
 import { renderCard, renderRecall, PROTOCOL } from '../engine/card.mjs';
@@ -104,6 +107,8 @@ export function renderBus(u, { lead = false } = {}) {
 export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICENSE_KEYS, env = process.env } = {}) {
   const limiter = new Buckets(vault.config.remote?.rate_per_min || 120);
   const nonces = new NonceCache();
+  // a grant whose device was removed stops working at once: the device's token_id is the grant's id
+  const oauth = new OAuthStore(path.join(vault.state, 'oauth.json'), (id) => { vault.devices.fresh(); return vault.devices.list().some((d) => d.token_id === id && d.status === 'revoked'); });
   // the licence file is read again at most every few seconds, so an install takes effect at once
   let lic = null; let licAt = 0;
   const policy = () => { if (Date.now() - licAt > 3000) { lic = loadLicense({ env, keys: licenseKeys }); licAt = Date.now(); } return seatPolicy({ license: lic, devices: vault.devices.list() }); };
@@ -126,6 +131,92 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
         if (!limiter.take(`ip:${ipKey}`) || (token && !limiter.take(`t:${token.slice(3, 11)}`))) return send(429, { error: 'rate_limited' }, { 'retry-after': '30' });
         fs.appendFile(audit, `${JSON.stringify({ ts: now(), ip: ipKey, route: route.slice(0, 64), method: req.method, token: token ? token.slice(3, 11) : null })}\n`, () => {});
       }
+      // OAuth 2.1 for cloud AI apps: discovery, dynamic client registration, authorization code
+      // with PKCE, token, refresh and revocation. A remote caller passes the same remote-off check,
+      // rate limit and audit log as every other route. The consent page is served and accepted only
+      // on the vault's own machine, where the owner approves; /mcp still needs a valid credential.
+      const port = server.address()?.port;
+      const localConsent = (code) => `http://127.0.0.1:${port}/oauth/consent?code=${encodeURIComponent(code || '')}`;
+      const issuer = `${local ? 'http' : 'https'}://${String(req.headers.host || 'localhost')}`;
+      if (req.method === 'GET' && url.pathname === '/.well-known/oauth-authorization-server') {
+        return send(200, {
+          issuer,
+          authorization_endpoint: `${issuer}/oauth/authorize`,
+          token_endpoint: `${issuer}/oauth/token`,
+          registration_endpoint: `${issuer}/oauth/register`,
+          revocation_endpoint: `${issuer}/oauth/revoke`,
+          response_types_supported: ['code'],
+          grant_types_supported: ['authorization_code', 'refresh_token'],
+          code_challenge_methods_supported: ['S256'],
+          token_endpoint_auth_methods_supported: ['none'],
+          scopes_supported: ['read', 'write'],
+        });
+      }
+      if (req.method === 'GET' && url.pathname === '/.well-known/oauth-protected-resource') {
+        return send(200, { resource: `${issuer}/mcp`, authorization_servers: [issuer], bearer_methods_supported: ['header'] });
+      }
+      if (req.method === 'POST' && url.pathname === '/oauth/register') {
+        let body; try { body = JSON.parse((await getBody()) || '{}'); } catch { return send(400, { error: 'invalid_client_metadata', error_description: 'the body is not json' }); }
+        try { return send(201, oauth.register(body)); }
+        catch (e) { return send(e instanceof OAuthError ? e.status : 400, { error: e.code, error_description: e.message }); }
+      }
+      if (req.method === 'GET' && url.pathname === '/oauth/authorize') {
+        const q = url.searchParams;
+        if (q.get('response_type') !== 'code') return send(400, { error: 'unsupported_response_type', error_description: 'response_type must be code' });
+        try {
+          const { code } = oauth.authorize({ client_id: q.get('client_id'), redirect_uri: q.get('redirect_uri'), code_challenge: q.get('code_challenge'), code_challenge_method: q.get('code_challenge_method'), scope: q.get('scope'), state: q.get('state') });
+          // a remote browser stays on the tunnel host, so it gets the link to open on the vault's machine
+          return send(302, '', { location: local ? `/oauth/consent?code=${code}` : localConsent(code) });
+        } catch (e) {
+          const code = e instanceof OAuthError ? e.code : 'invalid_request';
+          // an unknown client or an unregistered redirect_uri has not been validated, so sending the
+          // browser there would be an open redirect: answer plain, with no Location, instead
+          if (code === 'unauthorized_client' || code === 'invalid_redirect_uri') return send(400, { error: code, error_description: e.message });
+          const redir = q.get('redirect_uri');
+          if (redir && /^https?:/i.test(redir)) { const u = new URL(redir); u.searchParams.set('error', code); if (q.get('state')) u.searchParams.set('state', q.get('state')); return send(302, '', { location: u.toString() }); }
+          return send(400, { error: code, error_description: e.message });
+        }
+      }
+      if (req.method === 'GET' && url.pathname === '/oauth/consent') {
+        if (!local) return send(403, `Consent is approved on the computer that holds the vault, not through the tunnel. Open this link on that computer: ${localConsent(url.searchParams.get('code'))}`);
+        const rec = oauth.pending(url.searchParams.get('code'));
+        if (!rec) return send(400, 'unknown or expired consent code');
+        let host = null; try { host = new URL(rec.redirect_uri).hostname; } catch { host = null; }
+        return send(200, consentPage({ client: oauth.client(rec.client_id), scopes: rec.scopes, code: rec.code, state: rec.state, consent: rec.consent, redirectHost: host }), { 'content-type': 'text/html; charset=utf-8' });
+      }
+      if (req.method === 'POST' && url.pathname === '/oauth/consent') {
+        if (!local) return send(403, 'Consent is approved on the computer that holds the vault, not through the tunnel. Open the consent link on that computer.');
+        // a form posted from another origin (a phishing page) must not be able to approve
+        const origin = req.headers.origin;
+        if (origin !== undefined) {
+          let own = false;
+          try { const o = new URL(String(origin)); own = o.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(o.hostname) && o.port === String(port); } catch { own = false; }
+          if (!own) return send(403, 'the consent form only works from this vault\'s own consent page');
+        }
+        const form = new URLSearchParams((await getBody()) || '');
+        const decision = form.get('decision');
+        if (!['approve', 'deny'].includes(decision)) return send(400, { error: 'invalid_request', error_description: 'decision must be approve or deny' });
+        try {
+          const rec = oauth.consent(form.get('code'), { approve: decision === 'approve', consent: form.get('consent') });
+          const u = new URL(rec.redirect_uri);
+          if (rec.approved) u.searchParams.set('code', rec.code); else u.searchParams.set('error', 'access_denied');
+          if (rec.state) u.searchParams.set('state', rec.state);
+          return send(302, '', { location: u.toString() });
+        } catch (e) { return send(e instanceof OAuthError ? e.status : 400, { error: e.code, error_description: e.message }); }
+      }
+      if (req.method === 'POST' && url.pathname === '/oauth/token') {
+        const form = new URLSearchParams((await getBody()) || '');
+        try {
+          if (form.get('grant_type') === 'authorization_code') return send(200, oauth.exchange({ client_id: form.get('client_id'), code: form.get('code'), redirect_uri: form.get('redirect_uri'), code_verifier: form.get('code_verifier') }));
+          if (form.get('grant_type') === 'refresh_token') return send(200, oauth.refresh({ client_id: form.get('client_id'), refresh_token: form.get('refresh_token') }));
+          return send(400, { error: 'unsupported_grant_type', error_description: 'grant_type must be authorization_code or refresh_token' });
+        } catch (e) { return send(e instanceof OAuthError ? e.status : 400, { error: e.code, error_description: e.message }); }
+      }
+      if (req.method === 'POST' && url.pathname === '/oauth/revoke') {
+        const form = new URLSearchParams((await getBody()) || '');
+        oauth.revoke(form.get('token'));
+        return send(200, {});
+      }
       if (req.method === 'POST' && route === '/v1/invite-redeem') {
         let body; try { body = JSON.parse((await getBody()) || '{}'); } catch { return send(400, { error: 'bad_json', error_description: 'the body is not json' }); }
         try {
@@ -136,7 +227,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
           return send(expired ? 410 : 409, { error: expired ? 'expired' : 'refused', error_description: e.message });
         }
       }
-      const identity = vault.tokens.verify(token);
+      const identity = vault.tokens.verify(token) || (token ? oauth.verify(token) : null);
       if (!identity) return send(401, { error: 'unauthorized', error_description: 'a valid bearer token is required' }, { 'www-authenticate': 'Bearer' });
       if (!local) {
         if (!identity.remote) return send(403, { error: 'local_token', error_description: 'this token is for this machine only; for a cloud AI app use the connector URL from memev cloud url, and add another computer with memev devices enroll' });

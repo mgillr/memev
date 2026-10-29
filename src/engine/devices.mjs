@@ -234,6 +234,33 @@ export function deviceKeygen() {
 const invitePath = (root) => path.join(root, '.memev', 'invites.json');
 export const inviteHash = (secret) => sha256(String(secret));
 
+/**
+ * The backup value in an invite is handed to git fetch as the remote, so it must be a remote git
+ * can name: a URL (https, http, ssh, git, file), a [user@]host:path remote, or an absolute local
+ * path. Anything else is refused, including anything that starts with a dash (which git would read
+ * as an option) and a <transport>::<address> value (which runs a git remote helper).
+ */
+export function assertBackupRemote(value) {
+  const v = String(value ?? '');
+  const bad = () => { throw new Error('the invite backup is not a valid git remote (a URL, a user@host:path remote, or an absolute local path)'); };
+  if (!v || /[\x00-\x1f\x7f]/.test(v) || v.startsWith('-')) bad();
+  if (/^[A-Za-z0-9+.-]+::/.test(v)) bad();
+  if (v.startsWith('/') || /^[A-Za-z]:[\\/]/.test(v)) return v;
+  let m;
+  if ((m = /^(https?|ssh|git|git\+ssh|ssh\+git|file):\/\/(?:([^@/\s]*)@)?([^/:?#\s]*)(?::(\d+))?(?:[/?]|$)/.exec(v))) {
+    if (!m[3] && m[1] !== 'file') bad();
+    if (m[3].startsWith('-') || (m[2] || '').startsWith('-')) bad();
+    return v;
+  }
+  if ((m = /^(?:([^@/:\s]+)@)?([^/:\s]+):(.+)$/.exec(v))) {
+    if (m[2].startsWith('-') || (m[1] || '').startsWith('-')) bad();
+    // "scheme:value" without a slash (e.g. "http:bad") is not a remote git can name
+    if (!m[1] && /^(?:https?|ssh|git|git\+ssh|ssh\+git|file|ftps?)$/i.test(m[2])) bad();
+    return v;
+  }
+  bad();
+}
+
 export function encodeInvite({ address, secret, pubkey = undefined, backup = undefined }) {
   const o = { a: address, s: secret };
   if (pubkey) o.k = pubkey;
@@ -244,7 +271,8 @@ export function decodeInvite(code) {
   let o;
   try { o = JSON.parse(Buffer.from(String(code), 'base64url').toString('utf8')); } catch { throw new Error('bad invite code'); }
   if (!o || typeof o.a !== 'string' || typeof o.s !== 'string' || !o.a || !o.s) throw new Error('bad invite code');
-  return { address: o.a, secret: o.s, pubkey: typeof o.k === 'string' && o.k ? o.k : null, backup: typeof o.b === 'string' && o.b ? o.b : null };
+  const backup = typeof o.b === 'string' && o.b ? assertBackupRemote(o.b) : null;
+  return { address: o.a, secret: o.s, pubkey: typeof o.k === 'string' && o.k ? o.k : null, backup };
 }
 
 function loadInvites(root) { return readJson(invitePath(root), null) || { version: 1, invites: {} }; }
