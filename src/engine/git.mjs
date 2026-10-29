@@ -7,6 +7,15 @@ export function git(root, args, opts = {}) {
   return { ok: r.ok, status: r.status, out: r.stdout.trim(), err: r.stderr.trim() || r.error || '' };
 }
 
+// git init -b main needs git 2.28; on older git, fall back to a plain init and move HEAD by hand.
+export function gitInitMain(root) {
+  let r = git(root, ['init', '-q', '-b', 'main']);
+  if (r.ok) return r;
+  r = git(root, ['init', '-q']);
+  if (!r.ok) return r;
+  return git(root, ['symbolic-ref', 'HEAD', 'refs/heads/main']);
+}
+
 export class CommitQueue {
   constructor(root, { delayMs = 400, enabled = true } = {}) { this.root = root; this.delayMs = delayMs; this.enabled = enabled; this.pending = new Map(); this.timer = null; this.commits = 0; }
   add(p, client) {

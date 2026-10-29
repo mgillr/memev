@@ -134,6 +134,15 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   const ids = Object.keys(clients.connected || {});
   r.push(C('apps', 'AI apps connected', ids.length ? (missing.length ? 'warn' : 'ok') : 'warn', ids.length ? `${ids.join(', ')}${missing.length ? `; entries missing for ${[...new Set(missing)].join(', ')}` : ''}` : 'none yet', ids.length && !missing.length ? null : { desc: 'connect every installed app again', destructive: false, cmd: 'connect' }));
   const cfg = config(root);
+  // deployment: report where the vault runs and what kind of AI provider it uses. Report only: it
+  // never fails the run. The one warning is a choice that cannot work as written.
+  const dep = cfg.deployment || {};
+  const depMode = ['local', 'on-prem', 'cloud-hosted'].includes(dep.mode) ? dep.mode : 'local';
+  const depProvider = ['hosted-api', 'internal-llm', 'mixed'].includes(dep.ai_provider) ? dep.ai_provider : 'unset';
+  const depMismatch = depMode === 'cloud-hosted' && depProvider === 'internal-llm';
+  r.push(C('deployment', 'deployment mode', depMismatch ? 'warn' : 'ok', depMismatch
+    ? `mode ${depMode}, provider ${depProvider}: an internal model is only reachable inside your network, so it cannot be reached from a managed host; see docs/DOCKER.md for the self-hosted install`
+    : `mode ${depMode}, provider ${depProvider}`));
   const tun = readJson(path.join(state, 'tunnel.json'), null);
   if (cfg.remote?.enabled) r.push(C('remote', 'remote access', tun?.state === 'up' ? 'ok' : 'warn', tun?.state === 'up' ? `${tun.provider} at ${tun.url}${tun.stable ? '' : ' (address changes on restart)'}` : `on, but the tunnel is ${tun?.state || 'not started'}; memev cloud off switches remote access off`));
   else r.push(C('remote', 'remote access', 'ok', 'off (local only)'));
@@ -149,6 +158,12 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
     r.push(C('license', 'licence and seats (report only)', flagged.length || renewal ? 'warn' : 'ok', `${ls.license.state === 'none' ? 'free tier, no licence needed' : `licence ${ls.license.state}${ls.license.tier ? ` (${ls.license.tier})` : ''}`}; ${ls.usage.computers} computer(s), ${ls.usage.connectors} connector(s), ${ls.usage.local_clients} local client(s)${ls.notes.length ? `; ${ls.notes.join(' ')}` : ''}${renewal ? `; ${renewal}` : ''}${flagged.length ? `; credential flagged on ${flagged.map((f) => f.label).join(', ')}: memev devices` : ''}`));
   } catch (e) { r.push(C('license', 'licence and seats (report only)', 'ok', `not checked: ${e.message}`)); }
   try { const s = fs.statfsSync(root); const freePct = (s.bavail / s.blocks) * 100; const inodePct = s.files ? (s.ffree / s.files) * 100 : 100; r.push(C('disk', 'disk space', freePct < 3 || inodePct < 3 ? 'warn' : 'ok', `${freePct.toFixed(0)}% space, ${inodePct.toFixed(0)}% inodes free`)); } catch {}
+  if (env.MEMEV_CONTAINER === '1') {
+    const vaultWritable = (() => { try { const t = path.join(root, '.memev', `write-test-${process.pid}`); fs.writeFileSync(t, 'ok'); fs.rmSync(t, { force: true }); return true; } catch { return false; } })();
+    r.push(C('container-vault', 'vault volume mounted and writable', vaultWritable ? 'ok' : 'fail', vaultWritable ? `${root} is writable` : `${root} is not writable; check the volume mount`));
+    r.push(C('container-loopback', 'host port (check it on the host)', 'ok', 'the host port mapping is not visible from inside the container; check it on the host with: docker compose -f compose.trial.yaml port memev 7787'));
+    r.push(C('container-remote', 'remote access off', cfg.remote?.enabled ? 'warn' : 'ok', cfg.remote?.enabled ? 'remote access is on in the vault config; run memev cloud off in the container' : 'off (local only)'));
+  }
   return r;
 }
 
