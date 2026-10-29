@@ -202,9 +202,8 @@ export function relayFetch(address, { relay, path: p = '/', method = 'GET', head
 
 // ---- the setting and the daemon side
 export const relaySetting = (root) => ({ enabled: false, url: null, domain: null, default_url: null, default_domain: null, ...(config(root).remote?.relay || {}) });
-/** A Personal with more computers licence (id personal or personal_more) that is valid or still in
- * its grace period. Every other tier is not. */
-export const personalActive = (license) => (license?.state === 'valid' || license?.state === 'grace') && ['personal', 'personal_more'].includes(license.tier);
+/** A Personal licence that is valid or still in its grace period. The free tier and every other tier are not. */
+export const personalActive = (license) => (license?.state === 'valid' || license?.state === 'grace') && license.tier === 'personal';
 
 /** Store a relay address the licence service sent beside the signed licence. An address that is missing or not a relay URL is left untouched. */
 export function applyRelayDefault(root, relay) {

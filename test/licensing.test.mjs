@@ -213,7 +213,7 @@ test('CLI: memev license status and memev devices; the doctor reports seats with
   try {
     assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
     const st = sb.run(['license', 'status']);
-    assert.equal(st.code, 0, st.err); assert.match(st.out, /Personal, no licence needed/); assert.match(st.out, /Computers: 1 of 1 enrolled/);
+    assert.equal(st.code, 0, st.err); assert.match(st.out, /free tier needs none/); assert.match(st.out, /Computers: 1 of 1 enrolled/);
     const nokey = sb.run(['devices', 'enroll', '--kind', 'remote-computer', '--label', 'office-pc']);
     assert.equal(nokey.code, 1); assert.match(nokey.out, /device key/);
     const e = sb.run(['devices', 'enroll', '--kind', 'cloud-connector', '--label', 'chatgpt']);
@@ -227,7 +227,7 @@ test('CLI: memev license status and memev devices; the doctor reports seats with
     const j = JSON.parse(sb.run(['license', 'status', '--json']).out);
     assert.equal(j.blocked, false); assert.equal(j.license.state, 'none');
     const d = JSON.parse(sb.run(['doctor', '--json']).out);
-    const c = d.find((x) => x.id === 'license'); assert.equal(c.status, 'ok'); assert.match(c.detail, /Personal, no licence needed/);
+    const c = d.find((x) => x.id === 'license'); assert.equal(c.status, 'ok'); assert.match(c.detail, /free tier/);
     const bad = sb.run(['license', 'install', path.join(PKG, 'package.json')]); assert.equal(bad.code, 1);
   } finally { sb.stop(); }
 });

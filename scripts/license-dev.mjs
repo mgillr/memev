@@ -7,7 +7,7 @@
 // excludes *.pem as a second guard.
 //
 //   node scripts/license-dev.mjs keygen [--out DIR]
-//   node scripts/license-dev.mjs sign --key DIR/license-ed25519.pem --tier personal_more --seats 4 \
+//   node scripts/license-dev.mjs sign --key DIR/license-ed25519.pem --tier personal --seats 4 \
 //        [--connectors 10] [--services sync,backup,relay] [--exp 2027-11-15|none] [--grace 14] [--kid ID]
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -34,7 +34,7 @@ if (cmd === 'keygen') {
   const keyFile = arg('key'); if (!keyFile) { console.error('--key is required'); process.exit(2); }
   const pem = fs.readFileSync(keyFile, 'utf8');
   const exp = arg('exp', null);
-  const fields = { v: 1, lid: arg('lid', `lic_${crypto.randomBytes(6).toString('hex')}`), tier: arg('tier', 'personal_more'), services: String(arg('services', 'sync,backup,relay')).split(',').filter(Boolean), seats: Number(arg('seats', 4)), connectors: Number(arg('connectors', 10)), iat: arg('iat', new Date().toISOString().slice(0, 10)), exp: !exp || exp === 'none' ? null : exp, grace_days: Number(arg('grace', 14)) };
+  const fields = { v: 1, lid: arg('lid', `lic_${crypto.randomBytes(6).toString('hex')}`), tier: arg('tier', 'personal'), services: String(arg('services', 'sync,backup,relay')).split(',').filter(Boolean), seats: Number(arg('seats', 4)), connectors: Number(arg('connectors', 10)), iat: arg('iat', new Date().toISOString().slice(0, 10)), exp: !exp || exp === 'none' ? null : exp, grace_days: Number(arg('grace', 14)) };
   const pub = crypto.createPublicKey(pem).export({ type: 'spki', format: 'der' }).toString('base64');
   const kid = arg('kid', `dev-${crypto.createHash('sha256').update(pub).digest('hex').slice(0, 8)}`);
   const lic = signLicense(fields, pem, kid);
@@ -42,6 +42,6 @@ if (cmd === 'keygen') {
   if (!['valid', 'grace', 'expired', 'not_yet_valid'].includes(check.state)) { console.error(`self-check failed: ${check.reason}`); process.exit(1); }
   console.log(JSON.stringify(lic, null, 2));
 } else {
-  console.error('usage: license-dev.mjs keygen [--out DIR] | sign --key FILE --tier personal_more|business|corporate|founder --seats N [--exp DATE|none]');
+  console.error('usage: license-dev.mjs keygen [--out DIR] | sign --key FILE --tier T --seats N [--exp DATE|none]');
   process.exit(2);
 }
