@@ -140,6 +140,7 @@ export class SetupChannel {
     if (!ok) throw new Error('handshake: operator signature invalid');
 
     this._hsDone = true;
+    this._pump();
   }
 
   async _sendPlain(obj) {
@@ -187,6 +188,7 @@ export class SetupChannel {
           this._pending.resolve(JSON.parse(body.toString('utf8')));
         } catch { this._fail('bad handshake frame'); return; }
         this._pending = null;
+        return;
       } else {
         const ct = body.subarray(0, body.length - 16);
         const tag = body.subarray(body.length - 16);

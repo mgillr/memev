@@ -139,6 +139,12 @@ export class OperatorStub {
     this.sock.write(Buffer.concat([hdr, frame]));
   }
 
+  sendRaw(frame) {
+    const hdr = Buffer.alloc(4);
+    hdr.writeUInt32BE(frame.length);
+    this.sock.write(Buffer.concat([hdr, frame]));
+  }
+
   waitForResult(id, timeout = 5000) {
     return new Promise((resolve, reject) => {
       const existing = this._results.find((r) => r.id === id);

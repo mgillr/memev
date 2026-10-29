@@ -8,6 +8,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { parseCode, makeCode, SetupChannel } from '../src/engine/setup-channel.mjs';
 import { checkAllowlist, Session, appendLog, verifyChain, logPath, statusPath, sessionDir, redact } from '../src/cli/setup-remote.mjs';
+import { detect } from '../src/cli/clients.mjs';
 import { OperatorStub, makeOperatorKeys } from './setup-operator-stub.mjs';
 import { listeningSockets } from './helpers/proc.mjs';
 import { freePort } from './helpers/cli.mjs';
@@ -38,6 +39,16 @@ function fixtureClock(start = Date.now()) {
     now: () => t,
     advance: (ms) => { t += ms; },
   };
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function waitHs(stub, ms = 2000) {
+  const t0 = Date.now();
+  while (!stub._hsDone && Date.now() - t0 < ms) await sleep(20);
+  return stub._hsDone;
 }
 
 test('MEM-142 AC01: session opens no listening socket and nothing starts it by itself', async () => {
@@ -284,12 +295,17 @@ test('MEM-142 AC05: customer can revoke with Ctrl-C and stop command', async () 
 
 test('MEM-142 AC06: allowlist enforces scoped commands', async () => {
   const root = tmpRoot();
+  const apps = detect();
+  const foundApp = apps.find((a) => a.found && a.supported !== false);
+  const notFoundApp = apps.find((a) => !a.found && a.supported !== false);
+  const unsupportedApp = apps.find((a) => a.supported === false);
 
   const allowed = [
     ['doctor'], ['status'], ['deployment', 'show'], ['deployment', 'set', 'local'],
     ['deployment', 'set', 'container'], ['license', 'status'], ['license', 'install', 'key.lic'],
-    ['devices', 'list'], ['connect', 'claude-code'], ['ready'], ['setup', 'remote', 'log'],
+    ['devices', 'list'], ['ready'], ['setup', 'remote', 'log'],
   ];
+  if (foundApp) allowed.push(['connect', foundApp.id]);
   for (const argv of allowed) {
     const r = checkAllowlist(argv, root);
     assert.ok(r.ok, `should allow: ${argv.join(' ')}: ${r.reason}`);
@@ -306,10 +322,13 @@ test('MEM-142 AC06: allowlist enforces scoped commands', async () => {
     { argv: ['admin-token'], reason: 'not in allowlist' },
     { argv: ['setup', 'remote', '--code', 'x'], reason: 'only log' },
     { argv: [], reason: 'empty' },
+    { argv: ['connect', 'all'], reason: 'all is not allowed' },
   ];
+  if (notFoundApp) refused.push({ argv: ['connect', notFoundApp.id], reason: 'app not found' });
+  if (unsupportedApp) refused.push({ argv: ['connect', unsupportedApp.id], reason: 'app unsupported' });
   for (const { argv, reason } of refused) {
     const r = checkAllowlist(argv, root);
-    assert.ok(!r.ok, `should refuse: ${argv.join(' ') || '(empty)'}`);
+    assert.ok(!r.ok, `should refuse: ${argv.join(' ') || '(empty)'} (${reason})`);
   }
   fs.rmSync(root, { recursive: true, force: true });
 });
@@ -391,6 +410,133 @@ test('MEM-142 AC08: no stored credentials, code works once, only log and status 
   assert.ok(!r2.ok, 'replayed code should be refused');
   assert.match(r2.reason, /one-time|already used/);
 
+  stub.close();
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('MEM-142 AC05: a command round trip through the channel returns its result', async () => {
+  const root = tmpRoot();
+  const port = freePort();
+  const { code, sid, secret, keys } = makeTestCode(port);
+  const stub = new OperatorStub({ sid, secret, port, minutes: 5, keys });
+  await stub.start();
+
+  const outLines = [];
+  const seen = [];
+  const session = new Session({
+    root, code: parseCode(code),
+    outStream: { write: (s) => outLines.push(s) },
+    execute: (argv) => { seen.push(argv); return { ok: true, code: 0, out: `ran ${argv.join(' ')}` }; },
+  });
+  const p = session.start();
+  assert.ok(await waitHs(stub), 'handshake completed');
+
+  const id = stub.sendCmd(['status']);
+  const res = await stub.waitForResult(id, 5000);
+  assert.ok(res.ok, 'result is ok');
+  assert.equal(res.code, 0);
+  assert.ok(res.out.includes('ran status'), 'result carries the command output');
+  assert.deepEqual(seen, [['status']], 'the client ran the command');
+
+  session.revoke();
+  await p;
+  stub.close();
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('MEM-142 AC03: a replayed frame is refused and the session ends', async () => {
+  const root = tmpRoot();
+  const port = freePort();
+  const { code, sid, secret, keys } = makeTestCode(port);
+  const stub = new OperatorStub({ sid, secret, port, minutes: 5, keys });
+  await stub.start();
+
+  const outLines = [];
+  const session = new Session({
+    root, code: parseCode(code),
+    outStream: { write: (s) => outLines.push(s) },
+    execute: (argv) => { outLines.push(`ran ${argv.join(' ')}`); return { ok: true, code: 0, out: 'ok' }; },
+  });
+  const p = session.start();
+  assert.ok(await waitHs(stub), 'handshake completed');
+
+  const id = stub.sendCmd(['status']);
+  await stub.waitForResult(id, 5000);
+
+  const pt = Buffer.from(JSON.stringify({ kind: 'cmd', id: 50, argv: ['status'] }), 'utf8');
+  const nonce = Buffer.alloc(12);
+  nonce.writeBigUInt64BE(0n, 4);
+  const c = crypto.createCipheriv('aes-256-gcm', stub.o2cKey, nonce);
+  const frame = Buffer.concat([Buffer.concat([c.update(pt), c.final()]), c.getAuthTag()]);
+  stub.sendRaw(frame);
+  stub.sendRaw(frame);
+
+  await new Promise((r) => {
+    const t = setTimeout(r, 2000);
+    const iv = setInterval(() => {
+      if (session.done) { clearInterval(iv); clearTimeout(t); r(); }
+    }, 20);
+  });
+
+  assert.ok(session.done, 'session ended after the replayed frame');
+  assert.ok(outLines.some((l) => l.includes('frame auth failed')), 'replay refused with an auth failure');
+  assert.equal(outLines.filter((l) => l.startsWith('ran ')).length, 1, 'the replayed command did not run again');
+  const endLine = outLines.find((l) => l.startsWith('session ended:'));
+  assert.ok(endLine, 'the customer sees why the session ended');
+
+  session.revoke();
+  await p;
+  stub.close();
+  fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('MEM-142 AC05: the first command in the same read as the auth frame still runs', async () => {
+  const root = tmpRoot();
+  const port = freePort();
+  const { code, sid, secret, keys } = makeTestCode(port);
+  const stub = new OperatorStub({ sid, secret, port, minutes: 5, keys });
+  await stub.start();
+
+  const origPlain = stub._sendPlain.bind(stub);
+  stub._sendPlain = function (obj) {
+    if (obj.type === 'auth') {
+      const p = Buffer.from(JSON.stringify(obj));
+      const h = Buffer.alloc(4);
+      h.writeUInt32BE(p.length);
+      this._held = Buffer.concat([h, p]);
+      return Promise.resolve();
+    }
+    return origPlain(obj);
+  };
+  const origSend = stub.send.bind(stub);
+  stub.send = function (obj) {
+    const w = this.sock.write.bind(this.sock);
+    if (this._held) {
+      const held = this._held;
+      this._held = null;
+      this.sock.write = (buf, cb) => { this.sock.write = w; return w(Buffer.concat([held, buf]), cb); };
+    }
+    return origSend(obj);
+  };
+
+  const outLines = [];
+  const seen = [];
+  const session = new Session({
+    root, code: parseCode(code),
+    outStream: { write: (s) => outLines.push(s) },
+    execute: (argv) => { seen.push(argv); return { ok: true, code: 0, out: 'ran' }; },
+  });
+  const p = session.start();
+  assert.ok(await waitHs(stub), 'handshake completed');
+
+  const id = stub.sendCmd(['status']);
+  const res = await stub.waitForResult(id, 5000);
+  assert.ok(res.ok, 'the command ran and returned a result');
+  assert.deepEqual(seen, [['status']], 'the client ran the command');
+
+  session.revoke();
+  const settled = await Promise.race([p.then(() => 'returned'), sleep(3000).then(() => 'still pending')]);
+  assert.equal(settled, 'returned', 'start() settles after revoke');
   stub.close();
   fs.rmSync(root, { recursive: true, force: true });
 });

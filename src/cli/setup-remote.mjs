@@ -63,6 +63,8 @@ export function checkAllowlist(argv, root) {
     const app = apps.find((a) => a.id === rest[0]);
     if (!app)
       return { ok: false, reason: `connect: unknown app ${rest[0]}` };
+    if (!app.found || app.supported === false)
+      return { ok: false, reason: `connect: app ${rest[0]} is not found and supported on this install` };
     return { ok: true };
   }
   if (cmd === 'ready' && rest.length === 0) return { ok: true };
@@ -128,6 +130,16 @@ export function redact(obj, secret) {
   return s.split(secret).join('***');
 }
 
+export function isMemevSetupPid(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    const cl = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8');
+    return cl.includes('memev') && cl.includes('setup') && cl.includes('remote');
+  } catch {
+    return false;
+  }
+}
+
 export class Session {
   constructor({ root, code, clock = Date, outStream = process.stdout, execute = null }) {
     this.root = root;
@@ -155,11 +167,16 @@ export class Session {
     const { sid, host, port, secret, fingerprint, minutes } = this.code;
     const cfg = config(this.root);
     const maxMin = cfg.setup?.session_max_minutes;
-    const effMax = (maxMin != null && Number.isInteger(maxMin) && maxMin > 0 && maxMin <= 240) ? maxMin : 60;
-    const limit = Math.min(minutes, effMax);
-    if (maxMin != null && Number.isInteger(maxMin) && maxMin > 240) {
-      this._out(`setup.session_max_minutes ${maxMin} is above 240; using 240`);
+    let effMax = 60;
+    if (maxMin != null && Number.isInteger(maxMin) && maxMin > 0) {
+      if (maxMin > 240) {
+        this._out(`setup.session_max_minutes ${maxMin} is above 240; using 240`);
+        effMax = 240;
+      } else {
+        effMax = maxMin;
+      }
     }
+    const limit = Math.min(minutes, effMax);
 
     const lp = logPath(this.root, sid);
     if (fs.existsSync(lp)) {
@@ -179,7 +196,11 @@ export class Session {
     this.channel = new SetupChannel({ host, port, sid, secret, fingerprint, clock: this.clock });
     this.channel.on('message', (msg) => this._onMessage(msg));
     this.channel.on('close', () => this._finish('connection closed'));
-    this.channel.on('error', (e) => this._finish(e.message));
+    this.channel.on('error', (e) => {
+      this._out(`session ended: ${e.message}`);
+      this._log({ kind: 'end', reason: e.message });
+      this._finish(e.message);
+    });
 
     this._out(`setup session ${sid} starting to ${host}:${port} (limit ${limit} min)`);
     this._log({ kind: 'start', host, port, limit });
@@ -192,6 +213,8 @@ export class Session {
       this._cleanup();
       return { ok: false, reason: e.message };
     }
+
+    if (this.done) return { ok: false, reason: 'session ended during handshake' };
 
     this._out(`setup session ${sid} connected; waiting for operator commands`);
     this._log({ kind: 'connected' });
@@ -258,6 +281,13 @@ export class Session {
   _handleCmd(msg) {
     const { id, argv } = msg;
     this.cmdId = Math.max(this.cmdId, id || 0);
+    if (!Array.isArray(argv) || !argv.every((a) => typeof a === 'string')) {
+      const shown = Array.isArray(argv) ? argv.join(' ') : String(argv);
+      this._out(`refused: command must be a list of words`);
+      this._log({ kind: 'refusal', id, argv: shown, reason: 'command must be a list of words' });
+      try { this.channel.send({ kind: 'result', id, ok: false, code: 1, out: 'refused: command must be a list of words' }); } catch {}
+      return;
+    }
     const check = checkAllowlist(argv, this.root);
     if (!check.ok) {
       this._out(`refused: ${check.reason}`);
@@ -390,10 +420,13 @@ export async function command(cmd, pos, flags, ctx) {
       const sp = path.join(dir, f);
       const rp = sp.replace('.status', '.revoked');
       fs.writeFileSync(rp, 'revoked');
-      try {
-        const st = JSON.parse(fs.readFileSync(sp, 'utf8'));
-        if (st.pid) process.kill(st.pid, 'SIGINT');
-      } catch {}
+      let st = null;
+      try { st = JSON.parse(fs.readFileSync(sp, 'utf8')); } catch {}
+      if (st && st.pid && isMemevSetupPid(st.pid)) {
+        try { process.kill(st.pid, 'SIGINT'); } catch {}
+      } else {
+        try { fs.unlinkSync(sp); } catch {}
+      }
       out.info(`setup session ${sid} stop requested`);
     }
     return 0;
