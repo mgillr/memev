@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Vault } from '../src/engine/vault.mjs';
-import { newVault, cleanup, OWNER } from './helpers/tmp.mjs';
+import { newVault, cleanup, OWNER, tmpdir } from './helpers/tmp.mjs';
 after(cleanup);
 
 test('an edit to a large note is logged as a small splice, not the whole note', () => {
@@ -116,6 +116,27 @@ test('every write lands in git', async () => {
   const { git } = await import('../src/engine/git.mjs');
   assert.match(git(root, ['log', '-1', '--format=%B']).out, /Memev-Client: test-client/);
   v.close();
+});
+
+test('MEM-003 AC02: when git init fails on a folder that already has files, the files that were there before are not removed', async () => {
+  const os = await import('node:os');
+  const { initVault } = await import('../src/engine/vault.mjs');
+  const shim = fs.mkdtempSync(path.join(os.tmpdir(), 'gitshim-'));
+  fs.writeFileSync(path.join(shim, 'git'), '#!/bin/sh\nif [ "$1" = "init" ]; then echo "git: init: boom" >&2; exit 1; fi\nexec /usr/bin/false\n', { mode: 0o755 });
+  const root = path.join(tmpdir(), 'vault');
+  const kept = path.join(root, 'my-notes', 'thesis.md');
+  fs.mkdirSync(path.dirname(kept), { recursive: true });
+  fs.writeFileSync(kept, 'my work\n');
+  const prev = process.env.PATH;
+  process.env.PATH = `${shim}:${prev}`;
+  try {
+    assert.throws(() => initVault(root), /git/);
+  } finally {
+    process.env.PATH = prev;
+  }
+  assert.ok(fs.existsSync(root), 'the folder that existed before the call is still there');
+  assert.equal(fs.readFileSync(kept, 'utf8'), 'my work\n', 'the file that was there before is still there');
+  assert.ok(!fs.existsSync(path.join(root, '.git')), 'no half built git repo is left behind');
 });
 
 test('incremental indexing of appends gives the same recall as a full rebuild', () => {
