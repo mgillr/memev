@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { seatPolicy } from '../src/engine/entitlements.mjs';
-import { unrelatedHistory, cloneOffer, syncBackup } from '../src/cli/github.mjs';
+import { unrelatedHistory, cloneOffer, syncBackup, undoGithub } from '../src/cli/github.mjs';
+import { config, saveConfig } from '../src/cli/common.mjs';
 import { sandbox } from './helpers/cli.mjs';
 import { tmpdir, cleanup } from './helpers/tmp.mjs';
 
@@ -19,8 +20,8 @@ const which = (name) => spawnSync('which', [name], { encoding: 'utf8' }).stdout.
 test('REV-006 AC01: the Free refusal names the backup path', () => {
   const p = seatPolicy({ license: null, devices: [{ id: 'd1', kind: 'remote-computer', status: 'active', created: '2026-01-01', label: 'other' }] });
   assert.equal(p.can_enroll, false);
-  assert.match(p.reason, /back the vault up on the first computer with memev github setup/);
-  assert.match(p.reason, /memev init on this computer and join that backup/);
+  assert.match(p.reason, /your own GitHub backup \(docs\/GITHUB\.md\)/);
+  assert.match(p.reason, /memev upgrade/);
 });
 
 test('REV-006 AC02: memev init --from clones a backup with no GitHub CLI and creates no new vault', () => {
@@ -50,7 +51,7 @@ test('REV-006 AC02: memev init --from clones a backup with no GitHub CLI and cre
   } finally { sb.stop(); cleanup(); }
 });
 
-test('REV-006 AC03: setup on an unrelated-history target offers the clone, and a sync names the cause', () => {
+test('REV-006 AC03: setup on an unrelated-history target offers the clone and takes back what it set, and a sync names the cause', () => {
   // repository A holds a Memev vault (the first computer's backup)
   const a = tmpdir('repo-a-');
   fs.writeFileSync(path.join(a, 'README.md'), '# Your Memev vault\n');
@@ -59,20 +60,30 @@ test('REV-006 AC03: setup on an unrelated-history target offers the clone, and a
   g(a, ['init', '-q', '-b', 'main']);
   g(a, ['add', '.']);
   g(a, ['commit', '-q', '-m', 'first computer']);
-  // a fresh vault B with an unrelated history, pointed at A
+  // a fresh vault B with an unrelated history, pointed at A, with what setup already set
   const b = tmpdir('repo-b-');
   fs.writeFileSync(path.join(b, 'README.md'), '# Your Memev vault\n');
   g(b, ['init', '-q', '-b', 'main']);
   g(b, ['add', '.']);
   g(b, ['commit', '-q', '-m', 'fresh vault']);
   g(b, ['remote', 'add', 'origin', a]);
+  g(b, ['config', 'core.sshCommand', 'ssh -i /tmp/deploy -o IdentitiesOnly=yes']);
+  fs.writeFileSync(path.join(b, '.git', 'hooks', 'pre-push'), '#!/bin/sh\n', { mode: 0o755 });
+  saveConfig(b, { github: { repo: 'someone/vault', remote: a, key: 'deploy-key', host: 'github.com' } });
 
   assert.equal(unrelatedHistory(b, 'origin'), true, 'the fresh vault and the backup have unrelated histories');
   const offer = cloneOffer(a);
   assert.match(offer, /unrelated history/);
   assert.match(offer, /memev init --from/);
+  // a sync into the unrelated history names the cause
   const sync = syncBackup(b, { remote: 'origin' });
   assert.equal(sync.ok, false);
   assert.match(sync.error, /unrelated/);
   assert.match(sync.error, /memev init --from/);
+  // setup takes back everything it set, so no background sync runs against the unrelated repository
+  undoGithub(b);
+  assert.notEqual(g(b, ['remote', 'get-url', 'origin']).status, 0, 'the origin remote is removed');
+  assert.notEqual(g(b, ['config', 'core.sshCommand']).status, 0, 'the deploy-key ssh command is unset');
+  assert.equal(fs.existsSync(path.join(b, '.git', 'hooks', 'pre-push')), false, 'the pre-push hook is removed');
+  assert.equal(config(b).github, undefined, 'cfg.github is removed');
 });

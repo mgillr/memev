@@ -54,7 +54,7 @@ export function cloneBackup(repo, root) {
 export function cloneFromUrl(url, root) {
   root = path.resolve(root);
   fs.mkdirSync(path.dirname(root), { recursive: true });
-  return sh('git', ['clone', '-q', url, root]);
+  return sh('git', ['clone', '-q', '--', url, root]);
 }
 
 /** True when root is a clone of a Memev vault backup: its README starts with the marker. */
@@ -148,6 +148,18 @@ export function syncBackup(root, { remote = 'origin', branch = 'main' } = {}) {
   return { ok: true, error: null };
 }
 
+/**
+ * Take back everything setup set for the GitHub backup: the origin remote, the deploy-key ssh
+ * command, the pre-push hook, and cfg.github. Called when the target holds an unrelated vault, so
+ * no background sync runs against it.
+ */
+export function undoGithub(root) {
+  git(root, ['remote', 'remove', 'origin']);
+  git(root, ['config', '--unset', 'core.sshCommand']);
+  try { fs.rmSync(path.join(root, '.git', 'hooks', 'pre-push'), { force: true }); } catch {}
+  const cfg = config(root); if (cfg.github) { delete cfg.github; saveConfig(root, cfg); }
+}
+
 // A TCP connect with a short timeout: true when the host answers. Injectable so tests never touch the network.
 const tcpProbe = (host, port) => new Promise((resolve) => {
   const s = net.connect({ host, port, timeout: 2500 });
@@ -212,9 +224,14 @@ export async function setup({ root, env = process.env, repo = null, flags = {} }
   git(root, ['config', 'core.sshCommand', `ssh -i "${key}" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new`]);
   fs.writeFileSync(path.join(root, '.git', 'hooks', 'pre-push'), PRE_PUSH(sshUrl), { mode: 0o755 });
   const cfg = config(root); cfg.github = { repo: name, remote: sshUrl, key: path.basename(key), host }; saveConfig(root, cfg);
-  // a fresh vault pointed at a repository that already holds a different vault: do not push over it
+  // a fresh vault pointed at a repository that already holds a different vault: do not push over it,
+  // and take back the remote, key, hook and config so no background sync runs against it
   const ur = unrelatedHistory(root, 'origin');
-  if (ur === true) { step('manual', 'Unrelated history', cloneOffer(sshUrl)); return { ok: false, steps, repo: name }; }
+  if (ur === true) {
+    undoGithub(root);
+    step('manual', 'Unrelated history', cloneOffer(sshUrl));
+    return { ok: false, steps, repo: name };
+  }
   const p = pushBackup(root, { upstream: true, quiet: false, remote: 'origin' });
   if (!p.ok) { step('manual', 'First push', `${p.error} (Memev retries every 30 minutes)`); return { ok: false, steps, repo: name }; }
   const via = p.via && p.via !== sshUrl ? ` via ${p.via.replace('ssh://git@', '')}` : '';
