@@ -1,6 +1,6 @@
 # Business (coming)
 
-Part of the [tiers pages](README.md). Up: the [README](../../README.md#which-tier). Architecture chart:
+Part of the [tiers pages](README.md). Up: the [README](../../README.md). Architecture chart:
 [ARCHITECTURE.md](../ARCHITECTURE.md#business-coming).
 
 > **DRAFT and coming.** Business is not built yet: the company vault, the admin console, the company

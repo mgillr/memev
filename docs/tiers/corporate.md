@@ -1,6 +1,6 @@
 # Corporate (coming)
 
-Part of the [tiers pages](README.md). Up: the [README](../../README.md#which-tier). Architecture chart:
+Part of the [tiers pages](README.md). Up: the [README](../../README.md). Architecture chart:
 [ARCHITECTURE.md](../ARCHITECTURE.md#corporate-coming).
 
 > **DRAFT and coming.** Everything specific to this tier is planned; see the

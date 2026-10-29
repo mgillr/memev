@@ -7,7 +7,7 @@ import path from 'node:path';
 import os from 'node:os';
 import readline from 'node:readline/promises';
 import { spawnSync } from 'node:child_process';
-import { readJson, writeJson, exists, sha256, configDir, homeDir, now } from '../engine/util.mjs';
+import { readJson, writeJson, exists, sha256, configDir, homeDir, now, run } from '../engine/util.mjs';
 import { redactSecrets, findSecrets } from '../engine/secrets.mjs';
 import { VERSION, isVault } from '../engine/vault.mjs';
 import { PKG, daemonInfo, pidAlive, config, out, clientsFile, tokenExpiryWarnings } from './common.mjs';
@@ -22,9 +22,9 @@ const C = (id, title, status, detail = '', fix = null) => ({ id, title, status, 
 
 /** Run icacls on a path; null when icacls is not available (not Windows, or not on PATH). */
 export function runIcacls(args) {
-  const r = spawnSync('icacls', args, { encoding: 'utf8', timeout: 15000 });
-  if (r.error || r.status !== 0) return null;
-  return `${r.stdout || ''}`;
+  const r = run('icacls', args, { timeout: 15000 });
+  if (!r.ok) return null;
+  return r.stdout;
 }
 
 /** Principals an ACL entry may name without making a file readable by others: this user, the system and administrators. */
@@ -100,8 +100,8 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   const r = [];
   const major = Number(process.versions.node.split('.')[0]);
   r.push(C('node', 'Node.js 22+', major >= 22 ? 'ok' : 'fail', process.versions.node));
-  const g = spawnSync('git', ['--version'], { encoding: 'utf8' });
-  r.push(C('git', 'git installed', g.status === 0 ? 'ok' : 'fail', g.status === 0 ? g.stdout.trim() : 'install git'));
+  const g = run('git', ['--version']);
+  r.push(C('git', 'git installed', g.ok ? 'ok' : 'fail', g.ok ? g.stdout.trim() : `not found on PATH (${g.error})`, g.ok ? null : { desc: 'install git', destructive: false, cmd: 'git' }));
   if (!isVault(root)) { r.push(C('vault', 'vault exists', 'fail', `no vault at ${root}`, { desc: 'create it: memev init', destructive: false, cmd: 'init' })); return r; }
   r.push(C('vault', 'vault exists', 'ok', root));
   const state = path.join(root, '.memev');
@@ -134,10 +134,19 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   const ids = Object.keys(clients.connected || {});
   r.push(C('apps', 'AI apps connected', ids.length ? (missing.length ? 'warn' : 'ok') : 'warn', ids.length ? `${ids.join(', ')}${missing.length ? `; entries missing for ${[...new Set(missing)].join(', ')}` : ''}` : 'none yet', ids.length && !missing.length ? null : { desc: 'connect every installed app again', destructive: false, cmd: 'connect' }));
   const cfg = config(root);
+  // deployment: report where the vault runs and what kind of AI provider it uses. Report only: it
+  // never fails the run. The one warning is a choice that cannot work as written.
+  const dep = cfg.deployment || {};
+  const depMode = ['local', 'on-prem', 'cloud-hosted'].includes(dep.mode) ? dep.mode : 'local';
+  const depProvider = ['hosted-api', 'internal-llm', 'mixed'].includes(dep.ai_provider) ? dep.ai_provider : 'unset';
+  const depMismatch = depMode === 'cloud-hosted' && depProvider === 'internal-llm';
+  r.push(C('deployment', 'deployment mode', depMismatch ? 'warn' : 'ok', depMismatch
+    ? `mode ${depMode}, provider ${depProvider}: an internal model is only reachable inside your network, so it cannot be reached from a managed host; see docs/DOCKER.md for the self-hosted install`
+    : `mode ${depMode}, provider ${depProvider}`));
   const tun = readJson(path.join(state, 'tunnel.json'), null);
   if (cfg.remote?.enabled) r.push(C('remote', 'remote access', tun?.state === 'up' ? 'ok' : 'warn', tun?.state === 'up' ? `${tun.provider} at ${tun.url}${tun.stable ? '' : ' (address changes on restart)'}` : `on, but the tunnel is ${tun?.state || 'not started'}; memev cloud off switches remote access off`));
   else r.push(C('remote', 'remote access', 'ok', 'off (local only)'));
-  const remote = spawnSync('git', ['remote'], { cwd: root, encoding: 'utf8' }).stdout.trim();
+  const remote = run('git', ['remote'], { cwd: root }).stdout.trim();
   const jobs = readJson(path.join(state, 'jobs.json'), {});
   r.push(C('backup', 'vault backed up off this machine', remote ? (jobs.sync?.error ? 'warn' : 'ok') : 'warn', remote ? (jobs.sync?.error ? `last sync: ${jobs.sync.error}` : `git remote ${remote}${jobs.sync?.at ? `, last sync ${jobs.sync.at}` : ''}`) : 'no backup yet: memev github setup'));
   if (jobs.sync?.warning) r.push(C('writers', 'one computer writes the git backup', 'warn', jobs.sync.warning));
@@ -149,6 +158,12 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
     r.push(C('license', 'licence and seats (report only)', flagged.length || renewal ? 'warn' : 'ok', `${ls.license.state === 'none' ? 'free tier, no licence needed' : `licence ${ls.license.state}${ls.license.tier ? ` (${ls.license.tier})` : ''}`}; ${ls.usage.computers} computer(s), ${ls.usage.connectors} connector(s), ${ls.usage.local_clients} local client(s)${ls.notes.length ? `; ${ls.notes.join(' ')}` : ''}${renewal ? `; ${renewal}` : ''}${flagged.length ? `; credential flagged on ${flagged.map((f) => f.label).join(', ')}: memev devices` : ''}`));
   } catch (e) { r.push(C('license', 'licence and seats (report only)', 'ok', `not checked: ${e.message}`)); }
   try { const s = fs.statfsSync(root); const freePct = (s.bavail / s.blocks) * 100; const inodePct = s.files ? (s.ffree / s.files) * 100 : 100; r.push(C('disk', 'disk space', freePct < 3 || inodePct < 3 ? 'warn' : 'ok', `${freePct.toFixed(0)}% space, ${inodePct.toFixed(0)}% inodes free`)); } catch {}
+  if (env.MEMEV_CONTAINER === '1') {
+    const vaultWritable = (() => { try { const t = path.join(root, '.memev', `write-test-${process.pid}`); fs.writeFileSync(t, 'ok'); fs.rmSync(t, { force: true }); return true; } catch { return false; } })();
+    r.push(C('container-vault', 'vault volume mounted and writable', vaultWritable ? 'ok' : 'fail', vaultWritable ? `${root} is writable` : `${root} is not writable; check the volume mount`));
+    r.push(C('container-loopback', 'host port (check it on the host)', 'ok', 'the host port mapping is not visible from inside the container; check it on the host with: docker compose -f compose.trial.yaml port memev 7787'));
+    r.push(C('container-remote', 'remote access off', cfg.remote?.enabled ? 'warn' : 'ok', cfg.remote?.enabled ? 'remote access is on in the vault config; run memev cloud off in the container' : 'off (local only)'));
+  }
   return r;
 }
 
@@ -234,8 +249,12 @@ export async function allChecks({ root, env }) {
   } else r.push(...fileChecks({ root, env, vault }));
   if (vault) vault.close();
   // the reachability probe only runs for a GitHub ssh backup, so a local or HTTPS remote never touches the network here
-  const backupRemote = spawnSync('git', ['remote'], { cwd: root, encoding: 'utf8' }).stdout.trim().split('\n')[0];
-  if (backupRemote && alt443(spawnSync('git', ['remote', 'get-url', backupRemote], { cwd: root, encoding: 'utf8' }).stdout.trim())) r.push(await githubNetCheck());
+  const remoteR = run('git', ['remote'], { cwd: root });
+  const backupRemote = remoteR.ok ? remoteR.stdout.trim().split('\n')[0] : '';
+  if (backupRemote) {
+    const urlR = run('git', ['remote', 'get-url', backupRemote], { cwd: root });
+    if (urlR.ok && alt443(urlR.stdout.trim())) r.push(await githubNetCheck());
+  }
   const { unitPaths, serviceOff } = await import('./service.mjs');
   const u = unitPaths(env);
   if (serviceOff(env)) r.push(C('service', 'starts at login', 'ok', 'off: MEMEV_NO_SERVICE is set'));
@@ -283,6 +302,7 @@ export async function command(cmd, pos, flags, { root, env }) {
         else if (c.fix.cmd === 'runtime' || c.fix.cmd === 'service') { const m = await import('./main.mjs'); m.installRuntime(env); if (c.fix.cmd === 'service') { const s = await import('./service.mjs'); await s.installService({ env, root }); } }
         else if (c.fix.cmd === 'bus') { const st = readJson(path.join(configDir(env), 'clients-state.json'), { connected: {} }); const { setupBus } = await import('./bus-cli.mjs'); const b = await setupBus({ root, env, clients: Object.keys(st.connected || {}), ask: false }); if (!b.ok) throw new Error(b.problems.join('; ')); }
         else if (c.fix.cmd === 'init') { out.warn('run memev init'); continue; }
+        else if (c.fix.cmd === 'git') { out.warn('install git, then rerun memev doctor'); continue; }
         tried.push(c);
       } catch (e) { out.bad(`could not fix ${c.title}: ${e.message}`); }
     }

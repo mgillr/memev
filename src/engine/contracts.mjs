@@ -8,8 +8,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { configDir, randomToken, slug, now, readJson, writePrivate, exists, truncate } from './util.mjs';
+import { configDir, randomToken, slug, now, readJson, writePrivate, exists, truncate, run as spawn } from './util.mjs';
 import { git } from './git.mjs';
 import * as A from '../../vendor/attest/contract.mjs';
 import { decompose as attestDecompose } from '../../vendor/attest/decompose.mjs';
@@ -143,9 +142,9 @@ export function attach(Vault) {
       if (v.type === 'command') {
         if (!local && this.config.contracts?.exec_local_only !== false) return { status: 'BLOCKED', detail: 'commands run only from this machine' };
         if (this.config.contracts?.exec === false) return { status: 'BLOCKED', detail: 'running commands is switched off (contracts.exec)' };
-        const r = spawnSync('sh', ['-c', v.cmd], { cwd: wd, encoding: 'utf8', timeout: (v.timeout_s || 300) * 1000 });
+        const r = spawn('sh', ['-c', v.cmd], { cwd: wd, timeout: (v.timeout_s || 300) * 1000 });
         const want = v.expect_exit ?? 0;
-        return { status: r.status === want ? 'PASS' : 'FAIL', detail: `exit ${r.status}${r.status === want ? '' : `: ${truncate(`${r.stderr || ''}${r.stdout || ''}`.trim(), 300)}`}` };
+        return { status: r.status === want ? 'PASS' : 'FAIL', detail: `exit ${r.status}${r.status === want ? '' : `: ${r.error || truncate(`${r.stderr}${r.stdout}`.trim(), 300)}`}` };
       }
       if (v.type === 'file_exists') return exists(path.join(wd, v.path)) ? { status: 'PASS', detail: v.path } : { status: 'FAIL', detail: `${v.path} is missing` };
       if (v.type === 'test_exists') return exists(path.join(wd, v.test_file)) ? { status: 'PASS', detail: v.test_file } : { status: 'FAIL', detail: `${v.test_file} is missing` };
