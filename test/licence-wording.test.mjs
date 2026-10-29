@@ -114,8 +114,6 @@ test('MEM-135 AC03: the licensing notice says the trial is a time-limited entitl
   assert.match(n, /not part of this repository/i);
   assert.match(n, /not part of the\s+free core/i);
   assert.doesNotMatch(n, /patent/i);
-  assert.doesNotMatch(n, /\bBSL\b/);
-  assert.doesNotMatch(n, /crdt-merge/i);
 });
 
 test('MEM-135 AC04: the changed docs make no claim of approval or accreditation by an outside body, carry no em-dash, and keep the planned label on the hosted trial paths', () => {

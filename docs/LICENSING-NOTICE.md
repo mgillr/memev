@@ -9,11 +9,11 @@ This notice announces the decided licence direction.
 The Memev core in this repository stays **Apache-2.0**. Nothing in this repository changes
 licence.
 
-## The convergence engine is a separate component
+## The convergence engine is crdt-merge, in its own repository
 
-The convergence engine, with its merge strategies, is not part of this repository. It is a separate
-component under its own licence, in its own repository. It is never vendored into the Memev core:
-Memev calls it as an external dependency.
+The convergence engine, crdt-merge, with its merge strategies, is not part of this repository. It
+lives in its own repository under its original licence, currently BSL 1.1. It is never vendored into
+the Memev core: Memev calls it as an external dependency.
 
 ## Where the paid value stays
 
