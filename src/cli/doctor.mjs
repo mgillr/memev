@@ -141,7 +141,7 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   const depProvider = ['hosted-api', 'internal-llm', 'mixed'].includes(dep.ai_provider) ? dep.ai_provider : 'unset';
   const depMismatch = depMode === 'cloud-hosted' && depProvider === 'internal-llm';
   r.push(C('deployment', 'deployment mode', depMismatch ? 'warn' : 'ok', depMismatch
-    ? `mode ${depMode}, provider ${depProvider}: an internal model is only reachable inside your network, so it cannot be reached from a managed host; see docs/deploy-on-prem.md`
+    ? `mode ${depMode}, provider ${depProvider}: an internal model is only reachable inside your network, so it cannot be reached from a managed host; see docs/DOCKER.md for the self-hosted install`
     : `mode ${depMode}, provider ${depProvider}`));
   const tun = readJson(path.join(state, 'tunnel.json'), null);
   if (cfg.remote?.enabled) r.push(C('remote', 'remote access', tun?.state === 'up' ? 'ok' : 'warn', tun?.state === 'up' ? `${tun.provider} at ${tun.url}${tun.stable ? '' : ' (address changes on restart)'}` : `on, but the tunnel is ${tun?.state || 'not started'}; memev cloud off switches remote access off`));

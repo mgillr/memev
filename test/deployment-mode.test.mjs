@@ -70,6 +70,7 @@ test('MEM-138 AC02: deployment prints the mode, the provider and three lines, --
     assert.deepEqual(j, { mode: 'local', provider: 'unset', runs_where: RUNS_WHERE.local, trial_path: trialPath('local', 'unset') });
     const set = sb.run(['deployment', 'set', '--mode', 'on-prem', '--ai', 'internal-llm']);
     assert.equal(set.code, 0, set.err);
+    assert.match(set.out, /^deployment set: mode on-prem, provider internal-llm$/m, `the set line must name the provider: ${set.out}`);
     const after = JSON.parse(fs.readFileSync(file, 'utf8'));
     const { deployment: _b, ...restBefore } = before;
     const { deployment: depAfter, ...restAfter } = after;
@@ -120,7 +121,7 @@ test('MEM-138 AC04: doctor has one deployment check that reports mode and provid
     assert.equal(c.status, 'warn');
     assert.match(c.detail, /mode cloud-hosted, provider internal-llm/);
     assert.match(c.detail, /cannot be reached from a managed host/);
-    assert.match(c.detail, /docs\/deploy-on-prem\.md/);
+    assert.match(c.detail, /docs\/DOCKER\.md/);
     assert.ok(!c.detail.includes('\n'), 'the warning is one line');
     const mcp = mcpClient(sb, 'claude-code');
     const res = await mcp.tool('memev_doctor', {});

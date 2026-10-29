@@ -83,8 +83,8 @@ export async function command(cmd, pos, flags, { root }) {
   if (!exists(path.join(root, '.memev', 'config.json'))) throw new Error(`no vault at ${root}; run memev init`);
   const sub = pos[0] || 'show';
   if (sub === 'set') {
-    const { mode, ai } = set(root, flags);
-    console.log(`deployment set: mode ${mode}, provider ${ai}`);
+    const { mode, provider } = set(root, flags);
+    console.log(`deployment set: mode ${mode}, provider ${provider}`);
     if (flags.mode === 'cloud-hosted') console.log('cloud-hosted is planned: the managed service is not available yet; this setting records the choice and changes nothing else.');
     return 0;
   }
