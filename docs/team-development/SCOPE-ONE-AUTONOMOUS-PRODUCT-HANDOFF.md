@@ -33,6 +33,7 @@ This document distinguishes existing capabilities from proposed Scope One work. 
 11. **Local-first and least privilege:** retain existing security boundaries; remote sharing and access remain controlled.
 12. **Measure outcomes:** validate lower time-to-delivery, less rework, reliable recovery, and fewer false completion claims.
 13. **Command-centre clarity:** expose progress, agents, communications, plans, changes, outstanding work, and deliverables through coherent views over one canonical state—not separate dashboards with competing truths.
+14. **Explicit leadership:** the user may choose the preferred supported lead agent; runtime coordination must enforce one active lead, with deterministic fallback and safe handover.
 
 ## 2. Target user experience
 
@@ -131,6 +132,40 @@ These views should be different projections of the same canonical project/task/e
 - UI status remains consistent with backend state after refresh, process restart, and reconnection.
 - Closing the dashboard does not stop autonomous execution; reopening it reconstructs the current state from durable project data.
 - A user can start from a natural-language goal and reach the first meaningful plan without needing to configure agents, protocols, or infrastructure manually.
+
+## Lead agent selection and single-authority coordination
+
+The product must have exactly one active **project lead/coordinator** for each project execution. This is the agent responsible for interpreting the user's goal, maintaining the plan, distributing work to other agents and tools, resolving routine coordination questions, tracking dependencies, and reporting back to the user. Specialist agents execute delegated tasks; they do not independently become a second project lead.
+
+### User preference first; deterministic fallback second
+
+- During guided setup, let the user choose a preferred lead from the supported, actually available agents—for example Codex, Claude, or Grok. Present only integrations that are configured and reachable, and explain briefly what choosing a lead means.
+- If the user has already expressed a preference, respect it when that agent is supported and available. Do not ask them to choose again unnecessarily.
+- If no preference is supplied, select a deterministic default from the configured/available agents using a documented policy; show the selection and allow the user to change it. Do not randomly select a lead or infer that the first agent to speak owns leadership.
+- If the preferred lead is unavailable, do not silently substitute another agent. Explain the issue and offer a clear choice: retry/connect the preferred agent, select a fallback, or continue in a limited mode if that is genuinely supported.
+- Store the user's choice as project configuration, including the provider/agent identity and any required connection/profile identifier. The lead is a role assigned to an agent, not a hard-coded provider or a special privileged model.
+- The user can change the lead later. Make the handover explicit: stop new dispatch briefly, checkpoint in-flight work, transfer canonical plan/state and outstanding assignments, record the handover event, then resume under the new lead. Preserve specialist assignments where safe; do not replay tasks blindly.
+
+### Enforce one lead in the runtime
+
+- Separate **lead/coordinator** from Memev's existing bus **operator seat**. The operator seat represents who speaks for the user; it must not automatically be treated as the project lead unless an explicit, validated configuration binds those roles.
+- Keep one canonical `project.lead_agent_id` (or equivalent) and a versioned assignment/lease for the active coordinator. All dispatch decisions must go through the coordinator service, not whichever agent happens to receive a prompt.
+- Validate every coordination command against the current lead identity, project, and assignment version. Reject stale-lead writes and conflicting coordinator actions; record the reason in the event history.
+- Use atomic compare-and-set or equivalent single-writer/lease semantics for leadership changes. A stale or partitioned lead must not continue dispatching work after its authority expires. If leadership cannot be determined safely, pause new dispatch and surface a recoverable conflict rather than allowing split-brain coordination.
+- Specialist agents may suggest plan changes or request delegation, but the active lead (or an explicitly defined policy/human gate) owns the decision and canonical state transition.
+- The lead is not allowed to bypass permission checks or human approval gates. Provider capabilities differ; tool access, credentials, budget, external actions, and verification remain governed by policy.
+- If the lead crashes or disconnects, recover using the stored user preference and documented fallback policy. Record the failure and any reassignment. Never imply that a fallback was chosen by the user when it was automatic.
+
+### Lead agent acceptance criteria
+
+- Setup allows the user to select a supported available lead such as Codex, Claude, or Grok, while remaining usable with sensible defaults.
+- The chosen lead is visible in the command centre, along with its provider, health, and current role.
+- Exactly one lead has authority to dispatch work at a time, even when several AI clients are connected to the same Memev bus.
+- Two agents attempting to coordinate the same project cannot create competing plans or dispatch the same task under different leadership.
+- An unavailable preferred lead triggers an explicit recovery choice; there is no silent substitution.
+- Lead handover preserves canonical project state, records an auditable event, and prevents the old lead from acting with stale authority.
+- A lead failure does not erase work or trigger blind duplicate execution; recovery follows the saved preference and fallback policy.
+- The bus operator seat and project lead are independently represented unless the user explicitly configures them to be the same.
 
 ## 3. Autonomy model and human gates
 
@@ -455,6 +490,8 @@ Reviewed/current baseline references:
 - [ ] Validate source map against current code before implementation.
 - [ ] Agree the first supported clients and test them end to end.
 - [ ] Implement state schema, transitions, and invariants first.
+- [ ] Implement lead selection, single-authority enforcement, and safe lead handover before parallel dispatch.
+- [ ] Keep the project lead distinct from the existing bus operator seat unless explicitly configured.
 - [ ] Implement atomic ownership/idempotency/recovery before parallel dispatch.
 - [ ] Connect contracts and verification before claiming autonomous delivery.
 - [ ] Add policy and human gates before enabling external or destructive actions.
