@@ -140,7 +140,7 @@ export function aiderReadEntries(confText, conv = AIDER_CONVENTIONS()) {
     if (scalar) { inRead = false; if (unquote(scalar[1]) === conv) out.push(line); continue; }
     if (AIDER_READ_KEY.test(line)) { inRead = true; continue; }
     if (!inRead) continue;
-    if (/^\S/.test(line)) { inRead = false; continue; } // a new top-level key ends the list
+    if (/^\S/.test(line) && !/^-(\s|$)/.test(line)) { inRead = false; continue; } // a new top-level key ends the list
     const m = /^\s*-\s*(.*)$/.exec(line);
     if (m && unquote(m[1]) === conv) out.push(line);
   }
@@ -164,9 +164,14 @@ export function addAiderRead(confText, conv = AIDER_CONVENTIONS()) {
     lines.splice(i, 1, 'read:', ...[...theirs, conv].map((f) => `  - ${f}`));
     return lines.join('\n');
   }
-  let last = i;
-  for (let j = i + 1; j < lines.length; j++) { if (/^\S/.test(lines[j])) break; if (/^\s*-\s*/.test(lines[j])) last = j; }
-  lines.splice(last + 1, 0, `  - ${conv}`);
+  // the new entry goes after the last item, at the same indent as the items (YAML allows them at column 0)
+  let last = i, indent = null;
+  for (let j = i + 1; j < lines.length; j++) {
+    const item = /^(\s*)-(\s|$)/.exec(lines[j]);
+    if (item) { last = j; if (indent === null) indent = item[1]; continue; }
+    if (/^\S/.test(lines[j])) break;
+  }
+  lines.splice(last + 1, 0, `${indent ?? '  '}- ${conv}`);
   return lines.join('\n');
 }
 /** Remove the conventions file from the `read:` list; a second call changes nothing. Only our path is
@@ -187,7 +192,7 @@ export function removeAiderRead(confText, conv = AIDER_CONVENTIONS()) {
     if (scalar) { inRead = false; if (unquote(scalar[1]) !== conv) out.push(line); continue; }
     if (AIDER_READ_KEY.test(line)) { inRead = true; out.push(line); continue; }
     if (inRead) {
-      if (/^\S/.test(line)) { inRead = false; out.push(line); continue; }
+      if (/^\S/.test(line) && !/^-(\s|$)/.test(line)) { inRead = false; out.push(line); continue; }
       const m = /^\s*-\s*(.*)$/.exec(line);
       if (m && unquote(m[1]) === conv) continue;
     }
