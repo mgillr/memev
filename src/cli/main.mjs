@@ -33,6 +33,8 @@ Setup
   memev path add|remove|status     put the memev command on your PATH (a line in your shell's startup file, or your user PATH on
                                    Windows) and take it out again; until it is there, init prints the full path in every hint
   memev status | doctor [--fix] [--bundle]
+  memev deployment [set --mode M --ai T]   where this vault runs and what kind of AI provider it uses,
+                                    and the trial path that fits; set writes the choice into the vault config
   memev cloud on|off|status|url    reach this vault from cloud AI apps through a private tunnel (off until you
                                    turn it on, or say yes when init asks on a terminal)
   memev github setup [--host H]    back the vault up to your own private GitHub repository (--host for GitHub Enterprise)
@@ -69,7 +71,7 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', runner: './runner.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', deployment: './deployment.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', runner: './runner.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
@@ -231,8 +233,13 @@ async function run(argv, env) {
       return up ? 0 : 1;
     }
     case 'container': {
-      // the image's entry point: create the vault on first run, print how to connect, then serve
+      // the image's entry point: create the vault on first run, run the container doctor checks, print how to connect, then serve
       if (!isVault(root)) { initVault(root, { template: path.join(PKG, 'templates', 'vault') }); console.log(`Created a vault in ${root}`); }
+      if (env.MEMEV_CONTAINER === '1') {
+        const { fileChecks } = await import('./doctor.mjs');
+        const checks = fileChecks({ root, env }).filter((x) => x.id.startsWith('container-'));
+        for (const c of checks.filter((x) => x.status === 'fail' || x.status === 'warn')) console.log(`doctor: ${c.status} ${c.title}: ${c.detail}`);
+      }
       console.log(`Connect an app: http://127.0.0.1:${config(root).port || 7787}/mcp with the header Authorization: Bearer <token>; get a token with: docker compose exec memev memev token issue <app-name>`);
       await import('../server/main.mjs'); return new Promise(() => {});
     }
