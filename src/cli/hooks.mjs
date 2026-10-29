@@ -26,7 +26,8 @@ export function projectInfo(cwd, root) {
   if (!cwd) return null;
   const abs = path.resolve(cwd);
   const r = run('git', ['rev-parse', '--show-toplevel'], { cwd: abs, timeout: 1500 });
-  const top = r.ok && r.stdout.trim() ? r.stdout.trim() : abs;
+  let top = r.ok && r.stdout.trim() ? r.stdout.trim() : abs;
+  try { top = fs.realpathSync(top); } catch {} // the app can report a path that no longer exists
   const pin = root ? config(root).projects?.[top] : null;
   if (pin) return { name: slug(pin), source: 'pinned', top };
   return { name: slug(path.basename(top)), source: r.ok && r.stdout.trim() ? 'git' : 'folder', top };

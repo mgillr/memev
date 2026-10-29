@@ -57,8 +57,9 @@ memev github setup                 # back the vault up to a private GitHub repo
 
 Memories are filed under a project: the git top-level folder you work in, or the folder itself
 outside a repository. `memev project` shows the name and where it came from; `memev project set
-<name>` pins a name for the repository or folder, so a renamed or re-cloned folder keeps the same
-project.
+<name>` pins a name for the repository or folder at its path, so a re-clone into the same path
+keeps the same project. A rename moves the folder to a new path, so pin the new path to keep the
+name.
 
 ## The vault
 

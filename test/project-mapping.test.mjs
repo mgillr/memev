@@ -66,9 +66,10 @@ test('REV-023 AC02: memev project set <name> pins a name for this repository or 
   const repo = gitRepo('some-repo');
   const r = cli(['project', 'set', 'My Pinned App'], { cwd: repo, root: v });
   assert.equal(r.code, 0, `project set failed: ${r.err}`);
-  // the pin is stored in the vault config, keyed by the repository
+  // the pin is stored in the vault config, keyed by the repository's real path (an app can
+  // report a path through a symlink)
   const cfg = JSON.parse(fs.readFileSync(path.join(v, '.memev', 'config.json'), 'utf8'));
-  assert.equal(cfg.projects?.[repo], 'My Pinned App', 'the pin is in the vault config for the repository');
+  assert.equal(cfg.projects?.[fs.realpathSync(repo)], 'My Pinned App', 'the pin is in the vault config for the repository');
   // the hook's project resolution uses it from then on, from any subfolder of the repository
   const sub = path.join(repo, 'a', 'b');
   fs.mkdirSync(sub, { recursive: true });
@@ -97,4 +98,26 @@ test('REV-023 AC03: a folder named in Japanese or Cyrillic gets a stable project
   fs.mkdirSync(cy);
   assert.equal(projectInfo(cy).name, 'новыйпроект', 'a Cyrillic folder gets its own slug');
   assert.notEqual(projectInfo(cy).name, 'untitled', 'a Cyrillic folder never becomes untitled');
+  // Indic vowel signs are combining marks and must be kept, or names that differ only in a
+  // vowel sign collide
+  assert.equal(slug('हिंदी'), 'हिंदी', 'an Indic name keeps its vowel signs');
+  assert.notEqual(slug('हिंदी'), slug('हंदी'), 'Indic names that differ only in a vowel sign stay distinct');
+  // the cut is by code point, never in the middle of a surrogate pair
+  assert.equal(slug('東' + '𠀋'.repeat(30)), '東' + '𠀋'.repeat(30), 'a short astral name is not cut at a surrogate boundary');
+  const cut = slug('東' + '𠀋'.repeat(50));
+  assert.equal([...cut].length, 48, 'the slug is cut to 48 code points');
+  assert.ok(!/[\ud800-\udfff]/u.test(cut), 'the cut slug holds no lone surrogate');
+});
+
+test('REV-023 AC01: an accented folder keeps the project slug the code before this change wrote under it', () => {
+  // the rule before this change: ASCII letters and digits only
+  const oldSlug = (s) => String(s || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'untitled';
+  for (const name of ['Café-Projekt', 'München', 'São-Paulo', 'Straße', 'Ångström']) {
+    assert.equal(slug(name), oldSlug(name), `${name} keeps the slug the old code wrote under`);
+  }
+  // write under the old code's slug, read with the new resolution: the memory is still found
+  const folder = path.join(tmpdir(), 'Café-Projekt');
+  fs.mkdirSync(folder);
+  assert.equal(oldSlug('Café-Projekt'), 'cafe-projekt', 'the old code filed it under cafe-projekt');
+  assert.equal(projectInfo(folder).name, 'cafe-projekt', 'the new code still reads it from cafe-projekt');
 });

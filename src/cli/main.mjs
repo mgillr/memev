@@ -342,6 +342,7 @@ async function run(argv, env) {
         need();
         const name = pos[1];
         if (!name) throw new Error('memev project set <name>');
+        if (!/[\p{L}\p{N}]/u.test(name)) throw new Error('the name has no letters or digits, so it would pin the shared untitled project');
         const c = config(root); c.projects = { ...c.projects, [info.top]: name }; saveConfig(root, c);
         console.log(`Pinned ${slug(name)} for ${info.top}; recall and the hooks use it from now on.`);
         return 0;
