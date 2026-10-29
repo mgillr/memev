@@ -115,6 +115,10 @@ const codexTomlSkipNote = (b) => (b && MEMEV_TABLE.test(removeBlock(b, [TOML_STA
 
 const json = (file, apply, remove, note) => ({ file, kind: 'json', apply, remove, note });
 const text = (file, apply, remove, note) => ({ file, kind: 'text', apply, remove, note });
+// The Memev tools a consented Claude Code may call without a prompt each time: the memory tools the hooks
+// drive every turn, plus the read-only status and why tools. The write and contract tools are left to prompt.
+export const MEMEV_TOOLS = ['mcp__memev__memev_recall', 'mcp__memev__memev_remember', 'mcp__memev__memev_checkpoint', 'mcp__memev__memev_status', 'mcp__memev__memev_why'];
+
 const mdBlock = (file) => text(file, (t) => addBlock(t, INSTRUCTIONS), (t) => removeBlock(t));
 
 // Aider has no MCP and no hooks, so the hand-off is a conventions file that .aider.conf.yml lists under
@@ -208,18 +212,35 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
   const win = winSpawn(env, platform);
   const launcher = win ? `"${win.node}" "${win.script}"` : `"${bin}"`;
   const stdio = (id) => win ? { command: win.node, args: [win.script, 'mcp', '--client', id] } : { command: bin, args: ['mcp', '--client', id] };
+  // With consent, Claude Code is told it may call Memev's memory tools without a prompt each time: the
+  // per-tool entries in permissions.allow (the write and contract tools are left to prompt). Added when
+  // allowTools is true, removed when false; disconnect always takes them out again.
+  const allowMemev = (j) => {
+    j.permissions = j.permissions && typeof j.permissions === 'object' ? j.permissions : {};
+    j.permissions.allow = Array.isArray(j.permissions.allow) ? j.permissions.allow : [];
+    for (const t of MEMEV_TOOLS) if (!j.permissions.allow.includes(t)) j.permissions.allow.push(t);
+    return j;
+  };
+  const unallowMemev = (j) => {
+    if (j.permissions && typeof j.permissions === 'object' && Array.isArray(j.permissions.allow)) {
+      j.permissions.allow = j.permissions.allow.filter((e) => e !== 'mcp__memev' && !String(e).startsWith('mcp__memev__'));
+      if (!j.permissions.allow.length) delete j.permissions.allow;
+      if (!Object.keys(j.permissions).length) delete j.permissions;
+    }
+    return j;
+  };
   // OpenCode takes a local MCP server as a command array in opencode.json
   const opencodeLocal = (id) => ({ type: 'local', command: [...(win ? [win.node, win.script] : [bin]), 'mcp', '--client', id], enabled: true });
   const defs = [
     { id: 'claude-code', name: 'Claude Code', mode: 'hooks', detect: () => exists(path.join(home, '.claude')) || exists(path.join(home, '.claude.json')),
       edits: () => [
         json(path.join(home, '.claude.json'), setServer('mcpServers', { type: 'stdio', ...stdio('claude-code') }), delServer('mcpServers')),
-        json(path.join(home, '.claude', 'settings.json'), (j) => setGroupHooks(j, {
+        json(path.join(home, '.claude', 'settings.json'), (j) => (opts.allowTools === true ? allowMemev : opts.allowTools === false ? unallowMemev : (x) => x)(setGroupHooks(j, {
           SessionStart: { matcher: 'startup|resume|clear|compact', command: hookCmd(launcher, 'session-start', 'claude-code'), timeout: 10 },
           UserPromptSubmit: { command: hookCmd(launcher, 'prompt', 'claude-code'), timeout: 10 },
           PreCompact: { command: hookCmd(launcher, 'pre-compact', 'claude-code'), timeout: 15 },
           Stop: { command: hookCmd(launcher, 'stop', 'claude-code'), timeout: 10 },
-        }), removeGroupHooks),
+        })), (j) => unallowMemev(removeGroupHooks(j))),
         mdBlock(path.join(home, '.claude', 'CLAUDE.md')),
       ] },
     { id: 'codex', name: 'Codex CLI', mode: 'hooks', detect: () => exists(path.join(home, '.codex')),
@@ -284,6 +305,13 @@ export function clientDefs(env, bin, platform = process.platform, opts = {}) {
   return defs;
 }
 
+/** Whether Claude Code's settings.json allows Memev's memory tools right now (any of the per-tool entries in permissions.allow). */
+export function claudeToolsAllowed(env = process.env) {
+  const { home } = platformDirs(env);
+  const j = readJson(path.join(home, '.claude', 'settings.json'), null);
+  return !!(j && j.permissions && Array.isArray(j.permissions.allow) && MEMEV_TOOLS.some((t) => j.permissions.allow.includes(t)));
+}
+
 /** The apps Memev detects but does not support yet. They are listed as found, not supported, and their files are never changed.
  *  Each app is looked up at the directory its own docs name, which differs per app and per platform. */
 export function unsupportedDefs(env) {
@@ -329,9 +357,9 @@ function plan(def, opts = {}) {
   return { changes };
 }
 
-export function connect(id, { env = process.env, launcher, dryRun = false, platform = process.platform, project = null } = {}) {
+export function connect(id, { env = process.env, launcher, dryRun = false, platform = process.platform, project = null, allowTools } = {}) {
   const proj = project ? path.resolve(String(project)) : null;
-  const def = clientDefs(env, launcher, platform, { project: proj }).find((d) => d.id === id);
+  const def = clientDefs(env, launcher, platform, { project: proj, allowTools }).find((d) => d.id === id);
   if (!def) throw new Error(`unknown app: ${id}`);
   const p = plan(def, { project: proj });
   if (p.error) return { id, name: def.name, status: 'needs-manual', reason: `${p.file} ${p.error}`, file: p.file, problem: p.error };
@@ -476,8 +504,8 @@ export function detect(env = process.env, launcher = 'memev', platform = process
 }
 
 /** Connect every app that is installed and not yet connected (and not declined, unless forced). Apps that are found but not supported yet are left alone. */
-export function connectAll({ env = process.env, launcher, force = false, platform = process.platform, project = null } = {}) {
-  return detect(env, launcher, platform).filter((c) => c.found && c.supported && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform, project }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
+export function connectAll({ env = process.env, launcher, force = false, platform = process.platform, project = null, allowTools } = {}) {
+  return detect(env, launcher, platform).filter((c) => c.found && c.supported && (force || !c.declined)).map((c) => { try { return connect(c.id, { env, launcher, platform, project, allowTools }); } catch (e) { return { id: c.id, name: c.name, status: 'failed', reason: e.message }; } });
 }
 
 export function launcherPath(env = process.env) { return path.join(configDir(env), 'bin', process.platform === 'win32' ? 'memev.cmd' : 'memev'); }
@@ -503,7 +531,14 @@ export async function command(cmd, pos, flags, { env, root }) {
       const c = detect(env, launcher).find((x) => x.id === target);
       if (c && c.found && !c.supported) { out.info(`${c.name}: found, not supported yet (see docs/CLIENTS.md to ask for it)`); return 0; }
     }
-    const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force, project: flags.project }) : [connect(target, { env, launcher, dryRun: !!flags['dry-run'], project: flags.project })];
+    // the stored consent (the init question or an earlier --allow-tools) keeps applying: a plain connect
+    // re-adds the entries after a disconnect, and the flag still forces them on or off
+    const v = flags['no-allow-tools'] ? false : flags['allow-tools'];
+    const explicit = v === undefined ? undefined : !/^(false|no|off|0)$/i.test(String(v));
+    const ob = await import('./onboarding.mjs');
+    if (explicit !== undefined && !flags['dry-run']) ob.setAllowTools(env, explicit);
+    const allowTools = explicit ?? (ob.allowToolsSettings(env).enabled || undefined);
+    const res = target === 'all' ? connectAll({ env, launcher, force: !!flags.force, project: flags.project, allowTools }) : [connect(target, { env, launcher, dryRun: !!flags['dry-run'], project: flags.project, allowTools })];
     if (!res.length) {
       const unsup = detect(env, launcher).filter((c) => c.found && !c.supported);
       if (unsup.length) { console.log(`Found ${unsup.map((c) => c.name).join(', ')} but Memev does not support ${unsup.length > 1 ? 'them' : 'it'} yet (see docs/CLIENTS.md to ask for it).`); return 0; }
