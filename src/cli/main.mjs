@@ -231,8 +231,13 @@ async function run(argv, env) {
       return up ? 0 : 1;
     }
     case 'container': {
-      // the image's entry point: create the vault on first run, print how to connect, then serve
+      // the image's entry point: create the vault on first run, run the container doctor checks, print how to connect, then serve
       if (!isVault(root)) { initVault(root, { template: path.join(PKG, 'templates', 'vault') }); console.log(`Created a vault in ${root}`); }
+      if (env.MEMEV_CONTAINER === '1') {
+        const { fileChecks } = await import('./doctor.mjs');
+        const checks = fileChecks({ root, env }).filter((x) => x.id.startsWith('container-'));
+        for (const c of checks.filter((x) => x.status === 'fail' || x.status === 'warn')) console.log(`doctor: ${c.status} ${c.title}: ${c.detail}`);
+      }
       console.log(`Connect an app: http://127.0.0.1:${config(root).port || 7787}/mcp with the header Authorization: Bearer <token>; get a token with: docker compose exec memev memev token issue <app-name>`);
       await import('../server/main.mjs'); return new Promise(() => {});
     }
