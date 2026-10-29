@@ -9,6 +9,9 @@
 //     "kid": "memev-2026-10", "sig": "ed25519:<base64>" }
 //
 // The signature covers every field except `sig`, serialised as JSON with sorted keys.
+//
+// A trial licence also carries "trial": true, and its one extension "trial_ext": true, plus an
+// opaque "org" id; all three are inside the signed bytes, so changing any of them fails the check.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,10 +34,14 @@ export const canonicalTier = (id) => ({ personal: 'personal_more', team: 'busine
 const DAY = 86400e3;
 const SKEW_MS = DAY; // a licence issued "tomorrow" by a clock a little ahead still verifies
 
+/** The trial term and the one self-serve extension, in days. Both are 14. */
+export const TRIAL_DAYS = 14;
+export const TRIAL_EXT_DAYS = 14;
+
 export const licenseFile = (env = process.env) => path.join(configDir(env), 'license.json');
 
 /** The only fields a licence may carry. Anything else (a name, an e-mail, a machine) is identity and is refused. */
-export const LICENSE_FIELDS = ['v', 'lid', 'tier', 'services', 'seats', 'connectors', 'iat', 'exp', 'grace_days', 'kid', 'sig'];
+export const LICENSE_FIELDS = ['v', 'lid', 'tier', 'services', 'seats', 'connectors', 'iat', 'exp', 'grace_days', 'kid', 'sig', 'trial', 'trial_ext', 'org'];
 
 /** Names of the fields in a licence object that a licence is not allowed to carry. */
 export const extraFields = (l) => (l && typeof l === 'object' && !Array.isArray(l) ? Object.keys(l).filter((k) => !LICENSE_FIELDS.includes(k)) : []);
@@ -58,6 +65,9 @@ function shapeErrors(l) {
   if (Number.isNaN(Date.parse(l.iat))) e.push('bad iat');
   if (l.exp !== null && Number.isNaN(Date.parse(l.exp))) e.push('bad exp');
   if (l.grace_days !== undefined && (!Number.isInteger(l.grace_days) || l.grace_days < 0 || l.grace_days > 365)) e.push('bad grace_days');
+  if (l.trial !== undefined && typeof l.trial !== 'boolean') e.push('trial must be true or false');
+  if (l.trial_ext !== undefined && typeof l.trial_ext !== 'boolean') e.push('trial_ext must be true or false');
+  if (l.org !== undefined && (typeof l.org !== 'string' || !/^org_[A-Za-z0-9_-]{8,64}$/.test(l.org))) e.push('bad org');
   if (typeof l.sig !== 'string' || !l.sig.startsWith('ed25519:')) e.push('missing ed25519 signature');
   return e;
 }
@@ -67,7 +77,7 @@ function shapeErrors(l) {
  *   valid | grace (expired, inside grace_days) | expired | not_yet_valid | invalid
  * `keys` defaults to the embedded LICENSE_KEYS; tests pass their own.
  */
-export function verifyLicense(l, { keys = LICENSE_KEYS, now = Date.now() } = {}) {
+export function verifyLicense(l, { keys = LICENSE_KEYS, now = Date.now(), floor } = {}) {
   const errs = shapeErrors(l);
   if (errs.length) return { state: 'invalid', reason: errs.join('; ') };
   const candidates = l.kid ? (keys[l.kid] ? [keys[l.kid]] : []) : Object.values(keys);
@@ -77,19 +87,25 @@ export function verifyLicense(l, { keys = LICENSE_KEYS, now = Date.now() } = {})
   const ok = candidates.some((k) => { try { return crypto.verify(null, data, crypto.createPublicKey({ key: Buffer.from(k, 'base64'), format: 'der', type: 'spki' }), sig); } catch { return false; } });
   if (!ok) return { state: 'invalid', reason: 'signature does not verify' };
   const fields = { lid: l.lid, tier: l.tier, services: l.services, seats: l.seats, connectors: l.connectors ?? null, iat: l.iat, exp: l.exp, grace_days: l.grace_days ?? 14 };
-  if (Date.parse(l.iat) - SKEW_MS > now) return { state: 'not_yet_valid', reason: `issued for ${l.iat}`, ...fields };
+  if (l.trial !== undefined) fields.trial = l.trial;
+  if (l.trial_ext !== undefined) fields.trial_ext = l.trial_ext;
+  if (l.org !== undefined) fields.org = l.org;
+  // The effective time is the later of now and floor (the latest timestamp the vault has recorded),
+  // so winding the clock back does not revive a lapsed trial.
+  const t = floor === undefined ? now : Math.max(now, floor);
+  if (Date.parse(l.iat) - SKEW_MS > t) return { state: 'not_yet_valid', reason: `issued for ${l.iat}`, ...fields };
   if (l.exp === null) return { state: 'valid', reason: 'perpetual', days_left: null, ...fields };
   const end = Date.parse(l.exp), graceEnd = end + fields.grace_days * DAY;
-  if (now <= end) return { state: 'valid', reason: `valid until ${l.exp}`, days_left: Math.ceil((end - now) / DAY), ...fields };
-  if (now <= graceEnd) return { state: 'grace', reason: `expired ${l.exp}; grace until ${new Date(graceEnd).toISOString().slice(0, 10)}`, days_left: Math.ceil((graceEnd - now) / DAY), ...fields };
+  if (t <= end) return { state: 'valid', reason: `valid until ${l.exp}`, days_left: Math.ceil((end - t) / DAY), ...fields };
+  if (t <= graceEnd) return { state: 'grace', reason: `expired ${l.exp}; grace until ${new Date(graceEnd).toISOString().slice(0, 10)}`, days_left: Math.ceil((graceEnd - t) / DAY), ...fields };
   return { state: 'expired', reason: `expired ${l.exp}`, days_left: 0, ...fields };
 }
 
 /** Read and verify the installed licence. No licence is the normal case: state "none", free tier. */
-export function loadLicense({ env = process.env, file = licenseFile(env), keys, now } = {}) {
+export function loadLicense({ env = process.env, file = licenseFile(env), keys, now, floor } = {}) {
   let raw; try { raw = fs.readFileSync(file, 'utf8'); } catch { return { state: 'none', reason: 'no licence installed (the free tier needs none)' }; }
   let l; try { l = JSON.parse(raw); } catch { return { state: 'invalid', reason: 'not JSON' }; }
-  return verifyLicense(l, { keys, now });
+  return verifyLicense(l, { keys, now, floor });
 }
 
 /** Sign a licence. For the development key script and tests only: the client never holds a signing key. */
