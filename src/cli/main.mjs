@@ -6,7 +6,7 @@ import { PKG, parseArgs, resolveRoot, defaultVaultFile, api, clientToken, adminT
 import { ensureDaemon, startDaemon, stopDaemon, healthy, choosePort } from './daemon.mjs';
 import { initVault, isVault, VERSION } from '../engine/vault.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
-import { writeAtomic, configDir } from '../engine/util.mjs';
+import { writeAtomic, configDir, slug } from '../engine/util.mjs';
 import { renderCard } from '../engine/card.mjs';
 import { fetchOut } from '../engine/net.mjs';
 
@@ -59,6 +59,9 @@ Setup
 
 Daily
   memev recall <query> [--project P] [--all-projects]  |  memev card [--project P] [--aider]
+  memev project [set <name>]       the project name this folder's memories are filed under, and where
+                                   it comes from (a pin, the git top-level folder, or the folder);
+                                   set <name> pins a name for this repository or folder
   memev remember <text> [--kind decision] [--why W] [--review-by DATE|DAYS] [--force]
   memev why <query> [--item path#heading] [--project P]   why recall returned what it did
   memev review [list|keep|drop|reset] [items] [--days N]  the inbox of flagged and short-lived memories
@@ -330,6 +333,23 @@ async function run(argv, env) {
       if (sub === 'revoke') { if (!pos[1]) throw new Error('memev token revoke <id>'); console.log(ts.revoke(pos[1]) ? `Revoked ${pos[1]}.` : `No token ${pos[1]}.`); return 0; }
       if (sub === 'rotate') { if (!pos[1]) throw new Error('memev token rotate <id> [--ttl DAYS]'); const t = ts.rotate(pos[1], { ttlDays: Number(flags.ttl ?? 365) }); const f = path.join(root, '.memev', 'clients.json'); try { const all = JSON.parse(fs.readFileSync(f, 'utf8')); for (const k of Object.keys(all)) if (all[k].startsWith(`mv_${pos[1]}_`)) all[k] = t.token; fs.writeFileSync(f, JSON.stringify(all, null, 2), { mode: 0o600 }); } catch {} console.log(`Rotated ${pos[1]}; the credential now expires ${t.expires ? t.expires.slice(0, 10) : 'never'}. The old secret no longer works, so the link pasted into the cloud app must be pasted again: memev cloud url prints the new one. New token (shown once):\n${t.token}`); return 0; }
       throw new Error('memev token list|issue|revoke|rotate');
+    }
+    case 'project': {
+      const { projectInfo } = await import('./hooks.mjs');
+      const info = projectInfo(process.cwd(), root);
+      if (!info) throw new Error('no folder to show');
+      if (pos[0] === 'set') {
+        need();
+        const name = pos[1];
+        if (!name) throw new Error('memev project set <name>');
+        if (!/[\p{L}\p{N}]/u.test(name)) throw new Error('the name has no letters or digits, so it would pin the shared untitled project');
+        const c = config(root); c.projects = { ...c.projects, [info.top]: name }; saveConfig(root, c);
+        console.log(`Pinned ${slug(name)} for ${info.top}; recall and the hooks use it from now on.`);
+        return 0;
+      }
+      const from = info.source === 'pinned' ? 'pinned with memev project set' : info.source === 'git' ? `the git top-level folder ${info.top}` : `the folder ${info.top}`;
+      console.log(`${info.name}  (${from})`);
+      return 0;
     }
     case 'admin-token': need(); console.log(adminToken(root) || '(none)'); return 0;
     case 'backup': {
