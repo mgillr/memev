@@ -71,7 +71,13 @@ export function fetchBackupAddress(remote, env = process.env, { timeoutMs = 3000
     f = run(['fetch', '-q', '--depth', '1', '--end-of-options', backup, ref]);
     if (f.status === 0 || !/couldn't find remote ref/.test(f.stderr || '')) break;
   }
-  if (f.status !== 0) return { ok: false, error: f.error?.code === 'ETIMEDOUT' ? 'the fetch timed out' : (last(f) || 'git fetch failed') };
+  if (f.status !== 0) {
+    const err = f.error?.code === 'ETIMEDOUT' ? 'the fetch timed out' : (last(f) || 'git fetch failed');
+    // --end-of-options needs git 2.24 or newer; on an older git the fetch fails with "unknown option",
+    // which is safe (nothing runs) but breaks the refresh, so say what to do
+    if (/unknown option/i.test(f.stderr || '')) return { ok: false, error: `${err} (git 2.24 or newer is needed for the backup refresh; upgrade git or drop the backup)` };
+    return { ok: false, error: err };
+  }
   const s = run(['show', 'FETCH_HEAD:address.json']);
   if (s.status !== 0) return { ok: false, error: 'the backup holds no address record' };
   try { return { ok: true, rec: JSON.parse(s.stdout) }; } catch { return { ok: false, error: 'the address record in the backup is not valid JSON' }; }

@@ -236,23 +236,29 @@ export const inviteHash = (secret) => sha256(String(secret));
 
 /**
  * The backup value in an invite is handed to git fetch as the remote, so it must be a remote git
- * can name: an https or ssh URL, a user@host:path remote, or an absolute local path. Anything
- * else (including anything that starts with a dash, which git would read as an option) is refused.
+ * can name: a URL (https, http, ssh, git, file), a [user@]host:path remote, or an absolute local
+ * path. Anything else is refused, including anything that starts with a dash (which git would read
+ * as an option) and a <transport>::<address> value (which runs a git remote helper).
  */
 export function assertBackupRemote(value) {
   const v = String(value ?? '');
-  if (!v || /\s/.test(v) || v.startsWith('-')) throw new Error('the invite backup is not a valid git remote (an https or ssh URL, a user@host:path remote, or an absolute local path)');
-  if (v.startsWith('/')) return v;
+  const bad = () => { throw new Error('the invite backup is not a valid git remote (a URL, a user@host:path remote, or an absolute local path)'); };
+  if (!v || /[\x00-\x1f\x7f]/.test(v) || v.startsWith('-')) bad();
+  if (/^[A-Za-z0-9+.-]+::/.test(v)) bad();
+  if (v.startsWith('/') || /^[A-Za-z]:[\\/]/.test(v)) return v;
   let m;
-  if ((m = /^(?:https?|ssh):\/\/(?:([^@/\s]+)@)?([^/:?#\s]+)(?::(\d+))?(?:[/?]|$)/.exec(v))) {
-    if (m[2].startsWith('-') || (m[1] || '').startsWith('-')) throw new Error('the invite backup is not a valid git remote (an https or ssh URL, a user@host:path remote, or an absolute local path)');
+  if ((m = /^(https?|ssh|git|git\+ssh|ssh\+git|file):\/\/(?:([^@/\s]*)@)?([^/:?#\s]*)(?::(\d+))?(?:[/?]|$)/.exec(v))) {
+    if (!m[3] && m[1] !== 'file') bad();
+    if (m[3].startsWith('-') || (m[2] || '').startsWith('-')) bad();
     return v;
   }
-  if ((m = /^([^@/:\s]+)@([^/:\s]+):(.+)$/.exec(v))) {
-    if (m[1].startsWith('-') || m[2].startsWith('-')) throw new Error('the invite backup is not a valid git remote (an https or ssh URL, a user@host:path remote, or an absolute local path)');
+  if ((m = /^(?:([^@/:\s]+)@)?([^/:\s]+):(.+)$/.exec(v))) {
+    if (m[2].startsWith('-') || (m[1] || '').startsWith('-')) bad();
+    // "scheme:value" without a slash (e.g. "http:bad") is not a remote git can name
+    if (!m[3].includes('/') && !m[1]) bad();
     return v;
   }
-  throw new Error('the invite backup is not a valid git remote (an https or ssh URL, a user@host:path remote, or an absolute local path)');
+  bad();
 }
 
 export function encodeInvite({ address, secret, pubkey = undefined, backup = undefined }) {
