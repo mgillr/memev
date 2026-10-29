@@ -6,18 +6,30 @@ import path from 'node:path';
 import { newVault, cleanup } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
 import { mintInvite, redeemInvite, decodeInvite, inviteHash, deviceKeygen } from '../src/engine/devices.mjs';
+import { command } from '../src/cli/invite.mjs';
 
 after(() => cleanup());
 
 const allow = { can_enroll: true };
 
-test('MEM-023 AC01: memev invite prints a code that encodes the vault address and a one-time secret', () => {
+test('MEM-023 AC01: memev invite prints a code that encodes the vault address and a one-time secret', async () => {
   const sb = sandbox();
   try {
     const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
     assert.equal(init.code, 0, init.err + init.out);
-    const inv = sb.run(['invite', '--ttl', '600', '--local']);
-    assert.equal(inv.code, 0, inv.err + inv.out);
+    // a licence that allows more computers, so the seat policy lets the code through
+    const lic = { state: 'valid', tier: 'personal', seats: 3, exp: '2027-01-01' };
+    const logs = [];
+    const origLog = console.log;
+    console.log = (...args) => logs.push(args.join(' '));
+    let rc;
+    try {
+      rc = await command(null, null, { ttl: '600', local: true }, { root: sb.root, env: sb.env, license: lic });
+    } finally {
+      console.log = origLog;
+    }
+    const inv = { code: rc, out: logs.join('\n') };
+    assert.equal(inv.code, 0, inv.out);
     const code = (inv.out.match(/^code: (\S+)/m) || [])[1];
     assert.ok(code, inv.out);
     const decoded = decodeInvite(code);

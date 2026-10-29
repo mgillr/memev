@@ -14,7 +14,8 @@ test('MEM-025 AC01: On Free with no trial available, memev invite prints the pla
     const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
     assert.equal(init.code, 0, init.err + init.out);
     // A fresh Free vault has no licence and no trial started, so no trial is available to offer.
-    const inv = sb.run(['invite']);
+    // --local keeps the address rules quiet, so only the plan gate can stop the mint.
+    const inv = sb.run(['invite', '--local']);
     assert.equal(inv.code, 1, inv.out + inv.err);
     assert.match(inv.out, /Personal covers this computer/);
     assert.match(inv.out, /memev upgrade/);

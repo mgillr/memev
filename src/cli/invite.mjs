@@ -54,6 +54,8 @@ export async function command(_cmd, _pos, flags, { root, env, license = null }) 
   }
   const address = tunnel || loopbackAddress(root);
   if (!tunnel) console.log('note: this address is loopback; only a computer that shares this machine can use it');
+  // a vault that cannot add a computer, with no trial to offer, prints no code: the plan line above is the answer
+  if (!policy.can_enroll && !trialAvailable()) return 1;
   const minted = mintInvite(root, { address, ttlSec: ttl });
   console.log(`code: ${minted.code}`);
   console.log(`link: ${minted.link}`);
