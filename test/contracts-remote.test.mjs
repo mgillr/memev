@@ -135,6 +135,50 @@ test('REV-002 AC06: a remote caller cannot prove files outside the vault', async
     v.contractSign(OWNER, { id: d.id, local: false });
     v.contractApprove(OWNER, { id: d.id });
     const r = await call('memev_contract_verify', { id: d.id });
-    assert.equal(r.tasks[0].criteria[0].status, 'FAIL', 'the file outside the vault is not proof of the criterion');
+    assert.equal(r.tasks[0].criteria[0].status, 'BLOCKED', 'the file outside the vault is not proof of the criterion');
+    assert.match(r.tasks[0].criteria[0].detail, /outside the vault/);
   } finally { close(); }
+});
+
+// The identity a remote OAuth or cloud app gets: read and write on the remote paths, contracts included.
+const REMOTE = { id: 'oa_rev002', agent: 'cloud-app', scopes: ['read', 'write'], paths: ['memory/**', 'work/**', 'contracts/**', 'bus/**'], remote: true };
+
+test('REV-002 AC02: a remote caller cannot write an approval record, so its commands stay blocked', () => {
+  const { v, d } = setup();
+  v.contractSign(REMOTE, { id: d.id, local: false });
+  assert.throws(() => v.write(REMOTE, { path: `contracts/signed/${d.id}.approval.txt`, body: '{}\n' }), /immutable/);
+  v.write(REMOTE, { path: `contracts/approved/${d.id}.json`, body: `{"id":"${d.id}"}\n` }); // a plain write elsewhere is not an approval
+  assert.equal(v._contractApproved(d.id), false);
+  const cmd = v.contractVerify(OWNER, { id: d.id }, { local: true }).tasks[0].criteria[1];
+  assert.equal(cmd.status, 'BLOCKED', 'the command does not run on a remote-written record');
+  v.contractApprove(OWNER, { id: d.id });
+  assert.equal(v._contractApproved(d.id), true, 'a local approval counts');
+  assert.deepEqual(v.contractApprove(OWNER, { id: d.id }), { approved: true, id: d.id }, 'approving again changes nothing');
+});
+
+test('REV-002 AC03: a local verify of a remote-signed contract reads nothing outside the vault', () => {
+  const { v } = setup();
+  const outside = tmpdir('rev-outside-');
+  fs.writeFileSync(path.join(outside, 'secret.txt'), 'root:x\n');
+  const d = v.contractDraft(REMOTE, { title: 'Remote outside', project: 'api', workdir: outside, tasks: [{ id: 'T1', title: 'read', scope: ['**'], criteria: [
+    { statement: 'the file exists', verifier: { type: 'file_exists', path: 'secret.txt' } },
+    { statement: 'the file names root', verifier: { type: 'grep', file: 'secret.txt', pattern: '^root:' } },
+  ] }] });
+  v.contractSign(REMOTE, { id: d.id, local: false });
+  const crits = v.contractVerify(OWNER, { id: d.id }, { local: true }).tasks[0].criteria;
+  for (const c of crits) { assert.equal(c.status, 'BLOCKED', `${c.statement}: nothing outside the vault is proved`); assert.match(c.detail, /outside the vault/); }
+});
+
+test('REV-002 AC03: a remote verify of a contract whose workdir is inside the vault still passes', () => {
+  const { v, work } = setup();
+  fs.writeFileSync(path.join(work, 'health.js'), 'ok\n');
+  const d = v.contractDraft(REMOTE, { title: 'Remote inside', project: 'api', workdir: work, tasks: [{ id: 'T1', title: 'files', scope: ['**'], criteria: [
+    { statement: 'the handler exists', verifier: { type: 'file_exists', path: 'health.js' } },
+    { statement: 'the handler says ok', verifier: { type: 'grep', file: 'health.js', pattern: '^ok' } },
+  ] }] });
+  v.contractSign(REMOTE, { id: d.id, local: false });
+  for (const local of [false, true]) {
+    const crits = v.contractVerify(local ? OWNER : REMOTE, { id: d.id }, { local }).tasks[0].criteria;
+    assert.deepEqual(crits.map((c) => c.status), ['PASS', 'PASS'], `${local ? 'local' : 'remote'} verify reads the file in the workdir`);
+  }
 });

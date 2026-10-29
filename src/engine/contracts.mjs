@@ -128,7 +128,10 @@ export function attach(Vault) {
     if (!local) throw new ContractError('forbidden', 'approval is a local operator action; run it on this machine (memev contract approve ' + id + ')');
     this._need(identity, 'admin', null);
     if (this._read(`${SIGNED}/${id}.json`) === null) throw new ContractError('not_found', `contract ${id} is not signed`);
-    this.write(identity, { path: `contracts/approved/${id}.json`, body: `${JSON.stringify({ id, at: now(), by: identity.agent }, null, 2)}\n`, client: null, internal: true });
+    // the approval sits beside the signed contract, under the protected path: no plain write can create it
+    // (a remote caller included), and it is written once, since the vault hook refuses a change under signed/
+    if (this._contractApproved(id)) return { approved: true, id };
+    this.write(identity, { path: `${SIGNED}/${id}.approval.txt`, body: `${JSON.stringify({ id, at: now(), by: identity.agent }, null, 2)}\n`, client: null, internal: true });
     this._applyMisc(this.log.append({ type: 'contract.approved', path: null, agent: identity.agent, data: { id } }));
     return { approved: true, id };
   };
@@ -140,7 +143,7 @@ export function attach(Vault) {
   };
 
   P._contractApproved = function (id) {
-    return this._read(`contracts/approved/${id}.json`) !== null;
+    return this._read(`${SIGNED}/${id}.approval.txt`) !== null;
   };
 
   const _origOpenContracts = P._openContracts;
@@ -148,11 +151,14 @@ export function attach(Vault) {
     return _origOpenContracts.call(this).map((k) => ({ ...k, origin: this._contractOrigin(k.id) || 'local', approved: this._contractApproved(k.id) }));
   };
 
-  P._confinePath = function (workdir, p) {
+  P._confinePath = function (workdir, p, { inVault = false } = {}) {
     const raw = String(p);
     if (path.isAbsolute(raw)) throw new ContractError('forbidden', `absolute paths are not allowed: ${p}`);
     if (raw.split(/[\\/]/).includes('..')) throw new ContractError('forbidden', `path escapes the vault: ${p}`);
-    return path.resolve(workdir, raw);
+    const abs = path.resolve(workdir, raw);
+    const rel = path.relative(this.root, abs);
+    if (inVault && (rel.startsWith('..') || path.isAbsolute(rel))) throw new ContractError('forbidden', `outside the vault: ${p} in ${workdir}`);
+    return abs;
   };
 
   P.contractCheckSignature = function (id) {
@@ -173,9 +179,9 @@ export function attach(Vault) {
     const origin = c.origin || 'local';
     const approved = this._contractApproved(id);
     const needsApproval = origin === 'remote' && !approved;
-    // file-based criteria are confined to the vault root when the caller is remote: a contract may
-    // name a workdir outside the vault, but a remote check must not read or prove anything outside it
-    const base = !local ? this.root : wd;
+    // file-based criteria stay inside the vault root when the caller is remote or the contract was signed
+    // remotely (its receipt is readable remotely, so a local verify must not prove anything outside it either)
+    const inVault = !local || origin === 'remote';
     const run = (crit) => {
       const v = crit.verifier;
       if (v.type === 'command') {
@@ -186,9 +192,9 @@ export function attach(Vault) {
         const want = v.expect_exit ?? 0;
         return { status: r.status === want ? 'PASS' : 'FAIL', detail: `exit ${r.status}${r.status === want ? '' : `: ${r.error || truncate(`${r.stderr}${r.stdout}`.trim(), 300)}`}` };
       }
-      if (v.type === 'file_exists') { let p; try { p = this._confinePath(base, v.path); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.path } : { status: 'FAIL', detail: `${v.path} is missing` }; }
-      if (v.type === 'test_exists') { let p; try { p = this._confinePath(base, v.test_file); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.test_file } : { status: 'FAIL', detail: `${v.test_file} is missing` }; }
-      if (v.type === 'grep') { let p; try { p = this._confinePath(base, v.file); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } let t = ''; try { t = fs.readFileSync(p, 'utf8'); } catch { return { status: 'FAIL', detail: `${v.file} is missing` }; } return new RegExp(v.pattern, v.flags || '').test(t) ? { status: 'PASS', detail: `${v.file} matches` } : { status: 'FAIL', detail: `${v.file} does not match ${v.pattern}` }; }
+      if (v.type === 'file_exists') { let p; try { p = this._confinePath(wd, v.path, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.path } : { status: 'FAIL', detail: `${v.path} is missing` }; }
+      if (v.type === 'test_exists') { let p; try { p = this._confinePath(wd, v.test_file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.test_file } : { status: 'FAIL', detail: `${v.test_file} is missing` }; }
+      if (v.type === 'grep') { let p; try { p = this._confinePath(wd, v.file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } let t = ''; try { t = fs.readFileSync(p, 'utf8'); } catch { return { status: 'FAIL', detail: `${v.file} is missing` }; } return new RegExp(v.pattern, v.flags || '').test(t) ? { status: 'PASS', detail: `${v.file} matches` } : { status: 'FAIL', detail: `${v.file} does not match ${v.pattern}` }; }
       return { status: 'BLOCKED', detail: `${v.type} criteria are checked by a person or CI, not here` };
     };
     const tasks = c.tasks.map((t) => ({ id: t.id, title: t.title, criteria: t.criteria.map((cr) => ({ id: cr.id, statement: cr.statement || `${cr.verifier?.type || "check"} check`, mandatory: cr.mandatory !== false, ...run(cr) })) }));
