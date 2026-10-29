@@ -27,11 +27,9 @@ export async function command(_cmd, _pos, flags, { root }) {
   if (!Number.isFinite(ttl) || ttl <= 0) throw new Error('--ttl is a number of seconds');
   const cfg = readJson(path.join(root, '.memev', 'config.json'), {});
   const tunnel = tunnelUrl(root);
-  // A local-only or organisation install (remote access answered off) has no second computer by
-  // design, so its invite is for a computer that shares this machine and may use the loopback
-  // address without the flag.
-  const local = !!flags.local || (cfg.remote?.asked === true && cfg.remote?.enabled !== true);
-  if (!tunnel && !local) {
+  // Without a tunnel, only an explicit --local may mint the loopback address, for a computer that
+  // shares this machine (a container or a second user).
+  if (!tunnel && !flags.local) {
     if (cfg.remote?.enabled === true) throw new Error('the secure link is on but the tunnel has no address yet; check memev cloud status, or mint for this machine with: memev invite --local');
     throw new Error('the secure link is off, so a second computer cannot reach this vault. Turn it on with: memev cloud on. For a computer that shares this machine (a container or a second user): memev invite --local');
   }

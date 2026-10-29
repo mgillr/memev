@@ -26,6 +26,22 @@ test('REV-020 AC01: with the secure link off and no --local flag, memev invite e
   } finally { sb.stop(); }
 });
 
+test('REV-020 AC01: an install that answered no to cloud access (asked and not enabled) still refuses without --local and names memev cloud on', () => {
+  const sb = sandbox();
+  try {
+    const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
+    assert.equal(init.code, 0, init.err + init.out);
+    const cfg = JSON.parse(fs.readFileSync(path.join(sb.root, '.memev', 'config.json'), 'utf8'));
+    assert.equal(cfg.remote?.asked, true, 'remote access was asked');
+    assert.equal(cfg.remote?.enabled, false, 'remote access is off');
+    const inv = sb.run(['invite']);
+    assert.notEqual(inv.code, 0, inv.out);
+    assert.match(inv.out + inv.err, /memev cloud on/);
+    assert.doesNotMatch(inv.out, /^code: /m);
+    assert.doesNotMatch(inv.out, /127\.0\.0\.1/);
+  } finally { sb.stop(); }
+});
+
 test('REV-020 AC02: with the link on, the invite carries the tunnel address', () => {
   const sb = sandbox();
   try {
