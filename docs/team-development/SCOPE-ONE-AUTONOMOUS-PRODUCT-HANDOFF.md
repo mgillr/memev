@@ -632,3 +632,48 @@ Reviewed/current baseline references:
 - [ ] Record demo and metrics; update this document as implementation decisions change.
 
 **Definition of success:** A non-technical user describes an outcome, approves the material scope and permissions, and the product coordinates supported AI agents to deliver a tested result, safely recover from interruption, and explain what is verified—without requiring the user to manage the technical machinery.
+
+
+## Complete-system requirement — not an MVP
+
+**Scope One means the complete agreed Scope One system implemented in the current Memev codebase. It does not mean a small fraction, demo, mock interface, or disconnected proof of concept.** The first end-to-end vertical slice is the first integration gate, not the final scope. Once it passes, implementation must continue until every agreed Scope One requirement is delivered and verified.
+
+Before broad implementation, reconcile every requirement against actual code, runtime wiring, existing development contracts, tests, and evidence. Give each requirement an owner and one explicit status: verified implemented, incomplete, missing, conflicting, unknown, or explicitly deferred by product-owner decision. No requirement may disappear silently. Deferred or blocked items must state the reason, user impact, owner, and resolution path.
+
+### The finished Scope One system
+
+Reconcile the detailed list below against the repository and agreed requirements; these are completion obligations, not claims that they already exist.
+
+- A complete, non-technical onboarding and project command centre.
+- Local project-folder selection and safe, explicitly scoped filesystem access.
+- Optional GitHub connection, repository discovery/selection, scoped permissions, safe Git operations, and secret scanning before publication.
+- User-selected supported lead agent, visible fallback handling, one active coordinator, and safe lead handover.
+- Natural-language goal intake, clarification of material ambiguity, plan/scope review, and approval gates for consequential actions.
+- Persistent project and task state; atomic contracts; dependencies and ownership; dispatch, progress, retries, idempotency, interruption recovery, and conflict handling.
+- Integrated memory and shared context based on a documented Memev/Hivevault architecture decision, with recall, provenance, retention, recovery, and migration guarantees.
+- Specialist-agent coordination through reconciled existing bus/tool interfaces, not a competing orchestration subsystem.
+- Build, test, integration, and evidence-backed verification. A task claim alone is not completion; changes to scope or artifacts must invalidate affected verification.
+- Security and permissions enforced by runtime adapters: least privilege, revocation, secrets protection, audit records, and human approval for destructive, external, financial, privacy-sensitive, or otherwise consequential actions.
+- Complete install, first-run, upgrade, backup/recovery, rollback, and uninstall paths for every advertised supported distribution.
+- User-facing delivery of results, test evidence, known limitations, remaining work, and useful troubleshooting information.
+- Regression, integration, security, clean-install, upgrade, restart/recovery, and end-to-end acceptance tests.
+
+Do not expand Scope One indiscriminately into unrelated future enterprise features. The goal is complete delivery of the agreed scope, not uncontrolled scope growth. Anything genuinely outside Scope One must be named as such and must not be counted as completed Scope One work.
+
+### First proof point versus final acceptance
+
+The first proof point is one complete delivery loop on a clean supported machine: install Memev, select a local folder, optionally connect GitHub, choose a supported lead agent, describe a real goal, approve material decisions, let Memev coordinate the work, and receive a tested deliverable with evidence and honest limitations.
+
+Passing that loop is necessary but not sufficient. The team must then close the entire reconciled Scope One contract backlog, including all required onboarding, memory, coordination, security, recovery, distribution, documentation, and user-facing behaviour. Dashboards and agent activity are not substitutes for a working system.
+
+### Completion gate
+
+Do not call Scope One complete, production-ready, or fully autonomous until all agreed requirements are mapped to implementation and evidence; all mandatory contracts are closed or explicitly excluded by the product owner; the full journey passes in a clean supported environment; mandatory integration, security, recovery, and release gates pass; and known limitations are visible. Record exact test commands and results, supported environments, artifact versions, outstanding issues, and approved exceptions. Documentation, mocked flows, isolated unit tests, and agent self-report are not sufficient evidence.
+
+### Memory and commercial boundary: Memev Free and paid capabilities
+
+Memev already contains more than simple note retrieval, including a local Markdown vault, recall index, graph, memory-quality gate, operation log, and agent context/coordination mechanisms. Do not describe the free core as merely "get notes" without verifying its actual user-visible behaviour. Hivevault is a separate local-first shared-memory implementation; neither project should be assumed more efficient or correct without comparative evidence.
+
+Audit both implementations and test them against the same workloads: recall relevance and latency, write performance, storage growth, duplicate/conflicting memories, concurrent and offline writes, convergence, crash recovery, resource use, and migration. Record the results and make an explicit architecture decision to retain Memev's implementation, reuse a bounded Hivevault component, or migrate to one implementation. Document the API/data boundary, licensing/dependency implications, migration and rollback. Maintain one canonical authority for each kind of project state and memory; do not create two competing recall, graph, or merge pipelines.
+
+Keep the free core useful and define paid entitlements precisely. Multi-device convergence, hosted sync/backup, team administration, and other paid capabilities must be labelled accurately as implemented, planned, or unavailable. Pricing documents do not prove implementation. Define upgrade/downgrade behaviour and ensure users retain access to their local notes and export options if a paid service or subscription ends.
