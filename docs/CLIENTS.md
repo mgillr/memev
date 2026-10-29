@@ -20,8 +20,14 @@ connects them, unless you disconnected that app yourself.
 | Windsurf | `~/.codeium/windsurf/mcp_config.json`; a block in `memories/global_rules.md` | instructions |
 | VS Code | `Code/User/mcp.json` | instructions |
 | Zed | `context_servers` in `zed/settings.json` | instructions |
+| Aider | a conventions file in `~/.config/memev/aider-conventions.md`, listed under `read:` in `~/.aider.conf.yml` | conventions file (no MCP) |
 | OpenCode | `mcp` entry in `~/.config/opencode/opencode.json`; a block in the OpenCode rules file (skipped if the Claude rules file exists and the OpenCode one is missing) | instructions |
 | GitHub Copilot CLI | `mcpServers` entry in `~/.copilot/mcp-config.json` and a block in `~/.copilot/copilot-instructions.md` (in `$COPILOT_HOME` when it is set) | instructions |
+
+**Aider** has no MCP and no hooks, so the hand-off is different: `memev card --aider` writes the
+resume card to a conventions file and adds it to the `read:` list in `~/.aider.conf.yml`, which Aider
+reads into context at session start. It is opt-in, so `memev connect` does not touch it; `memev
+disconnect aider` removes the entry and the conventions file.
 
 **Hooks** mode: the resume card is injected at session start, relevant memories are added to each
 prompt, a checkpoint is written before compaction, and the turn is journaled when it ends. The app
