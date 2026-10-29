@@ -162,8 +162,18 @@ export class Bus {
     const moved = [];
     for (const s of this.seats()) {
       if (s.device !== deviceId || s.removed) continue;
-      const next = this._seatNameAfterRename(s.seat, device);
-      if (!next || next === s.seat) continue;
+      const base = this._seatNameAfterRename(s.seat, device);
+      if (!base || base === s.seat) continue;
+      // a name another computer already holds goes to the first free <app>@<machine>-2, -3 ..., as ownSeatName does
+      const [app, rest] = base.split('@'); const [machine, sub] = rest.split('/');
+      let next = null;
+      for (let i = 1; i < 100 && !next; i++) {
+        const n = i === 1 ? base : `${app}@${machine.slice(0, 41 - `-${i}`.length)}-${i}${sub ? `/${sub}` : ''}`;
+        const r = this.seat(n);
+        if (!r || r.seat === s.seat) next = n;
+      }
+      if (!next) throw new BusError('conflict', `no free seat name for ${base}`);
+      if (next === s.seat) continue;
       moved.push(this.renameSeat(s.seat, next));
     }
     return moved;
