@@ -1,5 +1,5 @@
 // MEM-142: customer-initiated secure remote setup session.
-import { test } from 'node:test';
+import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -7,9 +7,17 @@ import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import { parseCode, makeCode, SetupChannel } from '../src/engine/setup-channel.mjs';
-import { checkAllowlist, Session, appendLog, verifyChain, logPath, statusPath, sessionDir, redact } from '../src/cli/setup-remote.mjs';
+import { checkAllowlist, appendLog, verifyChain, logPath, statusPath, sessionDir, redact } from '../src/cli/setup-remote.mjs';
 import { detect } from '../src/cli/clients.mjs';
-import { OperatorStub, makeOperatorKeys } from './setup-operator-stub.mjs';
+import { OperatorStub as BaseStub, makeOperatorKeys } from './setup-operator-stub.mjs';
+import { Session as BaseSession } from '../src/cli/setup-remote.mjs';
+
+// every stub and session a test opens is closed after it, pass or fail, so a failed assertion cannot
+// leave a socket open and keep the run alive
+const live = new Set();
+class OperatorStub extends BaseStub { constructor(...a) { super(...a); live.add(this); } }
+class Session extends BaseSession { constructor(...a) { super(...a); live.add(this); } }
+afterEach(() => { for (const x of live) { try { x.revoke?.(); } catch {} try { x.close?.(); } catch {} } live.clear(); });
 import { listeningSockets } from './helpers/proc.mjs';
 import { freePort } from './helpers/cli.mjs';
 
