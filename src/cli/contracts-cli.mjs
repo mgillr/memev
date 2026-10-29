@@ -77,9 +77,10 @@ export async function command(cmd, pos, flags, { root, env }) {
   }
   if (sub === 'new') { const spec = JSON.parse(fs.readFileSync(pos[1], 'utf8')); return call('memev_contract_draft', spec); }
   if (sub === 'sign') return call('memev_contract_sign', { id: pos[1] });
+  if (sub === 'approve') return call('memev_contract_approve', { id: pos[1] });
   if (sub === 'verify') return call('memev_contract_verify', { id: pos[1] });
   if (sub === 'amend') return call('memev_contract_amend', { id: pos[1], title: flags.title });
   if (sub === 'decompose') return call('memev_contract_decompose', { scope: JSON.parse(fs.readFileSync(pos[1], 'utf8')) });
-  throw new Error('memev contract list | status [id] | from-request <text> | new <spec.json> | sign <id> | verify <id> | amend <id> | decompose <scope.json> | hook [dir]');
+  throw new Error('memev contract list | status [id] | from-request <text> | new <spec.json> | sign <id> | approve <id> | verify <id> | amend <id> | decompose <scope.json> | hook [dir]');
 }
 

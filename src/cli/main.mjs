@@ -60,7 +60,7 @@ Daily
   memev review [list|keep|drop|reset] [items] [--days N]  the inbox of flagged and short-lived memories
   memev audit [--json]             a read-only report on junk, duplicates and stale memories
   memev checkpoint --project P [--task T] [--done a,b] [--doing x] [--next c,d]
-  memev claims [--status fact]  |  memev contract status|from-request|new|sign|verify|list|amend|decompose|hook
+  memev claims [--status fact]  |  memev contract status|from-request|new|sign|approve|verify|list|amend|decompose|hook
   memev verify [id]  |  memev gate [--workdir DIR]   check signed contracts on this machine (never CI)
   memev token issue|list|revoke|rotate
   memev start | stop | restart | serve
