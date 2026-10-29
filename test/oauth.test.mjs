@@ -142,7 +142,13 @@ test('MEM-058 AC02: remote OAuth routes obey the remote-off switch, the rate lim
   assert.ok(limited > 0, 'the burst is rate limited');
   // a remote OAuth call is written to the audit log
   await fetch(`${base}/oauth/register`, { method: 'POST', headers: { 'content-type': 'application/json', ...viaTunnel }, body: JSON.stringify({ client_name: 'Audit App', redirect_uris: [`${base}/callback`] }) });
-  const log = fs.readFileSync(path.join(v.state, 'access.jsonl'), 'utf8').trim().split('\n');
+  // the audit write is async, so give it a moment to land before reading the log
+  let log = [];
+  for (let i = 0; i < 20; i++) {
+    log = fs.readFileSync(path.join(v.state, 'access.jsonl'), 'utf8').trim().split('\n');
+    if (log.some((l) => l.includes('/oauth/register'))) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
   assert.ok(log.some((l) => l.includes('/oauth/register')), 'remote OAuth access is audited');
 });
 
@@ -220,4 +226,72 @@ test('MEM-058 AC04: the connector URL token still works', async () => {
   const r = await fetch(`${base}/c/${tok}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) });
   assert.equal(r.status, 200);
   assert.ok((await r.json()).result.tools.length > 0);
+});
+
+test('MEM-058 AC03: removing a device revokes its oauth tokens at once', async () => {
+  const { reg, tok } = await flow('Removed App');
+  // the app connects through the tunnel, so it is registered as a cloud-connector device
+  assert.equal((await mcp(tok.access_token, 'tools/list', viaTunnel)).status, 200);
+  const dev = v.devices.list().find((d) => d.label === 'removed-app' && d.kind === 'cloud-connector');
+  assert.ok(dev, 'the app is registered as a cloud-connector device');
+  // remove the device: its oauth tokens stop working at once
+  v.devices.remove(v.tokens, dev.id);
+  assert.equal((await mcp(tok.access_token)).status, 401, 'the access token is refused after removal');
+  const ref = await formPost(`${base}/oauth/token`, { grant_type: 'refresh_token', client_id: reg.client_id, refresh_token: tok.refresh_token });
+  assert.equal(ref.status, 400, 'the refresh token is refused after removal');
+  assert.equal((await ref.json()).error, 'invalid_grant');
+});
+
+test('MEM-058 AC02: a connected app keeps its seat when the client cap is full', async () => {
+  const { tok } = await flow('Kept App');
+  assert.equal((await mcp(tok.access_token)).status, 200);
+  for (let i = 0; i < 60; i++) await register(`Filler ${i}`);
+  // the connected app was not evicted: its token still works
+  assert.equal((await mcp(tok.access_token)).status, 200, 'the connected app keeps its seat');
+});
+
+test('MEM-058 AC02: an unknown client or unregistered redirect_uri gets no redirect', async () => {
+  // an unknown client: a plain 400, with no Location to follow
+  const unknown = await fetch(`${base}/oauth/authorize?${new URLSearchParams({ response_type: 'code', client_id: 'oc_nope', redirect_uri: `${base}/callback`, code_challenge: 'x', code_challenge_method: 'S256', state: 's1' })}`, { redirect: 'manual' });
+  assert.equal(unknown.status, 400);
+  assert.equal(unknown.headers.get('location'), null, 'no redirect for an unknown client');
+  assert.equal((await unknown.json()).error, 'unauthorized_client');
+  // an unregistered redirect_uri: a plain 400, with no Location to follow
+  const reg = await register('Redirect Check App');
+  const bad = await fetch(`${base}/oauth/authorize?${new URLSearchParams({ response_type: 'code', client_id: reg.client_id, redirect_uri: 'https://not-registered.example/callback', code_challenge: 'x', code_challenge_method: 'S256', state: 's1' })}`, { redirect: 'manual' });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.headers.get('location'), null, 'no redirect for an unregistered redirect_uri');
+  assert.equal((await bad.json()).error, 'invalid_redirect_uri');
+});
+
+test('MEM-058 AC02: a client only receives the scopes it registered with', async () => {
+  const reg = await fetch(`${base}/oauth/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_name: 'Read Only App', redirect_uris: [`${base}/callback`], scope: 'read' }) }).then((r) => r.json());
+  const { verifier, challenge } = pkce();
+  const auth = await fetch(`${base}/oauth/authorize?${new URLSearchParams({ response_type: 'code', client_id: reg.client_id, redirect_uri: `${base}/callback`, code_challenge: challenge, code_challenge_method: 'S256', state: 's1', scope: 'read write' })}`, { redirect: 'manual' });
+  assert.equal(auth.status, 302);
+  const code = new URL(auth.headers.get('location'), base).searchParams.get('code');
+  const { consent } = await consentPage(code);
+  const redir = await formPost(`${base}/oauth/consent`, { code, state: 's1', decision: 'approve', consent });
+  assert.equal(redir.status, 302);
+  const loc = new URL(redir.headers.get('location'));
+  const tok = await (await formPost(`${base}/oauth/token`, { grant_type: 'authorization_code', code: loc.searchParams.get('code'), redirect_uri: `${base}/callback`, client_id: reg.client_id, code_verifier: verifier })).json();
+  assert.equal(tok.scope, 'read', 'the token only carries the scope the client registered with');
+});
+
+test('MEM-058 AC02: oauth.json stores tokens by hash, never raw', async () => {
+  const { tok } = await flow('Hash App');
+  const raw = fs.readFileSync(path.join(v.state, 'oauth.json'), 'utf8');
+  assert.ok(!raw.includes(tok.access_token), 'the raw access token is not in oauth.json');
+  assert.ok(!raw.includes(tok.refresh_token), 'the raw refresh token is not in oauth.json');
+  // the token still works: it is found by its hash
+  assert.equal((await mcp(tok.access_token)).status, 200);
+});
+
+test('MEM-058 AC02: a non-loopback http redirect URI is refused at registration', async () => {
+  const r = await fetch(`${base}/oauth/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ client_name: 'Plain Http App', redirect_uris: ['http://evil.example/callback'] }) });
+  assert.equal(r.status, 400);
+  assert.equal((await r.json()).error, 'invalid_redirect_uri');
+  // loopback http is still allowed
+  const ok = await register('Loopback App', 'http://127.0.0.1/callback');
+  assert.ok(ok.client_id, 'loopback http is allowed');
 });

@@ -5,7 +5,7 @@
 // State lives in .memev/oauth.json, next to tokens.json; only opaque tokens are stored.
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { readJson, writePrivateJson, randomToken, now } from '../engine/util.mjs';
+import { readJson, writePrivateJson, randomToken, now, sha256 } from '../engine/util.mjs';
 
 const ACCESS_TTL_S = 3600;
 const REFRESH_TTL_DAYS = 30;
@@ -21,11 +21,15 @@ export class OAuthError extends Error {
 }
 
 const s256 = (verifier) => crypto.createHash('sha256').update(String(verifier)).digest('base64url');
+// tokens are stored by their sha256, never raw: a leaked oauth.json does not hand over a working credential
+const thash = (t) => sha256(String(t || ''));
 // the seat name an OAuth app takes on the bus: its registered client name, normalised (ChatGPT -> chatgpt)
 export const agentName = (name) => String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'app';
 
 export class OAuthStore {
-  constructor(file) { this.file = file; this.data = readJson(file, null) || { version: 1, clients: {}, codes: {}, access: {}, refresh: {} }; this.mtime = this._mtime(); }
+  // isRevoked(id) reports whether the device behind an oauth grant (its token_id) was removed; when it
+  // was, the grant's tokens stop working at once instead of outliving the device that owns them
+  constructor(file, isRevoked = () => false) { this.file = file; this.isRevoked = isRevoked; this.data = readJson(file, null) || { version: 1, clients: {}, codes: {}, access: {}, refresh: {} }; this.mtime = this._mtime(); }
   _mtime() { try { const s = fs.statSync(this.file); return `${s.ino}:${s.mtimeMs}:${s.size}`; } catch { return ''; } }
   /** Expired consent codes are dropped on every write, so the file does not keep them. */
   _gc() {
@@ -41,15 +45,37 @@ export class OAuthStore {
     this.fresh();
     const uris = [...new Set([].concat(redirect_uris || []).map(String).filter(Boolean))];
     if (!uris.length) throw new OAuthError('invalid_redirect_uri', 'redirect_uris is required');
-    for (const u of uris) { const x = new URL(u); if (!['http:', 'https:'].includes(x.protocol)) throw new OAuthError('invalid_redirect_uri', 'redirect URIs must be http or https'); }
+    for (const u of uris) {
+      const x = new URL(u);
+      if (!['http:', 'https:'].includes(x.protocol)) throw new OAuthError('invalid_redirect_uri', 'redirect URIs must be http or https');
+      // plain http hands the code to an eavesdropper, so it is only allowed on the vault machine itself
+      if (x.protocol === 'http:' && !['127.0.0.1', '[::1]', 'localhost'].includes(x.hostname)) throw new OAuthError('invalid_redirect_uri', 'plain http redirect URIs are only allowed on loopback');
+    }
     const wanted = (typeof scope === 'string' ? scope.split(/\s+/) : []).filter((s) => SCOPES.includes(s));
     const id = `oc_${randomToken(12)}`;
     this.data.clients[id] = { id, name: String(client_name || 'Unnamed client').slice(0, 60), redirect_uris: uris, scopes: wanted.length ? wanted : ['read', 'write'], created: now() };
-    const oldest = Object.values(this.data.clients).sort((a, b) => a.created.localeCompare(b.created) || a.id.localeCompare(b.id));
-    for (const c of oldest.slice(0, Math.max(0, oldest.length - MAX_CLIENTS))) this._dropClient(c.id);
+    // the cap frees idle seats first: a client that still holds a live token keeps its seat
+    const over = Object.keys(this.data.clients).length - MAX_CLIENTS;
+    if (over > 0) {
+      const idle = Object.values(this.data.clients).filter((c) => c.id !== id && !this._clientHasLiveTokens(c.id)).sort((a, b) => a.created.localeCompare(b.created) || a.id.localeCompare(b.id));
+      for (const c of idle.slice(0, over)) this._dropClient(c.id);
+      if (idle.length < over) {
+        // every seat is held by a connected client: the new registration gives way
+        this._dropClient(id);
+        throw new OAuthError('invalid_client_metadata', 'the client list is full of connected apps; remove one before registering another');
+      }
+    }
     this.save();
     const c = this.data.clients[id];
     return { client_id: c.id, client_name: c.name, redirect_uris: c.redirect_uris, scope: c.scopes.join(' '), grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'], token_endpoint_auth_method: 'none' };
+  }
+
+  /** A client with an unexpired access or refresh token is still connected and keeps its seat. */
+  _clientHasLiveTokens(id) {
+    const t = Date.now();
+    for (const r of Object.values(this.data.access)) if (r.client_id === id && Date.parse(r.expires) >= t) return true;
+    for (const r of Object.values(this.data.refresh)) if (r.client_id === id && Date.parse(r.expires) >= t) return true;
+    return false;
   }
 
   client(id) { this.fresh(); return this.data.clients[String(id || '')] || null; }
@@ -68,7 +94,8 @@ export class OAuthStore {
     if (!c) throw new OAuthError('unauthorized_client', 'unknown client_id', 401);
     if (!c.redirect_uris.includes(String(redirect_uri))) throw new OAuthError('invalid_redirect_uri', 'redirect_uri was not registered for this client');
     if (!code_challenge || code_challenge_method !== 'S256') throw new OAuthError('invalid_request', 'PKCE is required: send code_challenge with code_challenge_method S256');
-    const scopes = (scope ? String(scope).split(/\s+/) : c.scopes).filter((s) => SCOPES.includes(s));
+    // a client may only ask for scopes it registered with, not the whole supported set
+    const scopes = (scope ? String(scope).split(/\s+/) : c.scopes).filter((s) => SCOPES.includes(s) && c.scopes.includes(s));
     if (!scopes.length) throw new OAuthError('invalid_scope', 'no supported scope was requested');
     const code = randomToken(24);
     // a one-time value the consent page must send back: knowing the code alone is not enough to approve
@@ -111,9 +138,10 @@ export class OAuthStore {
   /** A refresh token trades for a new pair; the old refresh token stops working at once. */
   refresh({ client_id, refresh_token }) {
     this.fresh();
-    const r = this.data.refresh[String(refresh_token || '')];
+    const r = this.data.refresh[thash(refresh_token)];
     if (!r) throw new OAuthError('invalid_grant', 'unknown refresh token');
     if (r.client_id !== String(client_id)) throw new OAuthError('invalid_grant', 'the refresh token was issued to another client');
+    if (this.isRevoked(r.id)) { this.revokeId(r.id); throw new OAuthError('invalid_grant', 'this client was removed; authorize it again to get new tokens'); }
     if (Date.parse(r.expires) < Date.now()) { this._kill(r); throw new OAuthError('invalid_grant', 'the refresh token expired'); }
     delete this.data.refresh[r.token];
     this.save();
@@ -123,8 +151,8 @@ export class OAuthStore {
   _issue(client_id, scopes, id = `oa_${randomToken(10)}`) {
     const access = `mvat_${randomToken(24)}`;
     const refresh = `mvrt_${randomToken(24)}`;
-    this.data.access[access] = { id, client_id, scopes, expires: new Date(Date.now() + ACCESS_TTL_S * 1000).toISOString(), created: now(), refresh };
-    this.data.refresh[refresh] = { token: refresh, id, client_id, scopes, expires: new Date(Date.now() + REFRESH_TTL_DAYS * 86400e3).toISOString(), access };
+    this.data.access[thash(access)] = { id, client_id, scopes, expires: new Date(Date.now() + ACCESS_TTL_S * 1000).toISOString(), created: now(), refresh: thash(refresh) };
+    this.data.refresh[thash(refresh)] = { token: thash(refresh), id, client_id, scopes, expires: new Date(Date.now() + REFRESH_TTL_DAYS * 86400e3).toISOString(), access: thash(access) };
     this.save();
     return { access_token: access, refresh_token: refresh, token_type: 'Bearer', expires_in: ACCESS_TTL_S, scope: scopes.join(' ') };
   }
@@ -138,10 +166,21 @@ export class OAuthStore {
   /** Revocation: an access token dies with its refresh token, and the other way round. */
   revoke(token) {
     this.fresh();
-    const t = String(token || '');
+    const t = thash(token);
     if (this.data.access[t]) { const a = this.data.access[t]; delete this.data.access[t]; if (this.data.refresh[a.refresh]) delete this.data.refresh[a.refresh]; this.save(); return true; }
     if (this.data.refresh[t]) { this._kill(this.data.refresh[t]); return true; }
     return false;
+  }
+
+  /** A removed device kills every token pair that belongs to it, access and refresh at once. */
+  revokeId(id) {
+    this.fresh();
+    const t = String(id || '');
+    let changed = false;
+    for (const [key, r] of Object.entries(this.data.access)) if (r.id === t) { delete this.data.access[key]; if (this.data.refresh[r.refresh]) delete this.data.refresh[r.refresh]; changed = true; }
+    for (const [key, r] of Object.entries(this.data.refresh)) if (r.id === t) { delete this.data.refresh[key]; changed = true; }
+    if (changed) this.save();
+    return changed;
   }
 
   /** The identity for a valid access token, or null. */
@@ -149,9 +188,10 @@ export class OAuthStore {
     const t = String(token || '').trim();
     if (!t.startsWith('mvat_')) return null;
     this.fresh();
-    const r = this.data.access[t];
+    const r = this.data.access[thash(t)];
     if (!r) return null;
-    if (Date.parse(r.expires) < Date.now()) { delete this.data.access[t]; this.save(); return null; }
+    if (Date.parse(r.expires) < Date.now()) { delete this.data.access[thash(t)]; this.save(); return null; }
+    if (this.isRevoked(r.id)) { this.revokeId(r.id); return null; }
     const c = this.data.clients[r.client_id];
     return { id: r.id, agent: agentName(c?.name), scopes: r.scopes, paths: PATHS, remote: true, expires: r.expires, note: 'cloud connector (oauth)' };
   }
