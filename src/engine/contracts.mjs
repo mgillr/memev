@@ -124,7 +124,8 @@ export function attach(Vault) {
     return { id, signed: true, version: c.version || 1, supersedes: c.supersedes || null, hash: canonicalHash(c), keyid: key.id, path: `${SIGNED}/${id}.json`, origin, memory: mem.path || null, next: 'build the tasks in order; run memev_contract_verify after each one' };
   };
 
-  P.contractApprove = function (identity, { id }) {
+  P.contractApprove = function (identity, { id, local = true }) {
+    if (!local) throw new ContractError('forbidden', 'approval is a local operator action; run it on this machine (memev contract approve ' + id + ')');
     this._need(identity, 'admin', null);
     if (this._read(`${SIGNED}/${id}.json`) === null) throw new ContractError('not_found', `contract ${id} is not signed`);
     this.write(identity, { path: `contracts/approved/${id}.json`, body: `${JSON.stringify({ id, at: now(), by: identity.agent }, null, 2)}\n`, client: null, internal: true });
@@ -172,6 +173,9 @@ export function attach(Vault) {
     const origin = c.origin || 'local';
     const approved = this._contractApproved(id);
     const needsApproval = origin === 'remote' && !approved;
+    // file-based criteria are confined to the vault root when the caller is remote: a contract may
+    // name a workdir outside the vault, but a remote check must not read or prove anything outside it
+    const base = !local ? this.root : wd;
     const run = (crit) => {
       const v = crit.verifier;
       if (v.type === 'command') {
@@ -182,9 +186,9 @@ export function attach(Vault) {
         const want = v.expect_exit ?? 0;
         return { status: r.status === want ? 'PASS' : 'FAIL', detail: `exit ${r.status}${r.status === want ? '' : `: ${r.error || truncate(`${r.stderr}${r.stdout}`.trim(), 300)}`}` };
       }
-      if (v.type === 'file_exists') { let p; try { p = this._confinePath(wd, v.path); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.path } : { status: 'FAIL', detail: `${v.path} is missing` }; }
-      if (v.type === 'test_exists') { let p; try { p = this._confinePath(wd, v.test_file); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.test_file } : { status: 'FAIL', detail: `${v.test_file} is missing` }; }
-      if (v.type === 'grep') { let p; try { p = this._confinePath(wd, v.file); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } let t = ''; try { t = fs.readFileSync(p, 'utf8'); } catch { return { status: 'FAIL', detail: `${v.file} is missing` }; } return new RegExp(v.pattern, v.flags || '').test(t) ? { status: 'PASS', detail: `${v.file} matches` } : { status: 'FAIL', detail: `${v.file} does not match ${v.pattern}` }; }
+      if (v.type === 'file_exists') { let p; try { p = this._confinePath(base, v.path); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.path } : { status: 'FAIL', detail: `${v.path} is missing` }; }
+      if (v.type === 'test_exists') { let p; try { p = this._confinePath(base, v.test_file); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.test_file } : { status: 'FAIL', detail: `${v.test_file} is missing` }; }
+      if (v.type === 'grep') { let p; try { p = this._confinePath(base, v.file); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } let t = ''; try { t = fs.readFileSync(p, 'utf8'); } catch { return { status: 'FAIL', detail: `${v.file} is missing` }; } return new RegExp(v.pattern, v.flags || '').test(t) ? { status: 'PASS', detail: `${v.file} matches` } : { status: 'FAIL', detail: `${v.file} does not match ${v.pattern}` }; }
       return { status: 'BLOCKED', detail: `${v.type} criteria are checked by a person or CI, not here` };
     };
     const tasks = c.tasks.map((t) => ({ id: t.id, title: t.title, criteria: t.criteria.map((cr) => ({ id: cr.id, statement: cr.statement || `${cr.verifier?.type || "check"} check`, mandatory: cr.mandatory !== false, ...run(cr) })) }));

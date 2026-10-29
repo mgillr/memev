@@ -27,6 +27,13 @@ export async function command(cmd, pos, flags, { root, env }) {
     const res = r.json?.result; if (!res) throw new Error(r.text);
     console.log(res.content[0].text); return res.isError ? 1 : (res.structuredContent?.ok === false ? 1 : 0);
   };
+  // approve is an admin action; the CLI's client token is read+write, so it goes over the admin token
+  const callAdmin = async (name, args) => {
+    const t = adminToken(root); if (!t) throw new Error('no admin token found; run memev init');
+    const r = await api(root, '/mcp', { token: t, body: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, timeoutMs: 600000 });
+    const res = r.json?.result; if (!res) throw new Error(r.text);
+    console.log(res.content[0].text); return res.isError ? 1 : (res.structuredContent?.ok === false ? 1 : 0);
+  };
   if (cmd === 'contracts') {
     if (sub === 'on' || sub === 'off') {
       const cfg = config(root);
@@ -77,7 +84,7 @@ export async function command(cmd, pos, flags, { root, env }) {
   }
   if (sub === 'new') { const spec = JSON.parse(fs.readFileSync(pos[1], 'utf8')); return call('memev_contract_draft', spec); }
   if (sub === 'sign') return call('memev_contract_sign', { id: pos[1] });
-  if (sub === 'approve') return call('memev_contract_approve', { id: pos[1] });
+  if (sub === 'approve') return callAdmin('memev_contract_approve', { id: pos[1] });
   if (sub === 'verify') return call('memev_contract_verify', { id: pos[1] });
   if (sub === 'amend') return call('memev_contract_amend', { id: pos[1], title: flags.title });
   if (sub === 'decompose') return call('memev_contract_decompose', { scope: JSON.parse(fs.readFileSync(pos[1], 'utf8')) });

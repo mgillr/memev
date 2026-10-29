@@ -111,7 +111,7 @@ export function renderCard(c, { maxChars = 6000, footer, root } = {}) {
   for (const k of c.open_contracts || []) {
     L.push(`Active contract ${k.id} v${k.version || 1} "${k.title}"${k.project ? ` (project ${k.project})` : ''}: ${k.passed ?? 0}/${k.total ?? '?'} tasks pass${k.last_verified ? ` at last verify ${k.last_verified}` : ', not verified yet'}.`);
     if (k.remaining?.length) {
-      if (k.origin === 'remote' && !k.approved) L.push(`  Remaining: ${k.remaining.join('; ')}. This contract was signed remotely; a local operator must approve it before commands run (memev contract approve ${k.id}).`);
+      if (k.origin === 'remote' && !k.approved) L.push(`  Remaining: ${k.remaining.join('; ')}. This contract was signed remotely; a local operator must approve it before commands run. Tell the user to approve it on this machine; the command is in docs/CONTRACTS.md.`);
       else L.push(`  Remaining: ${k.remaining.join('; ')}. Build these, then memev_contract_verify { id: "${k.id}" }.`);
     }
   }
