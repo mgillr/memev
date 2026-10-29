@@ -69,7 +69,7 @@ export function recordHash(rec) {
 export class OpLog {
   constructor(dir, { segmentBytes = 16 * 1024 * 1024, snapshotEvery = 1000, fsync = true, deviceId = null } = {}) {
     this.dir = dir; this.segmentBytes = segmentBytes; this.snapshotEvery = snapshotEvery; this.fsync = fsync;
-    this.heads = new Map(); this.seq = 0; this.sinceSnapshot = 0; this.fd = null;
+    this.heads = new Map(); this.seq = 0; this.sinceSnapshot = 0; this.fd = null; this.recovered = [];
     // Each record names the device that wrote it and carries a hybrid logical clock, so logs from
     // several devices can later be merged in a deterministic order. Records written before this
     // (no dev, no hlc) stay valid: the hash covers only the fields a record has.
@@ -99,14 +99,18 @@ export class OpLog {
       fromSeg = Math.max(0, this.manifest.segments.findIndex((s) => s.name === snap.active?.name));
       fromOff = snap.active?.offset || 0;
     }
-    // replay only what the snapshot does not cover: the tail of its segment and any later segment
+    // replay only what the snapshot does not cover: the tail of its segment and any later segment.
+    // A line that does not parse in the middle of a segment is torn or edited: it is skipped and
+    // reported, and every valid record after it is kept. Only a partial last line (no newline) is
+    // a torn tail, and it is truncated only after the good prefix has been read and verified.
     for (let i = fromSeg; i < this.manifest.segments.length; i++) {
       const seg = this.manifest.segments[i], file = path.join(this.dir, seg.name);
       let good = i === fromSeg ? fromOff : 0;
       for (const [line, off] of readLines(file, good)) {
-        let rec; try { rec = JSON.parse(line); } catch { break; }
-        if (rec.seq <= this.seq) { good = off + Buffer.byteLength(line) + 1; continue; }
-        this._apply(rec); good = off + Buffer.byteLength(line) + 1; this.sinceSnapshot++;
+        const end = off + Buffer.byteLength(line) + 1;
+        let rec; try { rec = JSON.parse(line); } catch { this.recovered.push(`${seg.name}: unreadable record at byte ${off}, skipped`); continue; }
+        if (rec.seq <= this.seq) { good = end; continue; }
+        this._apply(rec); good = end; this.sinceSnapshot++;
         if (!seg.first || seg.first > rec.seq) seg.first = rec.seq;
         seg.last = rec.seq;
       }
@@ -139,7 +143,8 @@ export class OpLog {
     rec.hlc = this.tick();
     rec.hash = recordHash(rec);
     const line = `${JSON.stringify(rec)}\n`;
-    fs.writeSync(this.fd, line);
+    const written = fs.writeSync(this.fd, line);
+    if (written !== Buffer.byteLength(line)) throw new Error(`op log short write: ${written} of ${Buffer.byteLength(line)} bytes`);
     if (this.fsync) fs.fdatasyncSync(this.fd);
     const a = this.active; a.bytes += Buffer.byteLength(line); a.last = rec.seq; if (!a.first) a.first = rec.seq;
     this._apply(rec);
@@ -174,7 +179,7 @@ export class OpLog {
       for (const [line] of readLines(path.join(this.dir, seg.name))) {
         if (!line) continue;
         if (raw) { yield line; continue; }
-        const rec = JSON.parse(line);
+        let rec; try { rec = JSON.parse(line); } catch { continue; }   // an unreadable line is not a record: skip it, as verify() does
         if (rec.seq < fromSeq) continue;
         if (only && rec.path !== only) continue;
         yield rec;
