@@ -77,3 +77,43 @@ test('MEM-003 AC02: when git init fails on a folder that already has files, the 
   assert.equal(fs.readFileSync(kept, 'utf8'), 'my work\n', 'the file that was there before is still there');
   assert.ok(!fs.existsSync(path.join(root, '.git')), 'no half built git repo is left behind');
 });
+
+// Every path under dir, relative, sorted; directories end in /.
+function listing(dir) {
+  const out = [];
+  const walk = (p) => { for (const e of fs.readdirSync(p, { withFileTypes: true })) { const q = path.join(p, e.name); out.push(path.relative(dir, q) + (e.isDirectory() ? '/' : '')); if (e.isDirectory()) walk(q); } };
+  walk(dir);
+  return out.sort();
+}
+function withShim(script, fn) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gitshim-'));
+  fs.writeFileSync(path.join(dir, 'git'), script, { mode: 0o755 });
+  const prev = process.env.PATH;
+  process.env.PATH = `${dir}${path.delimiter}${prev}`;
+  try { return fn(); } finally { process.env.PATH = prev; }
+}
+
+test('MEM-003 AC02: a failed init leaves a folder that already existed exactly as it was, mode included', () => {
+  const root = path.join(tmpdir('mem003-'), 'vault');
+  fs.mkdirSync(path.join(root, 'my-notes'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'my-notes', 'thesis.md'), 'my work\n');
+  fs.chmodSync(root, 0o755);
+  const before = listing(root);
+  withShim('#!/bin/sh\nif [ "$1" = "init" ]; then echo "git: init: boom" >&2; exit 1; fi\nexit 1\n', () => {
+    assert.throws(() => initVault(root, { template: path.join(PKG, 'templates', 'vault') }), /git init failed/);
+  });
+  assert.deepEqual(listing(root), before, 'nothing was added to the folder');
+  assert.equal(fs.statSync(root).mode & 0o777, 0o755, 'the folder mode is unchanged');
+});
+
+test('MEM-003 AC02: on old git, a failed symbolic-ref leaves no .git behind in a folder that already existed', () => {
+  const root = path.join(tmpdir('mem003-'), 'vault');
+  fs.mkdirSync(root, { recursive: true });
+  fs.writeFileSync(path.join(root, 'a.md'), 'x\n');
+  const real = spawnSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).stdout.trim();
+  const script = `#!/bin/sh\nfor a in "$@"; do [ "$a" = "-b" ] && { echo "error: unknown switch b" >&2; exit 129; }; done\nfor a in "$@"; do [ "$a" = "symbolic-ref" ] && { echo "symref boom" >&2; exit 1; }; done\nexec ${JSON.stringify(real)} "$@"\n`;
+  withShim(script, () => {
+    assert.throws(() => initVault(root, { template: path.join(PKG, 'templates', 'vault') }), /git init failed/);
+  });
+  assert.deepEqual(listing(root), ['a.md'], 'only the file that was there before is left');
+});
