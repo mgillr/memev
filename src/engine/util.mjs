@@ -63,7 +63,11 @@ export function globMatch(glob, p) {
 }
 
 export function slug(s, max = 48) {
-  return String(s || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, max) || 'untitled';
+  // Names the old rule already gave a slug for keep it, so what was filed before an upgrade is
+  // still found; the Unicode rule only takes over where the old rule said 'untitled'.
+  const old = String(s || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, max);
+  if (old) return old;
+  return [...String(s || '').toLowerCase().normalize('NFKC').replace(/[^\p{L}\p{N}\p{M}]+/gu, '-').replace(/^-+|-+$/g, '')].slice(0, max).join('') || 'untitled';
 }
 
 export function truncate(s, n) { s = String(s ?? ''); return s.length > n ? `${s.slice(0, n - 1)}…` : s; }

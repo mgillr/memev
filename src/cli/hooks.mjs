@@ -20,11 +20,19 @@ import { isVault } from '../engine/vault.mjs';
 import { PROTOCOL } from '../engine/card.mjs';
 
 function readStdin() { try { return fs.readFileSync(0, 'utf8'); } catch { return ''; } }
-export function projectOf(cwd) {
+// The project a memory belongs to: a name pinned for this repository or folder (memev project set,
+// kept in the vault config), else the git top-level folder, else the folder itself.
+export function projectInfo(cwd, root) {
   if (!cwd) return null;
-  const r = run('git', ['rev-parse', '--show-toplevel'], { cwd, timeout: 1500 });
-  return slug(path.basename(r.ok && r.stdout.trim() ? r.stdout.trim() : cwd));
+  const abs = path.resolve(cwd);
+  const r = run('git', ['rev-parse', '--show-toplevel'], { cwd: abs, timeout: 1500 });
+  let top = r.ok && r.stdout.trim() ? r.stdout.trim() : abs;
+  try { top = fs.realpathSync(top); } catch {} // the app can report a path that no longer exists
+  const pin = root ? config(root).projects?.[top] : null;
+  if (pin) return { name: slug(pin), source: 'pinned', top };
+  return { name: slug(path.basename(top)), source: r.ok && r.stdout.trim() ? 'git' : 'folder', top };
 }
+export function projectOf(cwd, root) { return projectInfo(cwd, root)?.name ?? null; }
 
 // Output shapes: Claude Code and Codex share one; Gemini CLI uses it with its own event names;
 // Cursor takes { additional_context } at session start only.
@@ -64,7 +72,7 @@ export async function runHook(event, flags, env = process.env) {
   const root = resolveRoot(flags.root, env);
   const client = String(flags.client || 'claude-code');
   const session = String(input.session_id || input.sessionId || input.conversation_id || env.MEMEV_SESSION || 'session').slice(0, 64);
-  const project = flags.project || projectOf(input.cwd || input.workspace_roots?.[0] || process.cwd());
+  const project = flags.project || projectOf(input.cwd || input.workspace_roots?.[0] || process.cwd(), root);
   const { loadRemote, remoteFetch } = await import('./remote.mjs');
   const remote = !isVault(root) ? loadRemote(env) : null; // this computer uses a vault elsewhere (memev join)
   const stateFile = remote ? path.join(configDir(env), 'hooks', `${slug(session, 64)}.json`) : path.join(root, '.memev', 'hooks', `${slug(session, 64)}.json`);
@@ -92,13 +100,23 @@ export async function runHook(event, flags, env = process.env) {
       const fresh = source !== 'compact' && source !== 'resume'; // startup or clear: a new context, so the rules as well
       const r = await call('session-start', { task: null });
       // whether the person still has to pick a lead: only at a fresh start, and only until the setup session has asked
-      // (bus/operator.json records it)
-      const asked = remote ? null : readJson(path.join(root, 'bus', 'operator.json'), null)?.asked;
-      const bus = await call('bus-pulse', { lead: fresh && !(typeof asked === 'string' && asked) }).catch(() => null);
+      // (bus/operator.json records it). The first fresh start is the setup session; it marks itself as having asked.
+      const opFile = remote ? null : path.join(root, 'bus', 'operator.json');
+      const op = opFile ? readJson(opFile, null) : null;
+      const asked = typeof op?.asked === 'string' && op.asked;
+      const isSetup = fresh && !asked;
+      const lead = await import('../engine/bus.mjs');
+      if (isSetup && opFile) lead.markLeadAsked(root);
+      const bus = await call('bus-pulse', { lead: isSetup }).catch(() => null);
+      // while no lead is set: the setup session gets the question with its own seat suggested; once it has
+      // asked, the others get one quiet line telling them not to ask again
+      const leadLines = [];
+      if (bus?.lead_needed && isSetup && bus.seat) leadLines.push(`[Memev bus] ${lead.leadSuggestion(bus.seat)}`);
+      if (bus?.lead_needed && fresh && asked) leadLines.push(`[Memev bus] ${lead.LEAD_ASKED_LINE}`);
       await call('journal', { role: 'event', text: `session ${source} (${client}${project ? `, ${project}` : ''})` }).catch(() => {});
       // the card goes in when the context does not hold it: at a fresh start, after a compaction, or when it changed
       const card = sha256(String(r.text || ''));
-      const parts = [fresh ? r.protocol || PROTOCOL : '', fresh || card !== st.card ? r.text : '', bus?.text || ''].filter(Boolean);
+      const parts = [fresh ? r.protocol || PROTOCOL : '', fresh || card !== st.card ? r.text : '', bus?.text || '', ...leadLines].filter(Boolean);
       st.card = card;
       emit(format, 'SessionStart', parts.join('\n\n'));
     } else if (event === 'prompt') {
