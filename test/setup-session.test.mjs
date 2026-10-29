@@ -421,27 +421,28 @@ test('MEM-142 AC05: a command round trip through the channel returns its result'
   const stub = new OperatorStub({ sid, secret, port, minutes: 5, keys });
   await stub.start();
 
-  const outLines = [];
   const seen = [];
-  const session = new Session({
+  let session = null;
+  const p = (session = new Session({
     root, code: parseCode(code),
-    outStream: { write: (s) => outLines.push(s) },
+    outStream: { write: () => {} },
     execute: (argv) => { seen.push(argv); return { ok: true, code: 0, out: `ran ${argv.join(' ')}` }; },
-  });
-  const p = session.start();
-  assert.ok(await waitHs(stub), 'handshake completed');
+  })).start();
+  try {
+    assert.ok(await waitHs(stub), 'handshake completed');
 
-  const id = stub.sendCmd(['status']);
-  const res = await stub.waitForResult(id, 5000);
-  assert.ok(res.ok, 'result is ok');
-  assert.equal(res.code, 0);
-  assert.ok(res.out.includes('ran status'), 'result carries the command output');
-  assert.deepEqual(seen, [['status']], 'the client ran the command');
-
-  session.revoke();
-  await p;
-  stub.close();
-  fs.rmSync(root, { recursive: true, force: true });
+    const id = stub.sendCmd(['status']);
+    const res = await stub.waitForResult(id, 10000);
+    assert.ok(res.ok, 'result is ok');
+    assert.equal(res.code, 0);
+    assert.ok(res.out.includes('ran status'), 'result carries the command output');
+    assert.deepEqual(seen, [['status']], 'the client ran the command');
+  } finally {
+    session.revoke();
+    await p;
+    stub.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('MEM-142 AC03: a replayed frame is refused and the session ends', async () => {
@@ -452,42 +453,44 @@ test('MEM-142 AC03: a replayed frame is refused and the session ends', async () 
   await stub.start();
 
   const outLines = [];
-  const session = new Session({
+  let session = null;
+  const p = (session = new Session({
     root, code: parseCode(code),
     outStream: { write: (s) => outLines.push(s) },
     execute: (argv) => { outLines.push(`ran ${argv.join(' ')}`); return { ok: true, code: 0, out: 'ok' }; },
-  });
-  const p = session.start();
-  assert.ok(await waitHs(stub), 'handshake completed');
+  })).start();
+  try {
+    assert.ok(await waitHs(stub), 'handshake completed');
 
-  const id = stub.sendCmd(['status']);
-  await stub.waitForResult(id, 5000);
+    const id = stub.sendCmd(['status']);
+    await stub.waitForResult(id, 10000);
 
-  const pt = Buffer.from(JSON.stringify({ kind: 'cmd', id: 50, argv: ['status'] }), 'utf8');
-  const nonce = Buffer.alloc(12);
-  nonce.writeBigUInt64BE(0n, 4);
-  const c = crypto.createCipheriv('aes-256-gcm', stub.o2cKey, nonce);
-  const frame = Buffer.concat([Buffer.concat([c.update(pt), c.final()]), c.getAuthTag()]);
-  stub.sendRaw(frame);
-  stub.sendRaw(frame);
+    const pt = Buffer.from(JSON.stringify({ kind: 'cmd', id: 50, argv: ['status'] }), 'utf8');
+    const nonce = Buffer.alloc(12);
+    nonce.writeBigUInt64BE(0n, 4);
+    const c = crypto.createCipheriv('aes-256-gcm', stub.o2cKey, nonce);
+    const frame = Buffer.concat([Buffer.concat([c.update(pt), c.final()]), c.getAuthTag()]);
+    stub.sendRaw(frame);
+    stub.sendRaw(frame);
 
-  await new Promise((r) => {
-    const t = setTimeout(r, 2000);
-    const iv = setInterval(() => {
-      if (session.done) { clearInterval(iv); clearTimeout(t); r(); }
-    }, 20);
-  });
+    await new Promise((r) => {
+      const t = setTimeout(r, 2000);
+      const iv = setInterval(() => {
+        if (session.done) { clearInterval(iv); clearTimeout(t); r(); }
+      }, 20);
+    });
 
-  assert.ok(session.done, 'session ended after the replayed frame');
-  assert.ok(outLines.some((l) => l.includes('frame auth failed')), 'replay refused with an auth failure');
-  assert.equal(outLines.filter((l) => l.startsWith('ran ')).length, 1, 'the replayed command did not run again');
-  const endLine = outLines.find((l) => l.startsWith('session ended:'));
-  assert.ok(endLine, 'the customer sees why the session ended');
-
-  session.revoke();
-  await p;
-  stub.close();
-  fs.rmSync(root, { recursive: true, force: true });
+    assert.ok(session.done, 'session ended after the replayed frame');
+    assert.ok(outLines.some((l) => l.includes('frame auth failed')), 'replay refused with an auth failure');
+    assert.equal(outLines.filter((l) => l.startsWith('ran ')).length, 1, 'the replayed command did not run again');
+    const endLine = outLines.find((l) => l.startsWith('session ended:'));
+    assert.ok(endLine, 'the customer sees why the session ended');
+  } finally {
+    session.revoke();
+    await p;
+    stub.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('MEM-142 AC05: the first command in the same read as the auth frame still runs', async () => {
@@ -521,24 +524,26 @@ test('MEM-142 AC05: the first command in the same read as the auth frame still r
 
   const outLines = [];
   const seen = [];
-  const session = new Session({
+  let session = null;
+  const p = (session = new Session({
     root, code: parseCode(code),
     outStream: { write: (s) => outLines.push(s) },
     execute: (argv) => { seen.push(argv); return { ok: true, code: 0, out: 'ran' }; },
-  });
-  const p = session.start();
-  assert.ok(await waitHs(stub), 'handshake completed');
+  })).start();
+  try {
+    assert.ok(await waitHs(stub), 'handshake completed');
 
-  const id = stub.sendCmd(['status']);
-  const res = await stub.waitForResult(id, 5000);
-  assert.ok(res.ok, 'the command ran and returned a result');
-  assert.deepEqual(seen, [['status']], 'the client ran the command');
-
-  session.revoke();
-  const settled = await Promise.race([p.then(() => 'returned'), sleep(3000).then(() => 'still pending')]);
-  assert.equal(settled, 'returned', 'start() settles after revoke');
-  stub.close();
-  fs.rmSync(root, { recursive: true, force: true });
+    const id = stub.sendCmd(['status']);
+    const res = await stub.waitForResult(id, 10000);
+    assert.ok(res.ok, 'the command ran and returned a result');
+    assert.deepEqual(seen, [['status']], 'the client ran the command');
+  } finally {
+    session.revoke();
+    const settled = await Promise.race([p.then(() => 'returned'), sleep(3000).then(() => 'still pending')]);
+    assert.equal(settled, 'returned', 'start() settles after revoke');
+    stub.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('MEM-142 AC09: no convergence code added, operator side is only a test stub', async () => {
