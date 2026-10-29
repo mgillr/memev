@@ -131,24 +131,6 @@ export function cloneOffer(url) {
 }
 
 /**
- * Fetch and merge the backup remote into this vault (the free-path sync). When the histories are
- * unrelated, the merge is refused and the error names the cause and the fix.
- */
-export function syncBackup(root, { remote = 'origin', branch = 'main' } = {}) {
-  const f = git(root, ['fetch', '-q', remote]);
-  if (!f.ok) return { ok: false, error: `sync: could not fetch ${remote}: ${f.err.split('\n').pop()}` };
-  const heads = git(root, ['branch', '-r', '--list', `${remote}/*`]).out.split('\n').map((s) => s.trim()).filter(Boolean);
-  const target = heads.includes(`${remote}/${branch}`) ? `${remote}/${branch}` : heads[0];
-  if (!target) return { ok: true, error: null }; // an empty remote has nothing to sync
-  if (!git(root, ['merge-base', 'HEAD', target]).ok) {
-    return { ok: false, error: `sync: the backup and this vault have unrelated git histories, so the merge is refused; clone the backup instead (memev init --from <url>)` };
-  }
-  const m = git(root, ['merge', '-q', target]);
-  if (!m.ok) return { ok: false, error: `sync: ${m.err.split('\n').pop()}` };
-  return { ok: true, error: null };
-}
-
-/**
  * Take back everything setup set for the GitHub backup: the origin remote, the deploy-key ssh
  * command, the pre-push hook, and cfg.github. Called when the target holds an unrelated vault, so
  * no background sync runs against it.
