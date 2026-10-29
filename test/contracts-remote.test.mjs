@@ -15,7 +15,7 @@ function setup() {
   return { root, v, work, d };
 }
 
-test('REV-002 AC1: a remote-signed contract records origin remote and blocks commands until approved', () => {
+test('REV-002 AC01: a remote-signed contract records origin remote and blocks commands until approved', () => {
   const { v, d, work } = setup();
   const s = v.contractSign(OWNER, { id: d.id, local: false });
   assert.equal(s.origin, 'remote');
@@ -32,7 +32,7 @@ test('REV-002 AC1: a remote-signed contract records origin remote and blocks com
   v.close();
 });
 
-test('REV-002 AC2: the resume card does not solicit verify for an unapproved remote contract', () => {
+test('REV-002 AC02: the resume card does not solicit verify for an unapproved remote contract', () => {
   const { v, d } = setup();
   v.contractSign(OWNER, { id: d.id, local: false, session: 'sess-remote' });
   const card = v.sessionStart(OWNER, { task: 'test', project: 'api', session: 'sess-remote' });
@@ -44,7 +44,7 @@ test('REV-002 AC2: the resume card does not solicit verify for an unapproved rem
   v.close();
 });
 
-test('REV-002 AC3: file_exists and grep paths are confined to the vault root', () => {
+test('REV-002 AC03: file_exists and grep paths are confined to the vault root', () => {
   const { v, d, work } = setup();
   v.contractSign(OWNER, { id: d.id, local: true });
   const r = v.contractVerify(OWNER, { id: d.id }, { local: true });
@@ -62,7 +62,7 @@ test('REV-002 AC3: file_exists and grep paths are confined to the vault root', (
   v.close();
 });
 
-test('REV-002 AC4: no caller-supplied string is interpolated into a shell command', () => {
+test('REV-002 AC04: no caller-supplied string is interpolated into a shell command', () => {
   const { v, d, work } = setup();
   v.contractSign(OWNER, { id: d.id, local: true });
   const marker = path.join(work, 'pwned');
