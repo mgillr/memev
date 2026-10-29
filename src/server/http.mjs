@@ -281,14 +281,18 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
           // The prompt hook gets the bar, leaves out what it already injected this session (body.exclude) and, unless
           // recall.hook_include_journals is on, past session journals and contract drafts. memev recall on the command
           // line is a search the person asked for and keeps recall.min_score only. memev_recall does not come here.
-          const auto = !ctx.cli, rc = vault.config.recall || {}, limit = body.limit || 4;
+          const auto = !ctx.cli, rc = vault.config.recall || {}, limit = body.limit == null ? 4 : Math.min(10, Math.max(1, Math.trunc(Number(body.limit)) || 1));
+          const offset = Math.max(0, Math.trunc(Number(body.offset)) || 0);
           const own = body.session ? `-${slug(String(body.session), 16)}.md` : null;
           const skip = new Set(auto ? [].concat(body.exclude || []).map(String) : []);
           const bar = auto ? hookMinScore(vault) : (rc.min_score ?? 1);
           // an item already given is left out, not replaced, so a prompt never brings in more than it would have
-          const hits = vault.recall(identity, { ...body, client, limit })
+          const recalled = vault.recall(identity, { ...body, client, limit, offset });
+          const total = recalled.total;
+          const hits = recalled
             .filter((h) => h.score >= bar && !skip.has(`${h.path}#${h.heading || ''}`) && !(auto && !rc.hook_include_journals && pastWork(h.path)) && !(own && h.path.startsWith('work/sessions/') && h.path.endsWith(own)));
-          return send(200, { hits, text: renderRecall(hits, { maxChars: rc.max_chars || 1500 }) });
+          const next = offset + limit < total ? offset + limit : null;
+          return send(200, { hits, total, offset, next, text: renderRecall(hits, { maxChars: rc.max_chars || 1500, note: next != null ? `more results: offset=${next}` : null }) });
         }
         if (route === '/v1/checkpoint') return send(200, vault.checkpoint(identity, { ...body, client }));
         if (route === '/v1/journal') return send(200, vault.journal(identity, { ...body, client }));

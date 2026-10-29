@@ -25,5 +25,6 @@ The same checks are available to an AI session as the `memev_doctor` MCP tool.
 | A note was edited by hand | nothing to do: Memev imports the change into its log |
 | The vault looks wrong after a crash | `memev doctor`: the log is checked against the files and anything missing is rebuilt from the log |
 | GitHub pushes fail | `memev doctor` shows the git error; check the deploy key still exists in the repository |
+| `memev_recall` returns fewer than requested | limit is clamped to 1-10; use `offset` to page through more results |
 
 To undo everything: `memev uninstall` (your vault stays).

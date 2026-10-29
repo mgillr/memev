@@ -353,9 +353,13 @@ export class Vault extends EventEmitter {
     return fn;
   }
   /** Recall: the index, filtered to what the token may read and the project, annotated with graph context; the use is logged. */
-  recall(identity, { query, project = null, all_projects = false, limit = 6, client = null, session = null, log = true }) {
+  recall(identity, { query, project = null, all_projects = false, limit = 6, offset = 0, client = null, session = null, log = true }) {
     this._need(identity, 'read', null);
-    const hits = this.index.query(query, { limit, project, boosts: this.tuning?.boosts, filter: this._recallFilter(identity, { project, all_projects }) });
+    const lim = limit == null ? 6 : Math.min(10, Math.max(1, Math.trunc(Number(limit)) || 1));
+    const off = Math.max(0, Math.trunc(Number(offset)) || 0);
+    const all = this.index.query(query, { limit: Infinity, project, boosts: this.tuning?.boosts, filter: this._recallFilter(identity, { project, all_projects }) });
+    const total = all.length;
+    const hits = all.slice(off, off + lim);
     for (const h of hits) {
       const key = `${h.path}#${h.heading || ''}`;
       const ents = this.graph.sectionEnts.get(key) || [];
@@ -365,6 +369,7 @@ export class Vault extends EventEmitter {
       const u = this.graph.usage.get(key); if (u) h.used = u.count;
     }
     if (log && hits.length) this._logUsage(identity, { client, session, query, items: hits.map((h) => `${h.path}#${h.heading || ''}`) });
+    hits.total = total;
     return hits;
   }
 
