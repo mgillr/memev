@@ -21,7 +21,7 @@ import { loadTuning } from './tuning.mjs';
 import { attach as attachContracts, installVaultHooks } from './contracts.mjs';
 import { assess, DEFAULT_GATE } from './quality.mjs';
 
-export const VERSION = '0.1.0';
+export const VERSION = readJson(new URL('../../package.json', import.meta.url), {}).version;
 export const STATE = '.memev';
 const KINDS = { decision: 'decisions', gotcha: 'gotchas', fact: 'facts', pattern: 'patterns', win: 'wins', person: 'people', note: 'notes', preference: 'preferences' };
 const PROTECTED = [/^contracts\/signed\//, /^contracts\/keys\//];
