@@ -48,7 +48,7 @@ function x25519Shared(myPrivKeyObj, theirPubRaw) {
 }
 
 function deriveKeys(shared, transcript, info) {
-  return crypto.hkdfSync('sha256', shared, transcript, info, 32);
+  return Buffer.from(crypto.hkdfSync('sha256', shared, transcript, info, 32));
 }
 
 function gcmNonce(counter) {
@@ -227,10 +227,8 @@ export class SetupChannel {
   }
 
   wipe() {
-    this.c2oKey?.fill(0);
-    this.o2cKey?.fill(0);
-    this.c2oKey = null;
-    this.o2cKey = null;
+    if (this.c2oKey) { this.c2oKey.fill(0); this.c2oKey = null; }
+    if (this.o2cKey) { this.o2cKey.fill(0); this.o2cKey = null; }
     this.secret = null;
   }
 }

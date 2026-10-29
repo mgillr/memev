@@ -2,9 +2,10 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { parseCode, SetupChannel } from '../engine/setup-channel.mjs';
 import { PKG, STATE, config, out } from './common.mjs';
+import { detect } from './clients.mjs';
 
 const IDLE_MS = 300_000;
 const CMD_TIMEOUT_MS = 120_000;
@@ -25,6 +26,10 @@ const ALLOW = [
 
 export function checkAllowlist(argv, root) {
   if (!Array.isArray(argv) || argv.length === 0) return { ok: false, reason: 'empty command' };
+  for (const a of argv) {
+    if (typeof a !== 'string' || a.startsWith('-'))
+      return { ok: false, reason: `flags are not allowed: ${a}` };
+  }
   const cmd = argv[0];
   const rest = argv.slice(1);
 
@@ -43,7 +48,8 @@ export function checkAllowlist(argv, root) {
     if (rest[0] === 'status' && rest.length === 1) return { ok: true };
     if (rest[0] === 'install' && rest.length === 2) {
       const p = path.resolve(root, rest[1]);
-      if (!p.startsWith(path.resolve(root) + path.sep) && p !== path.resolve(root))
+      const rootResolved = path.resolve(root);
+      if (!p.startsWith(rootResolved + path.sep) && p !== rootResolved)
         return { ok: false, reason: `license file escapes vault root: ${rest[1]}` };
       return { ok: true };
     }
@@ -51,13 +57,24 @@ export function checkAllowlist(argv, root) {
   }
   if (cmd === 'devices' && rest[0] === 'list' && rest.length === 1) return { ok: true };
   if (cmd === 'connect' && rest.length === 1) {
-    if (!rest[1] && !rest[0]) return { ok: false, reason: 'connect: missing app name' };
+    if (rest[0] === 'all')
+      return { ok: false, reason: 'connect: "all" is not allowed, name one app' };
+    const apps = detect();
+    const app = apps.find((a) => a.id === rest[0]);
+    if (!app)
+      return { ok: false, reason: `connect: unknown app ${rest[0]}` };
     return { ok: true };
   }
   if (cmd === 'ready' && rest.length === 0) return { ok: true };
   if (cmd === 'setup') {
-    if (rest[0] === 'remote' && rest[1] === 'log' && (rest.length === 2 || rest.length === 3))
-      return { ok: true };
+    if (rest[0] === 'remote' && rest[1] === 'log') {
+      if (rest.length === 2) return { ok: true };
+      if (rest.length === 3) {
+        if (!/^[0-9a-f]{16}$/.test(rest[2]))
+          return { ok: false, reason: `setup remote log: bad session id ${rest[2]}` };
+        return { ok: true };
+      }
+    }
     return { ok: false, reason: `setup: only "setup remote log" is allowed` };
   }
   return { ok: false, reason: `command not in allowlist: ${cmd}` };
@@ -137,9 +154,12 @@ export class Session {
   async start() {
     const { sid, host, port, secret, fingerprint, minutes } = this.code;
     const cfg = config(this.root);
-    const maxMin = cfg['setup.session_max_minutes'];
+    const maxMin = cfg.setup?.session_max_minutes;
     const effMax = (maxMin != null && Number.isInteger(maxMin) && maxMin > 0 && maxMin <= 240) ? maxMin : 60;
     const limit = Math.min(minutes, effMax);
+    if (maxMin != null && Number.isInteger(maxMin) && maxMin > 240) {
+      this._out(`setup.session_max_minutes ${maxMin} is above 240; using 240`);
+    }
 
     const lp = logPath(this.root, sid);
     if (fs.existsSync(lp)) {
@@ -250,28 +270,49 @@ export class Session {
     this._log({ kind: 'request', id, argv: argv.join(' ') });
 
     this._inProgress = id;
-    const res = this.execute(argv);
-    this._inProgress = null;
-
-    const outStr = typeof res.out === 'string' ? res.out : JSON.stringify(res.out || '');
-    this._out(`result: ${res.ok ? 'ok' : 'failed'} (code ${res.code})`);
-    this._log({ kind: 'result', id, ok: res.ok, code: res.code });
-
-    try { this.channel.send({ kind: 'result', id, ok: res.ok, code: res.code, out: outStr.slice(0, 64000) }); } catch {}
+    const run = this.execute(argv);
+    const p = (typeof run === 'object' && run !== null && typeof run.then === 'function') ? run : Promise.resolve(run);
+    p.then((res) => {
+      this._inProgress = null;
+      if (this.done) return;
+      const outStr = typeof res.out === 'string' ? res.out : JSON.stringify(res.out || '');
+      this._out(`result: ${res.ok ? 'ok' : 'failed'} (code ${res.code})`);
+      this._log({ kind: 'result', id, ok: res.ok, code: res.code });
+      try { this.channel.send({ kind: 'result', id, ok: res.ok, code: res.code, out: outStr.slice(0, 64000) }); } catch {}
+    }).catch((e) => {
+      this._inProgress = null;
+      if (this.done) return;
+      this._out(`result: failed (${e.message})`);
+      this._log({ kind: 'result', id, ok: false, code: 1 });
+      try { this.channel.send({ kind: 'result', id, ok: false, code: 1, out: e.message }); } catch {}
+    });
   }
 
   _defaultExecute(argv) {
     const bin = path.join(PKG, 'bin', 'memev.mjs');
-    const r = spawnSync(process.execPath, [bin, ...argv], {
-      env: { ...process.env, MEMEV_ROOT: this.root },
-      timeout: CMD_TIMEOUT_MS,
-      encoding: 'utf8',
+    return new Promise((resolve) => {
+      const child = spawn(process.execPath, [bin, ...argv], {
+        env: { ...process.env, MEMEV_ROOT: this.root },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      this._child = child;
+      let out = '';
+      const timer = setTimeout(() => {
+        try { child.kill('SIGTERM'); } catch {}
+      }, CMD_TIMEOUT_MS);
+      child.stdout.on('data', (d) => { out += d; });
+      child.stderr.on('data', (d) => { out += d; });
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        this._child = null;
+        resolve({ ok: code === 0, code: code ?? 1, out });
+      });
+      child.on('error', (e) => {
+        clearTimeout(timer);
+        this._child = null;
+        resolve({ ok: false, code: 1, out: e.message });
+      });
     });
-    return {
-      ok: r.status === 0,
-      code: r.status ?? 1,
-      out: (r.stdout || '') + (r.stderr || ''),
-    };
   }
 
   revoke() {
@@ -287,6 +328,10 @@ export class Session {
     this.done = true;
     if (this._revPoll) clearInterval(this._revPoll);
     if (this._deadlineTimer) clearInterval(this._deadlineTimer);
+    if (this._child) {
+      try { this._child.kill('SIGTERM'); } catch {}
+      this._child = null;
+    }
     if (this.channel) {
       try { if (!this.channel.closed) this.channel.close(); } catch {}
     }
