@@ -50,6 +50,7 @@ this folder links back here, and this page links down to every page.
 | [tiers/corporate.md](tiers/corporate.md) | Corporate (coming) |
 | [tiers/services.md](tiers/services.md) | services, support plans, response times |
 | [CONVERGENCE.md](CONVERGENCE.md) | the paid core: the crdt-merge convergence engine |
+| [EXTENSION-POINTS.md](EXTENSION-POINTS.md) | the one place the core hands work to an outside program: the merge engine boundary |
 | [PRICING.md](PRICING.md) | the tier table, the computer limit, licences |
 | [CHECKOUT.md](CHECKOUT.md) | how checkout and licence keys fit together |
 | [REFERRAL.md](REFERRAL.md) | the referral credit |
