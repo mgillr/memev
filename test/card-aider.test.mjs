@@ -101,7 +101,7 @@ test('MEM-047 AC02: removeAiderRead takes out only the conventions file from sca
 });
 
 test('MEM-047 AC01: a read: list at column 0 or indented four spaces gains the conventions file at the same indent', () => {
-  const conv = '/home/user/.config/memev/aider-conventions.md';
+  const conv = '/data/user/.config/memev/aider-conventions.md';
   const col0 = 'read:\n- CONVENTIONS.md\n';
   assert.equal(addAiderRead(col0, conv), `read:\n- CONVENTIONS.md\n- ${conv}\n`);
   assert.equal(aiderReadEntries(addAiderRead(col0, conv), conv).length, 1, 'listed once, so a second run adds nothing');
@@ -110,7 +110,7 @@ test('MEM-047 AC01: a read: list at column 0 or indented four spaces gains the c
 });
 
 test('MEM-047 AC02: removing the conventions file from a column-0 or four-space read: list gives back the original', () => {
-  const conv = '/home/user/.config/memev/aider-conventions.md';
+  const conv = '/data/user/.config/memev/aider-conventions.md';
   for (const text of ['read:\n- CONVENTIONS.md\n', 'model: sonnet\nread:\n    - CONVENTIONS.md\n    - docs/STYLE.md\nedit-format: diff\n']) {
     assert.equal(removeAiderRead(addAiderRead(text, conv), conv), text);
   }
