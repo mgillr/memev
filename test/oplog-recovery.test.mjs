@@ -89,28 +89,40 @@ test('REV-003 AC03: iterate() over a segment with an unreadable line yields the 
   log.close();
 });
 
-test('REV-003 AC04: append() checks the byte count writeSync returns and never records a short write as committed', () => {
+test('REV-003 AC04: a short write that cannot finish leaves nothing behind, and the next record survives a reopen', () => {
   const dir = tmpdir();
-  const log = openLog(dir);
+  let log = openLog(dir);
+  log.append({ type: 'put', path: 'a.md', agent: 't', data: { content: 'one' } });
+  const before = fs.statSync(segFile(dir)).size;
   const real = fs.writeSync;
-  let called = 0;
+  let calls = 0;
+  // the real failure shape: the first call writes a prefix, the next one fails (a full disk)
   fs.writeSync = (fd, data, ...rest) => {
-    if (typeof data === 'string' && data.endsWith('\n') && data.includes('"seq"')) { called++; return Buffer.byteLength(data) - 1; }
-    return real(fd, data, ...rest);
+    calls++;
+    if (calls === 1) return real(fd, Buffer.from(data).subarray(0, 20), 0, 20);
+    const e = new Error('ENOSPC: no space left on device'); e.code = 'ENOSPC'; throw e;
   };
   try {
-    assert.throws(() => log.append({ type: 'put', path: 'a.md', agent: 't', data: { content: 'one' } }), /short write/);
+    assert.throws(() => log.append({ type: 'put', path: 'b.md', agent: 't', data: { content: 'two' } }), /short write/);
   } finally { fs.writeSync = real; }
-  assert.equal(called, 1);
-  assert.equal(log.seq, 0, 'the short write is not recorded');
-  assert.equal(log.heads.size, 0);
-  assert.equal(log.active.bytes, 0, 'the manifest does not count the short write');
-  assert.equal(fs.statSync(segFile(dir)).size, 0, 'nothing is committed to the segment');
-  // a full write still works after the failed one
-  const ok = log.append({ type: 'put', path: 'a.md', agent: 't', data: { content: 'one' } });
-  assert.equal(ok.seq, 1);
-  assert.equal(log.seq, 1);
-  assert.equal(log.active.bytes, Buffer.byteLength(JSON.stringify(ok)) + 1);
-  assert.equal(log.verify().ok, true);
+  assert.equal(fs.statSync(segFile(dir)).size, before, 'the partial record is cut off again');
+  log.append({ type: 'put', path: 'c.md', agent: 't', data: { content: 'three' } });
+  log.close();
+  log = openLog(dir);
+  assert.deepEqual([...log.iterate()].map((r) => r.path), ['a.md', 'c.md']);
+  assert.deepEqual(log.recovered, []);
+  log.close();
+});
+
+test('REV-003 AC02: a complete but unreadable last line is reported and kept, not truncated', () => {
+  const dir = tmpdir();
+  let log = openLog(dir);
+  log.append({ type: 'put', path: 'a.md', agent: 't', data: { content: 'one' } });
+  log.close();
+  fs.appendFileSync(segFile(dir), '{"seq":2,"broken json}\n');
+  const size = fs.statSync(segFile(dir)).size;
+  log = openLog(dir);
+  assert.equal(fs.statSync(segFile(dir)).size, size, 'only a partial line with no newline is a torn tail');
+  assert.equal(log.recovered.length, 1);
   log.close();
 });

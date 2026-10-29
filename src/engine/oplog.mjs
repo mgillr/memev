@@ -106,8 +106,10 @@ export class OpLog {
     for (let i = fromSeg; i < this.manifest.segments.length; i++) {
       const seg = this.manifest.segments[i], file = path.join(this.dir, seg.name);
       let good = i === fromSeg ? fromOff : 0;
+      let complete = good;   // the end of the last whole line, readable or not: only bytes past it are a torn tail
       for (const [line, off] of readLines(file, good)) {
         const end = off + Buffer.byteLength(line) + 1;
+        complete = end;
         let rec; try { rec = JSON.parse(line); } catch { this.recovered.push(`${seg.name}: unreadable record at byte ${off}, skipped`); continue; }
         if (rec.seq <= this.seq) { good = end; continue; }
         this._apply(rec); good = end; this.sinceSnapshot++;
@@ -115,8 +117,8 @@ export class OpLog {
         seg.last = rec.seq;
       }
       const size = fs.existsSync(file) ? fs.statSync(file).size : 0;
-      if (!seg.sealed && size > good) fs.truncateSync(file, good);   // a torn last line from a crash
-      if (!seg.sealed) seg.bytes = good;
+      if (!seg.sealed && size > complete) fs.truncateSync(file, complete);   // a torn last line from a crash
+      if (!seg.sealed) seg.bytes = complete;
     }
     const active = this.active;
     this.fd = fs.openSync(path.join(this.dir, active.name), 'a', 0o600);
@@ -143,8 +145,10 @@ export class OpLog {
     rec.hlc = this.tick();
     rec.hash = recordHash(rec);
     const line = `${JSON.stringify(rec)}\n`;
-    const written = fs.writeSync(this.fd, line);
-    if (written !== Buffer.byteLength(line)) throw new Error(`op log short write: ${written} of ${Buffer.byteLength(line)} bytes`);
+    // finish a short write; if it cannot finish, cut the partial record off again so the next append starts on a line of its own
+    const buf = Buffer.from(line); let done = 0;
+    try { while (done < buf.length) { const n = fs.writeSync(this.fd, buf, done, buf.length - done); if (!(n > 0)) throw new Error('no progress'); done += n; } }
+    catch (e) { try { fs.ftruncateSync(this.fd, this.active.bytes); } catch {} throw new Error(`op log short write: ${done} of ${buf.length} bytes (${e.message}); the partial record was removed`); }
     if (this.fsync) fs.fdatasyncSync(this.fd);
     const a = this.active; a.bytes += Buffer.byteLength(line); a.last = rec.seq; if (!a.first) a.first = rec.seq;
     this._apply(rec);
