@@ -43,10 +43,6 @@ export async function command(_cmd, _pos, flags, { root, env, license = null }) 
   if (!policy.can_enroll) {
     // The vault cannot add a computer: say so, in the tier-aware copy, before anything else.
     console.log(policy.reason);
-    if (!trialAvailable()) {
-      // Free with no trial left, or a licence that covers no more computers: no code.
-      return 1;
-    }
   }
   const cfg = readJson(path.join(root, '.memev', 'config.json'), {});
   const tunnel = tunnelUrl(root);
