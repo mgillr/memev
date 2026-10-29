@@ -152,6 +152,37 @@ export class Bus {
     if (op?.seat === from) { writeJson(this._p('operator.json'), { ...op, seat: newName }); this.commit(this._rel('operator.json')); }
     return rec;
   }
+  /**
+   * A computer's label changed: move every seat on it to the name its new label gives, so the seat's
+   * history, tasks and lead follow it, and its old names still find the seat.
+   */
+  renameDeviceSeats(deviceId) {
+    const device = this.devices.get(deviceId);
+    if (!device) return [];
+    const moved = [];
+    for (const s of this.seats()) {
+      if (s.device !== deviceId || s.removed) continue;
+      const next = this._seatNameAfterRename(s.seat, device);
+      if (!next || next === s.seat) continue;
+      moved.push(this.renameSeat(s.seat, next));
+    }
+    return moved;
+  }
+  /** The seat name a seat on this device takes once the device's label is what it is now. */
+  _seatNameAfterRename(name, device) {
+    const at = String(name).split('@');
+    if (at.length < 2) return null;
+    const [app, rest] = at;
+    const [machine, sub] = rest.split('/');
+    if (device.kind === 'cloud-connector') {
+      const app2 = label(device.label);
+      if (app2 === app) return null;
+      return `${app2}@${machine}${sub ? `/${sub}` : ''}`;
+    }
+    const machine2 = device.kind === 'remote-computer' ? label(device.label) : this.machineName();
+    if (machine2 === machine) return null;
+    return `${app}@${machine2}${sub ? `/${sub}` : ''}`;
+  }
   /** A seat's name and the names it had before a rename: messages to or from any of them are its own. */
   _names(seat) {
     const rec = this.seat(seat);
