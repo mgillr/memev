@@ -1,0 +1,400 @@
+# Scope One — Autonomous Product Architecture & Developer Handoff
+
+**Document class:** TEAM DEVELOPMENT  
+**Status:** Proposed architecture and acceptance plan; not yet implemented as a complete product  
+**Repository:** `mgillr/memev`  
+**Reviewed baseline:** `main` at `76b1ce698140983c874036088ab50d3d2b0e3e00`  
+**Audience:** Product owner, architecture, implementation, integration, QA, and future builders
+
+## Executive decision
+
+Scope One is the first end-to-end implementation of a **provider-neutral autonomous project-delivery system** built on Memev's existing foundation. It is not a new memory product and must not duplicate capabilities already implemented or described in Memev.
+
+The intended experience is accessible to a non-technical user: describe a project in ordinary language; the product clarifies material ambiguities, builds a scope and delivery plan, asks for approval at the right boundary, then autonomously coordinates supported agents and tools to execute, test, recover, and deliver the result. The user should not need to understand MCP, memory stores, task queues, contracts, or state machines.
+
+**North-star outcome:** A user can state what they want, approve a clear plan, and receive a working deliverable with a trustworthy explanation of what was done, what was tested, what remains, and what evidence supports completion.
+
+The ambition is autonomous execution with low user effort—not unlimited authority. The system must pause for consequential decisions, missing permissions, irreversible actions, unclear requirements that materially affect the result, or security-sensitive steps. Routine, reversible work should proceed without repeated user approval.
+
+This document distinguishes existing capabilities from proposed Scope One work. It does not claim the proposed state layer or complete autonomous experience already exists, that every AI client supports automatic registration/cancellation, or that product-market fit is established.
+
+## 1. Product principles
+
+1. **Outcome-first UX:** users express goals, not implementation instructions.
+2. **Autonomous by default:** plan, dispatch, execute, test, recover, and report without requiring the user to supervise each step.
+3. **Human control at meaningful boundaries:** ask only when a decision is consequential, unsafe, irreversible, or cannot be inferred reliably.
+4. **One canonical project state:** reuse the Memev vault and engine unless evidence justifies a separate store.
+5. **State, not just memory:** track goals, scope, dependencies, ownership, attempts, artifacts, verification, and next actions.
+6. **Claims are not proof:** agent-reported completion is distinct from evidence-backed verification.
+7. **Provider-neutral:** agents are replaceable participants; project state and evidence belong to the user.
+8. **Safe recovery:** interruption, restart, stale ownership, and conflicting edits must be detectable and recoverable.
+9. **Visible uncertainty:** missing evidence and conflicts are explicit, not hidden by confident summaries.
+10. **Low setup friction:** guided install, client health checks, sensible defaults, automatic supported registration, and actionable diagnostics.
+11. **Local-first and least privilege:** retain existing security boundaries; remote sharing and access remain controlled.
+12. **Measure outcomes:** validate lower time-to-delivery, less rework, reliable recovery, and fewer false completion claims.
+
+## 2. Target user experience
+
+### Step A — Install once
+The user installs the product and follows a short guided setup. The local service starts automatically where the operating system and installation mode permit. The product detects and registers supported AI clients through their actual available mechanisms: hooks, MCP, extensions, or documented APIs. A connection screen says which clients are connected, which need one-time setup, and which are unsupported. Never pretend to have discovered or hooked a client when it has not.
+
+### Step B — Describe the desired outcome
+Example: “Build a small booking site for my restaurant. Customers should see available times, book a table, and receive confirmation. I want it deployed when it is ready.”
+
+The product turns the request into:
+- a plain-language project brief;
+- assumptions and questions that materially affect the outcome;
+- in-scope deliverables and explicit exclusions;
+- milestones and dependencies;
+- acceptance criteria and test strategy;
+- required credentials, external services, costs, or deployment permissions;
+- a proposed delivery plan.
+
+The user sees a concise summary, not an internal technical specification. Ask questions in batches only when necessary. Infer reversible defaults and show them for correction.
+
+### Step C — Scope and approval
+The system creates a versioned project scope and task graph. It requests approval before execution when scope, cost, privacy, deployment, external communication, data deletion, financial commitment, or other consequential actions require user authorisation. After approval, routine implementation proceeds autonomously.
+
+A changed requirement creates a visible amendment and identifies affected tasks; signed contracts are amended/superseded, never silently rewritten.
+
+### Step D — Execute autonomously
+The coordinator selects eligible tasks, chooses agents/tools according to capabilities, assigns ownership, observes progress, resolves routine dependencies, runs checks, and records outputs. Parallelise independent work; serialize work that shares mutable resources or has dependencies. Replan when new evidence invalidates the current plan.
+
+The user sees a concise progress view: current milestone, verified progress, blockers requiring a decision, and the next expected outcome. Do not ask the user to manage individual agent messages.
+
+### Step E — Verify and deliver
+The product runs the agreed tests and acceptance checks, checks deployment health when deployment is in scope, and packages the result with a useful handoff: deliverables, how to use/run them, verification performed, known limitations, and anything still requiring attention. A task or project is not labelled complete merely because an agent claims success.
+
+### Step F — Pause, resume, or change direction
+The user can say “pause,” “continue,” “change the colour scheme,” or “stop deployment.” Pause prevents new task dispatch and requests cooperative cancellation of in-flight work where supported. State is checkpointed. On resume, the product reconstructs canonical state and continues from the last safe point. If a client cannot cancel an in-flight action, report that limitation accurately.
+
+## 3. Autonomy model and human gates
+
+Classify actions by risk:
+
+- **Routine and reversible:** proceed autonomously within approved scope (drafting, coding, local tests, refactoring, documentation).
+- **Cost-bearing or externally visible:** operate only within explicit user-set limits; request approval if a limit is absent or exceeded.
+- **Security-sensitive:** use least privilege; never request or expose credentials unnecessarily; ask for user action when access must be granted.
+- **Irreversible or destructive:** require explicit approval (delete production data, destructive migrations, revoke access, overwrite important assets).
+- **Ambiguous with material impact:** ask a concise question and explain the decision's consequence.
+- **Low-impact ambiguity:** choose a reversible default, record the assumption, and continue.
+
+Autonomy is not a licence to bypass permissions, fabricate test results, conceal failure, or take actions outside the approved scope. Every external side effect must be visible in the audit record.
+
+## 4. Proposed project/task state machine
+
+Task-level states:
+- `PROPOSED`: identified but not accepted.
+- `ACCEPTED`: scope and acceptance criteria agreed.
+- `READY`: dependencies satisfied and task eligible for dispatch.
+- `IN_PROGRESS`: an owner has an active assignment/lease.
+- `BLOCKED`: dependency, permission, resource, or decision prevents progress.
+- `PAUSED`: execution suspended with a checkpoint.
+- `VERIFYING`: required checks are running or awaiting results.
+- `VERIFIED`: mandatory acceptance criteria passed and evidence is stored.
+- `FAILED`: a defined execution or verification attempt failed.
+- `CONFLICTED`: incompatible updates require reconciliation.
+- `CANCELLED`: explicitly cancelled with reason and actor.
+
+Project status should be derived from task state and policy: `DRAFT`, `ACTIVE`, `PAUSED`, `NEEDS_ATTENTION`, `VERIFYING`, `COMPLETE`, or `CANCELLED`.
+
+### Invariants
+- Only accepted work may be dispatched.
+- Agent assertions cannot alone move work to `VERIFIED`.
+- Verification must bind to the current scope version and relevant artifact/commit.
+- Scope changes invalidate affected checks and trigger replanning.
+- Reassignment requires an expired/released lease or authorised override and inspection of prior attempts.
+- Duplicate event delivery is idempotent.
+- A stale agent cannot overwrite canonical state after reassignment.
+- Conflicts are surfaced rather than silently resolved by last-write-wins.
+- Every transition records actor, time, reason, previous/new state, scope version, and evidence references.
+- “Pause” stops new dispatch; hard cancellation is claimed only if the integration confirms it.
+
+## 5. Proposed architecture
+
+```mermaid
+flowchart TD
+  U[Non-technical user] --> UX[Goal-first interface: describe, approve, pause, review]
+  UX --> IN[Intent and scope builder]
+  IN --> PLAN[Planner: tasks, dependencies, criteria, risk classification]
+  PLAN --> GATE[Policy and human-approval gates]
+  GATE --> CO[Autonomous coordinator]
+  A[Supported AI agents and tools] <--> AD[Adapters: hooks, MCP, extensions, APIs]
+  AD <--> CO
+  CO <--> STATE[Canonical project state and transition engine]
+  STATE <--> V[(Memev vault / existing engine)]
+  CO <--> BUS[Existing agent communication bus]
+  CO <--> CT[Existing signed contracts]
+  CO --> EX[Execution and verification orchestrator]
+  EX --> T[Tests, commands, CI, supported verifiers]
+  T --> EV[Evidence and artifact records]
+  EV --> STATE
+  STATE --> REC[Recovery, pause/resume, replan]
+  REC --> CO
+  STATE --> OUT[Progress, blockers, verified delivery and next actions]
+  OUT --> UX
+```
+
+### Components
+1. **Goal intake and scope builder:** translates natural-language intent into a versioned brief, assumptions, deliverables, constraints, acceptance criteria, and risk/cost boundaries.
+2. **Planner:** produces a dependency-aware task graph, selects suitable tools, and estimates required access/resources. The plan is revisable when evidence changes.
+3. **Policy/approval layer:** decides which actions are allowed autonomously and which need permission or human approval.
+4. **Client adapters:** register sessions and expose each client's capabilities, health, progress, cancellation semantics, and tool access.
+5. **Canonical project state:** stores project/task/scope/dependency/ownership/attempt/evidence records and append-only transition events.
+6. **Coordinator/dispatcher:** assigns eligible tasks, enforces ownership and dependencies, detects overlap, monitors health, and recovers stale assignments.
+7. **Execution layer:** delegates bounded tasks to agents/services and collects structured outcomes and artifact references.
+8. **Verification orchestrator:** runs acceptance criteria and records actual results, versions, hashes, timestamps, and receipts.
+9. **Continuity projection:** presents compact project context to each agent; transcripts and memory inform state but cannot override authoritative scope or verified facts.
+10. **User-facing status and delivery:** shows the next meaningful result, blockers requiring intervention, and final handoff without exposing unnecessary technical complexity.
+11. **Observability and diagnostics:** integration health, transition rejections, failures, retries, stale leases, policy decisions, and auditable external side effects.
+
+## 6. Map to existing code — reuse before adding
+
+Based on the reviewed repository baseline; verify exact symbols and tests against the active branch before implementation.
+
+| Requirement | Existing code/docs | Scope One action |
+|---|---|---|
+| Local service/runtime | `docs/ARCHITECTURE.md`, `src/server/*` | Extend the current daemon; do not introduce a second service without a demonstrated need. |
+| MCP interface | `src/server/mcp.mjs` | Add typed tools to the existing handler so stdio and HTTP paths behave consistently. |
+| Vault and persistence | `src/engine/vault.mjs`, `oplog.mjs`, `git.mjs` | Use the existing vault writer and add schema/version migration. |
+| Resume context | `src/engine/card.mjs` | Project concise authoritative state into the existing resume card; do not create a parallel memory layer. |
+| Transcript checkpoints | `src/cli/transcript.mjs` | Use as an input to recovery, not as the authoritative project state. |
+| Signed contracts | `src/engine/contracts.mjs`, `docs/CONTRACTS.md` | Bind acceptance criteria to project/scope versions and verification outcomes. Confirm fresh-install enablement/configuration. |
+| Agent bus | `src/engine/bus.mjs`, `docs/BUS.md` | Reuse communication messages, but implement explicit task claims/leases and transition rules separately. |
+| Client registration/hooks | `src/cli/clients.mjs`, `src/cli/hooks.mjs`, MCP stdio | Build per-client capability discovery and clear status. Support automatic registration only where actually possible. |
+| Security | `src/engine/tokens.mjs`, `devices.mjs`, threat-model docs | Reuse auth/device boundaries; define who can amend scope, assign, pause, deploy, and verify. |
+| Existing test patterns | `test/continuity.test.mjs`, `test/proofline-flow.test.mjs`, `test/sync-conflict.test.mjs` | Extend with state-machine, autonomous recovery, concurrency, and end-to-end tests. |
+| Proofline | `mgillr/proofline-action` `action.yml` | Integrate existing CI check/receipt behaviour where it fits; do not copy the Action into Memev. |
+| Hivevault | `mgillr/hivevault` README and dependency map | Optional only where shared memory adds a distinct capability. Avoid dual canonical project state. |
+| CRDT-Merge | `mgillr/crdt-merge` README and architecture | Not a default dependency. Evaluate only when concurrency tests prove the need; review BSL 1.1 restrictions before embedding or offering a service. |
+| ACFA-RS | `mgillr/acfa-rs` README | Outside Scope One unless a concrete robust-aggregation requirement appears. |
+| TrueDone | No verified API mapped in this review | Do not depend on it until repository/API, licence, ownership, and integration contract are identified. |
+
+### Suggested module boundaries
+Proposed names only; follow repository conventions:
+- `src/engine/project-state.mjs`: schema and transition invariants.
+- `src/engine/project-store.mjs`: persistence and migration.
+- `src/engine/coordinator.mjs`: task eligibility, claims, dependencies, leases, recovery.
+- `src/engine/planner.mjs`: plan representation and replan triggers.
+- `src/engine/policy.mjs`: autonomy limits and human approval gates.
+- `src/engine/evidence.mjs`: verification results and evidence freshness.
+- `src/server/mcp.mjs`: tools wired to existing server.
+- Tests: `test/project-state.test.mjs`, `test/coordinator.test.mjs`, `test/project-recovery.test.mjs`, `test/autonomy-policy.test.mjs`, `test/project-mcp.test.mjs`.
+
+## 7. Canonical data model
+
+Minimum entities:
+- **Project:** stable ID, goal, brief, scope version, constraints, exclusions, cost/time limits, owner, policy, status projection.
+- **Task:** stable ID, project ID, description, scope version, dependencies, acceptance criteria, state, priority, required capabilities.
+- **Assignment/lease:** task ID, agent/session, generation token, issued/expiry time, status, release reason.
+- **Attempt:** task/attempt ID, agent, timestamps, summary, changed artifacts/commits, result, errors, checkpoint.
+- **Evidence:** criterion ID, verifier type/version, command/CI reference, scope/artifact hash, result, timestamp, log/receipt reference.
+- **Event:** unique event ID, entity ID, actor, previous/new state, reason, time, scope version, correlation ID, evidence references.
+- **Conflict:** competing source/event references, affected entities, reason, resolution, authorised resolver.
+- **Integration session:** provider/client, session identity, capabilities, heartbeat, last acknowledged event, health.
+- **Approval:** action/scope, risk class, requester, approver, decision, time, limits and expiry.
+
+Avoid storing secrets in project records, transcripts, logs, or summaries. Define retention, redaction, and sharing policy before cross-device synchronisation.
+
+## 8. Autonomous coordination and duplicate-work controls
+
+The objective is to prevent avoidable overlap and make collisions recoverable, not to promise mathematically zero duplication under every provider/network failure.
+
+- Use atomic claims/leases where storage supports them.
+- Include a lease generation/token so stale agents cannot commit as current owners.
+- Use idempotency keys for task dispatch, state changes, and external actions.
+- Parallelise only independent tasks or explicitly partitioned resources.
+- Keep task dependencies and shared-resource locks visible to the planner.
+- When an agent disappears, inspect checkpoint, lease, changed artifacts, and outstanding side effects before reassignment.
+- Preserve late results as attempt evidence but do not silently overwrite canonical state.
+- Treat retries differently for idempotent and non-idempotent actions.
+- Detect semantic conflicts; Git merge success is not proof of semantic correctness.
+- Replan when requirements change, verification fails, or dependencies become invalid.
+
+## 9. Security and safety requirements
+
+- Local-first defaults and least-privilege credentials.
+- Scope-bounded execution; no unapproved expansion of objectives.
+- Explicit gates for destructive, irreversible, financial, externally visible, or privacy-sensitive actions.
+- Do not expose credentials in prompts, transcripts, MCP outputs, logs, or sync.
+- Treat agent output and transcript content as untrusted input.
+- Keep signed contracts immutable; amendments supersede earlier versions.
+- Bind evidence to the exact scope and artifact version.
+- Require authorisation for scope amendments, deployment, cancellation, and privileged operations.
+- Log external side effects and approval decisions.
+- Never fabricate progress, tool access, test outcomes, or cancellation.
+- Clearly distinguish inferred, reported, and verified status.
+
+## 10. Failure tests to build
+
+Reported community issues are useful problem signals, not proof of prevalence. Reproduce these failures in our own harness before making marketing claims.
+
+| ID | Failure | Expected result |
+|---|---|---|
+| F01 | Session context is compacted | Scope, constraints, task state, and next action survive resume. |
+| F02 | Different supported agent resumes the project | It receives canonical state and only eligible assignments. |
+| F03 | Agent claims completion without passing checks | Work remains unverified. |
+| F04 | Stale context from another project appears | Project boundaries/provenance prevent silent contamination. |
+| F05 | Two agents claim an exclusive task | One claim wins; the other gets a clear conflict response. |
+| F06 | Agent disconnects mid-task | Recover from checkpoint; no blind duplicate dispatch. |
+| F07 | Old agent returns after reassignment | Its output is retained but cannot overwrite current state. |
+| F08 | Scope changes after verification | Affected checks become stale and tasks are replanned. |
+| F09 | Devices sync incompatible changes | Conflict is visible and resolvable, not silently overwritten. |
+| F10 | User pauses during active execution | No new dispatch; in-flight cancellation state is reported honestly. |
+| F11 | Required verifier is unavailable | Task cannot become verified; system explains why. |
+| F12 | Event is delivered twice | Idempotency prevents duplicate transitions/side effects. |
+| F13 | Client lacks session discovery or cancellation | Status shows the limitation accurately. |
+| F14 | Evidence belongs to an old scope/artifact | It is not accepted for current scope without explicit policy. |
+| F15 | Daemon restarts | Canonical state and event history reconstruct consistently. |
+| F16 | Planner encounters an ambiguous high-impact choice | It asks the user and explains the consequence. |
+| F17 | Routine reversible choice is underspecified | It chooses a reasonable default, records the assumption, and proceeds. |
+| F18 | Action exceeds configured cost/permission boundary | It stops at the policy gate and requests approval. |
+| F19 | Verification fails | System diagnoses, retries within policy, or reports a blocker; it does not claim success. |
+| F20 | External side effect succeeds but acknowledgement is lost | System checks actual outcome before retrying to avoid duplicate side effects. |
+
+## 11. Scope One acceptance criteria
+
+Scope One is complete only when a reproducible demo proves:
+
+1. A non-technical user can install and connect the initial supported clients through a guided flow.
+2. User can describe a project in natural language and receive a comprehensible scope, assumptions, plan, and acceptance criteria.
+3. Material ambiguity and consequential actions trigger the appropriate approval; routine reversible work proceeds autonomously.
+4. User can approve, pause, resume, amend, or cancel the project without manually coordinating individual agents.
+5. The planner decomposes scope into dependency-aware tasks with stable IDs.
+6. At least two supported agent sessions execute different tasks through the shared state model.
+7. Exclusive task claims and stale ownership are enforced under concurrency.
+8. Daemon restart/new session reconstructs state from canonical records.
+9. UI distinguishes reported, inferred, and verified state and shows provenance.
+10. No task becomes verified without required checks tied to current scope/artifact versions.
+11. Failed checks, blocked work, conflicts, stale evidence, and missing permissions are actionable and visible.
+12. Pause stops new dispatch and accurately reports in-flight task status.
+13. Duplicate events and stale results do not corrupt state or repeat non-idempotent actions blindly.
+14. Existing Memev tests continue to pass; new deterministic failure cases are automated.
+15. A final delivery summary includes artefacts, run/use instructions, checks performed, evidence, limitations, and unresolved items.
+16. Product documentation identifies per-client capability limits and does not overclaim universal auto-registration or hard cancellation.
+
+## 12. Implementation plan
+
+### Phase 0 — Baseline and decisions
+- Run and record the current test suite.
+- Trace vault write APIs, contract verification, bus operations, MCP tool registration, hooks, and resume card.
+- Choose initial supported clients and verify their real integration/cancellation capabilities.
+- Decide schema/versioning, ID/event ordering, lease semantics, policy defaults, and permission matrix.
+- Record a short architecture decision record.
+
+**Exit gate:** baseline report and reviewed design decisions.
+
+### Phase 1 — State core
+- Implement schemas, persistence, migrations, event log, transition validation, and idempotency.
+- Add unit tests for all transition invariants.
+
+**Exit gate:** persistence and state-machine tests pass.
+
+### Phase 2 — Coordination and recovery
+- Implement dependencies, task claims/leases, heartbeats, stale-owner rejection, conflict records, and restart recovery.
+- Connect state transitions to the existing bus.
+
+**Exit gate:** concurrency, duplicate-event, stale-result, and recovery tests pass.
+
+### Phase 3 — Goal-to-scope planner and policy
+- Convert natural-language requests into a structured brief, task graph, assumptions, criteria, risk classification, and resource/permission requirements.
+- Provide an approval boundary for material choices.
+- Support re-planning after scope change or failed verification.
+
+**Exit gate:** scenario tests cover ambiguous requests, reversible defaults, approval gates, and scope amendments.
+
+### Phase 4 — MCP and client adapters
+- Expose project/task operations through existing MCP.
+- Add per-client registration/health and supported session/task handoff.
+- Integrate the canonical state projection into the existing resume card.
+
+**Exit gate:** a fresh supported session can continue the project using the shared state.
+
+### Phase 5 — Execution and verification
+- Bind tasks to existing contracts and supported verifiers.
+- Record evidence and bind it to scope/artifact versions.
+- Integrate Proofline where its existing CI receipts/checks are useful.
+
+**Exit gate:** no false verified state in the required test matrix.
+
+### Phase 6 — End-to-end demo and product validation
+- Demonstrate a user idea flowing through scope approval, multi-agent execution, pause/resume, a failed check, recovery, and verified delivery.
+- Compare against a baseline without coordination.
+- Measure time-to-resume, duplicate assignments, repeated work, missed requirements, verification failures, human interventions, and completion accuracy.
+
+**Exit gate:** recorded demo, reproducible tests, known limitations, and evidence of measurable improvement.
+
+## 13. Metrics
+
+Track at minimum:
+- Time from project description to approved scope.
+- Time from resume to useful work resumed.
+- Percentage of tasks with explicit acceptance criteria.
+- False-positive completion rate (target zero in deterministic tests).
+- Duplicate exclusive assignments and avoidable repeated work.
+- Recovery success after agent/daemon interruption.
+- Verification pass/fail rate and stale-evidence detection.
+- Number and reason of human interventions.
+- Autonomous completion rate within the approved scope.
+- Cost/time per verified deliverable.
+- Setup completion and integration connection failure rates.
+
+Do not equate a high autonomy rate with success if correctness, safety, or user trust degrades.
+
+## 14. Market problem evidence and research discipline
+
+Public reports suggest recurring complaints about lost context, stale memory, duplicated work, coordination failures, and unsupported completion claims. Treat each as a hypothesis to test—not as a market-size estimate.
+
+Starting source list to re-check before external publication:
+- Claude Code context/constraint reports: https://github.com/anthropics/claude-code/issues/32659 and https://github.com/anthropics/claude-code/issues/31409
+- Codex context/project instruction report: https://github.com/openai/codex/issues/25792
+- Mem0 memory extraction/contradiction reports: https://github.com/mem0ai/mem0/issues/5867, https://github.com/mem0ai/mem0/issues/7195, https://github.com/mem0ai/mem0/issues/5235
+- Multi-agent workflow engineering discussion: https://github.blog/ai-and-ml/generative-ai/multi-agent-workflows-often-fail-heres-how-to-engineer-ones-that-dont/
+- Codex duplicate-work report: https://github.com/openai/codex/issues/16900
+- Complaint-post analysis (interested source; proportions of posts are not user incidence): https://openchamber.dev/blog/ai-coding-complaints/
+
+Before using any source as a current fact, re-check its date/status and preserve the difference between an individual report, a maintainer-confirmed bug, an independent benchmark, and our own reproduction.
+
+## 15. Scope boundaries and deferred integrations
+
+- Do not rewrite Memev's memory/vault.
+- Do not add a second canonical project database.
+- Do not rebuild Proofline Action.
+- Do not require Hivevault, CRDT-Merge, or ACFA-RS to ship Scope One without a demonstrated need.
+- Do not assume all AI clients expose identical lifecycle hooks or cancellation semantics.
+- Do not promise zero duplication, uninterrupted execution, or perfect correctness.
+- Do not make enterprise controls, marketplace, billing, and every provider integration blockers for the first end-to-end release.
+
+## 16. Repository source map
+
+Reviewed/current baseline references:
+- Memev architecture: https://github.com/mgillr/memev/blob/main/docs/ARCHITECTURE.md
+- Module map: https://github.com/mgillr/memev/blob/main/docs/MODULES.md
+- Contracts: https://github.com/mgillr/memev/blob/main/docs/CONTRACTS.md
+- Agent bus: https://github.com/mgillr/memev/blob/main/docs/BUS.md
+- Resume card: https://github.com/mgillr/memev/blob/main/src/engine/card.mjs
+- Contracts implementation: https://github.com/mgillr/memev/blob/main/src/engine/contracts.mjs
+- Bus implementation: https://github.com/mgillr/memev/blob/main/src/engine/bus.mjs
+- MCP handler: https://github.com/mgillr/memev/blob/main/src/server/mcp.mjs
+- Transcript recovery: https://github.com/mgillr/memev/blob/main/src/cli/transcript.mjs
+- Continuity tests: https://github.com/mgillr/memev/blob/main/test/continuity.test.mjs
+- Proofline flow tests: https://github.com/mgillr/memev/blob/main/test/proofline-flow.test.mjs
+- Sync conflict tests: https://github.com/mgillr/memev/blob/main/test/sync-conflict.test.mjs
+- Proofline Action: https://github.com/mgillr/proofline-action/blob/main/action.yml
+- Hivevault: https://github.com/mgillr/hivevault/blob/main/README.md
+- CRDT-Merge licence/architecture context: https://github.com/mgillr/crdt-merge/blob/main/README.md and https://github.com/mgillr/crdt-merge/blob/main/docs/CRDT_ARCHITECTURE.md
+- ACFA-RS: https://github.com/mgillr/acfa-rs/blob/main/README.md
+
+## Builder handoff checklist
+
+- [ ] Confirm baseline branch, commit, working tree, and test status.
+- [ ] Validate source map against current code before implementation.
+- [ ] Agree the first supported clients and test them end to end.
+- [ ] Implement state schema, transitions, and invariants first.
+- [ ] Implement atomic ownership/idempotency/recovery before parallel dispatch.
+- [ ] Connect contracts and verification before claiming autonomous delivery.
+- [ ] Add policy and human gates before enabling external or destructive actions.
+- [ ] Ship the complete vertical slice before expanding integrations.
+- [ ] Record demo and metrics; update this document as implementation decisions change.
+
+**Definition of success:** A non-technical user describes an outcome, approves the material scope and permissions, and the product coordinates supported AI agents to deliver a tested result, safely recover from interruption, and explain what is verified—without requiring the user to manage the technical machinery.
