@@ -88,10 +88,15 @@ export class Vault extends EventEmitter {
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }
-  _read(p) { try { return fs.readFileSync(this.abs(p), 'utf8'); } catch { return null; } }
+  /** Read a note; a journal file that retention moved to work/archive is still readable at its old path. */
+  _read(p) {
+    try { return fs.readFileSync(this.abs(p), 'utf8'); } catch {}
+    if (p.startsWith('work/')) { try { return fs.readFileSync(this.abs(`work/archive/${p.slice(5)}`), 'utf8'); } catch {} }
+    return null;
+  }
   allNotes(dir = '') {
     const out = []; const base = dir ? this.abs(dir) : this.root;
-    const walk = (d, rel) => { let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of ents) { if (e.name.startsWith('.') || e.name === 'node_modules') continue; const r = rel ? `${rel}/${e.name}` : e.name; if (e.isDirectory()) walk(path.join(d, e.name), r); else if (e.name.endsWith('.md')) out.push(r); } };
+    const walk = (d, rel) => { let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of ents) { if (e.name.startsWith('.') || e.name === 'node_modules') continue; const r = rel ? `${rel}/${e.name}` : e.name; if (e.isDirectory()) { if (r === 'work/archive') continue; walk(path.join(d, e.name), r); } else if (e.name.endsWith('.md')) out.push(r); } };
     walk(base, dir.replace(/\/$/, '')); return out.sort();
   }
   reindexAll() { for (const p of this.allNotes()) { const b = this._read(p); this.index.update(p, b); this.graph.indexNote(p, b); } this.index.save(); }
@@ -589,6 +594,100 @@ export class Vault extends EventEmitter {
     for (const rec of this.log.iterate({ fromSeq: from })) { if (/^(graph\.|claim|usage)/.test(rec.type)) this.graph.applyOp(rec); else if (rec.type === 'tournament.match' || rec.type === 'feedback' || rec.type === 'review' || rec.type === 'contract.signed' || rec.type === 'contract.verified') this._applyMisc(rec); }
   }
   _saveGraph() { writePrivateJson(path.join(this.state, 'graph.json'), { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()], reviews: [...this.reviews.entries()], contract_sessions: [...this.contractSessions.entries()], contract_results: [...this.contractResults.entries()] }); }
+
+  // ---- retention and compaction
+  /** Total bytes of every file under a directory (recursive). */
+  _dirBytes(d) {
+    let s = 0; let ents = [];
+    try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return 0; }
+    for (const e of ents) { const f = path.join(d, e.name); if (e.isDirectory()) s += this._dirBytes(f); else { try { s += fs.statSync(f).size; } catch {} } }
+    return s;
+  }
+  /** Number of files under a directory (recursive), only those ending in `ext` when given. */
+  _dirFiles(d, ext = null) {
+    let n = 0; let ents = [];
+    try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return 0; }
+    for (const e of ents) { const f = path.join(d, e.name); if (e.isDirectory()) n += this._dirFiles(f, ext); else if (!ext || e.name.endsWith(ext)) { try { fs.statSync(f); n++; } catch {} } }
+    return n;
+  }
+  /** Bytes of the .jsonl segment files directly in a directory (not its subdirectories). */
+  _segBytes(d) {
+    let s = 0; let ents = [];
+    try { ents = fs.readdirSync(d); } catch { return 0; }
+    for (const n of ents) if (n.endsWith('.jsonl')) { try { s += fs.statSync(path.join(d, n)).size; } catch {} }
+    return s;
+  }
+
+  /** Measured sizes, from the file system, not estimates: op-log, journal, index and git objects. */
+  sizeReport() {
+    const oplogDir = path.join(this.state, 'oplog');
+    const segs = this.log.manifest.segments;
+    const indexFile = path.join(this.state, 'index.jsonl');
+    return {
+      oplog: { bytes: this._dirBytes(oplogDir), segments: segs.length, archived: segs.filter((s) => s.archived).length, activeBytes: this._segBytes(oplogDir), archivedBytes: this._segBytes(path.join(oplogDir, 'archive')) },
+      journal: { bytes: this._dirBytes(this.abs('work/sessions')), files: this._dirFiles(this.abs('work/sessions'), '.md') },
+      index: { bytes: fs.existsSync(indexFile) ? fs.statSync(indexFile).size : 0 },
+      git: { bytes: this._dirBytes(path.join(this.root, '.git', 'objects')) },
+    };
+  }
+
+  /**
+   * Move journal session files older than `journal.retention_days` out of the index into work/archive.
+   * The files are renamed, not deleted, and stay readable at their old path (see _read). When the vault
+   * is a git repository the move is a git mv committed on its own, so the archive reaches the backup
+   * and the working tree stays clean. Returns the number of files moved.
+   */
+  _journalRetention() {
+    const days = Number(this.config.journal?.retention_days ?? 90);
+    const cutoff = Date.now() - days * 86400000;
+    const srcDir = this.abs('work/sessions');
+    let ents = [];
+    try { ents = fs.readdirSync(srcDir, { withFileTypes: true }); } catch { return 0; }
+    const hasGit = exists(path.join(this.root, '.git'));
+    let moved = 0;
+    const paths = [];
+    for (const e of ents) {
+      if (!e.isFile() || !e.name.endsWith('.md')) continue;
+      const m = /^(\d{4}-\d{2}-\d{2})/.exec(e.name);
+      let age = m ? Date.parse(m[1]) : NaN;
+      if (Number.isNaN(age)) { try { age = fs.statSync(path.join(srcDir, e.name)).mtimeMs; } catch { continue; } }
+      if (age >= cutoff) continue;
+      const from = `work/sessions/${e.name}`, to = `work/archive/sessions/${e.name}`;
+      fs.mkdirSync(path.dirname(this.abs(to)), { recursive: true });
+      // git mv when the vault is a repository, so the move reaches the backup; a plain rename when it is not
+      const tracked = hasGit && git(this.root, ['mv', '--', from, to]).ok;
+      if (!tracked) fs.renameSync(this.abs(from), this.abs(to));
+      paths.push(tracked ? [from, to] : [to]);
+      this.index.remove(from);
+      moved++;
+    }
+    if (moved) {
+      this.index.save();
+      if (hasGit) {
+        const all = paths.flat();
+        git(this.root, ['add', '-A', '--', ...all]);
+        if (!git(this.root, ['diff', '--cached', '--quiet', '--', ...all]).ok) git(this.root, ['commit', '-q', '-m', `memev: archive ${moved} journal sessions`]);
+      }
+    }
+    return moved;
+  }
+
+  /**
+   * Compact the vault. A dry run only measures and reports. A real run seals and archives the op-log
+   * segments, applies journal retention, and rewrites the index and graph. Nothing is deleted: archived
+   * segments are renamed and still verify and materialize, and retained journal files stay readable.
+   */
+  compact({ dryRun = false } = {}) {
+    const before = this.sizeReport();
+    if (dryRun) return { dryRun: true, before };
+    this.log.roll();
+    const archived = this.log.archiveSealed();
+    const retained = this._journalRetention();
+    this.index.save();
+    this._saveGraph();
+    const after = this.sizeReport();
+    return { dryRun: false, before, after, archived, retained };
+  }
 
   status() {
     const mu = process.memoryUsage();
