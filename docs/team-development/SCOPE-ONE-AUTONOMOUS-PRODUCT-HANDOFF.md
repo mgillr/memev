@@ -34,6 +34,7 @@ This document distinguishes existing capabilities from proposed Scope One work. 
 12. **Measure outcomes:** validate lower time-to-delivery, less rework, reliable recovery, and fewer false completion claims.
 13. **Command-centre clarity:** expose progress, agents, communications, plans, changes, outstanding work, and deliverables through coherent views over one canonical state—not separate dashboards with competing truths.
 14. **Explicit leadership:** the user may choose the preferred supported lead agent; runtime coordination must enforce one active lead, with deterministic fallback and safe handover.
+15. **Local-first, scoped access:** start from a user-selected local workspace without requiring GitHub; connect repositories through explicit least-privilege authorization and never grant agents unrestricted system or repository access.
 
 ## 2. Target user experience
 
@@ -132,6 +133,56 @@ These views should be different projections of the same canonical project/task/e
 - UI status remains consistent with backend state after refresh, process restart, and reconnection.
 - Closing the dashboard does not stop autonomous execution; reopening it reconstructs the current state from durable project data.
 - A user can start from a natural-language goal and reach the first meaningful plan without needing to configure agents, protocols, or infrastructure manually.
+
+## Local workspace and GitHub access — zero-friction project onboarding
+
+The system must be useful immediately on a user's computer, whether or not they already use GitHub. Local files and GitHub repositories are complementary project sources, not competing modes. The user should not need to understand repository setup, agent permissions, or filesystem configuration to start.
+
+### Local-first access
+
+- During onboarding, offer a clear "Choose a project folder" flow. With explicit user selection and OS/runtime permission, the product can inspect and work within that folder and its descendants according to the granted scope.
+- Do not silently scan the entire computer or assume unrestricted filesystem access. Ask for a folder or workspace, explain what access enables, and offer a way to revoke it.
+- The chosen project root is the default workspace boundary. Agents receive scoped tools for that workspace; access to other paths requires a separate grant or a user-visible decision.
+- Detect common project markers (for example Git metadata, package manifests, README files, and known build/test configurations) to understand an existing project without forcing the user through a technical setup wizard.
+- If the user chooses an existing local repository, preserve its history, remotes, branches, and uncommitted changes. Inspect status first; never overwrite or reset work silently.
+- If the folder is not yet under version control, offer to initialise Git locally when appropriate. Local Git use must not require a GitHub account.
+
+### GitHub connection and repository discovery
+
+- Offer a guided **Connect GitHub** option through the supported GitHub authorization flow. Request least-privilege permissions, explain them in plain language, and let the user choose which repositories to grant access to where the provider supports selection.
+- Once connected, discover repositories the authenticated user is actually allowed to access. Let them choose an existing repository or associate one with the selected local project. Do not assume all repositories are accessible, and do not expose repository contents to agents that have not been granted the relevant project permissions.
+- Keep local filesystem authorization and GitHub authorization separate. Connecting GitHub does not grant access to arbitrary local files; selecting a local folder does not grant access to remote repositories.
+- When a local Git repository already has a GitHub remote, detect and display it, verify that access works, and avoid creating a duplicate repository.
+- Support local-only operation for users who do not have GitHub or do not want to connect it. Do not block first use on creating an account. If a specific feature genuinely requires a remote repository, explain the reason at that point.
+
+### New repository and account setup
+
+- When the user requests remote collaboration, backup, CI, or another feature that requires GitHub and has no suitable repository, guide them through creating a repository under their own authenticated account or organization, subject to their permissions.
+- The product may create a repository only after the user has connected an account, selected the owner/location, chosen visibility, and confirmed the operation. Default to private when suitable; never make a repository public without explicit informed approval.
+- Do not claim the product can create a GitHub account for the user automatically. Account registration, email verification, terms, MFA, and recovery may require the user to interact directly with GitHub. Provide a short handoff link and resume setup after they finish.
+- Before publishing local files, show the intended repository, visibility, files to be pushed, and any sensitive-file warnings. Exclude credentials, tokens, .env files, private keys, and other detected secrets; stop and ask when uncertain.
+- Before the first push, inspect the destination and local working tree. Never overwrite an existing remote history or force-push without a specific, explicit approval and a recoverable plan.
+- If authorization expires, a repository is inaccessible, or the user lacks permission, explain the actual limitation and give a recovery action rather than repeatedly retrying or silently falling back.
+
+### System-wide agent access and security boundaries
+
+- Agents share project context through Memev's canonical state and comms bus, but they do not receive unrestricted access to every local file or every repository by default.
+- The lead coordinates access requests and task assignment; it cannot grant itself or other agents permissions that the user has not approved. All agents/tools must use the same policy enforcement point for filesystem and GitHub operations.
+- Represent each grant with a clear scope (project root or repository), principal/tool, permitted operations, and revocation state. Enforce the scope in tool adapters, not just in prompts.
+- Record access, writes, pushes, branch changes, and permission errors in the project event history. Do not put credentials or tokens in the bus, prompts, logs, or project files.
+- When a task needs a file or repository outside the current grant, request the narrow additional access needed and explain why. Never silently broaden the scope.
+
+### Onboarding acceptance criteria
+
+- A user with only a local folder can start a project without a GitHub account.
+- A user with GitHub can connect it once, select permitted repositories, and use them from the command centre without configuring each agent separately.
+- Local folder access and GitHub access are separately scoped, visible, and revocable.
+- Existing Git remotes and repository history are detected and preserved; the product does not create duplicates or silently overwrite changes.
+- Creating a remote repository or pushing local content requires explicit confirmation of owner, visibility, destination, and intended operation.
+- The system never claims to create a GitHub account automatically; it guides the user through any required provider-owned registration steps.
+- Secret scanning and destination checks run before publishing content; detected secrets block the push until resolved.
+- Agents cannot access local paths or repositories outside the user's grants, even if another agent requests access.
+- When setup is complete, the lead and all permitted agents use the same project-scoped access layer; users do not configure credentials separately for each agent.
 
 ## Lead agent selection and single-authority coordination
 
@@ -487,6 +538,9 @@ Reviewed/current baseline references:
 ## Builder handoff checklist
 
 - [ ] Confirm baseline branch, commit, working tree, and test status.
+- [ ] Implement scoped local workspace selection and access checks before allowing agents to read/write project files.
+- [ ] Implement GitHub authorization, repository discovery/selection, and explicit repo-creation/push confirmation; keep local-only use available.
+- [ ] Add secret scanning and destination/history checks before any initial push or publish operation.
 - [ ] Validate source map against current code before implementation.
 - [ ] Agree the first supported clients and test them end to end.
 - [ ] Implement state schema, transitions, and invariants first.
