@@ -32,6 +32,11 @@ export function renewalReminder(license, { days = RENEWAL_REMINDER_DAYS } = {}) 
   return `The licence expires in ${license.days_left === 1 ? '1 day' : `${license.days_left} days`} (${license.exp}); renew it with memev license activate <key> or memev license install <file>.`;
 }
 
+/** One human line for the licence state: no licence reads as the Personal tier, otherwise the state and tier name. */
+export function licencePhrase(license) {
+  return license.state === 'none' ? 'Personal, no licence needed' : `licence ${license.state}${license.tier ? ` (${tierLabel(license.tier)})` : ''}`;
+}
+
 /** Licence, seats and notes in one object (the doctor check and `memev license status --json`). `license` is a test seam for a pre-loaded licence. */
 export function licensingStatus({ root, env = process.env, vault = null, license = null }) {
   const lic = license ?? loadLicense({ env });
@@ -144,7 +149,7 @@ export async function command(cmd, pos, flags, { root, env, license = null }) {
     const lic = license ?? loadLicense({ env });
     const s = report({ license: lic, seats, devices: reg.list() });
     console.log(`Seats: ${s.computers_enrolled} of ${s.seats_licensed} computers${s.can_enroll ? '' : ' (no more can be added)'}`);
-    console.log(lic.state === 'none' ? 'Personal, no licence needed' : `licence ${lic.state}${lic.tier ? ` (${tierLabel(lic.tier)})` : ''}`);
+    console.log(licencePhrase(lic));
     for (const n of s.notes) out.info(n);
     return 0;
   }
