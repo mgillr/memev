@@ -38,10 +38,14 @@ release; only the release owner publishes it.
 
 The version check is opt-in and off by default. When it is on, `memev doctor` and `memev status` read a static version file whose location comes from the vault config (`update.version_file`) and show one `update available` line when it names a newer version. It reads only that local file; it makes no network call. Turn it on with `update.check: true` in the vault config, or `MEMEV_UPDATE_CHECK=1`.
 
+## Tag-triggered release build
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`: the full test suite, the leak scan with `--history`, the tag check against the version in `package.json` (`scripts/release-tag-check.mjs`), the release tarball and its `.sha256` file, and the attachment of both to the release. The workflow builds and attaches only; it publishes nothing.
+
 ## Publish
 
-- [ ] `npm publish`, run by the release owner from their own terminal.
-- [ ] Tag the release and push the tag.
+- [ ] Tag the release and push the tag, then wait for the release workflow to pass: the test suite, the leak scan and the tag check run before anything is attached.
+- [ ] `npm publish`, run by the maintainer from their own terminal, only after that workflow passed.
 - [ ] Confirm the published version runs: `npm exec --yes --package memev@<version> -- memev --version`.
 
 ## Failure and rollback
