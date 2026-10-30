@@ -7,6 +7,8 @@
 // second writer gets a warning (in memev doctor and jobs.json). The warning never blocks anything.
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 import { git } from '../engine/git.mjs';
 import { gitVia443, alt443, cloneOffer } from './github.mjs';
@@ -31,6 +33,36 @@ export function recordConflicts(root, conflicts) {
 /** The installed licence as the signed object, or null when there is none (the free tier). */
 function rawLicense(env = process.env) {
   try { return JSON.parse(fs.readFileSync(licenseFile(env), 'utf8')); } catch { return null; }
+}
+
+const PAID_CLIENT = new URL('../engine/paid-merge.mjs', import.meta.url);
+let paidClient = null;
+// loaded synchronously when the runtime can require an ES module, so the first sync of a fresh
+// process already has it; the dynamic import covers the rest
+try { paidClient = createRequire(import.meta.url)(fileURLToPath(PAID_CLIENT)); } catch {}
+const paidClientLoad = paidClient ? Promise.resolve(paidClient) : import(PAID_CLIENT).then((m) => { paidClient = m; return m; }, () => null);
+
+/** Load the paid client module once; null when it is not installed. */
+export function loadPaidClient() {
+  return paidClientLoad;
+}
+
+/** The paid engine flag: off by default on every install. */
+export function paidEngineOn(config) {
+  return config?.merge?.paid === true;
+}
+
+/**
+ * The state of the paid engine flag, for the status line: on only when the install turns it on,
+ * and usable only when the paid client is installed; otherwise the free behaviour runs and the
+ * reason says which.
+ */
+export function paidEngineStatus(config, { client = PAID_CLIENT } = {}) {
+  const on = paidEngineOn(config);
+  const installed = fs.existsSync(client);
+  if (!on) return { on: false, installed, reason: 'the paid engine flag is off' };
+  if (!installed) return { on: true, installed: false, reason: 'the engine is not installed' };
+  return { on: true, installed: true, reason: null };
 }
 
 /** The lines of a jsonl file that are valid JSON objects with a device and a dseq. */
@@ -94,10 +126,28 @@ function conflictCopyPath(root, p) {
 }
 
 /**
+ * The provider for the paid engine, when the flag is on and the install has not set its own
+ * provider: the paid client, pointed at the engine command the install configured. Returns the
+ * config to merge with, or the reason the free behaviour runs instead.
+ */
+function paidProviderFor(config, opts) {
+  if (config?.merge?.provider) return null; // the install set its own provider; the gate uses it
+  if (!paidEngineOn(config)) return null;   // the flag is off; the gate decides as before
+  const st = paidEngineStatus(config, { client: opts.client });
+  if (!st.installed) return { reason: st.reason };
+  if (!paidClient) return { reason: 'the paid client is not loaded yet' };
+  const command = config?.merge?.command;
+  if (typeof command !== 'string' || !command) return { reason: 'the paid engine has no command configured' };
+  const provider = paidClient.commandProvider(command, { args: config.merge.args ?? [], timeoutMs: config.merge.timeout_ms ?? 30000 });
+  return { config: { ...config, merge: { ...config.merge, provider } } };
+}
+
+/**
  * Resolve the files a merge left conflicted. A bus log keeps both sides' lines (renumbering a
- * duplicate device+dseq so every id stays unique). A note keeps this computer's version at the
- * path and the other computer's version whole in a conflict copy next to it, so the two versions
- * are never combined. Returns the resolved paths and the conflict record.
+ * duplicate device+dseq so every id stays unique). A note goes to the merge engine first when the
+ * paid engine flag is on and the licence allows it; otherwise it keeps this computer's version at
+ * the path and the other computer's version whole in a conflict copy next to it, so the two
+ * versions are never combined. Returns the resolved paths and the conflict record.
  */
 export function resolveConflicts(root, vault, opts = {}) {
   // core.quotePath=false so non-ASCII paths come back as the real path, not a quoted octal string
@@ -134,7 +184,18 @@ export function resolveConflicts(root, vault, opts = {}) {
     }
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     let logLine = null;
-    const res = resolveMerge({ a: ours, b: theirs, base: stageContent(root, 1, p), license: opts.license, config: vault?.config, keys: opts.keys, now: opts.now, log: (l) => { logLine = l; } });
+    const log = (l) => { logLine = l; };
+    let config = vault?.config ?? null;
+    const paid = config ? paidProviderFor(config, opts) : null;
+    if (paid?.config) config = paid.config;
+    let res;
+    if (paid?.reason) {
+      // the flag is on but the engine cannot be called; the free behaviour runs and the reason says which
+      log(`kept both versions: ${paid.reason}`);
+      res = { resolved: false, keepBoth: true };
+    } else {
+      res = resolveMerge({ a: ours, b: theirs, base: stageContent(root, 1, p), license: opts.license, config, keys: opts.keys, now: opts.now, log });
+    }
     if (res.resolved) {
       fs.writeFileSync(abs, res.text);
       adds.push(p);
@@ -202,7 +263,7 @@ export function publishAddressRecord(root, url) {
 // The sync, step by step: local git work runs here, and each network step (fetch, push) is yielded to
 // the caller, which runs it blocking (syncOnce), blocking with a deadline (syncOnceWithin, at daemon
 // stop) or off the event loop with a timeout (syncOnceAsync, the daemon's start and interval syncs).
-function* syncSteps(vault, { root, license, keys, at } = {}) {
+function* syncSteps(vault, { root, license, keys, at, client } = {}) {
   const fc = vault.commits.flush();
   const remote = git(root, ['remote']).out.split('\n').filter(Boolean)[0];
   const res = { at: now(), remote: remote || null, pulled: 0, pushed: false, error: null };
@@ -219,7 +280,7 @@ function* syncSteps(vault, { root, license, keys, at } = {}) {
     if (!git(root, ['merge-base', 'HEAD', `${remote}/${branch}`]).ok) { res.error = `unrelated history: ${cloneOffer(url)}`; return res; }
     const m = git(root, ['merge', '--no-edit', '-q', `${remote}/${branch}`]);
     if (!m.ok) {
-      const r = resolveConflicts(root, vault, { license: license === undefined ? rawLicense() : license, keys, now: at });
+      const r = resolveConflicts(root, vault, { license: license === undefined ? rawLicense() : license, keys, now: at, client });
       if (!r.ok) { git(root, ['merge', '--abort']); res.error = 'merge conflict: left as is; run memev doctor'; return res; }
       const prev = pruneConflicts(root);
       recordConflicts(root, { at: now(), files: [...new Set([...(prev?.files || []), ...r.files])], conflicts: [...(prev?.conflicts || []), ...r.conflicts] });
@@ -301,6 +362,7 @@ function endGit(child) {
 
 /** The sync off the event loop: the daemon keeps answering while fetch and push wait on the network. */
 export async function syncOnceAsync(vault, { timeoutMs = NET_TIMEOUT_MS, live = null, ...opts } = {}) {
+  await loadPaidClient(); // the conflict resolver uses the paid client when the flag is on
   const g = syncSteps(vault, opts);
   let r = g.next();
   while (!r.done) {
