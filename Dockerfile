@@ -23,6 +23,6 @@ ENV HOME=/home/memev MEMEV_ROOT=/vault MEMEV_BIND=0.0.0.0 MEMEV_TRUST_GATEWAY=1 
 ENV MEMEV_CONTAINER=1
 VOLUME ["/vault"]
 EXPOSE 7787
-HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:7787/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 --start-period=10s CMD wget -qO- http://127.0.0.1:7787/healthz || exit 1
 ENTRYPOINT ["/sbin/tini", "--", "memev"]
 CMD ["container"]
