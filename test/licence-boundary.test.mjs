@@ -36,7 +36,9 @@ test('WO-05-E AC01: both pages state the same five facts about the engine, so th
 
 const PATENT = [
   ['a patent word', /patent/i],
-  ['a patent number', /\bUS\s?\d{5,}\b/i],
+  ['a patent word', /\bpat\.(?=\s|$)/im],
+  ['a patent number', /\b(?:US|EP|WO|DE|GB|JP|CN|KR)\s?-?\d{5,}\b/i],
+  ['a patent number', /\bWO\s?\d{4}\/\d{5,}\b/i],
   ['a patent number', /\b\d{1,2},\d{3},\d{3}\b/],
   ['a patent claim', /\bclaim[s]?\s+\d{1,4}\b/i],
 ];
@@ -71,5 +73,17 @@ test('WO-05-E AC05: both pages keep the engine on crdt-merge own original licenc
     assert.match(text, /external dependency/i, `${f}: called as an external dependency`);
     assert.match(text, /never vendored/i, `${f}: never vendored`);
     assert.doesNotMatch(text, /FSL/i, `${f}: the superseded source-available choice is back`);
+  }
+});
+
+// The engine is never shipped inside Memev: a page may say it is never vendored or bundled, and may
+// not say that Memev bundles, vendors, ships or includes it.
+const NEGATED = /\b(?:never|not|no)\s+(?:be\s+)?(?:bundled|vendored|shipped|included)\b/gi;
+const SHIPPED = /\b(?:bundl\w*|vendor(?:s|ed|ing)?|ships?\s+(?:with|inside)|included\s+in)\b/i;
+
+test('WO-05-E AC05: neither page says Memev bundles, vendors, ships or includes the engine', () => {
+  for (const f of PAGES) {
+    const text = readDoc(f).replace(NEGATED, '');
+    assert.doesNotMatch(text, SHIPPED, `${f} says the engine ships with Memev`);
   }
 });
