@@ -20,6 +20,7 @@ import { Tournament, ROUNDS } from './tournament.mjs';
 import { loadTuning } from './tuning.mjs';
 import { attach as attachContracts, installVaultHooks } from './contracts.mjs';
 import { assess, DEFAULT_GATE } from './quality.mjs';
+import { ProjectStore } from './project-store.mjs';
 
 export const VERSION = readJson(new URL('../../package.json', import.meta.url), {}).version;
 export const STATE = '.memev';
@@ -321,6 +322,11 @@ export class Vault extends EventEmitter {
     const pick = (re) => (re.exec(last) || [])[1]?.trim() || null;
     const next = [...last.matchAll(/^- \[ \] (.+)$/gm)].map((m) => m[1].trim()).filter((n) => !done.has(n.toLowerCase()));
     return { path: p, checkpoints: cps.length, at: last.split('\n')[0].replace(/^### /, ''), task: pick(/^Task: (.+)$/m), doing: pick(/^Doing: (.+)$/m), next, done: [...done.values()], files: pick(/^Files: (.+)$/m) };
+  }
+
+  /** The canonical project store for one project, under this vault's .memev directory. One writer at a time. */
+  projectStore(projectId, opts = {}) {
+    return new ProjectStore(this.root, { id: projectId, deviceId: this.host?.id ?? null, fsync: this.opts.fsync ?? true, ...opts }).open();
   }
 
   /** Record one turn of a session (continuous recording). */
