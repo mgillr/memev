@@ -28,7 +28,7 @@ flowchart LR
         engine["crdt-merge<br/>convergence engine and its merge strategies"]
     end
     core -. "calls it as an external dependency;<br/>never vendored" .-> engine
-    engine --> paid["Paid features<br/>automatic merge across several computers (Personal),<br/>vault convergence for a team or company (Business, Corporate)"]
+    engine --> paid["Paid features<br/>automatic merge across several computers (Personal),<br/>convergence of supported shared state across people, projects and sites (planned)"]
 ```
 
 ## What free users get
@@ -53,7 +53,7 @@ server: no notes, no file names, no vault id, and no machine name. The one other
 anonymous milestone report, which is off unless you turn it on and holds only milestone names, days and
 a random id ([METRICS.md](METRICS.md)).
 
-## What is not said here
+## Relationship to Federation\n\nCRDT-Merge is intended to provide the convergence mechanism for supported replicated state in\nMemev's wider Federation architecture. The current integration documented in this repository is\nnarrower: it resolves conflicting note versions against a common base. It does not yet provide a\ngeneral synchronisation service for every organisational record, a universal project graph merge,\nfederated learning or policy enforcement. Those require separate schemas, authority semantics,\ntransport, replication policy, workload algorithms and acceptance tests. See\n[FEDERATION.md](FEDERATION.md) and [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).\n\n## What is not said here
 
 This page states no merge strategy names, benchmark figures or release dates for the engine, because
 none are published for Memev. A page for any of them is written when the feature ships.
