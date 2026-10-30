@@ -44,7 +44,7 @@ Memev connects three parts of AI work that are usually handled separately:
 - **Coordination:** let connected sessions discover one another, check presence and hand off tasks through a shared communications bus.
 - **Defined work:** describe expected outcomes and acceptance criteria in work contracts, then retain verification results where those checks are available.
 
-The vault and coordination bus provide the common working layer. What happens next depends on the connected AI client and workflow: Memev supplies the shared context and coordination mechanisms, while agents and people carry out the work.
+The diagram below shows the current Personal deployment on one computer. It is not the full target topology: multi-device, business and site federation extend the same local architecture, as described in the federation section. What happens next depends on the connected AI client and workflow: Memev supplies the shared context and coordination mechanisms, while agents and people carry out the work.
 
 ```mermaid
 flowchart LR
