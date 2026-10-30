@@ -4,7 +4,17 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md#the-
 [ARCHITECTURE.md](ARCHITECTURE.md), [PRICING.md](PRICING.md), [tiers/](tiers/README.md),
 [LICENSING-NOTICE.md](LICENSING-NOTICE.md).
 
-## CRDT-Merge implementation\n\nThe external engine is the proprietary CRDT-Merge implementation developed by Ryan Gillespie. Its\nresearch basis is described in [Gillespie (2026), *Conflict-Free Replicated Data Types for Neural\nNetwork Model Merging: A Two-Layer Architecture*](https://arxiv.org/abs/2605.19373). This is a\nspecific implementation and architecture; it is not a claim to own the general CRDT concept. The\npublished work addresses neural-network model merging. Memev's current adapter is a separate,\nnarrower note-conflict integration. Applying the technology to structured project, programme,\nportfolio or organisational state requires explicit extensions and conformance tests.\n\n## What is open and what is paid
+## CRDT-Merge implementation
+
+The external engine is the proprietary CRDT-Merge implementation developed by Ryan Gillespie. Its
+research basis is described in [Gillespie (2026), *Conflict-Free Replicated Data Types for Neural
+Network Model Merging: A Two-Layer Architecture*](https://arxiv.org/abs/2605.19373). This is a
+specific implementation and architecture; it is not a claim to own the general CRDT concept. The
+published work addresses neural-network model merging. Memev's current adapter is a separate,
+narrower note-conflict integration. Applying the technology to structured project, programme,
+portfolio or organisational state requires explicit extensions and conformance tests.
+
+## What is open and what is paid
 
 - **Memev core is open source and free.** It is Apache-2.0 and lives in this repository. One person on
   one computer gets all of it, and that never changes ([CHARTER.md](../CHARTER.md)).
@@ -12,9 +22,9 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md#the-
   under its original licence, currently BSL 1.1. It is **never vendored into Memev**: no copy of it is
   in this repository, and Memev calls it as an external dependency.
 - **It powers the paid features.** crdt-merge is what merges edits when several computers change a
-  vault at the same time, and what brings a company vault into one state:
+  vault at the same time, and, as contracts mature, may support convergence of defined shared state across people, projects and sites:
   - **Personal with more computers:** automatic merge across several computers at once.
-  - **Business and Corporate:** vault convergence for a team or company (both coming).
+  - **Business, Corporate and Federation:** convergence of supported structured state as schemas and authority rules are implemented (planned).
 
 Today the engine is not built into any released Memev. The paid features that depend on it are
 planned and are not sold until they are built ([tiers/README.md](tiers/README.md#what-is-built-and-what-is-planned)).
