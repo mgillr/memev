@@ -22,9 +22,9 @@ function seed(v, n = 25) {
 
 const key = (h) => `${h.path}#${h.heading || ''}`;
 
-async function mcpHits(v, args) {
+async function mcpResult(v, args) {
   const r = await handle(v, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'memev_recall', arguments: args } }, { identity: OWNER, client: 'test', local: true });
-  return JSON.parse(r.result.content[0].text);
+  return r.result;
 }
 
 async function serve(v) {
@@ -54,8 +54,9 @@ test('MEM-108 AC02: limit 1000, limit 11, and limit 0 or negative are clamped to
     assert.equal(r(0).length, 1, 'limit 0 clamps to 1');
     assert.equal(r(-5).length, 1, 'a negative limit clamps to 1');
     assert.equal(r(1000).total, 25, 'all 25 notes match, so the cap is what keeps it at 10');
-    const tool = await mcpHits(v, { query: QUERY, limit: 1000 });
-    assert.equal(tool.hits.length, 10, 'memev_recall clamps limit 1000 to 10');
+    const tool = await mcpResult(v, { query: QUERY, limit: 1000 });
+    assert.ok(Array.isArray(JSON.parse(tool.content[0].text)), 'the tool text stays a JSON array of hits');
+    assert.equal(tool.structuredContent.result.length, 10, 'memev_recall clamps limit 1000 to 10');
     const http = await serve(v);
     try {
       const cli = await http.post({ query: QUERY, limit: 1000 }, { cli: true });
@@ -94,11 +95,11 @@ test('MEM-108 AC04: the result states how many hits exist in total, and that mor
   try {
     const p1 = v.recall(OWNER, { query: QUERY, limit: 10, offset: 0 });
     assert.equal(p1.total, 25, 'the vault states how many hits exist in total');
-    const tool1 = await mcpHits(v, { query: QUERY, limit: 10, offset: 0 });
-    assert.equal(tool1.total, 25);
-    assert.equal(tool1.next, 10, 'memev_recall says more can be fetched with offset 10');
-    const tool2 = await mcpHits(v, { query: QUERY, limit: 10, offset: 20 });
-    assert.equal(tool2.next, null, 'memev_recall is silent when there are no more');
+    const tool1 = await mcpResult(v, { query: QUERY, limit: 10, offset: 0 });
+    assert.equal(tool1.structuredContent.total, 25, 'memev_recall states how many hits exist in total');
+    assert.equal(tool1.structuredContent.next, 10, 'memev_recall says more can be fetched with offset 10');
+    const tool2 = await mcpResult(v, { query: QUERY, limit: 10, offset: 20 });
+    assert.equal(tool2.structuredContent.next, null, 'memev_recall is silent when there are no more');
     const http = await serve(v);
     try {
       const first = await http.post({ query: QUERY, limit: 10, offset: 0 }, { cli: true });
