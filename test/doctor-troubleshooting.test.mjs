@@ -1,11 +1,13 @@
 // WO-08-A: the doctor's checks and the troubleshooting table cannot drift apart.
 // One row per check id, pinned in both directions, and the row and the check agree on severity.
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { sandbox } from './helpers/cli.mjs';
-import { PKG } from './helpers/tmp.mjs';
+import { PKG, cleanup } from './helpers/tmp.mjs';
+
+after(cleanup);
 
 const DOC = path.join(PKG, 'docs', 'TROUBLESHOOTING.md');
 const DOCTOR = path.join(PKG, 'src', 'cli', 'doctor.mjs');
@@ -27,11 +29,17 @@ function rows() {
 }
 
 // Every check id the doctor can report, read straight from the source: the
-// first argument of each C('id', ...) call.
+// first argument of each C(id, ...) call. An id has to be a plain string
+// literal in any quote style, so the table can be checked against it; an id
+// built at run time fails here instead of slipping past the table.
 function reportableIds() {
   const src = fs.readFileSync(DOCTOR, 'utf8');
   const ids = new Set();
-  for (const m of src.matchAll(/\bC\('([a-z][a-z0-9-]*)'/g)) ids.add(m[1]);
+  for (const m of src.matchAll(/\bC\(\s*([^,)]*)/g)) {
+    const lit = /^(['"`])([a-z][a-z0-9-]*)\1$/.exec(m[1].trim());
+    assert.ok(lit, `a check id in doctor.mjs is not a plain string literal: C(${m[1].trim()}`);
+    ids.add(lit[2]);
+  }
   return ids;
 }
 
@@ -90,8 +98,10 @@ test('WO-08-A AC03: a row whose fix is a command names one the help lists, and i
     const helpLines = help.out.split('\n').filter((l) => l.trimStart().startsWith('memev '));
     const listed = (sub) => helpLines.some((l) => new RegExp(`\\b${sub}\\b`).test(l));
 
+    const table = rows();
+    assert.ok(table.length > 0, 'the troubleshooting table has no check rows');
     const cmds = new Set();
-    for (const r of rows()) {
+    for (const r of table) {
       for (const m of r.fix.matchAll(/`memev ([^`]+)`/g)) {
         const cmd = m[1].trim();
         const sub = cmd.split(/\s+/)[0];
@@ -99,8 +109,13 @@ test('WO-08-A AC03: a row whose fix is a command names one the help lists, and i
         cmds.add(cmd);
       }
     }
+    assert.ok(cmds.size > 0, 'no row names a memev command as its fix');
     for (const cmd of cmds) {
-      const r = sb.run(cmd.split(' ').slice(1));
+      // github setup signs in to GitHub in a browser when gh is signed out, as it
+      // is in the sandbox; --no-login stops at that step with its message.
+      const args = cmd.split(/\s+/);
+      if (args[0] === 'github' && args[1] === 'setup') args.push('--no-login');
+      const r = sb.run(args);
       const out = `${r.out || ''}${r.err || ''}`;
       assert.ok(!RAW_ERROR.test(out), `memev ${cmd} printed a raw JavaScript error:\n${out}`);
       if (r.code !== 0) assert.ok(out.trim().length > 0, `memev ${cmd} exited ${r.code} without a message`);

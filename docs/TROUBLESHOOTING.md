@@ -41,7 +41,7 @@ Before there is a vault, two symptoms have no check id yet:
 | `apps` | warning | no AI app is connected yet, or a connected app is missing its Memev entry | `memev clients` lists the installed apps; `memev connect` registers Memev in one |
 | `deployment` | warning | the deployment mode and provider cannot work together: an internal model is not reachable from a managed host | `memev deployment` shows the current choice; `memev deployment set --mode M --ai T` writes a working one; docs/DOCKER.md covers the self-hosted install |
 | `remote` | warning | remote access is on but the tunnel is not up, so cloud apps cannot reach the vault | `memev cloud status` shows the tunnel state; `memev cloud off` switches remote access off |
-| `backup` | warning | the vault has no backup off this machine, so a lost disk loses the vault | back it up to a private git remote with `memev backup set <git-url>` (GitHub or self-hosted); the doctor tracks the sync |
+| `backup` | warning | the vault has no backup off this machine, so a lost disk loses the vault | `memev github setup` backs it up to a private GitHub repository with a deploy key for this vault; for another git host, `memev backup set <git-url>`; the doctor tracks the sync |
 | `writers` | warning | more than one computer writes the git backup, so the pushes collide | keep one computer as the writer and the others read-only; `memev devices` lists the computers |
 | `license` | warning | a credential is flagged, or the licence needs renewal (report only: nothing is limited) | `memev license status` shows the licence; `memev devices` shows the flagged credential |
 | `disk` | warning | less than 3% of the disk space or inodes is free | `memev compact --dry-run` measures what can be archived; `memev compact` archives it (on a stopped vault) |
@@ -53,5 +53,14 @@ Before there is a vault, two symptoms have no check id yet:
 | `two-vaults` | warning | two vaults run on this computer | join the other instead of keeping two: `memev init --join` with an invite code |
 | `backup-vault` | warning | the backup belongs to a different vault (two vaults per user are not supported) | join that vault instead: `memev init --join` with an invite code |
 | `service` | warning | the login service is not installed, so Memev does not start at login | `memev service install` installs it |
+
+Some symptoms have no check id, because the doctor cannot see them from the vault:
+
+- A cloud app gets 401. The token was not issued for remote use, or it was revoked: `memev cloud url` prints a fresh connector URL.
+- A cloud app cannot connect. `memev cloud status` shows the tunnel; a quick tunnel address changes on restart, so update the app, or use Tailscale or a named Cloudflare tunnel.
+- Cursor does not recall on every prompt. Expected: Cursor hooks inject only at session start, and the MCP instructions cover the rest.
+- GitHub pushes fail. `memev doctor` shows the git error under `backup`; check that the deploy key still exists in the repository.
+- A note was edited by hand. Nothing to do: Memev imports the change into its log.
+- The vault looks wrong after a crash. `memev doctor` checks the log against the files, and anything missing is rebuilt from the log.
 
 To undo everything: `memev uninstall` (your vault stays).
