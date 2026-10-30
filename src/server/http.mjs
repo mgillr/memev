@@ -292,7 +292,9 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
           const hits = recalled
             .filter((h) => h.score >= bar && !skip.has(`${h.path}#${h.heading || ''}`) && !(auto && !rc.hook_include_journals && pastWork(h.path)) && !(own && h.path.startsWith('work/sessions/') && h.path.endsWith(own)));
           const next = offset + limit < total ? offset + limit : null;
-          return send(200, { hits, total, offset, next, text: renderRecall(hits, { maxChars: rc.max_chars || 1500, note: next != null ? `more results: offset=${next}` : null }) });
+          const text = renderRecall(hits, { maxChars: rc.max_chars || 1500 });
+          const more = next != null && !auto ? (text ? `${text}\n` : '') + `more results: offset=${next}` : text;
+          return send(200, { hits, total, offset, next, text: more });
         }
         if (route === '/v1/checkpoint') return send(200, vault.checkpoint(identity, { ...body, client }));
         if (route === '/v1/journal') return send(200, vault.journal(identity, { ...body, client }));
