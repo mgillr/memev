@@ -47,6 +47,11 @@ test('WO-10-A AC02: the brief answers the five questions a stranger asks, each l
       assert.ok(re.test(body), `the answer for ${topic} links ${link}`);
     }
   }
+  assert.match(brief, /listens on loopback/i, 'the daemon listens on loopback by default');
+  assert.doesNotMatch(brief, /every interface|all interfaces/i, 'the daemon does not listen on every interface');
+  assert.match(brief, /stored hashed/i, 'tokens are stored hashed');
+  assert.match(brief, /scoped/i, 'tokens are scoped');
+  assert.doesNotMatch(brief, /plain text/i, 'tokens are not stored in plain text');
 });
 
 test('WO-10-A AC03: the data-flow map lists every outbound call a default install can make and no other', () => {
@@ -84,19 +89,17 @@ test('WO-10-A AC04: the pilot checklist runs two to four weeks, agrees week for 
   const rows = {};
   for (const m of pilot.matchAll(/^\|\s*(\d+)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*$/gm)) rows[m[1]] = { step: flat(m[2]), owner: flat(m[3]) };
   assert.deepEqual(Object.keys(rows).sort(), ['1', '2', '3', '4'], 'the pilot has four weeks');
-  // The setup table names the on-premises provider with a word that new lines
-  // must not repeat, so the checklist says "on-premises model" instead. I take
-  // the word from the table itself and read it as "model" on both sides; every
-  // other character of every week must still agree.
-  const word = (setup.match(/on-premises (\w+)/) || [])[1];
-  assert.ok(word, 'the setup table names the on-premises provider');
-  const norm = (s) => s.replace(new RegExp(`\\b${word}\\b`, 'gi'), 'model');
   for (const w of ['1', '2', '3', '4']) {
     assert.ok(rows[w].step, `week ${w} has a named step`);
     assert.ok(rows[w].owner, `week ${w} has an owner`);
-    assert.equal(norm(rows[w].step), norm(biz[w]), `week ${w} agrees with the Business setup table`);
+    assert.equal(rows[w].step, biz[w], `week ${w} agrees with the Business setup table`);
+    const caps = rows[w].owner.split(/\s+/).filter((t) => /^[A-Z]/.test(t));
+    assert.ok(caps.every((t) => t === 'IT'), `week ${w} owner is a role, not a person name`);
   }
   assert.ok(pilot.includes('[tiers/services.md](tiers/services.md)'), 'the services menu is linked for anything quoted');
+  assert.match(pilot, /contact us/i, 'Business has no public price: contact us');
+  assert.doesNotMatch(pilot, /\$\s?\d+/, 'no currency figure is stated for the pilot');
+  assert.doesNotMatch(pilot, /Business is built/i, 'Business is not claimed as built');
   const planned = section(pilot, /what is planned/i);
   assert.ok(planned, 'the pilot names its planned parts');
   for (const part of ['company server', 'sign-in', 'departments', 'admin console']) {

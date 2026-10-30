@@ -11,7 +11,7 @@ this page quotes a rate or a package, it links the services menu instead of rest
 | Week | Step | Owner |
 |---|---|---|
 | 1 | call to agree departments, roles, the one AI provider and what counts as restricted; check the server | you and the operator |
-| 2 | install the company server (and the on-premises model, if that is the chosen provider), connect sign-in and the GitHub organisation | the operator |
+| 2 | install the company server (and the on-premises LLM, if that is the chosen provider), connect sign-in and the GitHub organisation | the operator |
 | 3 | install Memev on the computers (IT runs one command per machine, or pushes it with their usual tool), import the org chart | your IT |
 | 4 | check permissions with test accounts, hand over, one hour of training for staff | the operator, with your IT |
 
