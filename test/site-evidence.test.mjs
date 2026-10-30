@@ -40,6 +40,14 @@ const headings = (md) => md.split('\n').filter((l) => /^#{1,6} /.test(l)).map((l
 const statusLines = (md) => md.split('\n').map((l) => l.trim())
   .filter((l) => l && /\b(built|planned)\b/i.test(l) && !/^\|[\s:|-]+\|$/.test(l));
 const countWord = (s, w) => (s.match(new RegExp(`\\b${w}\\b`, 'gi')) || []).length;
+// Every table cell and prose line of a source page, normalised like normMd: a page whose content is a
+// table and prose has few headings and no status lines, so those alone would not notice a dropped row.
+const contentItems = (md) => md.split('\n').flatMap((l) => {
+  const t = l.trim();
+  if (!t || /^#{1,6} /.test(t) || /^\|[\s:|-]+\|$/.test(t) || /^```/.test(t)) return [];
+  if (t.startsWith('|')) return t.split('|').slice(1, -1).map(normMd).filter(Boolean);
+  return [normMd(t)];
+});
 
 // The install command the README shows first: the first code tag in the file.
 function installCommand() {
@@ -138,6 +146,22 @@ test('WO-03-A AC03: the complaints analysis keeps every heading, status and the 
     'the page makes no built claim the source does not make');
 });
 
+test('WO-03-A AC03: the comparison keeps every heading, status line, table cell and paragraph', () => {
+  const md = read(path.join(PKG, 'docs', 'COMPARISON.md'));
+  const text = strip(readHtml('comparison'));
+  for (const h of headings(md)) {
+    assert.ok(text.includes(normMd(h)), `the page carries the heading: ${h}`);
+  }
+  for (const l of statusLines(md)) {
+    assert.ok(text.includes(normMd(l)), `the page carries the status line: ${l.slice(0, 60)}`);
+  }
+  for (const c of contentItems(md)) {
+    assert.ok(text.includes(c), `the page carries: ${c.slice(0, 60)}`);
+  }
+  assert.ok(countWord(text, 'built') <= countWord(md, 'built'),
+    'the page makes no built claim the source does not make');
+});
+
 test('WO-03-A AC04: the pages load nothing from other hosts and every relative link resolves in the build output', () => {
   for (const name of ['solutions', 'comparison', 'quickstart']) {
     const html = readHtml(name);
@@ -145,6 +169,8 @@ test('WO-03-A AC04: the pages load nothing from other hosts and every relative l
     assert.ok(!/<img[\s>]/i.test(html), `${name} loads no image`);
     assert.ok(!/url\(\s*['"]?https?:/i.test(html), `${name} loads no asset from another host`);
     assert.ok(!/@import/i.test(html), `${name} imports no stylesheet from another host`);
+    assert.ok(!/<link\b[^>]*\bhref\s*=\s*["']?(https?:)?\/\//i.test(html), `${name} links no stylesheet or icon from another host`);
+    assert.ok(!/\bsrc\s*=\s*["']?(https?:)?\/\//i.test(html), `${name} loads nothing by src from another host`);
     assert.ok(!/google-analytics|googletagmanager|gtag|hotjar|clarity|doubleclick/i.test(html),
       `${name} loads no analytics or tag`);
     assert.ok(!/document\.cookie/i.test(html), `${name} sets no cookie`);
