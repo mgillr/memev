@@ -13,6 +13,7 @@ import {
   verifyAgentBinding,
   setupAgentRole,
   AgentBindError,
+  OPENSSH_NEEDED,
 } from '../src/engine/agentid-bind.mjs';
 
 after(cleanup);
@@ -140,6 +141,33 @@ test('MEM-145 AC03: with no ssh-keygen and with a pre-8.0 stand-in, bind and set
   assert.throws(() => runWith(standDir, () => bindAgentRole(role, { sshKeyPath, principal, dir: agentsDir })), want, 'bind fails with a pre-8.0 stand-in');
   assert.throws(() => runWith(standDir, () => setupAgentRole(role, { principal, sshKeyPath, trustDir, dir: agentsDir })), want, 'setup fails with a pre-8.0 stand-in');
   assert.deepEqual(snapshotDir(agentsDir), before, 'the keys directory is untouched with a pre-8.0 stand-in');
+});
+
+test('MEM-145 AC03: with no ssh-keygen and with a pre-8.0 stand-in, verify reports unavailable, never invalid', () => {
+  const { base, agentsDir } = newAgents();
+  const sshKeyPath = makeSshKey(base, 'person');
+  const role = 'writer';
+  makeRolePair(agentsDir, role);
+  const principal = 'alice';
+  bindAgentRole(role, { sshKeyPath, principal, dir: agentsDir });
+  const allowedSigners = path.join(base, 'allowed_signers');
+  fs.writeFileSync(allowedSigners, principal + ' ' + fs.readFileSync(sshKeyPath + '.pub', 'utf8').trim() + '\n');
+  const runWith = (pathVal, fn) => {
+    const old = process.env.PATH;
+    try { process.env.PATH = pathVal; return fn(); } finally { process.env.PATH = old; }
+  };
+  const verify = (p = principal) => verifyAgentBinding(role, { allowedSigners, principal: p, dir: agentsDir });
+  assert.equal(verify(), 'bound', 'the binding verifies with OpenSSH present');
+  const emptyDir = tmpdir('memev-empty-');
+  assert.equal(runWith(emptyDir, () => verify()), 'unavailable', 'a good binding is unavailable, not invalid, with no ssh-keygen');
+  assert.equal(runWith(emptyDir, () => verify('bob')), 'unavailable', 'nothing is judged with no ssh-keygen');
+  const standDir = tmpdir('memev-stand-');
+  fs.writeFileSync(path.join(standDir, 'ssh-keygen'), '#!/bin/sh\necho "unknown option -- Y" >&2\nexit 255\n', { mode: 0o755 });
+  assert.equal(runWith(standDir, () => verify()), 'unavailable', 'a good binding is unavailable, not invalid, with a pre-8.0 stand-in');
+  assert.equal(runWith(emptyDir, () => verifyAgentBinding('reader', { allowedSigners, principal, dir: agentsDir })), 'unbound', 'no signature is still unbound, with nothing to run');
+  assert.equal(verify('bob'), 'invalid', 'with OpenSSH back, a wrong principal is still invalid');
+  assert.equal(verify(), 'bound');
+  assert.match(OPENSSH_NEEDED, /OpenSSH 8\.0/, 'one message names the OpenSSH version for every step');
 });
 
 test('MEM-145 AC04: setupAgentRole is one rollback-safe step that keeps a matching binding and refuses a different one', () => {
