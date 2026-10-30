@@ -12,7 +12,9 @@ import { redactSecrets, findSecrets } from '../engine/secrets.mjs';
 import { VERSION, isVault } from '../engine/vault.mjs';
 import { PKG, daemonInfo, pidAlive, config, out, clientsFile, tokenExpiryWarnings } from './common.mjs';
 import { EXPIRY_WARNING_DAYS } from '../engine/tokens.mjs';
-import { licensingStatus, licencePhrase } from './licensing.mjs';
+import { licensingStatus, licencePhrase, pendingMergeCopies } from './licensing.mjs';
+import { relaySetting, relayState } from './relay.mjs';
+import { loadLicense } from '../engine/license.mjs';
 import { alt443, githubReachable } from './github.mjs';
 import { label } from '../engine/bus.mjs';
 import { fetchOut } from '../engine/net.mjs';
@@ -158,6 +160,29 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
     const renewal = ls.renewal;
     r.push(C('license', 'licence and seats (report only)', flagged.length || renewal ? 'warn' : 'ok', `${licencePhrase(ls.license)}; ${ls.usage.computers} computer(s), ${ls.usage.connectors} connector(s), ${ls.usage.local_clients} local client(s)${ls.notes.length ? `; ${ls.notes.join(' ')}` : ''}${renewal ? `; ${renewal}` : ''}${flagged.length ? `; credential flagged on ${flagged.map((f) => f.label).join(', ')}: memev devices` : ''}`));
   } catch (e) { r.push(C('license', 'licence and seats (report only)', 'ok', `not checked: ${e.message}`)); }
+  // the four paid paths, each named on every run so a regression is reported, not silent. Report only: none fails the run.
+  const relay = relaySetting(root);
+  const rstate = relayState(root);
+  const rUp = rstate && rstate.state === 'up';
+  r.push(C('relay', 'relay reachable (falls back to the git backup)',
+    !relay.enabled ? 'ok' : rUp ? 'ok' : 'warn',
+    !relay.enabled ? 'off; the vault is reached through the git backup'
+      : rUp ? `up at ${rstate.address || relay.url}`
+      : `down or not started (${rstate?.state || 'not started'}); the vault is reached through the git backup`));
+  const pending = pendingMergeCopies(root);
+  r.push(C('merge', 'same-note conflicts keep both versions', pending.length ? 'warn' : 'ok',
+    pending.length
+      ? `${pending.length} note(s) edited on two computers at once, kept as two whole files: ${pending.map((p) => `${p.path} and ${p.copy}`).join('; ')}; a person decides what to keep`
+      : 'no unresolved same-note conflicts'));
+  let licState = 'none';
+  try { licState = (license ?? loadLicense({ env })).state || 'none'; } catch { licState = 'none'; }
+  r.push(C('licence-expired', 'an expired licence keeps this computer working',
+    licState === 'expired' ? 'warn' : 'ok',
+    licState === 'expired'
+      ? 'the licence is past its grace period: this computer keeps full read and write access, added computers can read but not write, and nothing is deleted'
+      : `licence ${licState}; this computer is never limited`));
+  r.push(C('licence-change', 'changing the licence needs no re-enrolment', 'ok',
+    'installing a licence restores writing and removing it returns to Personal; the vault, its computers and its notes are unchanged by either'));
   try { const s = fs.statfsSync(root); const freePct = (s.bavail / s.blocks) * 100; const inodePct = s.files ? (s.ffree / s.files) * 100 : 100; r.push(C('disk', 'disk space', freePct < 3 || inodePct < 3 ? 'warn' : 'ok', `${freePct.toFixed(0)}% space, ${inodePct.toFixed(0)}% inodes free`)); } catch {}
   const upd = updateLine(root, env);
   if (upd) r.push(C('update', 'update available', 'warn', upd));

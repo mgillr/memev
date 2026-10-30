@@ -26,5 +26,9 @@ The same checks are available to an AI session as the `memev_doctor` MCP tool.
 | The vault looks wrong after a crash | `memev doctor`: the log is checked against the files and anything missing is rebuilt from the log |
 | GitHub pushes fail | `memev doctor` shows the git error; check the deploy key still exists in the repository |
 | The vault is taking up too much space | `memev compact --dry-run` measures the op-log, journal, index and git objects from disk; `memev compact` archives the sealed op-log segments and moves old journal sessions out of the index (nothing is deleted, and the old sessions stay readable) |
+| The relay is down and the vault is only reachable through the git backup (doctor check: relay) | nothing to do for the backup: the vault keeps working through the git backup; to restore the relay, check the relay address in the setting, run `memev start`, and `memev doctor` names the relay state |
+| A note was edited on two computers at once and kept as two whole files (doctor check: merge) | nothing to do: both versions are kept byte for byte; `memev doctor` lists the pairs, open the two files, decide what to keep, and delete the copy you do not want |
+| The licence is past its grace period (doctor check: licence-expired) | this computer keeps full read and write access and nothing is deleted; added computers can read but not write; to restore writing on the others, install a current licence with `memev license install <file>` |
+| I changed the licence tier and want to know what changes (doctor check: licence-change) | nothing to re-enrol: installing a licence restores writing and removing it returns to Personal; the vault, its computers and its notes are unchanged by either |
 
 To undo everything: `memev uninstall` (your vault stays).
