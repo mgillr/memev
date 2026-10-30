@@ -4,7 +4,7 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md#the-
 [ARCHITECTURE.md](ARCHITECTURE.md), [PRICING.md](PRICING.md), [tiers/](tiers/README.md),
 [LICENSING-NOTICE.md](LICENSING-NOTICE.md).
 
-## What is open and what is paid
+## CRDT-Merge implementation\n\nThe external engine is the proprietary CRDT-Merge implementation developed by Ryan Gillespie. Its\nresearch basis is described in [Gillespie (2026), *Conflict-Free Replicated Data Types for Neural\nNetwork Model Merging: A Two-Layer Architecture*](https://arxiv.org/abs/2605.19373). This is a\nspecific implementation and architecture; it is not a claim to own the general CRDT concept. The\npublished work addresses neural-network model merging. Memev's current adapter is a separate,\nnarrower note-conflict integration. Applying the technology to structured project, programme,\nportfolio or organisational state requires explicit extensions and conformance tests.\n\n## What is open and what is paid
 
 - **Memev core is open source and free.** It is Apache-2.0 and lives in this repository. One person on
   one computer gets all of it, and that never changes ([CHARTER.md](../CHARTER.md)).
