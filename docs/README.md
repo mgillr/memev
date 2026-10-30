@@ -22,6 +22,7 @@ this folder links back here, and this page links down to every page.
 | [MAPPING.md](MAPPING.md) | everything Memev does without being asked |
 | [BUS.md](BUS.md) | the comms bus: seats, the lead, roster, comms checks, tasks |
 | [CONTRACTS.md](CONTRACTS.md) | signed, immutable work contracts |
+| [PROJECTS.md](PROJECTS.md) | the project layer: task states, the transition table, derived project status |
 | [CLIENTS.md](CLIENTS.md) | what is added to each AI app; per-app pages below |
 | [CLOUD.md](CLOUD.md) | the secure link, devices, invites, joining another computer |
 | [RELAY.md](RELAY.md) | the relay protocol and the `memev cloud relay` client |
@@ -50,6 +51,7 @@ this folder links back here, and this page links down to every page.
 | [tiers/corporate.md](tiers/corporate.md) | Corporate (coming) |
 | [tiers/services.md](tiers/services.md) | services, support plans, response times |
 | [CONVERGENCE.md](CONVERGENCE.md) | the paid core: the crdt-merge convergence engine |
+| [PAID-CONVERGENCE.md](PAID-CONVERGENCE.md) | the specification of the paid convergence service: what the engine does, and the boundary it is called across |
 | [EXTENSION-POINTS.md](EXTENSION-POINTS.md) | the one place the core hands work to an outside program: the merge engine boundary |
 | [PRICING.md](PRICING.md) | the tier table, the computer limit, licences |
 | [CHECKOUT.md](CHECKOUT.md) | how checkout and licence keys fit together |

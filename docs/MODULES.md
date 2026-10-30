@@ -2,7 +2,7 @@
 
 Part of the [Memev documentation](README.md). Written by `node scripts/docs/module-graph.mjs` from the real imports in `bin/` and `src/`; do not edit it by hand. `node scripts/docs/module-graph.mjs --check` (and `test/docs-module-map.test.mjs`) fail when it is out of date. How the parts fit at a higher level: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-66 modules and 260 import edges (66 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
+67 modules and 260 import edges (66 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
 
 ## Layers
 
@@ -91,6 +91,7 @@ flowchart LR
     src_engine_milestones["milestones.mjs"]
     src_engine_net["net.mjs"]
     src_engine_oplog["oplog.mjs"]
+    src_engine_project_state["project-state.mjs"]
     src_engine_quality["quality.mjs"]
     src_engine_secrets["secrets.mjs"]
     src_engine_setup_channel["setup-channel.mjs"]
@@ -435,6 +436,7 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 | `src/engine/milestones.mjs` | Activation milestones, worked out on this computer from what the vault already keeps: its operation log, the comms bus and the invites file | `engine/oplog.mjs`, `engine/util.mjs` | `cli/onboarding.mjs` |
 | `src/engine/net.mjs` | Every request Memev makes goes through fetchOut, which honours the usual proxy settings: HTTPS_PROXY for https, HTTP_PROXY for http (either case),... | none | `cli/common.mjs`, `cli/doctor.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/mcp-stdio.mjs`, `cli/onboarding.mjs`, `cli/remote.mjs`, `cli/tunnel.mjs` |
 | `src/engine/oplog.mjs` | The operation log: append-only, segmented, snapshotted, streamed | `engine/util.mjs` | `cli/transcript.mjs`, `engine/index.mjs`, `engine/milestones.mjs`, `engine/vault.mjs` |
+| `src/engine/project-state.mjs` | The project and task state machine: the eleven task states, the seven derived project statuses, one transition table, and the invariants of the... | none | none |
 | `src/engine/quality.mjs` | The write gate for memories | `engine/index.mjs` | `engine/vault.mjs` |
 | `src/engine/secrets.mjs` | The secrets guard: text that looks like a credential is refused unless the caller says allow_secrets | none | `cli/doctor.mjs`, `engine/bus.mjs`, `engine/importers/ai-history.mjs`, `engine/importers/exports.mjs`, `engine/importers/project.mjs`, `engine/vault.mjs` |
 | `src/engine/setup-channel.mjs` | Outbound setup channel: mutual-auth handshake over node:crypto primitives, then an AES-256-GCM encrypted frame channel | none | `cli/setup-remote.mjs` |
