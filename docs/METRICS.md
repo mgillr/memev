@@ -151,6 +151,45 @@ host's access log, counted by distinct day and file, with no address kept.
 | activations | licence endpoint | paid or trial licences taken up |
 | milestones | your own `onboarding.json`; shared only if you turn on the opt-in report, which is off by default | what you reach after installing |
 
+## The weekly funnel report (a development tool)
+
+`scripts/metrics/report.mjs` renders the three numbers together in one page, for the owner. It is a
+development tool: it reads count files handed to it as flags, prints one page of dated numbers, and
+reports nothing anywhere. It is not in the npm package file list, and it derives no count from a
+person's computer.
+
+- **Inputs, as files.** `--package` holds the package download rows (the npm range answer, one row
+  per day: `{ "day": "<date>", "downloads": N }`), `--release` the release-host download rows (the
+  same shape, one row per day and file), and `--activations` the licence-activation rows
+  (`{ "day": "<date>", "licence_id": "...", "result": "issued" or "refused" }`, one row per
+  activation). `--milestones` optionally holds the opt-in milestone rows (the report payload above,
+  one row per milestone: name and day). A row without a day counts in the total only. With no
+  milestone input the page says so in one line and still renders.
+- **The page.** For each count set: the count per day, per week (ISO week) and the total. Nothing
+  is estimated and nothing is typed into the program: every number on the page comes from the
+  files.
+- **The gates.** The page header renders the gates from `scripts/metrics/gates.json`: the month-6
+  gates, installs at or above 5,000 by month 6, and free-to-paid at or above 1 percent once sync
+  has shipped. The thresholds live in the file, never in the program, because the owner moves
+  them. Each gate prints its measured value, its threshold and pass or miss.
+- **The installs choice.** A download is not an install, so the file also says which counted
+  number stands for installs (`installs_proxy`: `package_downloads`, `release_downloads`,
+  `downloads` or `activations`). That choice is the owner's; until it is made the file says open,
+  the page prints that line, and both gates stay open. Editing the file changes the header with no
+  change to the program.
+- **The monthly verdict.** With `--month N`, the page adds a monthly verdict below the gates: each
+  of the file's monthly gates as a row with the gate, its threshold, the measured value, the month
+  it falls due and pass or miss. A gate whose due month has not arrived is not yet due, never a
+  miss; a gate with no measured value is not measured, never a pass. A missed gate prints the
+  branch text held for that gate in the file, word for word, and a met gate prints none. The
+  branch text lives in the file, not in the program, so the owner moves it with the thresholds.
+  The measured values come from the counted rows: installs through the installs choice,
+  free-to-paid from the activation rows over the install rows, paying users as the distinct issued
+  licences, and the Business pilot from the milestone rows named in the file. The file also holds
+  the conservative-case 2029 values as reference, not as month-12 milestones.
+- **Hosts nothing.** The counts are kept beside the licence endpoint on the owner's server; this
+  tool reads counts handed to it and hosts nothing.
+
 ## What is never counted
 
 No per-user identifier, no vault content, no file paths, no names of the apps you use, and no usage
