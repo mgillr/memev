@@ -1,0 +1,5 @@
+### Added
+
+- `docs/INSTALL-FOR-AI.md` is a step-by-step runbook for an AI app that installs Memev at the person's request. It has nine sections in setup order (operating system and runtime, installation path, permission, the pinned release, version and health, the smoke test, connecting approved clients, reporting results, and failure handling), every command on the page is in `memev help` or the README install section, and it names no client product and no version.
+- `memev ready --json` prints one machine-readable object: `ok`, `smoke`, and one entry per connected client with `id`, `name`, `joined`, and `joinedAt`, the time of its first heartbeat or null. Exit codes are 0 when ready, 1 when it is not ready within the timeout, and 2 for a usage error.
+- `test/agent-runbook.test.mjs` checks the runbook against the real CLI: the section order, the command coverage, the machine-readable forms and their fields, the `ready --json` exit codes and smoke semantics, and the ban on client product names and versions.
