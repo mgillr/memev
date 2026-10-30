@@ -97,7 +97,7 @@ The same core design applies at every scale:
 - **A small business:** people, devices and projects coordinate while retaining appropriate personal and business boundaries.
 - **One site or many sites:** each site can operate its own Memev server and local memory; sites exchange only the state and information their policies permit.
 - **An enterprise or portfolio:** departments, programmes, projects, business functions and locations can be connected without requiring one central memory server or one AI provider.
-- **Federated organisations:** independent organisations can participate in shared programmes or computation while retaining their own administration, data and authority.
+- **Federated organisations:** independent organisations can participate in shared projects, programmes and portfolios while retaining their own administration, data and authority. Where appropriate, they can also participate in explicitly authorised distributed computation.
 
 This extends the current architecture; it does not replace the local vault, daemon, MCP integrations, communications bus, contracts or existing workflows. Federation adds governed site-to-site relationships and distributed capabilities around those foundations. Features beyond the current single-vault implementation are explicitly marked as planned or specified.
 
@@ -224,6 +224,7 @@ up. The main pages:
 | [Quickstart](docs/QUICKSTART.md) | install, first session, everyday commands |
 | [Architecture](docs/ARCHITECTURE.md) | what runs today and how the same architecture extends to multi-site federation |
 | [Module map](docs/MODULES.md) | every module and what imports what, generated from the code; not a future architecture diagram |
+| [Architectural interdependencies](docs/ARCHITECTURAL-INTERDEPENDENCIES.md) | how the current components fit together and what the wider architecture depends on |
 | [AI apps](docs/CLIENTS.md) | what is changed in each app, hooks vs instructions, undoing it |
 | [Cloud access](docs/CLOUD.md) | the secure link, connector URLs, other computers, turning it on |
 | [Comms bus](docs/BUS.md) | how your AI apps talk to each other, the roster and comms checks |
@@ -241,7 +242,7 @@ up. The main pages:
 | [Design](docs/DESIGN.md) | log, index, graph, recall, scale |
 | [Federation](docs/FEDERATION.md) | local ownership, site topologies, replication and cross-organisation boundaries |
 | [Organisational intelligence](docs/ORGANISATIONAL-INTELLIGENCE.md) | work graph across people, projects, programmes, portfolios and functions |
-| [Federated computation](docs/FEDERATED-COMPUTATION.md) | distributed execution, analytics, optimisation, evaluation and federated learning |
+| [Federated computation](docs/FEDERATED-COMPUTATION.md) | an additional capability: distributed execution, analytics, optimisation, evaluation and federated learning |
 | [Data sovereignty](docs/DATA-SOVEREIGNTY.md) | jurisdiction-aware data, derived information, replication and recovery |
 | [Hands-off runtime](docs/MAPPING.md) | everything Memev does without being asked |
 | [Developing Memev](docs/DEVELOPING.md) | tests, the leak scan, changelog notes, regenerating the module map |
