@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { newVault, cleanup, tmpdir } from './helpers/tmp.mjs';
-import { syncOnce, paidEngineStatus } from '../src/cli/sync.mjs';
+import { syncOnce, syncOnceWithin, syncOnceAsync, paidEngineStatus } from '../src/cli/sync.mjs';
 import { git } from '../src/engine/git.mjs';
 import { signLicense } from '../src/engine/license.mjs';
 
@@ -191,5 +191,82 @@ test('WO-05-B AC03: the licence gate still decides when the engine is called', (
   res = syncOnce(v, { root, license: trialLicence('2027-11-15'), keys, at: NOW });
   assert.equal(res.error, null, `sync completes: ${res.error}`);
   assert.ok(fs.existsSync(eng.marker), 'the engine is called with a valid licence');
+  v.close();
+});
+
+test('WO-05-B AC04: the stop sync skips the engine and keeps both inside the stop window', () => {
+  // a hanging engine (sleeps 4 s) with a 30 s timeout would hold the stop sync past its 3 s
+  // window; the stop flag skips the engine so the sync finishes in time and keeps both
+  const eng = stubEngine('slow');
+  const { v, root, note } = noteConflict();
+  v.config.merge = { paid: true, command: eng.command, args: eng.args, timeout_ms: 30000 };
+  const t0 = Date.now();
+  const res = syncOnceWithin(v, { root, license: trialLicence('2027-11-15'), keys, at: NOW });
+  const elapsed = Date.now() - t0;
+  assert.equal(res.error, null, `stop sync completes: ${res.error}`);
+  const rec = res.conflicts?.find((c) => c.path === note);
+  assert.ok(rec, 'the note is recorded as a conflict');
+  assertFree(root, note, rec);
+  assert.match(rec.reason, /the stop sync skips the merge engine/, 'the reason names the stop skip');
+  assert.ok(elapsed < 3000, `the stop sync completes in ${elapsed} ms, within the 3 s stop window`);
+  v.close();
+});
+
+test('WO-05-B AC05: the interval sync bounds the engine call under the health window', async () => {
+  // a slow engine (sleeps 4 s) would hold the event loop past the daemon's 800 ms health window;
+  // the interval sync bounds the engine call to 500 ms so the health check still succeeds
+  const eng = stubEngine('slow');
+  const { v, root, note } = noteConflict();
+  v.config.merge = { paid: true, command: eng.command, args: eng.args };
+  const t0 = Date.now();
+  const res = await syncOnceAsync(v, { root, license: trialLicence('2027-11-15'), keys, at: NOW });
+  const elapsed = Date.now() - t0;
+  assert.equal(res.error, null, `interval sync completes: ${res.error}`);
+  const rec = res.conflicts?.find((c) => c.path === note);
+  assert.ok(rec, 'the note is recorded as a conflict');
+  assertFree(root, note, rec);
+  assert.ok(elapsed < 5000, `the interval sync completes in ${elapsed} ms, well under the 30 s default`);
+  v.close();
+});
+
+test('WO-05-B AC06: a note over 1 MB merges without ENOBUFS', () => {
+  // the default spawnSync maxBuffer is 1 MB; a 2 MB note would fail with ENOBUFS unless the
+  // engine call raises it. The boundary's commandProvider now passes ENGINE_MAX_BUFFER (64 MB).
+  const big = 'x'.repeat(2 * 1024 * 1024);
+  const { v, root, other } = twoComputers();
+  const note = 'notes/note.md';
+  fs.mkdirSync(path.join(root, 'notes'), { recursive: true });
+  fs.writeFileSync(path.join(root, note), `# N\n\n${big}\n`);
+  git(root, ['add', note]); git(root, ['commit', '-q', '-m', 'base']);
+  const p0 = git(root, ['push', '-q', 'origin', 'main']);
+  assert.ok(p0.ok, `push: ${p0.err}`);
+  const pl = otherGit(other, 'pull', '-q', 'origin', 'main');
+  assert.ok(pl.ok, `other pull: ${pl.err}`);
+  fs.writeFileSync(path.join(other, note), `# N\n\n${big}-theirs\n`);
+  otherGit(other, 'add', note); otherGit(other, 'commit', '-q', '-m', 'theirs');
+  const p1 = otherGit(other, 'push', '-q', 'origin', 'main');
+  assert.ok(p1.ok, `push: ${p1.err}`);
+  fs.writeFileSync(path.join(root, note), `# N\n\n${big}-ours\n`);
+  git(root, ['add', note]); git(root, ['commit', '-q', '-m', 'ours']);
+  // a stub engine that echoes back the ours version as the merged note
+  const dir = tmpdir('engine-');
+  const script = path.join(dir, 'engine.mjs');
+  const marker = path.join(dir, 'called');
+  fs.writeFileSync(script, [
+    "import fs from 'node:fs';",
+    `fs.writeFileSync(${JSON.stringify(marker)}, 'called');`,
+    "let buf = '';",
+    "process.stdin.on('data', (d) => { buf += d; });",
+    "process.stdin.on('end', () => {",
+    "  const { a } = JSON.parse(buf);",
+    "  console.log(JSON.stringify({ text: a }));",
+    "});",
+  ].join('\n'));
+  v.config.merge = { paid: true, command: process.execPath, args: [script] };
+  const res = syncOnce(v, { root, license: trialLicence('2027-11-15'), keys, at: NOW });
+  assert.equal(res.error, null, `sync completes: ${res.error}`);
+  assert.ok(fs.existsSync(marker), 'the engine is called');
+  const content = fs.readFileSync(path.join(root, note), 'utf8');
+  assert.ok(content.includes(big), 'the merged note carries the 2 MB content');
   v.close();
 });

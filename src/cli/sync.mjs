@@ -7,14 +7,12 @@
 // second writer gets a warning (in memev doctor and jobs.json). The warning never blocks anything.
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 import { git } from '../engine/git.mjs';
 import { gitVia443, alt443, cloneOffer } from './github.mjs';
 import { signAddressRecord } from '../engine/devices.mjs';
 import { now, readJson, writeJson } from '../engine/util.mjs';
-import { resolveMerge } from '../engine/merge.mjs';
+import { resolveMerge, commandProvider, registerMergeProvider, ENGINE_MAX_BUFFER } from '../engine/merge.mjs';
 import { licenseFile } from '../engine/license.mjs';
 
 export const ADDRESS_FILE = 'address.json';
@@ -35,17 +33,9 @@ function rawLicense(env = process.env) {
   try { return JSON.parse(fs.readFileSync(licenseFile(env), 'utf8')); } catch { return null; }
 }
 
+// the paid client module, present only when the install ships it; its presence is the "installed"
+// check, and the engine command is reached through the boundary's commandProvider, never imported
 const PAID_CLIENT = new URL('../engine/paid-merge.mjs', import.meta.url);
-let paidClient = null;
-// loaded synchronously when the runtime can require an ES module, so the first sync of a fresh
-// process already has it; the dynamic import covers the rest
-try { paidClient = createRequire(import.meta.url)(fileURLToPath(PAID_CLIENT)); } catch {}
-const paidClientLoad = paidClient ? Promise.resolve(paidClient) : import(PAID_CLIENT).then((m) => { paidClient = m; return m; }, () => null);
-
-/** Load the paid client module once; null when it is not installed. */
-export function loadPaidClient() {
-  return paidClientLoad;
-}
 
 /** The paid engine flag: off by default on every install. */
 export function paidEngineOn(config) {
@@ -108,7 +98,7 @@ function mergeJsonl(ours, theirs) {
 
 /** The exact content of one side of a conflicted file, from the merge index (stage 2 is ours, 3 theirs). */
 function stageContent(root, stage, p) {
-  const r = spawnSync('git', ['show', `:${stage}:${p}`], { cwd: root, encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+  const r = spawnSync('git', ['show', `:${stage}:${p}`], { cwd: root, encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, maxBuffer: ENGINE_MAX_BUFFER });
   return r.status === 0 ? r.stdout : null;
 }
 
@@ -127,19 +117,20 @@ function conflictCopyPath(root, p) {
 
 /**
  * The provider for the paid engine, when the flag is on and the install has not set its own
- * provider: the paid client, pointed at the engine command the install configured. Returns the
- * config to merge with, or the reason the free behaviour runs instead.
+ * provider: the engine command the install configured, run as an external process through the
+ * boundary's commandProvider. Returns the provider to register, or the reason the free behaviour
+ * runs instead. At stop the engine is skipped so the stop sync never holds past its window.
  */
-function paidProviderFor(config, opts) {
+function paidEngineFor(config, opts) {
   if (config?.merge?.provider) return null; // the install set its own provider; the gate uses it
   if (!paidEngineOn(config)) return null;   // the flag is off; the gate decides as before
+  if (opts.stop) return { reason: 'the stop sync skips the merge engine' };
   const st = paidEngineStatus(config, { client: opts.client });
   if (!st.installed) return { reason: st.reason };
-  if (!paidClient) return { reason: 'the paid client is not loaded yet' };
   const command = config?.merge?.command;
   if (typeof command !== 'string' || !command) return { reason: 'the paid engine has no command configured' };
-  const provider = paidClient.commandProvider(command, { args: config.merge.args ?? [], timeoutMs: config.merge.timeout_ms ?? 30000 });
-  return { config: { ...config, merge: { ...config.merge, provider } } };
+  const provider = commandProvider(command, { args: config.merge.args ?? [], timeoutMs: opts.engineTimeoutMs ?? config.merge.timeout_ms ?? 30000, maxBuffer: ENGINE_MAX_BUFFER });
+  return { provider };
 }
 
 /**
@@ -154,6 +145,12 @@ export function resolveConflicts(root, vault, opts = {}) {
   const st = git(root, ['-c', 'core.quotePath=false', 'diff', '--name-only', '--diff-filter=U']);
   const files = st.out.split('\n').filter(Boolean);
   const adds = [];
+  // the paid engine is determined once per sync, not per note; a stale provider from a previous
+  // sync is cleared so the flag off leaves nothing registered and no call leaves the computer
+  globalThis.__memevMergeProvider = null;
+  const config0 = vault?.config ?? null;
+  const paid = config0 ? paidEngineFor(config0, opts) : null;
+  if (paid?.provider) registerMergeProvider(paid.provider);
   const conflicts = files.map((p) => {
     const abs = path.join(root, ...p.split('/'));
     const ours = stageContent(root, 2, p);
@@ -185,16 +182,13 @@ export function resolveConflicts(root, vault, opts = {}) {
     fs.mkdirSync(path.dirname(abs), { recursive: true });
     let logLine = null;
     const log = (l) => { logLine = l; };
-    let config = vault?.config ?? null;
-    const paid = config ? paidProviderFor(config, opts) : null;
-    if (paid?.config) config = paid.config;
     let res;
     if (paid?.reason) {
       // the flag is on but the engine cannot be called; the free behaviour runs and the reason says which
       log(`kept both versions: ${paid.reason}`);
       res = { resolved: false, keepBoth: true };
     } else {
-      res = resolveMerge({ a: ours, b: theirs, base: stageContent(root, 1, p), license: opts.license, config, keys: opts.keys, now: opts.now, log });
+      res = resolveMerge({ a: ours, b: theirs, base: stageContent(root, 1, p), license: opts.license, config: config0, keys: opts.keys, now: opts.now, log });
     }
     if (res.resolved) {
       fs.writeFileSync(abs, res.text);
@@ -263,7 +257,7 @@ export function publishAddressRecord(root, url) {
 // The sync, step by step: local git work runs here, and each network step (fetch, push) is yielded to
 // the caller, which runs it blocking (syncOnce), blocking with a deadline (syncOnceWithin, at daemon
 // stop) or off the event loop with a timeout (syncOnceAsync, the daemon's start and interval syncs).
-function* syncSteps(vault, { root, license, keys, at, client } = {}) {
+function* syncSteps(vault, { root, license, keys, at, client, stop, engineTimeoutMs } = {}) {
   const fc = vault.commits.flush();
   const remote = git(root, ['remote']).out.split('\n').filter(Boolean)[0];
   const res = { at: now(), remote: remote || null, pulled: 0, pushed: false, error: null };
@@ -280,7 +274,7 @@ function* syncSteps(vault, { root, license, keys, at, client } = {}) {
     if (!git(root, ['merge-base', 'HEAD', `${remote}/${branch}`]).ok) { res.error = `unrelated history: ${cloneOffer(url)}`; return res; }
     const m = git(root, ['merge', '--no-edit', '-q', `${remote}/${branch}`]);
     if (!m.ok) {
-      const r = resolveConflicts(root, vault, { license: license === undefined ? rawLicense() : license, keys, now: at, client });
+      const r = resolveConflicts(root, vault, { license: license === undefined ? rawLicense() : license, keys, now: at, client, stop, engineTimeoutMs });
       if (!r.ok) { git(root, ['merge', '--abort']); res.error = 'merge conflict: left as is; run memev doctor'; return res; }
       const prev = pruneConflicts(root);
       recordConflicts(root, { at: now(), files: [...new Set([...(prev?.files || []), ...r.files])], conflicts: [...(prev?.conflicts || []), ...r.conflicts] });
@@ -302,6 +296,9 @@ function* syncSteps(vault, { root, license, keys, at, client } = {}) {
 
 const NET_TIMEOUT_MS = 60000;   // one fetch or push in the background; a dropped port 22 hangs about 75 s
 export const STOP_SYNC_MS = 3000; // the last sync at stop, inside the 5 s memev stop waits before SIGKILL
+// the engine call in the interval and start syncs, bounded well under the daemon's 800 ms health
+// window so a slow engine never holds the event loop past the health check
+const ENGINE_INTERVAL_TIMEOUT_MS = 500;
 
 /** The sync, run blocking: memev sync and the sync provider. */
 export function syncOnce(vault, opts = {}) {
@@ -328,7 +325,7 @@ function gitWithin(root, { args, remote, url }, deadline) {
 /** The sync with a deadline, for the daemon's stop: what does not finish in time is left to the next start. */
 export function syncOnceWithin(vault, { ms = STOP_SYNC_MS, ...opts } = {}) {
   const deadline = Date.now() + ms;
-  const g = syncSteps(vault, opts);
+  const g = syncSteps(vault, { ...opts, stop: true });
   let r = g.next();
   while (!r.done) {
     const out = gitWithin(opts.root, r.value, deadline);
@@ -362,8 +359,9 @@ function endGit(child) {
 
 /** The sync off the event loop: the daemon keeps answering while fetch and push wait on the network. */
 export async function syncOnceAsync(vault, { timeoutMs = NET_TIMEOUT_MS, live = null, ...opts } = {}) {
-  await loadPaidClient(); // the conflict resolver uses the paid client when the flag is on
-  const g = syncSteps(vault, opts);
+  // the interval and start syncs run off the event loop; the engine call is bounded well under the
+  // daemon's health window so a slow engine never holds the event loop past it
+  const g = syncSteps(vault, { ...opts, engineTimeoutMs: ENGINE_INTERVAL_TIMEOUT_MS });
   let r = g.next();
   while (!r.done) {
     const { args, remote, url } = r.value;
