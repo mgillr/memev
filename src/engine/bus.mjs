@@ -26,6 +26,12 @@ export const LEAD_NEEDED = 'No lead AI is set for this vault. Ask the user which
 const SEAT_RE = /^[a-z0-9][a-z0-9._-]{0,40}@[a-z0-9][a-z0-9._-]{0,40}(\/[a-z0-9._-]{1,24})?$/;
 const REF_RE = /^[A-Za-z0-9._:-]{1,64}$/;
 const PULSE_COMMIT_MS = 5 * 60e3;
+export const UNREAD_VIEW = 8;   // default messages a capped bus_unread shows
+export const UNREAD_MAX = 50;   // stated maximum for the bus_unread limit
+export const BODY_CUT = 300;    // characters per message in the capped view
+export const CUT_MARK = '…';    // appended when a body is cut to fit the view
+export const TAIL_MAX = 50;     // stated maximum for bus_tail n
+export const SINCE_MAX = 50;    // stated maximum for bus_since limit
 
 export class BusError extends Error { constructor(code, message) { super(message); this.code = code; this.name = 'BusError'; } }
 
@@ -335,20 +341,87 @@ export class Bus {
 
   since(ctx, { seq = 0, limit = 50, seat = null } = {}) {
     const who = this.resolve(ctx, { seat }); this.pulse(ctx, { who });
-    return this.all().filter((m) => m.seq > Number(seq || 0) && this._visible(who, m)).slice(0, Math.min(200, limit));
+    const lim = Math.min(Math.max(1, Math.floor(Number(limit)) || SINCE_MAX), SINCE_MAX);
+    const matched = this.all().filter((m) => m.seq > Number(seq || 0) && this._visible(who, m));
+    return { messages: matched.slice(0, lim), more: Math.max(0, matched.length - lim) };
   }
   tail(ctx, { n = 20, seat = null, type = null } = {}) {
     const who = this.resolve(ctx, { seat });
-    return this.all().filter((m) => this._visible(who, m) && (!type || m.type === type)).slice(-Math.min(200, n));
+    const lim = Math.min(Math.max(1, Math.floor(Number(n)) || 20), TAIL_MAX);
+    const matched = this.all().filter((m) => this._visible(who, m) && (!type || m.type === type));
+    return { messages: matched.slice(-lim), more: Math.max(0, matched.length - lim) };
   }
-  /** New messages for this seat; marks them read, counts as a heartbeat and answers comms checks. */
-  unread(ctx, { seat = null, peek = false } = {}) {
+  /** The read state for a device: a number (contiguous prefix) or { up_to, extra }. */
+  _readUpTo(read, device) {
+    const v = read[device];
+    if (v == null) return { upTo: 0, extra: new Set() };
+    if (typeof v === 'number') return { upTo: v, extra: new Set() };
+    return { upTo: v.up_to || 0, extra: new Set(v.extra || []) };
+  }
+  _storeRead(read, device, upTo, extra) {
+    const arr = [...extra].sort((a, b) => a - b);
+    if (!arr.length) { if (upTo > 0) read[device] = upTo; else delete read[device]; return; }
+    if (arr.every((d) => d <= upTo)) { read[device] = upTo; return; }
+    read[device] = { up_to: upTo, extra: arr };
+  }
+  /** Has this seat seen this message yet (its read prefix or extras cover it)? */
+  _isRead(read, m) {
+    const { upTo, extra } = this._readUpTo(read, m.device);
+    return m.dseq <= upTo || extra.has(m.dseq);
+  }
+  /** Mark one message read, keeping the contiguous prefix and the extras. */
+  _markRead(read, m) {
+    const { upTo, extra } = this._readUpTo(read, m.device);
+    if (m.dseq <= upTo) return;
+    if (m.dseq === upTo + 1) {
+      let n = m.dseq;
+      while (extra.has(n + 1)) { extra.delete(n + 1); n += 1; }
+      this._storeRead(read, m.device, n, extra);
+    } else {
+      extra.add(m.dseq);
+      this._storeRead(read, m.device, upTo, extra);
+    }
+  }
+  /** Mark every message up to and including m read (the old all-at-once behaviour). */
+  _markAllRead(read, m) {
+    const { upTo, extra } = this._readUpTo(read, m.device);
+    const newUp = Math.max(upTo, m.dseq);
+    const rest = new Set([...extra].filter((d) => d > newUp));
+    this._storeRead(read, m.device, newUp, rest);
+  }
+  /** One message in the capped view: body cut to BODY_CUT unless it is a priority type. */
+  _view(m, { cut = true } = {}) {
+    const doCut = cut && m.body.length > BODY_CUT;
+    return { seq: m.seq, id: m.id, from: m.from, to: m.to, type: m.type, ref: m.ref, operator: m.operator, ts: m.ts, body: doCut ? m.body.slice(0, BODY_CUT) + CUT_MARK : m.body, cut: doCut };
+  }
+  /** New messages for this seat; counts as a heartbeat and answers comms checks.
+   * Capped (a limit, or the capped flag) it shows the priority messages (hold, task) in full plus
+   * the last `limit` of the rest cut to BODY_CUT, marks only what it showed read, and says how many
+   * it left. Uncapped it returns every fresh message and marks them all read, as the hook path does. */
+  unread(ctx, { seat = null, peek = false, limit = null, capped = false } = {}) {
     const who = this.resolve(ctx, { seat });
     const p = this._pulse(who.seat); const read = p.read || {};
     const all = this.all();
     const names = this._names(who.seat);
-    const fresh = all.filter((m) => m.dseq > (read[m.device] || 0) && this._toMe(who, m, names) && this._visible(who, m));
-    if (!peek) for (const m of all) if (this._toMe(who, m, names) || names.includes(m.from)) read[m.device] = Math.max(read[m.device] || 0, m.dseq);
+    const fresh = all.filter((m) => !this._isRead(read, m) && this._toMe(who, m, names) && this._visible(who, m));
+    const cap = capped || limit != null;
+    const isPriority = (m) => m.type === 'task' || (m.type === 'hold' && m.operator);
+    let shownMsgs = fresh; let notShown = 0;
+    if (cap) {
+      const lim = Math.min(Math.max(1, Math.floor(Number(limit)) || UNREAD_VIEW), UNREAD_MAX);
+      const priority = fresh.filter(isPriority);
+      const rest = fresh.filter((m) => !isPriority(m));
+      shownMsgs = [...priority, ...rest.slice(-lim)];
+      notShown = fresh.length - shownMsgs.length;
+    }
+    if (!peek) {
+      if (cap) {
+        for (const m of shownMsgs) this._markRead(read, m);
+        for (const m of all) if (names.includes(m.from)) this._markRead(read, m);
+      } else {
+        for (const m of all) if (this._toMe(who, m, names) || names.includes(m.from)) this._markAllRead(read, m);
+      }
+    }
     this.pulse(ctx, { who, read: peek ? null : read });
     const acked = [];
     if (!(who.operator && who.seat === OPERATOR)) {
@@ -356,7 +429,8 @@ export class Bus {
         try { if (!ctx.identity?.read_only) { this._append(who, { to: m.from, type: 'ack', body: 'comms check: here', ref: m.id, project: null }); acked.push(m.id); } } catch {}
       }
     }
-    return { seat: who.seat, operator: who.operator, hold: this.holdOn(who.seat, all), messages: fresh, acked, ...(this.operator() ? {} : { lead_needed: LEAD_NEEDED }) };
+    const messages = cap ? shownMsgs.map((m) => this._view(m, { cut: !isPriority(m) })) : fresh;
+    return { seat: who.seat, operator: who.operator, hold: this.holdOn(who.seat, all), messages, ...(cap ? { not_shown: notShown } : {}), acked, ...(this.operator() ? {} : { lead_needed: LEAD_NEEDED }) };
   }
 
   // ---- pulse
@@ -429,10 +503,10 @@ export class Bus {
     return { check: msg.id, seq: msg.seq, waited_ms: Date.now() - start, answered, missing };
   }
 
-  /** Has this seat not seen this message yet (its read pointer is still behind it)? */
+  /** Has this seat not seen this message yet (its read prefix or extras do not cover it)? */
   unreadFor(seat, m) {
     const p = this._pulse(seat);
-    return m.dseq > (p.read?.[m.device] || 0);
+    return !this._isRead(p.read || {}, m);
   }
   /** Tasks with who claimed them, the restatement, the latest status and the verdict. An unclaimed
    * task to a live seat that has not read it yet waits for that seat's next turn. */

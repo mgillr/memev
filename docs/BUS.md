@@ -147,6 +147,19 @@ An app only answers between turns, so a comms check mostly shows who is in a ses
 For an app or script that should stay reachable, run `memev bus watch <seat>`: it checks every few
 seconds, prints new messages and keeps the heartbeat going.
 
+## Reading the bus
+
+`bus_unread` shows a bounded view so a busy bus does not flood a turn. It shows at most eight of the
+newest unread messages that are not your go, and says how many were left out (`not_shown`). A body
+longer than 300 characters is cut with a marker; the full body is still on the bus, and `bus_since`
+reaches it by seq. A task or an operator hold is always shown first, in full and never cut, whatever
+the cap. What a capped call does not show stays unread, so the next call shows it in its place by
+time.
+
+`bus_tail` and `bus_since` show at most 50 messages and say how many more exist (`more`); ask for
+fewer with `n` or `limit`. The hook that puts new messages in front of a hooked app reads the whole
+bus, so it is not capped.
+
 ## Limits
 
 - An agent in the operator session speaks for you. You pick that seat; Memev never does.
