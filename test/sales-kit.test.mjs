@@ -84,10 +84,17 @@ test('WO-10-A AC04: the pilot checklist runs two to four weeks, agrees week for 
   const rows = {};
   for (const m of pilot.matchAll(/^\|\s*(\d+)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*$/gm)) rows[m[1]] = { step: flat(m[2]), owner: flat(m[3]) };
   assert.deepEqual(Object.keys(rows).sort(), ['1', '2', '3', '4'], 'the pilot has four weeks');
+  // The setup table names the on-premises provider with a word that new lines
+  // must not repeat, so the checklist says "on-premises model" instead. I take
+  // the word from the table itself and read it as "model" on both sides; every
+  // other character of every week must still agree.
+  const word = (setup.match(/on-premises (\w+)/) || [])[1];
+  assert.ok(word, 'the setup table names the on-premises provider');
+  const norm = (s) => s.replace(new RegExp(`\\b${word}\\b`, 'gi'), 'model');
   for (const w of ['1', '2', '3', '4']) {
     assert.ok(rows[w].step, `week ${w} has a named step`);
     assert.ok(rows[w].owner, `week ${w} has an owner`);
-    assert.equal(rows[w].step, biz[w], `week ${w} agrees with the Business setup table`);
+    assert.equal(norm(rows[w].step), norm(biz[w]), `week ${w} agrees with the Business setup table`);
   }
   assert.ok(pilot.includes('[tiers/services.md](tiers/services.md)'), 'the services menu is linked for anything quoted');
   const planned = section(pilot, /what is planned/i);
