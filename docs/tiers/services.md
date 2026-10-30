@@ -29,7 +29,7 @@ Each package is priced on your requirements: contact us for a quote.
 |---|---|---|
 | Onboarding, small | Personal: install, GitHub backup, apps connected, a walkthrough | 1 to 2 days |
 | Business setup | the company server, sign-in, departments, computers, backup | 2 to 3 weeks |
-| Business setup with an on-premises LLM | the above plus the model server, connected as the organisation's one AI provider, and the rules for what reaches it | 3 to 4 weeks |
+| Business setup with an on-premises LLM | the above plus optional locally hosted models, additional AI integrations and the rules for what information each tool may receive | 3 to 4 weeks |
 | Sales-assisted pilot | Business or Corporate for an organisation that needs an on-premises LLM, an air-gapped install or a compliance-led rollout (planned) | |
 | Trial setup, on-prem | the operator installs and configures the trial for you, on your servers | priced on your requirements |
 | Corporate onboarding | discovery, high availability, identity, SIEM, pilot, rollout | 6 to 12 weeks |
