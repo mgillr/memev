@@ -59,7 +59,7 @@ The contract is the same for every tier that buys the merge service. It says not
 the engine runs: the boundary speaks to a command or an address, and this page does not decide
 which. That decision is open, and the contract holds either way.
 
-## What is not said here
+## Relationship to the wider architecture\n\nThe present service contract is a note-conflict contract. It must not be silently interpreted as a\ncontract for arbitrary structured state, project/programme/portfolio graphs, business approvals,\nsite federation or federated learning. Extending CRDT-Merge into those areas requires explicit\ninput/output schemas, ownership and authority rules, provenance, failure behaviour, policy checks\nand conformance tests. Memev remains responsible for business semantics and permission decisions;\nthe convergence engine does not decide whether a contribution is true, authorised or approved.\nSee [FEDERATION.md](FEDERATION.md), [ORGANISATIONAL-INTELLIGENCE.md](ORGANISATIONAL-INTELLIGENCE.md)\nand [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).\n\n## What is not said here
 
 This page states no merge strategy names, no benchmark figures and no release dates for the
 engine, because none are published for Memev. A page for any of them is written when the feature
