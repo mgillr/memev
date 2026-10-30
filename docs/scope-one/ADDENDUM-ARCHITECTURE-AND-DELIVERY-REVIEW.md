@@ -12,6 +12,8 @@ Scope One remains the complete product target: a user describes an outcome and i
 
 The first end-to-end demonstration is an integration gate, not a replacement for the full Scope One scope. Do not reduce the product to a memory store, agent launcher or coding-only workbench.
 
+The final product direction also extends beyond individual project execution: Memev is intended to become a shared, permission-governed organisational memory and coordination environment. It must support an individual working across local and cloud agents, a multi-person business whose departments can learn from and scrutinise one another's work, and federated enterprises coordinating activity across offices, locations and jurisdictions. This is a progressive scale-out of one coherent architecture, not a set of unrelated products.
+
 ## Findings and recommendations
 
 ### 1. Establish one trustworthy development baseline
@@ -211,6 +213,145 @@ Recovery must preserve history and surface unresolved conflicts; it must not sil
 
 Repeat with different provider and machine configurations. Record which steps are automatic, policy-gated or genuinely require human intervention.
 
+
+### 13. Define the final-state architecture: shared organisational memory, cross-functional intelligence and federation
+
+**Product direction:** Memev must scale from a personal multi-agent work environment into the shared operational memory and coordination layer for an entire business, and ultimately a federation of businesses or enterprise units. It is not only a mechanism for completing isolated projects. It should allow people and agents working on different tasks, projects, programmes and business activities to contribute to, retrieve and reason over a coherent organisational body of knowledge, subject to explicit permissions and trust boundaries.
+
+#### 13.1 Personal deployment: one person, one or several machines, many agents
+
+The personal use case is one person working on one computer, potentially with several local agents and cloud-based agents, or the same person working across two or three computers. Examples include Claude Code, Codex and other local/terminal-oriented clients alongside cloud services such as Claude, Grok and other supported providers.
+
+- Treat the person as the owner of a coherent personal work environment, not as an operator who must manually move context between clients, sessions or machines.
+- Provide a common, durable memory and project context across the person's permitted agents and devices. Agents should be able to discover relevant prior work, decisions, artefacts, constraints and unfinished obligations without requiring the user to repeat them.
+- Preserve local-first operation and useful single-machine functionality. Multi-device synchronisation must not make a hosted service a hidden prerequisite for local project integrity.
+- Keep agent-specific execution and provider sessions replaceable. The durable unit is the user's work, its state and evidence, not a particular chat or agent session.
+- A single computer may run multiple agents without needing the full distributed business infrastructure. Two or three computers introduce device synchronisation and recovery requirements, but do not by themselves imply an enterprise trust domain.
+
+#### 13.2 Small business: a shared memory and intelligence layer across people and departments
+
+For a small business, imagine approximately ten people working across different functions: engineering, operations, sales, finance, customer support, research, management or other departments. Each person may use different computers, agents, providers and tools. They may be working on entirely different projects and routine business activities.
+
+Memev should allow those separately operating people and systems to contribute relevant work state, decisions, artefacts, events and evidence into a coherent, shared organisational memory. This is more than a shared folder or a collection of project summaries.
+
+- Establish an organisation-level knowledge and work graph connecting people, teams, departments, projects, programmes, customers or other business entities, commitments, decisions, artefacts, risks, issues, dependencies and evidence.
+- Let an authorised person or agent discover relevant work elsewhere in the organisation. For example, an agent assisting with a new customer proposal could discover a delivery constraint identified by engineering, a contractual commitment recorded by operations, a pricing assumption from finance, or a previous customer issue that materially changes the proposal.
+- Enable cross-functional reasoning. Agents should be able to identify inconsistent assumptions, duplicated effort, conflicting commitments, overlooked dependencies, emerging risks, reusable work and opportunities that are not visible when each project is considered in isolation.
+- Allow insights from one project or department to inform another. A technical decision, operational incident, customer requirement or failed approach should become discoverable organisational knowledge where policy permits, rather than remaining trapped in the original agent session or project.
+- Make organisational memory cumulative: each new piece of work can improve the context available to future work. The value should compound as the organisation uses Memev across more activities, not only as it creates more projects.
+- Support both explicit retrieval and proactive discovery. Agents should be able to query the relevant organisational context, while background analysis may surface material cross-project relationships, anomalies, risks and opportunities for review.
+- Keep each project independently governed. Shared organisational awareness must not erase project scope, ownership, approval authority, confidentiality or the distinction between a local project fact and an organisation-wide policy.
+- The system may propose assumptions, identify gaps and raise potential issues, but it must show the source, context, freshness and confidence of each finding. A model-generated inference is a hypothesis to validate, not a new organisational fact or an authorised change.
+- Do not require staff to manually copy every update into a central knowledge base. Capture and reconcile useful work state through the existing project store, event history, integrations and approved agent workflows, with explicit controls over what is shared.
+
+The intended result is an integrated but distributed team: people and agents can work independently, while the organisation benefits from a coherent understanding of what is happening across the business.
+
+#### 13.3 Larger businesses: offices, clusters and operational domains
+
+The architecture must continue to work as a business grows beyond a single office. A representative progression might be a cluster of roughly 29 computers across several offices, with people and agents working across multiple departments and programmes.
+
+- Support multiple Memev nodes and execution resources at each location, with local work continuing during WAN outages or remote-service disruption where possible.
+- Reconcile shared work and organisational knowledge across locations without assuming that all nodes are continuously connected.
+- Represent location, department, team, project and programme as distinct scopes. A user may participate in several of them, with different permissions and responsibilities in each.
+- Permit local operational state to remain local where necessary while publishing approved shared facts, references, evidence or derived views to the wider organisation.
+- Preserve causal history and provenance when updates cross office boundaries. Delayed, duplicated or reordered messages must not create false progress, erase accepted work or silently overwrite a more authoritative decision.
+- Allow organisation-wide agents and authorised departmental agents to reason across permitted scopes, while preventing a department's local assumptions from being silently promoted to company policy.
+
+#### 13.4 Enterprise and international federation
+
+At enterprise scale, Memev must support many offices, clusters, business units and countries. Some locations may operate under different legal, contractual, security or data-residency requirements. The system must therefore federate authority and knowledge without requiring indiscriminate centralisation.
+
+- Model federation as an explicit relationship between independently governed nodes, offices, business units or organisations. Each federation relationship defines what identities, state, evidence, metadata, artefacts and derived knowledge may cross the boundary, for what purpose and under whose authority.
+- Support multiple trust and policy domains. An enterprise-wide project may span several offices while each office retains control over local resources, sensitive records and jurisdiction-specific obligations.
+- Allow controlled exchange of shared project state, approved evidence, commitments, dependency information and derived insights. Where raw data or artefacts cannot cross a boundary, use policy-approved metadata, references, proofs or locally computed results where technically and legally appropriate.
+- Preserve data sovereignty, access control, retention and audit requirements at the relevant boundary. Federation must not imply that every node receives every underlying record.
+- Support partial connectivity, asynchronous reconciliation, independent operation and explicit conflict handling between locations.
+- Permit cross-organisation collaboration only through explicit contracts, identity relationships, capabilities and data-sharing rules. A partner organisation must not gain ambient access to another organisation's memory merely because it participates in one joint project.
+- Make trust changes and revocation meaningful across the federation. A compromised identity, node or operator must not retain authority simply because it was previously trusted or because a location is temporarily disconnected.
+- Provide an enterprise-level view of projects, programmes, operations, risks and commitments without flattening local authority or hiding uncertainty.
+
+#### 13.5 Shared organisational memory is governed, not unrestricted
+
+The phrase "shared memory" must mean that relevant work becomes discoverable across the organisation under its access and sharing policy. It must not mean that every person, agent, provider or computer can read every record.
+
+- Enforce identity, role, project membership, department, purpose, data classification, jurisdiction, consent and explicit resource permissions at retrieval and action time.
+- Apply least privilege and deny by default across organisational and federation boundaries. Do not rely on UI filtering alone; access control must be enforced by the underlying services and data paths.
+- Distinguish raw source records, confidential artefacts, shared summaries, metadata, derived insights and public organisational knowledge. Each may have different sharing rules.
+- Preserve source attribution and links to the underlying evidence. Summaries and embeddings must not become an uncontrolled side channel around source permissions.
+- Respect revocation, retention, deletion obligations and permission changes in indexes, caches, replicas and derived views. Define how already-derived insights are invalidated or re-evaluated when their source access changes.
+- Keep secrets, credentials, personal data and restricted material out of general organisational retrieval unless explicitly authorised and necessary for the task.
+- Record which identity or agent accessed, contributed, transformed or disclosed material organisational knowledge, and under which authority.
+- Allow administrators to define organisation-wide defaults while retaining narrower project, team, department, location and jurisdiction controls.
+
+#### 13.6 Cross-project intelligence and proactive issue discovery
+
+Memev's organisational memory should do more than answer questions. It should help an integrated distributed team notice what isolated teams may miss.
+
+Examples include:
+- Detecting that two departments are making incompatible assumptions about the same customer, product, delivery date, cost or technical dependency.
+- Identifying that a proposed commitment conflicts with capacity, an existing programme milestone, a known supplier issue or a previously recorded contractual obligation.
+- Finding duplicated research, repeated failed approaches, reusable components or decisions that should be reconsidered in light of newer evidence.
+- Noticing that a change in one project creates downstream risk for another project or business process.
+- Identifying missing ownership, missing evidence, unverified claims or unresolved decisions that affect multiple workstreams.
+- Surfacing opportunities where work in one department can accelerate or improve work in another.
+
+These capabilities must be evidence-led and appropriately cautious:
+- Every material finding should link to the source records, relevant scope and time context, affected entities and reasoning basis.
+- Distinguish observed facts, recorded decisions, agent-generated inferences, assumptions and recommendations.
+- State uncertainty, conflicting sources and missing context. Do not manufacture consensus from repetition or from multiple agents that share the same underlying source.
+- Route consequential findings into the appropriate owner or decision workflow. Do not silently edit approved project scope, alter commitments, disclose restricted information or change business policy.
+- Support dismissal, correction, adjudication and feedback so that false positives do not become permanent organisational memory.
+
+#### 13.7 The distributed systems research becomes core infrastructure at multi-system scale
+
+CRDT-Merge, ACFA-RS and E4 should be treated as complementary infrastructure for the Business and Enterprise deployment model, not as unrelated optional research demonstrations. Their importance increases as Memev moves from one person's local environment to independently operating devices, people, departments, offices and federated organisations.
+
+- **CRDT-Merge — convergence of replicated work state:** the existing paid convergence engine is the convergence mechanism for supported distributed state. Its role should extend through a well-defined Memev integration contract from the initial supported conflict types to the structured project and organisational state required by the product: project and scope versions, requirements, plans, tasks and dependencies, assignments, execution attempts, artefact manifests, decisions, receipts and evidence references. Memev remains authoritative for project semantics, permissions, approvals and legal task transitions. CRDT-Merge does not decide whether work is correct, authorised or VERIFIED. Convergence of state is not proof of truth.
+- **ACFA-RS — accountable admission and reconciliation of contributions:** use it where independently operating nodes and operators submit signed structured contributions, verifier findings, test results, measurements, compliance evidence or competing claims. Its role is to provide accountable admission, equivocation evidence and deterministic reconstruction under its stated assumptions. It is not a generic natural-language voting system and does not turn admitted evidence into proof of correctness.
+- **E4 — distributed trust and eligibility governance:** use it to govern the trust relationships and evidence associated with people, agents, devices, services and participating organisations. Trust must affect eligibility, permitted operations and verification requirements, with provenance and reviewable changes. Do not collapse trust into one self-asserted score or treat trust propagation as a substitute for access control, cryptographic verification or independent evidence.
+
+The integration boundaries must remain explicit:
+- Memev owns project and organisational authority, canonical schemas, access policy, task lifecycle, approvals, verification semantics and user-facing decisions.
+- CRDT-Merge owns its defined convergence mechanics behind the paid service boundary.
+- ACFA-RS owns its defined accountable contribution-admission and reconstruction mechanisms where selected.
+- E4 owns its defined trust-governance mechanisms where selected.
+- The event, receipt and evidence model links these systems without allowing one subsystem to claim guarantees that belong to another.
+- The system must remain useful locally and degrade safely if a paid or remote service is unavailable. It must not falsely claim distributed convergence, trust verification or evidence admission while those services are unavailable.
+
+The Business tier should make multi-person, multi-device shared work state and organisational memory a first-class supported deployment, using the paid convergence integration where required. Enterprise should extend this into multi-office, multi-domain and international federation, with stronger trust, policy, sovereignty, audit and cross-boundary controls. Personal should remain approachable and local-first, supporting one person's agents and a small number of devices without forcing enterprise infrastructure onto an individual.
+
+These are target architecture and integration requirements. They do not claim that the current Memev codebase or the existing service contracts already implement the full structured organisational-state or federation model. The exact schemas, APIs, policy model, failure semantics and guarantees must be specified, tested and accepted before being described as delivered.
+
+#### 13.8 Scale is determined by topology and trust boundaries, not fixed device counts
+
+Illustrative deployment profiles:
+- **Personal:** one person, one computer, multiple local and cloud agents.
+- **Personal multi-device:** one person across two or three computers, with shared personal work context and continuity.
+- **Small business:** approximately ten people across multiple functions, sharing governed organisational memory and cross-functional intelligence.
+- **Growing business:** a cluster of approximately 29 computers across several offices, with distributed execution and replicated organisational state.
+- **Enterprise:** many offices and locations, multiple departments and programmes, with federated policy and trust domains.
+- **International enterprise or inter-enterprise federation:** multiple countries, legal jurisdictions and independently governed organisations.
+
+These are examples, not licensing or technical thresholds. A smaller deployment may need federation because of its legal or trust topology; a larger deployment in one controlled environment may not. Tier boundaries should reflect the capabilities, support, governance and operational complexity supplied, not arbitrary machine counts.
+
+#### 13.9 Acceptance tests for the final-state architecture
+
+Extend the integration and adversarial test programme to cover:
+- One person using several different local and cloud agents on one computer, with shared context, consistent project state and no dependence on a single provider session.
+- One person moving between two or three computers, with offline work, reconnection, duplicate and reordered updates, and correct recovery of personal project state.
+- A representative small business with approximately ten people across different departments, each working on separate projects and activities, where authorised agents can discover relevant shared knowledge and identify a seeded cross-department conflict.
+- A finding that correctly links the source evidence, affected projects, relevant owners and uncertainty, and is routed for review without silently changing either project.
+- Confidential departmental or project information that must not be exposed to an unauthorised person or agent, including through summaries, search, embeddings, caches or derived insights.
+- A growing business with several offices and independently operating nodes, including WAN partitions, delayed reconciliation, conflicting updates and local continuation.
+- A multi-office enterprise with separate policy and trust domains, proving that approved state and evidence cross boundaries while restricted records remain local.
+- A cross-border federation scenario with different data-residency or retention rules, proving that prohibited data is not replicated merely to simplify convergence.
+- A compromised or revoked operator/device whose trust and permissions change, with affected contributions and downstream verification identified for review and revalidation.
+- An unavailable CRDT-Merge, ACFA-RS or E4 service, proving that Memev reports degraded capability truthfully, preserves local history and does not claim guarantees it could not establish.
+- Reproducible reconstruction of who contributed what, under which authority, which evidence was admitted, what was shared across each boundary and why a cross-project issue was raised.
+- Growth in the number of people, projects, departments and nodes without turning the user experience into manual agent routing or requiring a central operator to reconcile every ordinary change.
+
+Measure convergence and recovery, prohibited information disclosure, duplicate side effects, false or unsupported findings, evidence traceability, trust-change propagation, scoped re-verification, time to detect cross-project conflicts, operational overhead and the ability to continue through partial failure.
+
 ## Competitive implication
 
 The closest product-level threats are autonomous engineering and multi-agent execution platforms, particularly OpenHands, Factory and Devin; Conductor and Replit are also relevant. Memory products are subsystem competitors, not the primary category for Scope One.
@@ -226,6 +367,10 @@ Memev should not compete merely on launching more agents or storing more context
 - evidence-bound verification and auditable history;
 - an accessible non-technical workspace alongside deep developer visibility;
 - local-first operation with optional cloud/commercial capabilities.
+- shared organisational memory that connects people, departments, projects, programmes and business activities under explicit access and sovereignty rules;
+- cross-functional intelligence that discovers evidence-backed conflicts, assumptions, risks, dependencies and reusable knowledge across otherwise independent work;
+- progressive scale from personal multi-agent use to multi-person businesses and federated, international enterprises;
+- distributed convergence, accountable contribution admission and trust governance through clearly separated CRDT-Merge, ACFA-RS and E4 integration boundaries.
 
 These are positioning hypotheses, not established advantages. They must be demonstrated through the integration and fault-injection tests above.
 
@@ -240,6 +385,9 @@ These are positioning hypotheses, not established advantages. They must be demon
 7. Complete autonomous dispatch, recovery, evidence-bound verification and adversarial tests, including UI reconstruction and permission revocation.
 8. Complete onboarding, supported workflows and release paths.
 9. Progress cloud, paid convergence and enterprise capabilities on stable interfaces without making them accidental blockers to local-first delivery.
+10. Define and implement the governed organisational memory and cross-project knowledge graph, including identity-aware retrieval, provenance, classification, retention, derived-insight invalidation and cross-functional issue discovery.
+11. Extend the paid CRDT-Merge integration contract to structured project and organisational state; define where ACFA-RS contribution admission and E4 trust governance participate, with explicit service failure and degraded-mode behaviour.
+12. Deliver Business multi-person/multi-device operation and then Enterprise multi-office and international federation, validating each deployment profile with partition, confidentiality, trust and recovery tests.
 
 Workstreams may proceed in parallel when their interfaces and ownership are stable. Do not create parallel implementations of the same authority or data model. Do not build elaborate visualisations before the underlying project relationships and event semantics are reliable.
 
