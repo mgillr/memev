@@ -7,7 +7,7 @@
 <h1>Memev</h1>
 
 <p><strong>Shared context and coordination for the AI tools you already use.</strong><br>
-The same architecture extends to several computers, to a business and, as planned work, to independently operated sites.</p>
+The same architecture extends to several computers today and, as planned work, to a business and to independently operated sites.</p>
 
 <p>
 <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue">
@@ -180,8 +180,9 @@ independently operated site nodes: each site owns its node and its memory, sites
 they are authorised to share through the convergence engine under its contract, and no central
 coordinator sequences ordinary updates. The company vault described above is the one-node case of
 that target, and it is what the first Business release ships. Federation across sites, and federated
-computation on top of it, are planned capabilities of Corporate, and of a multi-site Business by
-agreement; they are not a tier and have no price. Every multi-site statement in these pages carries
+computation on top of it, are planned capabilities of Corporate, and of a Business licence whose
+services list includes the multi-site federation design ([services](docs/tiers/services.md)); they are
+not a tier and have no price. Every multi-site statement in these pages carries
 the planned label. See [Federation](docs/FEDERATION.md), [Organisational
 intelligence](docs/ORGANISATIONAL-INTELLIGENCE.md), [Federated
 computation](docs/FEDERATED-COMPUTATION.md) and [Data sovereignty](docs/DATA-SOVEREIGNTY.md).

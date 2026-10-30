@@ -84,7 +84,7 @@ not automatically an authorised approval; a model-generated explanation is not e
 |---|---|
 | Personal | connect the person's projects, tools, decisions, files and ongoing work across AI sessions and computers |
 | Business, one node | relate projects, customers, suppliers, staff capacity, finance, operations and delivery commitments in the one company vault (coming) |
-| Business, several sites (planned, by agreement) | identify dependencies across sites and teams while respecting local ownership |
+| Business, several sites (planned, with the multi-site federation design) | identify dependencies across sites and teams while respecting local ownership |
 | Corporate (planned) | reason across programmes, portfolios, functions, risk, governance and international sites |
 | Cross-organisation federation (planned) | coordinate selected work and commitments between independent participants without merging their private organisational memories |
 

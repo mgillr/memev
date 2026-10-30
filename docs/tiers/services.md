@@ -33,7 +33,7 @@ Each package is priced on your requirements: contact us for a quote.
 | Sales-assisted pilot | Business or Corporate for an organisation that needs an on-premises LLM, an air-gapped install or a compliance-led rollout (planned) | |
 | Trial setup, on-prem | the operator installs and configures the trial for you, on your servers | priced on your requirements |
 | Corporate onboarding | discovery, high availability, identity, SIEM, pilot, rollout | 6 to 12 weeks |
-| Multi-site federation design | Corporate, or a multi-site Business by agreement: site topology, replication policy, recovery (planned; [FEDERATION.md](../FEDERATION.md)) | scoped to requirements |
+| Multi-site federation design | Corporate, or a Business licence that lists this service: site topology, replication policy, recovery (planned; [FEDERATION.md](../FEDERATION.md)) | scoped to requirements |
 | Private deployment | we run and maintain a dedicated company server in your data centre or cloud account | 2 to 4 weeks to start |
 | Compliance pack | data-flow diagrams, records of processing, the security answers your auditors ask for, kept current, once or yearly | 2 to 3 weeks |
 | Workshop | one session for staff, up to 3 hours | |

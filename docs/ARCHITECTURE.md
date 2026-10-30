@@ -215,7 +215,8 @@ authorised to share through the convergence engine under its contract, and no ce
 sequences ordinary updates. The company vault and the main corporate vault above are the one-node
 case of that target, and the one-node case is what the first Business release ships. Federation
 across sites, and federated computation on top of it, are planned capabilities of Corporate, and
-of a multi-site Business by agreement; they are not a tier.
+of a Business licence whose services list includes the multi-site federation design
+([tiers/services.md](tiers/services.md)); they are not a tier.
 
 ```mermaid
 flowchart LR
@@ -279,4 +280,4 @@ keys, no grants, mounts or mixing
 | Overview | [tiers/free.md](tiers/free.md) | [tiers/business.md](tiers/business.md) | [tiers/corporate.md](tiers/corporate.md) |
 | Price and licence | [PRICING.md](PRICING.md) | contact us | contact us |
 | Services | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) |
-| Several sites (planned) | | by agreement: [FEDERATION.md](FEDERATION.md) | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) |
+| Several sites (planned) | | with the multi-site federation design in [tiers/services.md](tiers/services.md): [FEDERATION.md](FEDERATION.md) | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) |

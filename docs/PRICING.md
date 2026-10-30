@@ -60,8 +60,9 @@ outside Memev. Corporate has one main corporate vault.
 independently operated site nodes, each owning its node and its memory and converging authorised
 state through the convergence engine under its contract. The company vault above is the one-node
 case of that target, and it is what the first Business release ships. Federation across sites, and
-federated computation on top of it, are planned capabilities of Corporate, and of a multi-site
-Business by agreement. They are not a tier, they have no column and no price cell in the table
+federated computation on top of it, are planned capabilities of Corporate, and of a Business
+licence whose services list includes the multi-site federation design
+([tiers/services.md](tiers/services.md)). They are not a tier, they have no column and no price cell in the table
 above, and they are not sold before they are built. See [tiers/README.md](tiers/README.md),
 [FEDERATION.md](FEDERATION.md) and [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).
 

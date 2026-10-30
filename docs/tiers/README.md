@@ -20,7 +20,7 @@ company vault.
 | Who can see what | you | you | the company, through the admin console, sees and searches everything in the company vault (coming) | the same, plus your identity provider's groups (coming) |
 | AI apps and models | several cloud AI apps side by side (Claude, ChatGPT; more coming soon) and local coding tools via MCP | the same, on each computer | the AI providers and tools the organisation's policy allows, cloud AI services or an on-premises LLM, over MCP; a policy may restrict the organisation to one provider (planned) | the same, with an air-gapped on-premises option (coming) |
 | Two computers | one at a time: you switch computers through your own GitHub. Git sync is single-writer backup, so a second computer that pushes gets a warning that concurrent edits can conflict | at once: edit on two machines, nothing to resolve. The crdt-merge convergence engine, in its own repository and called as an external dependency, does the merging (planned) | coming | coming |
-| Several sites | | | one company vault is the first release; a multi-site Business, by agreement, is planned ([FEDERATION.md](../FEDERATION.md)) | federation of independently operated site nodes, and federated computation on top of it (planned; [FEDERATION.md](../FEDERATION.md), [FEDERATED-COMPUTATION.md](../FEDERATED-COMPUTATION.md)) |
+| Several sites | | | one company vault is the first release; several sites come with the multi-site federation design in [services.md](services.md) (planned; [FEDERATION.md](../FEDERATION.md)) | federation of independently operated site nodes, and federated computation on top of it (planned; [FEDERATION.md](../FEDERATION.md), [FEDERATED-COMPUTATION.md](../FEDERATED-COMPUTATION.md)) |
 | Price | free | $12/month or $120/year, early-supporter price | contact us | contact us |
 | Trial | no Personal trial | no Personal trial | time-limited trial: 5 members and 10 computers, 14 days with one 14-day extension; self-serve for hosted AI providers or a mix, a sales-assisted pilot for on-premises, air-gapped or compliance-led organisations (planned); the terms: [BUSINESS-TRIAL.md](../BUSINESS-TRIAL.md) | a sales-assisted pilot (planned) |
 | Setup | you, in minutes | you, in minutes on each computer | remote, 2 to 4 weeks | remote or onsite, 6 to 12 weeks |
@@ -50,7 +50,8 @@ sequences ordinary updates. The company vault and the main corporate vault above
 case of that target, and the one-node case is what the first Business release ships.
 
 Federation across sites, and federated computation on top of it, are planned capabilities of
-Corporate, and of a multi-site Business by agreement. They are not a tier: the four tiers stand,
+Corporate, and of a Business licence whose services list includes the multi-site federation design
+([services.md](services.md)). They are not a tier: the four tiers stand,
 and the planned rows in the tables on this page are where they appear. The trust service and the
 admission service that the federation pages name are planned adapter boundaries beside the merge
 boundary ([EXTENSION-POINTS.md](../EXTENSION-POINTS.md)). The pages:
@@ -114,8 +115,8 @@ copied outside Memev.
 | High-availability servers, air-gapped package | planned | |
 | SIEM and audit export, retention rules, legal hold | planned | |
 | Project state machine | planned | the code is present in `src/engine/project-state.mjs` and nothing imports it yet ([PROJECTS.md](../PROJECTS.md)) |
-| Federation of independently operated site nodes | planned | Corporate, and a multi-site Business by agreement; the company vault is the one-node case and the first release ([FEDERATION.md](../FEDERATION.md)) |
-| Federated computation across sites | planned | Corporate, and a multi-site Business by agreement; workload-specific algorithms, the engine converges supported state only ([FEDERATED-COMPUTATION.md](../FEDERATED-COMPUTATION.md)) |
+| Federation of independently operated site nodes | planned | Corporate, and a Business licence whose services list includes the multi-site federation design ([services.md](services.md)); the company vault is the one-node case and the first release ([FEDERATION.md](../FEDERATION.md)) |
+| Federated computation across sites | planned | Corporate, and a Business licence whose services list includes the multi-site federation design; workload-specific algorithms, the engine converges supported state only ([FEDERATED-COMPUTATION.md](../FEDERATED-COMPUTATION.md)) |
 | The trust service and the admission service | planned | two adapter boundaries beside the merge boundary, named generically until they are published ([EXTENSION-POINTS.md](../EXTENSION-POINTS.md)) |
 
 Nothing on these pages is sold before it is built. A planned part goes into an offer only with a

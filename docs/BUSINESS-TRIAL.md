@@ -86,4 +86,5 @@ Planned, as on the [tiers pages](tiers/README.md): the company vault, the admin 
 company server, sign-in, departments and roles, labels and the egress log, the automatic merge by
 the convergence engine, and both delivery paths of the trial itself. A planned part goes into an
 offer only with a delivery date. The trial is the one-node case: a Business with several sites is
-planned work by agreement, outside the trial ([FEDERATION.md](FEDERATION.md)).
+planned work through the multi-site federation design in [tiers/services.md](tiers/services.md),
+outside the trial ([FEDERATION.md](FEDERATION.md)).

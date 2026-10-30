@@ -7,7 +7,8 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Re
 > **Planned. Architectural target, not shipped code.** Nothing on this page is built. It states the
 > rules the planned federation of independently operated site nodes must meet
 > ([FEDERATION.md](FEDERATION.md)); jurisdiction-aware replication and recovery are planned
-> capabilities of Corporate, and of a multi-site Business by agreement
+> capabilities of Corporate, and of a Business licence whose services list includes the
+> multi-site federation design ([tiers/services.md](tiers/services.md))
 > ([tiers/README.md](tiers/README.md#several-sites-and-federation-planned)).
 
 ## Purpose

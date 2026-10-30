@@ -9,8 +9,8 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Re
 > Business release is the one-node case that the tier pages call the company vault: one
 > organisation node that members' work data syncs into and that the company can see and search
 > ([tiers/business.md](tiers/business.md)). Every multi-site statement on this page is planned, and
-> federation is a planned capability of Corporate, and of a multi-site Business by agreement, not
-> a tier ([tiers/README.md](tiers/README.md#several-sites-and-federation-planned)).
+> federation is a planned capability of Corporate, and of a Business licence whose services list
+> includes the multi-site federation design ([tiers/services.md](tiers/services.md)), not a tier ([tiers/README.md](tiers/README.md#several-sites-and-federation-planned)).
 
 ## Purpose
 
@@ -77,13 +77,13 @@ them to the deployment scopes of the target.
 | Personal | one person, one computer | local memory and the AI tools the person chooses (built) |
 | Personal with more computers | desktop, laptop and other computers, each with its own device key | the person's one vault (built); the automatic merge is planned |
 | Business, one node | one office or a distributed small team | members' work data in one company vault that the company can see and search (coming); the first release |
-| Business, several sites (planned, by agreement) | several offices, workshops or operating locations | independently operated site nodes and selected shared work |
+| Business, several sites (planned, with the multi-site federation design) | several offices, workshops or operating locations | independently operated site nodes and selected shared work |
 | Corporate (planned) | departments, programmes, portfolios and international offices | multiple sites, trust domains and jurisdiction policies |
 | Cross-organisation federation (planned) | partners working on a shared programme or portfolio | only the commitments, evidence, work products and computations explicitly authorised by each organisation |
 
-A small organisation may need several site nodes by agreement; a large organisation may choose one
-node. Federation is a planned capability of Corporate, and of a multi-site Business by agreement,
-not a tier.
+A small organisation may need several site nodes; a large organisation may choose one node.
+Federation is a planned capability of Corporate, and of a Business licence whose services list
+includes the multi-site federation design ([tiers/services.md](tiers/services.md)), not a tier.
 
 ## Topology
 
@@ -133,7 +133,7 @@ flowchart TB
     y["Programme partner node"]
     x <-->|"explicit project scope"| y
   end
-  sm -. "planned: a multi-site Business<br/>adds sites by agreement" .-> a
+  sm -. "planned: a Business licence with the<br/>multi-site federation design adds sites" .-> a
   c -. "separate trust agreement (planned)" .-> x
 ```
 
@@ -224,7 +224,8 @@ Personal with more computers extends the same vault to the person's other comput
 one company vault that members' work data syncs into (coming), the one-node case and the first
 release; Corporate is the same model at larger scale with stricter control (coming). Federation
 across sites, and federated computation on top of it, are planned capabilities of Corporate, and
-of a multi-site Business by agreement. Federation is not a tier and not a different core.
+of a Business licence whose services list includes the multi-site federation design
+([tiers/services.md](tiers/services.md)). Federation is not a tier and not a different core.
 
 ## Acceptance criteria for a federation implementation
 

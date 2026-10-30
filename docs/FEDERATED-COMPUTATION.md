@@ -6,8 +6,9 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Re
 
 > **Planned. Architectural target, not shipped code.** Nothing on this page is built. Federated
 > computation rests on the planned federation of independently operated site nodes
-> ([FEDERATION.md](FEDERATION.md)) and is a planned capability of Corporate, and of a multi-site
-> Business by agreement; it is not a tier
+> ([FEDERATION.md](FEDERATION.md)) and is a planned capability of Corporate, and of a Business
+> licence whose services list includes the multi-site federation design
+> ([tiers/services.md](tiers/services.md)); it is not a tier
 > ([tiers/README.md](tiers/README.md#several-sites-and-federation-planned)).
 
 ## Purpose
