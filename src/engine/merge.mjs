@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// The engine call boundary. The core hands a conflicted note to the external merge engine only
+// The engine call gate. The core hands a conflicted note to the external merge engine only
 // through this file, and only when the licence allows it. The engine is a separate component under
 // its own licence, not in this repository: it is reached as an external process the install
 // registers here, and the core holds no convergence logic of its own. When the licence does not
