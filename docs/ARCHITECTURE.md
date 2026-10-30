@@ -3,10 +3,10 @@
 Part of the [Memev documentation](README.md). Up: the [README](../README.md). Down: the
 [module map](MODULES.md) (generated from the real imports) and the per-topic pages linked below.
 
-This page has two parts. The first shows what is built and running today, module by module. The
-second shows the three tiers side by side with one diagram each: [Personal](#personal),
-[Business](#business-coming) and [Corporate](#corporate-coming). Business and Corporate are coming; their
-diagrams show the design, not shipped code.
+This page separates the current local implementation from the wider deployment architecture. The
+first part shows what is built and running today. The remaining diagrams show how the same design
+extends from an individual to business, corporate, multi-site, cross-organisation and federated
+computation deployments. Anything marked planned or architectural target is not shipped code.
 
 ## What runs today
 
