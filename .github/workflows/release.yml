@@ -20,6 +20,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -28,7 +29,7 @@ jobs:
       - name: Leak scan (files and every commit message)
         run: node scripts/leak-scan.mjs --history
       - name: Check the tag against the version in package.json
-        run: node scripts/release-tag-check.mjs "${{ github.ref_name }}"
+        run: node scripts/release-tag-check.mjs "${GITHUB_REF_NAME}"
       - name: Build the release tarball and its SHA-256 file
         run: node scripts/release-tarball.mjs --out dist
       - name: Attach the tarball and its checksum to the release

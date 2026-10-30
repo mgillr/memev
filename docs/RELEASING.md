@@ -38,8 +38,8 @@ Pushing a `v*` tag runs `.github/workflows/release.yml`: the full test suite, th
 
 ## Publish
 
-- [ ] `npm publish`, run by the maintainer from their own terminal.
-- [ ] Tag the release and push the tag.
+- [ ] Tag the release and push the tag, then wait for the release workflow to pass: the test suite, the leak scan and the tag check run before anything is attached.
+- [ ] `npm publish`, run by the maintainer from their own terminal, only after that workflow passed.
 - [ ] Confirm the published version runs: `npm exec --yes --package memev@<version> -- memev --version`.
 
 ## After

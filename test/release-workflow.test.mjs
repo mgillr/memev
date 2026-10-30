@@ -59,6 +59,17 @@ function parseWorkflow(text) {
 }
 
 const idx = (steps, pred) => steps.findIndex(pred);
+// The job names under the top-level jobs: key.
+const jobsOf = (text) => {
+  const lines = text.split('\n');
+  const at = lines.findIndex((l) => /^jobs:\s*$/.test(l));
+  const out = [];
+  for (let j = at + 1; at >= 0 && j < lines.length && !/^\S/.test(lines[j]); j++) {
+    const m = lines[j].match(/^  ([\w-]+):\s*$/);
+    if (m) out.push(m[1]);
+  }
+  return out;
+};
 const runOf = (s) => (s.run || '') + ' ' + (s.uses || '');
 
 test('WO-01-A AC01: the release workflow runs only on a v* tag push, its steps are the test suite, the leak scan, the tag check, the tarball build and the attachment in order, and it installs no dependency', () => {
@@ -87,6 +98,21 @@ test('WO-01-A AC01: the release workflow runs only on a v* tag push, its steps a
   const p = pkg();
   assert.ok(!('dependencies' in p) && !('devDependencies' in p) && !('optionalDependencies' in p) && !('peerDependencies' in p),
     'the repository still declares no dependency');
+});
+
+test('WO-01-A AC01: one job, nothing is released before the leak scan, and no step can be skipped or have its failure ignored', () => {
+  const text = wfText();
+  assert.deepEqual(jobsOf(text).length, 1, 'the workflow has one job, so nothing runs beside the checked steps');
+  const { steps } = parseWorkflow(text);
+  const iLeak = idx(steps, (s) => (s.run || '').includes('node scripts/leak-scan.mjs --history'));
+  assert.ok(iLeak > 0, 'the workflow has a leak scan step');
+  for (const s of steps.slice(0, iLeak)) {
+    assert.doesNotMatch((s.name || '') + ' ' + runOf(s), /gh release|release-action|action-gh-release|upload-artifact/i, 'nothing is released before the leak scan: ' + (s.name || runOf(s)));
+  }
+  assert.doesNotMatch(text, /^\s*(continue-on-error|if):/m, 'no step or job is conditional or allowed to fail');
+  for (const s of steps) {
+    assert.doesNotMatch(s.run || '', /\|\|\s*(true|:|exit 0)\b/, 'no step swallows a failure: ' + (s.name || s.run));
+  }
 });
 
 test('WO-01-A AC01: a local dry run of the workflow scripts passes: the leak scan is clean, the tag check exits 0 and the tarball build writes a matching .sha256', () => {
@@ -118,6 +144,11 @@ test('WO-01-A AC02: the workflow publishes nothing by itself: no publish step an
   assert.doesNotMatch(text, /npm publish/);
   assert.doesNotMatch(text, /NPM_TOKEN|NODE_AUTH_TOKEN|npm_token/);
   assert.doesNotMatch(text, /registry[\s-]*token|token[\s-]*registry/i);
+  const secrets = [...text.matchAll(/secrets\.(\w+)/g)].map((m) => m[1]);
+  assert.ok(secrets.length > 0 && secrets.every((n) => n === 'GITHUB_TOKEN'), 'the only secret is the default token: ' + secrets.join(', '));
+  assert.match(text, /^permissions:\n  contents: write\n(?! )/m, 'permissions are exactly contents: write');
+  assert.equal((text.match(/^\s*permissions:/gm) || []).length, 1, 'no job widens the permissions');
+  assert.match(text, /- uses: actions\/checkout@v4\n        with:\n(?:          .*\n)*?          persist-credentials: false\n/, 'the checkout keeps no token in .git/config');
 });
 
 test('WO-01-A AC03: release-tag-check.mjs exits 0 on a tag that matches the version and non-zero on one that does not, and the workflow runs it', () => {
@@ -132,5 +163,10 @@ test('WO-01-A AC03: release-tag-check.mjs exits 0 on a tag that matches the vers
   const none = spawnSync(process.execPath, ['scripts/release-tag-check.mjs'], { cwd: root, encoding: 'utf8' });
   assert.notEqual(none.status, 0, 'a missing tag is an error');
   const { steps } = parseWorkflow(wfText());
-  assert.ok(idx(steps, (s) => (s.run || '').includes('node scripts/release-tag-check.mjs')) >= 0, 'the workflow runs the tag check');
+  const iTag = idx(steps, (s) => (s.run || '').includes('node scripts/release-tag-check.mjs'));
+  assert.ok(iTag >= 0, 'the workflow runs the tag check');
+  assert.equal(steps[iTag].run.trim(), 'node scripts/release-tag-check.mjs "${GITHUB_REF_NAME}"', 'the tag check gets the tag from the environment, exactly');
+  for (const s of steps) {
+    assert.doesNotMatch(s.run || '', /\$\{\{/, 'no run line pastes an expression into the shell: ' + (s.name || s.run));
+  }
 });
