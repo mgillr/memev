@@ -63,7 +63,17 @@ server: no notes, no file names, no vault id, and no machine name. The one other
 anonymous milestone report, which is off unless you turn it on and holds only milestone names, days and
 a random id ([METRICS.md](METRICS.md)).
 
-## Relationship to Federation\n\nCRDT-Merge is intended to provide the convergence mechanism for supported replicated state in\nMemev's wider Federation architecture. The current integration documented in this repository is\nnarrower: it resolves conflicting note versions against a common base. It does not yet provide a\ngeneral synchronisation service for every organisational record, a universal project graph merge,\nfederated learning or policy enforcement. Those require separate schemas, authority semantics,\ntransport, replication policy, workload algorithms and acceptance tests. See\n[FEDERATION.md](FEDERATION.md) and [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).\n\n## What is not said here
+## Relationship to Federation
+
+CRDT-Merge is intended to provide the convergence mechanism for supported replicated state in
+Memev's wider Federation architecture. The current integration documented in this repository is
+narrower: it resolves conflicting note versions against a common base. It does not yet provide a
+general synchronisation service for every organisational record, a universal project graph merge,
+federated learning or policy enforcement. Those require separate schemas, authority semantics,
+transport, replication policy, workload algorithms and acceptance tests. See
+[FEDERATION.md](FEDERATION.md) and [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).
+
+## What is not said here
 
 This page states no merge strategy names, benchmark figures or release dates for the engine, because
 none are published for Memev. A page for any of them is written when the feature ships.
