@@ -12,6 +12,17 @@ export { offerImport };
 // live daemon holding the vault open under me, with a stale in-memory index.
 const daemonUp = (root) => { const i = daemonInfo(root); return !!(i && pidAlive(i.pid)); };
 
+// When the import restarts the daemon, I keep it quiet: no tunnel, no download, no background sync.
+// The import is a local operation and must not reach out, even through a child process.
+const QUIET_DAEMON_ENV = { MEMEV_NO_TUNNEL: '1', MEMEV_NO_DOWNLOAD: '1', MEMEV_NO_BACKGROUND: '1' };
+
+async function startQuietDaemon(root) {
+  const saved = {};
+  for (const [k, v] of Object.entries(QUIET_DAEMON_ENV)) { saved[k] = process.env[k]; process.env[k] = v; }
+  try { await startDaemon(root, { quiet: true }); }
+  finally { for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } }
+}
+
 function buildPreview(items) {
   const lines = ['Import preview', ''];
   let n = 0;
@@ -44,7 +55,7 @@ export async function command(cmd, pos, flags, { root, env }) {
       if (!list.length) { console.log('No imports yet.'); return 0; }
       for (const it of list) console.log(`${it.id}  ${it.items} item(s)  ${it.path}`);
     } finally { v.close(); }
-    if (wasUp) { try { await startDaemon(root, { quiet: true }); } catch {} }
+    if (wasUp) { try { await startQuietDaemon(root); } catch {} }
     return 0;
   }
 
@@ -60,7 +71,7 @@ export async function command(cmd, pos, flags, { root, env }) {
       if (!r.ok) { console.log(r.error); return 1; }
       console.log(`Removed ${id}.`);
     } finally { v.close(); }
-    if (wasUp) { try { await startDaemon(root, { quiet: true }); } catch {} }
+    if (wasUp) { try { await startQuietDaemon(root); } catch {} }
     return 0;
   }
 
@@ -115,6 +126,6 @@ export async function command(cmd, pos, flags, { root, env }) {
     console.log(`Imported ${result.imported} item(s) as ${result.id} (${result.skipped} skipped).`);
     console.log(`Undo with: memev import undo ${result.id}`);
   } finally { v.close(); }
-  if (wasUp) { try { await startDaemon(root, { quiet: true }); } catch {} }
+  if (wasUp) { try { await startQuietDaemon(root); } catch {} }
   return 0;
 }
