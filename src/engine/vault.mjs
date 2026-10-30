@@ -362,9 +362,9 @@ export class Vault extends EventEmitter {
     this._need(identity, 'read', null);
     const lim = limit == null ? 6 : Math.min(10, Math.max(1, Math.trunc(Number(limit)) || 1));
     const off = Math.max(0, Math.trunc(Number(offset)) || 0);
-    const all = this.index.query(query, { limit: Infinity, project, boosts: this.tuning?.boosts, filter: this._recallFilter(identity, { project, all_projects }) });
-    const total = all.length;
-    const hits = all.slice(off, off + lim);
+    const top = this.index.query(query, { limit: off + lim, project, boosts: this.tuning?.boosts, filter: this._recallFilter(identity, { project, all_projects }) });
+    const total = top.total;
+    const hits = top.slice(off, off + lim);
     for (const h of hits) {
       const key = `${h.path}#${h.heading || ''}`;
       const ents = this.graph.sectionEnts.get(key) || [];

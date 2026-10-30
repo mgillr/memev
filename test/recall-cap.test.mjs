@@ -98,14 +98,17 @@ test('MEM-108 AC04: the result states how many hits exist in total, and that mor
     const tool1 = await mcpResult(v, { query: QUERY, limit: 10, offset: 0 });
     assert.equal(tool1.structuredContent.total, 25, 'memev_recall states how many hits exist in total');
     assert.equal(tool1.structuredContent.next, 10, 'memev_recall says more can be fetched with offset 10');
+    assert.match(tool1.content[1].text, /25 in total; more with offset 10/, 'the tool text says how many exist and that more can be fetched');
     const tool2 = await mcpResult(v, { query: QUERY, limit: 10, offset: 20 });
     assert.equal(tool2.structuredContent.next, null, 'memev_recall is silent when there are no more');
+    assert.match(tool2.content[1].text, /25 in total/, 'the tool text still says how many exist');
+    assert.doesNotMatch(tool2.content[1].text, /more with offset/, 'the tool text is silent when there are no more');
     const http = await serve(v);
     try {
       const first = await http.post({ query: QUERY, limit: 10, offset: 0 }, { cli: true });
       assert.equal(first.total, 25);
       assert.equal(first.next, 10, 'the route says more can be fetched with offset 10');
-      assert.match(first.text, /more results: offset=10/);
+      assert.doesNotMatch(first.text, /more results/, 'the route leaves the paging hint off for CLI callers');
       const last = await http.post({ query: QUERY, limit: 10, offset: 20 }, { cli: true });
       assert.equal(last.next, null, 'the route is silent when there are no more');
       assert.doesNotMatch(last.text, /more results/);
@@ -129,7 +132,7 @@ test('MEM-108 AC05: the first page of the labelled queries keeps the ranking and
     const cur = H.seeded(curCode, base, 'small', queries, 'cur');
     const old = H.seeded(baseCode, base, 'small', queries, 'base');
     try {
-      const firstPage = (r) => { const j = JSON.parse(r.text); return (Array.isArray(j) ? j : j.hits).map((h) => `${h.path}#${h.heading || ''}@${h.score}`); };
+      const firstPage = (r) => { const j = JSON.parse(r.result.content[0].text); return (Array.isArray(j) ? j : j.hits).map((h) => `${h.path}#${h.heading || ''}@${h.score}`); };
       for (const q of queries.on_topic) {
         const a = firstPage(await cur.tool('memev_recall', { query: q.prompt, project: q.project }));
         const b = firstPage(await old.tool('memev_recall', { query: q.prompt, project: q.project }));
