@@ -150,8 +150,15 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   const remote = run('git', ['remote'], { cwd: root }).stdout.trim();
   const jobs = readJson(path.join(state, 'jobs.json'), {});
   const relay = cfg.remote?.relay || {};
-  const relayOff = !!(remote && !relay.enabled && (relay.url || relay.domain));
-  r.push(C('backup', 'vault backed up off this machine', remote ? (jobs.sync?.error ? 'warn' : 'ok') : 'warn', remote ? (jobs.sync?.error ? `last sync: ${jobs.sync.error}` : `git remote ${remote}${jobs.sync?.at ? `, last sync ${jobs.sync.at}` : ''}${relayOff ? '; the relay is off, so the vault is reached only through this git backup; memev cloud relay on switches it back on' : ''}`) : 'no backup yet: memev github setup'));
+  const relayState = readJson(path.join(state, 'relay-state.json'), null);
+  const through = tun?.state === 'up' ? ' through the tunnel and' : ' only through';
+  const relayLine = !remote ? ''
+    : relay.enabled && relayState && relayState.state !== 'up'
+      ? `; the relay is on but unreachable, so the vault is reached${through} this git backup; memev cloud relay status shows the relay's state`
+      : !relay.enabled && (relay.url || relay.domain)
+        ? `; the relay is off, so the vault is reached${through} this git backup; memev cloud relay on switches it back on`
+        : '';
+  r.push(C('backup', 'vault backed up off this machine', remote ? (jobs.sync?.error ? 'warn' : 'ok') : 'warn', remote ? (jobs.sync?.error ? `last sync: ${jobs.sync.error}` : `git remote ${remote}${jobs.sync?.at ? `, last sync ${jobs.sync.at}` : ''}`) + relayLine : 'no backup yet: memev github setup'));
   if (jobs.sync?.warning) r.push(C('writers', 'one computer writes the git backup', 'warn', jobs.sync.warning));
   try {
     // report only: licence and seats never fail the doctor and never limit anything

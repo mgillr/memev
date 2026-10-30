@@ -95,11 +95,13 @@ const lineReader = (sock, onLine, onRest) => {
 };
 
 /**
- * Keep this vault reachable at its relay address. { root, port (the daemon), url (relay://host:port), domain }.
- * Returns { id, address, ready (resolves with the address once the relay accepted us), stop() }. It reconnects
- * with a growing pause when the relay goes away, and takes the same name back each time.
+ * Keep this vault reachable at its relay address. { root, port (the daemon), url (relay://host:port), domain,
+ * connectTimeoutMs (default 10000) }. Returns { id, address, ready (resolves with the address once the relay
+ * accepted us), stop() }. It reconnects with a growing pause when the relay goes away, and takes the same name
+ * back each time. A connect that has not finished in time is dropped, so a non-routable address fails the same
+ * way a refused port does.
  */
-export function startRelayClient({ root, port, url, domain, log = () => {}, onState = () => {}, pingMs = 20000 }) {
+export function startRelayClient({ root, port, url, domain, log = () => {}, onState = () => {}, pingMs = 20000, connectTimeoutMs = 10000 }) {
   const target = parseRelayUrl(url);
   if (!domain || !/^[a-z0-9.-]+$/i.test(domain)) throw new Error('the relay needs a domain: the name its vault addresses are made under');
   const idn = ensureIdentity(root, { domain });
@@ -147,7 +149,8 @@ export function startRelayClient({ root, port, url, domain, log = () => {}, onSt
     const sock = net.connect(target.port, target.host); control = sock;
     sock.on('error', (e) => log(`relay: ${e.message}`)); sock.setNoDelay(true);
     let up = false;
-    sock.on('connect', () => sock.write(`${JSON.stringify({ t: 'hello', v: 1, pub })}\n`));
+    const connectTimer = setTimeout(() => { if (sock.connecting) sock.destroy(); }, connectTimeoutMs);
+    sock.on('connect', () => { clearTimeout(connectTimer); sock.write(`${JSON.stringify({ t: 'hello', v: 1, pub })}\n`); });
     const onMsg = (m) => {
       if (m.t === 'challenge') { sock.write(`${JSON.stringify({ t: 'auth', sig: sign(idn.key, controlMessage(idn.id, m.nonce)) })}\n`); return; }
       if (m.t === 'ready') { up = true; backoff = 500; state('up'); readyResolve(address); clearInterval(ping); ping = setInterval(() => { if (!sock.destroyed) sock.write('{"t":"ping"}\n'); }, pingMs); return; }
@@ -156,6 +159,7 @@ export function startRelayClient({ root, port, url, domain, log = () => {}, onSt
     };
     lineReader(sock, (m) => { onMsg(m); });
     sock.on('close', () => {
+      clearTimeout(connectTimer);
       clearInterval(ping); if (control === sock) control = null;
       if (stopped) return;
       state(up ? 'reconnecting' : `cannot reach the relay (retrying)`);

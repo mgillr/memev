@@ -117,12 +117,13 @@ changes nothing about that. With the relay off on a vault that was using it, the
 through the git backup, and the vault's tree is byte for byte what it was.
 
 The doctor says so on the backup check it already reports: one line that names the relay as off, the git
-backup as the path in use, and the command that switches the relay back on. That line stays out of a
-session's context; it is a troubleshooting note, not something a session reads.
+backup as the path in use, and the command that switches the relay back on. That line is not added to the
+resume card or the protocol; a session sees it only if it calls memev_doctor.
 
 When the relay is configured but unreachable, the client reports the failure and reconnects on a growing
-pause (half a second, doubling up to a minute). The retries run off the event loop, so the daemon's other
-background jobs keep running.
+pause (half a second, doubling up to a minute). A connect that has not finished in ten seconds is dropped,
+so a non-routable address fails the same way a refused port does. The retries are non-blocking timers on
+the event loop, so the daemon's other background jobs keep running.
 
 ## The relay for development and tests
 
