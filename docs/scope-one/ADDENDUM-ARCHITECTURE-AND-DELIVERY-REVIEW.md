@@ -60,18 +60,65 @@ The first end-to-end demonstration is an integration gate, not a replacement for
 
 A material scope change must invalidate affected approvals and verification evidence. An agent's assertion is evidence to inspect, not proof by itself.
 
-### 5. Bring a minimal command centre forward
+### 5. Make the project workspace a first-class product surface
 
-**Concern:** Deferring the user-facing command centre until late risks building a backend that is technically elaborate but difficult to understand or control. The UI is part of the product's safety and usability model, not just presentation.
+**Concern:** A terminal-centric launcher may be excellent for developers but will be opaque to non-technical users. Deferring the user-facing workspace until late risks building a capable backend that customers cannot understand, inspect or safely control. A generic task list is also insufficient for projects with nested architecture, deliverables and interdependent work.
 
 **Recommendation:**
-- Deliver a minimal, real command centre alongside the first integrated execution slice.
-- Show the approved outcome, plan, task owner, current state, blockers, approvals, evidence and remaining work.
-- Make pause, resume, cancel, re-plan and human approval semantics explicit and truthful.
-- Keep the UI as a view and command surface over canonical state; it must not become a competing source of truth.
-- Expand the experience incrementally without delaying backend correctness.
+- Deliver a usable visual project workspace alongside the first integrated execution slice. Treat it as a core product surface and part of the safety model, not a cosmetic frontend.
+- Provide two complementary experiences over the same project: a straightforward non-technical workspace and an advanced developer/diagnostic view. The existing terminal-based launcher remains valuable; it should expose the same underlying state rather than becoming a separate system.
+- Give the workspace a persistent interaction area for the **lead agent**. Users must be able to ask questions, give instructions, request explanations, challenge assumptions and propose changes in ordinary language. The lead agent should answer from the current project record, identify uncertainty and distinguish suggestions from committed project changes.
+- Organise the project canvas into navigable views/tabs, at minimum:
+  1. **Overview / roadmap:** intended outcome, approved scope, milestones, high-level phases, progress and delivery outlook.
+  2. **System architecture:** the whole-system design, major components, interfaces, trust boundaries and external dependencies.
+  3. **Subsystem architecture:** drill-down views for individual components, their internal structure, contracts and relationships.
+  4. **Work breakdown structure:** hierarchical deliverables, work packages, tasks, owners, dependencies, acceptance criteria and status. Users should be able to move from a roadmap milestone to its constituent tasks and back.
+  5. **Canvas / artefacts:** generated and user-provided documents, specifications, reports, diagrams, flowcharts, research, code and application previews, with suitable viewers and previews.
+  6. **Activity / agents:** human-readable live activity, agent and engine status, assignments, communications and relevant diagnostics. Developers may drill down to logs, sessions and bus events; ordinary users should not need to understand those internals.
+  7. **Blockers / decisions:** a dedicated, prominent queue of unresolved issues that require user input, approval or a decision.
+- Keep the lead-agent interaction area available across these views, with enough context to understand which project, subsystem, task or artefact the user is discussing.
+- Make pause, resume, cancel, re-plan, approval and deliverable-acceptance semantics explicit and truthful. A user instruction that changes scope must go through the scope-change process, not silently mutate the approved plan.
+- Build a flexible artefact canvas, not a wholesale replacement for Figma, Notion or a general project-management suite. Prioritise rendering and interacting with the outputs Memev itself creates.
 
-### 6. Separate the core single-machine delivery path from optional commercial infrastructure
+### 6. Make the workspace a factual, interdependent model of the project
+
+**Concern:** A dashboard can look convincing while showing stale, inferred or contradictory information. Agent-authored progress summaries, disconnected diagrams or manually maintained task boards can diverge from actual execution. That would be especially damaging when users rely on the interface to make decisions.
+
+**Recommendation:**
+- Every view must be a projection of the canonical project store and event history. The UI is a view and command surface, never a competing source of truth.
+- Represent relationships explicitly: scope items to milestones; milestones to deliverables; deliverables to work packages and tasks; tasks to dependencies, agents, artefacts, checks and evidence; blockers to the work they affect.
+- Propagate changes through these relationships. A changed requirement should visibly identify affected architecture, tasks, artefacts, approvals, dependencies and verification results. Mark affected work or evidence stale where appropriate; do not silently leave old results looking current.
+- Distinguish **planned, queued, dispatched, accepted, running, blocked, completed, verified and delivered** states where relevant. Do not collapse agent claims, observed execution and verified completion into one green tick.
+- Show provenance for material project facts: source event, timestamp, responsible actor or agent, relevant scope/plan version and supporting evidence.
+- Display uncertainty and freshness. If a provider is disconnected, a status is unknown, evidence is missing or an update has not been reconciled, say so plainly rather than guessing.
+- Derive progress from defined milestones, task weights or completion criteria that are visible and explainable. Never use an agent's unsupported percentage estimate as authoritative project progress.
+- Make the architecture diagrams, roadmap and work breakdown structure navigable projections of the same dependency model. They must not become independent documents that drift from live state.
+- Preserve a readable history of decisions and changes, including who or what proposed a change, who approved it and which downstream items were affected.
+
+### 7. Treat blockers and user decisions as a first-class workflow
+
+**Concern:** If the system encounters a permission boundary, conflicting instruction, failed dependency, uncertain requirement or consequential action, it must not bury the issue in logs or continue as though nothing happened. Equally, users should not be overwhelmed with routine implementation details that agents can resolve safely within the approved scope.
+
+**Recommendation:**
+- Maintain a dedicated blocker/decision queue with severity or urgency, concise explanation, affected milestone/tasks, dependencies, options, recommended next step, decision owner and the consequence of waiting.
+- Distinguish a genuine blocker requiring user action from an agent's internal retry, transient failure or routine subtask.
+- Give each decision a clear state: raised, awaiting user, answered, approved, rejected, deferred or resolved. Preserve the decision and its rationale in project history.
+- Let the lead agent explain the issue in plain language, present viable options and identify what it recommends and why. It must not present its recommendation as the user's decision.
+- When a decision is made, update the canonical project record and recalculate affected dependencies, plans, task eligibility and verification freshness.
+- Never silently bypass permissions, invent an approval, discard a blocker or continue a consequential action that requires human authorisation.
+
+### 8. Make artefacts inspectable and attributable
+
+**Concern:** A project canvas that merely displays files does not establish whether they are current, who produced them or whether they satisfy the approved requirement.
+
+**Recommendation:**
+- Link each material artefact to its originating task, producing agent/tool, creation and revision events, relevant scope/plan version and verification status.
+- Support version history and comparison, and distinguish drafts, reviewed outputs and accepted deliverables.
+- Provide appropriate previews for supported formats, including documents, diagrams, flowcharts, code and web/application outputs.
+- Show verification evidence and outstanding limitations alongside the artefact. Do not imply that visual presence in the canvas means the output has passed acceptance.
+- Keep the underlying files in the user's chosen workspace or explicitly configured storage; the canvas should not create an opaque, proprietary copy as the only authoritative version.
+
+### 9. Separate the core single-machine delivery path from optional commercial infrastructure
 
 **Concern:** Paid convergence, cloud relay, entitlement, licensing and enterprise services are important to the wider Memev roadmap, but they are not automatically prerequisites for proving a single-machine Scope One workflow. Coupling them too tightly could delay the core outcome.
 
@@ -82,7 +129,7 @@ A material scope change must invalidate affected approvals and verification evid
 - Document the relationship between `converge` and `crdt-merge`, including ownership, trust boundaries, failure behaviour and licensing, before treating them as interchangeable.
 - Do not let cloud availability become a hidden dependency for local project integrity.
 
-### 7. Make recovery and security first-class acceptance criteria
+### 10. Make recovery and security first-class acceptance criteria
 
 **Concern:** Happy-path demonstrations are insufficient for a system that coordinates autonomous agents and edits user projects. Silent data loss, duplicate side effects, stale writes or privilege escalation would undermine trust.
 
@@ -94,23 +141,28 @@ A material scope change must invalidate affected approvals and verification evid
 - scope changes after approval or partial completion;
 - missing, corrupt or unreadable evidence;
 - permission denial and attempted access outside the approved workspace;
-- retries of consequential external actions.
+- retries of consequential external actions;
+- UI refresh, reconnection and restart while events are arriving, ensuring the workspace reconstructs the same authoritative state;
+- stale or out-of-order events, ensuring views do not regress or show a false current status.
 
 Recovery must preserve history and surface unresolved conflicts; it must not silently convert uncertainty into deletion, success or last-write-wins.
 
-### 8. Prove the whole user journey, not a collection of isolated features
+### 11. Prove the whole user journey, not a collection of isolated features
 
 **Recommendation:** Use one reproducible reference project for the integration gate:
 1. A non-technical user selects a local workspace and describes an outcome.
 2. Memev clarifies material ambiguity and obtains scope approval.
-3. Memev creates a versioned plan with acceptance criteria.
-4. A selected lead agent delegates a specialist task to another supported provider.
-5. Both work under explicit ownership and shared project state.
-6. Interrupt one agent and restart or resume it.
-7. Introduce a failed verification and require repair.
-8. Change scope and confirm affected evidence becomes stale.
-9. Reconcile a conflicting edit without silently losing work.
-10. Produce a final report linking delivered artifacts, checks, evidence and outstanding limitations.
+3. The lead agent creates a versioned roadmap, system architecture outline and work breakdown structure with acceptance criteria.
+4. The workspace renders those views from canonical project state and lets the user navigate between them.
+5. A selected lead agent delegates a specialist task to another supported provider.
+6. Both work under explicit ownership and shared project state; the activity view reflects observed events.
+7. A generated document or diagram appears in the artefact canvas with provenance and verification state.
+8. Introduce a blocker requiring a user decision; the lead agent explains options, records the user's choice and updates affected work.
+9. Interrupt one agent and restart or resume it.
+10. Introduce a failed verification and require repair.
+11. Change scope and confirm affected roadmap items, architecture, tasks, approvals and evidence are updated or marked stale.
+12. Reconcile a conflicting edit without silently losing work.
+13. Produce a final report linking delivered artefacts, checks, evidence, decisions and outstanding limitations.
 
 Repeat with different lead/specialist combinations. Record which steps are automated, provider-dependent or require human intervention.
 
@@ -119,11 +171,12 @@ Repeat with different lead/specialist combinations. Record which steps are autom
 The closest product-level threats are autonomous engineering and multi-agent execution platforms, particularly OpenHands, Factory and Devin; Conductor and Replit are also relevant. Memory products are subsystem competitors, not the primary category for Scope One.
 
 Memev should not compete merely on launching more agents or storing more context. Its intended differentiation should be the combination of:
-
 - user-owned, provider-neutral project authority;
 - explicit scope, task ownership and policy;
 - durable coordination and recoverable execution;
+- a factual, navigable project model spanning roadmap, architecture, work breakdown, artefacts and decisions;
 - evidence-bound verification and auditable history;
+- an accessible non-technical workspace alongside deep developer visibility;
 - local-first operation with optional cloud/commercial capabilities.
 
 These are positioning hypotheses, not established advantages. They must be demonstrated through the integration and fault-injection tests above.
@@ -134,16 +187,19 @@ These are positioning hypotheses, not established advantages. They must be demon
 2. Integrate and test the state machine, canonical store and coordinator.
 3. Define the agent adapter contract and complete a small number of real integrations.
 4. Implement scope resolution, planning, lead authority and approval boundaries.
-5. Integrate the minimal command centre early.
-6. Complete evidence-bound verification, recovery and adversarial tests.
-7. Complete onboarding, supported workflows and release paths.
-8. Progress cloud, paid convergence and enterprise capabilities on stable interfaces without making them accidental blockers to local-first delivery.
+5. Define the canonical project/artefact/decision relationship model and event projections needed by the workspace.
+6. Deliver the minimum usable workspace early: lead-agent interaction, overview/roadmap, work breakdown, activity and blockers. Add architecture drill-down and rich artefact previews as the underlying models support them.
+7. Complete evidence-bound verification, recovery and adversarial tests, including UI reconstruction and consistency.
+8. Complete onboarding, supported workflows and release paths.
+9. Progress cloud, paid convergence and enterprise capabilities on stable interfaces without making them accidental blockers to local-first delivery.
 
-Workstreams may proceed in parallel when their interfaces and ownership are stable. Do not create parallel implementations of the same authority or data model.
+Workstreams may proceed in parallel when their interfaces and ownership are stable. Do not create parallel implementations of the same authority or data model. Do not build elaborate visualisations before the underlying project relationships and event semantics are reliable.
 
 ## Review and adoption protocol
 
 Claude A and Claude B should review this addendum independently against the current repository and Scope One requirements. Each should classify every recommendation as **agree**, **disagree** or **needs evidence**, identify omissions and cite concrete files, contracts or tests.
+
+The new workspace, lead-agent interaction, tab structure, blocker workflow and project-consistency requirements should be reviewed as explicit product requirements, not assumed to be implied by the existing command-centre recommendation.
 
 Ryan should resolve disagreements. Only recommendations with explicit consensus and acceptance should be converted into development contracts or changes to the requirement register. Record rejected or deferred recommendations with a short rationale. This document itself is advisory until that review is complete.
 
