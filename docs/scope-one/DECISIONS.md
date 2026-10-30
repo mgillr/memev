@@ -34,7 +34,7 @@ current code already uses, so no contract is blocked on a guess.
   applied, are not fixed. The op-log already provides an append-only order; the open
   question is whether state-machine events reuse that order or carry their own sequence.
 - Safe default: reuse the existing op-log order for state events; ids are opaque strings
-  generated at write time. No reordering, no gaps.
+  assigned at write time. No reordering, no gaps.
 
 ### ADR 3: lease semantics
 
