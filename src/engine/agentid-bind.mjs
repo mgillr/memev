@@ -81,13 +81,18 @@ function isEncryptedKey(content) {
   return false;
 }
 
-// OpenSSH before 8.0 has no -Y. Run it in a way that only an old binary answers with an option
-// error; a missing binary reports its own error. Either way the keys directory is left untouched.
+// The one message for every step that needs ssh-keygen when it is missing or older than 8.0.
+export const OPENSSH_NEEDED = 'binding needs OpenSSH 8.0 or later';
+
+// OpenSSH before 8.0 has no -Y, so an old binary answers with an option error; a missing binary, or
+// one that does not answer in time, is a run error.
+const noOpenSSH = (r) => Boolean(r.error) || /unknown option|invalid option|illegal option/i.test(r.stderr);
+
+// Run ssh-keygen in a way that only an old binary answers with an option error, so the keys
+// directory is left untouched when OpenSSH 8.0 or later is not there.
 function requireOpenSSH() {
   const r = run('ssh-keygen', ['-Y', 'check-novalidate', '-n', NAMESPACE, '-s', '/dev/null'], { timeout: SIG_TIMEOUT_MS });
-  if (r.error || /unknown option|invalid option|illegal option/i.test(r.stderr)) {
-    throw new AgentBindError('openssh', 'binding needs OpenSSH 8.0 or later');
-  }
+  if (noOpenSSH(r)) throw new AgentBindError('openssh', OPENSSH_NEEDED);
 }
 
 function signMessage(message, sshKeyPath, principal) {
@@ -159,8 +164,10 @@ export function bindAgentRole(role, { sshKeyPath, principal, dir, terminal } = {
 }
 
 // Check a stored binding against an allowed_signers file. Reports 'bound' when it verifies,
-// 'unbound' when there is no signature, and 'invalid' when the signature is there but does not
-// verify (wrong principal, tampered signature, or a signature from another namespace).
+// 'unbound' when there is no signature, 'unavailable' when ssh-keygen is missing or older than 8.0
+// (nothing was checked, so it says nothing about the binding; OPENSSH_NEEDED is the message), and
+// 'invalid' when the signature is there but does not verify (wrong principal, tampered signature,
+// or a signature from another namespace).
 export function verifyAgentBinding(role, { allowedSigners, principal, dir } = {}) {
   let p;
   try { role = checkRole(role); p = checkPrincipal(principal); } catch { return 'invalid'; }
@@ -170,7 +177,8 @@ export function verifyAgentBinding(role, { allowedSigners, principal, dir } = {}
   if (!exists(rolePubPath)) return 'invalid';
   const rolePub = fs.readFileSync(rolePubPath, 'utf8').trim();
   const r = run('ssh-keygen', ['-Y', 'verify', '-f', allowedSigners, '-I', p, '-n', NAMESPACE, '-s', sshsigPath], { timeout: SIG_TIMEOUT_MS, input: bindingMessage(role, p, rolePub) });
-  return r.ok ? 'bound' : 'invalid';
+  if (r.ok) return 'bound';
+  return noOpenSSH(r) ? 'unavailable' : 'invalid';
 }
 
 // One checked, rollback-safe step: create the role key pair when absent, bind it to the person, and
