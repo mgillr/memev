@@ -44,7 +44,8 @@ marked *planned* is not built and is not part of what you pay for. The Personal 
 price is an early-supporter price: it stays locked for as long as the subscription runs, and it is
 labelled that way while sync and the relay are planned. Business and Corporate are one model at two
 scales and are chosen by need (a company vault, sign-in, roles, high availability), not by size.
-Office and Team are not tiers. Hosted sync and the hosted relay are not part of Business, because its
+A team of people buys Business and contacts us for a price. Office and Team are not tiers. Hosted sync
+and the hosted relay are not part of Business, because its
 company server runs on the company's own server. Sync, the relay, the company server, sign-in, roles,
 labels and the egress log are planned, not built, and no date is given. See [tiers/](tiers/README.md)
 for how each tier is set up.
