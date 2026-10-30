@@ -12,6 +12,7 @@ import { newVault, cleanup, tmpdir, OWNER } from './helpers/tmp.mjs';
 import { signLicense, loadLicense } from '../src/engine/license.mjs';
 import { seatPolicy } from '../src/engine/entitlements.mjs';
 import { createServer } from '../src/server/http.mjs';
+import { GREP_VERIFY_BUDGET_MS } from '../src/engine/contracts.mjs';
 after(cleanup);
 
 const vendor = (() => { const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519'); return { pem: privateKey.export({ type: 'pkcs8', format: 'pem' }), keys: { 'test-vendor': publicKey.export({ type: 'spki', format: 'der' }).toString('base64') } }; })();
@@ -77,6 +78,15 @@ test('REV-012 AC03: a remote grep criterion is bounded by a pattern cap and a ma
   assert.ok(ms < 15000, `the verify took ${ms.toFixed(0)} ms`);
   assert.equal(r2.tasks[0].criteria[0].status, 'FAIL');
   assert.match(r2.tasks[0].criteria[0].detail, /did not finish/);
+  // the grep time of one verify is capped as a whole, so ten pathological criteria do not stall it for ten seconds
+  const many = draft(Array.from({ length: 10 }, (_, i) => ({ statement: `pathological ${i}`, verifier: { type: 'grep', file: 'big.txt', pattern: '(a+)+b' } })));
+  const s1 = performance.now();
+  const r4 = v.contractVerify(REMOTE, { id: many }, { local: false });
+  const ms2 = performance.now() - s1;
+  t.diagnostic(`ten pathological greps returned in ${ms2.toFixed(0)} ms`);
+  assert.ok(ms2 < GREP_VERIFY_BUDGET_MS + 1500, `the verify took ${ms2.toFixed(0)} ms`);
+  assert.ok(r4.tasks[0].criteria.every((c) => c.status === 'FAIL'));
+  assert.ok(r4.tasks[0].criteria.some((c) => /grep time for this verify is used up/.test(c.detail)));
   // a normal pattern still passes
   const ok = draft([{ statement: 'plain', verifier: { type: 'grep', file: 'big.txt', pattern: 'aa' } }]);
   const r3 = v.contractVerify(REMOTE, { id: ok }, { local: false });

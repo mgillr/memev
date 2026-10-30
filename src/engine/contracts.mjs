@@ -18,9 +18,11 @@ import { sign as dsseSign, verify as dsseVerify, keyId, generateKeyPair, canonic
 const STOP_AMEND = 'If the requirements change: do not edit this contract. Amend it (memev_contract_amend), which signs a new version that supersedes this one.';
 
 // A remote caller supplies the pattern. It is length-capped and runs in a worker that is terminated
-// when it does not finish in time, so a pathological pattern cannot hang a verify.
+// when it does not finish in time, so a pathological pattern cannot hang a verify. The match blocks this
+// process while it runs, so the grep time of one verify with remote patterns is capped as a whole too.
 export const GREP_PATTERN_MAX = 200;
 export const GREP_TIMEOUT_MS = 1000;
+export const GREP_VERIFY_BUDGET_MS = 2000;
 const GREP_WORKER = `
 const { parentPort } = require('node:worker_threads');
 parentPort.on('message', (m) => {
@@ -215,6 +217,8 @@ export function attach(Vault) {
     // file-based criteria stay inside the vault root when the caller is remote or the contract was signed
     // remotely (its receipt is readable remotely, so a local verify must not prove anything outside it either)
     const inVault = !local || origin === 'remote';
+    // the same callers supply grep patterns: past the budget their remaining grep criteria fail unchecked
+    let grepLeft = inVault ? GREP_VERIFY_BUDGET_MS : Infinity;
     const run = (crit) => {
       const v = crit.verifier;
       if (v.type === 'command') {
@@ -227,7 +231,7 @@ export function attach(Vault) {
       }
       if (v.type === 'file_exists') { let p; try { p = this._confinePath(wd, v.path, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.path } : { status: 'FAIL', detail: `${v.path} is missing` }; }
       if (v.type === 'test_exists') { let p; try { p = this._confinePath(wd, v.test_file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.test_file } : { status: 'FAIL', detail: `${v.test_file} is missing` }; }
-      if (v.type === 'grep') { let p; try { p = this._confinePath(wd, v.file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } const pat = String(v.pattern ?? ''); if (!pat) return { status: 'FAIL', detail: 'the pattern is missing' }; if (pat.length > GREP_PATTERN_MAX) return { status: 'FAIL', detail: `a pattern over ${GREP_PATTERN_MAX} characters is not checked` }; let t = ''; try { t = fs.readFileSync(p, 'utf8'); } catch { return { status: 'FAIL', detail: `${v.file} is missing` }; } const m = grepMatch(pat, String(v.flags || ''), t); if (m.timeout) return { status: 'FAIL', detail: `the pattern did not finish within ${GREP_TIMEOUT_MS} ms and is not checked` }; if (m.error) return { status: 'FAIL', detail: 'the pattern is not a usable regular expression' }; return m.ok ? { status: 'PASS', detail: `${v.file} matches` } : { status: 'FAIL', detail: `${v.file} does not match ${v.pattern}` }; }
+      if (v.type === 'grep') { let p; try { p = this._confinePath(wd, v.file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } const pat = String(v.pattern ?? ''); if (!pat) return { status: 'FAIL', detail: 'the pattern is missing' }; if (pat.length > GREP_PATTERN_MAX) return { status: 'FAIL', detail: `a pattern over ${GREP_PATTERN_MAX} characters is not checked` }; let t = ''; try { t = fs.readFileSync(p, 'utf8'); } catch { return { status: 'FAIL', detail: `${v.file} is missing` }; } if (grepLeft <= 0) return { status: 'FAIL', detail: 'not checked: the grep time for this verify is used up' }; const limit = Math.min(GREP_TIMEOUT_MS, grepLeft); const g0 = Date.now(); const m = grepMatch(pat, String(v.flags || ''), t, limit); grepLeft -= Date.now() - g0; if (m.timeout) return { status: 'FAIL', detail: `the pattern did not finish within ${limit} ms and is not checked` }; if (m.error) return { status: 'FAIL', detail: 'the pattern is not a usable regular expression' }; return m.ok ? { status: 'PASS', detail: `${v.file} matches` } : { status: 'FAIL', detail: `${v.file} does not match ${v.pattern}` }; }
       return { status: 'BLOCKED', detail: `${v.type} criteria are checked by a person or CI, not here` };
     };
     const tasks = c.tasks.map((t) => ({ id: t.id, title: t.title, criteria: t.criteria.map((cr) => ({ id: cr.id, statement: cr.statement || `${cr.verifier?.type || "check"} check`, mandatory: cr.mandatory !== false, ...run(cr) })) }));
