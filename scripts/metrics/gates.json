@@ -1,0 +1,8 @@
+{
+  "installs_proxy": null,
+  "installs_proxy_note": "open: which counted number stands for installs is the owner's choice (D-WO-INSTALL-PROXY); pick one of package_downloads, release_downloads, downloads or activations",
+  "gates": [
+    { "name": "installs at or above 5,000 by month 6", "metric": "installs", "threshold": 5000 },
+    { "name": "free-to-paid at or above 1 percent once sync has shipped", "metric": "free_to_paid_percent", "threshold": 1 }
+  ]
+}
