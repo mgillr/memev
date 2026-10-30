@@ -1,0 +1,136 @@
+{
+  "title": "SR-1.09 Code a second engineer can read",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G09: 300 to 600 character lines, server imports CLI, helpers duplicated three times, empty catch blocks hide faults. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Line length and format check",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "no source line over 160 characters",
+        "a zero-dependency check script enforces it in npm test"
+      ],
+      "description": "",
+      "scope": [
+        "scripts/**",
+        "src/**",
+        "bin/**",
+        "test/style.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "The style test fails on a 161-character line",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/style.test.mjs",
+            "cmd": "node --test test/style.test.mjs"
+          }
+        },
+        {
+          "statement": "Longest line in src and bin <= 160",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/longest-line.mjs src bin --json",
+            "key": "max",
+            "op": "<=",
+            "value": 160
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Layering",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "src/engine imports nothing from src/cli or src/server; src/server imports nothing from src/cli; shared code moves to src/lib"
+      ],
+      "description": "",
+      "scope": [
+        "src/**",
+        "test/layering.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "The layering test fails when server imports cli",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/layering.test.mjs",
+            "cmd": "node --test test/layering.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "One helper each, no silent catch",
+      "phase": "implement",
+      "depends_on": [
+        "T1",
+        "T2"
+      ],
+      "requirements": [
+        "which, pidAlive, reloadDaemon and the loopback check exist once",
+        "every catch {} carries a comment saying why it is safe or logs"
+      ],
+      "description": "",
+      "scope": [
+        "src/**",
+        "test/style.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "No uncommented empty catch in src",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/count-silent-catch.mjs src --json",
+            "key": "silent",
+            "op": "==",
+            "value": 0
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

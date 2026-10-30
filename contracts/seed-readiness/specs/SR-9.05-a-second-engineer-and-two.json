@@ -1,0 +1,86 @@
+{
+  "title": "SR-9.05 A second engineer and two-person review",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G80: Bus factor of one; the code has never had a second human reader. Repository: mgillr/memev. Depends on contracts: SR-9.01, SR-1.09.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Second engineer hired",
+      "phase": "plan",
+      "depends_on": [],
+      "requirements": [
+        "a second engineer is engaged and owns the hosted layer"
+      ],
+      "description": "",
+      "scope": [
+        "CODEOWNERS",
+        ".github/**"
+      ],
+      "criteria": [
+        {
+          "statement": "CODEOWNERS names two people",
+          "verifier": {
+            "type": "file_exists",
+            "path": ".github/CODEOWNERS"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Review enforced",
+      "phase": "integrate",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "branch protection requires one approving review from someone other than the author on main"
+      ],
+      "description": "",
+      "scope": [
+        ".github/**",
+        "docs/DEVELOPING.md"
+      ],
+      "criteria": [
+        {
+          "statement": "Main requires an approving review",
+          "verifier": {
+            "type": "command",
+            "cmd": "gh api repos/mgillr/memev/branches/main/protection --jq .required_pull_request_reviews.required_approving_review_count | grep -qx 1"
+          }
+        },
+        {
+          "statement": "At least 90% of merged PRs in 30 days had a second reviewer",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/review-stats.mjs --days 30 --json",
+            "key": "reviewed_share",
+            "op": ">=",
+            "value": 0.9
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

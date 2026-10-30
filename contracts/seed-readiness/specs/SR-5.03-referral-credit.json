@@ -1,0 +1,42 @@
+{
+  "title": "SR-5.03 Referral credit",
+  "project": "memev-cloud",
+  "workdir": null,
+  "request": "Closes G44: REFERRAL.md is a draft spec with nothing built. Repository: mgillr/memev-cloud. Depends on contracts: SR-5.01.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Stripe referral codes",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "opt-in code per subscriber; a referred first payment credits one month; no in-app tracking"
+      ],
+      "description": "",
+      "scope": [
+        "services/billing/**",
+        "test/billing/**"
+      ],
+      "criteria": [
+        {
+          "statement": "A referred payment credits the referrer once",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/billing/referral.test.mjs",
+            "cmd": "node --test test/billing/referral.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

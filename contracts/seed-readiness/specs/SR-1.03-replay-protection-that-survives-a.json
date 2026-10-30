@@ -1,0 +1,51 @@
+{
+  "title": "SR-1.03 Replay protection that survives a restart",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G03: The nonce cache is in-memory, so a daemon restart reopens the five-minute replay window. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Persisted nonce cache",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "nonces seen in the skew window are persisted (0600) and reloaded on start",
+        "the store is bounded by the window and pruned"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/devices.mjs",
+        "src/server/http.mjs",
+        "test/nonce-persist.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "A signed request replayed after a daemon restart is refused",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/nonce-persist.test.mjs",
+            "cmd": "node --test test/nonce-persist.test.mjs"
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

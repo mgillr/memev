@@ -1,0 +1,43 @@
+{
+  "title": "SR-1.14 The multilingual claim runs in the suite",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G14: The 26-query, 9-script claim lives in an unwired lab script; the suite tests 7 queries. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Wire the 26 queries",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "all 26 queries in 9 scripts run in npm test against fixtures and the right note ranks first"
+      ],
+      "description": "",
+      "scope": [
+        "scripts/lab/measure.mjs",
+        "test/multilingual.test.mjs",
+        "test/fixtures/multilingual/**"
+      ],
+      "criteria": [
+        {
+          "statement": "Each of 26 queries returns its note first",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/multilingual.test.mjs",
+            "cmd": "node --test test/multilingual.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

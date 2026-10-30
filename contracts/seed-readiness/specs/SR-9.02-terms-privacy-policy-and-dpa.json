@@ -1,0 +1,62 @@
+{
+  "title": "SR-9.02 Terms, privacy policy and DPA",
+  "project": "memev-ops",
+  "workdir": null,
+  "request": "Closes G77: No terms of service, privacy policy for hosted services, data processing agreement or subprocessor list. Repository: mgillr/memev-ops. Depends on contracts: SR-9.01.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Legal documents",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "terms, privacy policy (revDSG and GDPR), DPA, subprocessor list; reviewed by counsel; published"
+      ],
+      "description": "",
+      "scope": [
+        "evidence/legal/**"
+      ],
+      "criteria": [
+        {
+          "statement": "Terms",
+          "verifier": {
+            "type": "file_exists",
+            "path": "evidence/legal/terms.md"
+          }
+        },
+        {
+          "statement": "Privacy policy",
+          "verifier": {
+            "type": "file_exists",
+            "path": "evidence/legal/privacy.md"
+          }
+        },
+        {
+          "statement": "DPA",
+          "verifier": {
+            "type": "file_exists",
+            "path": "evidence/legal/dpa.md"
+          }
+        },
+        {
+          "statement": "Counsel review recorded",
+          "verifier": {
+            "type": "grep",
+            "file": "evidence/legal/review.md",
+            "pattern": "Counsel:"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

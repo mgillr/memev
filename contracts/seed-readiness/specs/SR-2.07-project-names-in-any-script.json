@@ -1,0 +1,43 @@
+{
+  "title": "SR-2.07 Project names in any script",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G27: Project names written only in non-Latin scripts collapse to the same file name. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Unicode-safe project slugs",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "distinct names in any script map to distinct, stable file names; existing vaults migrate once"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/util.mjs",
+        "src/engine/vault.mjs",
+        "test/project-names.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "東京 and 大阪 map to different project files",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-names.test.mjs",
+            "cmd": "node --test test/project-names.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

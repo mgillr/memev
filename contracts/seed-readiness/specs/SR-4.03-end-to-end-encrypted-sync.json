@@ -1,0 +1,77 @@
+{
+  "title": "SR-4.03 End-to-end encrypted sync between one person's computers",
+  "project": "memev-cloud",
+  "workdir": null,
+  "request": "Closes G38: Hosted E2E sync is planned and memev-cloud has no code. Repository: mgillr/memev-cloud. Depends on contracts: SR-4.01, SR-3.04.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Sync relay",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "stores and forwards ciphertext only; per-vault keys never leave clients; licence id is the only identity"
+      ],
+      "description": "",
+      "scope": [
+        "services/sync/**",
+        "test/sync/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The server store contains no plaintext from a 1,000-note vault",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/sync/opaque.test.mjs",
+            "cmd": "node --test test/sync/opaque.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Client in memev and deployed",
+      "phase": "release",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "memev sync on uses the hosted relay; three computers converge through it"
+      ],
+      "description": "",
+      "scope": [
+        "deploy/**",
+        "docs/**"
+      ],
+      "criteria": [
+        {
+          "statement": "Production sync smoke test passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "node deploy/smoke.mjs --sync"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

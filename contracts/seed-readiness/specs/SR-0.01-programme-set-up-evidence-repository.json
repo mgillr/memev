@@ -1,0 +1,115 @@
+{
+  "title": "SR-0.01 Programme set-up: evidence repository, contract register and seed-gate script",
+  "project": "memev-ops",
+  "workdir": null,
+  "request": "Closes no gap (enabler): Enabler: a place to hold non-code evidence and one command that reports every contract. Repository: mgillr/memev-ops. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Evidence repository layout",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "memev-ops is private",
+        "one folder per WBS area with a README naming what evidence belongs there"
+      ],
+      "description": "",
+      "scope": [
+        "README.md",
+        "evidence/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The evidence index exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "evidence/README.md"
+          }
+        },
+        {
+          "statement": "The index covers every area SR-0 to SR-9",
+          "verifier": {
+            "type": "grep",
+            "file": "evidence/README.md",
+            "pattern": "SR-9"
+          }
+        },
+        {
+          "statement": "The README states the repository is private and why",
+          "verifier": {
+            "type": "grep",
+            "file": "README.md",
+            "pattern": "private"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Contract register and seed-gate script",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "register/contracts.json lists all 85 SR contracts with repo, signed id and status",
+        "scripts/seed-gate.mjs runs memev verify for each signed id in its repo checkout and prints PASS n/85",
+        "exits 1 while any contract is not PASS"
+      ],
+      "description": "",
+      "scope": [
+        "register/**",
+        "scripts/**",
+        "test/**",
+        "package.json"
+      ],
+      "criteria": [
+        {
+          "statement": "The register exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "register/contracts.json"
+          }
+        },
+        {
+          "statement": "The register holds 85 contracts",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/seed-gate.mjs --count --json",
+            "key": "contracts",
+            "op": "==",
+            "value": 85
+          }
+        },
+        {
+          "statement": "The gate fails on one FAIL contract and passes when all PASS",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/seed-gate.test.mjs",
+            "cmd": "node --test test/seed-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

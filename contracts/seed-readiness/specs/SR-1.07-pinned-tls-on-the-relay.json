@@ -1,0 +1,84 @@
+{
+  "title": "SR-1.07 Pinned TLS on the relay and a configured OAuth issuer",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G07: Relay client uses rejectUnauthorized:false with name pinning; the OAuth issuer is derived from the Host header. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Certificate fingerprint pinning",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "the relay client verifies the peer certificate public key against the pinned SPKI hash in checkServerIdentity"
+      ],
+      "description": "",
+      "scope": [
+        "src/cli/relay.mjs",
+        "test/relay.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "A relay presenting a different key is refused before any request byte is sent",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/relay.test.mjs",
+            "cmd": "node --test test/relay.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Issuer from config",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "the issuer comes from the tunnel or relay URL in config; a request with another Host is refused on OAuth routes"
+      ],
+      "description": "",
+      "scope": [
+        "src/server/http.mjs",
+        "src/server/oauth.mjs",
+        "test/oauth.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "A metadata request with a forged Host returns the configured issuer",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oauth.test.mjs",
+            "cmd": "node --test test/oauth.test.mjs"
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "title": "SR-3.01 Engine decision: what merges a note, where it lives, how it is licensed",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G30: crdt-merge is presented as the paid core but merges tensors and records, not Markdown; the engine has no design. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "names the algorithm (section-aware three-way merge with a sequence CRDT fallback, or another, with reasons)",
+        "names the runtime (Node, no Python bridge) and the repository",
+        "states crdt-merge's actual role, if any, in words a buyer can check"
+      ],
+      "description": "",
+      "scope": [
+        "docs/decisions/**",
+        "docs/CONVERGENCE.md",
+        "docs/PAID-CONVERGENCE.md",
+        "README.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The decision record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/decisions/merge-engine.md"
+          }
+        },
+        {
+          "statement": "The algorithm is named",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/decisions/merge-engine.md",
+            "pattern": "Algorithm:"
+          }
+        },
+        {
+          "statement": "The runtime is Node",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/decisions/merge-engine.md",
+            "pattern": "Runtime:\\s*Node"
+          }
+        },
+        {
+          "statement": "The README names the engine that ships",
+          "verifier": {
+            "type": "grep",
+            "file": "README.md",
+            "pattern": "memev-merge"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

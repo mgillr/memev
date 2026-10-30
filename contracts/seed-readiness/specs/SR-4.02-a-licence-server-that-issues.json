@@ -1,0 +1,86 @@
+{
+  "title": "SR-4.02 A licence server that issues and activates licences",
+  "project": "memev-cloud",
+  "workdir": null,
+  "request": "Closes G37: No licence server exists; memev license activate has nothing to call. Repository: mgillr/memev-cloud. Depends on contracts: SR-4.01, SR-9.03.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Activation endpoint",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "POST /v1/activate takes a key, returns a signed licence; stores no vault data; rate limited; keys hashed at rest",
+        "the signing key lives in an HSM or KMS, never in the repo"
+      ],
+      "description": "",
+      "scope": [
+        "services/licence/**",
+        "test/licence/**",
+        "package.json"
+      ],
+      "criteria": [
+        {
+          "statement": "A valid key returns a licence that memev verifies offline; a reused key is refused past its seats",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/licence/activate.test.mjs",
+            "cmd": "node --test test/licence/activate.test.mjs"
+          }
+        },
+        {
+          "statement": "No vault-derived field is accepted or stored",
+          "verifier": {
+            "type": "command",
+            "cmd": "node services/licence/check-no-vault-fields.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Deployed",
+      "phase": "release",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "live at a stable HTTPS address that memev ships as its default"
+      ],
+      "description": "",
+      "scope": [
+        "deploy/**",
+        "docs/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The production licence endpoint answers the smoke test",
+          "verifier": {
+            "type": "command",
+            "cmd": "node deploy/smoke.mjs --licence"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

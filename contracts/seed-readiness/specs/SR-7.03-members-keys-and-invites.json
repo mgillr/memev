@@ -1,0 +1,78 @@
+{
+  "title": "SR-7.03 Members, keys and invites",
+  "project": "memev-org",
+  "workdir": null,
+  "request": "Closes G59: Member keys, org-admin invites and separate personal and company identities are planned. Repository: mgillr/memev-org. Depends on contracts: SR-7.02.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Member keys and invites",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "one key per person covering their computers; invite by link with expiry; a personal vault and a company vault never share keys or identities"
+      ],
+      "description": "",
+      "scope": [
+        "src/**",
+        "test/**"
+      ],
+      "criteria": [
+        {
+          "statement": "An invite redeems once; a personal device key is refused by the company server",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/invites.test.mjs",
+            "cmd": "node --test test/invites.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Client side in memev",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "memev org join <invite> on a member computer; the two vaults show separately in memev status"
+      ],
+      "description": "",
+      "scope": [
+        "src/**",
+        "test/**"
+      ],
+      "criteria": [
+        {
+          "statement": "Joining a company leaves the personal vault untouched",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/org-join.test.mjs",
+            "cmd": "node --test test/org-join.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "title": "SR-1.20 External security review before any public launch",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G20: OAuth server, tunnel exposure, device signing, rate limiting and setup channel have had no outside review. Repository: mgillr/memev. Depends on contracts: SR-1.01, SR-1.02, SR-1.03, SR-1.04, SR-1.05, SR-1.07.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Review commissioned and run",
+      "phase": "verify",
+      "depends_on": [],
+      "requirements": [
+        "an independent reviewer tests the daemon, OAuth, tunnel, relay, device keys, bus injection and contracts"
+      ],
+      "description": "",
+      "scope": [
+        "docs/security/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The review report (or its public summary) is filed",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/security/review-2027.md"
+          }
+        },
+        {
+          "statement": "The reviewer is named",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/security/review-2027.md",
+            "pattern": "Reviewer:\\s*\\S+"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Findings closed",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "every critical and high finding has a fix commit and a regression test; mediums have a decision"
+      ],
+      "description": "",
+      "scope": [
+        "src/**",
+        "test/**",
+        "docs/security/**"
+      ],
+      "criteria": [
+        {
+          "statement": "No open critical or high finding",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/security-findings.mjs --json",
+            "key": "open_high",
+            "op": "==",
+            "value": 0
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

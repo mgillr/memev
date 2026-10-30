@@ -1,0 +1,43 @@
+{
+  "title": "SR-7.10 One AI provider per organisation",
+  "project": "memev-org",
+  "workdir": null,
+  "request": "Closes G66: Connecting one cloud AI service or an on-prem LLM for the organisation over MCP is planned. Repository: mgillr/memev-org. Depends on contracts: SR-7.09.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Provider binding",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "the org binds one provider (a hosted service or an on-prem endpoint); other clients are refused"
+      ],
+      "description": "",
+      "scope": [
+        "src/**",
+        "test/**",
+        "docs/**"
+      ],
+      "criteria": [
+        {
+          "statement": "A second provider is refused; an on-prem LLM endpoint works end to end",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/provider.test.mjs",
+            "cmd": "node --test test/provider.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

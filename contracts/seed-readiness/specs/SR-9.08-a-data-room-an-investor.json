@@ -1,0 +1,56 @@
+{
+  "title": "SR-9.08 A data room an investor can work from",
+  "project": "memev-ops",
+  "workdir": null,
+  "request": "Closes G83: No deck, financial model, cap table or use-of-funds plan. Repository: mgillr/memev-ops. Depends on contracts: SR-9.07, SR-6.08, SR-5.05.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Data room",
+      "phase": "release",
+      "depends_on": [],
+      "requirements": [
+        "deck, 36-month model tied to the rate card and traction, cap table, use of funds, the WBS register with receipts"
+      ],
+      "description": "",
+      "scope": [
+        "evidence/data-room/**"
+      ],
+      "criteria": [
+        {
+          "statement": "Data room index",
+          "verifier": {
+            "type": "file_exists",
+            "path": "evidence/data-room/index.md"
+          }
+        },
+        {
+          "statement": "The cap table is listed",
+          "verifier": {
+            "type": "grep",
+            "file": "evidence/data-room/index.md",
+            "pattern": "Cap table"
+          }
+        },
+        {
+          "statement": "The model is listed",
+          "verifier": {
+            "type": "grep",
+            "file": "evidence/data-room/index.md",
+            "pattern": "Financial model"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

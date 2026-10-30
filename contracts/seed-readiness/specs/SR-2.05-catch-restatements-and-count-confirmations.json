@@ -1,0 +1,51 @@
+{
+  "title": "SR-2.05 Catch restatements and count confirmations",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G25: A restatement in different words gets through; a repeated save is discarded instead of counted. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Shown-context comparison and confirmation counts",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a save is compared with what this session was shown; a near match is refused with the matching note",
+        "a repeat of an existing memory increments its confirmations and raises its feedback weight"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/quality.mjs",
+        "src/engine/vault.mjs",
+        "test/memory-quality.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "Saving what recall just returned, reworded, is refused with the note it matches",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/memory-quality.test.mjs",
+            "cmd": "node --test test/memory-quality.test.mjs"
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

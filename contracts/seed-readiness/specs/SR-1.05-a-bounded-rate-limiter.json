@@ -1,0 +1,51 @@
+{
+  "title": "SR-1.05 A bounded rate limiter",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G05: The rate limiter bucket map is never evicted (http.mjs:69-77), an unbounded memory growth on a public tunnel. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Evicting buckets",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "idle buckets older than two minutes are dropped",
+        "the map is capped (10,000 keys) with oldest-first eviction"
+      ],
+      "description": "",
+      "scope": [
+        "src/server/http.mjs",
+        "test/rate-limit.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "After 50,000 distinct keys the map holds at most 10,000 entries",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "node --test test/rate-limit.test.mjs"
+          }
+        },
+        {
+          "statement": "The cap is a named constant",
+          "verifier": {
+            "type": "grep",
+            "file": "src/server/http.mjs",
+            "pattern": "MAX_BUCKETS"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

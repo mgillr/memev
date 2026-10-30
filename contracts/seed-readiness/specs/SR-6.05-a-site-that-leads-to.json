@@ -1,0 +1,50 @@
+{
+  "title": "SR-6.05 A site that leads to the product",
+  "project": "memev-site",
+  "workdir": null,
+  "request": "Closes G52: The site links to no repository, registry or installer; every call to action is a mailto. Repository: mgillr/memev-site. Depends on contracts: SR-6.02.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Install path and real forms",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "the hero shows the install command and links the repo; Business enquiries go to a form with storage and consent, not mailto"
+      ],
+      "description": "",
+      "scope": [
+        "web/src/**",
+        "web/public/**",
+        "test/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The install command is on the home page",
+          "verifier": {
+            "type": "grep",
+            "file": "web/src/app/page.tsx",
+            "pattern": "npx memev init"
+          }
+        },
+        {
+          "statement": "The enquiry form is not a mailto",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -R \"mailto:\" web/src/components/EnquiryForm.tsx"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

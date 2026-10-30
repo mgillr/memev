@@ -1,0 +1,47 @@
+{
+  "title": "SR-8.06 A services catalogue matched to capacity",
+  "project": "memev-ops",
+  "workdir": null,
+  "request": "Closes G75: Setup in 2 to 12 weeks, 1-hour 24/7 response and embedded engineers are offered with no one to deliver them. Repository: mgillr/memev-ops. Depends on contracts: SR-9.05.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Re-scoped catalogue",
+      "phase": "plan",
+      "depends_on": [],
+      "requirements": [
+        "each service names who delivers it, a price and a capacity limit; anything unstaffed is withdrawn from docs and site"
+      ],
+      "description": "",
+      "scope": [
+        "evidence/services/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The catalogue exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "evidence/services/catalogue.md"
+          }
+        },
+        {
+          "statement": "Every listed service names a delivering person",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/services-staffed.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

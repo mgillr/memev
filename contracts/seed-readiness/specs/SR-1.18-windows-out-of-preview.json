@@ -1,0 +1,95 @@
+{
+  "title": "SR-1.18 Windows out of preview",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G18: parentProcName has no Windows path; installer is win-x64 only; Windows CI runs 6 files; no lab run. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Windows code paths complete",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "parent app detection works on Windows",
+        "install.ps1 supports win-arm64"
+      ],
+      "description": "",
+      "scope": [
+        "src/cli/common.mjs",
+        "scripts/install.ps1",
+        "scripts/node-runtime.json",
+        "test/windows.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "parentProcName returns the parent image name on Windows",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/windows.test.mjs",
+            "cmd": "node --test test/windows.test.mjs"
+          }
+        },
+        {
+          "statement": "A pinned win-arm64 Node runtime exists",
+          "verifier": {
+            "type": "grep",
+            "file": "scripts/node-runtime.json",
+            "pattern": "\"win-arm64\""
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Windows lab run",
+      "phase": "verify",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "T-WIN-01 to T-WIN-09 run on Windows 11 with results recorded; README drops the preview label only after"
+      ],
+      "description": "",
+      "scope": [
+        "docs/testing/**",
+        "README.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The Windows lab results are filed",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/testing/results/windows-11.md"
+          }
+        },
+        {
+          "statement": "All nine Windows cases PASS",
+          "verifier": {
+            "type": "command",
+            "cmd": "node -e \"const s=require('fs').readFileSync('docs/testing/results/windows-11.md','utf8');process.exit((s.match(/T-WIN-0[1-9].*PASS/g)||[]).length===9?0:1)\""
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

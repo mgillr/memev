@@ -1,0 +1,77 @@
+{
+  "title": "SR-5.01 People can pay: live checkout, webhook, licence by email",
+  "project": "memev-cloud",
+  "workdir": null,
+  "request": "Closes G42: Stripe is in test mode; no webhook, no licence email; the paid tier cannot be bought. Repository: mgillr/memev-cloud. Depends on contracts: SR-4.02, SR-9.01, SR-9.02.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Checkout to licence",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "Stripe live mode; webhook verifies signatures, issues the licence, emails the key; renewals extend expiry; cancellations set grace"
+      ],
+      "description": "",
+      "scope": [
+        "services/billing/**",
+        "test/billing/**"
+      ],
+      "criteria": [
+        {
+          "statement": "A signed checkout.session.completed issues exactly one licence; a replay issues none",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/billing/webhook.test.mjs",
+            "cmd": "node --test test/billing/webhook.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "First real purchase",
+      "phase": "release",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "a purchase by someone other than the founder completes end to end"
+      ],
+      "description": "",
+      "scope": [
+        "deploy/**",
+        "ops/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The first external purchase is recorded (no personal data)",
+          "verifier": {
+            "type": "file_exists",
+            "path": "ops/evidence/first-purchase.md"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

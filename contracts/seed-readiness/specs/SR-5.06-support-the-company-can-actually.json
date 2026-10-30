@@ -1,0 +1,48 @@
+{
+  "title": "SR-5.06 Support the company can actually deliver",
+  "project": "memev-ops",
+  "workdir": null,
+  "request": "Closes G47: Paid support has no address; Corporate promises 1-hour 24/7 response and embedded engineers a one-person company cannot give. Repository: mgillr/memev-ops. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Support channel and honest SLAs",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a support address and ticket system live; SLAs set to staffed capacity; on-call rota named before any 24/7 promise"
+      ],
+      "description": "",
+      "scope": [
+        "evidence/support/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The SLA document exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "evidence/support/sla.md"
+          }
+        },
+        {
+          "statement": "The SLA names who staffs it",
+          "verifier": {
+            "type": "grep",
+            "file": "evidence/support/sla.md",
+            "pattern": "Staffed by:"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

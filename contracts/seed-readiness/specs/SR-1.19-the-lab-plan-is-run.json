@@ -1,0 +1,62 @@
+{
+  "title": "SR-1.19 The lab plan is run, not just written",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G19: 143 manual lab cases; no evidence any were run. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Full lab run with evidence",
+      "phase": "verify",
+      "depends_on": [],
+      "requirements": [
+        "every id in LAB-TEST-PLAN.md has a result row with date, machine, PASS or FAIL and a link to evidence",
+        "every FAIL becomes a fix commit or an amended contract"
+      ],
+      "description": "",
+      "scope": [
+        "docs/testing/**",
+        "scripts/lab/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The lab run results file exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/testing/results/lab-run.md"
+          }
+        },
+        {
+          "statement": "At least 95% of lab cases PASS",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/lab/results.mjs --json",
+            "key": "pass_ratio",
+            "op": ">=",
+            "value": 0.95
+          }
+        },
+        {
+          "statement": "No lab case is without a result",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/lab/results.mjs --json",
+            "key": "missing",
+            "op": "==",
+            "value": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

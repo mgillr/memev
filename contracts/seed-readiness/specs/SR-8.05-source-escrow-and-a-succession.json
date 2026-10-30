@@ -1,0 +1,47 @@
+{
+  "title": "SR-8.05 Source escrow and a succession plan",
+  "project": "memev-ops",
+  "workdir": null,
+  "request": "Closes G74: Escrow and succession are planned; a one-person vendor is a supplier risk for corporate buyers. Repository: mgillr/memev-ops. Depends on contracts: SR-9.01.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Escrow and plan",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "escrow agreement with a recognised agent; written succession plan naming who holds keys and code if the founder is unavailable"
+      ],
+      "description": "",
+      "scope": [
+        "evidence/escrow/**"
+      ],
+      "criteria": [
+        {
+          "statement": "Escrow agreement recorded",
+          "verifier": {
+            "type": "file_exists",
+            "path": "evidence/escrow/agreement.md"
+          }
+        },
+        {
+          "statement": "Succession plan filed",
+          "verifier": {
+            "type": "file_exists",
+            "path": "evidence/escrow/succession.md"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

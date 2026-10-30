@@ -1,0 +1,56 @@
+{
+  "title": "SR-3.05 One licence for the engine, stated once",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G34: The engine licence is stated three ways (BSL 1.1, FSL-1.1-ALv2, draft BUSL-1.1 with licensor to be confirmed). Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision and alignment",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "one licence, licensor (the company from SR-9.01) and change date, reviewed by counsel",
+        "every mention in memev and memev-cloud agrees"
+      ],
+      "description": "",
+      "scope": [
+        "docs/LICENSING-NOTICE.md",
+        "docs/CONVERGENCE.md",
+        "docs/PAID-CONVERGENCE.md",
+        "README.md",
+        "CHANGELOG.md",
+        "changelog.d/**",
+        "test/licence-boundary.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "Any other engine licence name in docs fails the test",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/licence-boundary.test.mjs",
+            "cmd": "node --test test/licence-boundary.test.mjs"
+          }
+        },
+        {
+          "statement": "Counsel review is recorded",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/LICENSING-NOTICE.md",
+            "pattern": "Reviewed by counsel"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "title": "SR-6.01 The repository goes public",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G48: The repository is private, so no one can find, star or install it. Repository: mgillr/memev. Depends on contracts: SR-1.20, SR-9.01.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Public-ready repository",
+      "phase": "release",
+      "depends_on": [],
+      "requirements": [
+        "history leak-clean; contributor guide, code of conduct, issue templates, security contact"
+      ],
+      "description": "",
+      "scope": [
+        "README.md",
+        "CONTRIBUTING.md",
+        "CODE_OF_CONDUCT.md",
+        "SECURITY.md",
+        ".github/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The leak scan is clean over files and history",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history"
+          }
+        },
+        {
+          "statement": "Contributor guide",
+          "verifier": {
+            "type": "file_exists",
+            "path": "CONTRIBUTING.md"
+          }
+        },
+        {
+          "statement": "Code of conduct",
+          "verifier": {
+            "type": "file_exists",
+            "path": "CODE_OF_CONDUCT.md"
+          }
+        },
+        {
+          "statement": "The repository is public",
+          "verifier": {
+            "type": "command",
+            "cmd": "gh repo view mgillr/memev --json visibility -q .visibility | grep -qx PUBLIC"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

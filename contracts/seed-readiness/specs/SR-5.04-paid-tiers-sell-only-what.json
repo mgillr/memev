@@ -1,0 +1,54 @@
+{
+  "title": "SR-5.04 Paid tiers sell only what is built, on every surface",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G45: The $12 tier advertises automatic merge, which does not exist; the pricing test covers docs but not the site. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Pricing truth from one table",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a machine-readable status table (built, planned, date) is the single source; docs and the site render from it",
+        "a feature listed in a paid tier must be built or carry a delivery date"
+      ],
+      "description": "",
+      "scope": [
+        "docs/PRICING.md",
+        "docs/tiers/**",
+        "src/engine/entitlements.mjs",
+        "scripts/status-table.mjs",
+        "docs/status.json",
+        "test/pricing-honesty.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "A planned feature shown as included in any tier fails, in docs and in the exported site data",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pricing-honesty.test.mjs",
+            "cmd": "node --test test/pricing-honesty.test.mjs"
+          }
+        },
+        {
+          "statement": "The status table exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/status.json"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

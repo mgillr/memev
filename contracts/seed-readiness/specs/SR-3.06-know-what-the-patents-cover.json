@@ -1,0 +1,48 @@
+{
+  "title": "SR-3.06 Know what the patents cover",
+  "project": "memev-ops",
+  "workdir": null,
+  "request": "Closes G35: Two UK patent applications on CRDT model merging; no claims map against Memev and no freedom-to-operate note. Repository: mgillr/memev-ops. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Claims map and FTO note",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "the claims of 2607132.4 and GB2608127.3 mapped to Memev features; a patent attorney's note on reach and FTO for note merging"
+      ],
+      "description": "",
+      "scope": [
+        "evidence/ip/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The claims map is filed",
+          "verifier": {
+            "type": "file_exists",
+            "path": "evidence/ip/claims-map.md"
+          }
+        },
+        {
+          "statement": "An attorney is named",
+          "verifier": {
+            "type": "grep",
+            "file": "evidence/ip/claims-map.md",
+            "pattern": "Attorney:\\s*\\S+"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

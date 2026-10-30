@@ -1,0 +1,49 @@
+{
+  "title": "SR-8.02 An air-gapped package",
+  "project": "memev-org",
+  "workdir": null,
+  "request": "Closes G71: The air-gapped package with signed bundle updates is planned. Repository: mgillr/memev-org. Depends on contracts: SR-7.10.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Offline bundle",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "one signed bundle installs with no network; updates are signed bundles; an on-prem LLM is the only provider"
+      ],
+      "description": "",
+      "scope": [
+        "deploy/airgap/**",
+        "test/**"
+      ],
+      "criteria": [
+        {
+          "statement": "Install and upgrade succeed in a VM with networking off",
+          "verifier": {
+            "type": "command",
+            "cmd": "bash deploy/airgap/install-test.sh"
+          }
+        },
+        {
+          "statement": "A tampered bundle is refused",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bundle-signature.test.mjs",
+            "cmd": "node --test test/bundle-signature.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

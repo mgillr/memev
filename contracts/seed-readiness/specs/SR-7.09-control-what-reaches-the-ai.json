@@ -1,0 +1,50 @@
+{
+  "title": "SR-7.09 Control what reaches the AI provider",
+  "project": "memev-org",
+  "workdir": null,
+  "request": "Closes G65: Labels, egress rules, pseudonymising and an egress log are planned. Repository: mgillr/memev-org. Depends on contracts: SR-7.08.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Labels, rules, log",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "notes carry labels; rules say which labels each client may receive; names and amounts pseudonymised for cloud providers; every byte returned is logged"
+      ],
+      "description": "",
+      "scope": [
+        "src/**",
+        "test/**"
+      ],
+      "criteria": [
+        {
+          "statement": "A restricted note never reaches a cloud client and the attempt is in the egress log",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/egress.test.mjs",
+            "cmd": "node --test test/egress.test.mjs"
+          }
+        },
+        {
+          "statement": "Names and amounts are replaced consistently and restored in the reply",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pseudonymise.test.mjs",
+            "cmd": "node --test test/pseudonymise.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

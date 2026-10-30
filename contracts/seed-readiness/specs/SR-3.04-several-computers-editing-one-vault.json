@@ -1,0 +1,109 @@
+{
+  "title": "SR-3.04 Several computers editing one vault at once, nothing to resolve",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G33: Git sync is single-writer and advisory; the oplog HLC merge has no caller; a second writer leaves conflict copies. Repository: mgillr/memev. Depends on contracts: SR-3.03, SR-1.01.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Merge on sync through the boundary",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "with a licence carrying merge, conflicting notes go to the engine; logs from devices are merged in HLC order",
+        "without a licence the free behaviour is byte-identical to today (CHARTER.md)"
+      ],
+      "description": "",
+      "scope": [
+        "src/cli/sync.mjs",
+        "src/engine/merge.mjs",
+        "src/engine/oplog.mjs",
+        "test/multi-writer.test.mjs",
+        "test/seats.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "Three clones edit the same notes concurrently for 500 rounds and converge with no conflict copies",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/multi-writer.test.mjs",
+            "cmd": "node --test test/multi-writer.test.mjs"
+          }
+        },
+        {
+          "statement": "One computer with no licence still gets everything",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/seats.test.mjs",
+            "cmd": "node --test test/seats.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Soak",
+      "phase": "verify",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "three real machines (macOS, Linux, Windows) run for 72 hours with scripted edits"
+      ],
+      "description": "",
+      "scope": [
+        "scripts/soak/**",
+        "bench/soak/**"
+      ],
+      "criteria": [
+        {
+          "statement": "Soak results filed",
+          "verifier": {
+            "type": "file_exists",
+            "path": "bench/soak/72h.json"
+          }
+        },
+        {
+          "statement": "Zero lost changes over 72 hours",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/soak/report.mjs --from bench/soak/72h.json --json",
+            "key": "lost_changes",
+            "op": "==",
+            "value": 0
+          }
+        },
+        {
+          "statement": "Zero conflict copies",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/soak/report.mjs --from bench/soak/72h.json --json",
+            "key": "conflict_copies",
+            "op": "==",
+            "value": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

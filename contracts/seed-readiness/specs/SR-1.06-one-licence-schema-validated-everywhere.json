@@ -1,0 +1,60 @@
+{
+  "title": "SR-1.06 One licence schema, validated everywhere",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G06: LICENSE_FIELDS omits trial, org and trial_ext that other modules read; installLicense skips the check activate applies. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Schema and both entry points",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "every field read anywhere is in the schema",
+        "install and activate run the same validator",
+        "the header comment matches what a licence may carry"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/license.mjs",
+        "src/cli/licensing.mjs",
+        "test/license-schema.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "A licence with an unknown field is refused by install and by activate",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "trial is in the schema",
+          "verifier": {
+            "type": "grep",
+            "file": "src/engine/license.mjs",
+            "pattern": "LICENSE_FIELDS[^\\n]*'trial'"
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

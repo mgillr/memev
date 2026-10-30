@@ -1,0 +1,69 @@
+{
+  "title": "SR-4.06 Run the hosted services like a business",
+  "project": "memev-cloud",
+  "workdir": null,
+  "request": "Closes G41: No operations: no monitoring, status page, backups of the services themselves or incident process. Repository: mgillr/memev-cloud. Depends on contracts: SR-4.02, SR-4.03, SR-4.04.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Operations baseline",
+      "phase": "monitor",
+      "depends_on": [],
+      "requirements": [
+        "uptime monitoring and alerting to a phone",
+        "public status page",
+        "infrastructure as code",
+        "incident and key-compromise runbooks",
+        "a restore drill"
+      ],
+      "description": "",
+      "scope": [
+        "ops/**",
+        "deploy/**"
+      ],
+      "criteria": [
+        {
+          "statement": "Incident runbook",
+          "verifier": {
+            "type": "file_exists",
+            "path": "ops/runbooks/incident.md"
+          }
+        },
+        {
+          "statement": "Key-compromise runbook",
+          "verifier": {
+            "type": "file_exists",
+            "path": "ops/runbooks/key-compromise.md"
+          }
+        },
+        {
+          "statement": "A restore drill is recorded",
+          "verifier": {
+            "type": "file_exists",
+            "path": "ops/drills/restore-drill.md"
+          }
+        },
+        {
+          "statement": "30-day uptime >= 99.5%",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node ops/uptime-report.mjs --days 30 --json",
+            "key": "uptime",
+            "op": ">=",
+            "value": 0.995
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

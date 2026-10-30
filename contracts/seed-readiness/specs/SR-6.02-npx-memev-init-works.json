@@ -1,0 +1,50 @@
+{
+  "title": "SR-6.02 npx memev init works",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G49: Not on npm; the one-command install path is coming soon. Repository: mgillr/memev. Depends on contracts: SR-6.01.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Publish 1.0",
+      "phase": "release",
+      "depends_on": [],
+      "requirements": [
+        "a tagged release on npm with provenance; npx memev init passes on clean macOS, Linux and Windows"
+      ],
+      "description": "",
+      "scope": [
+        "package.json",
+        "CHANGELOG.md",
+        "changelog.d/**",
+        "docs/RELEASING.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The package is on npm",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm view memev version"
+          }
+        },
+        {
+          "statement": "The tag matches the version",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/release-tag-check.mjs v$(node -p \"require('./package.json').version\")"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

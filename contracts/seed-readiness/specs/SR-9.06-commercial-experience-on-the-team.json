@@ -1,0 +1,40 @@
+{
+  "title": "SR-9.06 Commercial experience on the team",
+  "project": "memev-ops",
+  "workdir": null,
+  "request": "Closes G81: No commercial co-founder or advisor who has sold self-hosted developer infrastructure to European mid-market buyers. Repository: mgillr/memev-ops. Depends on contracts: SR-9.01.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Advisor or co-founder",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "an advisor agreement or co-founder agreement with someone who has done this sale"
+      ],
+      "description": "",
+      "scope": [
+        "evidence/team/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The agreement is recorded with role and equity or fee",
+          "verifier": {
+            "type": "file_exists",
+            "path": "evidence/team/commercial-lead.md"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

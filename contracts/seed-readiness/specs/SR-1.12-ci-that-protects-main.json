@@ -1,0 +1,91 @@
+{
+  "title": "SR-1.12 CI that protects main",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G12: Linux tests run only on pull requests, docs-only changes skip CI although tests assert on docs, no macOS job, no coverage. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Workflow coverage",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "the Linux suite runs on push to main and on every PR including docs-only",
+        "a macOS job runs the suite on push to main",
+        "the Windows job runs the full suite"
+      ],
+      "description": "",
+      "scope": [
+        ".github/workflows/ci.yml",
+        "test/release-workflow.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "A macOS job exists",
+          "verifier": {
+            "type": "grep",
+            "file": ".github/workflows/ci.yml",
+            "pattern": "macos-latest"
+          }
+        },
+        {
+          "statement": "The workflow test fails if the Linux job is PR-only or docs paths are filtered",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/release-workflow.test.mjs",
+            "cmd": "node --test test/release-workflow.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Coverage floor",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "node --experimental-test-coverage runs in CI with a line floor of 80% for src/"
+      ],
+      "description": "",
+      "scope": [
+        ".github/workflows/ci.yml",
+        "scripts/coverage-floor.mjs",
+        "package.json"
+      ],
+      "criteria": [
+        {
+          "statement": "Line coverage of src >= 80%",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/coverage-floor.mjs --json",
+            "key": "lines",
+            "op": ">=",
+            "value": 80
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

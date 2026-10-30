@@ -1,0 +1,90 @@
+{
+  "title": "SR-1.16 Docs and code say the same thing",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G16: Help omits real subcommands; CLIENTS.md says sync every few minutes (default 30); delete is not reconciled; dependency claim overstated. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Help is generated from the dispatch table",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "memev help lists every dispatched command and subcommand"
+      ],
+      "description": "",
+      "scope": [
+        "src/cli/main.mjs",
+        "src/cli/bus-cli.mjs",
+        "src/cli/tunnel.mjs",
+        "test/help.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "A dispatched subcommand missing from help fails the test",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/help.test.mjs",
+            "cmd": "node --test test/help.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Claims fixed",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "sync interval stated from config default",
+        "delete reconciles like write",
+        "the README states external tools needed: git, and optionally cloudflared or tailscale"
+      ],
+      "description": "",
+      "scope": [
+        "docs/**",
+        "src/engine/vault.mjs",
+        "test/vault.test.mjs",
+        "README.md"
+      ],
+      "criteria": [
+        {
+          "statement": "A hand-edited file deleted through the API is imported before the delete",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault.test.mjs",
+            "cmd": "node --test test/vault.test.mjs"
+          }
+        },
+        {
+          "statement": "The README names git as a requirement",
+          "verifier": {
+            "type": "grep",
+            "file": "README.md",
+            "pattern": "needs git"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

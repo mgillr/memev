@@ -1,0 +1,50 @@
+{
+  "title": "SR-4.01 One architecture for personal and company data",
+  "project": "memev-cloud",
+  "workdir": null,
+  "request": "Closes G36: memev-cloud says servers never read vault content; the Business design says the company server reads everything. Repository: mgillr/memev-cloud. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Architecture decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "personal hosted services are end-to-end encrypted; the company server is customer-run and reads what members promote",
+        "both statements appear in memev and memev-cloud docs in the same words"
+      ],
+      "description": "",
+      "scope": [
+        "docs/**",
+        "README.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The ADR exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/decisions/0001-trust-model.md"
+          }
+        },
+        {
+          "statement": "The ADR is accepted",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/decisions/0001-trust-model.md",
+            "pattern": "Status:\\s*Accepted"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

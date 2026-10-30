@@ -1,0 +1,50 @@
+{
+  "title": "SR-7.11 A Business trial that starts in minutes",
+  "project": "memev-org",
+  "workdir": null,
+  "request": "Closes G67: The site offers a free self-serve cloud trial; there is no hosted company server to start it on. Repository: mgillr/memev-org. Depends on contracts: SR-7.02, SR-5.02, SR-4.06.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Self-serve hosted trial",
+      "phase": "release",
+      "depends_on": [],
+      "requirements": [
+        "sign up, get a hosted company server, invite members, connect one provider, all in under 15 minutes; tenant isolation tested"
+      ],
+      "description": "",
+      "scope": [
+        "deploy/**",
+        "src/**",
+        "test/**"
+      ],
+      "criteria": [
+        {
+          "statement": "One trial tenant cannot read another",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/tenant-isolation.test.mjs",
+            "cmd": "node --test test/tenant-isolation.test.mjs"
+          }
+        },
+        {
+          "statement": "A trial is provisioned end to end in production",
+          "verifier": {
+            "type": "command",
+            "cmd": "node deploy/trial-smoke.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

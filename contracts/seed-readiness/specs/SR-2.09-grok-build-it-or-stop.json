@@ -1,0 +1,51 @@
+{
+  "title": "SR-2.09 Grok: build it or stop showing it",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G29: The site shows Grok as coming soon; nothing in the product repo supports it. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision and delivery",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a decision record says whether Grok is supported; if yes, a connector with a test; if no, the site drops it (SR-6.06)"
+      ],
+      "description": "",
+      "scope": [
+        "docs/CLIENTS.md",
+        "docs/decisions/**",
+        "src/cli/clients.mjs",
+        "test/clients.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "The decision is recorded",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/decisions/grok.md"
+          }
+        },
+        {
+          "statement": "The decision is build or drop",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/decisions/grok.md",
+            "pattern": "Decision:\\s*(build|drop)"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

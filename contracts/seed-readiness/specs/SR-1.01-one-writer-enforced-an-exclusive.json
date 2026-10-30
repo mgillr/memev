@@ -1,0 +1,104 @@
+{
+  "title": "SR-1.01 One writer, enforced: an exclusive lock on the vault log",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G01: Single-writer rule is convention only; runner.mjs opens a Vault beside a live daemon and can corrupt the oplog. Repository: mgillr/memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Exclusive vault lock",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "OpLog.open takes an exclusive lock file (O_EXCL with stale-pid recovery) before truncating or rewriting the manifest",
+        "a second opener gets a VaultLocked error naming the holder pid",
+        "a read-only open mode exists that never mutates the log"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/oplog.mjs",
+        "src/engine/vault.mjs",
+        "src/engine/util.mjs",
+        "test/oplog-lock.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "Two writers on one vault: the second is refused and the log verifies",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "node --test test/oplog-lock.test.mjs"
+          }
+        },
+        {
+          "statement": "The lock error exists in the oplog",
+          "verifier": {
+            "type": "grep",
+            "file": "src/engine/oplog.mjs",
+            "pattern": "VaultLocked"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Runner goes through the daemon",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "runner.mjs no longer constructs new Vault(root) for writes; it calls the daemon over HTTP or opens read-only"
+      ],
+      "description": "",
+      "scope": [
+        "src/cli/runner.mjs",
+        "test/runner.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "The runner with a live daemon leaves log.verify() ok and no duplicate seq",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/runner.test.mjs",
+            "cmd": "node --test test/runner.test.mjs"
+          }
+        },
+        {
+          "statement": "No writable Vault is opened in runner.mjs",
+          "verifier": {
+            "type": "command",
+            "cmd": "node -e \"process.exit(/new Vault\\(root\\)(?![^\\n]*readOnly)/.test(require('fs').readFileSync('src/cli/runner.mjs','utf8'))?1:0)\""
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
