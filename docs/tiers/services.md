@@ -28,12 +28,12 @@ Each package is priced on your requirements: contact us for a quote.
 | Package | For | Remote timeline |
 |---|---|---|
 | Onboarding, small | Personal: install, GitHub backup, apps connected, a walkthrough | 1 to 2 days |
-| Business setup | the company server, sign-in, departments, computers, backup | 2 to 3 weeks |
+| Business setup | business node or nodes, identity, teams, project scopes, computers and backup | 2 to 3 weeks |
 | Business setup with an on-premises LLM | the above plus optional locally hosted models, additional AI integrations and the rules for what information each tool may receive | 3 to 4 weeks |
 | Sales-assisted pilot | Business or Corporate for an organisation that needs an on-premises LLM, an air-gapped install or a compliance-led rollout (planned) | |
 | Trial setup, on-prem | the operator installs and configures the trial for you, on your servers | priced on your requirements |
-| Corporate onboarding | discovery, high availability, identity, SIEM, pilot, rollout | 6 to 12 weeks |
-| Private deployment | we run and maintain a dedicated company server in your data centre or cloud account | 2 to 4 weeks to start |
+| Corporate / federation onboarding | discovery, site topology, identity, sovereignty, recovery, SIEM, pilot and rollout | scoped to requirements |
+| Private deployment | we run and maintain dedicated Memev node(s) in your data centre, cloud account or approved sites | scoped to requirements |
 | Compliance pack | data-flow diagrams, records of processing, the security answers your auditors ask for, kept current, once or yearly | 2 to 3 weeks |
 | Workshop | one session for staff, up to 3 hours | |
 | Admin training day | a full day for the people who run the company server | |
