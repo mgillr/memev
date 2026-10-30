@@ -149,7 +149,9 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   else r.push(C('remote', 'remote access', 'ok', 'off (local only)'));
   const remote = run('git', ['remote'], { cwd: root }).stdout.trim();
   const jobs = readJson(path.join(state, 'jobs.json'), {});
-  r.push(C('backup', 'vault backed up off this machine', remote ? (jobs.sync?.error ? 'warn' : 'ok') : 'warn', remote ? (jobs.sync?.error ? `last sync: ${jobs.sync.error}` : `git remote ${remote}${jobs.sync?.at ? `, last sync ${jobs.sync.at}` : ''}`) : 'no backup yet: memev github setup'));
+  const relay = cfg.remote?.relay || {};
+  const relayOff = !!(remote && !relay.enabled && (relay.url || relay.domain));
+  r.push(C('backup', 'vault backed up off this machine', remote ? (jobs.sync?.error ? 'warn' : 'ok') : 'warn', remote ? (jobs.sync?.error ? `last sync: ${jobs.sync.error}` : `git remote ${remote}${jobs.sync?.at ? `, last sync ${jobs.sync.at}` : ''}${relayOff ? '; the relay is off, so the vault is reached only through this git backup; memev cloud relay on switches it back on' : ''}`) : 'no backup yet: memev github setup'));
   if (jobs.sync?.warning) r.push(C('writers', 'one computer writes the git backup', 'warn', jobs.sync.warning));
   try {
     // report only: licence and seats never fail the doctor and never limit anything

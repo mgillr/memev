@@ -109,6 +109,21 @@ The hosted relay is planned. `memev cloud relay address` prints the address and 
 relay is reachable, so you can give it to an app first. Remote access (`memev cloud on`) must be on, or the
 vault refuses what arrives. The address is kept when you switch the relay off.
 
+## When the relay is off or unreachable
+
+The relay is the vault's stable address, not its backup. The vault's backup is the git remote, and it runs
+whether or not the relay is on: a sync pushes to the git remote, and switching the relay off or losing it
+changes nothing about that. With the relay off on a vault that was using it, the next sync still runs
+through the git backup, and the vault's tree is byte for byte what it was.
+
+The doctor says so on the backup check it already reports: one line that names the relay as off, the git
+backup as the path in use, and the command that switches the relay back on. That line stays out of a
+session's context; it is a troubleshooting note, not something a session reads.
+
+When the relay is configured but unreachable, the client reports the failure and reconnects on a growing
+pause (half a second, doubling up to a minute). The retries run off the event loop, so the daemon's other
+background jobs keep running.
+
 ## The relay for development and tests
 
 `createRelay()` in `src/server/relay-dev.mjs` runs on this computer and implements what is above. It
