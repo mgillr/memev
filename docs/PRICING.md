@@ -5,8 +5,9 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 
 > **DRAFT. Not an offer and not in force.** The list below is the current table (decided 28 October
 > 2026). The Memev core is free. Self-serve checkout is Personal only, through Stripe, in test mode
-> first. The checkout program reads product ids, prices and the computer cap from config. Business and
-> Corporate have no public price: contact us. Hosted features are planned, with no date. There is no
+> first. The checkout program reads product ids, prices and the computer cap from config. Business,
+> Corporate and Federation services have no public price: contact us. Hosted and federated features
+> are planned, with no date. There is no
 > Personal trial; Business has a time-limited trial (planned, see below). What the licence enforces
 > today is how many computers can use one
 > vault. One computer with no licence gets the Personal tier ([CHARTER.md](../CHARTER.md)). The Memev core
@@ -14,7 +15,7 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 
 ## Tiers (draft)
 
-| | Personal | Personal with more computers | Business | Corporate |
+| | Personal | Personal with more computers | Business | Corporate | Federation / computation |
 |---|---|---|---|---|
 | Price | free | $12/month or $120/year | contact us | contact us |
 | People | 1 | 1, non-transferable | counted once per organisation | counted once per organisation |
@@ -30,8 +31,8 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 | Hosted end-to-end encrypted sync between computers | | planned | | planned, or self-hosted |
 | Hosted encrypted backup and a stable relay address | | planned | | planned, or self-hosted |
 | Member keys: one key per person, covering their computers | | | planned | planned |
-| One company vault that all members' work data syncs into, with an admin console that sees and searches it | | | planned | planned |
-| One AI provider per organisation, a cloud AI service or an on-premises LLM, over MCP | | | planned | planned |
+| Governed shared work scopes and project/programme/portfolio views | | | planned | planned | planned |
+| Provider-neutral integrations for each person's and team's chosen AI tools | ✓ | ✓ | planned | planned | planned |
 | Company server, departments and roles from an org chart | | | planned | planned |
 | Sign-in with Google Workspace or Microsoft Entra ID | | | planned | planned |
 | Rules for what reaches the AI provider, egress log | | | planned | planned |
@@ -42,18 +43,19 @@ AI apps on all of them share one memory and one comms bus. A person can connect 
 side by side (Claude and ChatGPT today, more coming soon) and local coding tools over MCP. A cell
 marked *planned* is not built and is not part of what you pay for. The Personal with more computers
 price is an early-supporter price: it stays locked for as long as the subscription runs, and it is
-labelled that way while sync and the relay are planned. Business and Corporate are one model at two
-scales and are chosen by need (a company vault, sign-in, roles, high availability), not by size.
+labelled that way while sync and the relay are planned. Business, Corporate and Federation are deployment models selected by topology, governance,
+sovereignty, recovery and support requirements, not by a fixed size threshold.
 A team of people buys Business and contacts us for a price. Office and Team are not tiers. Hosted sync
 and the hosted relay are not part of Business, because its
 company server runs on the company's own server. Sync, the relay, the company server, sign-in, roles,
 labels and the egress log are planned, not built, and no date is given. See [tiers/](tiers/README.md)
 for how each tier is set up.
 
-**Business and Corporate connect to one AI provider** for the whole organisation, either one cloud AI
-service or an on-premises LLM. Business has one company vault; all members' work data syncs into it
-and the company can see and search everything in it. Members keep private work outside Memev.
-Corporate has one main corporate vault.
+**Business and Corporate are provider-neutral and are not defined by one central vault.** People and
+teams can use the AI providers and agent systems they choose, subject to policy. The intended
+architecture supports local memories and independently operated nodes, with governed sharing across
+projects, programmes, portfolios and sites. Federation extends this to multiple jurisdictions and
+independent organisations. These are planned architectural capabilities, not current shipped features.
 
 **Licences count once per organisation, by person and by computer.** Today the vault counts
 computers only; counting people is planned with Business.
@@ -101,7 +103,7 @@ response times are in [tiers/services.md](tiers/services.md).
 
 ## Services for Business and Corporate
 
-These are for Business and Corporate. Each price is quoted.
+These are for Business, Corporate and Federation deployments. Each price is quoted.
 
 **Service agreements**
 
@@ -156,7 +158,7 @@ leaves no file, and the command prints why. After that the licence is checked of
 
 - **Personal:** one computer, no licence, no network needed.
 - **Personal with more computers:** as in the table, with the number of computers in the licence.
-- **Business and Corporate:** the number of computers in the licence, issued once per organisation.
+- **Business, Corporate and Federation:** the number of computers or nodes included in the agreed licence, issued under the applicable service contract.
 
 When a licence lapses, its grace period (14 days unless the licence says otherwise) keeps
 everything working, and computers can still be added. After the grace period no computer can be
