@@ -182,6 +182,29 @@ test('WO-05-A AC04: the engine is reached as an external process, not a package 
   assert.ok(!pkg.dependencies?.['crdt-merge'], 'the engine is not a package dependency');
 });
 
+test('WO-05-A AC03: an external engine that refuses, fails, answers nonsense or hangs keeps both versions', () => {
+  // stand-in engines run as commands, one for each answer the boundary must not take as a merge
+  const dir = tmpdir('engine-');
+  const engine = (name, body) => {
+    const f = path.join(dir, `${name}.mjs`);
+    fs.writeFileSync(f, `let b = ''; process.stdin.on('data', (d) => { b += d; }); process.stdin.on('end', () => { ${body} });\n`);
+    return f;
+  };
+  const rows = [
+    ['refuses', engine('refuses', "process.stdout.write(JSON.stringify({ refuse: true }) + '\\n');"), 30000, /^the merge engine refused$/],
+    ['exits non-zero', engine('exit1', "process.stdout.write(JSON.stringify({ text: 'partial' }) + '\\n'); process.exit(1);"), 30000, /^the merge engine failed: exit 1$/],
+    ['answers nonsense', engine('garbage', "process.stdout.write('not json\\n');"), 30000, /^the merge engine failed: /],
+    ['hangs', engine('hangs', 'setTimeout(() => {}, 60000);'), 1000, /^the merge engine failed: .*ETIMEDOUT/],
+  ];
+  for (const [what, file, timeoutMs, reason] of rows) {
+    const provider = commandProvider(process.execPath, { args: [file], timeoutMs });
+    const r = resolveMerge({ a: '# Note\n\nVersion C\n', b: '# Note\n\nVersion B\n', base: '# Note\n\nVersion A\n', license: mergeLicence(), keys, now: Date.parse('2026-11-01'), config: { merge: { provider } } });
+    assert.equal(r.resolved, false, `an engine that ${what} does not resolve the note`);
+    assert.equal(r.keepBoth, true, `an engine that ${what} keeps both versions`);
+    assert.match(r.reason, reason, `the reason names what the engine did: ${what}`);
+  }
+});
+
 test('WO-05-A AC05: the boundary exports the registration point and imports no paid client', () => {
   // the registration point is exported from the boundary, and the engine registers into it
   assert.equal(typeof registerMergeProvider, 'function', 'the boundary exports the registration point');
@@ -202,4 +225,8 @@ test('WO-05-A AC05: the boundary exports the registration point and imports no p
   for (const spec of imports) {
     assert.ok(spec.startsWith('node:') || spec === './license.mjs', `the boundary imports no paid client, only node built-ins and the licence gate: ${spec}`);
   }
+  // a module can also be loaded without a `from`: a side-effect import, a dynamic import or require
+  assert.ok(!/^\s*import\s+['"]/m.test(src), 'the boundary has no side-effect import');
+  assert.ok(!/\bimport\s*\(/.test(src), 'the boundary has no dynamic import');
+  assert.ok(!/\brequire\s*\(/.test(src), 'the boundary has no require');
 });
