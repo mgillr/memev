@@ -32,8 +32,11 @@ The engine cannot be a package dependency, so the boundary speaks to a command o
 `commandProvider(command)` builds a provider that runs the engine as an external process: the
 boundary sends the two versions and the base to the command's standard input as one JSON line,
 and reads one JSON line back. `{ "text": "..." }` is the merged note; `{ "refuse": true }` keeps
-both versions. A provider may also be an in-process function with the same shape, for an install
-that hosts the engine in its own process.
+both versions. The answer may be up to 64 MB (the `maxBuffer` option), so a large note still
+merges. When the engine fails, the reason names it by its id (the command's file name, or the `id`
+option), never by a path, because the reason is kept in the conflict record and shown on the card.
+A provider may also be an in-process function with the same shape, for an install that hosts the
+engine in its own process.
 
 The provider receives only the two versions and the common base, and nothing else: no licence, no
 token, no path.
