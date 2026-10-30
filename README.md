@@ -7,7 +7,7 @@
 <h1>Memev</h1>
 
 <p><strong>Shared context and coordination for the AI tools you already use.</strong><br>
-Keep project knowledge consistent across AI sessions, and give supported agents a shared place to coordinate work.</p>
+The same architecture extends to several computers, to a business and, as planned work, to independently operated sites.</p>
 
 <p>
 <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue">
@@ -24,6 +24,7 @@ Keep project knowledge consistent across AI sessions, and give supported agents 
 <a href="docs/QUICKSTART.md">Quickstart</a> &middot;
 <a href="docs/README.md">Documentation</a> &middot;
 <a href="docs/ARCHITECTURE.md">Architecture</a> &middot;
+<a href="docs/FEDERATION.md">Federation (planned)</a> &middot;
 <a href="docs/tiers/README.md">Tiers</a> &middot;
 <a href="CHANGELOG.md">Changelog</a>
 </p>
@@ -133,12 +134,12 @@ see [docs/CONTRACTS.md](docs/CONTRACTS.md).
 
 ## Choose how you deploy Memev
 
-The same core—shared context, coordination and defined work—applies across tiers. The difference is how many people and computers share a vault, and how much organisational control the deployment needs.
+The same core (shared context, coordination and defined work) applies across tiers. The difference is how many people and computers share a vault, and how much organisational control the deployment needs. Every tier is provider-neutral: people use the AI providers and tools they, or their organisation's policy, allow.
 
 | | Personal | Personal with more computers | Business (coming) | Corporate (coming) |
 |---|---|---|---|---|
 | For | one person using several AI tools with shared project context | one person continuing work across several computers | a team sharing work context and coordinating AI-assisted work under company control | organisations needing the Business model at greater scale and with stricter deployment controls |
-| AI apps | several cloud AI apps side by side (Claude, ChatGPT; more coming soon) and local coding tools via MCP | the same, on each computer | ONE AI provider for the organisation: one cloud AI service or an on-premises LLM | the same, with an air-gapped option |
+| AI apps | several cloud AI apps side by side (Claude, ChatGPT; more coming soon) and local coding tools via MCP | the same, on each computer | the AI providers and tools the organisation's policy allows, cloud AI services or an on-premises LLM; a policy may restrict the organisation to one provider (planned) | the same, with an air-gapped option |
 | Runs on | your computer, backed up to your own GitHub | your computers | your company server | your data centre, high availability, air-gapped option |
 | Two computers | one at a time: switch computers, lose nothing | edit on two machines at once, nothing to resolve (planned) | coming | coming |
 | Price | free, for good | $12/month or $120/year (CHF 10 or CHF 100), early-supporter price | contact us | contact us |
@@ -158,8 +159,9 @@ That merging is done by crdt-merge, the paid convergence engine; see
 
 **Business and Corporate use the same organisational model at different scale.** Every
 member's computer syncs its work data into one vault: one company vault for Business, one main
-corporate vault for Corporate. The company can see and search everything in it. Each organisation
-connects to **one AI provider**, either one cloud AI service or an on-premises LLM, over MCP. Members
+corporate vault for Corporate. The company can see and search everything in it. Members use the AI
+providers and tools the organisation's policy allows, over MCP; an organisation may restrict itself to
+one provider by policy, with egress rules and labels (planned). Members
 keep private work outside Memev. An org admin invites members into the company vault; there is no
 Team tier. A personal or home vault never crosses into a company: separate identities and keys, with
 no grants, mounts or mixing. Anyone who leaves a company loses all vault access: access ends, keys
@@ -173,6 +175,17 @@ a worked 20-person example, and [the architecture charts](docs/ARCHITECTURE.md#t
 Personal, Business and Corporate side by side. Business and Corporate, and the services around them,
 have no public price: contact us.
 
+**Several sites and federation are planned.** The architectural target is a federation of
+independently operated site nodes: each site owns its node and its memory, sites converge the state
+they are authorised to share through the convergence engine under its contract, and no central
+coordinator sequences ordinary updates. The company vault described above is the one-node case of
+that target, and it is what the first Business release ships. Federation across sites, and federated
+computation on top of it, are planned capabilities of Corporate, and of a multi-site Business by
+agreement; they are not a tier and have no price. Every multi-site statement in these pages carries
+the planned label. See [Federation](docs/FEDERATION.md), [Organisational
+intelligence](docs/ORGANISATIONAL-INTELLIGENCE.md), [Federated
+computation](docs/FEDERATED-COMPUTATION.md) and [Data sovereignty](docs/DATA-SOVEREIGNTY.md).
+
 ## The paid core: crdt-merge
 
 The Memev core is open source (Apache-2.0) and free, and it stays that way. The convergence engine,
@@ -183,6 +196,8 @@ It powers the paid features:
 
 - **Automatic merge across several computers at once** (Personal with more computers).
 - **Team and business vault convergence** (Business and Corporate, both coming).
+- **Convergence of authorised state between independently operated sites** (planned, with
+  federation; see [docs/FEDERATION.md](docs/FEDERATION.md)).
 
 Free users get one computer at a time through their own GitHub. Nothing is overwritten, and when two
 copies conflict both versions are kept. Only licence information passes between an install and our side,
@@ -216,6 +231,7 @@ up. The main pages:
 | [Quickstart](docs/QUICKSTART.md) | install, first session, everyday commands |
 | [Architecture](docs/ARCHITECTURE.md) | what runs today, and the Personal, Business and Corporate charts |
 | [Module map](docs/MODULES.md) | every module and what imports what, generated from the code |
+| [Architectural interdependencies](docs/ARCHITECTURAL-INTERDEPENDENCIES.md) | how the current components fit together, and what the planned federation capabilities depend on |
 | [AI apps](docs/CLIENTS.md) | what is changed in each app, hooks vs instructions, undoing it |
 | [Cloud access](docs/CLOUD.md) | the secure link, connector URLs, other computers, turning it on |
 | [Comms bus](docs/BUS.md) | how your AI apps talk to each other, the roster and comms checks |
@@ -231,6 +247,10 @@ up. The main pages:
 | [Security](SECURITY.md) and [threat model](docs/THREAT-MODEL.md) | |
 | [Charter](CHARTER.md) | the free tier is never limited |
 | [Design](docs/DESIGN.md) | log, index, graph, recall, scale |
+| [Federation (planned)](docs/FEDERATION.md) | the target: independently operated site nodes, membership, replication and cross-organisation boundaries |
+| [Organisational intelligence (planned)](docs/ORGANISATIONAL-INTELLIGENCE.md) | a work graph across people, projects, programmes, portfolios and functions |
+| [Federated computation (planned)](docs/FEDERATED-COMPUTATION.md) | distributed execution, analytics, optimisation, evaluation and federated learning across sites |
+| [Data sovereignty (planned)](docs/DATA-SOVEREIGNTY.md) | jurisdiction-aware data, derived information, replication and recovery |
 | [Hands-off runtime](docs/MAPPING.md) | everything Memev does without being asked |
 | [Developing Memev](docs/DEVELOPING.md) | tests, the leak scan, changelog notes, regenerating the module map |
 

@@ -6,7 +6,9 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 This page has two parts. The first shows what is built and running today, module by module. The
 second shows the three tiers side by side with one diagram each: [Personal](#personal),
 [Business](#business-coming) and [Corporate](#corporate-coming). Business and Corporate are coming; their
-diagrams show the design, not shipped code.
+diagrams show the design, not shipped code. A last section shows the planned extension of the same
+design to [several sites and federation](#several-sites-and-federation-planned); nothing in it is
+built.
 
 ## What runs today
 
@@ -91,8 +93,9 @@ Three things are the same in every tier:
 
 ### Personal
 
-Personal is one person. On one computer it is free. Personal with more computers is the paid step:
-several computers edit at once and the convergence engine merges them (planned). A person can connect
+Personal is one person. On one computer it is free. Personal with more computers is the paid step: a
+second computer joins the vault over the secure link with its own device key (built), and several
+computers editing at once with the convergence engine merging them is planned. A person can connect
 several cloud AI apps side by side, and local coding tools, all to the same memory.
 
 ```mermaid
@@ -130,8 +133,9 @@ resolve ([CONVERGENCE.md](CONVERGENCE.md#what-free-users-get)). Tier page: [tier
 
 Business is one organisation. Every member's computer runs Memev and their local tools. All members'
 work data syncs into **one company vault**, which the company can see and search everything in
-through the admin console. The organisation connects to **one AI provider**, either one cloud AI
-service or an on-premises LLM, over MCP. Members keep private work outside Memev.
+through the admin console. Members use the AI providers and tools the organisation's policy allows,
+cloud AI services or an on-premises LLM, over MCP; an organisation may restrict itself to one provider
+by policy, with egress rules and labels (planned). Members keep private work outside Memev.
 
 ```mermaid
 flowchart LR
@@ -154,7 +158,7 @@ flowchart LR
     end
     cv[("ONE company vault")]
     admin["Company admin console<br/>sees and searches everything"]
-    provider["ONE AI provider per organisation<br/>one cloud AI service<br/>OR an on-premises LLM"]
+    provider["AI providers the organisation's policy allows<br/>cloud AI services or an on-premises LLM<br/>(a one-provider policy: planned)"]
     engine["crdt-merge convergence engine and relay<br/>separate repository, external dependency<br/>(paid): merges edits"]
     lic["Licence server<br/>licence information only,<br/>no vault data"]
     ma & mb & mc -->|"work data syncs in"| cv
@@ -171,8 +175,9 @@ Details: [tiers/business.md](tiers/business.md).
 ### Corporate (coming)
 
 Corporate is the same model as Business at larger scale and with stricter control: one **main
-corporate vault**, one AI provider (a cloud AI service or an on-premises LLM, which can be air-gapped),
-identity sign-in, and audit export to your own systems.
+corporate vault**, the AI providers the organisation's policy allows (cloud AI services or an
+on-premises LLM, which can be air-gapped; a one-provider policy is planned), identity sign-in, and
+audit export to your own systems.
 
 ```mermaid
 flowchart LR
@@ -186,7 +191,7 @@ flowchart LR
         admin["Admin console<br/>sees and searches everything"]
         engine["crdt-merge convergence engine and relay<br/>(paid, external dependency)"]
     end
-    provider["ONE AI provider<br/>a cloud AI service<br/>OR an on-premises LLM<br/>(air-gapped option)"]
+    provider["AI providers the policy allows<br/>cloud AI services or<br/>an on-premises LLM<br/>(air-gapped option)"]
     idp["Identity provider<br/>SSO and SCIM"]
     siem["SIEM and audit export"]
     lic["Licence server<br/>licence information only,<br/>checked offline"]
@@ -202,6 +207,71 @@ flowchart LR
 
 Details: [tiers/corporate.md](tiers/corporate.md).
 
+### Several sites and federation (planned)
+
+Nothing in this section is built. The architectural target is a federation of independently
+operated site nodes: each site owns its node and its memory, sites converge the state they are
+authorised to share through the convergence engine under its contract, and no central coordinator
+sequences ordinary updates. The company vault and the main corporate vault above are the one-node
+case of that target, and the one-node case is what the first Business release ships. Federation
+across sites, and federated computation on top of it, are planned capabilities of Corporate, and
+of a multi-site Business by agreement; they are not a tier.
+
+```mermaid
+flowchart LR
+    subgraph siteA["Site A (planned)"]
+        a["Memev node A"]
+        am[("Site memory A")]
+        a <--> am
+    end
+    subgraph siteB["Site B (planned)"]
+        b["Memev node B"]
+        bm[("Site memory B")]
+        b <--> bm
+    end
+    subgraph siteC["Site C (planned)"]
+        c["Memev node C"]
+        cm[("Site memory C")]
+        c <--> cm
+    end
+    a <-->|"authorised state, planned"| b
+    b <-->|"authorised state, planned"| c
+    a <-->|"authorised state, planned"| c
+    engine["crdt-merge convergence engine<br/>separate repository, external dependency<br/>(paid, planned): converges authorised state"]
+    regional["Regional service (planned)<br/>routing, discovery, permitted caching;<br/>never the owner of a site's memory"]
+    a & b & c <-.-> engine
+    a & b & c -.-> regional
+```
+
+What the planned extension needs, beside the merge boundary that exists today
+([EXTENSION-POINTS.md](EXTENSION-POINTS.md)):
+
+- **Node identity and membership (planned):** each site has an operator and a key; sites establish
+  and revoke scoped relationships.
+- **Per-scope operation-log streams (planned):** the replication unit, each entry carrying its
+  classification and causal context; the engine converges the streams it is contracted for. Git
+  stays the single-writer backup of the whole local vault for Personal and for the one-node
+  Business, and there are no per-scope git repositories.
+- **The trust service and the admission service (planned):** two adapter boundaries beside the
+  merge boundary, one for trust governance between participants and one for accountable admission
+  of contributions. Both are named generically until they are published.
+- **A regional service (planned):** may help with routing, discovery or permitted caching. It is not
+  a relay, which only forwards ([RELAY.md](RELAY.md)), and it never becomes the owner of a site's
+  memory or the sequencer of ordinary updates.
+- **The project state machine (planned):** the code is present in `src/engine/project-state.mjs`,
+  and nothing imports it yet ([PROJECTS.md](PROJECTS.md)); the planned multi-site work wires it in.
+- **Federated computation (planned):** authorised computational work coordinated across sites,
+  with workload-specific algorithms; the engine converges supported state only and does not replace
+  those algorithms.
+
+A personal or home vault never federates into a company or site node: separate identities and
+keys, no grants, mounts or mixing
+([tiers/README.md](tiers/README.md#personal-and-company-vaults-never-mix)). The pages:
+[FEDERATION.md](FEDERATION.md), [ORGANISATIONAL-INTELLIGENCE.md](ORGANISATIONAL-INTELLIGENCE.md),
+[FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md),
+[DATA-SOVEREIGNTY.md](DATA-SOVEREIGNTY.md) and
+[ARCHITECTURAL-INTERDEPENDENCIES.md](ARCHITECTURAL-INTERDEPENDENCIES.md).
+
 ## Where each tier is documented
 
 | | Personal | Business | Corporate |
@@ -209,3 +279,4 @@ Details: [tiers/corporate.md](tiers/corporate.md).
 | Overview | [tiers/free.md](tiers/free.md) | [tiers/business.md](tiers/business.md) | [tiers/corporate.md](tiers/corporate.md) |
 | Price and licence | [PRICING.md](PRICING.md) | contact us | contact us |
 | Services | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) |
+| Several sites (planned) | | by agreement: [FEDERATION.md](FEDERATION.md) | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) |

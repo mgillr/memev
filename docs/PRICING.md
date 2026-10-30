@@ -31,7 +31,7 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 | Hosted encrypted backup and a stable relay address | | planned | | planned, or self-hosted |
 | Member keys: one key per person, covering their computers | | | planned | planned |
 | One company vault that all members' work data syncs into, with an admin console that sees and searches it | | | planned | planned |
-| One AI provider per organisation, a cloud AI service or an on-premises LLM, over MCP | | | planned | planned |
+| Provider policy: restrict to one provider, egress rules | | | planned | planned |
 | Company server, departments and roles from an org chart | | | planned | planned |
 | Sign-in with Google Workspace or Microsoft Entra ID | | | planned | planned |
 | Rules for what reaches the AI provider, egress log | | | planned | planned |
@@ -50,10 +50,20 @@ company server runs on the company's own server. Sync, the relay, the company se
 labels and the egress log are planned, not built, and no date is given. See [tiers/](tiers/README.md)
 for how each tier is set up.
 
-**Business and Corporate connect to one AI provider** for the whole organisation, either one cloud AI
-service or an on-premises LLM. Business has one company vault; all members' work data syncs into it
-and the company can see and search everything in it. Members keep private work outside Memev.
-Corporate has one main corporate vault.
+**Every tier is provider-neutral.** Members use the AI providers and tools the organisation's policy
+allows, cloud AI services or an on-premises LLM; an organisation may restrict itself to one provider
+by policy, with egress rules and labels (planned). Business has one company vault; all members' work
+data syncs into it and the company can see and search everything in it. Members keep private work
+outside Memev. Corporate has one main corporate vault.
+
+**Several sites and federation (planned).** The architectural target is a federation of
+independently operated site nodes, each owning its node and its memory and converging authorised
+state through the convergence engine under its contract. The company vault above is the one-node
+case of that target, and it is what the first Business release ships. Federation across sites, and
+federated computation on top of it, are planned capabilities of Corporate, and of a multi-site
+Business by agreement. They are not a tier, they have no column and no price cell in the table
+above, and they are not sold before they are built. See [tiers/README.md](tiers/README.md),
+[FEDERATION.md](FEDERATION.md) and [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).
 
 **Licences count once per organisation, by person and by computer.** Today the vault counts
 computers only; counting people is planned with Business.
