@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Problems and solutions, Memev</title>
+  <meta name="description" content="205 public complaints about AI memory tools, sorted into 13 groups, checked against Memev's code: what is built, what is planned, and the command that proves each fix.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="name" href="index.html">Memev</a>
+    <nav>
+      <a href="quickstart.html">Quickstart</a>
+      <a href="personal.html">Personal</a>
+      <a href="business.html">Business</a>
+      <a href="trial.html">Trial</a>
+      <a href="video.html">Video</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+  </div>
+</header>
+<main>
+  <h1>Problems and solutions</h1>
+
+  <p>Part of the Memev documentation. Up: the README.</p>
+
+  <p>People who use AI memory tools complain about the same things again and again. We collected 205 public complaints about memory in ChatGPT, Claude, Gemini, Cursor, mem0, Zep, Basic Memory, Glean, Microsoft 365 Copilot and others, sorted them into 13 groups, and checked each group against Memev's code. This page lists every group: why it happens, what Memev does about it, which tier it belongs to, and the command that proves it works.</p>
+
+  <p>The counts come from issue trackers, forums and review sites (about 70% from Hacker News and GitHub), so they show what those sources say, not how common each problem is everywhere.</p>
+
+  <p>Status: "built" means the code and tests are in this repository. "Planned" means it is not built yet, and nothing on this page claims otherwise.</p>
+
+  <p>Many fixes here are things a careful memory tool should do anyway. Where a fix is ordinary, the "Why it matters for Memev" line says so. The parts that are hard for others to copy are listed at the end.</p>
+
+  <h2>Install</h2>
+  <p>In a copy of the Memev repository, run the install command:</p>
+  <pre class="install"><code>npm install -g . && memev init</code></pre>
+  <p>Then follow the <a href="quickstart.html">quickstart</a>.</p>
+
+  <h2>1. Wrong, junk or stale memories (39 complaints)</h2>
+
+  <p><strong>Why it happens.</strong> Memory tools save too much. Most of them tell the model to save anything that might matter, and nothing checks what gets written. A public audit of one mem0 store found 97.8% of 10,134 entries were junk, and over half of that junk was the model re-saving its own setup instructions. Memev's own instruction used to say "save a durable memory the moment it surfaces", which invites the same result. Temporary notes ("for now we skip the tests") are then treated as permanent.</p>
+
+  <p><strong>What Memev does (built).</strong></p>
+  <ul>
+    <li>A quality check runs before every save, on your machine, with fixed rules: no model call, so no text leaves the computer to decide what to keep. It refuses acknowledgements ("ok, thanks"), heartbeat and cron noise, fragments under three words, and duplicates of anything already in memory, and it says why. <code>force</code> saves a refused memory anyway, marked as forced.</li>
+    <li>Notes that read as short-lived get a review date. After it they drop out of recall unless someone keeps them. You can also set the date yourself (<code>--review-by 2026-12-01</code> or a number of days).</li>
+    <li>Hedged notes ("maybe", "I think") and near-duplicates are flagged for review.</li>
+    <li><code>memev review</code> (and the <code>memev_review</code> tool) lists flagged and expired memories; <code>keep</code> and <code>drop</code> are recorded in the log. The note itself is never edited, so nothing is lost.</li>
+    <li><code>memev audit</code> (and <code>memev_audit</code>) reports what the check would refuse today, duplicates, expired notes, hedged notes, memories never recalled after 30 days and memories rated unhelpful. It changes nothing.</li>
+    <li>The instruction Memev gives every AI app now asks for memories that will still matter in a later session, with the reason, and says that greetings and status updates will be refused.</li>
+  </ul>
+
+  <p><strong>Why it matters for Memev.</strong> Filtering junk is basic hygiene and other tools do it too. What is different is that the check is local and explains itself, and that a dropped memory stays in the log and in git, so a mistake can be undone.</p>
+
+  <p><strong>Limit.</strong> A restatement in different words gets through (it is flagged as similar, not refused). Comparing new memories against what Memev itself showed the session is planned.</p>
+
+  <p><strong>Tier.</strong> Personal.</p>
+
+  <p><strong>Done check.</strong> <code>node --test test/memory-quality.test.mjs</code> (gate, review dates, inbox, audit).</p>
+
+  <h2>2. Forgetting across sessions and after compaction (24)</h2>
+
+  <p><strong>Why it happens.</strong> Apps compact long conversations and drop what was decided. Instruction files such as <code>CLAUDE.md</code> are read once and fade.</p>
+
+  <p><strong>What Memev does (built).</strong> In apps with hooks (Claude Code, Codex, Gemini CLI) Memev injects a resume card at session start, adds relevant memories to each prompt and saves a checkpoint before compaction. Cursor has hooks at session start only. Claude Desktop, Windsurf, VS Code and Zed get the same steps as MCP instructions, which work only if the model follows them.</p>
+
+  <p><strong>Planned.</strong> A published benchmark of how much each app keeps across a compaction, and a way to keep the current task visible in apps without hooks.</p>
+
+  <p><strong>Why it matters for Memev.</strong> One memory that every app reads at the right moments is the main reason to use Memev at all. Vendors have little reason to build memory that works across their competitors' apps.</p>
+
+  <p><strong>Tier.</strong> Personal.</p>
+
+  <p><strong>Done check.</strong> <code>node --test test/continuity.test.mjs</code>.</p>
+
+  <h2>3. Privacy: data leaving, and recalled text going to the cloud (18)</h2>
+
+  <p><strong>Why it happens.</strong> Most memory products are cloud services. Even a local tool sends what it recalls to whichever cloud model the app uses.</p>
+
+  <p><strong>What Memev does.</strong></p>
+  <ul>
+    <li>Built: no telemetry, no runtime dependencies, the daemon listens on <code>127.0.0.1</code> only, files are readable only by you, and every remote request needs a per-device token and is logged.</li>
+    <li>Built: remote access is off by default on every install. <code>memev init</code> on a terminal offers it once, with one line on what gets exposed, and <code>memev cloud on</code> switches it on. An organisation install (<code>memev init --org</code>) needs <code>memev cloud on --yes</code>.</li>
+    <li>Planned for Business and Corporate (both coming): labels on notes, rules for what each kind of client may receive, pseudonymising names and amounts before they go to a cloud AI service, and a log of every byte returned to the organisation's AI provider.</li>
+  </ul>
+
+  <p><strong>What Memev cannot do.</strong> Once text reaches a cloud model, Memev has no control over it. Protection there is a contract with the provider, not a technical guarantee.</p>
+
+  <p><strong>Tier.</strong> Personal for the local guarantees; Business and Corporate (both coming) for labels, egress rules and the egress log.</p>
+
+  <p><strong>Done check.</strong> <code>node --test test/memory-quality.test.mjs</code> (the <code>--org</code> test) and <code>node --test test/http.test.mjs</code> (remote rules).</p>
+
+  <h2>4. Reliability, setup and capacity (26)</h2>
+
+  <p><strong>Why it happens.</strong> Memory tools often need a database, an API key and a cloud account, and they slow down as memory grows.</p>
+
+  <p><strong>What Memev does (built).</strong> One command sets everything up. <code>memev doctor</code> checks and repairs the install. A growth benchmark replays 170 million tokens of use: the heap peaks at 160 MB, recall takes 1.1 ms at the median, and every note rebuilds byte-identical from the log.</p>
+
+  <p><strong>Planned.</strong> A public list of known issues and long soak tests on Windows and Linux.</p>
+
+  <p><strong>Tier.</strong> Personal. Business support adds response times.</p>
+
+  <p><strong>Done check.</strong> <code>npm test</code> and <code>node --max-old-space-size=256 scripts/growth-bench.mjs</code>.</p>
+
+  <h2>5. Memory scattered across tools (17)</h2>
+
+  <p><strong>Why it happens.</strong> Each app keeps its own memory: ChatGPT memory, Claude projects, Cursor rules.</p>
+
+  <p><strong>What Memev does (built).</strong> Eight local apps and any cloud app that takes an MCP URL share one vault. It is plain Markdown in git, so you can read it and take it with you.</p>
+
+  <p><strong>Planned.</strong> One rules file that Memev writes into <code>CLAUDE.md</code>, <code>AGENTS.md</code> and Cursor rules for you.</p>
+
+  <p><strong>Why it matters for Memev.</strong> Basic Memory and OpenMemory share the idea. Memev's difference is the hooks in each app and the tests behind them.</p>
+
+  <p><strong>Tier.</strong> Personal.</p>
+
+  <p><strong>Done check.</strong> <code>node --test test/clients.test.mjs</code>.</p>
+
+  <h2>6. Memory bleeding across projects (11)</h2>
+
+  <p><strong>Why it happens.</strong> Most tools have one pool of memory. Memev used to rank the current project higher but still return other projects' notes.</p>
+
+  <p><strong>What Memev does (built).</strong> When recall has a project (the hooks pass the project from the working folder), it searches only that project's notes and notes that belong to no project. Other projects' notes are filtered out before ranking. <code>all_projects</code> (or <code>--all-projects</code>) widens the search and ranks the current project first, as before. The resume card uses the same rule.</p>
+
+  <p><strong>Measured.</strong> On a 15,600-section test vault where projects share most of their words, the old boost already kept other projects out of the top four. When a query named something that belonged to another project, the boost returned that project's notes every time; the hard scope returned none. So the value is a guarantee, not a better average.</p>
+
+  <p><strong>Limit.</strong> Project names written only in non-Latin scripts still map to the same file name; see the planned list.</p>
+
+  <p><strong>Tier.</strong> Personal.</p>
+
+  <p><strong>Done check.</strong> <code>node --test test/memory-quality.test.mjs</code> (project scope test).</p>
+
+  <h2>7. Rules and instructions ignored (16)</h2>
+
+  <p><strong>Why it happens.</strong> A model can always ignore an instruction, and instructions fade after compaction.</p>
+
+  <p><strong>What Memev does (built).</strong> Hooks repeat the relevant context on every prompt and after compaction. For work that must meet requirements, Memev turns the request into a signed contract with checks that run on your machine, and the work counts as done only when the checks pass.</p>
+
+  <p><strong>Tier.</strong> Personal.</p>
+
+  <p><strong>Done check.</strong> <code>node --test test/proofline-flow.test.mjs</code>.</p>
+
+  <h2>8. Shutdowns and removed features (9)</h2>
+
+  <p><strong>Why it happens.</strong> Rewind was shut down after its acquisition. Cursor removed its Memories UI. Users lost what they had stored.</p>
+
+  <p><strong>What Memev does (built).</strong> The vault is Markdown in your own git, under Apache-2.0, with no server Memev depends on. If Memev stopped tomorrow your memory would still be readable files.</p>
+
+  <p><strong>Planned for business buyers.</strong> Source escrow and a written succession plan.</p>
+
+  <p><strong>Tier.</strong> Personal; escrow is a Corporate option.</p>
+
+  <p><strong>Done check.</strong> <code>memev selftest</code>.</p>
+
+  <h2>9. Can't see, explain, edit or undo memory (13)</h2>
+
+  <p><strong>Why it happens.</strong> Users can't tell which memory shaped an answer, and deleted memories come back.</p>
+
+  <p><strong>What Memev does (built).</strong></p>
+  <ul>
+    <li><code>memev why "&lt;query&gt;"</code> (and <code>memev_why</code>) shows, for each result, the words that matched and their share of the score, the project and feedback weights, the review state and how often it was used before. With <code>--item path#heading</code> it also says why a note was <em>not</em> returned (another project, dropped, past its review date, no matching words) and where it came from: every write and commit.</li>
+    <li>Recall is keyword-based, so this is exact: the parts multiply back to the score. On a test vault with 15,600 sections, all 600 explained results matched their recall score.</li>
+    <li>Every change is a record in an append-only log and a git commit. A dropped memory is a log record, not an erased one.</li>
+  </ul>
+
+  <p><strong>Why it matters for Memev.</strong> Several open memory servers can explain their recall too. Memev ties the explanation to the log and git history, so you can see who wrote a memory and when.</p>
+
+  <p><strong>Planned.</strong> A small read-only web view of the vault.</p>
+
+  <p><strong>Tier.</strong> Personal.</p>
+
+  <p><strong>Done check.</strong> <code>node --test test/memory-quality.test.mjs</code> (the <code>why</code> test).</p>
+
+  <h2>10. Permissions and oversharing (8)</h2>
+
+  <p><strong>Why it happens.</strong> Enterprise search tools index everything a service account can see, and Microsoft's own guidance calls oversharing the largest risk in a Copilot rollout.</p>
+
+  <p><strong>What Memev does.</strong></p>
+  <ul>
+    <li>Built: tokens can be limited to paths, and recall filters by those paths before ranking.</li>
+    <li>Built: the knowledge graph (<code>memev_graph</code>, <code>memev_explain</code>) now hides people, projects and terms that appear only in notes the token may not read. Before this change those names could leak through the graph.</li>
+    <li>Planned: departments, roles and path grants with deny by default, a separate index and graph per scope, and "restricted" notes that the organisation's one AI provider does not receive.</li>
+  </ul>
+
+  <p><strong>Tier.</strong> Business and Corporate (both coming) for roles and scopes.</p>
+
+  <p><strong>Done check.</strong> <code>node --test test/memory-quality.test.mjs</code> (graph path test).</p>
+
+  <h2>11. No multi-user, SSO or login when self-hosted (10)</h2>
+
+  <p><strong>Why it happens.</strong> Self-hosted AI tools often start single-user with authentication off.</p>
+
+  <p><strong>What Memev does.</strong> Built: every computer and app has its own credential, which can be revoked. Planned: a company server, sign-in with Google or Microsoft Entra ID, a member list from an org chart, and offboarding.</p>
+
+  <p><strong>Tier.</strong> Business and Corporate (both coming).</p>
+
+  <p><strong>Done check.</strong> <code>node --test test/licensing.test.mjs test/seats.test.mjs</code> (device credentials and keys). The company server has no check yet because it does not exist yet.</p>
+
+  <h2>12. Price and access for small companies (9)</h2>
+
+  <p><strong>Why it happens.</strong> Enterprise knowledge tools sell to large companies. One review says vendors ignore firms under 50 people.</p>
+
+  <p><strong>What Memev does.</strong> One person on one computer gets all of Memev for free, for good (CHARTER.md). Personal with more computers has a set price ($12/month or $120/year (CHF 10 or CHF 100)); Business and Corporate (both coming) have no public price: contact us. There is no Team tier. See PRICING.md and tiers/.</p>
+
+  <p><strong>Tier.</strong> All.</p>
+
+  <h2>13. English-only search (5)</h2>
+
+  <p><strong>Why it happens.</strong> Memev's old tokenizer kept only <code>a-z</code>, <code>0-9</code> and a few symbols, so Chinese, Japanese, Korean, Cyrillic, Greek and Arabic text was never indexed, and accented words were split in two. mem0 and Supermemory have open issues about the same problem.</p>
+
+  <p><strong>What Memev does (built).</strong> Words are split by Unicode letter and digit, so every script is indexed. Accents on Latin and Greek letters are folded (café matches cafe). Chinese, Japanese and Korean runs are indexed as single characters plus overlapping pairs, so 東京 matches without a dictionary. ASCII text splits exactly as before. The index format version went up, so an existing vault reindexes once on its next start.</p>
+
+  <p><strong>Measured.</strong> 26 test queries in 9 scripts: the old tokenizer matched 1, the new one returns the right note first for all 26. Indexing speed: about 17 million characters a second for ASCII and 6 million for mixed scripts.</p>
+
+  <p><strong>Planned.</strong> Optional local embeddings through Ollama, for paraphrases.</p>
+
+  <p><strong>Tier.</strong> Personal.</p>
+
+  <p><strong>Done check.</strong> <code>node --test test/memory-quality.test.mjs</code> (tokenizer tests).</p>
+
+  <h2>Also found and fixed</h2>
+
+  <p>Two memories saved in the same minute by the same app used to get the same heading, and the heading is how review, feedback and <code>why</code> name a memory. A second memory in the same minute now gets a number (<code>· 2</code>).</p>
+
+  <h2>What sets Memev apart</h2>
+
+  <p>Most fixes above are ordinary. A few things would be hard for a competitor to copy.</p>
+
+  <p>It works across vendors: one memory for Claude Code, Codex, Gemini CLI, Cursor and the cloud apps. The model companies have every reason to keep memory inside their own products.</p>
+
+  <p>The hooks are tested in each app, so context arrives at session start, on each prompt and after a compaction without the user asking.</p>
+
+  <p>There is a record you can audit. The append-only log, git history, provenance, claims with a status and signed contracts mean every recall can be explained and every change traced.</p>
+
+  <p>The decisions stay on your machine. The quality check, the explanations and the project scope need no model call and no server.</p>
+
+  <p>For companies of 10 to 100 people, a self-hosted memory is planned with permissions that follow the org chart, sensitive departments kept on a local model, and a log of what leaves. See tiers/.</p>
+
+  <h2>Planned work in order</h2>
+
+  <table>
+    <thead>
+      <tr><th>Item</th><th>Tier</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Compare new memories against what Memev showed the session (catches restatements)</td><td>Personal</td><td>planned</td></tr>
+      <tr><td>Count a repeated save as confirmation instead of discarding it</td><td>Personal</td><td>planned</td></tr>
+      <tr><td>Compaction benchmark across apps</td><td>Personal</td><td>planned</td></tr>
+      <tr><td>One rules file written into every app's instruction file</td><td>Personal</td><td>planned</td></tr>
+      <tr><td>Project names in any script (today non-Latin names share a file name)</td><td>Personal</td><td>planned</td></tr>
+      <tr><td>Local read-only web view</td><td>Personal</td><td>planned</td></tr>
+      <tr><td>End-to-end encrypted sync between your computers</td><td>Personal with more computers</td><td>planned</td></tr>
+      <tr><td>Company server, org chart import, roles and path grants</td><td>Business and Corporate</td><td>planned</td></tr>
+      <tr><td>Sign-in with Google or Microsoft Entra ID, offboarding</td><td>Business and Corporate</td><td>planned</td></tr>
+      <tr><td>Labels, egress rules, egress log, pseudonymising for cloud models</td><td>Business and Corporate</td><td>planned</td></tr>
+      <tr><td>High availability, air-gapped install, SIEM export, retention and legal hold</td><td>Corporate</td><td>planned</td></tr>
+    </tbody>
+  </table>
+
+  <p>The signed contract for this work, its public key and the receipt from its verification run are in contracts/. It was drafted with <code>memev contract new</code> and signed with <code>memev contract sign</code>.</p>
+</main>
+<footer class="site">
+  <div class="wrap">
+    <p>{{companyName}}. <a href="privacy.html">Privacy</a> and <a href="imprint.html">imprint</a>.
+    <a href="contact.html">Contact</a>.</p>
+  </div>
+</footer>
+</body>
+</html>
