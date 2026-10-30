@@ -16,8 +16,8 @@ this folder links back here, and this page links down to every page.
 
 | Page | What it holds |
 |---|---|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | what runs today, and the Personal, Business and Corporate charts |
-| [MODULES.md](MODULES.md) | the module interdependency map, generated from the real imports |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | what runs today and how the same design extends to multi-site federation and computation |
+| [MODULES.md](MODULES.md) | the source-code import map, generated from real imports; do not edit by hand |\n| [ARCHITECTURAL-INTERDEPENDENCIES.md](ARCHITECTURAL-INTERDEPENDENCIES.md) | how current components and planned federation capabilities depend on one another |\n| [FEDERATION.md](FEDERATION.md) | local ownership, site topologies, membership, replication and cross-organisation boundaries |\n| [ORGANISATIONAL-INTELLIGENCE.md](ORGANISATIONAL-INTELLIGENCE.md) | connected work across people, projects, programmes, portfolios and business functions |\n| [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) | distributed execution, analytics, optimisation, evaluation and federated learning |\n| [DATA-SOVEREIGNTY.md](DATA-SOVEREIGNTY.md) | jurisdiction-aware processing, derived data, replication, retention and recovery |
 | [DESIGN.md](DESIGN.md) | the log, the index, recall, memory quality, the graph, scale |
 | [MAPPING.md](MAPPING.md) | everything Memev does without being asked |
 | [BUS.md](BUS.md) | the comms bus: seats, the lead, roster, comms checks, tasks |
@@ -45,7 +45,7 @@ this folder links back here, and this page links down to every page.
 
 | Page | What it holds |
 |---|---|
-| [tiers/README.md](tiers/README.md) | the four tiers side by side, what is built and what is planned |
+| [tiers/README.md](tiers/README.md) | Personal through Corporate, Federation and Federated Computation deployment levels and status |
 | [tiers/free.md](tiers/free.md) | Personal, one computer, free; Personal with more computers |
 | [tiers/business.md](tiers/business.md) | Business (coming) |
 | [tiers/corporate.md](tiers/corporate.md) | Corporate (coming) |
