@@ -24,6 +24,7 @@ Memev connects people, AI agents, applications, computers and independently oper
 <a href="docs/QUICKSTART.md">Quickstart</a> &middot;
 <a href="docs/README.md">Documentation</a> &middot;
 <a href="docs/ARCHITECTURE.md">Architecture</a> &middot;
+<a href="docs/FEDERATION.md">Federation</a> &middot;
 <a href="docs/tiers/README.md">Tiers</a> &middot;
 <a href="CHANGELOG.md">Changelog</a>
 </p>
