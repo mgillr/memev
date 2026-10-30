@@ -41,16 +41,17 @@ export const PROJECT_STATUSES = Object.freeze({
 });
 
 // The one transition table: for each state, the states a task may move to. Anything not
-// listed is refused with ILLEGAL_TRANSITION; a move to the same state is NO_CHANGE.
+// listed is refused with ILLEGAL_TRANSITION; a move to the same state is NO_CHANGE. Every
+// state change in this module goes through transition(), so nothing moves a task off it.
 export const TRANSITIONS = Object.freeze({
   PROPOSED: Object.freeze(['ACCEPTED', 'CANCELLED']),
   ACCEPTED: Object.freeze(['READY', 'BLOCKED', 'PAUSED', 'CANCELLED']),
   READY: Object.freeze(['IN_PROGRESS', 'BLOCKED', 'PAUSED', 'CANCELLED']),
-  IN_PROGRESS: Object.freeze(['BLOCKED', 'PAUSED', 'VERIFYING', 'FAILED', 'CANCELLED']),
+  IN_PROGRESS: Object.freeze(['BLOCKED', 'PAUSED', 'VERIFYING', 'FAILED', 'CONFLICTED', 'CANCELLED']),
   BLOCKED: Object.freeze(['READY', 'ACCEPTED', 'PAUSED', 'CANCELLED']),
   PAUSED: Object.freeze(['READY', 'IN_PROGRESS', 'CANCELLED']),
   VERIFYING: Object.freeze(['VERIFIED', 'FAILED', 'CONFLICTED', 'ACCEPTED']),
-  VERIFIED: Object.freeze(['CANCELLED']),
+  VERIFIED: Object.freeze(['ACCEPTED', 'CANCELLED']),
   FAILED: Object.freeze(['ACCEPTED', 'READY', 'CANCELLED']),
   CONFLICTED: Object.freeze(['ACCEPTED', 'READY', 'CANCELLED']),
   CANCELLED: Object.freeze([]),
@@ -75,30 +76,45 @@ function liveLease(task, ctx) {
   const l = ctx.lease;
   if (!l || l.taskId !== task.id) return refuse('NO_LIVE_LEASE', 'no lease reference for this task');
   if (l.state === 'expired' || l.state === 'released') return refuse('NO_LIVE_LEASE', `the lease is ${l.state}`);
-  if (ctx.now != null && l.expiresAt != null && l.expiresAt <= ctx.now) return refuse('NO_LIVE_LEASE', 'the lease has expired');
+  if (l.expiresAt != null) {
+    // the module reads no clock: a lease with an expiry is checked against the time the caller gives
+    if (ctx.now == null) return refuse('NO_LIVE_LEASE', 'the lease has an expiry and no time was given to check it against');
+    if (l.expiresAt <= ctx.now) return refuse('NO_LIVE_LEASE', 'the lease has expired');
+  }
   return { ok: true };
 }
 
-/** VERIFIED: an evidence record for every mandatory criterion, bound to the task's current
- *  scope version and artifact hash. An agent report is not evidence. */
+/** VERIFIED: the task names at least one mandatory criterion and carries the scope version and
+ *  artifact hash its evidence binds to, and every mandatory criterion has a live (not stale)
+ *  evidence record of this task bound to both. An agent report is not evidence. Returns the
+ *  bound records, which become the evidence references of the transition record. */
 function evidenceFor(task, ctx) {
   const mandatory = (task.criteria ?? []).filter((c) => c.mandatory);
+  const report = ctx.report ? '; an agent report is not evidence' : '';
+  if (!mandatory.length) return refuse('NO_CRITERIA', `the task has no mandatory criterion, so nothing can verify it${report}`);
+  if (task.scopeVersion == null || task.artifactHash == null) return refuse('UNBOUND_TASK', `the task has no ${task.scopeVersion == null ? 'scope version' : 'artifact hash'} for evidence to bind to${report}`);
   const evs = ctx.evidence ?? [];
+  const bound = [];
   for (const c of mandatory) {
-    const hit = evs.some((e) => e.taskId === task.id && e.criterion === c.id && e.scopeVersion === task.scopeVersion && e.artifactHash === task.artifactHash);
-    if (!hit) return refuse('NO_EVIDENCE', `criterion ${c.id} has no evidence bound to scope version ${task.scopeVersion} and the current artifact hash${ctx.report ? '; an agent report is not evidence' : ''}`);
+    const hit = evs.find((e) => e && !e.stale && e.taskId === task.id && e.criterion === c.id && e.scopeVersion === task.scopeVersion && e.artifactHash === task.artifactHash);
+    if (!hit) return refuse('NO_EVIDENCE', `criterion ${c.id} has no evidence bound to scope version ${task.scopeVersion} and the current artifact hash${report}`);
+    bound.push(hit);
   }
-  return { ok: true };
+  return { ok: true, bound };
 }
 
 const RECORD_FIELDS = ['actor', 'time', 'reason', 'correlationId'];
 
 /** The transition record: actor, time, reason, previous state, new state, scope version,
- *  correlation id and evidence references. A record missing any field is refused naming it. */
-export function makeRecord(task, to, ctx = {}) {
+ *  correlation id and evidence references. A record missing any field is refused naming it.
+ *  The evidence references are what the move rests on: for VERIFIED, the record bound to each
+ *  mandatory criterion; otherwise the evidence the caller gives. */
+export function makeRecord(task, to, ctx = {}, evidence = ctx.evidence ?? []) {
   for (const f of RECORD_FIELDS) {
     if (ctx[f] === undefined || ctx[f] === null || ctx[f] === '') return refuse('MISSING_FIELD', `record is missing ${f}`);
   }
+  if (task.scopeVersion === undefined || task.scopeVersion === null) return refuse('MISSING_FIELD', 'record is missing scopeVersion');
+  if (!Array.isArray(evidence)) return refuse('MISSING_FIELD', 'record is missing evidence references');
   return {
     ok: true,
     record: {
@@ -109,7 +125,7 @@ export function makeRecord(task, to, ctx = {}) {
       to,
       scopeVersion: task.scopeVersion,
       correlationId: ctx.correlationId,
-      evidence: [...(ctx.evidence ?? [])],
+      evidence: evidence.map((e) => ({ ...e })),
     },
   };
 }
@@ -117,28 +133,39 @@ export function makeRecord(task, to, ctx = {}) {
 /** Move a task to a new state. Returns { ok: true, task, record } with a new task record,
  *  or { ok: false, code, reason, task } leaving the input untouched. */
 export function transition(task, to, ctx = {}) {
-  if (!TASK_STATES[to]) return refuse('UNKNOWN_STATE', `unknown state ${to}`);
+  if (!Object.hasOwn(TASK_STATES, to)) return { ...refuse('UNKNOWN_STATE', `unknown state ${to}`), task };
+  if (!Object.hasOwn(TRANSITIONS, task.state)) return { ...refuse('UNKNOWN_STATE', `unknown state ${task.state}`), task };
   if (to === task.state) return { ...refuse('NO_CHANGE', `already ${task.state}`), task };
-  if (!(TRANSITIONS[task.state] ?? []).includes(to)) return { ...refuse('ILLEGAL_TRANSITION', `${task.state} -> ${to} is not in the transition table`), task };
+  if (!TRANSITIONS[task.state].includes(to)) return { ...refuse('ILLEGAL_TRANSITION', `${task.state} -> ${to} is not in the transition table`), task };
   if (to === TASK_STATES.READY) { const d = depsSatisfied(task, ctx); if (!d.ok) return { ...d, task }; }
   if (to === TASK_STATES.IN_PROGRESS) { const l = liveLease(task, ctx); if (!l.ok) return { ...l, task }; }
-  if (to === TASK_STATES.VERIFIED) { const e = evidenceFor(task, ctx); if (!e.ok) return { ...e, task }; }
-  const rec = makeRecord(task, to, ctx);
-  if (!rec.ok) return rec;
+  let evidence = ctx.evidence ?? [];
+  if (to === TASK_STATES.VERIFIED) { const e = evidenceFor(task, ctx); if (!e.ok) return { ...e, task }; evidence = e.bound; }
+  const rec = makeRecord(task, to, ctx, evidence);
+  if (!rec.ok) return { ...rec, task };
   const newTask = { ...task, state: to };
   if (to === TASK_STATES.CANCELLED) newTask.cancelReason = ctx.reason;
   return { ok: true, task: newTask, record: rec.record };
 }
 
-/** The append-only event log: every record gets a unique id and is frozen on entry. */
+// A copy frozen all the way down, so nothing the caller still holds can change a stored entry
+// and nothing the caller holds is frozen.
+function frozenCopy(v) {
+  if (v === null || typeof v !== 'object') return v;
+  return Object.freeze(Array.isArray(v) ? v.map(frozenCopy) : Object.fromEntries(Object.entries(v).map(([k, x]) => [k, frozenCopy(x)])));
+}
+
+/** The append-only event log: every record gets a unique id and is frozen on entry. An id the
+ *  log makes skips any id already taken by an explicit one. */
 export class EventLog {
   #entries = [];
   #ids = new Set();
   #seq = 0;
   append(record) {
-    const id = record.id ?? `ev-${++this.#seq}`;
+    let id = record.id;
+    if (id === undefined || id === null) { do id = `ev-${++this.#seq}`; while (this.#ids.has(id)); }
     if (this.#ids.has(id)) return refuse('DUPLICATE_EVENT_ID', `event id ${id} is already recorded`);
-    const entry = Object.freeze({ ...record, id });
+    const entry = frozenCopy({ ...record, id });
     this.#ids.add(id);
     this.#entries.push(entry);
     return { ok: true, entry };
@@ -147,25 +174,36 @@ export class EventLog {
   get size() { return this.#entries.length; }
 }
 
+const REPLAN = 'scope changed: the bound evidence is stale, replan the task';
+
 /** A scope change: bump the version, return the affected tasks and evidence, mark that
  *  evidence stale, and move affected VERIFIED and VERIFYING tasks back to ACCEPTED with a
- *  replan reason. Unaffected tasks keep their state and ids. */
-export function amendScope(project, change) {
+ *  replan reason, each move through transition() with its record. Unaffected tasks keep their
+ *  state and ids. ctx gives the actor, time and correlation id of the change; a record that
+ *  cannot be made refuses the whole change and the project is left as it was. */
+export function amendScope(project, change, ctx = {}) {
   const paths = new Set(change.paths ?? []);
   const nextVersion = project.scopeVersion + 1;
   const affectedTaskIds = new Set();
-  const tasks = project.tasks.map((t) => {
-    const hit = (t.scope ?? []).some((p) => paths.has(p));
-    if (!hit) return t;
+  const tasks = [];
+  const records = [];
+  for (const t of project.tasks) {
+    if (!(t.scope ?? []).some((p) => paths.has(p))) { tasks.push(t); continue; }
     affectedTaskIds.add(t.id);
     if (t.state === TASK_STATES.VERIFIED || t.state === TASK_STATES.VERIFYING) {
-      return { ...t, state: TASK_STATES.ACCEPTED, scopeVersion: nextVersion, replanReason: 'scope changed: the bound evidence is stale, replan the task' };
+      const r = transition({ ...t, scopeVersion: nextVersion }, TASK_STATES.ACCEPTED, { ...ctx, reason: REPLAN, evidence: [] });
+      if (!r.ok) return { ok: false, code: r.code, reason: r.reason, project };
+      records.push(r.record);
+      tasks.push({ ...r.task, replanReason: REPLAN });
+    } else {
+      tasks.push({ ...t, scopeVersion: nextVersion });
     }
-    return { ...t, scopeVersion: nextVersion };
-  });
+  }
   const evidence = project.evidence.map((e) => (affectedTaskIds.has(e.taskId) && !e.stale ? { ...e, stale: true } : e));
   const affectedEvidence = evidence.filter((e, i) => e.stale && !(project.evidence[i] ?? {}).stale);
   return {
+    ok: true,
+    records,
     project: { ...project, scopeVersion: nextVersion, tasks, evidence },
     affected: {
       tasks: project.tasks.filter((t) => affectedTaskIds.has(t.id)),
@@ -187,28 +225,33 @@ export function projectStatus(tasks, flags = {}) {
 }
 
 /** Apply one update to a versioned entity. A current update applies and bumps the version;
- *  a stale update from a different source surfaces a CONFLICTED entity with a conflict
- *  record instead of last-write-wins; any other stale update is refused. */
-export function applyUpdate(entity, update) {
+ *  a stale update from a different source surfaces the conflict with a conflict record
+ *  instead of last-write-wins; any other stale update is refused. An entity that carries a
+ *  generation (a task that was reassigned) refuses an update that does not present that
+ *  generation, whatever version it is based on. A task (an entity with a state) moves to
+ *  CONFLICTED only where the table allows it, through transition() with its record (ctx gives
+ *  the actor, time and correlation id); in any other state, or when no record can be made, the
+ *  conflict record is attached and the state is kept, so a terminal task is never revived. An
+ *  entity with no state has no table and is marked CONFLICTED directly. */
+export function applyUpdate(entity, update, ctx = {}) {
+  if (entity.generation !== undefined && update.generation !== entity.generation) {
+    return { ok: false, code: 'STALE_GENERATION', reason: `update is from generation ${update.generation ?? 'none'}, the entity is at generation ${entity.generation}`, entity };
+  }
   if (update.baseVersion === entity.version) {
     return { ok: true, entity: { ...entity, ...update.patch, version: entity.version + 1, lastWrite: { source: update.source, ref: update.ref } } };
   }
   if (entity.lastWrite && entity.lastWrite.source !== update.source && !entity.conflict) {
-    return {
-      ok: false,
-      code: 'CONFLICT',
-      reason: 'two updates from different sources on the same version',
-      entity: {
-        ...entity,
-        state: TASK_STATES.CONFLICTED,
-        conflict: {
-          competing: [entity.lastWrite.ref, update.ref],
-          entity: entity.id,
-          reason: 'competing updates from different sources on the same version',
-          resolver: update.resolver ?? null,
-        },
-      },
+    const conflict = {
+      competing: [entity.lastWrite.ref, update.ref],
+      entity: entity.id,
+      reason: 'competing updates from different sources on the same version',
+      resolver: update.resolver ?? null,
     };
+    const out = { ok: false, code: 'CONFLICT', reason: 'two updates from different sources on the same version' };
+    if (entity.state === undefined) return { ...out, entity: { ...entity, state: TASK_STATES.CONFLICTED, conflict } };
+    const r = transition(entity, TASK_STATES.CONFLICTED, { ...ctx, reason: conflict.reason });
+    if (!r.ok) return { ...out, entity: { ...entity, conflict } };
+    return { ...out, entity: { ...r.task, conflict }, record: r.record };
   }
   return { ok: false, code: 'STALE_GENERATION', reason: `update is based on version ${update.baseVersion}, the entity is at ${entity.version}`, entity };
 }
@@ -233,7 +276,7 @@ export function reassign(task, ctx = {}) {
     evidence: [],
     inspectedAttempts: (ctx.attempts ?? []).map((a) => a.ref ?? a.id),
   };
-  for (const f of ['actor', 'time', 'correlationId']) {
+  for (const f of ['actor', 'time', 'correlationId', 'scopeVersion']) {
     if (record[f] === undefined || record[f] === null || record[f] === '') return refuse('MISSING_FIELD', `record is missing ${f}`);
   }
   const newTask = { ...task, holder: ctx.to, generation: (task.generation ?? 0) + 1, version: (task.version ?? 1) + 1 };
@@ -254,20 +297,34 @@ export function pause(project) {
 }
 
 /** Ask the adapter to hard-cancel an in-flight task. The cancellation is recorded as
- *  CANCELLED only when the adapter confirms it; otherwise the task keeps its state with a
- *  cancellation field of requested or unsupported. */
-export function requestCancellation(task, adapter) {
+ *  CANCELLED, through transition() with its record, only when the adapter confirms it;
+ *  otherwise the task keeps its state with a cancellation field of requested or unsupported.
+ *  The move and its record are checked before the adapter is asked, so the adapter never
+ *  cancels work the table or a missing field would then refuse to record. */
+export function requestCancellation(task, adapter, ctx = {}) {
+  const move = transition(task, TASK_STATES.CANCELLED, { ...ctx, reason: ctx.reason ?? 'hard cancellation confirmed by the adapter' });
+  if (!move.ok) return move;
   const result = typeof adapter === 'function' ? adapter() : adapter;
   if (result === 'confirmed') {
-    return { ok: true, task: { ...task, state: TASK_STATES.CANCELLED, cancellation: 'confirmed', cancelReason: 'hard cancellation confirmed by the adapter' } };
+    return { ok: true, task: { ...move.task, cancellation: 'confirmed' }, record: move.record };
   }
   if (result === 'unsupported') return { ok: false, code: 'CANCELLATION_UNSUPPORTED', task: { ...task, cancellation: 'unsupported' } };
   return { ok: false, code: 'CANCELLATION_PENDING', task: { ...task, cancellation: 'requested' } };
 }
 
-/** Resume the project: restore the tasks from the checkpoint taken at pause. */
+/** Resume the project: dispatch is allowed again, and every change made while paused is kept,
+ *  because it is the truth (a confirmed cancellation, a move to VERIFYING). The checkpoint taken
+ *  at pause is used only to withdraw what pause() itself added: a task whose state is unchanged
+ *  since the pause and whose cancellation is still the requested (or unsupported) one gets its
+ *  pre-pause cancellation field back. */
 export function resume(project) {
   if (!project.paused) return refuse('NOT_PAUSED', 'the project is not paused');
-  const tasks = (project.checkpoint?.tasks ?? project.tasks).map((t) => ({ ...t }));
+  const before = new Map((project.checkpoint?.tasks ?? []).map((t) => [t.id, t]));
+  const tasks = project.tasks.map((t) => {
+    const b = before.get(t.id);
+    if (!b || t.state !== b.state || t.cancellation === b.cancellation || !['requested', 'unsupported'].includes(t.cancellation)) return { ...t };
+    const { cancellation, ...rest } = t;
+    return b.cancellation === undefined ? rest : { ...rest, cancellation: b.cancellation };
+  });
   return { ...project, paused: false, tasks, checkpoint: null };
 }

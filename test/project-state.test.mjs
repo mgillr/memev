@@ -20,17 +20,42 @@ const ctx = (over = {}) => ({
   tasksById: {}, evidence: [], policy: {}, ...over,
 });
 const task = (state, over = {}) => ({ id: 't1', state, scope: [], scopeVersion: 1, criteria: [], dependsOn: [], ...over });
+const bound = (over = {}) => ({ taskId: 't1', criterion: 'c1', scopeVersion: 1, artifactHash: 'h1', ...over });
+const verifiable = (state, over = {}) => task(state, { criteria: [{ id: 'c1', mandatory: true }], artifactHash: 'h1', ...over });
+
+// The table, written out here so a change to the module's table fails a test: a test that only
+// reads TRANSITIONS agrees with any table.
+const EXPECTED_TRANSITIONS = {
+  PROPOSED: ['ACCEPTED', 'CANCELLED'],
+  ACCEPTED: ['READY', 'BLOCKED', 'PAUSED', 'CANCELLED'],
+  READY: ['IN_PROGRESS', 'BLOCKED', 'PAUSED', 'CANCELLED'],
+  IN_PROGRESS: ['BLOCKED', 'PAUSED', 'VERIFYING', 'FAILED', 'CONFLICTED', 'CANCELLED'],
+  BLOCKED: ['READY', 'ACCEPTED', 'PAUSED', 'CANCELLED'],
+  PAUSED: ['READY', 'IN_PROGRESS', 'CANCELLED'],
+  VERIFYING: ['VERIFIED', 'FAILED', 'CONFLICTED', 'ACCEPTED'],
+  VERIFIED: ['ACCEPTED', 'CANCELLED'],
+  FAILED: ['ACCEPTED', 'READY', 'CANCELLED'],
+  CONFLICTED: ['ACCEPTED', 'READY', 'CANCELLED'],
+  CANCELLED: [],
+};
+const inTable = (rec) => EXPECTED_TRANSITIONS[rec.from].includes(rec.to);
 
 test('SO-04-A AC01: the module exports the eleven task states and the seven project statuses', () => {
   assert.deepEqual(Object.values(TASK_STATES), ['PROPOSED', 'ACCEPTED', 'READY', 'IN_PROGRESS', 'BLOCKED', 'PAUSED', 'VERIFYING', 'VERIFIED', 'FAILED', 'CONFLICTED', 'CANCELLED']);
   assert.deepEqual(Object.values(PROJECT_STATUSES), ['DRAFT', 'ACTIVE', 'PAUSED', 'NEEDS_ATTENTION', 'VERIFYING', 'COMPLETE', 'CANCELLED']);
 });
 
+test('SO-04-A AC01: the transition table is exactly the documented one', () => {
+  assert.deepEqual(Object.fromEntries(Object.entries(TRANSITIONS).map(([k, v]) => [k, [...v]])), EXPECTED_TRANSITIONS);
+  assert.deepEqual(Object.keys(TRANSITIONS).sort(), Object.values(S).sort(), 'every state has one row');
+});
+
 test('SO-04-A AC01: every state pair is walked against the one table, and each illegal pair is refused with a reason code', () => {
   for (const from of Object.values(S)) {
     for (const to of Object.values(S)) {
-      const t = task(from);
-      const r = transition(t, to, ctx());
+      // a task that can pass every guard, so the table alone decides
+      const t = verifiable(from);
+      const r = transition(t, to, ctx({ evidence: [bound()] }));
       const allowed = (TRANSITIONS[from] ?? []).includes(to);
       if (allowed) {
         assert.equal(r.ok, true, `${from} -> ${to} is in the table and must pass`);
@@ -39,8 +64,9 @@ test('SO-04-A AC01: every state pair is walked against the one table, and each i
         assert.equal(t.state, from, 'the input is never mutated');
       } else {
         assert.equal(r.ok, false, `${from} -> ${to} is not in the table and must be refused`);
-        assert.ok(r.code, 'the refusal carries a reason code');
+        assert.equal(r.code, from === to ? 'NO_CHANGE' : 'ILLEGAL_TRANSITION', `${from} -> ${to}`);
         assert.match(r.reason, /.+/);
+        assert.equal(r.task, t, 'the refusal hands back the task unchanged');
       }
     }
   }
@@ -55,6 +81,16 @@ test('SO-04-A AC01: transition returns a new record and never mutates its input'
   assert.equal(t.state, S.PROPOSED);
 });
 
+test('SO-04-A AC01: a state the module does not know is a typed refusal, including one named like an Object method', () => {
+  for (const [from, to] of [['constructor', S.ACCEPTED], [S.PROPOSED, 'constructor'], [S.PROPOSED, 'toString'], ['NOPE', S.READY]]) {
+    const t = task(from);
+    const r = transition(t, to, ctx());
+    assert.equal(r.ok, false);
+    assert.equal(r.code, 'UNKNOWN_STATE', `${from} -> ${to}`);
+    assert.equal(r.task, t);
+  }
+});
+
 test('SO-04-A AC01: docs/PROJECTS.md lists the same task states and project statuses', () => {
   const text = fs.readFileSync(path.join(ROOT, 'docs', 'PROJECTS.md'), 'utf8');
   const section = (title) => {
@@ -66,6 +102,13 @@ test('SO-04-A AC01: docs/PROJECTS.md lists the same task states and project stat
   const names = (s) => [...s.matchAll(/`([A-Z][A-Z0-9_]*)`/g)].map((m) => m[1]);
   assert.deepEqual([...names(section('Task states'))].sort(), Object.values(S).sort());
   assert.deepEqual([...names(section('Project statuses'))].sort(), Object.values(P).sort());
+  // the table, one line per state: `FROM` to `A`, `B`
+  const table = {};
+  for (const line of section('Transition table').split('\n')) {
+    const m = /^- `([A-Z_]+)` to (.*)$/.exec(line);
+    if (m) table[m[1]] = [...m[2].matchAll(/`([A-Z_]+)`/g)].map((x) => x[1]);
+  }
+  assert.deepEqual(table, EXPECTED_TRANSITIONS, 'the page lists the same table');
 });
 
 test('SO-04-A AC02: READY is refused while a dependency is not VERIFIED, and a CANCELLED one only where the policy allows', () => {
@@ -79,6 +122,9 @@ test('SO-04-A AC02: READY is refused while a dependency is not VERIFIED, and a C
   assert.equal(r.ok, true, 'the policy allows the CANCELLED dependency');
   r = transition(t, S.READY, ctx({ tasksById: { t2: task(S.VERIFIED, { id: 't2' }) } }));
   assert.equal(r.ok, true);
+  r = transition(t, S.READY, ctx({ tasksById: {} }));
+  assert.equal(r.ok, false, 'a dependency that is not in the task set is refused');
+  assert.equal(r.code, 'MISSING_DEPENDENCY');
 });
 
 test('SO-04-A AC02: IN_PROGRESS requires a live lease reference', () => {
@@ -92,6 +138,10 @@ test('SO-04-A AC02: IN_PROGRESS requires a live lease reference', () => {
   r = transition(t, S.IN_PROGRESS, ctx({ lease: { taskId: 'other', state: 'active', expiresAt: 9999 } }));
   assert.equal(r.ok, false, 'a lease for another task does not count');
   assert.equal(r.code, 'NO_LIVE_LEASE');
+  r = transition(t, S.IN_PROGRESS, ctx({ lease: { taskId: 't1', state: 'active', expiresAt: 1000 }, now: 1000 }));
+  assert.equal(r.code, 'NO_LIVE_LEASE', 'a lease whose expiry has passed is not live');
+  r = transition(t, S.IN_PROGRESS, ctx({ now: undefined }));
+  assert.equal(r.code, 'NO_LIVE_LEASE', 'a lease with an expiry needs the caller\'s time: the module reads no clock');
   r = transition(t, S.IN_PROGRESS, ctx());
   assert.equal(r.ok, true);
 });
@@ -106,9 +156,28 @@ test('SO-04-A AC02: VERIFIED needs evidence for every mandatory criterion bound 
   assert.equal(r.ok, false, 'evidence bound to an old artifact hash is refused');
   r = transition(t, S.VERIFIED, ctx({ evidence: [{ taskId: 't1', criterion: 'c1', scopeVersion: 0, artifactHash: 'h1' }] }));
   assert.equal(r.ok, false, 'evidence bound to an old scope version is refused');
+  r = transition(t, S.VERIFIED, ctx({ evidence: [bound({ taskId: 't9' })] }));
+  assert.equal(r.code, 'NO_EVIDENCE', 'evidence of another task is refused');
+  r = transition(t, S.VERIFIED, ctx({ evidence: [bound({ stale: true })] }));
+  assert.equal(r.code, 'NO_EVIDENCE', 'evidence marked stale by a scope change is refused');
   r = transition(t, S.VERIFIED, ctx({ evidence: [{ taskId: 't1', criterion: 'c1', scopeVersion: 1, artifactHash: 'h1' }] }));
   assert.equal(r.ok, true);
   assert.equal(r.task.state, S.VERIFIED);
+});
+
+test('SO-04-A AC02: a task with no mandatory criterion, or nothing to bind evidence to, never reaches VERIFIED on a report', () => {
+  const report = { text: 'the work is done' };
+  for (const criteria of [[], undefined, [{ id: 'c1' }], [{ id: 'c1', mandatory: false }]]) {
+    const r = transition(task(S.VERIFYING, { criteria, artifactHash: 'h1' }), S.VERIFIED, ctx({ report }));
+    assert.equal(r.ok, false, `criteria ${JSON.stringify(criteria)}`);
+    assert.equal(r.code, 'NO_CRITERIA');
+    assert.equal(r.task.state, S.VERIFYING, 'the task stays VERIFYING');
+  }
+  // both sides undefined must not count as bound
+  let r = transition(verifiable(S.VERIFYING, { artifactHash: undefined }), S.VERIFIED, ctx({ evidence: [bound({ artifactHash: undefined })] }));
+  assert.equal(r.code, 'UNBOUND_TASK');
+  r = transition(verifiable(S.VERIFYING, { scopeVersion: undefined }), S.VERIFIED, ctx({ evidence: [bound({ scopeVersion: undefined })] }));
+  assert.equal(r.code, 'UNBOUND_TASK');
 });
 
 test('SO-04-A AC03: every transition record carries actor, time, reason, previous state, new state, scope version, correlation id and evidence references', () => {
@@ -123,7 +192,10 @@ test('SO-04-A AC03: every transition record carries actor, time, reason, previou
   assert.equal(rec.to, S.VERIFIED);
   assert.equal(rec.scopeVersion, 3);
   assert.equal(rec.correlationId, 'corr-9');
-  assert.ok(Array.isArray(rec.evidence), 'evidence references are on the record');
+  assert.deepEqual(rec.evidence, [{ taskId: 't1', criterion: 'c1', scopeVersion: 3, artifactHash: 'h' }], 'the record names the evidence the move rests on');
+  const noise = { taskId: 't9', criterion: 'c1', scopeVersion: 3, artifactHash: 'h' };
+  const r2 = transition(t, S.VERIFIED, ctx({ evidence: [noise, { taskId: 't1', criterion: 'c1', scopeVersion: 3, artifactHash: 'h' }] }));
+  assert.deepEqual(r2.record.evidence, [{ taskId: 't1', criterion: 'c1', scopeVersion: 3, artifactHash: 'h' }], 'evidence of another task is not referenced');
 });
 
 test('SO-04-A AC03: a record missing any field is refused naming the field', () => {
@@ -134,7 +206,11 @@ test('SO-04-A AC03: a record missing any field is refused naming the field', () 
     assert.equal(r.ok, false, f);
     assert.equal(r.code, 'MISSING_FIELD');
     assert.match(r.reason, new RegExp(f));
+    assert.equal(r.task.state, S.PROPOSED, 'the refusal hands back the task');
   }
+  const r = transition(task(S.PROPOSED, { scopeVersion: undefined }), S.ACCEPTED, ctx());
+  assert.equal(r.code, 'MISSING_FIELD');
+  assert.match(r.reason, /scopeVersion/);
 });
 
 test('SO-04-A AC03: the event id is unique and the log is append-only', () => {
@@ -150,6 +226,25 @@ test('SO-04-A AC03: the event id is unique and the log is append-only', () => {
   assert.ok(Object.isFrozen(a.entry), 'a record is frozen once appended');
   assert.throws(() => { a.entry.type = 'tampered'; });
   assert.deepEqual(log.entries().map((e) => e.id), [a.entry.id, b.entry.id]);
+});
+
+test('SO-04-A AC03: a stored entry is frozen all the way down, and the caller\'s objects are not', () => {
+  const log = new EventLog();
+  const evidence = [{ taskId: 't1', criterion: 'c1' }];
+  const { entry } = log.append({ type: 'transition', evidence });
+  assert.throws(() => { log.entries()[0].evidence.push('forged'); });
+  assert.throws(() => { entry.evidence[0].criterion = 'forged'; });
+  evidence.push({ taskId: 'later' });
+  assert.equal(log.entries()[0].evidence.length, 1, 'a later change to the caller\'s array does not reach the log');
+  assert.ok(!Object.isFrozen(evidence), 'the caller\'s array is not frozen');
+});
+
+test('SO-04-A AC03: an id the log makes never collides with an explicit one', () => {
+  const log = new EventLog();
+  assert.equal(log.append({ id: 'ev-1', type: 'explicit' }).ok, true);
+  const auto = log.append({ type: 'auto' });
+  assert.equal(auto.ok, true, 'the automatic id skips the one already taken');
+  assert.notEqual(auto.entry.id, 'ev-1');
 });
 
 test('SO-04-A AC04: amendScope bumps the version, returns the affected tasks and evidence, marks the evidence stale and replans the affected VERIFIED and VERIFYING tasks', () => {
@@ -168,7 +263,12 @@ test('SO-04-A AC04: amendScope bumps the version, returns the affected tasks and
       { id: 'e4', taskId: 't4', criterion: 'c', scopeVersion: 1, artifactHash: 'h', stale: false },
     ],
   };
-  const { project: next, affected } = amendScope(project, { paths: ['a.md', 'b.md'] });
+  const refused = amendScope(project, { paths: ['a.md', 'b.md'] });
+  assert.equal(refused.ok, false, 'a change with no actor is refused');
+  assert.equal(refused.code, 'MISSING_FIELD');
+  assert.equal(refused.project, project, 'and the project is left as it was');
+  const { ok, project: next, affected, records } = amendScope(project, { paths: ['a.md', 'b.md'] }, ctx());
+  assert.equal(ok, true);
   assert.equal(next.scopeVersion, 2, 'the scope version is bumped');
   const byId = Object.fromEntries(next.tasks.map((t) => [t.id, t]));
   assert.equal(byId.t1.state, S.ACCEPTED, 'an affected VERIFIED task moves back to ACCEPTED');
@@ -187,6 +287,14 @@ test('SO-04-A AC04: amendScope bumps the version, returns the affected tasks and
   assert.deepEqual(affected.evidence.map((e) => e.id).sort(), ['e1', 'e2', 'e3']);
   assert.equal(project.scopeVersion, 1, 'the input project is not mutated');
   assert.equal(project.tasks[0].state, S.VERIFIED);
+  // each replan is a move in the table, with its record
+  assert.deepEqual(records.map((r) => [r.from, r.to]), [[S.VERIFIED, S.ACCEPTED], [S.VERIFYING, S.ACCEPTED]]);
+  for (const r of records) {
+    assert.ok(inTable(r), `${r.from} -> ${r.to} is in the table`);
+    assert.equal(r.actor, 'tester');
+    assert.equal(r.scopeVersion, 2);
+    assert.match(r.reason, /replan/i);
+  }
 });
 
 test('SO-04-A AC05: projectStatus derives DRAFT, ACTIVE, PAUSED, NEEDS_ATTENTION, VERIFYING, COMPLETE and CANCELLED over a fixture', () => {
@@ -203,6 +311,14 @@ test('SO-04-A AC05: projectStatus derives DRAFT, ACTIVE, PAUSED, NEEDS_ATTENTION
   assert.equal(projectStatus([T(S.VERIFIED), T(S.CANCELLED, { cancelReason: 'superseded' })], {}), P.COMPLETE);
   assert.equal(projectStatus([T(S.CANCELLED)], {}), P.ACTIVE, 'a CANCELLED task without a recorded reason is not COMPLETE');
   assert.equal(projectStatus([T(S.VERIFIED)], { cancelled: true }), P.CANCELLED);
+  // precedence: CANCELLED, DRAFT, PAUSED, NEEDS_ATTENTION, VERIFYING, COMPLETE, ACTIVE
+  assert.equal(projectStatus([T(S.BLOCKED)], { cancelled: true, paused: true }), P.CANCELLED);
+  assert.equal(projectStatus([T(S.PROPOSED)], { paused: true }), P.DRAFT);
+  assert.equal(projectStatus([T(S.BLOCKED), T(S.VERIFYING)], { paused: true }), P.PAUSED);
+  assert.equal(projectStatus([T(S.BLOCKED), T(S.VERIFYING)], {}), P.NEEDS_ATTENTION);
+  assert.equal(projectStatus([T(S.VERIFIED), T(S.VERIFYING)], {}), P.VERIFYING);
+  // NEEDS_ATTENTION is BLOCKED, CONFLICTED or a pending approval; a FAILED task is replanned work
+  assert.equal(projectStatus([T(S.FAILED)], {}), P.ACTIVE);
 });
 
 test('SO-04-A AC05: the same input twice gives the same output', () => {
@@ -232,6 +348,32 @@ test('SO-04-A AC06: two updates from different sources on the same version produ
   assert.equal(d.entity.state, S.CONFLICTED);
 });
 
+test('SO-04-A AC06: a task moves to CONFLICTED only through the table, with its record, and a terminal task is never revived', () => {
+  const competing = (state) => {
+    const a = applyUpdate(task(state, { version: 1 }), { source: 's1', baseVersion: 1, ref: 'r1', patch: {} });
+    return applyUpdate(a.entity, { source: 's2', baseVersion: 1, ref: 'r2', patch: {} }, ctx());
+  };
+  const live = competing(S.IN_PROGRESS);
+  assert.equal(live.code, 'CONFLICT');
+  assert.equal(live.entity.state, S.CONFLICTED);
+  assert.ok(inTable(live.record), 'the move is in the table');
+  assert.equal(live.record.actor, 'tester');
+  assert.deepEqual(live.entity.conflict.competing, ['r1', 'r2']);
+  // with no actor for a record, the conflict is still surfaced; the state is kept and no record is made
+  const a = applyUpdate(task(S.IN_PROGRESS, { version: 1 }), { source: 's1', baseVersion: 1, ref: 'r1', patch: {} });
+  const bare = applyUpdate(a.entity, { source: 's2', baseVersion: 1, ref: 'r2', patch: {} });
+  assert.equal(bare.code, 'CONFLICT');
+  assert.equal(bare.entity.state, S.IN_PROGRESS);
+  assert.deepEqual(bare.entity.conflict.competing, ['r1', 'r2']);
+  assert.equal(bare.record, undefined);
+  for (const state of [S.CANCELLED, S.VERIFIED, S.PROPOSED]) {
+    const r = competing(state);
+    assert.equal(r.code, 'CONFLICT', `${state}: the conflict is surfaced`);
+    assert.equal(r.entity.state, state, `${state}: the state is kept, off-table moves are never made`);
+    assert.deepEqual(r.entity.conflict.competing, ['r1', 'r2']);
+  }
+});
+
 test('SO-04-A AC06: reassignment needs an expired or released lease or an authorised override, and records the inspection of prior attempts', () => {
   const t = { id: 't1', state: S.IN_PROGRESS, holder: 'h1', scopeVersion: 1, version: 3 };
   const base = { to: 'h2', actor: 'owner', time: 5, correlationId: 'corr-r', attempts: [{ ref: 'att-1' }, { ref: 'att-2' }] };
@@ -244,6 +386,18 @@ test('SO-04-A AC06: reassignment needs an expired or released lease or an author
   assert.equal(r.task.holder, 'h2');
   r = reassign(t, { ...base, lease: { taskId: 't1', state: 'active' }, override: { authorised: true, by: 'owner' } });
   assert.equal(r.ok, true, 'an authorised override reassigns over a live lease');
+  r = reassign(t, { ...base, lease: { taskId: 't1', state: 'active' }, override: { authorised: 'yes', by: 'agent' } });
+  assert.equal(r.code, 'LEASE_NOT_FREE', 'an override is authorised only when it says so exactly');
+  r = reassign(t, { ...base, lease: { taskId: 't9', state: 'expired' } });
+  assert.equal(r.code, 'LEASE_NOT_FREE', 'an expired lease of another task does not free this one');
+  for (const f of ['actor', 'time', 'correlationId']) {
+    r = reassign(t, { ...base, lease: { taskId: 't1', state: 'expired' }, [f]: undefined });
+    assert.equal(r.code, 'MISSING_FIELD', `a reassignment with no ${f} is refused`);
+    assert.match(r.reason, new RegExp(f));
+  }
+  r = reassign({ ...t, scopeVersion: undefined }, { ...base, lease: { taskId: 't1', state: 'expired' } });
+  assert.equal(r.code, 'MISSING_FIELD');
+  assert.match(r.reason, /scopeVersion/);
 });
 
 test('SO-04-A AC06: a stale generation cannot overwrite after reassignment', () => {
@@ -256,6 +410,15 @@ test('SO-04-A AC06: a stale generation cannot overwrite after reassignment', () 
   assert.equal(stale.code, 'STALE_GENERATION');
   assert.equal(stale.entity.version, 4, 'the entity is unchanged');
   assert.equal(stale.entity.holder, 'h2');
+  // the old holder re-reads the version and writes again: its generation is still the old one
+  const reread = applyUpdate(r.task, { source: 'h1', baseVersion: 4, generation: 0, ref: 'r-reread', patch: { holder: 'h1' } });
+  assert.equal(reread.ok, false, 'a stale generation cannot overwrite even on the current version');
+  assert.equal(reread.code, 'STALE_GENERATION');
+  assert.equal(reread.entity.holder, 'h2');
+  assert.equal(applyUpdate(r.task, { source: 'h1', baseVersion: 4, ref: 'r-none', patch: { holder: 'h1' } }).code, 'STALE_GENERATION', 'an update that presents no generation cannot overwrite either');
+  const current = applyUpdate(r.task, { source: 'h2', baseVersion: 4, generation: r.task.generation, ref: 'r-new', patch: { note: 'progress' } });
+  assert.equal(current.ok, true, 'the new holder writes with its generation');
+  assert.equal(current.entity.version, 5);
 });
 
 test('SO-04-A AC07: pause stops new dispatch, not the truth, and resume restores eligibility from the checkpoint', () => {
@@ -273,22 +436,56 @@ test('SO-04-A AC07: pause stops new dispatch, not the truth, and resume restores
   assert.equal(resumed.paused, false);
   assert.equal(eligibleForDispatch(resumed.tasks[0], resumed), true, 'eligibility is restored from the checkpoint');
   assert.deepEqual(resumed.tasks.map((t) => t.id), ['t1', 't2']);
-  assert.equal(resumed.tasks[1].cancellation, undefined, 'the checkpoint state is restored');
+  assert.equal(resumed.tasks[1].cancellation, undefined, 'the request the pause made is withdrawn');
   assert.equal(resume(resumed).code, 'NOT_PAUSED');
 });
 
+test('SO-04-A AC07: resume keeps what happened during the pause', () => {
+  const project = { id: 'p1', paused: false, scopeVersion: 1, tasks: [
+    { id: 't1', state: S.IN_PROGRESS, scopeVersion: 1 },
+    { id: 't2', state: S.IN_PROGRESS, scopeVersion: 1 },
+    { id: 't3', state: S.IN_PROGRESS, scopeVersion: 1 },
+    { id: 't4', state: S.READY, scopeVersion: 1 },
+  ] };
+  const paused = pause(project);
+  // while paused: the adapter confirms t1's hard cancel, t2 moves on to VERIFYING, t3 is left alone
+  const cancelled = requestCancellation(paused.tasks[0], () => 'confirmed', ctx());
+  assert.equal(cancelled.ok, true);
+  const verifying = transition(paused.tasks[1], S.VERIFYING, ctx());
+  assert.equal(verifying.ok, true);
+  const during = { ...paused, tasks: [cancelled.task, verifying.task, paused.tasks[2], paused.tasks[3]] };
+  const resumed = resume(during);
+  const byId = Object.fromEntries(resumed.tasks.map((t) => [t.id, t]));
+  assert.equal(byId.t1.state, S.CANCELLED, 'a confirmed cancellation stays');
+  assert.equal(byId.t1.cancellation, 'confirmed');
+  assert.equal(byId.t2.state, S.VERIFYING, 'progress made during the pause stays');
+  assert.equal(byId.t3.state, S.IN_PROGRESS);
+  assert.equal(byId.t3.cancellation, undefined, 'only the pause\'s own request is withdrawn');
+  assert.equal(eligibleForDispatch(byId.t4, resumed), true);
+});
+
 test('SO-04-A AC07: hard cancellation is recorded only when the adapter confirms it', () => {
-  const inflight = { id: 't2', state: S.IN_PROGRESS, cancellation: 'requested' };
-  const yes = requestCancellation(inflight, () => 'confirmed');
+  const inflight = { id: 't2', state: S.IN_PROGRESS, scopeVersion: 1, cancellation: 'requested' };
+  const yes = requestCancellation(inflight, () => 'confirmed', ctx());
   assert.equal(yes.ok, true);
   assert.equal(yes.task.state, S.CANCELLED);
   assert.equal(yes.task.cancellation, 'confirmed');
   assert.ok(yes.task.cancelReason, 'the cancellation carries a recorded reason');
-  const no = requestCancellation(inflight, () => 'unsupported');
+  assert.ok(inTable(yes.record), 'the cancellation is a move in the table');
+  assert.equal(yes.record.actor, 'tester');
+  // checked before the adapter is asked: a move the table refuses, or a record that cannot be made
+  let asked = 0;
+  const adapter = () => { asked++; return 'confirmed'; };
+  const verifying = requestCancellation({ ...inflight, state: S.VERIFYING }, adapter, ctx());
+  assert.equal(verifying.code, 'ILLEGAL_TRANSITION');
+  const noActor = requestCancellation(inflight, adapter, ctx({ actor: undefined }));
+  assert.equal(noActor.code, 'MISSING_FIELD');
+  assert.equal(asked, 0, 'the adapter is never asked to cancel what would not be recorded');
+  const no = requestCancellation(inflight, () => 'unsupported', ctx());
   assert.equal(no.ok, false);
   assert.equal(no.task.state, S.IN_PROGRESS, 'not confirmed, not cancelled');
   assert.equal(no.task.cancellation, 'unsupported');
-  const pending = requestCancellation(inflight, () => 'requested');
+  const pending = requestCancellation(inflight, () => 'requested', ctx());
   assert.equal(pending.ok, false);
   assert.equal(pending.task.state, S.IN_PROGRESS);
   assert.equal(pending.task.cancellation, 'requested');
