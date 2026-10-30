@@ -181,3 +181,25 @@ test('WO-05-A AC04: the engine is reached as an external process, not a package 
   assert.ok(!pkg.dependencies, 'the core has no runtime dependencies');
   assert.ok(!pkg.dependencies?.['crdt-merge'], 'the engine is not a package dependency');
 });
+
+test('WO-05-A AC05: the boundary exports the registration point and imports no paid client', () => {
+  // the registration point is exported from the boundary, and the engine registers into it
+  assert.equal(typeof registerMergeProvider, 'function', 'the boundary exports the registration point');
+  const stub = stubProvider('# Note\n\nMerged\n');
+  registerMergeProvider(stub);
+  try {
+    const r = resolveMerge({ a: '# Note\n\nVersion C\n', b: '# Note\n\nVersion B\n', base: '# Note\n\nVersion A\n', license: mergeLicence(), keys, now: Date.parse('2026-11-01') });
+    assert.equal(r.resolved, true, 'the registered engine gets the merge');
+    assert.equal(r.text, '# Note\n\nMerged\n', 'the boundary calls the engine it was registered with');
+    assert.equal(stub.calls.length, 1, 'the engine registers into the boundary, not the reverse');
+  } finally {
+    registerMergeProvider(null);
+  }
+  // the boundary imports no paid client: only node built-ins and the licence gate
+  const src = fs.readFileSync(path.join(PKG, 'src/engine/merge.mjs'), 'utf8');
+  const imports = [...src.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]);
+  assert.ok(imports.length > 0, 'the boundary has imports to check');
+  for (const spec of imports) {
+    assert.ok(spec.startsWith('node:') || spec === './license.mjs', `the boundary imports no paid client, only node built-ins and the licence gate: ${spec}`);
+  }
+});
