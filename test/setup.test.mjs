@@ -28,7 +28,8 @@ test('memev init in a clean home: vault, daemon, apps connected, remote off by d
   const cfg = JSON.parse(fs.readFileSync(path.join(sb.root, '.memev', 'config.json'), 'utf8'));
   assert.equal(cfg.remote.enabled, false, 'remote access is off by default');
   assert.ok(fs.existsSync(path.join(sb.env.MEMEV_CONFIG_DIR, 'bin', 'memev')), 'stable launcher');
-  assert.ok(fs.existsSync(path.join(sb.env.MEMEV_CONFIG_DIR, 'runtime', '0.1.0', 'src', 'engine', 'vault.mjs')), 'runtime copy');
+  const version = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+  assert.ok(fs.existsSync(path.join(sb.env.MEMEV_CONFIG_DIR, 'runtime', version, 'src', 'engine', 'vault.mjs')), 'runtime copy');
   const hooks = JSON.parse(fs.readFileSync(claudeSettings, 'utf8')).hooks;
   assert.ok(hooks.SessionStart[0].hooks[0].command.includes(path.join(sb.env.MEMEV_CONFIG_DIR, 'bin', 'memev')));
   assert.equal(r.out.includes('mv_'), false, 'no token printed during setup');

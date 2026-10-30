@@ -4,11 +4,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadLicense, verifyLicense, licenseFile, extraFields, LICENSE_KEYS } from '../engine/license.mjs';
-import { report, seatPolicy } from '../engine/entitlements.mjs';
+import { report, seatPolicy, tierLabel } from '../engine/entitlements.mjs';
 import { DeviceRegistry, hostDevice, deviceKeygen } from '../engine/devices.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
-import { configDir, writePrivate, exists } from '../engine/util.mjs';
+import { configDir, writePrivate, exists, readJson, writePrivateJson } from '../engine/util.mjs';
 import { isVault } from '../engine/vault.mjs';
+import { Bus } from '../engine/bus.mjs';
+import { CommitQueue } from '../engine/git.mjs';
 import { out } from './common.mjs';
 import { applyRelayDefault } from './relay.mjs';
 import { fetchOut } from '../engine/net.mjs';
@@ -30,6 +32,11 @@ export const RENEWAL_REMINDER_DAYS = 14;
 export function renewalReminder(license, { days = RENEWAL_REMINDER_DAYS } = {}) {
   if (!license || license.state !== 'valid' || !Number.isInteger(license.days_left) || license.days_left < 0 || license.days_left > days || !license.exp) return null;
   return `The licence expires in ${license.days_left === 1 ? '1 day' : `${license.days_left} days`} (${license.exp}); renew it with memev license activate <key> or memev license install <file>.`;
+}
+
+/** One human line for the licence state: no licence reads as the Personal tier, otherwise the state and tier name. */
+export function licencePhrase(license) {
+  return license.state === 'none' ? 'Personal, no licence needed' : `licence ${license.state}${license.tier ? ` (${tierLabel(license.tier)})` : ''}`;
 }
 
 /** Licence, seats and notes in one object (the doctor check and `memev license status --json`). `license` is a test seam for a pre-loaded licence. */
@@ -91,6 +98,100 @@ export async function activateLicense({ key, endpoint, env = process.env, keys =
   return { ok: true, license: l, state: v.state, file, relay };
 }
 
+/** The raw installed licence (unverified), or null when none is installed. The verified object drops
+ *  the trial and org fields, so the trial record and the conversion both read the raw file. */
+export function readLicenseRaw({ env = process.env } = {}) {
+  return readJson(licenseFile(env), null);
+}
+
+const isTrial = (l) => !!(l && l.trial === true);
+const trialFile = (env) => path.join(configDir(env), 'trials.json');
+
+/** The local trial record: one entry per organisation that has had a trial on this vault. */
+export function readTrialRecord(env = process.env) {
+  return readJson(trialFile(env), {}) || {};
+}
+
+/**
+ * Whether the merge engine may run at the next sync. The licence must be live (valid or in grace)
+ * and carry the merge service; a trial may merge only while it is valid, not in grace.
+ */
+export function mergeAllowed(license, { now = Date.now(), keys = LICENSE_KEYS } = {}) {
+  if (!license) return false;
+  const v = verifyLicense(license, { now, keys });
+  if (!['valid', 'grace'].includes(v.state)) return false;
+  if (!(v.services || []).includes('merge')) return false;
+  if (isTrial(license) && v.state !== 'valid') return false;
+  return true;
+}
+
+/**
+ * The keep-both copies a sync left on disk, listed but never merged. Each is the other computer's
+ * version of a note, kept whole next to this one, so a person decides what to keep.
+ */
+export function pendingMergeCopies(root) {
+  const conflicts = readJson(path.join(root, '.memev', 'jobs.json'), {})?.sync?.conflicts || [];
+  const out = [];
+  for (const c of conflicts) {
+    if (c && c.kind === 'note' && c.copy && exists(path.join(root, ...String(c.copy).split('/')))) out.push({ path: c.path, copy: c.copy, how: c.how });
+  }
+  return out;
+}
+
+/**
+ * Install a licence file in place. A paid licence installed over a trial converts it: the trial
+ * ends the day the paid licence is installed, the paid licence takes its own dates (no unused trial
+ * days carry over), and the vault is left exactly as it was (no re-enrolment, no token change, no
+ * restart). A trial is refused over a live paid licence, and a second trial for the same org is
+ * refused locally. `keys`, `now` and `root` are for tests.
+ */
+export function installLicense({ file, env = process.env, keys = LICENSE_KEYS, now = Date.now(), root = null }) {
+  let l; try { l = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return { ok: false, reason: 'that file is not a licence' }; }
+  const v = verifyLicense(l, { keys, now });
+  if (v.state === 'invalid') return { ok: false, reason: `not installed: ${v.reason}` };
+
+  const cur = readLicenseRaw({ env });
+  const converted = !isTrial(l) && isTrial(cur);
+  // an expired file never replaces a live licence (a wrong file would otherwise end a live trial)
+  if (v.state === 'expired' && cur && ['valid', 'grace'].includes(verifyLicense(cur, { keys, now }).state)) {
+    return { ok: false, reason: 'that licence has expired and the installed licence is live; nothing was changed' };
+  }
+
+  // a trial over a live paid licence is refused
+  if (isTrial(l) && cur && !isTrial(cur) && ['valid', 'grace'].includes(verifyLicense(cur, { keys, now }).state)) {
+    return { ok: false, reason: 'a paid licence is already active on this vault; a trial cannot be installed over it' };
+  }
+  // a second trial for the same org is refused locally
+  if (isTrial(l) && l.org) {
+    const prev = readTrialRecord(env)[l.org];
+    if (prev && prev.lid !== l.lid && !l.trial_ext) {
+      return { ok: false, reason: `this vault already had a trial for this organisation (${prev.lid}); a second trial cannot be installed` };
+    }
+  }
+
+  const target = licenseFile(env);
+  fs.mkdirSync(configDir(env), { recursive: true, mode: 0o700 });
+  writePrivate(target, `${JSON.stringify(l, null, 2)}\n`);
+
+  // record the trial, or end the one being converted
+  if (isTrial(l) || (converted && cur.org)) {
+    const rec = readTrialRecord(env);
+    const day = new Date(now).toISOString().slice(0, 10);
+    if (isTrial(l)) {
+      rec[l.org] = { lid: l.lid, iat: l.iat, exp: l.exp, extended: !!l.trial_ext, ended: null, converted_to: null };
+    } else {
+      const e = rec[cur.org] || { lid: cur.lid, iat: cur.iat, exp: cur.exp, extended: !!cur.trial_ext, ended: null, converted_to: null };
+      e.ended = day;
+      e.converted_to = l.lid;
+      rec[cur.org] = e;
+    }
+    writePrivateJson(trialFile(env), rec);
+  }
+
+  const merge = root ? { resumes: mergeAllowed(l, { now, keys }), pending: pendingMergeCopies(root) } : null;
+  return { ok: true, license: l, state: v.state, file: target, converted, trial: isTrial(l), tier: l.tier, merge };
+}
+
 export async function command(cmd, pos, flags, { root, env, license = null }) {
   const sub = pos[0] || (cmd === 'devices' ? 'list' : 'status');
   if (cmd === 'license') {
@@ -98,7 +199,7 @@ export async function command(cmd, pos, flags, { root, env, license = null }) {
       const s = licensingStatus({ root, env, license });
       if (flags.json) { console.log(JSON.stringify(s, null, 2)); return 0; }
       const l = s.license;
-      console.log(l.state === 'none' ? 'Licence: none. The free tier needs none: everything on this computer is free and unlimited.' : `Licence ${l.lid || ''}: ${l.state}${l.tier ? ` · ${l.tier}` : ''}${l.seats ? ` · ${l.seats} computer(s)` : ''}${l.connectors != null ? ` · ${l.connectors} connector(s)` : ''} · ${l.reason}`);
+      console.log(l.state === 'none' ? 'Licence: Personal, no licence needed (the free tier). Everything on this computer is free and unlimited.' : `Licence ${l.lid || ''}: licence ${l.state}${l.tier ? ` (${tierLabel(l.tier)})` : ''}${l.seats ? ` · ${l.seats} computer(s)` : ''}${l.connectors != null ? ` · ${l.connectors} connector(s)` : ''} · ${l.reason}`);
       if (s.renewal) console.log(s.renewal);
       console.log(s.computers_enrolled > s.seats_licensed
         ? `Computers: ${s.computers_enrolled} enrolled, but the licence covers ${s.seats_licensed}; the others can read but not write, and none can be added. This computer is never limited.`
@@ -110,10 +211,12 @@ export async function command(cmd, pos, flags, { root, env, license = null }) {
     }
     if (sub === 'install') {
       const src = pos[1]; if (!src) throw new Error('memev license install <file>');
-      const l = JSON.parse(fs.readFileSync(src, 'utf8')); const v = verifyLicense(l);
-      if (v.state === 'invalid') { out.bad(`not installed: ${v.reason}`); return 1; }
-      fs.mkdirSync(configDir(env), { recursive: true }); writePrivate(licenseFile(env), `${JSON.stringify(l, null, 2)}\n`);
-      out.ok(`installed licence ${l.lid} (${v.state}) in ${licenseFile(env)}`); return 0;
+      const r = installLicense({ file: src, env, root: isVault(root) ? root : null });
+      if (!r.ok) { out.bad(`not installed: ${r.reason}`); return 1; }
+      out.ok(r.converted
+        ? `converted the trial to a paid licence ${r.license.lid} (${r.state}) in ${r.file}; the vault is unchanged`
+        : `installed licence ${r.license.lid} (${r.state}) in ${r.file}`);
+      return 0;
     }
     if (sub === 'activate') {
       const key = pos[1]; if (!key) throw new Error('memev license activate <key> [--server URL]');
@@ -121,7 +224,7 @@ export async function command(cmd, pos, flags, { root, env, license = null }) {
       if (!r.ok) { out.bad(`not activated: ${r.reason}`); return 1; }
       out.ok(`activated licence ${r.license.lid} (${r.state}) in ${r.file}; it is checked on this computer from now on, with no network`); return 0;
     }
-    if (sub === 'remove') { fs.rmSync(licenseFile(env), { force: true }); out.ok('licence removed; nothing changes for the free tier'); return 0; }
+    if (sub === 'remove') { fs.rmSync(licenseFile(env), { force: true }); out.ok('licence removed; nothing changes for Personal'); return 0; }
     throw new Error('memev license status [--json] | activate <key> | install <file> | remove');
   }
   // devices
@@ -141,8 +244,10 @@ export async function command(cmd, pos, flags, { root, env, license = null }) {
     for (const d of reg.list()) console.log(`  ${d.status === 'active' ? (d.kind === 'host' ? '*' : ' ') : 'x'} ${d.id}  ${d.kind.padEnd(16)} ${String(d.label).padEnd(20)} ${d.last_seen ? `seen ${d.last_seen.slice(0, 16)}` : 'not seen yet'}${d.pubkey ? ' · key' : ''}${d.flags?.length ? ` · ${d.flags.map((f) => f.type).join(', ')}` : ''}`);
     console.log(`Computers: ${seats.computers} · cloud connectors: ${seats.connectors} · local clients: ${seats.local_clients} (active in the last ${seats.active_days} days)`);
     for (const f of seats.flagged) out.warn(`${f.label} (${f.id}): ${f.flags.join(', ')}; memev devices rotate ${f.id} if its credential was copied`);
-    const s = report({ license: license ?? loadLicense({ env }), seats, devices: reg.list() });
+    const lic = license ?? loadLicense({ env });
+    const s = report({ license: lic, seats, devices: reg.list() });
     console.log(`Seats: ${s.computers_enrolled} of ${s.seats_licensed} computers${s.can_enroll ? '' : ' (no more can be added)'}`);
+    console.log(licencePhrase(lic));
     for (const n of s.notes) out.info(n);
     return 0;
   }
@@ -157,6 +262,16 @@ export async function command(cmd, pos, flags, { root, env, license = null }) {
   }
   if (sub === 'remove' || sub === 'revoke') { const d = reg.remove(tokens, pos[1]); out.ok(`removed ${d.label} (${d.id}); its token no longer works${d.kind === 'remote-computer' ? ' and its seat is free' : ''}`); return 0; }
   if (sub === 'rotate') { const r = reg.rotate(tokens, pos[1]); console.log(`New token for ${r.device.label} (shown once; the old one stopped working):\n${r.token}`); return 0; }
-  if (sub === 'rename') { const d = reg.rename(pos[1], pos.slice(2).join(' ')); out.ok(`${d.id} is now "${d.label}"`); return 0; }
+  if (sub === 'rename') {
+    const d = reg.rename(pos[1], pos.slice(2).join(' '));
+    // A computer's label is part of its seats' names: move every seat on it with it, so its history,
+    // tasks and lead follow, and its old seat names still find the seats.
+    const q = new CommitQueue(root, { delayMs: 0 });
+    const bus = new Bus({ root, devices: reg, commit: (p) => q.add(p, 'bus') });
+    bus.renameDeviceSeats(d.id);
+    q.flush();
+    out.ok(`${d.id} is now "${d.label}"`);
+    return 0;
+  }
   throw new Error('memev devices [list|enroll --kind remote-computer --pubkey KEY|cloud-connector|local-client --label NAME|remove ID|rotate ID|rename ID NAME|keygen]');
 }

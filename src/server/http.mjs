@@ -241,9 +241,14 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       vault.devices.fresh();
       let dev = vault.devices.get(vault.devices.byToken.get(identity.id) || '');
       let proof = null;
-      if (!local && dev?.kind === 'remote-computer') {
+      // The proof requirement is decided from the device kind as stored before observe() runs:
+      // observe() may reclassify an inferred record from the User-Agent, and that must not let a
+      // keyless computer through the gate. A token with no record yet is judged by its note, the
+      // same way observe() will store it.
+      const needsProof = !local && (dev ? dev.kind === 'remote-computer' : !/cloud connector/.test(identity.note || ''));
+      if (needsProof) {
         if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) await getBody();
-        proof = dev.pubkey ? verifyProof(dev.pubkey, { method: req.method, path: url.pathname, ts: req.headers['x-memev-ts'], nonce: req.headers['x-memev-nonce'], sig: req.headers['x-memev-sig'], body: raw || '' }) : { ok: false, reason: 'this computer was added without a device key' };
+        proof = dev?.pubkey ? verifyProof(dev.pubkey, { method: req.method, path: url.pathname, ts: req.headers['x-memev-ts'], nonce: req.headers['x-memev-nonce'], sig: req.headers['x-memev-sig'], body: raw || '' }) : { ok: false, reason: 'this computer was added without a device key' };
         if (proof.ok && !nonces.use(`${dev.id}:${req.headers['x-memev-nonce']}`)) proof = { ok: false, reason: 'this signed request was already used' };
       }
       // which device this is, what kind of client, and whether its credential looks shared
@@ -253,8 +258,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
         if (!local && seen) fs.appendFile(audit, `${JSON.stringify({ ts: now(), device: seen.device, class: seen.class, route: route.slice(0, 64) })}\n`, () => {});
       } catch {}
       dev ||= seen ? vault.devices.get(seen.device) : null;
-      if (!local && dev?.kind === 'remote-computer') {
-        if (!proof) proof = { ok: false, reason: 'this computer was added without a device key' };
+      if (needsProof) {
         if (!proof.ok) return send(401, { error: 'device_key', error_description: `Refused: ${proof.reason}. A computer's connection details only work on the computer that holds its device key. To add this computer, run memev devices keygen on it and enroll it on the vault: memev devices enroll --kind remote-computer --pubkey <key>.` });
         const why = readOnlyReason(policy(), dev);
         if (why) identity.read_only = why;

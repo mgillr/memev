@@ -12,11 +12,12 @@ import { redactSecrets, findSecrets } from '../engine/secrets.mjs';
 import { VERSION, isVault } from '../engine/vault.mjs';
 import { PKG, daemonInfo, pidAlive, config, out, clientsFile, tokenExpiryWarnings } from './common.mjs';
 import { EXPIRY_WARNING_DAYS } from '../engine/tokens.mjs';
-import { licensingStatus } from './licensing.mjs';
+import { licensingStatus, licencePhrase } from './licensing.mjs';
 import { alt443, githubReachable } from './github.mjs';
 import { label } from '../engine/bus.mjs';
 import { fetchOut } from '../engine/net.mjs';
 import { fixFor } from './preflight.mjs';
+import { updateLine } from './update.mjs';
 
 const C = (id, title, status, detail = '', fix = null) => ({ id, title, status, detail, fix });
 
@@ -155,9 +156,11 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
     const ls = licensingStatus({ root, env, vault, license });
     const flagged = ls.usage.flagged || [];
     const renewal = ls.renewal;
-    r.push(C('license', 'licence and seats (report only)', flagged.length || renewal ? 'warn' : 'ok', `${ls.license.state === 'none' ? 'free tier, no licence needed' : `licence ${ls.license.state}${ls.license.tier ? ` (${ls.license.tier})` : ''}`}; ${ls.usage.computers} computer(s), ${ls.usage.connectors} connector(s), ${ls.usage.local_clients} local client(s)${ls.notes.length ? `; ${ls.notes.join(' ')}` : ''}${renewal ? `; ${renewal}` : ''}${flagged.length ? `; credential flagged on ${flagged.map((f) => f.label).join(', ')}: memev devices` : ''}`));
+    r.push(C('license', 'licence and seats (report only)', flagged.length || renewal ? 'warn' : 'ok', `${licencePhrase(ls.license)}; ${ls.usage.computers} computer(s), ${ls.usage.connectors} connector(s), ${ls.usage.local_clients} local client(s)${ls.notes.length ? `; ${ls.notes.join(' ')}` : ''}${renewal ? `; ${renewal}` : ''}${flagged.length ? `; credential flagged on ${flagged.map((f) => f.label).join(', ')}: memev devices` : ''}`));
   } catch (e) { r.push(C('license', 'licence and seats (report only)', 'ok', `not checked: ${e.message}`)); }
   try { const s = fs.statfsSync(root); const freePct = (s.bavail / s.blocks) * 100; const inodePct = s.files ? (s.ffree / s.files) * 100 : 100; r.push(C('disk', 'disk space', freePct < 3 || inodePct < 3 ? 'warn' : 'ok', `${freePct.toFixed(0)}% space, ${inodePct.toFixed(0)}% inodes free`)); } catch {}
+  const upd = updateLine(root, env);
+  if (upd) r.push(C('update', 'update available', 'warn', upd));
   if (env.MEMEV_CONTAINER === '1') {
     const vaultWritable = (() => { try { const t = path.join(root, '.memev', `write-test-${process.pid}`); fs.writeFileSync(t, 'ok'); fs.rmSync(t, { force: true }); return true; } catch { return false; } })();
     r.push(C('container-vault', 'vault volume mounted and writable', vaultWritable ? 'ok' : 'fail', vaultWritable ? `${root} is writable` : `${root} is not writable; check the volume mount`));
@@ -227,6 +230,19 @@ async function twoVaultChecks(root) {
   return [C('two-vaults', 'one vault on this computer', 'warn', `two vaults on this computer: this one is ${mine} and another is ${ids.join(', ')}. Join that vault instead of keeping two: memev init --join`)];
 }
 
+/**
+ * The vault id a local backup remote carries in its signed address record (address.json, committed with the
+ * backup). Null when the remote is not a local path (a git URL would need the network) or carries no readable
+ * record, so the doctor never reaches for the network to answer it.
+ */
+function backupVaultId(url) {
+  if (!url || !path.isAbsolute(url) || !exists(url)) return null;
+  const id = (text) => { try { const rec = JSON.parse(text); return rec && typeof rec.vault_id === 'string' ? rec.vault_id : null; } catch { return null; } };
+  try { const t = id(fs.readFileSync(path.join(url, 'address.json'), 'utf8')); if (t) return t; } catch { /* not a work tree */ }
+  const r = run('git', ['--git-dir', url, 'show', 'HEAD:address.json'], { timeout: 5000 });
+  return r.ok ? id(r.stdout) : null;
+}
+
 export async function allChecks({ root, env }) {
   const r = [];
   const info = daemonInfo(root);
@@ -253,7 +269,11 @@ export async function allChecks({ root, env }) {
   const backupRemote = remoteR.ok ? remoteR.stdout.trim().split('\n')[0] : '';
   if (backupRemote) {
     const urlR = run('git', ['remote', 'get-url', backupRemote], { cwd: root });
-    if (urlR.ok && alt443(urlR.stdout.trim())) r.push(await githubNetCheck());
+    const url = urlR.ok ? urlR.stdout.trim() : '';
+    if (url && alt443(url)) r.push(await githubNetCheck());
+    const theirs = backupVaultId(url);
+    const mine = config(root).vault_id;
+    if (theirs && mine && theirs !== mine) r.push(C('backup-vault', 'backup belongs to this vault', 'warn', `the backup belongs to a different vault: this one is ${mine} and the backup is ${theirs}. Two vaults per user are not supported. Join that vault instead of keeping two: memev init --join`));
   }
   const { unitPaths, serviceOff } = await import('./service.mjs');
   const u = unitPaths(env);

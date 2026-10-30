@@ -11,10 +11,21 @@ import { cleanup } from './helpers/tmp.mjs';
 // The other program answers /healthz with {"ok":true} and nothing else, the way an unrelated local service might.
 const OTHER = "require('http').createServer((q,s)=>{s.setHeader('content-type','application/json');s.end('{\"ok\":true}')}).listen(+process.argv[1],'127.0.0.1',()=>process.stdout.write('up\\n'))";
 
-let sb, other, mcp, busy, init, atInit;
+let sb, other, mcp, busy, init, atInit, initDone = false;
 const read = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 const cfg = () => read(path.join(sb.root, '.memev', 'config.json'));
 const daemon = () => { try { return read(path.join(sb.root, '.memev', 'daemon.json')); } catch { return null; } };
+
+function runInit() {
+  if (initDone) return;
+  initDone = true;
+  init = sb.run(['init', '--port', String(busy)]);
+  const clients = {};
+  for (const f of [path.join(sb.home, '.claude.json'), path.join(sb.home, '.claude', 'settings.json'), path.join(sb.home, '.claude', 'CLAUDE.md')]) {
+    if (fs.existsSync(f)) clients[f] = fs.statSync(f).mtimeMs;
+  }
+  atInit = { config: fs.statSync(path.join(sb.root, '.memev', 'config.json')).mtimeMs, daemon: daemon(), clients };
+}
 
 before(async () => {
   sb = sandbox({ ports: 2 }); busy = sb.port; // the port after the busy one is reserved too, so init can move to it
@@ -22,16 +33,16 @@ before(async () => {
   fs.writeFileSync(path.join(sb.home, '.claude', 'settings.json'), '{}\n');
   other = spawn(process.execPath, ['-e', OTHER, String(busy)], { stdio: ['ignore', 'pipe', 'inherit'] });
   await new Promise((resolve, reject) => { other.stdout.once('data', resolve); other.once('exit', (c) => reject(new Error(`the other program exited with ${c}`))); });
-  init = sb.run(['init', '--port', String(busy)]);
-  const clients = {};
-  for (const f of [path.join(sb.home, '.claude.json'), path.join(sb.home, '.claude', 'settings.json'), path.join(sb.home, '.claude', 'CLAUDE.md')]) {
-    if (fs.existsSync(f)) clients[f] = fs.statSync(f).mtimeMs;
-  }
-  atInit = { config: fs.statSync(path.join(sb.root, '.memev', 'config.json')).mtimeMs, daemon: daemon(), clients };
 });
-after(async () => { await mcp?.close(); sb.stop(); other?.kill(); cleanup(); });
+after(async () => {
+  await mcp?.close();
+  if (initDone) sb.stop();
+  other?.kill();
+  cleanup();
+});
 
 test('MEM-005 AC03: The chosen port is written to .memev/config.json before any client config is edited', () => {
+  runInit();
   assert.equal(init.code, 0, init.out + init.err);
   const port = cfg().port;
   assert.notEqual(port, busy, 'config.json holds a port other than the busy one');
@@ -46,6 +57,7 @@ test('MEM-005 AC03: The chosen port is written to .memev/config.json before any 
 });
 
 test('MEM-005 AC02: Apps are connected with the port that was finally chosen (MCP entries and hooks reference the saved port)', async () => {
+  runInit();
   assert.equal(init.code, 0, init.out + init.err);
   const port = cfg().port;
   assert.notEqual(port, busy);

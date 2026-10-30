@@ -12,7 +12,7 @@ connects them, unless you disconnected that app yourself.
 
 | App | What Memev adds | Mode |
 |---|---|---|
-| Claude Code | MCP server in `~/.claude.json`; hooks (SessionStart, UserPromptSubmit, PreCompact, Stop) in `~/.claude/settings.json`; a block in `~/.claude/CLAUDE.md` | hooks |
+| Claude Code | MCP server in `~/.claude.json`; hooks (SessionStart, UserPromptSubmit, PreCompact, Stop) in `~/.claude/settings.json`; a block in `~/.claude/CLAUDE.md`; with consent, the Memev memory tools (recall, remember, checkpoint, status, why) in `~/.claude/settings.json` `permissions.allow` | hooks |
 | Codex CLI | `[mcp_servers.memev]` in `~/.codex/config.toml`; hooks in `~/.codex/hooks.json`; a block in `~/.codex/AGENTS.md` | hooks (trust once) |
 | Gemini CLI | MCP server and hooks (SessionStart, BeforeAgent, PreCompress, AfterAgent) in `~/.gemini/settings.json`; a block in `~/.gemini/GEMINI.md` | hooks |
 | Cursor | `~/.cursor/mcp.json`; `~/.cursor/hooks.json`; with `--project`, an always-on rule in `<project>/.cursor/rules/memev.mdc` | hooks at session start, instructions otherwise |
@@ -20,8 +20,14 @@ connects them, unless you disconnected that app yourself.
 | Windsurf | `~/.codeium/windsurf/mcp_config.json`; a block in `memories/global_rules.md` | instructions |
 | VS Code | `Code/User/mcp.json` | instructions |
 | Zed | `context_servers` in `zed/settings.json` | instructions |
+| Aider | a conventions file in `~/.config/memev/aider-conventions.md`, listed under `read:` in `~/.aider.conf.yml` | conventions file (no MCP) |
 | OpenCode | `mcp` entry in `~/.config/opencode/opencode.json`; a block in the OpenCode rules file (skipped if the Claude rules file exists and the OpenCode one is missing) | instructions |
 | GitHub Copilot CLI | `mcpServers` entry in `~/.copilot/mcp-config.json` and a block in `~/.copilot/copilot-instructions.md` (in `$COPILOT_HOME` when it is set) | instructions |
+
+**Aider** has no MCP and no hooks, so the hand-off is different: `memev card --aider` writes the
+resume card to a conventions file and adds it to the `read:` list in `~/.aider.conf.yml`, which Aider
+reads into context at session start. It is opt-in, so `memev connect` does not touch it; `memev
+disconnect aider` removes the entry and the conventions file.
 
 **Hooks** mode: the resume card is injected at session start, relevant memories are added to each
 prompt, a checkpoint is written before compaction, and the turn is journaled when it ends. The app
@@ -31,6 +37,13 @@ does not need to call anything.
 instructions (call `memev_session_start` first, `memev_recall` before answering from memory,
 `memev_checkpoint` before long work ends). Apps that follow server instructions behave much like
 hooks mode; others need you to ask once per session.
+
+**Claude Code tool consent**: the hooks tell Claude to call Memev tools every turn, which would otherwise
+raise an approval prompt. With consent, Memev adds the Memev memory tools (recall, remember, checkpoint,
+status, why) to `permissions.allow` in `~/.claude/settings.json`, so Claude Code runs them without asking
+each time; the write and contract tools still prompt. Consent is a question at `memev init` (on a terminal)
+or the `--allow-tools` flag on `memev connect claude-code`; `memev disconnect claude-code` removes the
+entries again. It is off unless you opt in, and it never touches your other permissions.
 
 Manual steps:
 
