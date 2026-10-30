@@ -55,7 +55,7 @@ test('MEM-108 AC02: limit 1000, limit 11, and limit 0 or negative are clamped to
     assert.equal(r(-5).length, 1, 'a negative limit clamps to 1');
     assert.equal(r(1000).total, 25, 'all 25 notes match, so the cap is what keeps it at 10');
     const tool = await mcpResult(v, { query: QUERY, limit: 1000 });
-    assert.ok(Array.isArray(JSON.parse(tool.content[0].text)), 'the tool text stays a JSON array of hits');
+    assert.ok(Array.isArray(JSON.parse(tool.content[0].text).hits), 'the tool text is a JSON object whose hits is the array of hits');
     assert.equal(tool.structuredContent.result.length, 10, 'memev_recall clamps limit 1000 to 10');
     const http = await serve(v);
     try {
@@ -98,11 +98,14 @@ test('MEM-108 AC04: the result states how many hits exist in total, and that mor
     const tool1 = await mcpResult(v, { query: QUERY, limit: 10, offset: 0 });
     assert.equal(tool1.structuredContent.total, 25, 'memev_recall states how many hits exist in total');
     assert.equal(tool1.structuredContent.next, 10, 'memev_recall says more can be fetched with offset 10');
-    assert.match(tool1.content[1].text, /25 in total; more with offset 10/, 'the tool text says how many exist and that more can be fetched');
+    const t1 = JSON.parse(tool1.content[0].text);
+    assert.equal(t1.total, 25, 'the tool text states how many hits exist in total');
+    assert.equal(t1.next, 10, 'the tool text says more can be fetched with offset 10');
     const tool2 = await mcpResult(v, { query: QUERY, limit: 10, offset: 20 });
     assert.equal(tool2.structuredContent.next, null, 'memev_recall is silent when there are no more');
-    assert.match(tool2.content[1].text, /25 in total/, 'the tool text still says how many exist');
-    assert.doesNotMatch(tool2.content[1].text, /more with offset/, 'the tool text is silent when there are no more');
+    const t2 = JSON.parse(tool2.content[0].text);
+    assert.equal(t2.total, 25, 'the tool text still states how many hits exist');
+    assert.equal(t2.next, null, 'the tool text is silent when there are no more');
     const http = await serve(v);
     try {
       const first = await http.post({ query: QUERY, limit: 10, offset: 0 }, { cli: true });
