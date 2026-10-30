@@ -154,7 +154,8 @@ newest unread messages that are not your go, and says how many were left out (`n
 longer than 300 characters is cut with a marker; the full body is still on the bus, and `bus_since`
 reaches it by seq. A task or an operator hold is always shown first, in full and never cut, whatever
 the cap. What a capped call does not show stays unread, so the next call shows it in its place by
-time.
+time. A message that arrives later with an older time (written offline, for example) is always
+shown, whatever the cap, so nothing is lost.
 
 `bus_tail` and `bus_since` show at most 50 messages and say how many more exist (`more`); ask for
 fewer with `n` or `limit`. The hook that puts new messages in front of a hooked app reads the whole

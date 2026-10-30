@@ -395,9 +395,11 @@ export class Bus {
     return { seq: m.seq, id: m.id, from: m.from, to: m.to, type: m.type, ref: m.ref, operator: m.operator, ts: m.ts, body: doCut ? m.body.slice(0, BODY_CUT) + CUT_MARK : m.body, cut: doCut };
   }
   /** New messages for this seat; counts as a heartbeat and answers comms checks.
-   * Capped (a limit, or the capped flag) it shows the priority messages (hold, task) in full plus
-   * the last `limit` of the rest cut to BODY_CUT, marks only what it showed read, and says how many
-   * it left. Uncapped it returns every fresh message and marks them all read, as the hook path does. */
+   * Capped (a limit, or the capped flag) it shows the priority messages (hold, task) in full, then
+   * any message that arrived later with an older time (never lost under the cap), then the last
+   * `limit` of the in-order rest cut to BODY_CUT; it marks only what it showed read and says how
+   * many it left. Uncapped it returns every fresh message and marks them all read, as the hook
+   * path does. */
   unread(ctx, { seat = null, peek = false, limit = null, capped = false } = {}) {
     const who = this.resolve(ctx, { seat });
     const p = this._pulse(who.seat); const read = p.read || {};
@@ -410,9 +412,14 @@ export class Bus {
     if (cap) {
       const lim = Math.min(Math.max(1, Math.floor(Number(limit)) || UNREAD_VIEW), UNREAD_MAX);
       const priority = fresh.filter(isPriority);
-      const rest = fresh.filter((m) => !isPriority(m));
-      shownMsgs = [...priority, ...rest.slice(-lim)];
-      notShown = fresh.length - shownMsgs.length;
+      // I always show a message that arrives later with an older time (its seq is at or below
+      // what this seat has already seen), so an offline write is never lost under the cap; the
+      // cap applies only to the in-order rest.
+      const seen = p.seen_seq || 0;
+      const late = fresh.filter((m) => !isPriority(m) && m.seq <= seen);
+      const rest = fresh.filter((m) => !isPriority(m) && m.seq > seen);
+      shownMsgs = [...priority, ...[...late, ...rest.slice(-lim)].sort((a, b) => a.seq - b.seq)];
+      notShown = rest.length - rest.slice(-lim).length;
     }
     if (!peek) {
       if (cap) {
@@ -422,7 +429,8 @@ export class Bus {
         for (const m of all) if (this._toMe(who, m, names) || names.includes(m.from)) this._markAllRead(read, m);
       }
     }
-    this.pulse(ctx, { who, read: peek ? null : read });
+    const frontier = fresh.reduce((mx, m) => Math.max(mx, m.seq), p.seen_seq || 0);
+    this.pulse(ctx, { who, read: peek ? null : read, seen: peek ? null : frontier });
     const acked = [];
     if (!(who.operator && who.seat === OPERATOR)) {
       for (const m of fresh.filter((x) => x.check)) if (!all.some((a) => a.type === 'ack' && a.ref === m.id && names.includes(a.from))) {
@@ -436,11 +444,11 @@ export class Bus {
   // ---- pulse
   _pulse(seat) { return readJson(this._p('pulse', `${fileOf(seat)}.json`), { seat, read: {} }); }
   /** A heartbeat: the seat is here. The first one also joins the seat and says hello. */
-  pulse(ctx, { who = null, read = null, session = null, at = Date.now() } = {}) {
+  pulse(ctx, { who = null, read = null, seen = null, session = null, at = Date.now() } = {}) {
     who ||= this.resolve(ctx);
     if (who.seat === OPERATOR) return null;
     const p = this._pulse(who.seat);
-    const rec = { seat: who.seat, device: who.device.id, last_seen: new Date(at).toISOString(), session: session || ctx.session || p.session || null, beats: (p.beats || 0) + 1, read: read || p.read || {} };
+    const rec = { seat: who.seat, device: who.device.id, last_seen: new Date(at).toISOString(), session: session || ctx.session || p.session || null, beats: (p.beats || 0) + 1, read: read || p.read || {}, seen_seq: seen == null ? (p.seen_seq || 0) : seen };
     fs.mkdirSync(this._p('pulse'), { recursive: true });
     const f = `${fileOf(who.seat)}.json`;
     writeJson(this._p('pulse', f), rec);
