@@ -1,14 +1,16 @@
 // SO-R-A: release gates. I add the CLI smoke script, the CI steps for package validation, smoke
 // and container build, and the source-install commands in the docs, and I keep the doc commands
 // equal to the workflow's.
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { PKG, tmpdir } from './helpers/tmp.mjs';
+import { PKG, tmpdir, cleanup } from './helpers/tmp.mjs';
 
 const read = (p) => fs.readFileSync(path.join(PKG, p), 'utf8');
+
+after(cleanup);
 
 // The check job of the CI workflow: from "  check:" to the next job at the same indent.
 function checkJob() {
@@ -104,7 +106,7 @@ const GATES = [
 function gatesInOrder(runLines) {
   let last = -1;
   for (const cmd of GATES) {
-    const idx = runLines.findIndex((l) => l.includes(cmd));
+    const idx = runLines.findIndex((l) => l === cmd);
     if (idx < 0 || idx <= last) return false;
     last = idx;
   }
@@ -140,6 +142,32 @@ test('SO-R-A AC01: scripts/smoke.sh passes in a fresh HOME, runs the checkout bi
     assert.notEqual(r.status, 0, `smoke must fail when ${step} is broken`);
     assert.match(`${r.stdout}\n${r.stderr}`, new RegExp(`smoke: FAIL at step ${step}\\b`), `smoke names the ${step} step`);
   }
+  // A stub that prints a different version: the version step must fail on the comparison, not just
+  // on the exit status.
+  {
+    const dir = tmpdir('ac01-fail-versiondiff-');
+    const stub = path.join(dir, 'memev');
+    fs.writeFileSync(stub, STUB_MEMEV, { mode: 0o755 });
+    const r = spawnSync('sh', [script, stub], {
+      encoding: 'utf8',
+      timeout: 60000,
+      env: { PATH: process.env.PATH, HOME: tmpdir('ac01-failhome-versiondiff-'), STUB_FAIL: '' },
+    });
+    assert.notEqual(r.status, 0, 'smoke must fail when the printed version differs');
+    assert.match(`${r.stdout}\n${r.stderr}`, /smoke: FAIL at step version\b/, 'smoke names the version step when the version differs');
+  }
+  // The AC's failure path names a stub node on PATH: with a broken node, the port step fails.
+  {
+    const dir = tmpdir('ac01-nodestub-');
+    fs.writeFileSync(path.join(dir, 'node'), '#!/bin/sh\necho "stub node" >&2\nexit 1\n', { mode: 0o755 });
+    const r = spawnSync('sh', [script, path.join(PKG, 'bin', 'memev.mjs')], {
+      encoding: 'utf8',
+      timeout: 60000,
+      env: { PATH: `${dir}:${process.env.PATH}`, HOME: tmpdir('ac01-nodehome-') },
+    });
+    assert.notEqual(r.status, 0, 'smoke must fail when node on PATH is broken');
+    assert.match(`${r.stdout}\n${r.stderr}`, /smoke: FAIL at step port\b/, 'smoke names the port step when node is broken');
+  }
 });
 
 test('SO-R-A AC02: the pull-request job runs the suite, leak scan, pack-install-smoke and docker smoke in order, on Linux only, with no dependency install and no secret', () => {
@@ -147,13 +175,17 @@ test('SO-R-A AC02: the pull-request job runs the suite, leak scan, pack-install-
   const job = checkJob();
   const steps = jobSteps(job);
   const runLines = steps.flatMap((s) => s.run);
-  // The gates, in order, taken from the run values only.
+  // The gates, in order, taken from the run values only. Each gate line must be the command,
+  // not a string that merely contains it, so "npm test || true" does not count.
   assert.ok(gatesInOrder(runLines), 'the check job runs the gates in order');
-  // The container build lives in the docker smoke, which the check job runs.
-  assert.match(read('scripts/docker-smoke.sh'), /docker build/, 'scripts/docker-smoke.sh builds the container image');
+  // The job itself may not be allowed to fail.
+  assert.ok(!/^    continue-on-error:/m.test(job), 'the check job has no job-level continue-on-error');
+  // The container build lives in the docker smoke, which the check job runs. A comment does not
+  // count: the line must be a real docker build or docker compose build.
+  assert.match(read('scripts/docker-smoke.sh'), /^\s*docker (compose )?build\b/m, 'scripts/docker-smoke.sh builds the container image');
   // No step that runs a gate is skipped or allowed to fail: no if, no continue-on-error.
   for (const s of steps) {
-    const gate = s.run.find((l) => GATES.some((c) => l.includes(c)));
+    const gate = s.run.find((l) => GATES.includes(l));
     if (gate !== undefined) {
       assert.equal(s.if, null, `the step running ${gate} has no if: condition`);
       assert.equal(s.continueOnError, null, `the step running ${gate} has no continue-on-error`);
@@ -243,28 +275,16 @@ test('SO-R-A AC04: the runtime pins hold: engines.node at 22 or newer, no depend
 
 test('SO-R-A AC05: npm pack and the release tarball carry the allowed set and nothing private', () => {
   // The allowed set is pinned to the release list, not derived from package.json "files": adding
-  // scripts/ or .github/ to files must fail this test.
+  // scripts/ or .github/ to files must fail this test. It is the tracked files under those entries
+  // (git ls-files), so an untracked local file is neither allowed nor packed, and a local file npm
+  // would pack fails the comparison.
   const TOP = ['bin', 'src', 'templates', 'vendor', 'docs', 'LICENSE', 'NOTICE', 'README.md', 'SECURITY.md', 'CHARTER.md'];
   const EXCLUDE = new Set(['docs/BENCH.md']);
   const allowed = new Set(['package.json']);
-  const walk = (dir) => {
-    let out = [];
-    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-      const p = path.join(dir, e.name);
-      out = e.isDirectory() ? out.concat(walk(p)) : out.concat(p);
-    }
-    return out;
-  };
-  for (const f of TOP) {
-    const p = path.join(PKG, f);
-    if (fs.statSync(p).isDirectory()) {
-      for (const abs of walk(p)) {
-        const rel = path.relative(PKG, abs).split(path.sep).join('/');
-        if (!EXCLUDE.has(rel)) allowed.add(rel);
-      }
-    } else {
-      allowed.add(f);
-    }
+  const tracked = execFileSync('git', ['ls-files'], { cwd: PKG, encoding: 'utf8' }).split('\n').filter(Boolean);
+  for (const f of tracked) {
+    const top = f.split('/')[0];
+    if (TOP.includes(top) && !EXCLUDE.has(f)) allowed.add(f);
   }
   const dryRaw = execFileSync('npm', ['pack', '--dry-run', '--json'], { cwd: PKG, encoding: 'utf8', maxBuffer: 1 << 30 });
   const dry = JSON.parse(dryRaw);
