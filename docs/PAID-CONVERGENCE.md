@@ -15,14 +15,14 @@ several computers edit the same vault at the same time, and the edits come toget
 to resolve.
 
 - **Personal with more computers:** automatic merge across several computers at once (planned).
-- **Business and Corporate:** vault convergence for a company (both coming, planned).
+- **Business, Corporate and Federation:** convergence of supported structured state across people, projects and sites as schemas and authority rules are implemented (planned).
 
 Today the engine is not built into any released Memev. These features are planned and are not
 sold until they are built ([tiers/README.md](tiers/README.md#what-is-built-and-what-is-planned)).
 The free behaviour never changes: one computer at a time, git sync as single-writer backup, and a
 conflict left for a person to resolve ([CONVERGENCE.md](CONVERGENCE.md#what-free-users-get)).
 
-## The engine is an external dependency
+## Scope boundary\n\nThe service contract below remains the current note-conflict contract. It does not yet define a\ngeneral structured-state merge for project, programme, portfolio, organisation or site records.\nFederated computation and learning also require workload-specific algorithms and validation; they\nare not provided merely by converging contribution state. See [FEDERATION.md](FEDERATION.md),\n[ORGANISATIONAL-INTELLIGENCE.md](ORGANISATIONAL-INTELLIGENCE.md) and\n[FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).\n\n## The engine is an external dependency
 
 The engine is crdt-merge. It lives in its own repository under its original licence, currently
 BSL 1.1. Its source is not included in this repository: no copy of it is here, it is never
