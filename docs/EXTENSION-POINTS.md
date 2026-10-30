@@ -54,7 +54,7 @@ The free behaviour is the default and never changes:
 Removing a registered engine returns the install to this behaviour. No version is lost or
 overwritten: both are kept byte for byte, and the conflict copy is listed until it is resolved.
 
-## Where the boundary is called
+## How this fits the wider architecture\n\nThis boundary is the current note-conflict integration, not the complete future Federation API.\nThe wider architecture will need separately versioned interfaces for node identity, federation\nmembership, policy evaluation, authorised state exchange, structured work contributions, remote\nexecution and workload-specific results. Those interfaces must not bypass the existing local\npermission checks or assume that a successful merge grants authority. See\n[FEDERATION.md](FEDERATION.md) and [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).\n\n## Where the boundary is called
 
 The sync path calls the boundary when it resolves a conflicted note after a git merge
 (`src/cli/sync.mjs`). That is the only place in the core that reaches the engine. The bus log
