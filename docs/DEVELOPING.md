@@ -17,19 +17,20 @@ node scripts/docs/module-graph.mjs --check    # docs/MODULES.md matches the real
 
 CI runs the tests, the changelog guard and the leak scan on every pull request, and gitleaks on the
 history. It then packs the package, installs it from the packed tarball, runs the CLI smoke on the
-installed copy, builds the container image and runs the Docker smoke. The Windows job runs a subset
-on a push to `main`. See `.github/workflows/ci.yml`.
+installed copy, and runs the Docker smoke, which builds the image and checks it. The Windows job
+runs a subset on a push to `main`. See `.github/workflows/ci.yml`.
 
 ## Install from source
 
-The commands the CI pull-request job runs, in the same order.
-[test/release-gates.test.mjs](../test/release-gates.test.mjs) compares them with the workflow as
-strings and runs them from a clean export of `HEAD`, so no untracked developer file can be needed.
-There are no dependencies and no lockfile, so the pack and the install from the packed tarball are
-the whole install.
+The commands the CI pull-request job runs, in the same order. Clone the Memev repository first; the
+URL is on the repository page, and the owner handle is not kept in repository text, so it is not
+written here. [test/release-gates.test.mjs](../test/release-gates.test.mjs) compares them with the
+workflow as strings and runs them from a clean export of `HEAD`, so no untracked developer file can
+be needed. There are no dependencies and no lockfile, so the pack and the install from the packed
+tarball are the whole install.
 
 ```sh
-git clone https://github.com/you/memev.git
+git clone <memev-repository-url>
 cd memev
 npm test
 mkdir -p /tmp/memev-pack

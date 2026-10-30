@@ -1,8 +1,9 @@
 # Memev's own development checks. Kept to one short job on pull requests: Actions minutes are a
 # shared budget. The job runs the full suite, the leak scan, then packs the package, installs it
-# from the packed tarball, runs the CLI smoke on the installed copy, builds the container image and
-# runs the Docker smoke. The 170M-token growth bench and the macOS run are run locally before
-# merging: scripts/growth-bench.mjs. Windows (a preview) runs only on a push to main or a release
+# from the packed tarball, runs the CLI smoke on the installed copy, and runs the Docker smoke,
+# which builds the image and checks it. The 170M-token growth bench and the macOS run are run
+# locally before merging: scripts/growth-bench.mjs. Windows (a preview) runs only on a push to main
+# or a release
 # tag, never on a pull request, so pull requests cost no Windows minutes. The Memev product never
 # installs workflows into a user's repositories.
 name: ci
@@ -73,9 +74,7 @@ jobs:
           npm pack --pack-destination /tmp/memev-pack
           npm install --prefix /tmp/memev-install /tmp/memev-pack/*.tgz
           scripts/smoke.sh /tmp/memev-install/node_modules/.bin/memev
-      - name: Build the container image
-        run: docker build -t memev:local .
-      - name: Docker smoke
+      - name: Docker smoke (builds the image, then runs it)
         run: scripts/docker-smoke.sh
   windows:
     # the parts that differ on Windows: registering apps (node.exe, settings files), hooks, MCP and the doctor.

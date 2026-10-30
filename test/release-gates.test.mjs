@@ -29,50 +29,140 @@ function windowsJob() {
   return lines.slice(start).join('\n');
 }
 
-test('SO-R-A AC01: scripts/smoke.sh passes in a fresh HOME and names the step when a step fails', () => {
+// The steps of a job, with their run values (comment lines dropped) and any if / continue-on-error.
+function jobSteps(job) {
+  const steps = [];
+  let cur = null;
+  let inRun = false;
+  const attr = (key, val) => {
+    if (!cur) return;
+    if (key === 'name') cur.name = val;
+    else if (key === 'if') cur.if = val;
+    else if (key === 'continue-on-error') cur.continueOnError = val;
+    else if (key === 'uses') cur.uses = val;
+    else if (key === 'run') {
+      if (val === '|' || val === '>' || val === '') inRun = true;
+      else cur.run.push(val);
+    }
+  };
+  for (const line of job.split('\n')) {
+    const step = /^      - (.*)$/.exec(line);
+    if (step) {
+      cur = { name: '', run: [], if: null, continueOnError: null, uses: null };
+      steps.push(cur);
+      inRun = false;
+      const a = /^([A-Za-z][A-Za-z0-9-]*):(.*)$/.exec(step[1].trim());
+      if (a) attr(a[1], a[2].trim());
+      continue;
+    }
+    if (!cur) continue;
+    if (inRun) {
+      if (/^ {10,}/.test(line)) {
+        const c = line.trim();
+        if (c !== '' && !c.startsWith('#')) cur.run.push(c);
+        continue;
+      }
+      inRun = false;
+    }
+    const a = /^        ([A-Za-z][A-Za-z0-9-]*):(.*)$/.exec(line);
+    if (a) attr(a[1], a[2].trim());
+  }
+  return steps;
+}
+
+// A stub memev that fails the one step named in $STUB_FAIL and behaves otherwise.
+const STUB_MEMEV = `#!/bin/sh
+case "$1" in
+  --version)
+    if [ "$STUB_FAIL" = version ]; then echo "stub: no version" >&2; exit 1; fi
+    echo "0.0.0-stub"
+    ;;
+  init)
+    if [ "$STUB_FAIL" = init ]; then echo "stub: init failed" >&2; exit 1; fi
+    ;;
+  doctor)
+    if [ "$STUB_FAIL" = doctor ]; then echo '[{"name":"stub","status":"fail"}]'; else echo '[{"name":"stub","status":"pass"}]'; fi
+    ;;
+  status)
+    if [ "$STUB_FAIL" = status ]; then echo "stub: status failed" >&2; exit 1; fi
+    echo "stub: status ok"
+    ;;
+esac
+exit 0
+`;
+
+// The gates in the order the check job must run them.
+const GATES = [
+  'npm test',
+  'node scripts/leak-scan.mjs --history',
+  'npm pack --pack-destination /tmp/memev-pack',
+  'npm install --prefix /tmp/memev-install /tmp/memev-pack/*.tgz',
+  'scripts/smoke.sh /tmp/memev-install/node_modules/.bin/memev',
+  'scripts/docker-smoke.sh',
+];
+
+function gatesInOrder(runLines) {
+  let last = -1;
+  for (const cmd of GATES) {
+    const idx = runLines.findIndex((l) => l.includes(cmd));
+    if (idx < 0 || idx <= last) return false;
+    last = idx;
+  }
+  return true;
+}
+
+test('SO-R-A AC01: scripts/smoke.sh passes in a fresh HOME, runs the checkout binary when given one, and names the step when a step fails', () => {
   const script = path.join(PKG, 'scripts', 'smoke.sh');
   assert.ok(fs.existsSync(script), 'scripts/smoke.sh exists');
-  // The success path: the script makes its own fresh HOME and takes its port from the operating
-  // system, so the test only gives it a controlled environment.
-  const ok = spawnSync('sh', [script], {
+  // The success path: pass the checkout binary as the argument. A failing memev is first on PATH,
+  // so if the script fell back to PATH it would fail; it must use the checkout binary instead.
+  const stubDir = tmpdir('ac01-pathstub-');
+  const sentinel = path.join(stubDir, 'sentinel');
+  fs.writeFileSync(path.join(stubDir, 'memev'), `#!/bin/sh\necho used >> "${sentinel}"\nexit 1\n`, { mode: 0o755 });
+  const ok = spawnSync('sh', [script, path.join(PKG, 'bin', 'memev.mjs')], {
     encoding: 'utf8',
     timeout: 180000,
-    env: { PATH: process.env.PATH, HOME: tmpdir('smoke-home-') },
+    env: { PATH: `${stubDir}:${process.env.PATH}`, HOME: tmpdir('ac01-home-') },
   });
   assert.equal(ok.status, 0, `smoke failed: ${ok.stdout}\n${ok.stderr}`);
   assert.match(ok.stdout, /smoke: ok/);
-  // The failure path: a stub node on PATH breaks the first node step, and the script names it.
-  const stub = tmpdir('stub-node-');
-  fs.writeFileSync(path.join(stub, 'node'), '#!/bin/sh\necho stub node >&2\nexit 1\n', { mode: 0o755 });
-  const bad = spawnSync('sh', [script], {
-    encoding: 'utf8',
-    timeout: 60000,
-    env: { PATH: `${stub}:${process.env.PATH}`, HOME: tmpdir('smoke-home-') },
-  });
-  assert.notEqual(bad.status, 0, 'the smoke must fail with a broken step');
-  assert.match(bad.stderr, /smoke: FAIL at step \w+/);
+  assert.ok(!fs.existsSync(sentinel), 'the checkout binary ran, not the memev first on PATH');
+  // The failure path: a stub memev that fails one chosen step, in turn, and the script names it.
+  for (const step of ['version', 'init', 'doctor', 'status']) {
+    const dir = tmpdir(`ac01-fail-${step}-`);
+    const stub = path.join(dir, 'memev');
+    fs.writeFileSync(stub, STUB_MEMEV, { mode: 0o755 });
+    const r = spawnSync('sh', [script, stub], {
+      encoding: 'utf8',
+      timeout: 60000,
+      env: { PATH: process.env.PATH, HOME: tmpdir(`ac01-failhome-${step}-`), STUB_FAIL: step, MEMEV_EXPECT_VERSION: '0.0.0-stub' },
+    });
+    assert.notEqual(r.status, 0, `smoke must fail when ${step} is broken`);
+    assert.match(`${r.stdout}\n${r.stderr}`, new RegExp(`smoke: FAIL at step ${step}\\b`), `smoke names the ${step} step`);
+  }
 });
 
-test('SO-R-A AC02: the pull-request job runs the suite, leak scan, pack-install-smoke and container build in order, on Linux only, with no dependency install and no secret', () => {
+test('SO-R-A AC02: the pull-request job runs the suite, leak scan, pack-install-smoke and docker smoke in order, on Linux only, with no dependency install and no secret', () => {
   const wf = read('.github/workflows/ci.yml');
   const job = checkJob();
-  // The order: full suite, leak scan with --history, pack, install from the packed tarball, smoke,
-  // container build, docker smoke.
-  const order = [
-    'npm test',
-    'node scripts/leak-scan.mjs --history',
-    'npm pack --pack-destination /tmp/memev-pack',
-    'npm install --prefix /tmp/memev-install /tmp/memev-pack/*.tgz',
-    'scripts/smoke.sh /tmp/memev-install/node_modules/.bin/memev',
-    'docker build -t memev:local .',
-    'scripts/docker-smoke.sh',
-  ];
-  let prev = -1;
-  for (const cmd of order) {
-    const idx = job.indexOf(cmd);
-    assert.ok(idx > prev, `the check job runs ${cmd} after the previous step`);
-    prev = idx;
+  const steps = jobSteps(job);
+  const runLines = steps.flatMap((s) => s.run);
+  // The gates, in order, taken from the run values only.
+  assert.ok(gatesInOrder(runLines), 'the check job runs the gates in order');
+  // The container build lives in the docker smoke, which the check job runs.
+  assert.match(read('scripts/docker-smoke.sh'), /docker build/, 'scripts/docker-smoke.sh builds the container image');
+  // No step that runs a gate is skipped or allowed to fail: no if, no continue-on-error.
+  for (const s of steps) {
+    const gate = s.run.find((l) => GATES.some((c) => l.includes(c)));
+    if (gate !== undefined) {
+      assert.equal(s.if, null, `the step running ${gate} has no if: condition`);
+      assert.equal(s.continueOnError, null, `the step running ${gate} has no continue-on-error`);
+    }
   }
+  // Control: deleting the docker-smoke line must fail the order check.
+  const mutated = job.replace('run: scripts/docker-smoke.sh', 'run: scripts/no-such-smoke.sh');
+  assert.notEqual(mutated, job, 'the control changed the workflow');
+  assert.ok(!gatesInOrder(jobSteps(mutated).flatMap((s) => s.run)), 'the order check fails when the docker-smoke line is deleted');
   // The Linux job only, on pull requests.
   assert.match(job, /runs-on: ubuntu-latest/);
   assert.match(job, /if: github\.event_name == 'pull_request'/);
@@ -80,11 +170,11 @@ test('SO-R-A AC02: the pull-request job runs the suite, leak scan, pack-install-
   for (const cmd of ['npm pack', 'scripts/smoke.sh', 'docker build', 'scripts/docker-smoke.sh']) {
     assert.ok(!win.includes(cmd), `the Windows job does not run ${cmd}`);
   }
-  // No dependency install: the only npm install in the workflow is the one from the packed
+  // No dependency install: the only npm install in the run values is the one from the packed
   // tarball.
-  for (const line of wf.split('\n')) {
-    if (/npm (install|ci|i)\b/.test(line)) {
-      assert.match(line.trim(), /^npm install --prefix .*\.tgz$/, `no dependency install in the workflow: ${line.trim()}`);
+  for (const l of runLines) {
+    if (/npm (install|ci|i)\b/.test(l)) {
+      assert.match(l, /^npm install --prefix .*\.tgz$/, `no dependency install in the workflow: ${l}`);
     }
   }
   // No secret other than the built-in token.
@@ -100,15 +190,17 @@ test('SO-R-A AC03: the source-install commands in docs/DEVELOPING.md are the wor
   const cmds = m[2].split('\n').map((l) => l.trim()).filter(Boolean);
   const clone = cmds.find((c) => c.startsWith('git clone'));
   const testCmd = cmds.find((c) => c === 'npm test');
+  const mkdirCmd = cmds.find((c) => c.startsWith('mkdir -p'));
+  const packCmd = cmds.find((c) => c.startsWith('npm pack'));
   const install = cmds.find((c) => c.startsWith('npm install'));
   const run = cmds.find((c) => c.startsWith('scripts/smoke.sh'));
-  for (const [name, c] of [['clone', clone], ['test', testCmd], ['install', install], ['run', run]]) {
+  for (const [name, c] of [['clone', clone], ['test', testCmd], ['mkdir', mkdirCmd], ['pack', packCmd], ['install', install], ['run', run]]) {
     assert.ok(c, `the section has a ${name} command`);
   }
   // Compared as strings: the workflow runs the same commands.
   const job = checkJob();
   assert.ok(job.includes('actions/checkout@v4'), 'the workflow clones with actions/checkout');
-  for (const c of [testCmd, install, run]) {
+  for (const c of [testCmd, mkdirCmd, packCmd, install, run]) {
     assert.ok(job.includes(c), `the workflow runs exactly: ${c}`);
   }
   // And the clean-checkout path: export HEAD, run the commands there, through scripts/smoke.sh.
@@ -150,11 +242,11 @@ test('SO-R-A AC04: the runtime pins hold: engines.node at 22 or newer, no depend
 });
 
 test('SO-R-A AC05: npm pack and the release tarball carry the allowed set and nothing private', () => {
-  const pkg = JSON.parse(read('package.json'));
-  // The allowed set: what package.json "files" names, plus package.json, which npm always ships.
+  // The allowed set is pinned to the release list, not derived from package.json "files": adding
+  // scripts/ or .github/ to files must fail this test.
+  const TOP = ['bin', 'src', 'templates', 'vendor', 'docs', 'LICENSE', 'NOTICE', 'README.md', 'SECURITY.md', 'CHARTER.md'];
+  const EXCLUDE = new Set(['docs/BENCH.md']);
   const allowed = new Set(['package.json']);
-  const excludes = pkg.files.filter((f) => f.startsWith('!')).map((f) => f.slice(1).replace(/\/$/, ''));
-  const isExcluded = (p) => excludes.some((e) => p === e || p.startsWith(e + '/'));
   const walk = (dir) => {
     let out = [];
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -163,22 +255,21 @@ test('SO-R-A AC05: npm pack and the release tarball carry the allowed set and no
     }
     return out;
   };
-  for (const f of pkg.files) {
-    if (f.startsWith('!')) continue;
-    const p = f.replace(/\/$/, '');
-    if (fs.statSync(path.join(PKG, p)).isDirectory()) {
-      for (const abs of walk(path.join(PKG, p))) {
+  for (const f of TOP) {
+    const p = path.join(PKG, f);
+    if (fs.statSync(p).isDirectory()) {
+      for (const abs of walk(p)) {
         const rel = path.relative(PKG, abs).split(path.sep).join('/');
-        if (!isExcluded(rel)) allowed.add(rel);
+        if (!EXCLUDE.has(rel)) allowed.add(rel);
       }
     } else {
-      allowed.add(p);
+      allowed.add(f);
     }
   }
   const dryRaw = execFileSync('npm', ['pack', '--dry-run', '--json'], { cwd: PKG, encoding: 'utf8', maxBuffer: 1 << 30 });
   const dry = JSON.parse(dryRaw);
   const packList = (Array.isArray(dry) ? dry[0] : dry).files.map((f) => f.path).sort();
-  assert.deepEqual(packList, [...allowed].sort(), 'npm pack carries exactly the allowed set');
+  assert.deepEqual(packList, [...allowed].sort(), 'npm pack carries exactly the pinned release set');
   const out = tmpdir('release-tarball-');
   execFileSync('node', ['scripts/release-tarball.mjs', '--out', out], { cwd: PKG, encoding: 'utf8' });
   const tgz = fs.readdirSync(out).find((f) => f.endsWith('.tgz'));
