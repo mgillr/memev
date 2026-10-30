@@ -22,7 +22,16 @@ sold until they are built ([tiers/README.md](tiers/README.md#what-is-built-and-w
 The free behaviour never changes: one computer at a time, git sync as single-writer backup, and a
 conflict left for a person to resolve ([CONVERGENCE.md](CONVERGENCE.md#what-free-users-get)).
 
-## Scope boundary\n\nThe service contract below remains the current note-conflict contract. It does not yet define a\ngeneral structured-state merge for project, programme, portfolio, organisation or site records.\nFederated computation and learning also require workload-specific algorithms and validation; they\nare not provided merely by converging contribution state. See [FEDERATION.md](FEDERATION.md),\n[ORGANISATIONAL-INTELLIGENCE.md](ORGANISATIONAL-INTELLIGENCE.md) and\n[FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).\n\n## The engine is an external dependency
+## Scope boundary
+
+The service contract below remains the current note-conflict contract. It does not yet define a
+general structured-state merge for project, programme, portfolio, organisation or site records.
+Federated computation and learning also require workload-specific algorithms and validation; they
+are not provided merely by converging contribution state. See [FEDERATION.md](FEDERATION.md),
+[ORGANISATIONAL-INTELLIGENCE.md](ORGANISATIONAL-INTELLIGENCE.md) and
+[FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).
+
+## The engine is an external dependency
 
 The engine is crdt-merge. It lives in its own repository under its original licence, currently
 BSL 1.1. Its source is not included in this repository: no copy of it is here, it is never
@@ -59,7 +68,18 @@ The contract is the same for every tier that buys the merge service. It says not
 the engine runs: the boundary speaks to a command or an address, and this page does not decide
 which. That decision is open, and the contract holds either way.
 
-## Relationship to the wider architecture\n\nThe present service contract is a note-conflict contract. It must not be silently interpreted as a\ncontract for arbitrary structured state, project/programme/portfolio graphs, business approvals,\nsite federation or federated learning. Extending CRDT-Merge into those areas requires explicit\ninput/output schemas, ownership and authority rules, provenance, failure behaviour, policy checks\nand conformance tests. Memev remains responsible for business semantics and permission decisions;\nthe convergence engine does not decide whether a contribution is true, authorised or approved.\nSee [FEDERATION.md](FEDERATION.md), [ORGANISATIONAL-INTELLIGENCE.md](ORGANISATIONAL-INTELLIGENCE.md)\nand [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).\n\n## What is not said here
+## Relationship to the wider architecture
+
+The present service contract is a note-conflict contract. It must not be silently interpreted as a
+contract for arbitrary structured state, project/programme/portfolio graphs, business approvals,
+site federation or federated learning. Extending CRDT-Merge into those areas requires explicit
+input/output schemas, ownership and authority rules, provenance, failure behaviour, policy checks
+and conformance tests. Memev remains responsible for business semantics and permission decisions;
+the convergence engine does not decide whether a contribution is true, authorised or approved.
+See [FEDERATION.md](FEDERATION.md), [ORGANISATIONAL-INTELLIGENCE.md](ORGANISATIONAL-INTELLIGENCE.md)
+and [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).
+
+## What is not said here
 
 This page states no merge strategy names, no benchmark figures and no release dates for the
 engine, because none are published for Memev. A page for any of them is written when the feature
