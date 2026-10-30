@@ -4,6 +4,9 @@
 // commit 129f7ad6ff85817908eb3cd395214c4e08f2477f, which is Apache-2.0 licensed. The signature
 // namespace is memev. Every ssh-keygen call goes through run() in ./util.mjs with a timeout: no
 // shell, and the message goes over stdin, never in the argument list.
+// What a binding vouches for: that the person holding the SSH key, under one principal, vouched for
+// one role name and that role's public key. The signed message names all three, so a binding does
+// not carry over to another role name, another principal or another key.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -22,10 +25,12 @@ export class AgentBindError extends Error {
   }
 }
 
-// The message a person signs when they bind a role: it names the role's public key, so a signature
-// is only valid for the role it was made for.
-export function bindingMessage(publicKey) {
-  return `memev-agent-binding v1\npublic-key: ${String(publicKey).trim()}\n`;
+// The message a person signs when they bind a role: it names the role, the principal and the role's
+// public key, so a signature is only valid for that role under that principal. Copying a bound role's
+// files under another role name does not verify. The first line versions the format.
+export const BINDING_FORMAT = 'memev-agent-binding v1';
+export function bindingMessage(role, principal, publicKey) {
+  return `${BINDING_FORMAT}\nrole: ${role}\nprincipal: ${principal}\npublic-key: ${String(publicKey).trim()}\n`;
 }
 
 // A principal is one exact allowed_signers entry. It may use letters, digits and . _ @ + -, and it
@@ -34,6 +39,16 @@ export function checkPrincipal(p) {
   const s = String(p ?? '');
   if (!s || s.startsWith('-') || !/^[A-Za-z0-9._@+-]+$/.test(s)) {
     throw new AgentBindError('bad-principal', 'a principal may use letters, digits and . _ @ + -, and must not start with a dash');
+  }
+  return s;
+}
+
+// A role is one plain file name in the agents directory: letters, digits and . _ -, never a leading
+// dot or dash and never a slash, so its files cannot land outside the directory or read as an option.
+export function checkRole(r) {
+  const s = String(r ?? '');
+  if (!s || s.startsWith('.') || s.startsWith('-') || !/^[A-Za-z0-9._-]+$/.test(s)) {
+    throw new AgentBindError('bad-role', 'a role may use letters, digits and . _ -, and must not start with a dot or a dash');
   }
   return s;
 }
@@ -106,7 +121,7 @@ function checkExistingBinding(role, principal, personPub, dir) {
   const existingPrincipal = exists(principalPath) ? fs.readFileSync(principalPath, 'utf8').trim() : '';
   if (existingPrincipal !== principal) throw new AgentBindError('conflict', 'this role is already bound to a different principal');
   const rolePub = fs.readFileSync(rolePubPath, 'utf8').trim();
-  const message = bindingMessage(rolePub);
+  const message = bindingMessage(role, principal, rolePub);
   const tmpAllowed = path.join(os.tmpdir(), `memev-allowed-${process.pid}-${crypto.randomBytes(4).toString('hex')}`);
   fs.writeFileSync(tmpAllowed, principal + ' ' + personPub + '\n');
   try {
@@ -125,6 +140,7 @@ function noTerminalRefusal() {
 // A person signs the role's public key with their own SSH key. The signature and the principal are
 // stored beside the role's public key, under the vault's agents directory.
 export function bindAgentRole(role, { sshKeyPath, principal, dir, terminal } = {}) {
+  role = checkRole(role);
   const p = checkPrincipal(principal);
   if (!exists(sshKeyPath)) throw new AgentBindError('no-ssh-key', 'SSH key not found: ' + path.basename(sshKeyPath));
   requireOpenSSH();
@@ -134,7 +150,7 @@ export function bindAgentRole(role, { sshKeyPath, principal, dir, terminal } = {
   const rolePubPath = path.join(dir, role + '.pub');
   if (!exists(rolePubPath)) throw new AgentBindError('no-role-key', 'the role public key is missing: ' + role + '.pub');
   const rolePub = fs.readFileSync(rolePubPath, 'utf8').trim();
-  const sig = signMessage(bindingMessage(rolePub), sshKeyPath, p);
+  const sig = signMessage(bindingMessage(role, p, rolePub), sshKeyPath, p);
   const sshsigPath = path.join(dir, role + '.pub.sshsig');
   const principalPath = path.join(dir, role + '.pub.principal');
   writeAtomic(sshsigPath, sig, 0o644);
@@ -147,20 +163,22 @@ export function bindAgentRole(role, { sshKeyPath, principal, dir, terminal } = {
 // verify (wrong principal, tampered signature, or a signature from another namespace).
 export function verifyAgentBinding(role, { allowedSigners, principal, dir } = {}) {
   let p;
-  try { p = checkPrincipal(principal); } catch { return 'invalid'; }
+  try { role = checkRole(role); p = checkPrincipal(principal); } catch { return 'invalid'; }
   const sshsigPath = path.join(dir, role + '.pub.sshsig');
   if (!exists(sshsigPath)) return 'unbound';
   const rolePubPath = path.join(dir, role + '.pub');
   if (!exists(rolePubPath)) return 'invalid';
   const rolePub = fs.readFileSync(rolePubPath, 'utf8').trim();
-  const r = run('ssh-keygen', ['-Y', 'verify', '-f', allowedSigners, '-I', p, '-n', NAMESPACE, '-s', sshsigPath], { timeout: SIG_TIMEOUT_MS, input: bindingMessage(rolePub) });
+  const r = run('ssh-keygen', ['-Y', 'verify', '-f', allowedSigners, '-I', p, '-n', NAMESPACE, '-s', sshsigPath], { timeout: SIG_TIMEOUT_MS, input: bindingMessage(role, p, rolePub) });
   return r.ok ? 'bound' : 'invalid';
 }
 
 // One checked, rollback-safe step: create the role key pair when absent, bind it to the person, and
 // record the receiver-side trust line. Every prerequisite is checked before anything is written,
-// and a failure mid-way leaves the directory exactly as it was.
+// and a failure mid-way leaves the directory exactly as it was: every file the step wrote gets its
+// previous bytes back or is removed, and every directory the step made is removed.
 export function setupAgentRole(role, { principal, sshKeyPath, trustDir, dir, terminal } = {}) {
+  role = checkRole(role);
   const p = checkPrincipal(principal);
   if (!exists(sshKeyPath)) throw new AgentBindError('no-ssh-key', 'SSH key not found: ' + path.basename(sshKeyPath));
   requireOpenSSH();
@@ -169,46 +187,52 @@ export function setupAgentRole(role, { principal, sshKeyPath, trustDir, dir, ter
   const personPub = sshPublicKey(sshKeyPath);
   const existing = checkExistingBinding(role, p, personPub, dir);
   if (existing === 'same') return { role, principal: p, created: false };
-  ensureAgentsDir(dir);
-  const createdFiles = [];
-  let allowedPath = null;
-  let allowedPrev = null;
+  const madeDirs = [...missingDirs(dir), ...missingDirs(trustDir)];
+  const undo = [];
+  const put = (file, data, mode) => {
+    const prev = exists(file) ? { bytes: fs.readFileSync(file), mode: fs.statSync(file).mode & 0o777 } : null;
+    undo.push({ file, prev });
+    if (mode === 0o600) writePrivate(file, data);
+    else writeAtomic(file, data, mode);
+  };
   try {
+    ensureAgentsDir(dir);
     const roleKeyPath = path.join(dir, role);
     const rolePubPath = path.join(dir, role + '.pub');
     if (!exists(roleKeyPath) || !exists(rolePubPath)) {
       const { privateKeyPem, publicKey } = deviceKeygen();
-      writePrivate(roleKeyPath, privateKeyPem);
-      writeAtomic(rolePubPath, publicKey + '\n', 0o644);
-      createdFiles.push(roleKeyPath, rolePubPath);
+      put(roleKeyPath, privateKeyPem, 0o600);
+      put(rolePubPath, publicKey + '\n', 0o644);
     }
     const rolePub = fs.readFileSync(rolePubPath, 'utf8').trim();
-    const sig = signMessage(bindingMessage(rolePub), sshKeyPath, p);
-    const sshsigPath = path.join(dir, role + '.pub.sshsig');
-    const principalPath = path.join(dir, role + '.pub.principal');
-    writeAtomic(sshsigPath, sig, 0o644);
-    createdFiles.push(sshsigPath);
-    writeAtomic(principalPath, p + '\n', 0o644);
-    createdFiles.push(principalPath);
-    allowedPath = path.join(trustDir, 'allowed_signers');
-    allowedPrev = exists(allowedPath) ? fs.readFileSync(allowedPath, 'utf8') : null;
+    const sig = signMessage(bindingMessage(role, p, rolePub), sshKeyPath, p);
+    put(path.join(dir, role + '.pub.sshsig'), sig, 0o644);
+    put(path.join(dir, role + '.pub.principal'), p + '\n', 0o644);
+    const allowedPath = path.join(trustDir, 'allowed_signers');
+    const allowed = exists(allowedPath) ? fs.readFileSync(allowedPath, 'utf8') : '';
     const line = p + ' ' + personPub + '\n';
-    const base = allowedPrev ?? '';
-    if (!base.includes(line)) {
-      writeAtomic(allowedPath, base + line, 0o644);
-      if (allowedPrev === null) createdFiles.push(allowedPath);
-    }
+    if (!allowed.includes(line)) put(allowedPath, allowed + line, 0o644);
     return { role, principal: p, created: true };
   } catch (e) {
-    if (allowedPath !== null) {
-      try { if (allowedPrev === null) fs.unlinkSync(allowedPath); else writeAtomic(allowedPath, allowedPrev, 0o644); } catch {}
+    for (const { file, prev } of undo.reverse()) {
+      try { if (prev) writeAtomic(file, prev.bytes, prev.mode); else fs.unlinkSync(file); } catch {}
     }
-    for (const f of createdFiles.reverse()) {
-      try { fs.unlinkSync(f); } catch {}
+    for (const d of madeDirs) {
+      try { fs.rmdirSync(d); } catch {}
     }
     if (e instanceof AgentBindError) throw e;
     throw new AgentBindError('write-failed', 'could not write the binding: ' + (e.message || String(e)));
   }
+}
+
+// The directories on the way to dir that do not exist yet, deepest first.
+function missingDirs(dir) {
+  const out = [];
+  for (let d = path.resolve(dir); !exists(d); d = path.dirname(d)) {
+    out.push(d);
+    if (path.dirname(d) === d) break;
+  }
+  return out;
 }
 
 function defaultTerminal() {

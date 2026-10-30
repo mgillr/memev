@@ -78,6 +78,9 @@ test('MEM-145 AC01: a person binds a role and it verifies; a wrong principal, a 
   fs.writeFileSync(allowedSigners, principal + ' ' + personPub + '\n');
   assert.equal(verifyAgentBinding(role, { allowedSigners, principal, dir: agentsDir }), 'bound');
   assert.equal(verifyAgentBinding(role, { allowedSigners, principal: 'bob', dir: agentsDir }), 'invalid', 'a wrong principal is invalid');
+  // the message names the role, so a bound role's files copied under another role name do not verify
+  for (const s of ['', '.pub', '.pub.sshsig', '.pub.principal']) fs.copyFileSync(path.join(agentsDir, role + s), path.join(agentsDir, 'admin' + s));
+  assert.equal(verifyAgentBinding('admin', { allowedSigners, principal, dir: agentsDir }), 'invalid', 'a binding copied under another role name is invalid');
   const lines = fs.readFileSync(sshsigPath, 'utf8').split('\n');
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].length > 10 && !lines[i].startsWith('----')) { lines[i] = (lines[i][0] === 'A' ? 'B' : 'A') + lines[i].slice(1); break; }
@@ -101,11 +104,11 @@ test('MEM-145 AC02: the signature carries the namespace memev and a signature ma
   const sshsigPath = path.join(agentsDir, role + '.pub.sshsig');
   const armored = fs.readFileSync(sshsigPath, 'utf8');
   const rolePub = fs.readFileSync(path.join(agentsDir, role + '.pub'), 'utf8').trim();
-  execFileSync('ssh-keygen', ['-Y', 'check-novalidate', '-n', 'memev', '-s', sshsigPath], { input: bindingMessage(rolePub), encoding: 'utf8', stdio: 'pipe' });
-  assert.throws(() => execFileSync('ssh-keygen', ['-Y', 'check-novalidate', '-n', 'other', '-s', sshsigPath], { input: bindingMessage(rolePub), encoding: 'utf8', stdio: 'pipe' }), 'it fails check-novalidate in any other namespace');
+  execFileSync('ssh-keygen', ['-Y', 'check-novalidate', '-n', 'memev', '-s', sshsigPath], { input: bindingMessage(role, principal, rolePub), encoding: 'utf8', stdio: 'pipe' });
+  assert.throws(() => execFileSync('ssh-keygen', ['-Y', 'check-novalidate', '-n', 'other', '-s', sshsigPath], { input: bindingMessage(role, principal, rolePub), encoding: 'utf8', stdio: 'pipe' }), 'it fails check-novalidate in any other namespace');
   assert.equal(sshsigNamespace(armored), 'memev', 'the armored signature carries the namespace memev');
-  const foreign = execFileSync('ssh-keygen', ['-Y', 'sign', '-f', sshKeyPath, '-n', 'other', '-I', principal], { input: bindingMessage(rolePub), encoding: 'utf8' });
   const role2 = 'foreign';
+  const foreign = execFileSync('ssh-keygen', ['-Y', 'sign', '-f', sshKeyPath, '-n', 'other', '-I', principal], { input: bindingMessage(role2, principal, rolePub), encoding: 'utf8' });
   fs.writeFileSync(path.join(agentsDir, role2 + '.pub'), rolePub + '\n', { mode: 0o644 });
   fs.writeFileSync(path.join(agentsDir, role2 + '.pub.sshsig'), foreign);
   const allowedSigners = path.join(base, 'allowed_signers');
@@ -188,6 +191,59 @@ test('MEM-145 AC04: setupAgentRole is one rollback-safe step that keeps a matchi
     assert.equal(setupAgentRole('writer', { principal: 'alice', sshKeyPath: keyA, trustDir, dir: agentsDir }).created, false, 'a matching binding is kept');
     assert.deepEqual(snapshotDir(agentsDir), beforeAgents, 'the kept binding is unchanged');
     assert.deepEqual(snapshotDir(trustDir), beforeTrust, 'the trust file is unchanged for a kept binding');
+  }
+});
+
+test('MEM-145 AC04: a role that is not one plain file name is refused before anything is written', () => {
+  const { base, agentsDir } = newAgents();
+  const sshKeyPath = makeSshKey(base, 'person');
+  const trustDir = path.join(base, 'trust');
+  fs.mkdirSync(trustDir);
+  const allowedSigners = path.join(base, 'allowed_signers');
+  fs.writeFileSync(allowedSigners, 'alice ' + fs.readFileSync(sshKeyPath + '.pub', 'utf8').trim() + '\n');
+  const before = snapshotDir(base);
+  const want = (e) => e instanceof AgentBindError && e.code === 'bad-role';
+  for (const role of ['../escaped', 'sub/role', '.hidden', '-n', '', 'a b']) {
+    assert.throws(() => setupAgentRole(role, { principal: 'alice', sshKeyPath, trustDir, dir: agentsDir }), want, `setup refuses ${JSON.stringify(role)}`);
+    assert.throws(() => bindAgentRole(role, { sshKeyPath, principal: 'alice', dir: agentsDir }), want, `bind refuses ${JSON.stringify(role)}`);
+    assert.equal(verifyAgentBinding(role, { allowedSigners, principal: 'alice', dir: agentsDir }), 'invalid', `verify refuses ${JSON.stringify(role)}`);
+  }
+  assert.deepEqual(snapshotDir(base), before, 'nothing is written anywhere under the vault or the trust directory');
+  assert.ok(!fs.existsSync(path.join(base, '.memev', 'keys', 'escaped')), 'nothing lands beside the agents directory');
+});
+
+test('MEM-145 AC04: a failed setup puts back a file it overwrote and removes the directories it made', () => {
+  // a stale principal file with no signature is overwritten by setup; the failure puts it back
+  {
+    const { base, agentsDir } = newAgents();
+    const sshKeyPath = makeSshKey(base, 'person');
+    makeRolePair(agentsDir, 'writer');
+    fs.writeFileSync(path.join(agentsDir, 'writer.pub.principal'), 'stale\n');
+    const trustDir = path.join(base, 'trust');
+    fs.mkdirSync(trustDir);
+    fs.chmodSync(trustDir, 0o500);
+    const before = snapshotDir(agentsDir);
+    try {
+      assert.throws(() => setupAgentRole('writer', { principal: 'alice', sshKeyPath, trustDir, dir: agentsDir }), AgentBindError, 'a read-only trust directory fails the step');
+      assert.deepEqual(snapshotDir(agentsDir), before, 'the stale principal file is back, byte for byte, and nothing else changed');
+    } finally {
+      fs.chmodSync(trustDir, 0o700);
+    }
+  }
+  // no keys directory yet: the failure removes the directories the step made
+  {
+    const base = tmpdir();
+    const sshKeyPath = makeSshKey(base, 'person');
+    const agentsDir = path.join(base, '.memev', 'keys', 'agents');
+    const trustDir = path.join(base, 'trust');
+    fs.mkdirSync(trustDir);
+    fs.chmodSync(trustDir, 0o500);
+    try {
+      assert.throws(() => setupAgentRole('writer', { principal: 'alice', sshKeyPath, trustDir, dir: agentsDir }), AgentBindError, 'a read-only trust directory fails the step');
+      assert.equal(fs.existsSync(path.join(base, '.memev')), false, 'the directories the step made are gone');
+    } finally {
+      fs.chmodSync(trustDir, 0o700);
+    }
   }
 });
 
