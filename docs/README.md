@@ -17,7 +17,12 @@ this folder links back here, and this page links down to every page.
 | Page | What it holds |
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | what runs today and how the same design extends to multi-site federation and computation |
-| [MODULES.md](MODULES.md) | the source-code import map, generated from real imports; do not edit by hand |\n| [ARCHITECTURAL-INTERDEPENDENCIES.md](ARCHITECTURAL-INTERDEPENDENCIES.md) | how current components and planned federation capabilities depend on one another |\n| [FEDERATION.md](FEDERATION.md) | local ownership, site topologies, membership, replication and cross-organisation boundaries |\n| [ORGANISATIONAL-INTELLIGENCE.md](ORGANISATIONAL-INTELLIGENCE.md) | connected work across people, projects, programmes, portfolios and business functions |\n| [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) | distributed execution, analytics, optimisation, evaluation and federated learning |\n| [DATA-SOVEREIGNTY.md](DATA-SOVEREIGNTY.md) | jurisdiction-aware processing, derived data, replication, retention and recovery |
+| [MODULES.md](MODULES.md) | the source-code import map, generated from real imports; do not edit by hand |
+| [ARCHITECTURAL-INTERDEPENDENCIES.md](ARCHITECTURAL-INTERDEPENDENCIES.md) | how current components and planned federation capabilities depend on one another |
+| [FEDERATION.md](FEDERATION.md) | local ownership, site topologies, membership, replication and cross-organisation boundaries |
+| [ORGANISATIONAL-INTELLIGENCE.md](ORGANISATIONAL-INTELLIGENCE.md) | connected work across people, projects, programmes, portfolios and business functions |
+| [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) | distributed execution, analytics, optimisation, evaluation and federated learning |
+| [DATA-SOVEREIGNTY.md](DATA-SOVEREIGNTY.md) | jurisdiction-aware processing, derived data, replication, retention and recovery |
 | [DESIGN.md](DESIGN.md) | the log, the index, recall, memory quality, the graph, scale |
 | [MAPPING.md](MAPPING.md) | everything Memev does without being asked |
 | [BUS.md](BUS.md) | the comms bus: seats, the lead, roster, comms checks, tasks |
