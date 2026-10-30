@@ -112,9 +112,13 @@ export function undoImport(vault, identity, id) {
 
 export async function offerImport({ root, env, flags = {}, ask = false, input, output, cwd = process.cwd(), home = env.HOME || '' }) {
   const { config, saveConfig } = await import('../../cli/common.mjs');
-  const { startDaemon, stopDaemon, healthy } = await import('../../cli/daemon.mjs');
   const cfg = config(root);
   if (cfg.import && cfg.import.asked) return { asked: false, accepted: false, reason: 'already asked' };
+  // The question goes to the user only on a terminal, or with an explicit --yes/--keep. A non-TTY init is neither, so I
+  // do nothing at all: no scan, no daemon stop or restart, no config write. init must not be disturbed, and a daemon
+  // restarted here would stamp a start time after the client edits init makes.
+  if (!(flags.yes || flags.keep || (ask && input))) return { asked: false, accepted: false, reason: 'not offered' };
+  const { startDaemon, stopDaemon, healthy } = await import('../../cli/daemon.mjs');
   const paths = flags.path || [];
   let aiHistory = !!flags['ai-history'];
   const exportFiles = flags.export || [];
@@ -155,6 +159,7 @@ export async function offerImport({ root, env, flags = {}, ask = false, input, o
       const identity = { agent: 'cli', scopes: ['read', 'write'], paths: ['**'] };
       result = runImport(vault, identity, selected);
     }
+    // We only get here when the question was actually put to the user, so the answer is kept and it never comes back.
     const c2 = config(root);
     c2.import = { asked: true, accepted: !!(selected && selected.length) };
     saveConfig(root, c2);
