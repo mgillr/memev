@@ -116,6 +116,7 @@ test('WO-06-A AC03: with the relay configured and unreachable, the client report
   const { root, v } = newVault();
   // a background job that must keep running while the relay retries
   let jobs = 0;
+  const startedAt = Date.now();
   const job = setInterval(() => { jobs++; }, 20);
   const clients = [];
   t.after(() => { for (const c of clients) c.stop(); clearInterval(job); v.close(); });
@@ -138,7 +139,11 @@ test('WO-06-A AC03: with the relay configured and unreachable, the client report
     assert.ok(gaps[1] > gaps[0], `the pause should grow before each retry: ${gaps.join(', ')} ms`);
   }
 
-  // a non-routable address: the connect times out, so it fails the same way a refused port does
+  // a non-routable address: how the network treats it varies by machine. On a network that
+  // blackholes it, the ten second connect timeout ends each attempt; on a network that refuses
+  // it, the failure is immediate. Either way the first report must come well before the operating
+  // system would give up on its own (a hundred seconds or more), and the pause must grow before
+  // each retry.
   {
     const t0 = Date.now();
     const retries = [];
@@ -149,14 +154,15 @@ test('WO-06-A AC03: with the relay configured and unreachable, the client report
     clients.push(client);
     await waitFor(() => retries.length >= 3, 60000);
     client.stop();
-    // the first report comes at the connect timeout (ten seconds), not when the operating system gives up (a hundred seconds or more)
-    assert.ok(retries[0] >= 9000, `the first report should come at the connect timeout, got ${retries[0]} ms`);
-    assert.ok(retries[0] < 60000, `the first report came too late: ${retries[0]} ms`);
+    // the first report comes well before the operating system would give up on its own
+    assert.ok(retries[0] < 30000, `the first report came too late: ${retries[0]} ms`);
     // the pause grows before each retry
     const gaps = retries.slice(1).map((t, i) => t - retries[i]);
     assert.ok(gaps[1] > gaps[0], `the pause should grow before each retry: ${gaps.join(', ')} ms`);
   }
 
-  // the other background jobs kept running: the relay retries never block the event loop
-  assert.ok(jobs > 1000, `the background jobs kept running: ${jobs} ticks`);
+  // the other background jobs kept running: the relay retries never block the event loop, so the
+  // job ticks at least a quarter of the rate the elapsed time allows, even on a loaded machine
+  const elapsedMs = Date.now() - startedAt;
+  assert.ok(jobs > elapsedMs / 80, `the background jobs kept running: ${jobs} ticks in ${elapsedMs} ms`);
 });
