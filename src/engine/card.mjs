@@ -120,10 +120,9 @@ export function renderCard(c, { maxChars = 6000, footer, root } = {}) {
   return (footer ?? footerEnabled()) ? `${text}\n\n${FOOTER}` : text;
 }
 
-export function renderRecall(hits, { maxChars = 1500, note = null } = {}) {
+export function renderRecall(hits, { maxChars = 1500 } = {}) {
   if (!hits.length) return '';
   const L = ['[Memev recall for this prompt]'];
   for (const h of hits) L.push(`- [${h.path}${h.heading ? `#${h.heading}` : ''}] ${truncate(h.snippet, 300)}`);
-  if (note) L.push(note);
   return truncate(L.join('\n'), maxChars);
 }
