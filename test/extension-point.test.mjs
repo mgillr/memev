@@ -192,17 +192,44 @@ test('WO-05-A AC03: an external engine that refuses, fails, answers nonsense or 
   };
   const rows = [
     ['refuses', engine('refuses', "process.stdout.write(JSON.stringify({ refuse: true }) + '\\n');"), 30000, /^the merge engine refused$/],
-    ['exits non-zero', engine('exit1', "process.stdout.write(JSON.stringify({ text: 'partial' }) + '\\n'); process.exit(1);"), 30000, /^the merge engine failed: exit 1$/],
-    ['answers nonsense', engine('garbage', "process.stdout.write('not json\\n');"), 30000, /^the merge engine failed: /],
-    ['hangs', engine('hangs', 'setTimeout(() => {}, 60000);'), 1000, /^the merge engine failed: .*ETIMEDOUT/],
+    ['exits non-zero', engine('exit1', "process.stdout.write(JSON.stringify({ text: 'partial' }) + '\\n'); process.exit(1);"), 30000, /^the merge engine failed: exit 1 \(stub-engine\)$/],
+    ['answers nonsense', engine('garbage', "process.stdout.write('not json\\n');"), 30000, /^the merge engine failed: the answer is not JSON \(stub-engine\)$/],
+    ['hangs', engine('hangs', 'setTimeout(() => {}, 60000);'), 1000, /^the merge engine failed: no answer within 1000 ms \(stub-engine\)$/],
   ];
   for (const [what, file, timeoutMs, reason] of rows) {
-    const provider = commandProvider(process.execPath, { args: [file], timeoutMs });
+    const provider = commandProvider(process.execPath, { args: [file], timeoutMs, id: 'stub-engine' });
     const r = resolveMerge({ a: '# Note\n\nVersion C\n', b: '# Note\n\nVersion B\n', base: '# Note\n\nVersion A\n', license: mergeLicence(), keys, now: Date.parse('2026-11-01'), config: { merge: { provider } } });
     assert.equal(r.resolved, false, `an engine that ${what} does not resolve the note`);
     assert.equal(r.keepBoth, true, `an engine that ${what} keeps both versions`);
     assert.match(r.reason, reason, `the reason names what the engine did: ${what}`);
   }
+});
+
+test('WO-05-A AC03: a large merged note still merges, an answer over the cap keeps both, and no reason names a path', () => {
+  const dir = tmpdir('engine-');
+  const engine = (name, body) => {
+    const f = path.join(dir, `${name}.mjs`);
+    fs.writeFileSync(f, `let b = ''; process.stdin.on('data', (d) => { b += d; }); process.stdin.on('end', () => { ${body} });\n`);
+    return f;
+  };
+  const big = engine('big', "process.stdout.write(JSON.stringify({ text: 'x'.repeat(2 * 1024 * 1024) }) + '\\n');");
+  const merge = (provider) => resolveMerge({ a: '# Note\n\nVersion C\n', b: '# Note\n\nVersion B\n', base: '# Note\n\nVersion A\n', license: mergeLicence(), keys, now: Date.parse('2026-11-01'), config: { merge: { provider } } });
+  // a 2 MB merged note is well inside the default cap
+  const ok = merge(commandProvider(process.execPath, { args: [big] }));
+  assert.equal(ok.resolved, true, `a 2 MB answer merges: ${ok.reason}`);
+  assert.equal(ok.text.length, 2 * 1024 * 1024);
+  // an answer over the cap keeps both versions and says why
+  const over = merge(commandProvider(process.execPath, { args: [big], maxBuffer: 1024 }));
+  assert.equal(over.keepBoth, true);
+  assert.match(over.reason, /the answer is larger than 1024 bytes/);
+  // no reason carries the engine's path, only its id: the file name by default
+  const hang = engine('hang', 'setTimeout(() => {}, 60000);');
+  const missing = path.join(dir, 'no-such-engine');
+  for (const r of [over, merge(commandProvider(process.execPath, { args: [hang], timeoutMs: 1000 })), merge(commandProvider(missing))]) {
+    assert.equal(r.keepBoth, true);
+    for (const p of [dir, path.dirname(process.execPath)]) assert.ok(!r.reason.includes(p), `the reason names no path: ${r.reason}`);
+  }
+  assert.match(merge(commandProvider(missing)).reason, /^the merge engine failed: the engine could not be started \(no-such-engine\)$/);
 });
 
 test('WO-05-A AC05: the boundary exports the registration point and imports no paid client', () => {
