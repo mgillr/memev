@@ -4,6 +4,12 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md).
 
 A checklist for cutting a release of the `memev` npm package.
 
+## Roles
+
+The release owner is the maintainer who cuts a release: they run this checklist, publish the
+package, tag the release and keep the post-release verification record. Anyone can prepare a
+release; only the release owner publishes it.
+
 ## Before you tag
 
 - [ ] The working tree is clean and on `main` at the commit you intend to release.
@@ -34,9 +40,27 @@ The version check is opt-in and off by default. When it is on, `memev doctor` an
 
 ## Publish
 
-- [ ] `npm publish`, run by the maintainer from their own terminal.
+- [ ] `npm publish`, run by the release owner from their own terminal.
 - [ ] Tag the release and push the tag.
 - [ ] Confirm the published version runs: `npm exec --yes --package memev@<version> -- memev --version`.
+
+## Failure and rollback
+
+- [ ] If `npm publish` fails or the published package is broken, do not republish the same version:
+      bump the version and release again, or `npm deprecate memev@<version>` so installs warn.
+- [ ] Roll back the npm tag: `npm dist-tag add memev@<previous> latest`.
+- [ ] Roll back the installer: point `scripts/install.sh` and `scripts/install.ps1` at the previous
+      release tarball and its `.sha256`; the installer checks the hash, so the previous pair works
+      unchanged.
+- [ ] A broken tag is not rewritten: cut a new tag for the fixed release and deprecate the broken
+      one in its release notes.
+
+## Post-release verification record
+
+- [ ] Record in the release notes of the tag: the version, the tag, the date, the result of
+      `npm publish`, the output of `npm exec --yes --package memev@<version> -- memev --version`,
+      and the CI run that passed the full suite, the leak scan, the pack-install smoke and the
+      container build for that commit.
 
 ## After
 

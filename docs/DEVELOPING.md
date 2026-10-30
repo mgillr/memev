@@ -16,7 +16,27 @@ node scripts/docs/module-graph.mjs --check    # docs/MODULES.md matches the real
 ```
 
 CI runs the tests, the changelog guard and the leak scan on every pull request, and gitleaks on the
-history. The Windows job runs a subset on a push to `main`. See `.github/workflows/ci.yml`.
+history. It then packs the package, installs it from the packed tarball, runs the CLI smoke on the
+installed copy, builds the container image and runs the Docker smoke. The Windows job runs a subset
+on a push to `main`. See `.github/workflows/ci.yml`.
+
+## Install from source
+
+The commands the CI pull-request job runs, in the same order.
+[test/release-gates.test.mjs](../test/release-gates.test.mjs) compares them with the workflow as
+strings and runs them from a clean export of `HEAD`, so no untracked developer file can be needed.
+There are no dependencies and no lockfile, so the pack and the install from the packed tarball are
+the whole install.
+
+```sh
+git clone https://github.com/you/memev.git
+cd memev
+npm test
+mkdir -p /tmp/memev-pack
+npm pack --pack-destination /tmp/memev-pack
+npm install --prefix /tmp/memev-install /tmp/memev-pack/*.tgz
+scripts/smoke.sh /tmp/memev-install/node_modules/.bin/memev
+```
 
 ## Changelog notes
 
@@ -41,6 +61,7 @@ A change adds one note, `changelog.d/<CONTRACT-ID>.md`, and never edits `CHANGEL
 | `npm run bench` (`scripts/bench/run.mjs`) | the recall benchmark, see [BENCH.md](BENCH.md) |
 | `scripts/growth-bench.mjs` | the 170-million-token growth run behind the figures in [DESIGN.md](DESIGN.md) |
 | `scripts/docker-smoke.sh` | builds the image and runs a check inside it, see [DOCKER.md](DOCKER.md) |
+| `scripts/smoke.sh` | the CLI smoke a person or an agent runs after any install: version, init, doctor, status in a fresh HOME |
 | `scripts/release-tarball.mjs` | the release tarball and its checksum, see [RELEASING.md](RELEASING.md) |
 | `scripts/license-dev.mjs` | a throwaway key pair that signs test licences; memev does not trust them outside tests |
 | `scripts/license/issue.mjs` | issues a real licence; it needs the vendor private key, which is never in this repository |
