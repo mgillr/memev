@@ -16,27 +16,24 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 ## Tiers (draft)
 
 | | Personal | Personal with more computers | Business | Corporate | Federation / computation |
-|---|---|---|---|---|
-| Price | free | $12/month or $120/year | contact us | contact us |
-| People | 1 | 1, non-transferable | counted once per organisation | counted once per organisation |
-| Computers using one vault | 1 | up to 3 | counted once per organisation, by computer | counted once per organisation, by computer |
-| Local AI apps on a computer | unlimited | unlimited | unlimited | unlimited |
-| Cloud AI connectors | 5 | 10 | based on your requirements | based on your requirements |
-| Trial | no Personal trial | no Personal trial | time-limited trial: 5 members and 10 computers, 14 days with one 14-day extension (planned), see [BUSINESS-TRIAL.md](BUSINESS-TRIAL.md) | sales-assisted pilot (planned) |
-| Vault, recall, graph, contracts, doctor, your own tunnel | ✓ | ✓ | ✓ | ✓ |
-| Backup to your own GitHub (one writer) | ✓ | ✓ | ✓ | ✓ |
-| One memory for every AI app, and the comms bus between them | ✓ | ✓ | ✓ | ✓ |
-| Several computers on one vault over the secure link, provenance | | ✓ | ✓ | ✓ |
-| Automatic merge when several computers edit at once (crdt-merge) | | planned | planned | planned |
-| Hosted end-to-end encrypted sync between computers | | planned | | planned, or self-hosted |
-| Hosted encrypted backup and a stable relay address | | planned | | planned, or self-hosted |
-| Member keys: one key per person, covering their computers | | | planned | planned |
-| Governed shared work scopes and project/programme/portfolio views | | | planned | planned | planned |
-| Provider-neutral integrations for each person's and team's chosen AI tools | ✓ | ✓ | planned | planned | planned |
-| Company server, departments and roles from an org chart | | | planned | planned |
-| Sign-in with Google Workspace or Microsoft Entra ID | | | planned | planned |
-| Rules for what reaches the AI provider, egress log | | | planned | planned |
-| SCIM, SIEM and audit export, retention, legal hold, high availability | | | | planned |
+|---|---|---|---|---|---|
+| Price | free | $12/month or $120/year | contact us | contact us | scoped quote |
+| People | 1 | 1, non-transferable | by agreement | by agreement | participating organisations / users by agreement |
+| Devices / nodes | 1 computer | up to 3 computers | by agreement | by agreement | by agreement |
+| Local AI apps | unlimited | unlimited | provider-neutral, subject to policy | provider-neutral, subject to policy | participant-selected, subject to policy |
+| Cloud AI connectors | 5 | 10 | based on requirements | based on requirements | based on requirements |
+| Trial | no Personal trial | no Personal trial | planned Business trial; see [BUSINESS-TRIAL.md](BUSINESS-TRIAL.md) | scoped pilot (planned) | scoped pilot |
+| Vault, recall, graph, contracts, doctor | ✓ | ✓ | planned package | planned package | planned package |
+| Backup to own GitHub (single writer) | ✓ | ✓ | deployment-dependent | deployment-dependent | deployment-dependent |
+| Shared context and comms bus | ✓ | ✓ | planned | planned | planned |
+| Several computers on one vault | | ✓ | planned | planned | deployment-dependent |
+| Automatic convergence of supported replicated state (crdt-merge) | | planned | planned | planned | planned |
+| Governed project / programme / portfolio scopes | | | planned | planned | planned |
+| Independent site nodes and federation membership | | | | planned | planned |
+| Jurisdiction-aware replication and recovery | | | | planned | planned |
+| Federated execution, analytics and learning | | | | | planned / scoped |
+| Identity, roles and delegated administration | | | planned | planned | federation policy |
+| Audit, retention and legal hold | | | planned | planned | by agreement |
 
 Personal with more computers is sold for what exists today: the free core on up to 3 computers, so the
 AI apps on all of them share one memory and one comms bus. A person can connect several cloud AI apps
@@ -45,10 +42,10 @@ marked *planned* is not built and is not part of what you pay for. The Personal 
 price is an early-supporter price: it stays locked for as long as the subscription runs, and it is
 labelled that way while sync and the relay are planned. Business, Corporate and Federation are deployment models selected by topology, governance,
 sovereignty, recovery and support requirements, not by a fixed size threshold.
-A team of people buys Business and contacts us for a price. Office and Team are not tiers. Hosted sync
-and the hosted relay are not part of Business, because its
-company server runs on the company's own server. Sync, the relay, the company server, sign-in, roles,
-labels and the egress log are planned, not built, and no date is given. See [tiers/](tiers/README.md)
+A team buys Business; Corporate and Federation are scoped to the topology and governance required.
+Office and Team are not separate tiers. Server placement may be customer-operated, privately hosted
+or distributed across sites. Sync, relay, federation membership, identity, roles, labels and egress
+controls are planned, not built as a complete business deployment, and no date is given. See [tiers/](tiers/README.md)
 for how each tier is set up.
 
 **Business and Corporate are provider-neutral and are not defined by one central vault.** People and
