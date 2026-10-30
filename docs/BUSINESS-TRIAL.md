@@ -7,9 +7,11 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Re
 > nothing here is an offer. There is no Personal trial; Personal is free on one computer and priced
 > on the next ones.
 
-The Business trial is a time-limited entitlement to run the Business tier: one company vault that
-all members' work data syncs into, and one AI provider for the organisation. The trial is free: it
-costs nothing, and it is not a discount on a later subscription.
+The Business trial is a time-limited entitlement to evaluate the planned Business deployment within
+an agreed scope. The architecture is provider-neutral: participants may use the hosted AI providers,
+local models and agent tools permitted by their organisation. The trial is free: it costs nothing,
+and it is not a discount on a later subscription. The exact topology and data scopes must be agreed
+for the pilot; this draft does not assume one central company vault.
 
 ## Length and size
 
@@ -22,9 +24,9 @@ pilot, sized from the order form.
 
 ## The two paths
 
-**Self-serve Business trial (planned).** For a team that uses hosted AI providers, or a mix of
-hosted providers and local tools. It suits cloud-hosted, where the server runs on a host the
-operator manages (planned). Deployment: [deploy-cloud.md](deploy-cloud.md). The setup session page
+**Self-serve Business trial (planned).** For a team using hosted AI providers, local models or a
+mix of AI tools and local agents, within the trial's supported deployment scope. It suits a
+cloud-hosted deployment where the server runs on a host the operator manages (planned). Deployment: [deploy-cloud.md](deploy-cloud.md). The setup session page
 (docs/SETUP-SESSION.md) and the cloud trial page (docs/CLOUD-TRIAL.md) are planned and will carry
 the step-by-step.
 
@@ -74,15 +76,16 @@ organisation that has used its trial converts, or gets a sales-assisted pilot.
 
 ## Personal vaults stay separate
 
-A member's personal or home vault never crosses into the trial company vault. They have separate
-identities and separate keys, and there are no grants, mounts or mixing between them.
+A member's personal or home memory remains a separate scope from the organisation's work scope.
+They use separate identities and permissions; any explicit sharing requires a deliberate grant and
+is governed by the relevant policy.
 
 ## What is built and what is planned
 
 Built today for any licence: the grace period, read-only beyond the licensed computers, and
 export. The trial licence and its extension are planned.
 
-Planned, as on the [tiers pages](tiers/README.md): the company vault, the admin console, the
-company server, sign-in, departments and roles, labels and the egress log, the automatic merge by
-the convergence engine, and both delivery paths of the trial itself. A planned part goes into an
+Planned, as on the [tiers pages](tiers/README.md): the full multi-user business administration,
+identity, roles, governed shared scopes, policy enforcement, the automatic merge by the convergence
+engine, and both delivery paths of the trial itself. A planned part goes into an
 offer only with a delivery date.
