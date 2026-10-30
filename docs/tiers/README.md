@@ -1,110 +1,162 @@
-# Tiers: how each one is set up
+# Tiers and deployment models
 
-Part of the [Memev documentation](../README.md). Up: the [README](../../README.md). Charts for all
-three tiers: [ARCHITECTURE.md](../ARCHITECTURE.md#the-three-tiers).
+Part of the [Memev documentation](../README.md). Up: the [README](../../README.md).
+Architecture: [ARCHITECTURE.md](../ARCHITECTURE.md). Federation:
+[FEDERATION.md](../FEDERATION.md).
 
-> **DRAFT.** Packages and services on these pages are proposals, not offers. A licence sets one
-> thing, how many computers can join a vault ([CHARTER.md](../../CHARTER.md)). The Memev core is
-> free. Personal with more computers has a set price. Business and Corporate are coming and have no
-> public price: contact us. See [PRICING.md](../PRICING.md).
+> **DRAFT.** Commercial packages, limits and services on this page are proposals, not offers.
+> The Personal core is built and free. Personal multi-device, Business and Corporate capabilities
+> are at different stages of planning and implementation. Federation and federated computation
+> describe the larger architecture and are not claims of shipped functionality. See
+> [PRICING.md](../PRICING.md).
 
-There are four tiers: Personal (one computer), Personal with more computers, Business and Corporate.
-There is no Team tier. Teammates belong on the business side: an org admin invites members into the
-company vault.
+Memev uses one architecture across all deployments. The tiers describe the scope of operation,
+support and governance; they do not lock users to an AI provider or require a central vault.
 
-| | [Personal](free.md) | [Personal with more computers](free.md#personal-with-more-computers-draft) | [Business](business.md) | [Corporate](corporate.md) |
-|---|---|---|---|---|
-| For | one person, one computer at a time | one person, several computers at once | a company: all members' work data in one company vault that the company can see and search | the same model as Business, at larger scale, with one main corporate vault |
-| How it is counted | one computer | up to 3 computers | once per organisation, by person and by computer | once per organisation, by person and by computer |
-| Where Memev runs | your computer, backed up to your own GitHub | your computers | a server in your office or your cloud account, or cloud-hosted on a host the operator manages ([deploy-cloud.md](../deploy-cloud.md), [deploy-on-prem.md](../deploy-on-prem.md); both coming) | your data centre or private cloud, more than one server (coming) |
-| Who can see what | you | you | the company, through the admin console, sees and searches everything in the company vault (coming) | the same, plus your identity provider's groups (coming) |
-| AI apps and models | several cloud AI apps side by side (Claude, ChatGPT; more coming soon) and local coding tools via MCP | the same, on each computer | ONE AI provider for the organisation: one cloud AI service or an on-premises LLM, over MCP (coming) | the same, with an air-gapped on-premises option (coming) |
-| Two computers | one at a time: you switch computers through your own GitHub. Git sync is single-writer backup, so a second computer that pushes gets a warning that concurrent edits can conflict | at once: edit on two machines, nothing to resolve. The crdt-merge convergence engine, in its own repository and called as an external dependency, does the merging (planned) | coming | coming |
-| Price | free | $12/month or $120/year, early-supporter price | contact us | contact us |
-| Trial | no Personal trial | no Personal trial | time-limited trial: 5 members and 10 computers, 14 days with one 14-day extension; self-serve for hosted AI providers or a mix, a sales-assisted pilot for on-premises, air-gapped or compliance-led organisations (planned); the terms: [BUSINESS-TRIAL.md](../BUSINESS-TRIAL.md) | a sales-assisted pilot (planned) |
-| Setup | you, in minutes | you, in minutes on each computer | remote, 2 to 4 weeks | remote or onsite, 6 to 12 weeks |
-| Support | GitHub issues | priority support | business hours by priority (support plan quoted with the tier) | named or embedded engineer |
-| Status | built | built; the convergence engine, hosted sync, backup and relay planned | coming | coming |
+## Deployment levels
 
-Business and Corporate are one model at two scales. Every member's computer syncs its work data into
-one vault: the company vault for Business, the main corporate vault for Corporate. The company sees
-and searches everything in it, and company knowledge comes down to each member's apps. The organisation
-connects to one AI provider. Members keep private work outside Memev. Both are marked coming.
+| Level | Intended scope | Typical topology | Status |
+|---|---|---|---|
+| **Personal** | One person using the AI tools they choose | One local Memev node and memory | Built |
+| **Personal multi-device** | One person working across several computers | Multiple authorised devices sharing personal state | Planned convergence; device joining exists |
+| **Business** | A small or growing business, including distributed teams | One node or multiple locally operated nodes, shared project and business scopes | Organisational capabilities planned |
+| **Corporate** | Large or regulated organisation, departments, programmes and portfolios | Multiple servers and sites, delegated administration, high availability and jurisdiction controls | Architectural target; components planned |
+| **Federation** | Multiple sites, regions or independent organisations working together | Peer, mesh, regional-hub or hierarchical federation | Architectural target |
+| **Federated computation** | Distributed execution, analytics, optimisation, simulation, evaluation and federated learning | Approved workloads executed at participating nodes | Architectural target / research and integration work |
 
-The paid parts all rest on one engine, crdt-merge, which is not in this repository:
-see [CONVERGENCE.md](../CONVERGENCE.md).
+These are not fixed size bands. A small business may need multi-site sovereignty. A large organisation
+may choose a single deployment. The topology and governance needs determine the appropriate package.
 
-Services, remote and onsite work, travel and response times are in [services.md](services.md).
+## Provider-neutral by design
 
-Planned add-ons and services, and the custom module use cases, are in [the add-ons roadmap](../roadmap/add-ons.md).
+Every person and organisation can use the AI providers, models, agent frameworks and applications
+that suit them, subject to their own security and data policies. One team may use hosted assistants,
+another may use local models, and a third may use a different provider. Memev supplies shared
+context, identity, coordination, project state and governed interfaces underneath.
 
-## Personal and company vaults never mix
+Memev does not require:
+- one AI provider for the whole organisation;
+- one central vault containing all organisational data;
+- one central coordinator for every operation;
+- every site to replicate every record;
+- all participants to surrender their local administration.
 
-A personal or home vault never crosses into a business or corporate vault. They have separate
-identities and separate keys, and there are no grants, mounts or mixing between them. An AI app that
-works in both reaches each one on its own terms; nothing moves from one to the other by itself.
+## How the deployment grows
 
-## When someone leaves a company
+```mermaid
+flowchart TB
+  P["Personal<br/>one user, one local node"]
+  D["Personal multi-device<br/>one user, several authorised devices"]
+  B["Business<br/>people, projects and business functions"]
+  C["Corporate<br/>departments, programmes, portfolios and sites"]
+  F["Federation<br/>multiple sites, regions or organisations"]
+  X["Federated computation<br/>distributed workloads and learning"]
+  P --> D --> B --> C --> F
+  F --> X
+```
 
-Anyone who leaves a company loses all vault access:
+The diagram is a progression of possible capabilities, not a mandatory migration path. Federated
+computation can be used by an individual project or small business as well as by an enterprise or
+multi-organisation federation.
 
-- access ends
-- keys are revoked
-- devices are removed
-- the local cache is wiped
-- what the member synced stays in the company vault
+## What each level adds
 
-This is planned, with Business and Corporate. Memev cannot recall what a person has already read or
-copied outside Memev.
+### Personal
+
+One person, one local memory, several supported AI tools. The current product runs locally, with
+optional remote access and private Git backup. Personal remains complete and free under
+[CHARTER.md](../../CHARTER.md).
+
+### Personal multi-device
+
+The same personal environment across more than one computer. The planned convergence capability
+allows concurrent work against supported replicated state. The current free Git workflow remains
+single-writer backup and does not provide concurrent merge.
+
+### Business
+
+Connect people, projects, customers, suppliers and business functions without requiring all work
+to be placed in one unrestricted vault. A business may start with one node and later add sites.
+Personal and business scopes remain distinct, with explicit grants and authority.
+
+### Corporate
+
+Extend the same model across departments, programmes, portfolios and sites. Add identity
+federation, delegated administration, audit, policy, high availability, recovery and jurisdiction
+controls as required. Multiple local memories can participate in shared organisational views
+without requiring all source records to be copied everywhere.
+
+### Federation
+
+Connect independently operated sites or organisations around a defined project, programme or
+portfolio. Each participant retains its own identity, administration, local memory and policy.
+Only agreed state, references, evidence and contributions cross the boundary.
+
+### Federated computation
+
+Coordinate approved computational work across participating devices and organisations. This
+includes distributed task execution, data-local analytics, simulation, optimisation, model
+evaluation and federated learning. Each workload requires its own execution, privacy, aggregation,
+verification and recovery contracts.
+
+## Technology responsibilities
+
+| Component | Role |
+|---|---|
+| Memev | identity and authority, project semantics, policy, permissions, workflow, coordination, approvals and organisational intelligence |
+| CRDT-Merge | proprietary external convergence mechanism for supported replicated state under its defined contract |
+| ACFA-RS | accountable admission, reconciliation and reconstruction of supported contributions and evidence |
+| E4 | trust governance across participants, operators, devices and services |
+| Workload algorithms | actual execution, learning, optimisation, analytics and aggregation semantics |
+
+Convergence does not prove truth, correctness, permission or approval. The current Memev merge
+adapter is narrower than the full federation target: it resolves conflicting note versions against
+a common base. Structured project and organisational state requires further schemas, contracts and
+tests. See [CONVERGENCE.md](../CONVERGENCE.md) and [FEDERATED-COMPUTATION.md](../FEDERATED-COMPUTATION.md).
 
 ## What is built and what is planned
 
-| Part | Status | Notes |
+| Capability | Status | Boundary |
 |---|---|---|
-| Vault, recall, graph, hooks, contracts, doctor | built | every tier |
-| Quality check, review inbox, audit, `why` | built | every tier |
-| Hard project scope, path-limited tokens, graph filtered by path | built | every tier |
-| Per-computer and per-app credentials, removal | built | `memev devices`, `memev devices remove <id>` |
-| Secure link for cloud AI apps | built | optional and off by default on every install: `memev init` offers it once, `memev cloud on` and `memev cloud off` switch it; an `--org` install needs `memev cloud on --yes` |
-| Backup to your own private GitHub repository | built | git sync is single-writer backup: a second computer that pushes gets a warning that concurrent edits can conflict (shown in `memev doctor`), and nothing is blocked. A new computer can join the backup repository from `memev init` |
-| Several computers using one vault through the secure link | built | per-computer keys, `memev join`; no user accounts |
-| Comms bus between AI apps: seats, automatic join, heartbeats, roster, comms checks, tasks and holds | built | every tier; stored in the vault and its own git backup ([BUS.md](../BUS.md)) |
-| Offline licence and computer limit | built | each added computer has its own key; the vault refuses computers past the licensed number. One computer needs no licence. Counting once per organisation, by person and by computer, is planned with Business |
-| End-to-end encrypted sync between one person's computers | planned | |
-| Concurrent edits on several computers merged with nothing to resolve | planned | done by the crdt-merge convergence engine, which lives in its own repository under its own licence and which Memev calls as an external dependency; it is never vendored into this repository, and the free core does not do this merging itself ([CONVERGENCE.md](../CONVERGENCE.md)) |
-| Hosted encrypted backup | planned | the backup to your own GitHub repository is built |
-| Hosted relay with a stable address | planned | the relay protocol and the `memev cloud relay` client are built; the hosted relay is not |
-| Member keys: one key per person, covering that person's computers | planned | today each computer has its own key |
-| One company vault that all members' work data syncs into | planned | Business; Corporate has one main corporate vault. Members keep private work outside Memev |
-| Company knowledge comes back down to members' apps | planned | from the company vault to each member's apps |
-| One AI provider per organisation, over MCP | planned | one cloud AI service or an on-premises LLM, Business and Corporate |
-| Company admin console that sees and searches everything | planned | the admin view of the company vault |
-| Business trial: 5 members and 10 computers, 14 days with one 14-day extension | planned | self-serve for hosted AI providers or a mix, a sales-assisted pilot for on-premises, air-gapped or compliance-led organisations; the terms are in [BUSINESS-TRIAL.md](../BUSINESS-TRIAL.md) |
-| Separate identities and keys for personal and company vaults | planned | no grants, mounts or mixing between them |
-| Leaving a company: access ends, keys revoked, devices removed, local cache wiped | planned | what the member synced stays in the company vault |
-| Invites from an org admin into the company vault | planned | the only way a teammate joins; there is no Team tier |
-| Company server with user accounts | planned | the host of the company vault |
-| Sign-in with Google Workspace or Microsoft Entra ID, SCIM | planned | |
-| Departments, roles and path grants from an org chart | planned | |
-| Labels on notes and rules for what reaches the AI provider | planned | |
-| Pseudonymising names and amounts before a cloud AI service | planned | |
-| Egress log of what reached the AI provider | planned | |
-| Connectors that bring CRM, ticketing and chat data into the vault | planned | AI apps can use those vendors' own MCP servers next to Memev today |
-| High-availability servers, air-gapped package | planned | |
-| SIEM and audit export, retention rules, legal hold | planned | |
+| Local vault, recall, graph, hooks, contracts and doctor | Built | Current Memev core |
+| Per-device and per-app credentials | Built | Current device and token model |
+| Optional remote access and device joining | Built | Does not itself provide multi-site federation |
+| Communications bus | Built | Current vault-scoped coordination |
+| Project state and contract verification | Built / evolving | Current local project and work contracts |
+| Git backup | Built | Single-writer backup; not concurrent multi-writer convergence |
+| External merge-provider boundary | Built | Current note-conflict call path |
+| Paid CRDT-Merge service integration | Planned / in progress | See [PAID-CONVERGENCE.md](../PAID-CONVERGENCE.md) |
+| Concurrent multi-device convergence | Planned | Supported state and licence contract |
+| Business identity, roles and administration | Planned | Must retain provider neutrality and scoped access |
+| Independent site nodes and federation membership | Architectural target | See [FEDERATION.md](../FEDERATION.md) |
+| Cross-site project/programme/portfolio reasoning | Architectural target | See [ORGANISATIONAL-INTELLIGENCE.md](../ORGANISATIONAL-INTELLIGENCE.md) |
+| Jurisdiction-aware replication and recovery | Architectural target | See [DATA-SOVEREIGNTY.md](../DATA-SOVEREIGNTY.md) |
+| Federated computation and learning | Architectural target | Workload-specific contracts and algorithms required |
 
-Nothing on these pages is sold before it is built. A planned part goes into an offer only with a
-delivery date.
+Nothing is sold or represented as delivered before it is built and tested. Each future capability
+needs acceptance criteria and a clear statement of its dependencies.
 
-## Limits that apply to every tier
+## Personal and organisational boundaries
 
-- Cloud models are outside Memev's control. Once a note is sent to a cloud AI app or service, the provider
-  holds it under its own terms. Memev can decide what is sent; it cannot recall it afterwards.
-- The company server can read your notes. To search notes, the server must decrypt them. Encryption
-  protects them in transit and on disk, not from the server or whoever runs it. A self-hosted server is
-  not end-to-end encrypted, and we will not call it that. The company vault is held there, so
-  whoever runs it can read what members promote or share into it.
-- GitHub backup is a copy at GitHub. The vault is pushed as plain Markdown to a private
-  repository. Use a self-hosted git server instead if the notes must not leave your network.
-- The AI app decides what it asks for. Memev controls what it returns, not what the app does
-  with it.
+A person's private work and an organisation's work are separate scopes. Access between them is
+never implied by using the same AI application. A person may use the same AI provider in both
+contexts, but Memev must enforce the identity, token, scope and policy of the relevant deployment.
+
+## Leaving an organisation
+
+A future business or corporate deployment must revoke access and credentials when a member leaves,
+remove authorised devices, apply local cache and retention policy, and preserve organisational
+records that the organisation is authorised to retain. Revocation cannot recall information already
+read or copied outside Memev.
+
+## Limits that apply to every level
+
+- Cloud AI providers apply their own data handling terms to information sent to them.
+- A server that decrypts information to index or search it can expose that information to its
+  operator; encryption at rest is not end-to-end encryption.
+- Replication does not grant replica operators access to raw source records.
+- Derived information, embeddings, caches, logs, backups and model updates remain subject to the
+  policies of their source and purpose.
+- Site resilience depends on what was replicated before failure. Unreplicated changes may be
+  unavailable.
+- A converged state is not necessarily correct or approved.
