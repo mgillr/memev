@@ -279,7 +279,7 @@
         "QL-1.02"
       ],
       "tasks": 1,
-      "criteria": 19,
+      "criteria": 30,
       "spec": "specs/SR-1.21-a-missing-note-is-never-silent.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -312,7 +312,7 @@
         "QL-1.02"
       ],
       "tasks": 1,
-      "criteria": 6,
+      "criteria": 17,
       "spec": "specs/SR-1.23-verify-sees-a-removed-tail.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -327,8 +327,8 @@
         "SR-1.01",
         "QL-1.02"
       ],
-      "tasks": 1,
-      "criteria": 7,
+      "tasks": 2,
+      "criteria": 27,
       "spec": "specs/SR-1.24-no-cli-write-beside-a-live-daemon.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -343,7 +343,7 @@
         "QL-1.02"
       ],
       "tasks": 1,
-      "criteria": 6,
+      "criteria": 17,
       "spec": "specs/SR-1.25-a-cloud-seat-addresses-one-local-seat.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -359,7 +359,7 @@
         "QL-1.02"
       ],
       "tasks": 2,
-      "criteria": 26,
+      "criteria": 39,
       "spec": "specs/SR-1.26-one-write-can-never-make-the-vault-unopenable.json",
       "status": "proposed: owner's go pending, signs after a clean red-team round"
     },
@@ -369,13 +369,30 @@
       "area": "SR-1",
       "title": "Done comes only from a passing verify",
       "repo": "memev",
-      "closes": "Closes G92 (issue #242) and the PROTECTED part of issue #243: contractList sets a signed contract's state to done whenever a file named contracts/closed/<id>.json exists (src/engine/contracts.mjs:262-265), and nothing checks what the file holds or who wrote it. PROTECTED covers only contracts/signed/ and contracts/keys/ (src/engine/vault.mjs:27), verify writes contracts/closed/ through the caller's own identity (contracts.mjs:248), and contracts/receipts/ is unprotected. So any token with write scope over contracts/**, including the token a paired device gets (src/engine/devices.mjs:85) and a cloud connector's (src/engine/oauth.mjs:17), takes a contract out of the Stop-hook gate and the pre-push gate with no contract.verified record, and can rewrite its receipts. Found by the SR-0.03 red-team round and reproduced on 31 October 2026 on the main source",
+      "closes": "Closes G92 (issue #242) and the PROTECTED part of issue #243: contractList sets a signed contract's state to done whenever a file named contracts/closed/<id>.json exists (src/engine/contracts.mjs:262-265), and nothing checks what the file holds or who wrote it. PROTECTED covers only contracts/signed/ and contracts/keys/ (src/engine/vault.mjs:27), verify writes contracts/closed/ through the caller's own identity (contracts.mjs:248), and contracts/receipts/ is unprotected. So any token with write scope over contracts/**, including the token a paired device gets (src/engine/devices.mjs:85) and a cloud connector's (src/server/oauth.mjs:17), takes a contract out of the Stop-hook gate and the pre-push gate with no contract.verified record, and can rewrite its receipts. Found by the SR-0.03 red-team round and reproduced on 31 October 2026 on the main source",
       "depends_on": [
         "QL-1.02"
       ],
       "tasks": 2,
       "criteria": 28,
       "spec": "specs/SR-1.27-done-comes-only-from-a-passing-verify.json",
+      "status": "proposed: owner's go pending, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.28",
+      "gap": "G93",
+      "area": "SR-1",
+      "title": "The bus writes its own routing files",
+      "repo": "memev",
+      "closes": "Closes G93 (issue #250): connector and device tokens hold write on bus/** (src/engine/devices.mjs:85, src/server/oauth.mjs:17), and the bus's routing files are plain vault notes: bus/operator.json names the operator and bus/seats/<seat>.json carries renamed_from. So a note write makes a cloud connector the operator, its task to the 'operator' alias carries operator authority, and a runner turned on for a local seat starts its command headless with the connector's text as the prompt. Found by the SR-1.25 red-team round and reproduced on 31 October 2026 on the main source",
+      "depends_on": [
+        "SR-1.27",
+        "SR-1.24",
+        "QL-1.02"
+      ],
+      "tasks": 2,
+      "criteria": 17,
+      "spec": "specs/SR-1.28-the-bus-writes-its-own-routing-files.json",
       "status": "proposed: owner's go pending, signs after a clean red-team round"
     },
     {

@@ -2,7 +2,7 @@
   "title": "SR-1.27 Done comes only from a passing verify",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G92 (issue #242) and the PROTECTED part of issue #243: contractList sets a signed contract's state to done whenever a file named contracts/closed/<id>.json exists (src/engine/contracts.mjs:262-265), and nothing checks what the file holds or who wrote it. PROTECTED covers only contracts/signed/ and contracts/keys/ (src/engine/vault.mjs:27), verify writes contracts/closed/ through the caller's own identity (contracts.mjs:248), and contracts/receipts/ is unprotected. So any token with write scope over contracts/**, including the token a paired device gets (src/engine/devices.mjs:85) and a cloud connector's (src/engine/oauth.mjs:17), takes a contract out of the Stop-hook gate and the pre-push gate with no contract.verified record, and can rewrite its receipts. Found by the SR-0.03 red-team round and reproduced on 31 October 2026 on the main source. Repository: memev. Depends on contracts: QL-1.02. It is urgent: until it lands, a stopgap fix ahead of it needs the owner's approval. On a case-insensitive file system (macOS APFS, Windows) a case variant such as contracts/Signed/<id>.json also reaches a signed contract, because PROTECTED compares exact spelling. Sensitive path (contracts and tokens): the QL-1.03 checklist applies before merge. Also closes issue #247: contractCheckSignature joined an unchecked keyid into the key path (src/engine/contracts.mjs:203), so a forged signature verified with a key planted under contracts/drafts/.",
+  "request": "Closes G92 (issue #242) and the PROTECTED part of issue #243: contractList sets a signed contract's state to done whenever a file named contracts/closed/<id>.json exists (src/engine/contracts.mjs:262-265), and nothing checks what the file holds or who wrote it. PROTECTED covers only contracts/signed/ and contracts/keys/ (src/engine/vault.mjs:27), verify writes contracts/closed/ through the caller's own identity (contracts.mjs:248), and contracts/receipts/ is unprotected. So any token with write scope over contracts/**, including the token a paired device gets (src/engine/devices.mjs:85) and a cloud connector's (src/server/oauth.mjs:17), takes a contract out of the Stop-hook gate and the pre-push gate with no contract.verified record, and can rewrite its receipts. Found by the SR-0.03 red-team round and reproduced on 31 October 2026 on the main source. Repository: memev. Depends on contracts: QL-1.02. It is urgent: until it lands, a stopgap fix ahead of it needs the owner's approval. On a case-insensitive file system (macOS APFS, Windows) a case variant such as contracts/Signed/<id>.json also reaches a signed contract, because PROTECTED compares exact spelling. Sensitive path (contracts and tokens): the QL-1.03 checklist applies before merge. Also closes issue #247: contractCheckSignature joined an unchecked keyid into the key path (src/engine/contracts.mjs:203), so a forged signature verified with a key planted under contracts/drafts/.",
   "tasks": [
     {
       "id": "T1",
@@ -178,7 +178,7 @@
         "docs/CONTRACTS.md",
         "docs/MODULES.md",
         "changelog.d/SR-1.27.md",
-        "src/server/hooks.mjs"
+        "src/cli/hooks.mjs"
       ],
       "criteria": [
         {

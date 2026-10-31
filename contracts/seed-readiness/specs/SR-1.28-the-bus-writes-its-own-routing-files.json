@@ -1,0 +1,224 @@
+{
+  "title": "SR-1.28 The bus writes its own routing files",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G93 (issue #250): connector and device tokens hold write on bus/** (src/engine/devices.mjs:85, src/server/oauth.mjs:17), and the bus's routing files are plain vault notes: bus/operator.json names the operator and bus/seats/<seat>.json carries renamed_from. So a note write makes a cloud connector the operator, its task to the 'operator' alias carries operator authority, and a runner turned on for a local seat starts its command headless with the connector's text as the prompt. Found by the SR-1.25 red-team round and reproduced on 31 October 2026 on the main source. Repository: memev. Depends on contracts: SR-1.27, SR-1.24, QL-1.02. SR-1.27 brings the folded and resolved protected-path check this contract extends to bus/; SR-1.24 brings the admin-gated operator route of issue #248. It is urgent: until it lands, a stopgap fix ahead of it needs the owner's approval. Sensitive path (tokens, the bus and command execution): the QL-1.03 checklist applies before merge.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Bus routing files are written only by the bus",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "bus/ joins the internal-only paths: a note-tool write, append or delete under bus/, in any spelling, by SR-1.27's folded and resolved path check, is refused as immutable for every caller, and the bus writes its own files as internal writes",
+        "the operator is set only through the admin-gated route of SR-1.24 from a local terminal; a bus/operator.json written any other way (by hand, by a sync, by a stale process) is not taken as the operator, and memev doctor reports the drift",
+        "renamed_from is written only by the bus's own seat rename, and an entry naming 'operator' or 'all' is refused",
+        "a task from a cloud seat never carries operator authority, and a runner starts a command for a task only when its operator authority came from an operator set through the admin-gated route",
+        "each red-green criterion of this task that runs test/bus-routing-protected.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
+      ],
+      "scope": [
+        "src/engine/vault.mjs",
+        "src/engine/bus.mjs",
+        "src/server/http.mjs",
+        "src/server/mcp.mjs",
+        "src/cli/runner.mjs",
+        "src/cli/doctor.mjs",
+        "test/bus-routing-protected.test.mjs",
+        "test/helpers/**",
+        "docs/BUS.md",
+        "docs/MODULES.md",
+        "changelog.d/SR-1.28.md"
+      ],
+      "criteria": [
+        {
+          "statement": "With an enrolled cloud-connector token (remote true, paths memory/**, work/**, contracts/**, bus/**, as devices.mjs:85 issues it), note writes to bus/operator.json and bus/seats/<seat>.json, and to the variants Bus/operator.json and bus/Seats/<seat>.json, are refused as immutable through the vault, MCP and HTTP; the operator and every seat record are unchanged. A task the connector then sends to 'operator' carries operator: false, and a runner turned on for a local seat starts nothing (its run is a recorder).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-routing-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/bus-routing-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "bus/operator.json rewritten on disk by hand to name a cloud seat is not taken as the operator after a reopen: the operator stays the one set from the terminal, and memev doctor names the drift.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-routing-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c02:' test/bus-routing-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Setting the operator through the admin-gated route with the admin token makes a local seat the operator; a seat rename whose renamed_from would hold 'operator' or 'all' is refused and the seat record is unchanged.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-routing-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/bus-routing-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/bus-routing-protected.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/bus-routing-protected.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/bus-routing-protected.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "One full run of test/bus-routing-protected.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/bus-routing-protected.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c02:|^T1-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Bus participation is its own permission",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "a newly issued connector or device token gets no bus/** in its paths; bus participation is a separate scope, bus, which the bus routes and the bus MCP tools check",
+        "a token issued before this change whose paths include bus/** keeps bus participation and loses nothing else; with T1, its note-tool writes under bus/ are refused like any other caller's",
+        "memev token issue and the pairing flows that grant bus access grant the bus scope, and docs/BUS.md says so",
+        "each red-green criterion of this task that runs test/bus-permission.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest"
+      ],
+      "scope": [
+        "src/engine/devices.mjs",
+        "src/server/oauth.mjs",
+        "src/engine/tokens.mjs",
+        "src/engine/bus.mjs",
+        "src/server/http.mjs",
+        "src/server/mcp.mjs",
+        "src/cli/main.mjs",
+        "test/bus-permission.test.mjs",
+        "test/helpers/**",
+        "docs/BUS.md",
+        "docs/MODULES.md",
+        "changelog.d/SR-1.28.md"
+      ],
+      "criteria": [
+        {
+          "statement": "A connector token and a device token issued after the change have no bus/** in their paths and carry the bus scope; each can post to and read the bus through the bus routes and MCP tools. A token without the bus scope is refused on those routes and tools.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-permission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c01:' test/bus-permission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A token issued by the code at the base with bus/** in its paths, loaded by the new code, still posts to and reads the bus, and its note write to bus/x.md is refused as immutable.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-permission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c02:' test/bus-permission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/bus-permission.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/bus-permission.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/bus-permission.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "One full run of test/bus-permission.test.mjs passes every labelled subtest (T2-c01, T2-c02) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/bus-permission.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
