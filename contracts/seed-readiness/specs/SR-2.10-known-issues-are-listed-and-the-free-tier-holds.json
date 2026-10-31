@@ -2,7 +2,7 @@
   "title": "SR-2.10 Known issues are listed, and the free tier holds for three days",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G100: the seed-stage analysis (I2) lists a known-issues page and soak tests among the free tier's planned items, and neither has a contract; the only soak in the set is SR-3.04 task 2, for the paid multi-writer engine. Repository: memev. Depends on contracts: QL-1.02.",
+  "request": "Closes G100: the seed-stage analysis (I2) lists a known-issues page and soak tests among the free tier's planned items, and neither has a contract; the only soak in the set is SR-3.04 task 2, for the paid multi-writer engine. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -12,7 +12,11 @@
       "requirements": [
         "docs/KNOWN-ISSUES.md lists every open issue labelled bug and every limit the docs state (a sentence carrying the marker <!-- limit -->), each with its link or page, the date it was first seen and the workaround if there is one",
         "scripts/docs/known-issues.mjs --check reads the open issues through the GitHub API (or a file given with --issues, for tests) and the docs, and fails naming any open bug or stated limit the page lacks and any listed issue that is closed; CI runs it on a schedule and before a release",
-        "the README and the docs index link the page"
+        "the README and the docs index link the page",
+        "--check reads the issues through the GitHub API with every page followed, takes the API base from MEMEV_GITHUB_API, fails naming the status on any answer but 200, and counts an issue absent from the open set as closed",
+        "an open bug that also carries the security label is never required on the page, and --check fails if the page shows its number or title",
+        "a workflow with a schedule and issues: read runs node scripts/docs/known-issues.mjs --check, and release.yml runs it before the release upload",
+        "the limits the docs state carry <!-- limit -->, at least README.md's Windows preview line, docs/INSTALL-FOR-AI.md's Windows line, docs/TROUBLESHOOTING.md's line on two vaults and docs/CLIENTS.md's not-supported line, and the committed page passes --check against the repository's real issues"
       ],
       "scope": [
         "docs/KNOWN-ISSUES.md",
@@ -22,7 +26,8 @@
         "scripts/docs/known-issues.mjs",
         ".github/workflows/**",
         "test/known-issues.test.mjs",
-        "changelog.d/SR-2.10.md"
+        "changelog.d/SR-2.10.md",
+        "test/release-workflow.test.mjs"
       ],
       "criteria": [
         {
@@ -30,7 +35,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/known-issues.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 known issues' test/known-issues.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 known issues$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 known issues$' test/known-issues.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 known issues$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -49,44 +54,75 @@
           }
         },
         {
-          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
-          "verifier": {
-            "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/known-issues.test.mjs\" --json",
-            "key": "survived",
-            "op": "==",
-            "value": 0,
-            "timeout_s": 3600
-          }
-        },
-        {
-          "statement": "The same run judged at least one mutant (QL-1.02)",
-          "verifier": {
-            "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/known-issues.test.mjs\" --json",
-            "key": "mutants",
-            "op": ">",
-            "value": 0,
-            "timeout_s": 3600
-          }
-        },
-        {
-          "statement": "The same run ignored no changed line (QL-1.02)",
-          "verifier": {
-            "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/known-issues.test.mjs\" --json",
-            "key": "ignored",
-            "op": "==",
-            "value": 0,
-            "timeout_s": 3600
-          }
-        },
-        {
           "statement": "The full suite passes",
           "verifier": {
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "--check passes on the repository itself when it is given the repository's real bug issues, in the shape gh issue list --json prints (labels as objects, every state)",
+          "verifier": {
+            "type": "command",
+            "cmd": "T=$(mktemp) && gh issue list --state all --label bug --limit 1000 --json number,state,title,url,createdAt,labels > \"$T\" && node scripts/docs/known-issues.mjs --check --issues \"$T\"",
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Running the limit scanner on the real repository (README.md and docs/** recursively) finds at least the four limit sentences at README.md:94, docs/INSTALL-FOR-AI.md:12, docs/TROUBLESHOOTING.md:54 and docs/CLIENTS.md:69, each carrying <!-- limit -->. docs/KNOWN-ISSUES.md lists each one, and --check run on a copy of the page with any one of them removed fails naming that file and line",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/known-issues.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 known issues: real docs$' test/known-issues.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 known issues: real docs$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The script takes the API base from MEMEV_GITHUB_API. Against a local stub, a 403 {message:'Resource not accessible by integration'} makes --check exit non-zero naming the status. A 200 with a Link rel=next header whose second page holds the only open bug, which the page lacks, makes --check exit non-zero naming that issue",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/known-issues.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 known issues: API$' test/known-issues.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 known issues: API$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A workflow under .github/workflows has an on.schedule cron and a job with permissions issues: read that runs exactly node scripts/docs/known-issues.mjs --check, with no continue-on-error, no if:, and no '|| true'. release.yml runs the same step at a step index before the gh release upload step",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/known-issues.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 known issues: CI$' test/known-issues.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 known issues: CI$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With an issues file holding only open issues, and a page listing #N absent from that file, --check fails naming #N as not open. Being absent from the open set counts as closed",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/known-issues.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 known issues: not open$' test/known-issues.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 known issues: not open$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "An open bug that also carries the security label (or a label the script names as internal) is not required on the page, and --check fails if the page shows its number or title",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/known-issues.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 known issues: security$' test/known-issues.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 known issues: security$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "--issues takes the verbatim GitHub REST list response. A fixture with labels as {name} objects, an open pull request labelled bug, and an open issue without the bug label requires neither of the last two on the page. With open bug #12 and a page listing only #123, --check fails naming #12",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/known-issues.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 known issues: shapes$' test/known-issues.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 known issues: shapes$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Each failing fixture differs from the complete fixture by exactly one element, and --check's output names exactly that element (the closed issue's number; the limit's file:line) and no other problem. The complete fixture exits 0",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/known-issues.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 known issues: one cause$' test/known-issues.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 known issues: one cause$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -111,7 +147,10 @@
       "requirements": [
         "scripts/soak/free-tier.mjs runs one vault for 72 hours on one machine: the daemon, GitHub backup to a local bare repository, the hooks of two clients driven at a fixed rate (remember, recall, the prompt hook, session end), a daemon restart every 6 hours and a network drop every hour",
         "it writes bench/results/<date>-soak-<cpu>.json with the hardware, the hours run, the notes written and found again, notes_lost, daemon crashes, the hourly p95 of the prompt hook and of recall, and the hourly heap and disk use",
-        "a 10-minute form (--minutes 10) runs in CI on a schedule, so the script cannot rot"
+        "a 10-minute form (--minutes 10) runs in CI on a schedule, so the script cannot rot",
+        "the results file also records script_sha256, started_at, ended_at, the hourly samples, restarts, network_drops, write_errors, backup_failures and the daemon's RSS, and the short forms compress the restart and drop schedule in proportion",
+        "a run whose daemon crashes, that loses or fails a write, fails a backup or exceeds the bounds exits non-zero; found again means a recall hit whose body holds the written text",
+        "the soak runs in a sandbox of its own (HOME, MEMEV_CONFIG_DIR and XDG_CONFIG_HOME) and leaves no daemon running after it exits, normally or on SIGTERM"
       ],
       "scope": [
         "scripts/soak/**",
@@ -126,7 +165,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/soak.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 soak' test/soak.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 soak$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 soak$' test/soak.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 soak$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -158,36 +197,67 @@
           }
         },
         {
-          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "statement": "The latest results file is consistent with a real run of the committed script: script_sha256 equals the sha256 of scripts/soak/free-tier.mjs; ended_at minus started_at is at least 72 h and equals hours; there are at least 72 hourly samples with strictly increasing timestamps; notes_written > 0 and notes_written == notes_found + notes_lost. A determined forger can still fake this; it stops the accidental and lazy cases",
           "verifier": {
-            "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/soak.test.mjs\" --json",
-            "key": "survived",
-            "op": "==",
-            "value": 0,
-            "timeout_s": 3600
+            "type": "command",
+            "cmd": "f=$(ls bench/results/*-soak-*.json | sort | tail -1) && node -e 'const fs=require(\"fs\"),c=require(\"crypto\");const r=JSON.parse(fs.readFileSync(process.argv[1],\"utf8\"));const h=c.createHash(\"sha256\").update(fs.readFileSync(\"scripts/soak/free-tier.mjs\")).digest(\"hex\");const s=Date.parse(r.started_at),e=Date.parse(r.ended_at);const H=r.hourly||[];const ok=r.script_sha256===h&&e-s>=72*3600e3&&Math.abs(r.hours-(e-s)/3600e3)<0.01&&H.length>=72&&H.every((x,i)=>i===0||Date.parse(x.at)>Date.parse(H[i-1].at))&&r.notes_written>0&&r.notes_written===r.notes_found+r.notes_lost;process.exit(ok?0:1)' \"$f\"",
+            "timeout_s": 120
           }
         },
         {
-          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "statement": "The one-minute form compresses the schedule in proportion (restart every 6 h and drop every 1 h scaled by minutes/4320). The test asserts that the results report restarts >= 2 with a different daemon pid after each, network_drops >= 2 with a write made during a drop found afterwards, writes from both client ids, and backup_failures 0, and that git -C <bare> ls-tree -r HEAD contains every note written. A second run whose bare repository path is replaced by a plain file reports backup_failures > 0 and exits non-zero",
           "verifier": {
-            "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/soak.test.mjs\" --json",
-            "key": "mutants",
-            "op": ">",
-            "value": 0,
-            "timeout_s": 3600
+            "type": "test_red_green",
+            "test_file": "test/soak.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 soak: faults$' test/soak.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 soak: faults$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
-          "statement": "The same run ignored no changed line (QL-1.02)",
+          "statement": "With the vault's memory/ directory made read-only for the whole one-minute run, the soak reports write_errors > 0 and notes_written equal to the acknowledged writes (0), and exits non-zero. A clean run reports notes_written >= 0.99 x the attempts implied by the fixed rate, write_errors 0 and notes_lost 0, and exits 0",
           "verifier": {
-            "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/soak.test.mjs\" --json",
-            "key": "ignored",
-            "op": "==",
-            "value": 0,
-            "timeout_s": 3600
+            "type": "test_red_green",
+            "test_file": "test/soak.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 soak: failed writes$' test/soak.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 soak: failed writes$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The one-minute soak is run with HOME, MEMEV_CONFIG_DIR and XDG_CONFIG_HOME pointing at sentinel directories that hold a fake launcher and a fake app config, and with MEMEV_NO_SERVICE unset. The sentinel trees hash the same afterwards, no login unit file appears, and no daemon pid recorded in the soak vault's .memev/daemon.json is alive after the soak exits, both normally and after a SIGTERM at 20 s",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/soak.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 soak: sandbox$' test/soak.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 soak: sandbox$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "In the one-minute form the test SIGKILLs the daemon pid from .memev/daemon.json mid-run, outside a planned restart. The results report daemon_crashes 1, even though the next hook call restarted the daemon, and the soak exits non-zero",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/soak.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 soak: crash$' test/soak.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 soak: crash$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Mid-run, one written note is made unrecallable without touching its file (a review drop recorded for its path#heading). The results report notes_lost 1, the soak exits non-zero, and found again is defined as a recall hit whose body contains the written text",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/soak.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 soak: recall$' test/soak.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 soak: recall$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A workflow file has an on.schedule cron and a step whose run line is exactly node scripts/soak/free-tier.mjs --minutes 10, with no continue-on-error, no '|| true', and timeout-minutes >= 15",
+          "verifier": {
+            "type": "command",
+            "cmd": "node -e 'const fs=require(\"fs\"),p=\".github/workflows/\";const ok=fs.readdirSync(p).some(f=>{const t=fs.readFileSync(p+f,\"utf8\");return /^\\s+schedule:\\s*$/m.test(t)&&/^\\s+- cron:/m.test(t)&&t.split(\"\\n\").some(l=>/^\\s+(- )?run: node scripts\\/soak\\/free-tier\\.mjs --minutes 10\\s*$/.test(l))&&!/continue-on-error|\\|\\|\\s*(true|:)/.test(t)&&+((t.match(/timeout-minutes:\\s*(\\d+)/)||[0,0])[1])>=15});process.exit(ok?0:1)'",
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "The latest results file shows the tier held: daemon_crashes == 0, every hourly prompt-hook p95 and recall p95 below 1500 ms (the hook's own budget), and the daemon's own RSS (sampled with ps on the daemon pid) in the last hour at most 1.5x its value in hour 2.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(ls bench/results/*-soak-*.json | sort | tail -1) && node -e 'const r=JSON.parse(require(\"fs\").readFileSync(process.argv[1],\"utf8\"));const H=r.hourly||[];const ok=r.daemon_crashes===0&&H.length>=72&&H.every(x=>x.prompt_hook_p95_ms<1500&&x.recall_p95_ms<1500)&&H.at(-1).daemon_rss_mb<=1.5*H[1].daemon_rss_mb;process.exit(ok?0:1)' \"$f\"",
+            "timeout_s": 120
           }
         },
         {

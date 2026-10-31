@@ -457,7 +457,7 @@
         "QL-1.02"
       ],
       "tasks": 2,
-      "criteria": 16,
+      "criteria": 26,
       "spec": "specs/SR-1.32-bus-messages-reach-the-model-as-untrusted-data.json",
       "status": "proposed: owner's request 31 Oct (the seed analysis); signs after a clean red-team round"
     },
@@ -468,11 +468,9 @@
       "title": "A test count that means behaviour",
       "repo": "memev",
       "closes": "Closes G99: the seed-stage analysis (E1, E8). About a fifth of the test files read documents rather than run code: on main 5e1a1e05, 25 of 165 test files import nothing from src/ or bin/ and start no memev process, so the pass count overstates what is tested. The lab walk of every command (scripts/lab/cli-walk.sh) compares each command's exit code with an expected one that has gone stale, and nothing runs it",
-      "depends_on": [
-        "QL-1.02"
-      ],
+      "depends_on": [],
       "tasks": 2,
-      "criteria": 14,
+      "criteria": 17,
       "spec": "specs/SR-1.33-a-test-count-that-means-behaviour.json",
       "status": "proposed: owner's request 31 Oct (the seed analysis); signs after a clean red-team round"
     },
@@ -593,11 +591,9 @@
       "title": "Known issues are listed, and the free tier holds for three days",
       "repo": "memev",
       "closes": "Closes G100: the seed-stage analysis (I2) lists a known-issues page and soak tests among the free tier's planned items, and neither has a contract; the only soak in the set is SR-3.04 task 2, for the paid multi-writer engine",
-      "depends_on": [
-        "QL-1.02"
-      ],
+      "depends_on": [],
       "tasks": 2,
-      "criteria": 16,
+      "criteria": 26,
       "spec": "specs/SR-2.10-known-issues-are-listed-and-the-free-tier-holds.json",
       "status": "proposed: owner's request 31 Oct (the seed analysis); signs after a clean red-team round"
     },
@@ -670,7 +666,7 @@
         "QL-1.02"
       ],
       "tasks": 2,
-      "criteria": 16,
+      "criteria": 31,
       "spec": "specs/SR-4.07-memev-uses-the-live-hosted-services.json",
       "status": "proposed: owner's request 31 Oct (the seed analysis); signs after a clean red-team round"
     },
@@ -771,7 +767,7 @@
         "QL-1.06"
       ],
       "tasks": 1,
-      "criteria": 4,
+      "criteria": 12,
       "spec": "specs/SR-6.11-one-product-site.json",
       "status": "proposed: owner's request 31 Oct (the seed analysis); signs after a clean red-team round"
     },

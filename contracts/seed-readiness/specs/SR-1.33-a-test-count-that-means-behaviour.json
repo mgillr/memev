@@ -2,7 +2,7 @@
   "title": "SR-1.33 A test count that means behaviour",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G99: the seed-stage analysis (E1, E8). About a fifth of the test files read documents rather than run code: on main 5e1a1e05, 25 of 165 test files import nothing from src/ or bin/ and start no memev process, so the pass count overstates what is tested. The lab walk of every command (scripts/lab/cli-walk.sh) compares each command's exit code with an expected one that has gone stale, and nothing runs it. Repository: memev. Depends on contracts: QL-1.02.",
+  "request": "Closes G99: the seed-stage analysis (E1, E8). About a fifth of the test files read documents rather than run code: on main 5e1a1e05, 25 of 165 test files import nothing from src/ or bin/ and start no memev process, so the pass count overstates what is tested. The lab walk of every command (scripts/lab/cli-walk.sh) compares each command's exit code with an expected one that has gone stale, and nothing runs it. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -10,10 +10,11 @@
       "phase": "implement",
       "depends_on": [],
       "requirements": [
-        "a test file that only reads documents (it imports nothing from src/ or bin/ and starts no memev process) lives under test/docs/; every other test file exercises code",
+        "a test file that only reads files (it calls no code from src/, bin/ or scripts/ and starts no process of them) lives under test/docs/; a test that runs repository code under src/, bin/ or scripts/ (test/docs-module-map.test.mjs runs scripts/docs/module-graph.mjs) is a behaviour test and stays in test/",
         "npm test runs both and prints two lines, behaviour tests: N pass, M fail and document checks: N pass, M fail; CI's job summary shows both",
-        "scripts/test-kinds.mjs, run by npm test, fails naming the file when a test file outside test/docs/ neither imports from src/ or bin/ nor starts a memev process, or when a file under test/docs/ does either",
-        "wherever the README or docs/DEVELOPING.md give a test count, it is the behaviour count"
+        "scripts/test-kinds.mjs, run by npm test, fails naming the file when a test file outside test/docs/ neither calls code from src/, bin/ or scripts/ inside a test nor starts a process of it, or when a file under test/docs/ does either; importing a constant (such as PKG from ./helpers/tmp.mjs) or a module it never calls does not count",
+        "wherever the README or docs/DEVELOPING.md give a test count, it is the behaviour count",
+        "npm test exits non-zero when any behaviour test or document check fails, is cancelled or never runs, and when scripts/test-kinds.mjs fails; each count line comes from the run it reports"
       ],
       "scope": [
         "test/**",
@@ -22,15 +23,16 @@
         "docs/DEVELOPING.md",
         "README.md",
         ".github/workflows/**",
-        "changelog.d/SR-1.33.md"
+        "changelog.d/SR-1.33.md",
+        "docs/scope-one/TRACEABILITY.md"
       ],
       "criteria": [
         {
-          "statement": "SR-1.33 kinds: a fixture test file outside test/docs/ that only reads a Markdown file fails scripts/test-kinds.mjs naming it; a fixture under test/docs/ that imports src/engine/vault.mjs fails it too; the real tree passes",
+          "statement": "SR-1.33 kinds: a fixture test file outside test/docs/ that only reads a Markdown file fails scripts/test-kinds.mjs naming it; a fixture under test/docs/ that imports and calls src/engine/vault.mjs fails it too; the real tree passes",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/test-kinds.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.33 kinds' test/test-kinds.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.33 kinds$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.33 kinds$' test/test-kinds.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.33 kinds$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -45,41 +47,48 @@
           "statement": "npm test prints the behaviour and document counts apart, each with no failure",
           "verifier": {
             "type": "command",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test 2>&1); printf \"%s\" \"$out\" | grep -qE \"behaviour tests: [0-9]+ pass, 0 fail\" && printf \"%s\" \"$out\" | grep -qE \"document checks: [0-9]+ pass, 0 fail\"",
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test 2>&1); rc=$?; [ $rc -eq 0 ] && printf \"%s\" \"$out\" | grep -qE \"behaviour tests: [1-9][0-9]* pass, 0 fail\" && printf \"%s\" \"$out\" | grep -qE \"document checks: [1-9][0-9]* pass, 0 fail\"",
             "timeout_s": 1800
           }
         },
         {
-          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "statement": "SR-1.33 kinds wired: in a temp tree with a verbatim copy of package.json's scripts.test, scripts/test-kinds.mjs, src/x.mjs, a passing test/b.test.mjs that calls ../src/x.mjs, and a passing test/stray.test.mjs that only reads a .md file, `sh -c <scripts.test>` exits non-zero and its output names test/stray.test.mjs.",
           "verifier": {
-            "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/test-kinds.test.mjs\" --json",
-            "key": "survived",
-            "op": "==",
-            "value": 0,
-            "timeout_s": 3600
+            "type": "test_red_green",
+            "test_file": "test/test-kinds.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.33 kinds wired$' test/test-kinds.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -qE '^ *ok [0-9]+ - SR-1.33 kinds wired$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.33 kinds wired$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
-          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "statement": "SR-1.33 kinds unused import: these fixtures outside test/docs/ each fail scripts/test-kinds.mjs, which names them: one with only `import '../src/engine/vault.mjs';` that then reads README.md, and one that imports `{ VERSION }` from '../src/engine/vault.mjs' without ever referencing VERSION. A fixture that calls an imported src function inside a test() body passes.",
           "verifier": {
-            "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/test-kinds.test.mjs\" --json",
-            "key": "mutants",
-            "op": ">",
-            "value": 0,
-            "timeout_s": 3600
+            "type": "test_red_green",
+            "test_file": "test/test-kinds.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.33 kinds unused import$' test/test-kinds.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -qE '^ *ok [0-9]+ - SR-1.33 kinds unused import$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.33 kinds unused import$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
-          "statement": "The same run ignored no changed line (QL-1.02)",
+          "statement": "SR-1.33 kinds counts: the test builds a temp tree holding a verbatim copy of package.json's scripts.test, a copy of scripts/test-kinds.mjs, src/x.mjs, test/b.test.mjs (imports and calls ../src/x.mjs: 2 passing tests and 1 failing) and test/docs/d.test.mjs (reads d.md: 3 passing tests). It runs `sh -c <scripts.test>` there and asserts a non-zero exit plus exactly 'behaviour tests: 2 pass, 1 fail' and 'document checks: 3 pass, 0 fail'. Second run: make b pass and one doc test fail; assert a non-zero exit and 'document checks: 2 pass, 1 fail'. Third run: a behaviour test cancelled by its timeout; assert a non-zero exit and no 'behaviour tests: N pass, 0 fail'.",
           "verifier": {
-            "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/test-kinds.test.mjs\" --json",
-            "key": "ignored",
-            "op": "==",
-            "value": 0,
-            "timeout_s": 3600
+            "type": "test_red_green",
+            "test_file": "test/test-kinds.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.33 kinds counts$' test/test-kinds.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -qE '^ *ok [0-9]+ - SR-1.33 kinds counts$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.33 kinds counts$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-1.33 kinds text: each of these fixtures outside test/docs/ makes scripts/test-kinds.mjs fail and name it: (a) the mem-093 shape, which reads src/engine/vault.mjs with fs.readFileSync and asserts a regex on the text; (b) a file that names src/engine/vault.mjs, bin/memev.mjs, BIN and spawn only in a comment, a test title and a regex literal, then reads README.md; (c) a file whose only import from ./helpers/tmp.mjs is PKG, then reads README.md, since importing a constant does not count as running code. These fixtures pass outside test/docs/: (d) `const { Vault } = await import(path.join(ROOT, 'src', 'engine', 'vault.mjs'))` followed by a call; (e) a file that runs `memev --version` through ./helpers/cli.mjs's run helper; (f) a file that imports and calls buildGraph from ../scripts/docs/module-graph.mjs, since code under scripts/ counts as code.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/test-kinds.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.33 kinds text$' test/test-kinds.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -qE '^ *ok [0-9]+ - SR-1.33 kinds text$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.33 kinds text$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The real tree passes scripts/test-kinds.mjs with every test file that reads files and runs no repository code under test/docs/, and the script names no test file (no allowlist). test/docs-module-map.test.mjs, which three signed contracts run (SR-1.03, SR-1.05, SR-1.25), stays at test/: it imports and calls scripts/docs/module-graph.mjs, so it is a behaviour test.",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f test/docs-module-map.test.mjs && [ ! -e test/docs/docs-module-map.test.mjs ] && node scripts/test-kinds.mjs && ! grep -nE '[A-Za-z0-9_-]+\\.test\\.m?js' scripts/test-kinds.mjs",
+            "timeout_s": 60
           }
         },
         {
@@ -102,23 +111,28 @@
         "T1"
       ],
       "requirements": [
-        "scripts/lab/cli-walk.sh takes each command's expected exit code from the codes the CLI documents, and a --check mode runs the walk in a sandbox HOME with no network and exits non-zero naming each unexpected code",
+        "scripts/lab/cli-walk.sh takes each command's expected exit code from docs/EXIT-CODES.md, a table of every command the walk runs, by the walk's id, with its documented exit code, and a --check mode runs the walk in a sandbox HOME with no network and exits non-zero naming each unexpected code",
         "CI runs scripts/lab/cli-walk.sh --check on every pull request",
-        "every script under scripts/lab/ runs in CI in a check mode, or says at its top why it cannot run there"
+        "every script under scripts/lab/ runs in CI in a check mode, or says at its top why it cannot run there",
+        "--check keeps every command away from the account-wide service managers and the tunnel programs by itself, whatever the caller's environment",
+        "the walk reports each unexpected code once, in both directions: a refusal that now succeeds is as unexpected as a success that now fails"
       ],
       "scope": [
         "scripts/lab/**",
         ".github/workflows/**",
         "test/lab-walk.test.mjs",
-        "changelog.d/SR-1.33.md"
+        "changelog.d/SR-1.33.md",
+        "docs/EXIT-CODES.md",
+        "docs/README.md",
+        "docs/testing/LAB-TEST-PLAN.md"
       ],
       "criteria": [
         {
-          "statement": "SR-1.33 lab walk: a copy of cli-walk.sh whose expected code for one command is changed fails --check naming that command; the script as committed passes --check",
+          "statement": "SR-1.33 lab walk: with a copy of docs/EXIT-CODES.md whose code for one command is changed, --check fails naming that command; the committed walk and table pass --check",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/lab-walk.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.33 lab walk' test/lab-walk.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.33 lab walk$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.33 lab walk$' test/lab-walk.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.33 lab walk$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -130,44 +144,43 @@
           }
         },
         {
-          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
-          "verifier": {
-            "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/lab-walk.test.mjs\" --json",
-            "key": "survived",
-            "op": "==",
-            "value": 0,
-            "timeout_s": 3600
-          }
-        },
-        {
-          "statement": "The same run judged at least one mutant (QL-1.02)",
-          "verifier": {
-            "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/lab-walk.test.mjs\" --json",
-            "key": "mutants",
-            "op": ">",
-            "value": 0,
-            "timeout_s": 3600
-          }
-        },
-        {
-          "statement": "The same run ignored no changed line (QL-1.02)",
-          "verifier": {
-            "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/lab-walk.test.mjs\" --json",
-            "key": "ignored",
-            "op": "==",
-            "value": 0,
-            "timeout_s": 3600
-          }
-        },
-        {
           "statement": "The full suite passes",
           "verifier": {
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "SR-1.33 lab walk ci: the test reads .github/workflows/ci.yml the way test/release-workflow.test.mjs:15 reads a workflow. It takes the job whose `if:` admits pull_request (the check job, ci.yml:46-48) and asserts a non-comment `run:` line in that job invokes scripts/lab/cli-walk.sh --check. That step has no `if:` and no `continue-on-error`, and its command has no `|| true` or `|| :`.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/lab-walk.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.33 lab walk ci$' test/lab-walk.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -qE '^ *ok [0-9]+ - SR-1.33 lab walk ci$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.33 lab walk ci$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-1.33 lab walk sandbox: the test puts a temp dir first on PATH with a stub for each account-wide service manager and each tunnel program the CLI can start (the list held in the test, taken from src/cli/service.mjs and src/cli/tunnel.mjs), each appending its argv to a log. It unsets MEMEV_NO_SERVICE, MEMEV_NO_TUNNEL and MEMEV_NO_DOWNLOAD in the caller's env, sets HOME to a fresh temp dir H, and runs `sh scripts/lab/cli-walk.sh --check`. It asserts exit 0, an empty log and an unchanged H. The walk itself, not its caller, must keep every command off the service managers and the tunnel programs.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/lab-walk.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.33 lab walk sandbox$' test/lab-walk.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -qE '^ *ok [0-9]+ - SR-1.33 lab walk sandbox$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.33 lab walk sandbox$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-1.33 lab walk documented: the test copies docs/EXIT-CODES.md, the documented exit-code source the walk reads, changes one command's documented code, and runs the unmodified scripts/lab/cli-walk.sh --check against the copy. It asserts a non-zero exit and exactly one unexpected line, naming that command. It also asserts that the walk refuses to run a command that has no documented code.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/lab-walk.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.33 lab walk documented$' test/lab-walk.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -qE '^ *ok [0-9]+ - SR-1.33 lab walk documented$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.33 lab walk documented$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-1.33 lab walk both ways: the unmodified scripts/lab/cli-walk.sh --check runs from the worktree, where bin/memev.mjs resolves, against an edited copy of docs/EXIT-CODES.md. Case A changes C01-version's documented code from 0 to 3. Case B changes C23's from 1 to 0. Each must exit non-zero with exactly one line reported as unexpected, naming the changed id, and a summary of '1 unexpected exit code'. The committed walk and table report 0 unexpected.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/lab-walk.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.33 lab walk both ways$' test/lab-walk.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -qE '^ *ok [0-9]+ - SR-1.33 lab walk both ways$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.33 lab walk both ways$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
