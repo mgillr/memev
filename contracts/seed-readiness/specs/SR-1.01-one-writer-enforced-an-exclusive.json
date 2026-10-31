@@ -2,7 +2,7 @@
   "title": "SR-1.01 One writer, enforced: an exclusive lock on the vault log",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G01: Single-writer rule is convention only; runner.mjs opens a Vault beside a live daemon and can corrupt the oplog. Repository: memev. Depends on contracts: none.",
+  "request": "Closes G01: Single-writer rule is convention only; runner.mjs opens a Vault beside a live daemon and can corrupt the oplog. Repository: memev. Depends on contracts: none. Sequenced with SR-1.09, SR-1.15 and SR-1.20, which change the same CLI and server files; SR-1.24 depends on this contract. Sensitive path (the oplog): the QL-1.03 checklist applies before merge.",
   "tasks": [
     {
       "id": "T1",
@@ -10,18 +10,27 @@
       "phase": "implement",
       "depends_on": [],
       "requirements": [
-        "OpLog.open takes an exclusive lock file (O_EXCL with stale-pid recovery) before truncating or rewriting the manifest",
+        "OpLog.open takes the lock before anything else: before it reads the manifest, truncates a torn tail, rewrites manifest.json or opens a segment for append. The lock is the file .memev/oplog/LOCK, created with an exclusive create (flag wx), written with pid, host, boot id (the boot time computed from os.uptime()), the holder's start time and a random token, and fsynced; its bytes never change while it is held",
         "a second opener gets a VaultLocked error naming the holder pid",
-        "a read-only open mode exists that never mutates the log",
-        "the test opens a second writable Vault the way memev claims does (src/cli/main.mjs:327, which opens the vault in process and rewrites .memev/oplog/snapshot.json) beside an open one and asserts VaultLocked and an unchanged snapshot",
-        "stale-lock recovery never takes a lock whose holder is alive on another host or in another container: the lock records the host and the boot id beside the pid, and a holder whose host or boot id differs from the reader's is treated as alive unless an OS-level advisory lock on the same file is free"
+        "a read-only open (new Vault(root, { readOnly: true }) and new OpLog(dir, { readOnly: true })) takes no lock and writes nothing: no recover() import, no torn-tail truncate, no manifest, snapshot, device, index or graph write; it reads a torn tail as absent, and log.append() on it throws",
+        "the lock test opens the second writable Vault from a child process, the way memev claims does (src/cli/main.mjs:327), and asserts VaultLocked with the active segment, manifest.json, snapshot.json and device.json byte-identical; OpLog.open never writes snapshot.json, so an unchanged snapshot alone proves nothing",
+        "a lock is stale only when: on the same host and the same boot (boot times from os.uptime() within 120 s), its pid is not alive, or is alive with a start time more than 2 s from the recorded one (pid reuse), or equals the reader's own pid while the reader holds no token for it (an earlier run in a restarted container); on another host or boot, the lock file's mtime is more than 90 s old. An empty or unparsable lock is held while its mtime is younger than 60 s and stale after. When a pid's start time cannot be read (Windows, or the read fails), the holder counts as alive, and memev doctor names the lock's pid, host and age so the owner can remove it once that process is gone. Node core has no flock or fcntl and Memev takes no dependency, so no OS advisory lock is used",
+        "the holder renews the lock every 15 s from a worker_threads worker by setting its mtime to now (fs.utimesSync) after checking that the lock still carries its token; the lock's bytes never change, and a main thread blocked in a long synchronous verify keeps the lock; MEMEV_LOCK_RENEW_MS shortens the interval for tests; clocks may differ between hosts by up to 60 s; before every append the holder checks that the lock still carries its token and fails closed with VaultLocked if it does not",
+        "stale recovery renames the lock to a unique name in the same folder, re-reads it, and proceeds only if its bytes equal the stale lock it judged; otherwise it puts the file back without replacing any lock created meanwhile and reports VaultLocked; two openers recovering the same stale lock never both hold the vault",
+        "any error other than EEXIST while creating the lock (EACCES, ENOSPC, EROFS) fails the open with that error; it is never read as a held or a stale lock",
+        "a second writable open in the process that holds the lock is refused with VaultLocked like any other; the lock is never re-entrant",
+        "VaultLocked is exported from src/engine/oplog.mjs, and a bare new OpLog(dir).open() takes the lock too"
       ],
       "description": "",
       "scope": [
         "src/engine/oplog.mjs",
         "src/engine/vault.mjs",
         "src/engine/util.mjs",
-        "test/oplog-lock.test.mjs"
+        "test/oplog-lock.test.mjs",
+        "src/engine/index.mjs",
+        "src/engine/devices.mjs",
+        "test/helpers/**",
+        "test/fixtures/oplog-lock/**"
       ],
       "criteria": [
         {
@@ -38,6 +47,127 @@
             "type": "grep",
             "file": "src/engine/oplog.mjs",
             "pattern": "VaultLocked"
+          }
+        },
+        {
+          "statement": "A child node process opens the vault writable, prints its pid and waits. The parent's writable open throws an error whose name or code is VaultLocked and whose message contains the child's pid, which differs from process.pid. Every file under .memev/oplog is byte-identical afterwards. After kill -9 of the child, the next writable open succeeds, appends, and log.verify().ok holds with consecutive seq.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "node --test test/oplog-lock.test.mjs"
+          }
+        },
+        {
+          "statement": "Setup: a child process holds the vault writable; one note has been edited on disk and one deleted on disk; a partial line (no newline) has been appended to the active segment. Then `new Vault(root, { readOnly: true }).open()`, materialize(), iterate() and close() must leave the sha256 and size of every file under .memev/oplog unchanged, along with .memev/index.jsonl, graph.json, device.json and devices.json. The note files must be untouched, and log.append() on the read-only log must throw.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "node --test test/oplog-lock.test.mjs"
+          }
+        },
+        {
+          "statement": "Eight child processes are released together (via a shared start file) against a vault whose lock file is (i) absent, (ii) present but empty with a fresh mtime, or (iii) naming a dead pid on this host and boot. Each child that opens writable appends 50 records and holds the vault for 1 s. In cases (i) and (iii) exactly one child opens and the others get VaultLocked. In case (ii) all eight get VaultLocked while the empty lock's mtime is younger than 60 s; with its mtime set 61 s in the past, exactly one opens and the others get VaultLocked. Afterwards log.verify().ok holds with seq 1..50 and no duplicates. Run 20 rounds.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "node --test test/oplog-lock.test.mjs"
+          }
+        },
+        {
+          "statement": "A child process opens the vault writable, taking the vault lock, and waits. The parent rewrites the lock file's host field to 'other-host' and asserts that its writable open throws VaultLocked; it then sets the boot id to 'other-boot' instead and asserts VaultLocked again. After kill -9 of the child, the parent rewrites the host to 'other-host' and asserts its open still throws VaultLocked while the lock's mtime is fresh; it then sets the lock's mtime 91 s in the past and asserts its open succeeds and log.verify().ok. The test also asserts: the lock the parent writes records a non-empty boot id on linux and on darwin; and, with no open in this process, a lock naming process.pid with this host and boot (left by an earlier run that had the same pid, as in a restarted container) is recovered.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "node --test test/oplog-lock.test.mjs"
+          }
+        },
+        {
+          "statement": "While the holder (a child process) has a partial line with no newline appended to its active segment, standing in for an in-flight write, the parent's second writable open throws VaultLocked. Afterwards the active segment's size and bytes (still ending in the partial fragment), manifest.json's bytes and mtime, snapshot.json, and device.json are all unchanged.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "node --test test/oplog-lock.test.mjs"
+          }
+        },
+        {
+          "statement": "Two processes each call new OpLog(dir).open() directly on the same directory. The second throws an error that is an instanceof the VaultLocked exported from src/engine/oplog.mjs.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "node --test test/oplog-lock.test.mjs"
+          }
+        },
+        {
+          "statement": "With MEMEV_LOCK_RENEW_MS=500, the holder's main thread runs a busy loop for 2 s. During the loop the lock file's mtime advances at least twice. After the loop the holder's next append succeeds and the lock still carries its token.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "node --test test/oplog-lock.test.mjs"
+          }
+        },
+        {
+          "statement": "Inside one process, a second writable open while the first is still open throws VaultLocked naming this process's pid, and the first stays usable.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "node --test test/oplog-lock.test.mjs"
+          }
+        },
+        {
+          "statement": "A lock naming a live child process on this host and boot, with a recorded start time one hour earlier than the child's real start, is stale (pid reuse): the open succeeds, appends, and log.verify().ok holds.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "node --test test/oplog-lock.test.mjs"
+          }
+        },
+        {
+          "statement": "With .memev/oplog made read-only (chmod 0555) so the lock cannot be created, a writable open fails with EACCES or EROFS, not VaultLocked, and no file under .memev/oplog changes. The test does not run as root.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "node --test test/oplog-lock.test.mjs"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/oplog-lock.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/oplog-lock.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/oplog-lock.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
           }
         },
         {
@@ -60,12 +190,14 @@
         "T1"
       ],
       "requirements": [
-        "runner.mjs no longer constructs new Vault(root) for writes; it calls the daemon over HTTP or opens read-only"
+        "runner.mjs no longer constructs new Vault(root) for writes; it calls the daemon over HTTP or opens read-only",
+        "both writable opens in runner.mjs go (:211 in the command and :188 in watch); memev runner watch holds no oplog lock while it runs"
       ],
       "description": "",
       "scope": [
         "src/cli/runner.mjs",
-        "test/runner.test.mjs"
+        "test/runner.test.mjs",
+        "test/helpers/**"
       ],
       "criteria": [
         {
@@ -77,10 +209,162 @@
           }
         },
         {
-          "statement": "No writable Vault is opened in runner.mjs",
+          "statement": "The full suite passes",
           "verifier": {
             "type": "command",
-            "cmd": "node -e \"process.exit(/new Vault\\(root\\)(?![^\\n]*readOnly)/.test(require('fs').readFileSync('src/cli/runner.mjs','utf8'))?1:0)\""
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Setup: the sandbox daemon is running (memev start; the sandbox sets MEMEV_NO_BACKGROUND=1), one note has been edited on disk and one new note added on disk, and the sha256 of every file under .memev/oplog is recorded. Then `memev runner on cursor@host --max-runs-per-day 1 --command echo` and `memev runner --json` both exit 0, runner.json gains the cursor@host entry, and every .memev/oplog file is byte-identical afterwards. A daemon write over HTTP then leaves log.verify().ok with consecutive seq. This is red at the base because the runner's writable Vault.open runs recover(), which appends import records with client 'startup' (vault.mjs:66, :120, :122). It is also red at a base that already includes T1, where the runner exits with VaultLocked.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/runner.test.mjs",
+            "cmd": "node --test test/runner.test.mjs"
+          }
+        },
+        {
+          "statement": "Setup: the daemon is running and writing (a loop of memev_write calls over HTTP), and a note has been edited on disk. `memev runner on cursor@host ...` and `memev runner watch cursor@host` (started with runAsync and stopped with SIGTERM once one operator task has run) both exit 0 and do their job: the runner.json entry exists and the stub ran exactly once. Across the whole run the oplog grows only by the records the test asked the daemon to write: the count matches the number of HTTP writes, and no record has client 'startup'. log.verify().ok holds with consecutive seq.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/runner.test.mjs",
+            "cmd": "node --test test/runner.test.mjs"
+          }
+        },
+        {
+          "statement": "`memev runner watch cursor@host`, run through the CLI (sandbox runAsync) beside a live daemon, starts, runs one operator task with the stub, and exits 0 on SIGTERM. While it runs, `memev stop` followed by `memev start` brings the daemon back healthy within 6 s, meaning the watch holds no oplog lock. log.verify().ok holds afterwards.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/runner.test.mjs",
+            "cmd": "node --test test/runner.test.mjs"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/runner.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/runner.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/runner.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "The daemon and the CLI openers live with the lock",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "the daemon's start (src/server/main.mjs) meets a held lock with exit code 4 within 2 s, a VaultLocked message naming the holder's pid, and no daemon.lock left behind; it never ends in an uncaught error",
+        "memev start (startDaemon, src/cli/daemon.mjs) reports exit code 4 as the vault being locked by that pid, not as 'did not start'",
+        "memev claims uses the daemon over HTTP when it is up and a read-only open when it is not; memev doctor without --fix opens read-only; memev doctor --fix and memev compact take the lock and, with a live daemon, refuse with VaultLocked naming the daemon's pid and saying to stop it first",
+        "compact's guard is the lock, not daemon.json"
+      ],
+      "scope": [
+        "src/server/main.mjs",
+        "src/cli/daemon.mjs",
+        "src/cli/main.mjs",
+        "src/cli/doctor.mjs",
+        "src/cli/compact.mjs",
+        "test/oplog-lock-cli.test.mjs",
+        "test/helpers/**",
+        "docs/MODULES.md",
+        "changelog.d/SR-1.01.md"
+      ],
+      "criteria": [
+        {
+          "statement": "Starting the daemon (node src/server/main.mjs --root R) while a child process holds the oplog lock exits with code 4 within 2 s, prints a VaultLocked message naming the child's pid, and leaves no daemon.lock. memev start in the same state reports the vault as locked by that pid. After the child exits, memev start brings the daemon up healthy.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock-cli.test.mjs",
+            "cmd": "node --test test/oplog-lock-cli.test.mjs"
+          }
+        },
+        {
+          "statement": "memev claims --json, run while the daemon is starting and again with the daemon stopped, exits 0, leaves every file under .memev/oplog byte-identical, and does not stop the daemon from coming up.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock-cli.test.mjs",
+            "cmd": "node --test test/oplog-lock-cli.test.mjs"
+          }
+        },
+        {
+          "statement": "With a live daemon, memev compact and memev doctor --fix exit non-zero with VaultLocked naming the daemon's pid and leave every file under .memev/oplog byte-identical; memev doctor without --fix exits 0 and changes nothing.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock-cli.test.mjs",
+            "cmd": "node --test test/oplog-lock-cli.test.mjs"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/oplog-lock-cli.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/oplog-lock-cli.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/oplog-lock-cli.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
           }
         },
         {

@@ -23,8 +23,8 @@
       "repo": "memev",
       "closes": "Single-writer rule is convention only; runner.mjs opens a Vault beside a live daemon and can corrupt the oplog",
       "depends_on": [],
-      "tasks": 2,
-      "criteria": 7,
+      "tasks": 3,
+      "criteria": 34,
       "spec": "specs/SR-1.01-one-writer-enforced-an-exclusive.json"
     },
     {

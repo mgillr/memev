@@ -56,7 +56,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='killed daemon restart' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'killed daemon restart')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='killed daemon restart' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='killed daemon restart' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -64,7 +64,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='durable before the response' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'durable before the response')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='durable before the response' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='durable before the response' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -72,7 +72,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='refused because remembered' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'refused because remembered')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='refused because remembered' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='refused because remembered' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -80,7 +80,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='concurrent replays' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'concurrent replays')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='concurrent replays' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='concurrent replays' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -88,7 +88,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='future-dated' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'future-dated')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='future-dated' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='future-dated' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -96,7 +96,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='bounded by the window' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'bounded by the window')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='bounded by the window' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='bounded by the window' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -104,7 +104,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='damaged store' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'damaged store')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='damaged store' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='damaged store' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -112,7 +112,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='store is private' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'store is private')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='store is private' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='store is private' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -120,7 +120,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='unproven requests' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'unproven requests')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='unproven requests' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='unproven requests' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -144,7 +144,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='write failure' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'write failure')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='write failure' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='write failure' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -152,7 +152,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='pruned while running' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'pruned while running')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='pruned while running' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='pruned while running' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -160,7 +160,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='flood does not evict' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'flood does not evict')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='flood does not evict' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='flood does not evict' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -168,7 +168,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='unreadable or malformed store' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'unreadable or malformed store')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='unreadable or malformed store' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='unreadable or malformed store' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -176,7 +176,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='nonce on disk at writeHead' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'nonce on disk at writeHead')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='nonce on disk at writeHead' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='nonce on disk at writeHead' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -184,7 +184,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='out-of-order requests' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'out-of-order requests')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='out-of-order requests' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='out-of-order requests' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -192,7 +192,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='rotated token' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'rotated token')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='rotated token' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='rotated token' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -200,7 +200,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='two servers on one vault' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'two servers on one vault')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='two servers on one vault' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='two servers on one vault' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
@@ -208,7 +208,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/nonce-persist.test.mjs",
-            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='store read at createServer' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'store read at createServer')\" -ge 1 ]"
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='store read at createServer' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='store read at createServer' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
           }
         },
         {
