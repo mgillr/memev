@@ -424,7 +424,7 @@
         "QL-1.02"
       ],
       "tasks": 1,
-      "criteria": 41,
+      "criteria": 50,
       "spec": "specs/SR-1.30-done-holds-across-computers-and-clones.json",
       "status": "proposed: lead's decision under the owner's delegation, 31 Oct; signs after a clean red-team round"
     },
@@ -442,7 +442,7 @@
         "QL-1.02"
       ],
       "tasks": 1,
-      "criteria": 21,
+      "criteria": 33,
       "spec": "specs/SR-1.31-every-other-cli-state-writer-goes-through-the-daemon.json",
       "status": "proposed: lead's decision under the owner's delegation, 31 Oct; signs after a clean red-team round"
     },

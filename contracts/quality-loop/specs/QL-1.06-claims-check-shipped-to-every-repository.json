@@ -22,6 +22,16 @@
         "sync-gates.mjs refuses a row whose results field breaks QL-1.04's results-file rule (a non-empty .json object under a directory named results) and writes nothing outside --to",
         "sync-gates.mjs --check accepts a target's claims step only when it runs bare node scripts/gate/claims.mjs in a job that admits pull_request and schedule, with no continue-on-error, no '|| true' or '; exit 0', no if: that is false for pull_request, no --status or --now and no NODE_OPTIONS in its job or step env, and with --surfaces (or the default globs) covering every tracked .md, .mdx, .html and .astro file of the target; a YAML comment does not count",
         "the scheduled cross-repository job admits schedule only, never pull_request, pull_request_target or push, and has no continue-on-error; each checkout uses persist-credentials: false, a path of its own and a token taken from a secret; the --check step runs this repository's sync-gates.mjs from the workspace root, never a file inside a checkout; a guard step before the checkouts exits non-zero when the secret is empty",
+        "memev's own claims step fails CI when a claim runs ahead of its row: neither the step nor its job has continue-on-error, and its run text has no '|| true', no '| tee' and nothing else that hides claims.mjs's exit code",
+        "ci.yml's on.pull_request has no paths filter, or every tracked file under README.md, docs/, site/ and bench/results/ matches its paths and none matches a paths-ignore glob",
+        "the change leaves docs/status.json's rows as the base has them apart from their results fields (no row added, removed or re-statused) and removes no ' (planned)' label from README.md, docs/ or site/",
+        "sync-gates.mjs --check accepts a target's claims workflow only from an allowlist: on: holds pull_request with no paths, branches or types filter, and schedule; there is no workflow-level env; in the claims job only actions/checkout and actions/setup-node steps come before the claims step; the claims step is the single line node scripts/gate/claims.mjs, optionally with --surfaces, with no shell, working-directory, env or continue-on-error",
+        "a scheduled run of ci.yml runs only the claims job and the cross-repository job, and neither reads github.base_ref, github.event.before or github.event.pull_request",
+        "the contract closes only when each of memev-site, memev-cloud, memev-org and memev-ops, at its default branch, passes sync-gates.mjs --check, run by the owner with a read-only token; an unset token or owner fails the check, never skips it",
+        "every step of the cross-repository job that runs sync-gates.mjs --check fails the job when a target differs: no continue-on-error on the step or the job, and nothing in its run text that hides the exit code",
+        "the marker exempts the unit it sits in, a paragraph of a .md file, a table row or a line of an .html file, and such a unit states no figure, time figures in seconds and minutes included",
+        "each bench/results file is the output of a run: its top-level keys are exactly those its bench script writes (scripts/growth-bench.mjs or scripts/lab/measure.mjs), and a fresh run gives recall_ms_p50 and recall_ms_p95 within a factor of 2 of the file's, with max_heap_mb no more than heap_bound_mb",
+        "sync copies each named results file byte for byte to the same path in the target, never a manifest in its place, so claims.mjs in the target compares each figure with its value",
         "each red-green criterion of this task that runs test/gate-sync.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
@@ -103,7 +113,7 @@
           }
         },
         {
-          "statement": "T1-c09: the test parses ci.yml, finds every job containing the claims.mjs step, and evaluates that job's and that step's if: for github.event_name = 'schedule' and = 'pull_request'; both must admit the step. No earlier step in that job reads github.base_ref, the claims step passes no --now, and the scheduled run's concurrency group differs from a push to main's (not ci-refs/heads/main with cancel-in-progress). Red for a claims step added to the existing check job under ci.yml:44.",
+          "statement": "T1-c09: the test parses ci.yml, finds every job containing the claims.mjs step, and evaluates that job's and that step's if: for github.event_name = 'schedule' and = 'pull_request'; both must admit the step. No earlier step in that job reads github.base_ref, the claims step passes no --now, and the scheduled run's concurrency group differs from a push to main's (both evaluated from ci.yml's group expressions for the same sha). Red for a claims step added to the existing check job under ci.yml:44.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sync.test.mjs",
@@ -136,7 +146,7 @@
           }
         },
         {
-          "statement": "T1-c13: source row A names results/a.json, which exists in the source. After sync into a temp checkout whose README says '<A phrase> answers in 12 ms.', claims.mjs run in the target exits 0 (sync carried the named results file, or a sha256 manifest of it that claims.mjs checks); a target README giving '12 ms' for a row whose results file is missing in the source exits 1 naming the row.",
+          "statement": "T1-c13: source row A names results/a.json, which exists in the source. After sync into a temp checkout whose README says '<A phrase> answers in 12 ms.', claims.mjs run in the target exits 0 (sync carried the named results file to the same path); a target README giving '12 ms' for a row whose results file is missing in the source exits 1 naming the row.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sync.test.mjs",
@@ -177,10 +187,110 @@
           }
         },
         {
-          "statement": "One full run of test/gate-sync.test.mjs passes every labelled subtest (T1-c01, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c12, T1-c13, T1-c16, T1-c17) with nothing skipped and nothing todo.",
+          "statement": "T1-c18: the test parses on.pull_request in ci.yml. Either it has no paths and no paths-ignore key, or every file from git ls-files README.md docs site bench/results (plus a synthetic site/web/new.html) matches at least one paths glob and no paths-ignore glob, using GitHub's * and ** semantics. Red at base: README.md and site/web/solutions.html match nothing in ci.yml:9-21.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sync.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c18:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c18:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Against MEMEV_CONTRACT_BASE (which must already hold SR-5.04's docs/status.json): docs/status.json at head equals the base table once every 'results' key is removed from both, with keys sorted (no row added, removed or re-statused); and no file under README.md, docs or site has fewer ' (planned)' labels at head than at base.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-sync.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c04:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c12:|^T1-c13:|^T1-c16:|^T1-c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "cmd": "[ -n \"$MEMEV_CONTRACT_BASE\" ] && node -e 'const cp=require(\"child_process\"),fs=require(\"fs\");const s=o=>Array.isArray(o)?o.map(s):o&&typeof o==\"object\"?Object.fromEntries(Object.entries(o).filter(([k])=>k!=\"results\").sort((x,y)=>x[0]<y[0]?-1:1).map(([k,v])=>[k,s(v)])):o;const b=JSON.parse(cp.execSync(\"git show \"+process.env.MEMEV_CONTRACT_BASE+\":docs/status.json\"));const h=JSON.parse(fs.readFileSync(\"docs/status.json\",\"utf8\"));process.exit(JSON.stringify(s(b))===JSON.stringify(s(h))?0:1)' && ok=1 && for f in $(git ls-tree -r --name-only \"$MEMEV_CONTRACT_BASE\" -- README.md docs site); do b=$(git show \"$MEMEV_CONTRACT_BASE:$f\" | grep -o ' (planned)' | wc -l); h=$(cat \"$f\" 2>/dev/null | grep -o ' (planned)' | wc -l); [ \"$h\" -ge \"$b\" ] || { echo \"label removed: $f\"; ok=0; }; done; [ \"$ok\" = 1 ]",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "T1-c20: --check accepts a target's claims workflow only from an allowlist: on: has pull_request with no paths, branches or types filter, and schedule; no workflow-level env; in the claims job the steps before the claims step are only uses: actions/checkout@* or actions/setup-node@*; the claims step is a single line matching ^node scripts/gate/claims[.]mjs( --surfaces .+)?$ with no shell, working-directory, env or continue-on-error. Fixtures on byte-identical synced temp targets, each exiting non-zero and naming the repository and the reason: '| tee out'; '|| :'; 'set +e' on an earlier line; shell: 'bash {0}'; working-directory on the claims step; an earlier run: step that writes $GITHUB_ENV or $GITHUB_PATH or touches scripts/gate/ or docs/status.json; workflow-level env NODE_OPTIONS; pull_request with paths; on: without schedule. The canonical target still exits 0.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sync.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c20:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c20:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c21: the test parses ci.yml and evaluates every job's if: with event_name 'schedule' and ref 'refs/heads/main'. The jobs it admits are exactly the claims job and the cross-repository job, and no step in either has an env value or run text that reads github.base_ref, github.event.before or github.event.pull_request. Red with ci.yml:48 unchanged once on.schedule exists.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sync.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c21:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c21:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c22: source scripts/gate/claims.mjs at '// version: 1.10', target copy at 1.9: --check --json marks that file older/stale, not newer, and sync without --check leaves the target copy byte-identical to the source, with line 1 '// version: 1.10'. Target at 2.0 against source 1.10: --json says newer, and sync leaves the target copy byte-identical to its prior content.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sync.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c22:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c22:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c23: the test extracts every step of the cross-repository job that runs sync-gates.mjs, with its env, shell and continue-on-error, builds the four checkout paths in a temp workspace from synced copies, and runs the steps verbatim under GitHub's shell rules. All clean: every step exits 0. One target's scripts/gate/claims.mjs edited: some step exits non-zero, and neither that step nor its job has continue-on-error.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sync.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c23:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c23:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c24: the test evaluates the workflow-level concurrency group, and any job-level group of the claims job, for {event_name: schedule, ref: refs/heads/main, sha: S} and {event_name: push, ref: refs/heads/main, sha: S} with the same S. The two workflow-level groups differ, or cancel-in-progress evaluates false for the scheduled run. Red at ci.yml:43-44.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sync.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c24:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c24:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "For each tracked .md under README.md and docs, read in paragraphs (blank-line separated; a table row counts on its own), and each line of each tracked .html under site: a unit that carries '<!-- claims: not a figure -->' contains no figure term. The terms are criterion 14's plus a number followed by s, sec, seconds or minutes.",
+          "verifier": {
+            "type": "command",
+            "cmd": "hits=$(git ls-files -- README.md docs site | grep -E '[.](md|html)$' | while read -r f; do awk -v f=\"$f\" 'BEGIN { RS = \"\" } { n = split($0, L, \"\\n\"); for (i = 1; i <= n; i++) if (index(L[i], \"claims: not a figure\")) { u = (L[i] ~ /^[ \\t]*[|]/ || f ~ /[.]html$/) ? L[i] : $0; t = tolower(u); if (t ~ /[0-9] ?(ms|µs|us|s|sec|seconds|minutes)([^a-z]|$)|ops[/]s|req[/]s|[0-9] ?(x|×) faster|median|p50|p95|p99|heap|peak|latency|throughput/) print f \": \" L[i] } }' \"$f\"; done); [ -z \"$hits\" ] || { printf '%s\\n' \"$hits\"; exit 1; }",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "Run scripts/growth-bench.mjs (170M tokens, 256 MB heap) and scripts/lab/measure.mjs into temp JSON. Every bench/results/*.json has exactly the top-level key set of one of those fresh runs. Each growth-shaped file has recall_ms_p50 and recall_ms_p95 within a factor of 2 of the fresh run, the tolerance docs/testing/LAB-TEST-PLAN.md:301 states, and max_heap_mb <= heap_bound_mb.",
+          "verifier": {
+            "type": "command",
+            "cmd": "g=$(mktemp) && m=$(mktemp) && node --max-old-space-size=256 scripts/growth-bench.mjs --tokens 170000000 --json \"$g\" >/dev/null && { node scripts/lab/measure.mjs --json \"$m\" >/dev/null; [ -s \"$m\" ]; } && for r in bench/results/*.json; do [ -e \"$r\" ] || continue; G=\"$g\" M=\"$m\" R=\"$r\" node -e 'const fs=require(\"fs\");const rd=p=>JSON.parse(fs.readFileSync(p,\"utf8\"));const g=rd(process.env.G),m=rd(process.env.M),r=rd(process.env.R);const k=o=>JSON.stringify(Object.keys(o).sort());if(k(r)===k(m))process.exit(0);if(k(r)!==k(g))process.exit(1);const near=x=>r[x]>0&&r[x]<=2*g[x]&&g[x]<=2*r[x];process.exit(near(\"recall_ms_p50\")&&near(\"recall_ms_p95\")&&r.max_heap_mb<=r.heap_bound_mb?0:1)' || { echo \"not a bench run: $r\"; exit 1; }; done",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "T1-c27: after sync into a temp checkout, the target holds the row's results file at the same path, byte-identical to the source. A target README '<A phrase> answers in 13 ms.' against a results value of 12 makes claims.mjs, run in the target, exit 1 naming README.md.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sync.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c27:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c27:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c28: copy the tracked tree (git archive HEAD) into a temp git checkout and append to its README.md a sentence that claims, without ' (planned)', a feature whose docs/status.json row is planned. Extract the claims step from ci.yml with its step and job env, working-directory and shell, and run its run: text verbatim in that checkout under the shell GitHub would use (bash -e {0} when shell: is absent; bash --noprofile --norc -eo pipefail {0} for shell: bash): exit non-zero. With a reader that keeps hyphenated keys, assert that neither the step nor its job has continue-on-error. Red for continue-on-error on the step or job, '|| true' and '| tee'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sync.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c28:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c28:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Owner-run, with a read-only token in GATES_READ_TOKEN and the owner in GATES_OWNER: clone each of memev-site, memev-cloud, memev-org and memev-ops at its default branch into a temp dir, passing the token in an Authorization header and never in the URL, and run node scripts/gate/sync-gates.mjs --to <clone> --check: exit 0 for all four. An unset token or owner fails, never skips.",
+          "verifier": {
+            "type": "command",
+            "cmd": "{ [ -n \"$GATES_READ_TOKEN\" ] && [ -n \"$GATES_OWNER\" ]; } || { echo 'GATES_READ_TOKEN or GATES_OWNER unset'; exit 1; }; for r in memev-site memev-cloud memev-org memev-ops; do d=$(mktemp -d); git -c http.extraHeader=\"Authorization: Basic $(printf 'x-access-token:%s' \"$GATES_READ_TOKEN\" | base64 | tr -d '\\n')\" clone -q --depth 1 \"https://github.com/$GATES_OWNER/$r\" \"$d/t\" && node scripts/gate/sync-gates.mjs --to \"$d/t\" --check; rc=$?; rm -rf \"$d\"; [ $rc -eq 0 ] || { echo \"not shipped: $r\"; exit 1; }; done",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "One full run of test/gate-sync.test.mjs passes every labelled subtest (T1-c01, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c12, T1-c13, T1-c16, T1-c17, T1-c18, T1-c20, T1-c21, T1-c22, T1-c23, T1-c24, T1-c27, T1-c28) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-sync.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c04:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c12:|^T1-c13:|^T1-c16:|^T1-c17:|^T1-c18:|^T1-c20:|^T1-c21:|^T1-c22:|^T1-c23:|^T1-c24:|^T1-c27:|^T1-c28:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
             "timeout_s": 600
           }
         },
