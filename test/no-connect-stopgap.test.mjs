@@ -64,3 +64,19 @@ test('issue 284: a running daemon honours a background connect turned off after 
     assert.deepEqual(fs.readdirSync(codex), []);
   } finally { sb.stop(); }
 });
+
+test('issue 284: memev doctor --fix leaves the apps unconnected after memev init --no-connect', () => {
+  const sb = sandbox();
+  const codex = path.join(sb.home, '.codex'); fs.mkdirSync(codex, { recursive: true });
+  try {
+    assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
+    const d = sb.run(['doctor', '--json']);
+    const apps = JSON.parse(d.out).find((c) => c.id === 'apps');
+    assert.equal(apps.status, 'ok', `the apps check asks for a fix the person declined: ${JSON.stringify(apps)}`);
+    assert.ok(!apps.fix, 'the apps check offers to connect every app');
+    sb.run(['doctor', '--fix']);
+    assert.deepEqual(fs.readdirSync(codex), [], 'doctor --fix connected an app the person had not approved');
+    assert.equal(cfg(sb).clients?.auto_connect, false);
+  } finally { sb.stop(); }
+});
+

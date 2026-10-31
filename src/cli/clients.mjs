@@ -557,7 +557,7 @@ export async function command(cmd, pos, flags, { env, root }) {
     if (ids.length && !flags['dry-run']) await seatOnBus({ root, env, ids, flags });
     // connecting every app is what the background connect does, so asking for it turns that back on after memev init --no-connect;
     // memev connect <app> leaves it off, so one yes connects one app (issue 284)
-    if (target === 'all' && !flags['dry-run'] && root) {
+    if (target === 'all' && !flags['dry-run'] && !flags.project && root) {
       const f = path.join(root, '.memev', 'config.json'); const c = readJson(f, null);
       if (c?.clients?.auto_connect === false) { delete c.clients.auto_connect; writeJson(f, c, 0o600); out.info('Memev connects AI apps it finds from now on (memev init --no-connect had turned that off)'); }
     }
