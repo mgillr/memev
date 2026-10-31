@@ -1,15 +1,82 @@
 #!/bin/sh
-# Local Docker check (not run in CI): build, self-test, compose up, MCP with a token, 401 without.
+# Docker persistence check (not run in CI; run it from the repository root). MEMEV_IMAGE names a
+# published image to pull; without it the image is built locally. The script starts the container,
+# waits for the health check with a deadline (MEMEV_SMOKE_HEALTH_TIMEOUT, default 60 seconds),
+# checks that an MCP call without a token is refused with 401 through the published port and that
+# one with a token issued in the container is served there, writes a note unique to this run through
+# the CLI inside the container, removes the container and creates it again from the volume, reads the
+# note back, then checks that compose down keeps the volume.
+#
+# Everything runs in a compose project of its own (memev-smoke), so a memev deployed from this
+# checkout keeps its container and its vault volume; the smoke project's volume is removed at the
+# end. The port is the one compose.yaml publishes (MEMEV_PORT, default 7787): if a memev on this
+# machine already publishes it, run the smoke with MEMEV_PORT set to a free port.
 set -eu
-docker build -t memev:local .
-docker run --rm --entrypoint memev memev:local selftest
-docker compose up -d --build
-trap 'docker compose down -v' EXIT
-for i in $(seq 1 30); do curl -fs http://127.0.0.1:7787/healthz && break; sleep 1; done
-TOKEN=$(docker compose exec -T memev memev token issue smoke-host | tail -1)
-curl -fs -X POST http://127.0.0.1:7787/mcp -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"memev_remember","arguments":{"text":"compose smoke test memory","kind":"fact"}}}' | grep -q '"seq"'
-curl -fs -X POST http://127.0.0.1:7787/mcp -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"memev_recall","arguments":{"query":"compose smoke test"}}}' | grep -q 'compose smoke test memory'
-test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:7787/mcp -d '{}')" = 401
+
+fail() { echo "docker smoke: failed at $1" >&2; exit 1; }
+
+HEALTH_TIMEOUT="${MEMEV_SMOKE_HEALTH_TIMEOUT:-60}"
+PROJECT=memev-smoke
+VOLUME="${PROJECT}_memev-vault"
+PORT="${MEMEV_PORT:-7787}"
+# A note no earlier run wrote: reading it back proves this run's write survived the container, and
+# the write gate never takes it for a duplicate of an earlier run's note.
+NOTE="docker smoke note $(date +%s)-$$"
+
+dc() { docker compose -p "$PROJECT" "$@"; }
+
+if [ -n "${MEMEV_IMAGE:-}" ]; then
+  docker pull "$MEMEV_IMAGE" || fail "pull $MEMEV_IMAGE"
+else
+  dc build || fail "build"
+fi
+
+trap 'dc down -v' EXIT
+
+dc up -d || fail "up"
+
+wait_healthy() {
+  start=$(date +%s)
+  while :; do
+    state=$(dc ps --format json 2>/dev/null | grep -o '"Health":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+    if [ "$state" = "healthy" ]; then
+      echo "container is healthy"
+      return 0
+    fi
+    now=$(date +%s)
+    if [ $((now - start)) -ge "$HEALTH_TIMEOUT" ]; then
+      return 1
+    fi
+    sleep 1
+  done
+}
+
+wait_healthy || fail "wait for healthy"
+
+# LAB-TEST-PLAN T-INS-04: an MCP call without a token through the published port is refused
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X POST "http://127.0.0.1:$PORT/mcp" -d '{}' || true)
+[ "$code" = "401" ] || fail "401 without a token (got ${code:-no answer})"
+
+# a token issued in the container is served through the published port: the host reaches the vault the
+# way an app does, so a gateway the server does not take as local fails here, not only in the apps
+token=$(dc exec -T memev memev token issue docker-smoke --scopes read | tail -n 1 | tr -d '\r') || fail "issue a token"
+code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X POST "http://127.0.0.1:$PORT/mcp" -H "authorization: Bearer $token" -H 'content-type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' || true)
+[ "$code" = "200" ] || fail "an MCP call with an issued token through the published port (got ${code:-no answer})"
+
+dc exec -T memev memev remember "$NOTE" --kind fact || fail "remember"
+
+# remove the container and create it again: a restart keeps the container's own files, so only this
+# shows the note lives in the volume
+dc down || fail "down before the read-back"
+dc up -d || fail "up again"
+
+wait_healthy || fail "wait for healthy after up again"
+
+out=$(dc exec -T memev memev recall "$NOTE" 2>&1) || fail "recall"
+echo "$out" | grep -qF "$NOTE" || fail "read the note back"
+
+dc down || fail "down"
+
+docker volume inspect "$VOLUME" >/dev/null 2>&1 || fail "volume $VOLUME kept after down"
+
 echo "docker smoke: ok"
