@@ -16,9 +16,15 @@
         "installLicense refuses a licence carrying name, email or machine exactly as activateLicense does, and writes no file; the test installs such a licence from file and asserts the refusal (the twin measured install writing a licence that activate refuses: src/cli/licensing.mjs:148-151 never calls extraFields, :90 does)",
         "a trial licence and an org licence install from file and activate by key under the same rule; the schema header states which non-identity fields (trial, org, trial_ext) a licence may carry",
         "the schema check lives in verifyLicense, so install, activate, loadLicense and every reader apply one rule; the trial rules (one trial per organisation, a trial never replaces a live paid licence) live in one function that install and activate both call",
-        "the relay default that the activation server sends beside the licence (the wrapper's relay object) is the one unsigned exception: the schema lists it as a wrapper field; it is typed and validated (default_url a relay://host:port address exactly as src/cli/relay.mjs accepts it, default_domain a domain name, nothing else); it is applied only when no relay is configured; a malformed value is ignored with a warning and activation still succeeds; docs state that it is unsigned; every field read from the licence itself is a signed schema field",
+        "the relay default that the activation server sends beside the licence (the wrapper's relay object) is the one unsigned exception: the schema lists it as a wrapper field; it is typed and validated (default_url a relay://host:port address exactly as src/cli/relay.mjs accepts it, default_domain a domain name (two or more labels of 1 to 63 letters, digits or hyphens, none starting or ending with a hyphen, and not an IP address), nothing else); it is applied only by activateLicense, only after the licence and the wrapper are accepted, and only when no relay is configured (configured: a relay url is set, enabled or not, or a default_url is already stored); installLicense never applies a relay object read from a file and prints a warning naming relay; a default is stored whole or not at all; a malformed value is ignored with a warning and activation still succeeds; docs state that it is unsigned; every field read from the licence itself is a signed schema field",
         "a trial licence must carry org, so the one-trial-per-organisation rule cannot be sidestepped by leaving org out; existing fixtures that build a trial without org gain one",
         "keys that name Object.prototype members (__proto__, constructor, toString) are unknown fields, and an org of that name never reaches a prototype through the trial record",
+        "an expired licence is accepted by both installLicense and activateLicense in a fresh config dir (test/trial-convert.test.mjs installs an expired trial there) and refused by both, with the same reason, while a live licence or a live trial is installed; a not-yet-valid licence is refused by both; docs/PRICING.md says so",
+        "org matches exactly /^org_[A-Za-z0-9_-]{4,64}$/, so no prototype member name and no e-mail address can be an org",
+        "install and activate store the licence object alone, written again from the verified licence (no wrapper, no byte-order mark, no padding), so loadLicense reads back exactly what was accepted",
+        "the trial record is written before license.json, and a failure writing it refuses the install or the activation with no licence written",
+        "the size limit is measured in UTF-8 bytes on both paths",
+        "verifyLicense returns trial, org and trial_ext with the other fields it returns, so every reader of the verified licence can apply the trial-in-grace rule that src/engine/merge.mjs applies",
         "each red-green criterion of this task that runs test/license-schema.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
@@ -90,7 +96,7 @@
           }
         },
         {
-          "statement": "In a fresh config dir, a signed licence that expired more than grace_days ago gets the same ok from installLicense(file) as from activateLicense(fetchImpl -> same object), and when refused, neither writes licenseFile(env). Either outcome is acceptable as long as it is the owner's choice and the same on both paths. Repeat for not_yet_valid.",
+          "statement": "In a fresh config dir, a signed licence that expired more than grace_days ago is accepted by both installLicense(file) and activateLicense(fetchImpl -> same object), with the same result (the fresh-directory decision, which test/trial-convert.test.mjs needs). A not-yet-valid licence is refused by both, and neither writes licenseFile(env).",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/license-schema.test.mjs",
@@ -114,7 +120,7 @@
           }
         },
         {
-          "statement": "The test reads src/engine/license.mjs, takes the comment block before the first `import`, and checks three things: the set of quoted keys in its example equals the set of LICENSE_FIELDS; the block names trial, org and trial_ext as non-identity fields; every LICENSE_FIELDS entry appears in it. This is red at base because the header lacks trial/org/trial_ext.",
+          "statement": "The test reads src/engine/license.mjs, takes the comment block before the first `import`, and checks three things: the set of quoted keys in its licence example equals the set of LICENSE_FIELDS (the wrapper fields license, relay, default_url and default_domain are named in a separate wrapper example); the block names trial, org and trial_ext as non-identity fields; every LICENSE_FIELDS entry appears in it. This is red at base because the header lacks trial/org/trial_ext.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/license-schema.test.mjs",
@@ -195,7 +201,7 @@
           }
         },
         {
-          "statement": "For the wrapper {license:<valid signed>, relay:{...}}, and for wrappers that add each of ['email','customer_id','hostname','note']: activateLicense (fetchImpl) and installLicense (a file holding the same bytes, root set) return the same ok, write the same licence bytes or none, and leave the same relaySetting(root). Every wrapper key other than license (and relay, if the owner keeps it) is refused with a reason naming the key.",
+          "statement": "For the wrapper {license:<valid signed>, relay:{...}}, and for wrappers that add each of ['email','customer_id','hostname','note']: activateLicense (fetchImpl) and installLicense (a file holding the same bytes, root set) return the same ok and write the same licence bytes or none; a refused wrapper leaves relaySetting(root) unchanged on both paths, and an accepted wrapper's relay object is applied by activateLicense only, while installLicense prints a warning naming relay. Every wrapper key other than license and relay is refused with a reason naming the key.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/license-schema.test.mjs",
@@ -244,18 +250,106 @@
           }
         },
         {
+          "statement": "The new test file, copied into a clean tree of the base commit, loads there (so it imports only symbols that exist at base) and is red for the right reasons: at least 20 top-level tests run and at least 15 fail.",
+          "verifier": {
+            "type": "command",
+            "cmd": "b=$(mktemp -d) && git archive be457dbd829c89e48fbd3f19b72d43864cd97fd8 | tar -x -C \"$b\" && cp test/license-schema.test.mjs \"$b/test/\" && out=$(cd \"$b\" && MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap test/license-schema.test.mjs 2>&1); t=$(printf '%s\\n' \"$out\" | sed -n 's/^# tests \\([0-9]*\\)$/\\1/p'); f=$(printf '%s\\n' \"$out\" | sed -n 's/^# fail \\([0-9]*\\)$/\\1/p'); [ \"${t:-0}\" -ge 20 ] && [ \"${f:-0}\" -ge 15 ]",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Two cases are each run through installLicense(file) and activateLicense(fetchImpl). (1) A live signed paid licence is installed. (2) Separately, a live signed trial for org_exp0001 is installed. In each case a signed paid licence whose exp plus grace_days is before now is refused by both paths with the same reason. The installed licence bytes stay unchanged, and readTrialRecord(env).org_exp0001 keeps ended === null and converted_to === null. The spec states the fresh-directory decision (accept on both paths), and PRICING.md no longer says an expired licence leaves no file.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c28:' test/license-schema.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c28:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The setup has root set and relaySetting(root) with url, default_url and enabled all unset. installLicense is given a file holding exactly {license:<valid signed>, relay:{default_url:'relay://127.0.0.1:9', default_domain:'relay.test'}}. It returns the same ok and writes the same licence bytes as activateLicense on those bytes. It leaves relaySetting(root).default_url and default_domain null and prints a warning naming relay. activateLicense stores both. C21 is amended to compare relaySetting only for refused wrappers, and the spec defines 'configured' (url set, enabled or not, or default_url already set).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c29:' test/license-schema.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c29:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Each answer below carries relay:{default_url:'relay://127.0.0.1:9', default_domain:'relay.test'}: a wrapper with email, a licence signed by a foreign key, a licence with an unknown field, a trial over a live paid licence, and an expired licence over a live licence. For each, activateLicense and installLicense return ok:false, relaySetting(root).default_url and default_domain stay null, and the bytes of root/.memev/config.json are unchanged.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c30:' test/license-schema.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c30:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "verifyLicense returns 'invalid' with a reason naming org for signed trials whose org is '__proto__', 'constructor', 'toString', 'hasOwnProperty', '' or null. installLicense and activateLicense refuse each one, and write neither license.json nor trials.json. Afterwards ({}).ended, ({}).converted_to and ({}).lid are undefined. The spec pins org to exactly /^org_[A-Za-z0-9_-]{4,64}$/.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c31:' test/license-schema.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c31:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "This covers every input that installLicense or activateLicense accepts in this file: a bare licence, a wrapper with relay, a U+FEFF-prefixed licence, a 70 KiB padded licence, a trial, a trial_ext licence and an org licence. After each one, loadLicense({env, keys, now}) returns state 'valid' with the same lid, and JSON.parse of license.json has exactly the licence's own keys, with no license or relay key.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c32:' test/license-schema.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c32:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "activateLicense is given wrapper relay {default_url:'relay://127.0.0.1:9', default_domain:X} for each X in ['.', '..', '-', 'a..test', '-a.test', 'a'.repeat(64)+'.test', 'relay_test.example', '127.0.0.1']. Each time it returns ok:true, prints a warning naming default_domain, and leaves default_url and default_domain both null, with no partial store.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c33:' test/license-schema.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c33:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "In a fresh config dir, a directory is created at the trials.json path so the record cannot be written. installLicense(file) and activateLicense(fetchImpl) with a signed trial for org_crash0001 both return ok:false (or throw), and license.json does not exist afterwards. So the record is written first, or both files are committed together.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c34:' test/license-schema.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c34:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A table-driven test covers installed licence {none, paid valid, paid grace, paid expired, paid not_yet_valid, trial valid org A, trial expired org A, unsigned forged trial} × trial record {none, org A with another lid, org A ended} × incoming {paid valid, paid expired, paid not_yet_valid, trial org A, trial org A with trial_ext, trial org B}. Each combination runs through installLicense(file) in one config dir and activateLicense(fetchImpl) in an identical copy. The test asserts that ok, the reason, the license.json bytes and the trials.json bytes are identical.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c35:' test/license-schema.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c35:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A signed licence whose services hold one string of 40,000 U+00E9 characters gets the same ok from installLicense(file) as from activateLicense with fetchImpl returning new Response(sameBytes).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c36:' test/license-schema.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c36:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
           "statement": "The wrapper relay exception: activation with a valid relay://host:port default and a domain stores both when no relay is configured; with a relay already configured it changes nothing; with a malformed default (an https URL, a missing port, an extra key) it stores nothing, prints a warning naming the field and still installs the licence",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/license-schema.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c27:' test/license-schema.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c27:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c37:' test/license-schema.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c37:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
-          "statement": "One full run of test/license-schema.test.mjs passes every labelled subtest (T1-c01, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c11, T1-c13, T1-c14, T1-c15, T1-c16, T1-c17, T1-c18, T1-c19, T1-c20, T1-c21, T1-c22, T1-c24, T1-c25, T1-c26, T1-c27) with nothing skipped and nothing todo.",
+          "statement": "changelog.d/SR-1.06.md exists.",
+          "verifier": {
+            "type": "file_exists",
+            "path": "changelog.d/SR-1.06.md"
+          }
+        },
+        {
+          "statement": "One full run of test/license-schema.test.mjs passes every labelled subtest (T1-c01, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c11, T1-c13, T1-c14, T1-c15, T1-c16, T1-c17, T1-c18, T1-c19, T1-c20, T1-c21, T1-c22, T1-c24, T1-c25, T1-c26, T1-c28, T1-c29, T1-c30, T1-c31, T1-c32, T1-c33, T1-c34, T1-c35, T1-c36, T1-c37) with nothing skipped and nothing todo.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/license-schema.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c04:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c13:|^T1-c14:|^T1-c15:|^T1-c16:|^T1-c17:|^T1-c18:|^T1-c19:|^T1-c20:|^T1-c21:|^T1-c22:|^T1-c24:|^T1-c25:|^T1-c26:|^T1-c27:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/license-schema.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c04:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c13:|^T1-c14:|^T1-c15:|^T1-c16:|^T1-c17:|^T1-c18:|^T1-c19:|^T1-c20:|^T1-c21:|^T1-c22:|^T1-c24:|^T1-c25:|^T1-c26:|^T1-c28:|^T1-c29:|^T1-c30:|^T1-c31:|^T1-c32:|^T1-c33:|^T1-c34:|^T1-c35:|^T1-c36:|^T1-c37:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
             "timeout_s": 600
           }
         },

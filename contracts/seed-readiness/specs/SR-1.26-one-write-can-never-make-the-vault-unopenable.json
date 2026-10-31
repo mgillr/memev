@@ -14,11 +14,14 @@
         "the refusal reaches every caller as a 4xx with that reason (MCP tools and HTTP PUT and PATCH), never a 500, and the log, the files and the recall index are unchanged by it",
         "the check runs on the materialised view of the log, so a path that exists only in the log (a file deleted by hand) still conflicts",
         "every logging entry point (write, append, remember, checkpoint, journal and the external-import path) asks the file system first: it creates the parent folders and writes the temporary file, and appends to the log only when that succeeded; a failure there refuses the operation with nothing logged; the rename after the append is the only step that can fail after logging, and SR-1.22, which builds on this contract, completes it from the log; until SR-1.22 lands, that one window keeps the behaviour of G87",
-        "the path rules of this requirement apply to every path a call would create (write, append, remember, checkpoint, journal and the external import): a NUL byte, any other C0 control character or DEL; a segment longer than 255 UTF-8 bytes or a path longer than 1024 UTF-8 bytes; a segment ending in a dot or a space; a parent segment ending in a note extension, matched without regard to case; and a path whose fold key (per segment: NFC, then toUpperCase(), then toLowerCase()) equals an existing live head, or one of its parent folders, under a different spelling, so a vault moved between Linux, macOS and Windows cannot hold two names one file system sees as one; get, delete, review, why and provenance accept every path the log already holds",
+        "the path rules of this requirement apply to every path a call would create (write, append, remember, checkpoint, journal and the external import): a NUL byte, any other C0 control character or DEL; a segment longer than 255 UTF-8 bytes or a path longer than 1024 UTF-8 bytes (on darwin, also one whose join with the vault root is longer than 1024 bytes); a segment ending in a dot or a space; a segment holding any of the characters : < > | ? * or the double quote, or naming a Windows device (CON, PRN, AUX, NUL, COM1 to COM9 or LPT1 to LPT9, with or without an extension), without regard to case; a parent segment ending in a note extension, matched without regard to case; and a path whose fold key (per segment: NFC, then toUpperCase(), then toLowerCase()) equals an existing live head, or one of its parent folders, under a different spelling, so a vault moved between Linux, macOS and Windows cannot hold two names one file system sees as one; get, delete, review, why and provenance accept every path the log already holds, and a path that already has a live head (a legacy path written before this change) is still written, appended and imported from disk as before; the rules apply only to paths with no live head",
         "delete removes the folders it leaves empty up to the vault root, so a later write of a note with that folder's name is not refused by an empty folder",
-        "the task adds its helpers in new files under test/helpers/ and changes no existing helper, which 123 test files share",
+        "the task adds its helpers in new files under test/helpers/ and changes no existing helper, which the other test files share",
         "a target that exists on disk as a folder, whether or not it holds notes, or as anything other than a regular file, is refused before anything is logged, naming the target; no temporary file is left",
         "a conflict refusal is a VaultError with code conflict and a field conflict naming the other path; HTTP answers 409 with that field in its JSON body, and the MCP text starts with 'conflict:'",
+        "write, append and delete refuse, naming the path and before anything is logged, a path whose target or any existing folder between the vault root and the target is a symbolic link or a junction; allNotes lists regular files only, so a link named *.md is never a note; once SR-1.27's protected-path check is in place it runs first, so a link into a protected folder answers immutable",
+        "the temporary file of a write keeps its final segment within 255 bytes (for a long note name, a short name such as .<8 hex>.tmp in the same folder), so every path the rules allow can be written",
+        "the conflict and path checks run before the syncFromDisk that write and append call first, so a refused call reads and logs nothing",
         "each red-green criterion of this task that runs test/vault-path-conflict.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
       ],
       "scope": [
@@ -187,10 +190,58 @@
           }
         },
         {
-          "statement": "One full run of test/vault-path-conflict.test.mjs passes every labelled subtest (T1-c01, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c12, T1-c13, T1-c15, T1-c16, T1-c18) with nothing skipped and nothing todo.",
+          "statement": "T1-c19: outside/secret.txt and outside/dir/ sit next to the vault root in the temp dir. Plant notes/l.md -> ../../outside/secret.txt, notes/twin.md -> a.md (with note notes/a.md written) and the folder link notes/ext -> <absolute outside/dir>. Through vault.write, vault.append, MCP memev_write and memev_append, and HTTP PUT and PATCH on notes/l.md, notes/twin.md and notes/ext/n.md, each call is refused (VaultError, isError, HTTP 4xx, never 500) naming the path. After that: outside/secret.txt and notes/a.md are byte-identical; outside/dir has no new entry; log.seq is unchanged; no head's body equals secret.txt's bytes; vault.syncFromDisk('notes/l.md','git-pull') returns null and logs nothing; HTTP GET of notes/l.md does not return secret.txt's bytes; a fresh open records each link in the skipped list and logs nothing; and v.rebuildInto(tmp) creates no link.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-path-conflict.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c19:' test/vault-path-conflict.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c19:' && ! printf '%s\\n' \"$out\" | grep -Eq 'T1-c19:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c19:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c20: vault.write, vault.append, MCP memev_write and memev_append, and HTTP PUT and PATCH are each tried on three cases: notes/img.png/x.md (notes/img.png is a PNG on disk, never logged); notes/README/y/x.md (notes/README is a file with no extension); and, when not running as root, notes/ro/n.md where notes/ro is chmod 0555 (asserted inside the subtest, not a node skip). Each call is refused (VaultError with a 4xx code, isError, HTTP 4xx, never 500) naming the path. log.seq is unchanged; no folder, file or *.tmp is created; a fresh open records no skipped path.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-path-conflict.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c20:' test/vault-path-conflict.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c20:' && ! printf '%s\\n' \"$out\" | grep -Eq 'T1-c20:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c20:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c21: write notes/keep.md, notes/a.md/b.md and notes/x/y/z.md. Delete b.md with vault.delete and z.md with HTTP DELETE. Afterwards the folders notes/a.md, notes/x/y and notes/x do not exist, while notes/, the vault root and .memev/ do. Then vault.write of notes/a.md and an HTTP PUT of notes/a.md with a second body each succeed (200); log.seq rises by exactly 2; a fresh open reads the second body with no skipped path.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-path-conflict.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c21:' test/vault-path-conflict.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c21:' && ! printf '%s\\n' \"$out\" | grep -Eq 'T1-c21:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c21:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c22: for notes/ + 'x'.repeat(252) + '.md' (final segment exactly 255 bytes) and notes/ + 'y'.repeat(255) + '/n.md', vault.write, vault.append, MCP memev_write and HTTP PUT each succeed. A fresh open reads each body byte for byte with no skipped path, and no *.tmp remains. notes/ + 'x'.repeat(253) + '.md' is refused with HTTP 4xx and log.seq unchanged.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-path-conflict.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c22:' test/vault-path-conflict.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c22:' && ! printf '%s\\n' \"$out\" | grep -Eq 'T1-c22:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c22:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c23 (green at base, so this is a command criterion): the c14 legacy vault plus notes/caf\\u00e9.md. Overwrite each legacy file by hand with new bytes, call vault.syncFromDisk(p, 'git-pull') for each, then close and reopen. No call throws; each head's ch equals sha256 of the new bytes and materialize returns them; the skipped list is empty; fileChecks names none of the paths.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/vault-path-conflict.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c12:|^T1-c13:|^T1-c15:|^T1-c16:|^T1-c18:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c23:' test/vault-path-conflict.test.mjs 2>&1); printf '%s\\n' \"$out\" | awk -v pat='^T1-c23:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' && printf '%s\\n' \"$out\" | grep -Eq '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c23:' && ! printf '%s\\n' \"$out\" | grep -Eq 'T1-c23:.*# (SKIP|TODO)'",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "T1-c24: through vault.write and HTTP PUT, notes/x.md:y.md, notes/con.md, notes/aux/n.md, notes/a<b.md, notes/a|b.md, notes/a?.md, notes/a*.md and notes/a\"b.md are each refused with 4xx naming the path, log.seq unchanged. A path whose join with the vault root exceeds 1024 bytes, while the relative path is under 1024, is refused on darwin. If ':' and the others are ruled legitimate on macOS and Linux, the owner must instead accept that a Windows open only skips them, and say so in the requirement.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-path-conflict.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c24:' test/vault-path-conflict.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c24:' && ! printf '%s\\n' \"$out\" | grep -Eq 'T1-c24:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c24:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/vault-path-conflict.test.mjs passes every labelled subtest (T1-c01, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c12, T1-c13, T1-c15, T1-c16, T1-c18, T1-c19, T1-c20, T1-c21, T1-c22, T1-c23, T1-c24) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/vault-path-conflict.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c12:|^T1-c13:|^T1-c15:|^T1-c16:|^T1-c18:|^T1-c19:|^T1-c20:|^T1-c21:|^T1-c22:|^T1-c23:|^T1-c24:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
             "timeout_s": 600
           }
         },
@@ -216,13 +267,19 @@
       "requirements": [
         "recover() handles each path on its own: a path that cannot be materialised is skipped with its reason recorded (a skipped list the doctor shows; SR-1.21 also surfaces it), and recovery continues with the other paths; Vault.open() never throws because of one path",
         "a vault whose log already holds the conflicting put written by the code at be457db opens, every other note reads its logged body, and memev doctor reports the conflicting path with the command that resolves it",
-        "nothing is appended to the log by recovery",
+        "recovery appends nothing for a path it skips; a note that exists only on disk at a free, clean path, and a hand edit of a note, are imported once as before",
         "per-path recovery covers recover(), rebuildInto and _importExternal: each handles every error class on one path (EEXIST, ENOTDIR, EISDIR, ERR_INVALID_ARG_VALUE, ENAMETOOLONG and any other), records the path, and continues; a test drives at least three error classes through each",
         "a skipped head is marked unrecoverable in memory and is never turned into an external delete by syncFromDisk, a pull or the doctor's fix; writes to the good side of a conflict keep working",
         "the walk loop of recover() and rebuildInto skip a symlink (dangling or to a folder) and any entry that cannot be read, recording its reason; a link is never followed out of the vault",
         "T1's conflict check counts a head that recovery skipped as absent, so the good side of an existing conflict stays writable before any resolving command",
         "the resolving command is memev doctor --resolve <path>: it logs a put of the skipped note's body at a free path the doctor names, then a delete of the old head, so the note stays listed, readable and searchable",
         "the fixture's .memev files are committed with git add -f, so a clean clone holds the fixture vault",
+        "syncFromDisk, the git-pull loop in src/cli/sync.mjs and recover()'s import of notes that exist only on disk check each path with T1's rules; a path that breaks one is skipped and listed with its reason, never stops the sync, and the pull still commits and pushes the other paths",
+        "the resolving command quotes each path for a POSIX shell (single quotes, an embedded single quote closed, escaped and reopened) after a '--', and the human doctor output shows control characters in paths escaped; --json carries the raw path",
+        "when two live heads share a fold key on a case-insensitive file system, recover() skips one of the pair, lists it with its reason, and never imports one twin's bytes as the other's new version",
+        "memev doctor --resolve runs through the daemon when it is running and opens the vault itself only when the daemon is stopped, so a resolve is never a second writer of the log",
+        "the resolve never removes a folder or a file that belongs to another head: when the skipped head's path is a folder holding good notes, it logs the delete of the skipped head without touching the disk, and the moved note is indexed for recall",
+        "the skipped list reaches memev doctor with the daemon running through a check id the doctor relays from the daemon, or the relay filter in src/cli/doctor.mjs widens to include that check's id",
         "each red-green criterion of this task that runs test/vault-open-conflict.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest"
       ],
       "scope": [
@@ -234,7 +291,8 @@
         "docs/MODULES.md",
         "changelog.d/SR-1.26.md",
         "src/cli/sync.mjs",
-        "src/cli/main.mjs"
+        "src/cli/main.mjs",
+        "src/server/http.mjs"
       ],
       "criteria": [
         {
@@ -328,7 +386,7 @@
           }
         },
         {
-          "statement": "A helper in test/helpers checks, after every case in both new test files, that every pair of non-deleted heads in vault.log.heads where one equals by fold key a segment-wise ancestor of the other has exactly one member in the skipped list; in T1's file, where nothing is skipped, no such pair exists. One added case: write notes/a.md, close, replace the file by a folder holding b.md, and reopen. The vault opens, the log has no live notes/a.md/b.md head under a live notes/a.md, notes/a.md's logged body can still be read, the doctor names the path, and log.seq is unchanged by the open.",
+          "statement": "A helper in test/helpers checks, after every case in both new test files, that every pair of non-deleted heads in vault.log.heads where one equals by fold key a segment-wise ancestor of the other has exactly one member in the skipped list; a pair of case twins on a case-sensitive file system (T1-c14's legacy notes/Todo.md and notes/todo.md) is exempt, because both stay live there, and otherwise no such pair exists in T1's file, where nothing is skipped. One added case: write notes/a.md, close, replace the file by a folder holding b.md, and reopen. The vault opens, the log has no live notes/a.md/b.md head under a live notes/a.md, notes/a.md's logged body can still be read, the doctor names the path, and log.seq is unchanged by the open.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/vault-open-conflict.test.mjs",
@@ -377,6 +435,54 @@
           }
         },
         {
+          "statement": "T2-c17: a fixture-1 copy as a git repository with a bare remote. A second clone commits and pushes notes/z.md (clean) plus notes/a\\u0001.md, clients/Acme Co./p.md, notes/spec.md/v2.md and 'notes/a\\\\b.md'. Run syncOnce(vault, { root }). It does not throw and returns pushed true and error null. log.seq rises by exactly one (notes/z.md), and vault.log.heads has no entry for any of the other four. A fresh open logs nothing and lists the four in the skipped list with their reasons. memev doctor --json names them both with the daemon stopped and with it running, so the check id must pass the filter at doctor.mjs:262.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-open-conflict.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c17:' test/vault-open-conflict.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - T2-c17:' && ! printf '%s\\n' \"$out\" | grep -Eq 'T2-c17:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2-c18: a fixture copy whose log (vault.log.append, as at be457db) holds note notes/a.md with these skipped heads under it: 'notes/a.md/x $(touch PWNED1) `touch PWNED2`; touch PWNED3.md' and 'notes/a.md/k=v.md'. It also holds top-level note '--x.md' with skipped '--x.md/y.md', and 'notes/a.md/e\\u001b]52;c;eA==\\u0007.md'. For each of the first three, the test takes the resolving command from the human memev doctor output and from --json and runs it with sh -c from the vault root. Afterwards no PWNED* file exists, the doctor no longer names that path, its body reads at the moved path, and no other skipped path was resolved. The human output contains no byte below 0x20 other than \\n and \\t.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-open-conflict.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c18:' test/vault-open-conflict.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - T2-c18:' && ! printf '%s\\n' \"$out\" | grep -Eq 'T2-c18:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c18:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2-c19 (red on a case-insensitive host, which includes the verifying Mac): a fixture whose log (vault.log.append) holds notes/Todo.md (body A) then notes/todo.md (body B). Disk holds what git would leave: one file with body B on a case-insensitive file system, both files on a case-sensitive one. new Vault(root).open() succeeds; log.seq is unchanged; each head's ch is unchanged and materialize returns its own body. On a case-insensitive file system: exactly one of the pair is in the skipped list; vault.get of the other returns its own body; the doctor names the skipped one with its resolving command; after running that command both bodies read at distinct paths and a fresh open skips neither. On a case-sensitive file system, both read their own body and nothing is skipped.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-open-conflict.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c19:' test/vault-open-conflict.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - T2-c19:' && ! printf '%s\\n' \"$out\" | grep -Eq 'T2-c19:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c19:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2-c20: with the daemon running on a fixture-1 copy, a client sends PATCH /v1/notes/notes/busy.md and POST /v1/journal every 20 ms, from 1 s before until 2 s after the resolving command (parsed from memev doctor --json) runs as a subprocess. After memev stop: log.verify().ok is true; every seq from 1 to log.seq occurs exactly once across the segments; the resolve's put and its delete of notes/a.md/b.md each occur exactly once; a fresh open has heads.get('notes/a.md/b.md').deleted true and no skipped path; every PATCH that got a 200 has its text in notes/busy.md as rebuilt from the log.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-open-conflict.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c20:' test/vault-open-conflict.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - T2-c20:' && ! printf '%s\\n' \"$out\" | grep -Eq 'T2-c20:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c20:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2-c21: on a fixture-2 copy with the daemon running, run the resolving command for notes/a.md, parsed from memev doctor --json, as a subprocess. Afterwards notes/a.md/b.md is byte-identical on disk, its head is not deleted and GET returns it. GET of the moved path returns notes/a.md's logged body. POST /v1/recall with client cli and a word found only in notes/a.md's body returns a hit at the moved path; the same recall check holds on fixture 1 for b.md's moved path. After memev stop, a fresh open has no skipped path and log.verify().ok is true.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-open-conflict.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c21:' test/vault-open-conflict.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - T2-c21:' && ! printf '%s\\n' \"$out\" | grep -Eq 'T2-c21:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c21:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2-c22 (green at base, so this is a command criterion): with the vault closed, create notes/free.md by hand at a free, clean path and edit notes/other.md by hand, then open. notes/free.md has a live head whose ch is sha256 of its bytes, and notes/other.md's head ch matches its new bytes, each imported exactly once. A second open leaves log.seq unchanged.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c22:' test/vault-open-conflict.test.mjs 2>&1); printf '%s\\n' \"$out\" | awk -v pat='^T2-c22:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' && printf '%s\\n' \"$out\" | grep -Eq '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - T2-c22:' && ! printf '%s\\n' \"$out\" | grep -Eq 'T2-c22:.*# (SKIP|TODO)'",
+            "expect_exit": 0
+          }
+        },
+        {
           "statement": "No existing file under test/helpers is modified, deleted or renamed relative to the base commit.",
           "verifier": {
             "type": "command",
@@ -385,10 +491,10 @@
           }
         },
         {
-          "statement": "One full run of test/vault-open-conflict.test.mjs passes every labelled subtest (T2-c01, T2-c06, T2-c07, T2-c08, T2-c09, T2-c11, T2-c12, T2-c13, T2-c14, T2-c15) with nothing skipped and nothing todo.",
+          "statement": "One full run of test/vault-open-conflict.test.mjs passes every labelled subtest (T2-c01, T2-c06, T2-c07, T2-c08, T2-c09, T2-c11, T2-c12, T2-c13, T2-c14, T2-c15, T2-c17, T2-c18, T2-c19, T2-c20, T2-c21, T2-c22) with nothing skipped and nothing todo.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/vault-open-conflict.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c06:|^T2-c07:|^T2-c08:|^T2-c09:|^T2-c11:|^T2-c12:|^T2-c13:|^T2-c14:|^T2-c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/vault-open-conflict.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c06:|^T2-c07:|^T2-c08:|^T2-c09:|^T2-c11:|^T2-c12:|^T2-c13:|^T2-c14:|^T2-c15:|^T2-c17:|^T2-c18:|^T2-c19:|^T2-c20:|^T2-c21:|^T2-c22:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
             "timeout_s": 600
           }
         },
