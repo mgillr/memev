@@ -279,7 +279,7 @@
         "QL-1.02"
       ],
       "tasks": 1,
-      "criteria": 30,
+      "criteria": 41,
       "spec": "specs/SR-1.21-a-missing-note-is-never-silent.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
