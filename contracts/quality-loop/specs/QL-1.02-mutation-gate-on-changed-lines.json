@@ -13,9 +13,16 @@
         "scripts/gate/mutate.mjs takes --base <sha> and --test <cmd>, lists the lines added or changed between base and the working tree in src/**/*.mjs, and applies one mutation at a time from a fixed operator set: === and !==, < and >=, > and <=, && and ||, true and false, + and - on numeric operands, a return value replaced by undefined, a call statement removed",
         "before any mutant it runs the test command twice on the unmutated tree; a failure or a differing pass count there is NOISE and the run stops with exit 2, never judging a mutant (the twin's ME-MT oracle was confounded without this control)",
         "each mutant runs in a temporary copy of the workdir that is removed in a finally block; the original tree is byte-identical after the run (checked by hashing the scope files before and after)",
-        "--json prints {mutants, killed, survived, noise, survivors:[{file,line,operator}]}; exit 1 when any mutant survives; a line carrying the comment mutate-ignore with a reason is skipped and counted as ignored",
+        "--json prints {status, mutants, killed, survived, invalid, timeout, ignored, noise, survivors:[{file,line,operator}], unmutated:[{file,line}]}; exit 1 when any mutant survives; a line carrying the comment mutate-ignore with a reason is skipped and counted as ignored",
         "the script has no dependencies and its first line carries a version: comment",
-        "a NOISE run and a run with zero mutants never report survived 0 as a result: --json carries status (ok, noise or no-mutants) and the survived value counts only when status is ok"
+        "a NOISE run and a run with zero mutants never report survived 0 as a result: --json carries status (ok, noise, no-mutants or error) and the survived value counts only when status is ok",
+        "a mutant counts as killed only when two runs of the test command on it both fail; a mutant whose two runs disagree stops the run with exit 2 and status noise",
+        "mutants counts judged mutants only, so mutants equals killed + survived; invalid, timeout and ignored mutants have their own counts; a run that judged no mutant exits non-zero with status no-mutants and no numeric survived",
+        "the operator set also covers: a call used as a condition negated, a ! removed, a throw statement removed, a bare return; removed, ?? replaced by ||, += and -= swapped, ++ and -- swapped, and an awaited call statement removed; --json lists under unmutated every changed line that produced no mutant",
+        "each run creates its own temporary directory with fs.mkdtempSync under os.tmpdir(), mode 0700, never a fixed path, and removes it in a finally block and on SIGINT and SIGTERM; two concurrent runs never share a copy",
+        "a --base that is empty, does not resolve to a commit, or begins with '-' stops the run with exit 2 and status error before any test runs",
+        "before judging mutants the run applies a no-op change (a trailing comment on one changed line) and runs the test command once; a failure there shows the tests react to the diff itself, and the run stops with exit 2 and status noise",
+        "every test command runs with HOME set to a fresh directory inside the run's temporary directory and MEMEV_NO_SERVICE=1, so a mutant's tests never touch the caller's home or register a service"
       ],
       "description": "",
       "scope": [
@@ -81,7 +88,7 @@
           }
         },
         {
-          "statement": "A fixture has one changed line per operator kind in requirement 1, in both directions: === and !==, < and >=, > and <=, && and ||, true and false, numeric + and -, return x, and a bare call statement. It also has one line `return a > b && c;`. With a weak test that only checks each function returns, the survivors' operator set covers every kind and the two-site line yields two survivors. With a strong test on the same lines, every mutant is killed and the run exits 0",
+          "statement": "A fixture has one changed line per operator kind in requirement 1 and in the added operator set, in both directions where the kind has two: === and !==, < and >=, > and <=, && and ||, true and false, numeric + and -, return x, a bare call statement, a call used as a condition, a ! operator, a throw statement, a bare return;, ??, += and -=, ++ and --, and an awaited call statement. It also has one line `return a > b && c;`. With a weak test that only checks each function returns, the survivors' operator set covers every kind and the two-site line yields two survivors. With a strong test on the same lines, every mutant is killed and the run exits 0",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-mutate.test.mjs",
@@ -105,13 +112,59 @@
           }
         },
         {
-          "statement": "The run judged at least one mutant on the changed lines",
+          "statement": "A fixture has one changed comparison and a weak test that fails on exactly its 3rd invocation, counted in a file outside the fixture whose path is passed by env. The run never reports that mutant as killed and never exits 0: it exits 1 with the mutant in survivors, or exits 2 with status noise.",
           "verifier": {
-            "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/fixtures/mutate/kill.test.mjs\" --json",
-            "key": "mutants",
-            "op": ">=",
-            "value": 1
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
+          }
+        },
+        {
+          "statement": "On a fixture whose only changed line is `i = i + 1;` inside an unchanged while loop (its one mutant times out), on one whose changed lines all carry `// mutate-ignore: reason`, and on one with no changed src lines: the run exits non-zero, status is not ok, survived is null or absent, and mutants is 0. On every fixture in the file, mutants equals killed + survived.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
+          }
+        },
+        {
+          "statement": "A fixture has the changed lines `if (blocked(p)) throw new Error('no');`, `if (!ok) return;`, `const v = a ?? b;`, `n += 1;` and `await save(x);`, with a weak test. Each of these lines appears in survivors. --json lists under unmutated every changed line that produced no mutant (here none), so status ok cannot hide a line that was never judged.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
+          }
+        },
+        {
+          "statement": "With TMPDIR set to an empty directory, two gate runs are started on a fixture with one strongly tested changed comparison and one weakly tested changed comparison; the second run's --test is prefixed with `sleep 1` so their mutants interleave. Both exit 1, both report exactly the weak line in survivors and the strong line killed, each run's temp directories are distinct and created with mode 0700, and TMPDIR is empty after both exit.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
+          }
+        },
+        {
+          "statement": "A fixture's weak test also fails whenever src differs from HEAD (git diff --quiet HEAD -- src), with the change under test committed. The run stops with exit 2 and status noise before judging any mutant, and killed is 0.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
+          }
+        },
+        {
+          "statement": "mutate.mjs run with --base '', with --base set to a 40-hex sha absent from the repository, and with --base '--output=PWNED' each exits 2 with status error. A marker the --test command would write stays absent, and no PWNED file exists in the fixture, the cwd or the temp directory.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
+          }
+        },
+        {
+          "statement": "The fixture's --test command appends $HOME and $MEMEV_NO_SERVICE to a log outside the fixture. Every logged HOME lies inside the run's temporary directory and differs from the caller's HOME, and every logged MEMEV_NO_SERVICE is 1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
           }
         },
         {
@@ -134,9 +187,15 @@
         "T1"
       ],
       "requirements": [
-        "the attest lint used by memev contract new warns when an implement task whose scope includes src/** has no metric criterion on scripts/gate/mutate.mjs with key survived, op ==, value 0",
-        "docs/CONTRACTS.md shows the criterion to copy and states that a test that survives a mutation is a weak test",
-        "the warning lives in the vendored attest lint (vendor/attest/contract.mjs), so memev contract new and contract decompose share it"
+        "the mutation lint warns at memev contract new, from-request, amend and decompose when an implement task whose scope includes src/** lacks the canonical mutation criteria: three mandatory metrics on one canonical scripts/gate/mutate.mjs command, survived == 0, mutants > 0 and ignored == 0",
+        "docs/CONTRACTS.md shows the three criteria to copy and states that a test that survives a mutation is a weak test",
+        "the lint is engine code in src/engine/mutation-lint.mjs, called by contractDraft, contractFromRequest, contractAmend, contractDecompose (with the scope's workdir when it names one) and contractSign; the vendored attest code is unchanged, because the checks need the workdir's project test command and vendored code cannot import the engine",
+        "with the vault setting contracts.mutation_required on, memev contract sign and the MCP sign tool refuse, with a ContractError naming the mutation criterion, a draft whose src-touching implement task has any mutation lint finding, and write no signed contract; whether the workdir holds scripts/gate/mutate.mjs plays no part; the setting is off by default because the gate does not ship in the package, and the warning text names the setting",
+        "the canonical command is node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"<T>\" --json, with <T> either projectTestCommand(workdir) or node --test followed only by paths matching test/**/*.test.mjs (a listed subset can only leave more survivors than the full suite); the lint compares shell tokens, so an appended command, a redirection, a pipe, a repeated flag or a literal base is a finding",
+        "a src-touching implement task whose scope is omitted, or matches scripts/gate/mutate.mjs or package.json, is a finding even when it carries the canonical criteria",
+        "the canonical criteria include ignored == 0, so a mutate-ignore line fails the contract; the mutate-ignore marker stays a feature of the command-line tool for runs outside a contract",
+        "metric criteria run through the metric verifier of SR-0.03, which keeps the command criterion's three gates; this contract adds no verifier branch to contractVerify",
+        "docs/CONTRACTS.md gives the canonical criteria with a timeout_s and states that a run costs up to 3 + 2N runs of the test command for N mutants"
       ],
       "description": "",
       "scope": [
@@ -144,13 +203,13 @@
         "docs/CONTRACTS.md",
         "test/gate-mutate-lint.test.mjs",
         "test/helpers/**",
-        "vendor/attest/contract.mjs",
         "docs/MODULES.md",
-        "changelog.d/QL-1.02.md"
+        "changelog.d/QL-1.02.md",
+        "src/engine/mutation-lint.mjs"
       ],
       "criteria": [
         {
-          "statement": "A draft with an implement task touching src and no mutation criterion gets the warning; one with it gets none",
+          "statement": "A draft with an implement task touching src and no mutation criterion gets the warning; one carrying the canonical criteria (the three metrics in docs/CONTRACTS.md) gets none",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-mutate-lint.test.mjs",
@@ -158,7 +217,7 @@
           }
         },
         {
-          "statement": "The contracts page carries the criterion and the weak-test rule",
+          "statement": "The contracts page carries the canonical criteria and the weak-test rule",
           "verifier": {
             "type": "grep",
             "file": "docs/CONTRACTS.md",
@@ -174,7 +233,7 @@
           }
         },
         {
-          "statement": "A draft whose src-touching implement task carries only the metric survived == 0 still gets the warning. The warning clears only when the task also carries a metric on the same mutate.mjs command with key mutants, op >, value 0, and docs/CONTRACTS.md shows both criteria",
+          "statement": "A draft whose src-touching implement task carries only the metric survived == 0 still gets the warning. The warning clears only when the task also carries metrics on the same mutate.mjs command with key mutants, op >, value 0 and with key ignored, op ==, value 0, and docs/CONTRACTS.md shows all three criteria",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-mutate-lint.test.mjs",
@@ -182,7 +241,7 @@
           }
         },
         {
-          "statement": "Using newVault (test/helpers/tmp.mjs): a signed contract whose task carries a mandatory metric (a node -e cmd printing the JSON object survived:1, key survived, op ==, value 0) verifies FAIL. The same contract with survived:0 verifies PASS. A cmd that prints no JSON, or exits non-zero, verifies FAIL. A draft whose mutation metric is mandatory:false still gets the lint warning. This is red at base because contracts.mjs:235 returns BLOCKED",
+          "statement": "Using newVault (test/helpers/tmp.mjs), on the metric verifier that SR-0.03 provides: a signed contract whose task carries a mandatory metric (a node -e cmd printing the JSON object survived:1, key survived, op ==, value 0) verifies FAIL. The same contract with survived:0 verifies PASS. A cmd that prints no JSON, or exits non-zero, verifies FAIL. A draft whose mutation metric is mandatory:false still gets the lint warning, and that warning is what is absent at base",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-mutate-lint.test.mjs",
@@ -190,7 +249,7 @@
           }
         },
         {
-          "statement": "Through newVault: v.contractDraft with an implement task scoped ['src/**'] and no mutation metric returns a warnings entry naming the mutation criterion. So do v.contractFromRequest and v.contractAmend for the same task. The same draft carrying the canonical criterion returns no such warning",
+          "statement": "Through newVault: v.contractDraft with an implement task scoped ['src/**'] and no mutation metric returns a warnings entry naming the mutation criterion. So do v.contractFromRequest and v.contractAmend for the same task. The same draft carrying the canonical criteria returns no such warning",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-mutate-lint.test.mjs",
@@ -198,11 +257,92 @@
           }
         },
         {
-          "statement": "Each of these drafts gets the warning: a cmd that does not start with `node scripts/gate/mutate.mjs`; a --test that is not the workdir's project test command (projectTestCommand, contracts.mjs:80); --base HEAD; op, value or key other than survived == 0; mandatory:false; scope ['src/engine/x.mjs'], ['**'] or omitted; phase omitted. No warning appears for scope ['docs/**'], for a non-implement phase, or for the criterion parsed out of the fenced block in docs/CONTRACTS.md",
+          "statement": "Each of these drafts gets the warning: a cmd that does not start with `node scripts/gate/mutate.mjs`; a --test that is neither the workdir's project test command (projectTestCommand, contracts.mjs:80) nor `node --test` followed only by paths matching test/**/*.test.mjs; --base HEAD; op, value or key other than survived == 0; mandatory:false; scope ['src/engine/x.mjs'], ['**'] or omitted; phase omitted. No warning appears for scope ['docs/**'], for a non-implement phase, or for the criteria parsed out of the fenced block in docs/CONTRACTS.md",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-mutate-lint.test.mjs",
             "cmd": "node --test test/gate-mutate-lint.test.mjs"
+          }
+        },
+        {
+          "statement": "Each of these drafts gets the warning: the canonical cmd followed by `; echo '{\"survived\":0,\"mutants\":1}'`, by `|| true`, by `| tail -n 1`, or by `>/dev/null`; the canonical cmd with a second --test or --base flag; and --test \"npm test && true\". The lint accepts only a cmd whose shell tokens equal the canonical template in the docs/CONTRACTS.md fenced block, after substituting the base placeholder and, for --test, either projectTestCommand(workdir) or `node --test` followed only by paths matching test/**/*.test.mjs, and that docs criterion itself gets no warning.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "node --test test/gate-mutate-lint.test.mjs"
+          }
+        },
+        {
+          "statement": "A draft whose src-touching implement task carries the canonical survived == 0 and mutants > 0 metrics, but no metric on the same command with key ignored, op ==, value 0, gets the warning. docs/CONTRACTS.md shows all three metrics. Through newVault, a signed contract with the three metrics whose cmd prints {\"status\":\"ok\",\"mutants\":2,\"survived\":0,\"ignored\":1} verifies FAIL.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "node --test test/gate-mutate-lint.test.mjs"
+          }
+        },
+        {
+          "statement": "A draft whose src-touching implement task carries the canonical mutation criteria still gets a warning when its scope.allow matches scripts/gate/mutate.mjs or package.json: scope ['**'], ['scripts/**'], omitted, or ['src/**','package.json']. Scope ['src/**'] gets no such warning.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "node --test test/gate-mutate-lint.test.mjs"
+          }
+        },
+        {
+          "statement": "Through newVault with the vault setting contracts.mutation_required on, contractSign of a draft whose src-touching implement task lacks the canonical mutation criteria throws a ContractError naming the mutation criterion, and no signed contract is written. The same draft carrying the criteria signs and verifies normally. With the setting off, the draft without the criteria signs and its draft response still carries the warning.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "node --test test/gate-mutate-lint.test.mjs"
+          }
+        },
+        {
+          "statement": "Through newVault: create a temp git repo with a base commit holding src/f.mjs and a strong test, package.json scripts.test running that test, then a committed change to one comparison. A contract signed from that workdir before the change, carrying exactly the criteria parsed from the docs/CONTRACTS.md fenced block, verifies PASS with MEMEV_CONTRACT_BASE unset in the test process: contractSign records the base and contractVerify supplies it. With the test weakened, it verifies FAIL. A draft whose --base is any literal sha or ref instead of the placeholder gets the warning. mutate.mjs run with --base '' or with an unknown ref exits 2 with status not ok.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "node --test test/gate-mutate-lint.test.mjs"
+          }
+        },
+        {
+          "statement": "Through newVault, v.contractDecompose with an attest-scope/1 scope whose task is phase implement, scoped ['src/**'] and has no mutation criteria returns a warnings entry naming the mutation criterion. The same scope carrying the canonical criteria returns no such warning.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "node --test test/gate-mutate-lint.test.mjs"
+          }
+        },
+        {
+          "statement": "T2's own change to src/engine/contracts.mjs and src/engine/mutation-lint.mjs is judged by the gate against the tests that exercise it: survived == 0, with companion metrics mutants > 0 and ignored == 0 on the same cmd.",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/gate-mutate-lint.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 7200
+          }
+        },
+        {
+          "statement": "T2's own change: the same gate run judged at least one mutant.",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/gate-mutate-lint.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 7200
+          }
+        },
+        {
+          "statement": "T2's own change: no changed line was ignored.",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/gate-mutate-lint.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 7200
           }
         },
         {
