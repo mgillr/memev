@@ -35,6 +35,9 @@ export class VaultError extends Error { constructor(code, message) { super(messa
 export function checkPath(p) {
   const s = String(p || '').replace(/\\/g, '/').replace(/^\/+/, '');
   if (!s || s.split('/').some((x) => x === '..' || x === '' || x.startsWith('.'))) throw new VaultError('bad_path', `not a vault path: ${p}`);
+  // a control character (NUL included) is refused before anything is logged: no file system takes it, and once logged it
+  // stopped every open (issue 230)
+  if (/[\u0000-\u001f\u007f]/.test(s)) throw new VaultError('bad_path', `a vault path has no control characters: ${JSON.stringify(String(p))}`);
   if (!/\.(md|json|pub|txt)$/.test(s)) throw new VaultError('bad_path', `only .md, .json, .pub and .txt notes: ${p}`);
   return s;
 }
@@ -103,6 +106,23 @@ export class Vault extends EventEmitter {
     return false;
   }
   _noLink(p) { if (this._linked(p)) throw new VaultError('bad_path', `${p} goes through a symbolic link; memev does not follow links in the vault`); }
+  /**
+   * A write is refused before the log advances when the file system cannot take it: a note already sits where a folder of the
+   * path must be, or a folder with something in it sits at the path. An empty folder there, which a delete leaves behind, is
+   * removed. Before, the log took the write, the file system refused it, and every later open threw (issue 230).
+   */
+  _placeable(p) {
+    const segs = String(p).split('/'); let cur = this.root;
+    for (let i = 0; i < segs.length; i++) {
+      cur = path.join(cur, segs[i]);
+      let st; try { st = fs.lstatSync(cur); } catch { return; }
+      if (i < segs.length - 1 && !st.isDirectory()) throw new VaultError('bad_path', `${segs.slice(0, i + 1).join('/')} is a note, so nothing can be written under it`);
+      if (i === segs.length - 1 && st.isDirectory()) {
+        if (fs.readdirSync(cur).length) throw new VaultError('bad_path', `${p} is a folder with notes in it, so no note can be written there`);
+        fs.rmdirSync(cur);
+      }
+    }
+  }
   /** Read a note; a journal file that retention moved to work/archive is still readable at its old path. */
   _read(p) {
     if (this._linked(p)) return null; // a link is never followed, for reading either
@@ -125,19 +145,24 @@ export class Vault extends EventEmitter {
    *                              version stays in the log), never overwritten
    */
   recover() {
-    const fixed = [], imported = [];
+    const fixed = [], imported = [], skipped = [];
+    // one path the file system cannot take (a NUL in it, a note where a folder must be, a folder where the note goes) is
+    // skipped with its reason, so the rest of the vault opens; before, it threw and the vault never opened again (issue 230)
+    const each = (p, fn) => { try { fn(); } catch (e) { skipped.push({ path: p, reason: e.code || e.message }); } };
     for (const [p, h] of this.log.heads) {
       if (h.deleted || !h.ch) continue;
-      if (this._linked(p)) continue; // never rebuilt through a link: the write would land wherever the link points
-      const cur = this._read(p);
-      if (cur !== null && sha256(cur) === h.ch) continue;
-      const content = this.materialize(p);
-      if (content === null || sha256(content) !== h.ch) continue;
-      if (cur === null || (content.startsWith(cur) && cur.length < content.length)) { fs.mkdirSync(path.dirname(this.abs(p)), { recursive: true }); fs.writeFileSync(this.abs(p), content); fixed.push(p); }
-      else { this._importExternal(p, cur, 'startup'); imported.push(p); }
+      each(p, () => {
+        if (this._linked(p)) return; // never rebuilt through a link: the write would land wherever the link points
+        const cur = this._read(p);
+        if (cur !== null && sha256(cur) === h.ch) return;
+        const content = this.materialize(p);
+        if (content === null || sha256(content) !== h.ch) return;
+        if (cur === null || (content.startsWith(cur) && cur.length < content.length)) { fs.mkdirSync(path.dirname(this.abs(p)), { recursive: true }); fs.writeFileSync(this.abs(p), content); fixed.push(p); }
+        else { this._importExternal(p, cur, 'startup'); imported.push(p); }
+      });
     }
-    for (const p of this.allNotes()) if (!this.log.heads.has(p)) { this._importExternal(p, this._read(p), 'startup'); imported.push(p); }
-    this.recovered = fixed; this.imported = imported;
+    for (const p of this.allNotes()) if (!this.log.heads.has(p)) each(p, () => { this._importExternal(p, this._read(p), 'startup'); imported.push(p); });
+    this.recovered = fixed; this.imported = imported; this.skipped = skipped;
     return fixed;
   }
   _importExternal(p, body, source) {
@@ -203,8 +228,9 @@ export class Vault extends EventEmitter {
       else if (rec.type === 'splice') cur.set(rec.path, applySplice(c ?? '', rec.data));
       else if (rec.type === 'delete') cur.delete(rec.path);
     }
-    for (const [p, c] of cur) { const f = path.join(dir, ...p.split('/')); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, c); }
-    return [...cur.keys()].sort();
+    const written = [];
+    for (const [p, c] of cur) { try { const f = path.join(dir, ...p.split('/')); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, c); written.push(p); } catch {} }
+    return written.sort();
   }
 
   // ---- auth helpers
@@ -242,7 +268,7 @@ export class Vault extends EventEmitter {
   list(identity, prefix = '') { this._need(identity, 'read', null); return this.allNotes(prefix ? prefix.replace(/\/$/, '') : '').filter((p) => allowed(identity, 'read', p)); }
 
   write(identity, { path: p, body, client = null, allow_secrets = false, internal = false }) {
-    p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); body = String(body ?? '');
+    p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); this._placeable(p); body = String(body ?? '');
     this._guard(p, body, allow_secrets, internal);
     this.syncFromDisk(p);
     const old = this._read(p);
@@ -264,7 +290,7 @@ export class Vault extends EventEmitter {
   }
 
   append(identity, { path: p, text, client = null, allow_secrets = false, internal = false }) {
-    p = checkPath(p); this._need(identity, 'write', p); this._noLink(p);
+    p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); this._placeable(p);
     this.syncFromDisk(p);
     let ns = this._ncGet(p);
     if (!ns) { const cur = this._read(p); if (cur !== null) { this._ncSet(p, cur); ns = this._ncGet(p); } }
