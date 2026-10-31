@@ -12,7 +12,7 @@
       "requirements": [
         "nonces seen in the skew window are persisted (0600) and reloaded on start",
         "the store is bounded by the window and pruned",
-        "the nonce is recorded durably before the response is sent: the store is read synchronously inside createServer, before it returns and each use is written through atomically (write to a temporary file, then rename) with mode 0600 set on every write, and use() stays synchronous so one process cannot accept a nonce twice",
+        "the nonce is recorded durably before the response is sent: the store is read synchronously inside createServer, before it returns, and each use is written through atomically (write to a temporary file, then rename) with mode 0600 set on every write, and use() stays synchronous so one process cannot accept a nonce twice",
         "the cache stays keyed by device id and nonce (the bearer token is not part of the signed payload, so keying by token would let a rotated token reopen the window); a nonce is recorded only after the proof verifies",
         "a failure to persist the nonce fails closed: the request is refused with a 5xx and the nonce stays recorded in memory so a replay is still refused; no try and catch swallows the write error",
         "every write reads the store on disk, merges it with the in-memory set, prunes and writes the result, so two servers on one vault never lose each other's nonces",
