@@ -98,6 +98,25 @@ test('T1-c01: a tested comparison is killed, an untested one survives with exit 
   await checkC01Fixtures();
 });
 
+// Passes every run and prints a pass count that grows by one each run.
+const COUNTING_PASS = String.raw`import fs from 'node:fs';
+import { gt } from '../src/cmp.mjs';
+const f = process.env.GATE_COUNT;
+const n = (fs.existsSync(f) ? Number(fs.readFileSync(f, 'utf8')) : 0) + 1;
+fs.writeFileSync(f, String(n));
+gt(1, 2);
+console.log('# pass ' + n);
+`;
+// On its first run, edits the caller's own copy of the source through an absolute path.
+const TOUCH_CALLER = String.raw`import fs from 'node:fs';
+import { gt } from '../src/cmp.mjs';
+const f = process.env.GATE_COUNT;
+const n = (fs.existsSync(f) ? Number(fs.readFileSync(f, 'utf8')) : 0) + 1;
+fs.writeFileSync(f, String(n));
+if (n === 1) fs.appendFileSync(process.env.GATE_CALLER + '/src/cmp.mjs', '// touched\n');
+gt(1, 2);
+`;
+
 test('T1-c03: a flaky test and a test failing on the unmutated tree exit 2 with no numeric survived', async () => {
   const flaky = cmpFixture(FLAKY_GT);
   const failing = cmpFixture("import { gt } from '../src/cmp.mjs';\ngt(1, 2);\nprocess.exit(1);\n");
@@ -108,6 +127,11 @@ test('T1-c03: a flaky test and a test failing on the unmutated tree exit 2 with 
     assert.ok(!('survived' in r.j) || r.j.survived === null, 'survived is null or absent');
     assert.equal(r.j.survived === 0, false, 'a metric survived == 0 evaluated on this output fails');
   }
+  // two passing unmutated controls whose pass counts differ are noise too (requirement 2)
+  const counting = cmpFixture(COUNTING_PASS);
+  const rc = await gate(counting.dir, [...on(counting), ...RUN], { env: { GATE_COUNT: path.join(scratch(), 'count') } });
+  assert.deepEqual([rc.code, rc.j.status], [2, 'noise']);
+  assert.match(rc.j.reason, /pass count/);
 });
 
 // Logs its pid and keeps the source it ran on, then calls every export and checks only that each returns.
@@ -230,6 +254,11 @@ test('T1-c06: no run sees a mutated source at the workdir path, and a SIGKILLed 
   assert.deepEqual(hashTree(fx.dir), before, 'every file in the workdir hashes as before');
   assert.equal(gitState(fx.dir).status, status0, 'git status --porcelain is unchanged');
   assert.deepEqual(walkNames(fx.dir).filter((n) => n.startsWith('memev-mutate')), [], 'no gate temp directory in the workdir');
+  // a run during which the caller's tree changes ends in error (requirement 3)
+  const touch = cmpFixture(TOUCH_CALLER);
+  const rt = await gate(touch.dir, [...on(touch), ...RUN], { env: { GATE_COUNT: path.join(scratch(), 'count'), GATE_CALLER: touch.dir } });
+  assert.deepEqual([rt.code, rt.j.status], [2, 'error']);
+  assert.match(rt.j.reason, /working tree changed/);
 });
 
 test('T1-c07: committed, uncommitted, untracked and renamed changes are judged at their new-side lines and nowhere else', async () => {
@@ -423,6 +452,10 @@ test('T1-c11: a weak test that fails only on its 3rd run never gets the mutant c
   assert.ok(!r.j.results.some((x) => x.outcome === 'killed'));
   if (r.code === 1) assert.deepEqual(pairs(r.j.survivors), ['src/cmp.mjs:1']);
   else assert.deepEqual([r.code, r.j.status], [2, 'noise']);
+  // a flake on the first run of a mutant (the 4th invocation, after the two controls and the rewrite control) is noise, never a kill
+  const fx4 = cmpFixture(COUNTED_GT);
+  const r4 = await gate(fx4.dir, [...on(fx4), ...RUN], { env: { GATE_COUNT: path.join(scratch(), 'count'), GATE_FAIL: 'n === 4' } });
+  assert.deepEqual([r4.code, r4.j.status, r4.j.killed], [2, 'noise', 0]);
 });
 
 test('T1-c12: a run that judges no mutant (timeout only, all ignored, nothing changed) is not ok and has no numeric survived', async () => {
@@ -583,9 +616,11 @@ flow({ force: true }, true, 1, 2, [1, 2], 5, []);
 test('T1-c18: sentinel MEMEV_*, XDG_CONFIG_HOME, GIT_DIR and GIT_INDEX_FILE in the gate never reach a test, and stay untouched', async () => {
   const t = String.raw`import fs from 'node:fs';
 import { gt } from '../src/cmp.mjs';
+import { execFileSync } from 'node:child_process';
 const keys = ['HOME', 'MEMEV_ROOT', 'MEMEV_CONFIG_DIR', 'XDG_CONFIG_HOME', 'MEMEV_TEST_TMP', 'GIT_DIR', 'GIT_INDEX_FILE',
-  'MEMEV_NO_TUNNEL', 'MEMEV_NO_BACKGROUND'];
-fs.appendFileSync(process.env.GATE_LOG, JSON.stringify(Object.fromEntries(keys.map((k) => [k, process.env[k] ?? null]))) + '\n');
+  'MEMEV_NO_TUNNEL', 'MEMEV_NO_BACKGROUND', 'SSH_AUTH_SOCK', 'GIT_SSH_COMMAND'];
+const remotes = execFileSync('git', ['remote'], { encoding: 'utf8' }).trim();
+fs.appendFileSync(process.env.GATE_LOG, JSON.stringify({ ...Object.fromEntries(keys.map((k) => [k, process.env[k] ?? null])), remotes }) + '\n');
 gt(1, 2);
 `;
   const fx = cmpFixture(t);
@@ -600,7 +635,9 @@ gt(1, 2);
   const before = hashTree(box);
   const tmp = scratch();
   const log = path.join(scratch(), 'env.jsonl');
-  const r = await gate(fx.dir, [...on(fx), ...RUN], { env: { ...sentinels, TMPDIR: tmp, GATE_LOG: log } });
+  // the caller has a remote and an ssh agent; no copy keeps the remote and no test sees the agent, so a test cannot push anywhere real
+  spawnSync('git', ['remote', 'add', 'origin', path.join(box, 'upstream.git')], { cwd: fx.dir });
+  const r = await gate(fx.dir, [...on(fx), ...RUN], { env: { ...sentinels, TMPDIR: tmp, GATE_LOG: log, SSH_AUTH_SOCK: path.join(box, 'agent.sock'), GIT_SSH_COMMAND: 'ssh -i /nowhere' } });
   assert.equal(r.code, 1);
   const entries = readLog(log);
   assert.ok(entries.length >= 5);
@@ -609,6 +646,7 @@ gt(1, 2);
     assert.ok(inside(e.HOME, tmp) && runDir !== tmp, `HOME ${e.HOME} is inside the run's temp folder`);
     for (const k of Object.keys(sentinels)) assert.ok(e[k] === null || inside(e[k], runDir), `${k}=${e[k]} is unset or inside ${runDir}`);
     assert.deepEqual([e.MEMEV_NO_TUNNEL, e.MEMEV_NO_BACKGROUND], ['1', '1']);
+    assert.deepEqual([e.SSH_AUTH_SOCK, e.GIT_SSH_COMMAND, e.remotes], [null, null, ''], 'no ssh agent, no ssh override and no remote reach a test');
   }
   assert.deepEqual(hashTree(box), before, 'every sentinel folder hashes as before');
 });

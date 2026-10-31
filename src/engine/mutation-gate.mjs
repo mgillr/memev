@@ -534,6 +534,8 @@ function seedCopy(root, dest) {
     git(dest, ['config', 'core.bare', 'false']);
     git(dest, ['config', '--unset', 'core.worktree']);
   }
+  // a copy pushes nowhere: the caller's remotes are removed, so a test's git push or fetch cannot reach a real remote
+  for (const r of git(dest, ['remote']).out.split('\n').filter(Boolean)) git(dest, ['remote', 'remove', r]);
   const alt = path.join(gd, 'objects', 'info', 'alternates');
   if (fs.existsSync(alt)) {
     const r = git(dest, ['repack', '-a', '-d', '-q']);
@@ -577,6 +579,8 @@ function exec(ctx, cwd, env, limitMs) {
 function testEnv(box, cwd) {
   const env = cleanEnv();
   delete env.NODE_TEST_CONTEXT; // a test command that runs node --test reports on its own, not to a runner above the gate
+  // no key agent or ssh override reaches the test, so a test that runs git push cannot authenticate to a real remote
+  for (const k of ['SSH_AUTH_SOCK', 'SSH_AGENT_PID', 'GIT_SSH', 'GIT_SSH_COMMAND', 'GIT_ASKPASS', 'SSH_ASKPASS']) delete env[k];
   const dirs = { HOME: 'home', MEMEV_CONFIG_DIR: 'config', XDG_CONFIG_HOME: 'xdg', MEMEV_ROOT: 'root', MEMEV_TEST_TMP: 'test-tmp', TMPDIR: 'tmp' };
   fs.mkdirSync(path.join(box, 'env'), { mode: 0o700 });
   for (const [k, d] of Object.entries(dirs)) { env[k] = path.join(box, 'env', d); fs.mkdirSync(env[k], { mode: 0o700 }); }
