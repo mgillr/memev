@@ -17,19 +17,21 @@ the whole office travels with the vault.
 
 ## Invite a teammate
 
-A teammate joins the same vault from their own computer. On the vault, print an invite:
+A teammate joins the same vault from their own computer. Teammate invites are on the Team plan, and the
+teammate's computer reaches the vault through the secure link, so turn it on first with `memev cloud on`.
+On the vault, print an invite with your teammate's name:
 
-    memev invite --teammate
+    memev invite --teammate sam
 
 It prints a one-time code, a link and a QR code. The code is valid for 15 minutes unless you pass
 `--ttl <seconds>`. Your teammate runs:
 
     memev join <code>
 
-on their computer. That enrols the computer with its own device key, pulls the vault and connects
-their AI apps. Each app gets its own seat, named after the app and the computer, such as
-`claude-code@my-laptop`. A computer over the licensed count, or on a lapsed licence, can read the
-bus but not post; who may join follows the licence.
+on their computer. That enrols the computer under their name, with its own device key, pulls the vault
+and connects their AI apps. Each app gets its own seat, named after the app, the teammate and the
+computer, such as `claude-code@sam-laptop`. A computer over the licensed count, or on a lapsed licence,
+can read the bus but not post; who may join follows the licence.
 
 ## Choose the lead
 
