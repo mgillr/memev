@@ -12,7 +12,7 @@ import { git } from '../engine/git.mjs';
 import { gitVia443, alt443, cloneOffer } from './github.mjs';
 import { signAddressRecord } from '../engine/devices.mjs';
 import { now, readJson, writeJson } from '../engine/util.mjs';
-import { resolveMerge } from '../engine/merge.mjs';
+import { resolveMerge, ENGINE_MAX_BUFFER } from '../engine/merge.mjs';
 import { licenseFile } from '../engine/license.mjs';
 
 export const ADDRESS_FILE = 'address.json';
@@ -76,7 +76,9 @@ function mergeJsonl(ours, theirs) {
 
 /** The exact content of one side of a conflicted file, from the merge index (stage 2 is ours, 3 theirs). */
 function stageContent(root, stage, p) {
-  const r = spawnSync('git', ['show', `:${stage}:${p}`], { cwd: root, encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+  const r = spawnSync('git', ['show', `:${stage}:${p}`], { cwd: root, encoding: 'utf8', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }, maxBuffer: ENGINE_MAX_BUFFER });
+  // null means "this side has no such file" below; a read that failed (a note over the buffer) must not look like that
+  if (r.error) throw new Error(`could not read ${p} from the merge: ${r.error.code || r.error.message}`);
   return r.status === 0 ? r.stdout : null;
 }
 
@@ -103,6 +105,8 @@ export function resolveConflicts(root, vault, opts = {}) {
   // core.quotePath=false so non-ASCII paths come back as the real path, not a quoted octal string
   const st = git(root, ['-c', 'core.quotePath=false', 'diff', '--name-only', '--diff-filter=U']);
   const files = st.out.split('\n').filter(Boolean);
+  // every side is read before anything is written, so a side that cannot be read leaves the merge to be aborted
+  try { for (const p of files) for (const stage of [1, 2, 3]) stageContent(root, stage, p); } catch (e) { return { files, conflicts: [], ok: false, error: e.message }; }
   const adds = [];
   const conflicts = files.map((p) => {
     const abs = path.join(root, ...p.split('/'));

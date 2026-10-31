@@ -1,0 +1,81 @@
+{
+  "title": "SR-1.13 Performance numbers anyone can reproduce",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G13: Docs and site claim 1.1 ms recall and 160 MB heap with no hardware; measured 4.55 ms and 183 MB. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Stamped bench results",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "the growth bench writes bench/results/<date>-<cpu>.json with CPU model, cores, RAM, Node version and every figure"
+      ],
+      "description": "",
+      "scope": [
+        "scripts/growth-bench.mjs",
+        "bench/results/**",
+        "test/bench-results.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "A results file without hardware fields fails the test",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bench-results.test.mjs",
+            "cmd": "node --test test/bench-results.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Docs figures come from results",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "every latency and heap figure in docs cites a results file and names its hardware"
+      ],
+      "description": "",
+      "scope": [
+        "docs/**",
+        "README.md",
+        "scripts/docs/**",
+        "test/docs-figures.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "A figure in docs that is not in a results file fails",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/docs-figures.test.mjs",
+            "cmd": "node --test test/docs-figures.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
