@@ -66,10 +66,14 @@ function aggregate(rows, valueOf, dateOf) {
 }
 
 const num = (row) => (Number.isFinite(row.downloads) ? row.downloads : 0);
-// A trial licence is marked on its activation row with "trial": true, as on the licence itself. A
-// trial is counted on its own and never as paid.
-const paid = (row) => (row.result === 'issued' && row.trial !== true ? 1 : 0);
-const trial = (row) => (row.result === 'issued' && row.trial === true ? 1 : 0);
+// A trial licence is marked on its activation row with "trial": true, as on the licence itself, or
+// with 1, as a SQL export of the activations table gives it. A trial is counted on its own and never
+// as paid. false or 0 is paid, and so is a row with no trial field (or any other value), as the
+// product reads a licence with none; those issued rows are counted on a line of their own.
+const isTrial = (row) => row.trial === true || row.trial === 1;
+const unmarked = (row) => (row.result === 'issued' && ![true, 1, false, 0].includes(row.trial) ? 1 : 0);
+const paid = (row) => (row.result === 'issued' && !isTrial(row) ? 1 : 0);
+const trial = (row) => (row.result === 'issued' && isTrial(row) ? 1 : 0);
 const refused = (row) => (row.result === 'refused' ? 1 : 0);
 
 function section(title, agg, { hasRows, noInput, extra = [] } = {}) {
@@ -100,30 +104,47 @@ function pct(n) {
   return String(Math.round(n * 100) / 100);
 }
 
-function gateLines(gates, totals, label) {
+// How a measured value prints. Every installs choice is a download count, and a download is not an
+// install, so installs print as downloads; no measured value prints as not measured.
+function shown(g, value) {
+  if (value === null) return 'not measured';
+  return g.metric === 'installs' ? `${value} downloads` : value;
+}
+
+// The header gates read the same counted values as the monthly verdict, so one page never gives two
+// answers for one number: with no installs choice in the file both gates are open, and a gate whose
+// count file was not handed in is not measured, never 0 and a miss. Under each installs gate the
+// installed milestone rows of the opt-in report print as a floor of confirmed installs.
+function gateLines(gates, counted, label) {
   const lines = [`Gates (${label}):`];
   const proxy = gates.installs_proxy;
-  const installs = proxy && Object.hasOwn(PROXIES, proxy) ? PROXIES[proxy](totals) : null;
+  const chosen = Boolean(proxy) && Object.hasOwn(PROXIES, proxy);
   for (const g of gates.gates || []) {
     let measured = 'open';
     let verdict = 'open';
-    if (installs !== null) {
-      if (g.metric === 'installs') measured = installs;
-      else if (g.metric === 'free_to_paid_percent') measured = installs > 0 ? pct((totals.activations / installs) * 100) : 0;
-      verdict = measured >= g.threshold ? 'pass' : 'miss';
+    if (chosen) {
+      const value = measuredValue(g, counted);
+      measured = shown(g, value);
+      verdict = value === null ? 'not measured' : value >= g.threshold ? 'pass' : 'miss';
     }
     const unit = g.metric === 'free_to_paid_percent' ? ' percent' : '';
     lines.push(`  ${g.name}: measured ${measured}, threshold ${g.threshold}${unit}, ${verdict}`);
+    if (g.metric === 'installs') {
+      lines.push(counted.installed === null
+        ? '    confirmed installs, a floor: not measured (no milestone input)'
+        : `    confirmed installs, a floor: ${counted.installed} (the installed milestone rows of the opt-in report)`);
+    }
   }
-  if (installs !== null) lines.push(`  installs proxy: ${proxy}`);
+  if (chosen) lines.push(`  installs proxy: ${proxy} (a download is not an install)`);
   else if (proxy) lines.push(`  installs proxy: open (${JSON.stringify(proxy)} is not a choice; pick one of ${Object.keys(PROXIES).join(', ')})`);
   else lines.push(`  installs proxy: open (${gates.installs_proxy_note || "which counted number stands for installs is the owner's choice"})`);
   return lines;
 }
 
-// The measured value of one monthly gate, from the counted rows alone. A gate whose count file was
-// not handed in has no measured value (null), and neither has a gate the file marks as planned.
-function monthlyValue(g, counted) {
+// The measured value of one gate, in the header or the monthly verdict, from the counted rows alone.
+// A gate whose count file was not handed in has no measured value (null), and neither has a gate the
+// file marks as planned.
+function measuredValue(g, counted) {
   if (g.planned) return null;
   if (g.metric === 'installs') return counted.installs;
   if (g.metric === 'free_to_paid_percent') {
@@ -141,8 +162,8 @@ function monthlyValue(g, counted) {
 // text held for it in the file, word for word.
 function verdictLines(gates, month, counted) {
   const lines = [`Monthly verdict (month ${month}):`];
-  for (const g of (gates.monthly && gates.monthly.gates) || []) {
-    const measured = monthlyValue(g, counted);
+  for (const g of gates.monthly.gates) {
+    const measured = measuredValue(g, counted);
     let status;
     if (g.planned) status = 'planned, not measured';
     else if (g.due_month > month) status = 'not yet due';
@@ -150,7 +171,7 @@ function verdictLines(gates, month, counted) {
     else if (measured >= g.threshold) status = 'pass';
     else status = 'miss';
     const unit = g.metric === 'free_to_paid_percent' ? ' percent' : '';
-    lines.push(`  ${g.name}: measured ${measured === null ? 'not measured' : measured}, threshold ${g.threshold}${unit}, due month ${g.due_month}, ${status}`);
+    lines.push(`  ${g.name}: measured ${shown(g, measured)}, threshold ${g.threshold}${unit}, due month ${g.due_month}, ${status}`);
     if (status === 'miss' && g.branch) lines.push(`    branch: ${g.branch}`);
   }
   return lines;
@@ -169,27 +190,31 @@ export function renderReport({ packageRows = [], releaseRows = [], activationRow
   const act = aggregate(activationRows, paid, (r) => dayOf(r.day));
   const tri = aggregate(activationRows, trial, (r) => dayOf(r.day));
   const ref = aggregate(activationRows, refused, (r) => dayOf(r.day));
+  const unm = aggregate(activationRows, unmarked, (r) => dayOf(r.day));
   const mst = aggregate(milestoneRows, () => 1, (r) => dayOf(r.date));
   const names = new Map();
   for (const row of milestoneRows) if (row && row.name) names.set(row.name, (names.get(row.name) || 0) + 1);
-  const totals = { package: pkg.total, release: rel.total, activations: act.total };
   const days = [...pkg.perDay.keys(), ...rel.perDay.keys(), ...act.perDay.keys(), ...mst.perDay.keys()].sort();
+  // the counted values, once, for the header and the monthly verdict alike
+  const proxy = gates.installs_proxy;
+  const counts = { package: given.package ? pkg.total : null, release: given.release ? rel.total : null };
+  const counted = {
+    installs: proxy && Object.hasOwn(PROXIES, proxy) ? PROXIES[proxy](counts) : null,
+    activations: given.activations ? act.total : null,
+    paidLicences: given.activations ? new Set(activationRows.filter((r) => r && paid(r) && r.licence_id).map((r) => r.licence_id)).size : null,
+    milestones: given.milestones ? names : null,
+    installed: given.milestones ? names.get('installed') || 0 : null,
+  };
 
   const lines = ['Memev weekly funnel report'];
   lines.push(days.length ? `days ${days[0]} to ${days[days.length - 1]}` : 'days: none');
   lines.push('');
-  lines.push(...gateLines(gates, totals, gatesLabel));
+  lines.push(...gateLines(gates, counted, gatesLabel));
   lines.push('');
-  if (Number.isInteger(month) && month > 0 && gates.monthly && Array.isArray(gates.monthly.gates)) {
-    const proxy = gates.installs_proxy;
-    const counts = { package: given.package ? pkg.total : null, release: given.release ? rel.total : null };
-    const counted = {
-      installs: proxy && Object.hasOwn(PROXIES, proxy) ? PROXIES[proxy](counts) : null,
-      activations: given.activations ? act.total : null,
-      paidLicences: given.activations ? new Set(activationRows.filter((r) => r && paid(r) && r.licence_id).map((r) => r.licence_id)).size : null,
-      milestones: given.milestones ? names : null,
-    };
-    lines.push(...verdictLines(gates, month, counted));
+  if (Number.isInteger(month) && month > 0) {
+    // a month with no monthly gates in the file says so in one line, never nothing
+    if (gates.monthly && Array.isArray(gates.monthly.gates) && gates.monthly.gates.length) lines.push(...verdictLines(gates, month, counted));
+    else lines.push(`Monthly verdict (month ${month}): the gate file holds no monthly gates`);
     lines.push('');
   }
   lines.push(...section('Package downloads', pkg, { hasRows: packageRows.length > 0 }));
@@ -198,7 +223,11 @@ export function renderReport({ packageRows = [], releaseRows = [], activationRow
   lines.push('');
   lines.push(...section('Licence activations (paid)', act, {
     hasRows: activationRows.length > 0,
-    extra: [`  trials, not counted as paid: ${tri.total}`, ...(ref.total > 0 ? [`  refused: ${ref.total}`] : [])],
+    extra: [
+      `  trials, not counted as paid: ${tri.total}`,
+      ...(unm.total > 0 ? [`  issued with no trial field, counted as paid: ${unm.total}`] : []),
+      ...(ref.total > 0 ? [`  refused: ${ref.total}`] : []),
+    ],
   }));
   lines.push('');
   lines.push(...section('Milestones', mst, {

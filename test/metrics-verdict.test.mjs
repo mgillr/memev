@@ -12,8 +12,8 @@ after(cleanup);
 const REPORT = path.join(PKG, 'scripts', 'metrics', 'report.mjs');
 
 // The counted rows: 47 package downloads, 10 release downloads, 3 paid activations across 2
-// distinct licences, 1 trial activation and 1 refused, and 1 completed Business pilot among the
-// milestone rows.
+// distinct licences, 2 trial activations (one marked true, one marked 1 as a SQL export gives it)
+// and 1 refused, and 1 install and 1 completed Business pilot among the milestone rows.
 const FIXTURE = {
   package: [
     { day: '2026-10-19', downloads: 12 },
@@ -29,6 +29,7 @@ const FIXTURE = {
     { day: '2026-10-21', licence_id: 'L2', result: 'issued' },
     { day: '2026-10-22', licence_id: 'L1', result: 'issued' },
     { day: '2026-10-22', licence_id: 'T1', result: 'issued', trial: true },
+    { day: '2026-10-22', licence_id: 'T2', result: 'issued', trial: 1 },
     { day: '2026-10-22', licence_id: 'L3', result: 'refused' },
   ],
   milestones: [
@@ -95,7 +96,7 @@ test('WO-12-A AC01: the report has a monthly verdict section that renders each g
   const rows = verdict(out.split('\n'));
   assert.equal(rows[0], 'Monthly verdict (month 12):');
   assert.deepEqual(rows.slice(1), [
-    '  installs at or above 5,000 with the package and the directory listings live: measured 47, threshold 40, due month 6, pass',
+    '  installs at or above 5,000 with the package and the directory listings live: measured 47 downloads, threshold 40, due month 6, pass',
     '  free-to-paid conversion at or above 1 percent once sync has shipped: measured 6.38, threshold 100 percent, due month 6, miss',
     '    branch: the branch the file holds for the conversion gate',
     '  paying users at or above 600: measured 2, threshold 600, due month 12, miss',
@@ -112,9 +113,10 @@ test('WO-12-A AC01: the report has a monthly verdict section that renders each g
   const shipped = await run([...baseArgs(f), '--month', '12']);
   assert.equal(shipped.code, 0, shipped.err);
   const srows = verdict(shipped.out.split('\n'));
-  // paying users are the distinct paid licences: L1 and L2, never the trial T1
+  // paying users are the distinct paid licences: L1 and L2, never the trials T1 (true) and T2 (1)
   assert.ok(srows.includes('  paying users at or above 600: measured 2, threshold 600, due month 12, miss'), shipped.out);
-  assert.ok(srows.includes('  installs at or above 5,000 with the package and the directory listings live: measured not measured, threshold 5000, due month 6, not measured'));
+  // installs are the downloads, package and release together (47 + 10), as the shipped file chooses
+  assert.ok(srows.includes('  installs at or above 5,000 with the package and the directory listings live: measured 57 downloads, threshold 5000, due month 6, miss'), shipped.out);
   // no code records a completed Business pilot, so the shipped file marks that gate planned: it is
   // planned, not measured, even with such a row in the milestone input, and prints no branch
   const iPilot = srows.findIndex((l) => l.startsWith('  at least one organisation'));
@@ -167,7 +169,7 @@ test('WO-12-A AC03: the month-6 and month-12 gates are separate rows with their 
   let rows = verdict(r.out.split('\n'));
   assert.equal(rows[0], 'Monthly verdict (month 3):');
   assert.deepEqual(rows.slice(1), [
-    '  installs at or above 5,000 with the package and the directory listings live: measured 47, threshold 40, due month 6, not yet due',
+    '  installs at or above 5,000 with the package and the directory listings live: measured 47 downloads, threshold 40, due month 6, not yet due',
     '  free-to-paid conversion at or above 1 percent once sync has shipped: measured 6.38, threshold 100 percent, due month 6, not yet due',
     '  paying users at or above 600: measured 2, threshold 600, due month 12, not yet due',
     '  at least one organisation through a completed Business pilot: measured 1, threshold 1, due month 12, not yet due',
@@ -177,7 +179,7 @@ test('WO-12-A AC03: the month-6 and month-12 gates are separate rows with their 
   r = await run([...args, '--month', '6']);
   assert.equal(r.code, 0, r.err);
   rows = verdict(r.out.split('\n'));
-  assert.ok(rows.includes('  installs at or above 5,000 with the package and the directory listings live: measured 47, threshold 40, due month 6, pass'));
+  assert.ok(rows.includes('  installs at or above 5,000 with the package and the directory listings live: measured 47 downloads, threshold 40, due month 6, pass'));
   assert.ok(rows.includes('  free-to-paid conversion at or above 1 percent once sync has shipped: measured 6.38, threshold 100 percent, due month 6, miss'));
   assert.ok(rows.includes('  paying users at or above 600: measured 2, threshold 600, due month 12, not yet due'));
   assert.ok(rows.includes('  at least one organisation through a completed Business pilot: measured 1, threshold 1, due month 12, not yet due'));
@@ -224,8 +226,10 @@ test('WO-12-A AC04: the verdict needs no judgement: the same inputs give the sam
   const rows2 = verdict(c.out.split('\n'));
   assert.ok(rows2.find((l) => l.startsWith('  paying users')).includes('measured 3'), 'the measured value follows the count');
   assert.ok(rows2.find((l) => l.startsWith('  free-to-paid conversion')).includes('measured 8.51'), 'the measured value follows the count');
-  // a gate with no measured value renders as not measured rather than as a pass
-  const d = await run([...baseArgs(f), '--month', '12']);
+  // a gate with no measured value renders as not measured rather than as a pass: no installs choice
+  const open = path.join(dir, 'gates-open.json');
+  fs.writeFileSync(open, JSON.stringify({ ...MONTHLY_GATES, installs_proxy: null }));
+  const d = await run([...baseArgs(f), '--gates', open, '--month', '12']);
   assert.equal(d.code, 0, d.err);
   const installsRow = verdict(d.out.split('\n')).find((l) => l.startsWith('  installs at or above 5,000 with the package'));
   assert.ok(installsRow.includes('measured not measured'), 'the gate with no measured value says so');
@@ -236,7 +240,7 @@ test('WO-12-A AC04: the verdict needs no judgement: the same inputs give the sam
   const e = await run(['--package', f.package, '--gates', gf, '--month', '12']);
   assert.equal(e.code, 0, e.err);
   assert.deepEqual(verdict(e.out.split('\n')).slice(1), [
-    '  installs at or above 5,000 with the package and the directory listings live: measured 47, threshold 40, due month 6, pass',
+    '  installs at or above 5,000 with the package and the directory listings live: measured 47 downloads, threshold 40, due month 6, pass',
     '  free-to-paid conversion at or above 1 percent once sync has shipped: measured not measured, threshold 100 percent, due month 6, not measured',
     '  paying users at or above 600: measured not measured, threshold 600, due month 12, not measured',
     '  at least one organisation through a completed Business pilot: measured not measured, threshold 1, due month 12, not measured',
@@ -271,4 +275,80 @@ test('WO-12-A AC04: a month that is not a whole number of months, 1 or more, is 
   const ok = await run([...baseArgs(f), '--gates', gf, '--month', '6']);
   assert.equal(ok.code, 0, ok.err);
   assert.equal(verdict(ok.out.split('\n'))[0], 'Monthly verdict (month 6):');
+});
+
+test('WO-12-A AC04: the header gates and the monthly verdict read the same handed-in counts, so a number that was not counted is not measured in both, never 0 and a miss in the header', async () => {
+  const dir = tmpdir('wo12a-');
+  const f = writeFixtures(dir);
+  const gf = path.join(dir, 'gates.json');
+  fs.writeFileSync(gf, JSON.stringify(MONTHLY_GATES));
+  // the file chooses package downloads for installs, and no --package is handed in
+  const r = await run(['--activations', f.activations, '--milestones', f.milestones, '--gates', gf, '--month', '6']);
+  assert.equal(r.code, 0, r.err);
+  const page = r.out.split('\n');
+  assert.ok(page.includes('  installs at or above 5,000 by month 6: measured not measured, threshold 5000, not measured'), r.out);
+  assert.ok(page.includes('  free-to-paid at or above 1 percent once sync has shipped: measured not measured, threshold 1 percent, not measured'), r.out);
+  assert.ok(page.includes('  installs proxy: package_downloads (a download is not an install)'), 'the choice is still named, not called open');
+  const rows = verdict(page);
+  assert.ok(rows.includes('  installs at or above 5,000 with the package and the directory listings live: measured not measured, threshold 40, due month 6, not measured'), r.out);
+  assert.ok(rows.includes('  free-to-paid conversion at or above 1 percent once sync has shipped: measured not measured, threshold 100 percent, due month 6, not measured'), r.out);
+  assert.ok(!page.some((l) => /measured 0\b/.test(l)), 'no 0 for a number that was not counted');
+  // installs counted and no --activations: free-to-paid is not measured in the header as in the verdict
+  const a = await run(['--package', f.package, '--gates', gf, '--month', '6']);
+  assert.equal(a.code, 0, a.err);
+  const pa = a.out.split('\n');
+  assert.ok(pa.includes('  installs at or above 5,000 by month 6: measured 47 downloads, threshold 5000, miss'), a.out);
+  assert.ok(pa.includes('  free-to-paid at or above 1 percent once sync has shipped: measured not measured, threshold 1 percent, not measured'), a.out);
+  assert.ok(verdict(pa).includes('  free-to-paid conversion at or above 1 percent once sync has shipped: measured not measured, threshold 100 percent, due month 6, not measured'), a.out);
+  // the shipped choice, downloads, with one of its two files: not measured in both, and still named as the choice
+  const b = await run(['--package', f.package, '--activations', f.activations, '--month', '6']);
+  assert.equal(b.code, 0, b.err);
+  const pb = b.out.split('\n');
+  assert.ok(pb.includes('  installs at or above 5,000 by month 6: measured not measured, threshold 5000, not measured'), b.out);
+  assert.ok(pb.includes('  installs proxy: downloads (a download is not an install)'), b.out);
+  assert.ok(verdict(pb).includes('  installs at or above 5,000 with the package and the directory listings live: measured not measured, threshold 5000, due month 6, not measured'), b.out);
+});
+
+test('WO-12-A AC01: a month with a gate file that holds no monthly gates prints one line saying so, never nothing', async () => {
+  const dir = tmpdir('wo12a-');
+  const f = writeFixtures(dir);
+  const files = { none: { installs_proxy: 'package_downloads', gates: MONTHLY_GATES.gates }, empty: { ...MONTHLY_GATES, monthly: { gates: [] } } };
+  for (const [name, file] of Object.entries(files)) {
+    const gf = path.join(dir, `gates-${name}.json`);
+    fs.writeFileSync(gf, JSON.stringify(file));
+    const r = await run([...baseArgs(f), '--gates', gf, '--month', '6']);
+    assert.equal(r.code, 0, r.err);
+    assert.deepEqual(verdict(r.out.split('\n')), ['Monthly verdict (month 6): the gate file holds no monthly gates'], r.out);
+    // with no month there is no verdict line at all
+    const n = await run([...baseArgs(f), '--gates', gf]);
+    assert.equal(n.code, 0, n.err);
+    assert.ok(!n.out.includes('Monthly verdict'), n.out);
+  }
+});
+
+test('WO-12-A AC01: the installs gate reads downloads, package and release together in the shipped file, printed as downloads, with the installed milestone rows of the opt-in report under it as a floor of confirmed installs', async () => {
+  const dir = tmpdir('wo12a-');
+  const f = writeFixtures(dir);
+  // the shipped file: 47 package and 10 release downloads, and one installed row among the milestones
+  const r = await run([...baseArgs(f), '--month', '6']);
+  assert.equal(r.code, 0, r.err);
+  const page = r.out.split('\n');
+  const i = page.indexOf('  installs at or above 5,000 by month 6: measured 57 downloads, threshold 5000, miss');
+  assert.notEqual(i, -1, r.out);
+  assert.equal(page[i + 1], '    confirmed installs, a floor: 1 (the installed milestone rows of the opt-in report)', r.out);
+  assert.ok(page.includes('  installs proxy: downloads (a download is not an install)'), r.out);
+  // the verdict reads the same 57 downloads
+  assert.ok(verdict(page).includes('  installs at or above 5,000 with the package and the directory listings live: measured 57 downloads, threshold 5000, due month 6, miss'), r.out);
+  // the floor counts the rows named installed and nothing else
+  const ms = path.join(dir, 'milestones3.json');
+  fs.writeFileSync(ms, JSON.stringify([...FIXTURE.milestones, { name: 'installed', date: '2026-10-20' }, { name: 'installed', date: '2026-10-21' }, { name: 'invite_sent', date: '2026-10-21' }]));
+  const m = await run(['--package', f.package, '--release', f.release, '--activations', f.activations, '--milestones', ms]);
+  assert.equal(m.code, 0, m.err);
+  assert.ok(m.out.split('\n').includes('    confirmed installs, a floor: 3 (the installed milestone rows of the opt-in report)'), m.out);
+  // with no milestone input the floor is not measured, never 0
+  const n = await run(['--package', f.package, '--release', f.release, '--activations', f.activations]);
+  assert.equal(n.code, 0, n.err);
+  const pn = n.out.split('\n');
+  assert.ok(pn.includes('    confirmed installs, a floor: not measured (no milestone input)'), n.out);
+  assert.ok(pn.includes('Milestones: no milestone input'), 'the milestone section says so too');
 });
