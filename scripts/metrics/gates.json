@@ -1,0 +1,8 @@
+{
+  "installs_proxy": "downloads",
+  "installs_proxy_note": "which counted number stands for installs; D-WO-INSTALL-PROXY chose downloads, the package downloads and the release-host downloads together, printed as downloads because a download is not an install; the choices are package_downloads, release_downloads or downloads (activations are not a choice: free-to-paid divides paid activations by installs)",
+  "gates": [
+    { "name": "installs at or above 5,000 by month 6", "metric": "installs", "threshold": 5000 },
+    { "name": "free-to-paid at or above 1 percent once sync has shipped", "metric": "free_to_paid_percent", "threshold": 1 }
+  ]
+}
