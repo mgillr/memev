@@ -65,7 +65,7 @@
           }
         },
         {
-          "statement": "Guard test 'exhausted key stays limited' in test/rate-limit.test.mjs. Freeze the clock with mock.timers.enable({ apis: ['Date'] }) and set remote.rate_per_min = 5 before createServer. Remote address A (cf-connecting-ip) sends GET /healthz/x and gets 5 non-429 responses, then 429. Then MAX_BUCKETS + 1 requests come from distinct cf-connecting-ip values. A's next request must still be 429. This guard is green at base, so it runs as a named command and the pass count must be at least 1. It fails under LRU, FIFO, most-depleted-first or clear().",
+          "statement": "Guard test 'exhausted key stays limited' in test/rate-limit.test.mjs, with activeTunnel () => 'cloudflare' passed to createServer. Freeze the clock with mock.timers.enable({ apis: ['Date'] }) and set remote.rate_per_min = 5 before createServer. Remote address A (cf-connecting-ip) sends GET /healthz/x and gets 5 non-429 responses, then 429. Then MAX_BUCKETS + 1 requests come from distinct cf-connecting-ip values. A's next request must still be 429. This guard is green at base, so it runs as a named command and the pass count must be at least 1. It fails under LRU, FIFO, most-depleted-first or clear().",
           "verifier": {
             "type": "command",
             "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='exhausted key stays limited' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^# pass [1-9]'",
@@ -90,7 +90,7 @@
           }
         },
         {
-          "statement": "Guard test 'new caller served during flood'. With the clock frozen (mock.timers Date) and remote.rate_per_min = 5, send MAX_BUCKETS + 1 remote requests from distinct cf-connecting-ip values. A never-seen address must then get a status other than 429 on GET /healthz/x (401 is expected). Green at base, so it runs as a named command with a pass-count check.",
+          "statement": "Guard test 'new caller served during flood', with activeTunnel () => 'cloudflare' passed to createServer. With the clock frozen (mock.timers Date) and remote.rate_per_min = 5, send MAX_BUCKETS + 1 remote requests from distinct cf-connecting-ip values. A never-seen address must then get a status other than 429 on GET /healthz/x (401 is expected). Green at base, so it runs as a named command with a pass-count check.",
           "verifier": {
             "type": "command",
             "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='new caller served during flood' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^# pass [1-9]'",
@@ -99,7 +99,7 @@
           }
         },
         {
-          "statement": "Through HTTP with Date frozen, send 6,000 remote GET /healthz/x requests. Each has a distinct cf-connecting-ip and a distinct 'Authorization: Bearer mv_<8 hex>_<32 hex>'. These tokens are unverified, so under the single token rule only the 6,000 address keys reach the limiter. All responses must be 401, not 429. Afterwards the total entry count across every map the createServer-built limiter keeps must be <= MAX_BUCKETS.",
+          "statement": "Through HTTP with Date frozen and activeTunnel () => 'cloudflare' passed to createServer, send 6,000 remote GET /healthz/x requests. Each has a distinct cf-connecting-ip and a distinct 'Authorization: Bearer mv_<8 hex>_<32 hex>'. These tokens are unverified, so under the single token rule only the 6,000 address keys reach the limiter. All responses must be 401, not 429. Afterwards the total entry count across every map the createServer-built limiter keeps must be <= MAX_BUCKETS.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
@@ -152,7 +152,7 @@
           }
         },
         {
-          "statement": "Proxy-header trust follows the tunnel that carries the request, not leftover config (requires first amending R7 and the scope: test/oauth.test.mjs or test/helpers/tmp.mjs, docs/CLOUD.md, and src/cli/tunnel.mjs or src/server/main.mjs if the active provider is passed in). Date is frozen, rate_per_min = 5, remote.enabled is on and every request comes from the loopback socket. (a) 'quick tunnel callers are distinct': remote.provider = 'quick' and no remote.cloudflare. cf-connecting-ip 203.0.113.1 gets 401 five times, then 429. cf-connecting-ip 203.0.113.2 then gets 401. (b) 'funnel cannot spoof cf-connecting-ip': remote.provider = 'tailscale', remote.funnelConsent = true and a leftover remote.cloudflare = {name:'n', hostname:'h'}. One socket rotating cf-connecting-ip gets 429 on its sixth request.",
+          "statement": "Proxy-header trust follows the tunnel that carries the request, not leftover config. Date is frozen, rate_per_min = 5, remote.enabled is on and every request comes from the loopback socket. (a) 'quick tunnel callers are distinct': activeTunnel () => 'cloudflare' passed to createServer and no remote.cloudflare. cf-connecting-ip 203.0.113.1 gets 401 five times, then 429. cf-connecting-ip 203.0.113.2 then gets 401. (b) 'funnel cannot spoof cf-connecting-ip': activeTunnel () => 'tailscale' passed to createServer, remote.funnelConsent = true and a leftover remote.cloudflare = {name:'n', hostname:'h'}. One socket rotating cf-connecting-ip gets 429 on its sixth request.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
@@ -213,7 +213,7 @@
           }
         },
         {
-          "statement": "In both guards, remote.enabled is on and remote.cloudflare is configured; Date is frozen and rate_per_min = 5. Every one of the MAX_BUCKETS + 1 flood responses is exactly 401. In 'new caller served during flood' the never-seen address then gets exactly 401. In 'exhausted key stays limited', A's sixth request and its request after the flood are both 429.",
+          "statement": "In both guards, remote.enabled is on and activeTunnel () => 'cloudflare' is passed to createServer; Date is frozen and rate_per_min = 5. Every one of the MAX_BUCKETS + 1 flood responses is exactly 401. In 'new caller served during flood' the never-seen address then gets exactly 401. In 'exhausted key stays limited', A's sixth request and its request after the flood are both 429.",
           "verifier": {
             "type": "command",
             "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='new caller served during flood|exhausted key stays limited' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([2-9]|[1-9][0-9]+)'",
@@ -348,7 +348,7 @@
           }
         },
         {
-          "statement": "Without a trusted proxy configured, one connection rotating cf-connecting-ip and x-forwarded-for values is limited as one caller: at rate_per_min 5 the sixth request in a frozen minute gets 429 (memev twin finding F-2)",
+          "statement": "With no active tunnel (activeTunnel returning null) and no trusted proxy configured, one connection rotating cf-connecting-ip and x-forwarded-for values is limited as one caller: at rate_per_min 5 the sixth request in a frozen minute gets 429 (memev twin finding F-2)",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
