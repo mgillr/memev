@@ -37,6 +37,7 @@ History of the guard's form, 31 October 2026: (1) a count of matching passing li
 - QL-1.01: name guard on 34 criterion command(s).
 - QL-1.02: name guard on 27 criterion command(s).
 - QL-1.03: name guard on 25 criterion command(s).
+- QL-1.04: name guard on 11 criterion command(s).
 
 ## Subtest labels added by the build
 
@@ -45,3 +46,4 @@ When two or more red-green criteria of one task shared one whole-file command, o
 - QL-1.01: 34 criterion command(s) narrowed to labelled subtests.
 - QL-1.02: 27 criterion command(s) narrowed to labelled subtests.
 - QL-1.03: 25 criterion command(s) narrowed to labelled subtests.
+- QL-1.04: 11 criterion command(s) narrowed to labelled subtests.
