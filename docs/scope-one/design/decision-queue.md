@@ -36,7 +36,7 @@ Open, needs owner decision:
 
 Decided by the sources:
 
-- The distinction is required (spec line 14). The baseline places retries, assignment, dispatch, resource health and recovery inside the internal system, and says the user cannot bypass permissions, approvals or state-machine rules (baseline 9.3, the paragraph on the internal system).
+- The distinction is required (spec line 14). The baseline places retries, assignment, dispatch, resource health and recovery inside the internal system, and says the user cannot override permissions, approvals or state-machine rules (baseline 9.3, the paragraph on the internal system).
 - Two register rows give the two sides. A routine reversible choice proceeds with a recorded default (`docs/scope-one/REQUIREMENTS.md:57`, SO-REQ-033). An ambiguous high-impact choice, or an action beyond a cost or permission boundary, goes to the user (`docs/scope-one/REQUIREMENTS.md:56`, `:58`; SO-REQ-032 and SO-REQ-034). A failed verification is retried within policy or reported as a blocker (`docs/scope-one/REQUIREMENTS.md:59`, SO-REQ-035).
 - Today the state `BLOCKED` means "waiting on something outside the task" (`docs/PROJECTS.md:19`) and does not say whether a person or the system must act. A lease expiry, which the coordinator handles as an internal event, ends with the task set to `BLOCKED` and the reason `owner_lost` (`src/engine/coordinator.mjs:258-286`, reason at `:277`). By `src/engine/project-state.mjs:221` a `BLOCKED` task makes the project `NEEDS_ATTENTION`. So on main an internal event and a user-action blocker produce the same status.
 
