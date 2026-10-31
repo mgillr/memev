@@ -168,6 +168,217 @@
    "criteria": 22,
    "spec": "specs/SO-1.11-reference-project-acceptance.json",
    "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+  },
+  {
+   "id": "SO-2.01",
+   "gap": "G-SO-12",
+   "area": "SO-2",
+   "title": "Organisational knowledge model: relationships between people, teams, projects, decisions, artefacts and evidence",
+   "repo": "memev",
+   "closes": "Closes baseline 8.3 row 1 (WBS 5.3.1, 4.3.2): the vault graph and retrieval modules are foundations, not an organisational knowledge model",
+   "depends_on": [],
+   "tasks": 1,
+   "criteria": 12,
+   "spec": "specs/SO-2.01-organisational-knowledge-model.json",
+   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+  },
+  {
+   "id": "SO-2.02",
+   "gap": "G-SO-13",
+   "area": "SO-2",
+   "title": "Permission-aware knowledge access: retrieval governed by identity, project membership, classification, policy and jurisdiction",
+   "repo": "memev",
+   "closes": "Closes baseline 8.3 row 2 (WBS 5.3.2, 4.3.5): nothing enforces who may retrieve organisational knowledge at retrieval and action time",
+   "depends_on": [
+    "SO-2.01"
+   ],
+   "tasks": 1,
+   "criteria": 12,
+   "spec": "specs/SO-2.02-permission-aware-knowledge-access.json",
+   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+  },
+  {
+   "id": "SO-2.03",
+   "gap": "G-SO-14",
+   "area": "SO-2",
+   "title": "Provenance, retention and invalidation of organisational knowledge",
+   "repo": "memev",
+   "closes": "Closes baseline 8.3 row 3 (WBS 5.3.3, 4.3.5): source attribution, derived-record provenance, retention, deletion and invalidation have no rules",
+   "depends_on": [
+    "SO-2.01"
+   ],
+   "tasks": 1,
+   "criteria": 10,
+   "spec": "specs/SO-2.03-provenance-retention-invalidation.json",
+   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+  },
+  {
+   "id": "SO-2.04",
+   "gap": "G-SO-15",
+   "area": "SO-2",
+   "title": "Cross-project intelligence: evidence-backed discovery across otherwise independent work",
+   "repo": "memev",
+   "closes": "Closes baseline 8.3 row 4 (WBS 5.3.4, 4.3.6): there is no rule for what a cross-project finding must carry",
+   "depends_on": [
+    "SO-2.01",
+    "SO-2.03"
+   ],
+   "tasks": 1,
+   "criteria": 11,
+   "spec": "specs/SO-2.04-cross-project-intelligence.json",
+   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+  },
+  {
+   "id": "SO-2.05",
+   "gap": "G-SO-16",
+   "area": "SO-2",
+   "title": "Cross-functional issue discovery without unrestricted access to private records",
+   "repo": "memev",
+   "closes": "Closes baseline 8.3 row 5 (WBS 5.3.5, 4.3.6): nothing surfaces relevant information between departments while keeping private records private",
+   "depends_on": [
+    "SO-2.02",
+    "SO-2.04"
+   ],
+   "tasks": 1,
+   "criteria": 10,
+   "spec": "specs/SO-2.05-cross-functional-issue-discovery.json",
+   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+  },
+  {
+   "id": "SO-2.06",
+   "gap": "G-SO-17",
+   "area": "SO-2",
+   "title": "Organisational intelligence acceptance: tests for false findings, leakage and lost provenance",
+   "repo": "memev",
+   "closes": "Closes baseline 8.3 row 6 (WBS 5.3.6): no acceptance tests exist for organisational intelligence",
+   "depends_on": [
+    "SO-2.02",
+    "SO-2.03",
+    "SO-2.04",
+    "SO-2.05"
+   ],
+   "tasks": 1,
+   "criteria": 11,
+   "spec": "specs/SO-2.06-organisational-intelligence-acceptance.json",
+   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+  },
+  {
+   "id": "SO-2.07",
+   "gap": "G-SO-18",
+   "area": "SO-2",
+   "title": "Specialist knowledge systems: import, export, references, provenance and ownership at the boundary",
+   "repo": "memev",
+   "closes": "Closes baseline 8.4 row 4 (WBS 5.4.4): no contract defines how an authorised specialist knowledge system is used while Memev keeps its authority",
+   "depends_on": [
+    "SO-2.02",
+    "SO-2.03"
+   ],
+   "tasks": 1,
+   "criteria": 14,
+   "spec": "specs/SO-2.07-specialist-knowledge-systems.json",
+   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+  },
+  {
+   "id": "SO-2.08",
+   "gap": "G-SO-19",
+   "area": "SO-2",
+   "title": "Agent frameworks and runtimes: a provider-neutral task adapter and capability mapping",
+   "repo": "memev",
+   "closes": "Closes baseline 8.4 row 5 (WBS 5.4.5): no contract maps other frameworks and runtimes onto the canonical operation contracts",
+   "depends_on": [
+    "SO-1.04"
+   ],
+   "tasks": 1,
+   "criteria": 10,
+   "spec": "specs/SO-2.08-agent-frameworks-and-runtimes.json",
+   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+  },
+  {
+   "id": "SO-2.09",
+   "gap": "G-SO-20",
+   "area": "SO-2",
+   "title": "Software delivery systems: other repository hosts and issue trackers",
+   "repo": "memev",
+   "closes": "Closes baseline 8.4 row 6 (WBS 5.4.6): only GitHub has a contract (SO-O-B); other repository hosts and issue trackers have none",
+   "depends_on": [
+    "SO-1.06"
+   ],
+   "tasks": 1,
+   "criteria": 13,
+   "spec": "specs/SO-2.09-software-delivery-systems.json",
+   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+  },
+  {
+   "id": "SO-2.10",
+   "gap": "G-SO-21",
+   "area": "SO-2",
+   "title": "Business communication systems: authorised event ingestion and task linkage",
+   "repo": "memev",
+   "closes": "Closes baseline 8.4 row 7 (WBS 5.4.7): no contract defines how events from business communication systems enter a project",
+   "depends_on": [
+    "SO-1.06",
+    "SO-2.03"
+   ],
+   "tasks": 1,
+   "criteria": 12,
+   "spec": "specs/SO-2.10-business-communication-systems.json",
+   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+  },
+  {
+   "id": "SO-2.11",
+   "gap": "G-SO-22",
+   "area": "SO-2",
+   "title": "Enterprise systems: explicit data contracts, least privilege, audit and retention",
+   "repo": "memev",
+   "closes": "Closes baseline 8.4 row 8 (WBS 5.4.8): no contract defines the data contract between Memev and an enterprise system",
+   "depends_on": [
+    "SO-1.06",
+    "SO-2.02",
+    "SO-2.03"
+   ],
+   "tasks": 1,
+   "criteria": 12,
+   "spec": "specs/SO-2.11-enterprise-systems.json",
+   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+  },
+  {
+   "id": "SO-2.12",
+   "gap": "G-SO-23",
+   "area": "SO-2",
+   "title": "Federated computation behind the provider boundary",
+   "repo": "memev",
+   "closes": "Closes baseline 8.5 row 11 (WBS 5.5.11): federated computation has no line in the register or the addendum and no contract",
+   "depends_on": [],
+   "tasks": 1,
+   "criteria": 14,
+   "spec": "specs/SO-2.12-federated-computation.json",
+   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+  },
+  {
+   "id": "SO-2.13",
+   "gap": "G-SO-24",
+   "area": "SO-2",
+   "title": "Commercial integration services that keep the open-core boundary neutral",
+   "repo": "memev",
+   "closes": "Closes baseline 8.6 row 5 (WBS 5.6.5): paid managed, hosted or enterprise services have no contract that holds the open-core boundary",
+   "depends_on": [],
+   "tasks": 1,
+   "criteria": 10,
+   "spec": "specs/SO-2.13-commercial-integration-services.json",
+   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+  },
+  {
+   "id": "SO-2.14",
+   "gap": "G-SO-25",
+   "area": "SO-2",
+   "title": "Business deployment: multi-person project permissions and team administration",
+   "repo": "memev",
+   "closes": "Closes the uncovered part of baseline 8.6 row 2 (WBS 5.6.2): the business trial is SR-5.02, tier enforcement SR-5.04 and team invites MEM-069 (delivered); multi-person project permissions and team administration have no contract",
+   "depends_on": [],
+   "tasks": 1,
+   "criteria": 8,
+   "spec": "specs/SO-2.14-business-team-administration.json",
+   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
   }
  ]
 }

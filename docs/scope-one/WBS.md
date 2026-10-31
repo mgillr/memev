@@ -2,12 +2,12 @@
 
 Part of the [Memev documentation](../README.md). Up: the [README](../../README.md). Related: [requirements](REQUIREMENTS.md), [traceability](TRACEABILITY.md), [inventory](INVENTORY.md), [slice plan](SLICE-PLAN.md), [decisions](DECISIONS.md), [contracts](../../contracts/README.md).
 
-Reconciled 31 October 2026 against main at `67bec9d`. The requirement register and the traceability matrix stay dated 30 October at `2909702d`; this page is the refreshed view, and where it differs it says so and cites the evidence.
+Reconciled 31 October 2026 against main at `4823064`. The requirement register and the traceability matrix stay dated 30 October at `2909702d`; this page is the refreshed view, and where it differs it says so and cites the evidence.
 
 ## How to read this page
 
 - One tree, numbered. A leaf is one thing that has to be delivered, decided or settled. Each leaf has one owner line; an owner is named once on its own leaf and cited from the others, so no work is described twice.
-- A leaf has one of four statuses. **delivered**: on main and a test proves it. **covered**: an existing contract, an open pull request or merged work owns what is left. **new**: a contract added with this page (SO-1.01 to SO-1.11) owns it. **blocked**: it cannot be contracted or built until the named decision or fact exists.
+- A leaf has one of four statuses. **delivered**: on main and a test proves it. **covered**: an existing contract, an open pull request, merged work or a task of the programme decomposition owns what is left (a programme task is proposed and unsigned until its contract is signed). **new**: a contract added with this page (SO-1.01 to SO-1.11 and SO-2.01 to SO-2.14) owns it. **blocked**: it cannot be contracted or built until the named decision or fact exists.
 - A dagger (†) after an id marks a contract signed in the owner's vault that the review of PR #222 names (issuecomment-6534383323). It is not in this repository and cannot be checked from here, so every leaf that rests on one is flagged and counted apart.
 - Sections 1 to 3, 5, 6, 7 and 8 are different lenses on the same work, so a total across all of them counts a thing once per lens. Section 9 lists each owner once.
 - Source names: "baseline" is the master traceability and target architecture baseline of 31 October 2026 (main at `aa3af6c`), "addendum" is the Scope One addendum of PR #222, and "review" is its review table.
@@ -15,19 +15,19 @@ Reconciled 31 October 2026 against main at `67bec9d`. The requirement register a
 
 ## Summary
 
-Leaves: 276. delivered 21, covered 186, new 24, blocked 45. Of the covered leaves, 82 rest wholly or partly on a contract that only the owner's vault holds and this repository cannot check.
+Leaves: 276. delivered 21, covered 198, new 41, blocked 16. Of the covered leaves, 82 rest wholly or partly on a contract that only the owner's vault holds and this repository cannot check.
 
 | Section | Leaves | delivered | covered | new | blocked |
 | --- | --- | --- | --- | --- | --- |
 | 1 Control and decisions | 19 | 1 | 12 | 2 | 4 |
 | 2 Platform contracts | 57 | 0 | 57 | 0 | 0 |
 | 3 Requirements | 98 | 4 | 86 | 5 | 3 |
-| 4 Addendum | 23 | 0 | 4 | 10 | 9 |
-| 5 Delivery families | 52 | 0 | 17 | 7 | 28 |
+| 4 Addendum | 23 | 0 | 4 | 13 | 6 |
+| 5 Delivery families | 52 | 0 | 29 | 21 | 2 |
 | 6 Pull requests | 7 | 0 | 6 | 0 | 1 |
 | 7 Branches | 7 | 3 | 4 | 0 | 0 |
 | 8 Merged foundations | 13 | 13 | 0 | 0 | 0 |
-| Total | 276 | 21 | 186 | 24 | 45 |
+| Total | 276 | 21 | 198 | 41 | 16 |
 
 The sections are lenses on the same work, so the total counts a thing once per lens; the requirement lens (98 leaves) is the one that must reach "delivered".
 
@@ -365,11 +365,11 @@ Real inventory of the failure tests, from the code on main. The register records
 | WBS | Subject | Owner of what exists | Status | Evidence or remaining |
 | --- | --- | --- | --- | --- |
 | 4.3.1 | 13.1 Personal deployment, one or several machines | SR-3.04; SR-1.25; SR-1.30 | covered | owner decision 31 Oct 2026: Personal covers up to 3 computers; SR-3.04 owns concurrent editing of one vault |
-| 4.3.2 | 13.2 Small business shared memory | none | blocked | needs the organisational knowledge model and permission model of baseline 8.3, which no accepted requirement defines |
-| 4.3.3 | 13.3 Larger businesses and offices | none | blocked | depends on 13.2 and on the node-identity contract (5.5.5) |
+| 4.3.2 | 13.2 Small business shared memory | SO-2.01; SO-2.02; SO-2.14 | new | the organisational knowledge model (SO-2.01), the permission model (SO-2.02) and multi-person project permissions (SO-2.14) are design-record contracts released by the owner on 31 October 2026; the records are not yet written |
+| 4.3.3 | 13.3 Larger businesses and offices | none | blocked | depends on 13.2 and on the node-identity task (5.5.5), which the programme decomposition proposes as WP09-01 and WP13-03 |
 | 4.3.4 | 13.4 Enterprise and international federation | #224 (draft) | blocked | the federation architecture of #224 is not yet accepted |
-| 4.3.5 | 13.5 Governed shared memory | none | blocked | depends on the permission-aware access contract (5.3.2) |
-| 4.3.6 | 13.6 Cross-project intelligence | none | blocked | depends on 13.5; needs the false-positive and provenance acceptance tests (5.3.6) |
+| 4.3.5 | 13.5 Governed shared memory | SO-2.02; SO-2.03 | new | permission-aware access (SO-2.02) and provenance, retention and invalidation (SO-2.03); the status lattice of a note is WP10-01 and WP10-02 of the programme decomposition |
+| 4.3.6 | 13.6 Cross-project intelligence | SO-2.04; SO-2.05; SO-2.06 | new | findings (SO-2.04), cross-functional routing (SO-2.05) and the acceptance tests (SO-2.06); a prototype is WP08-04 of the programme decomposition and consumes these records |
 | 4.3.7 | 13.6.1 Federated site memory | none | blocked | owner decision 31 Oct 2026 settles local-first with the cloud only a relay and a backup; the review also asks for the two named integrations to be defined, and the trust-governance one is undefined in this repository |
 | 4.3.8 | 13.7 Convergence, accountable admission and trust governance | SR-3.01, SR-3.02, SR-3.05 (convergence engine boundary); WO-05-D (#206, specification merged) | blocked | the admission and trust-governance integrations have no contract and no definition in this repository |
 | 4.3.9 | 13.8 Deployment profiles | owner decision 31 Oct 2026 on tiers | covered | illustrative profiles, not thresholds; the tier set is decided |
@@ -413,51 +413,51 @@ Section 8 of the baseline lists proposed contract families and says their ids ar
 
 | WBS | Family | Owner | Status | Evidence or remaining |
 | --- | --- | --- | --- | --- |
-| 5.3.1 | Organisational knowledge model | none | blocked | appears in the baseline (8.3) and addendum 13.2, 13.5 and 13.6 only; no accepted requirement defines the model; needs the owner to accept 13.2 and 13.5 |
-| 5.3.2 | Permission-aware knowledge access | none | blocked | appears in the baseline (8.3) and addendum 13.2, 13.5 and 13.6 only; no accepted requirement defines the model; needs the owner to accept 13.2 and 13.5 |
-| 5.3.3 | Provenance and retention | none | blocked | appears in the baseline (8.3) and addendum 13.2, 13.5 and 13.6 only; no accepted requirement defines the model; needs the owner to accept 13.2 and 13.5 |
-| 5.3.4 | Cross-project intelligence | none | blocked | appears in the baseline (8.3) and addendum 13.2, 13.5 and 13.6 only; no accepted requirement defines the model; needs the owner to accept 13.2 and 13.5 |
-| 5.3.5 | Cross-functional issue discovery | none | blocked | appears in the baseline (8.3) and addendum 13.2, 13.5 and 13.6 only; no accepted requirement defines the model; needs the owner to accept 13.2 and 13.5 |
-| 5.3.6 | Organisational intelligence acceptance | none | blocked | appears in the baseline (8.3) and addendum 13.2, 13.5 and 13.6 only; no accepted requirement defines the model; needs the owner to accept 13.2 and 13.5 |
+| 5.3.1 | Organisational knowledge model | SO-2.01 | new | owner release of 8.3 on 31 October 2026; the vault graph and retrieval modules are foundations only |
+| 5.3.2 | Permission-aware knowledge access | SO-2.02 | new | retrieval and action time; sharing classes at a site boundary are WP13-01 of the programme decomposition |
+| 5.3.3 | Provenance and retention | SO-2.03 | new | retention, deletion, invalidation and derived-record provenance; the status lattice of a note is WP10-01 and WP10-02 |
+| 5.3.4 | Cross-project intelligence | SO-2.04 | new | the design record; the prototype is WP08-04 and consumes it |
+| 5.3.5 | Cross-functional issue discovery | SO-2.05 | new | routing and access rules; WP08-04 and WP14-04 build on it |
+| 5.3.6 | Organisational intelligence acceptance | SO-2.06 | new | the acceptance tests of the organisational-intelligence demonstrator in WP14-04 |
 
 ### 5.4 Ecosystem integrations
 
 | WBS | Family | Owner | Status | Evidence or remaining |
 | --- | --- | --- | --- | --- |
-| 5.4.1 | Existing client and tool interfaces | docs/CLIENTS.md; SR-2.03; SO-05-B† | covered |  |
-| 5.4.2 | Agent-to-agent communication | none | blocked | baseline 8.4 only; not in the register, the addendum or an owner decision |
-| 5.4.3 | Agentic commerce and payment | none | blocked | baseline 8.4 only; not in the register, the addendum or an owner decision |
-| 5.4.4 | Specialist knowledge systems | none | blocked | baseline 8.4 only; the addendum treats memory products as subsystem competitors |
-| 5.4.5 | Agent frameworks and runtimes | none | blocked | baseline 8.4 only; provider neutrality is decided, the framework list is not |
-| 5.4.6 | Software delivery systems | SO-O-B† (GitHub); none for the others | blocked | only the GitHub part has a contract; the others are baseline 8.4 only |
-| 5.4.7 | Business communication | none | blocked | baseline 8.4 only |
-| 5.4.8 | Enterprise systems | none | blocked | baseline 8.4 only |
+| 5.4.1 | Existing client and tool interfaces | docs/CLIENTS.md; SR-2.03; SO-05-B† | covered | owned already; no new contract |
+| 5.4.2 | Agent-to-agent communication | WP18-01 (programme decomposition, proposed and unsigned) | covered | an adapter alongside the existing MCP server; no replacement protocol |
+| 5.4.3 | Agentic commerce and payment | WP18-04 (programme decomposition, proposed and unsigned) | covered | payment after verified acceptance |
+| 5.4.4 | Specialist knowledge systems | SO-2.07 | new | owner release of 8.4 on 31 October 2026 |
+| 5.4.5 | Agent frameworks and runtimes | SO-2.08; WP18-02 (first adapter, programme decomposition) | new | provider neutrality is decided; SO-2.08 is every framework other than the first adapter |
+| 5.4.6 | Software delivery systems | SO-O-B† (GitHub); SO-2.09 | new | SO-2.09 is the other repository hosts and issue trackers |
+| 5.4.7 | Business communication | SO-2.10 | new | owner release of 8.4 on 31 October 2026 |
+| 5.4.8 | Enterprise systems | SO-2.11 | new | owner release of 8.4 on 31 October 2026 |
 
 ### 5.5 Convergence, trust and federation
 
 | WBS | Family | Owner | Status | Evidence or remaining |
 | --- | --- | --- | --- | --- |
-| 5.5.1 | Structured-state convergence | SR-3.01; SR-3.04 | blocked | extension to project and organisational state needs the 13.7 boundary defined |
-| 5.5.2 | Engine conformance and entitlement | SR-3.02; SR-3.05; WO-05-A, MEM-130 (#163), #201 | covered |  |
-| 5.5.3 | Contribution admission | none | blocked | no definition in this repository |
-| 5.5.4 | Distributed trust governance | WO-05-D (#206, specification merged) | blocked | the integration has no contract; the trust-governance component is undefined here |
-| 5.5.5 | Node identity and authority | none | blocked | depends on the federation decision of 13.4 |
-| 5.5.6 | Sovereign data exchange | none | blocked | depends on 13.4 and 13.5 |
-| 5.5.7 | Federation protocol | #224 (draft) | blocked | #224 is not accepted |
-| 5.5.8 | Partition and recovery | SR-3.04 (personal scale only) | blocked | multi-site recovery depends on 13.4 |
-| 5.5.9 | Multi-site administration | none | blocked | depends on 13.4 |
-| 5.5.10 | Cross-organisation projects | none | blocked | depends on 13.4 |
-| 5.5.11 | Federated computation | none | blocked | baseline 8.5 only; no line in the register or the addendum |
+| 5.5.1 | Structured-state convergence | WP05-01 to WP05-06 (programme decomposition, proposed and unsigned); SR-3.04 | covered | the merge-semantics table and the integration design; reported superseded items stay as in the note before section 2 |
+| 5.5.2 | Engine conformance and entitlement | SR-3.02; SR-3.05; WO-05-A, MEM-130 (#163), #201; WP02-01 to WP02-04, WP15-01 (programme decomposition, proposed and unsigned) | covered |  |
+| 5.5.3 | Contribution admission | WP09-02 (programme decomposition, proposed and unsigned) | covered | the admission boundary for contributions |
+| 5.5.4 | Distributed trust governance | WO-05-D (#206, specification merged); WP09-01, WP09-03, WP06-01 to WP06-03 (programme decomposition, proposed and unsigned) | covered | identity, equivocation handling and the acceptance state model |
+| 5.5.5 | Node identity and authority | WP09-01, WP13-03 (programme decomposition, proposed and unsigned) | covered |  |
+| 5.5.6 | Sovereign data exchange | WP13-01, WP13-02 (programme decomposition, proposed and unsigned) | covered | sharing classes at the publish boundary and the disclosure policy |
+| 5.5.7 | Federation protocol | WP12-01 to WP12-03 (programme decomposition, proposed and unsigned); #224 (draft) | covered | transport adapter, relay-backed transport and the three-node harness |
+| 5.5.8 | Partition and recovery | SR-3.04 (personal scale only); WP12-02, WP13-04 (programme decomposition, proposed and unsigned) | covered |  |
+| 5.5.9 | Multi-site administration | WP13-03 (programme decomposition, proposed and unsigned) | covered | site identity, organisation membership and sovereignty policy |
+| 5.5.10 | Cross-organisation projects | WP13-05 (programme decomposition, proposed and unsigned) | covered | cross-organisation identity and trust-domain boundaries |
+| 5.5.11 | Federated computation | SO-2.12 | new | owner release of 8.5 row 11 on 31 October 2026; behind the provider boundary |
 
 ### 5.6 Commercial and distribution
 
 | WBS | Family | Owner | Status | Evidence or remaining |
 | --- | --- | --- | --- | --- |
 | 5.6.1 | Personal multi-device release | SR-3.04; SR-3.05; SR-5.04; MEM-130 (#163); MEM-134 (#177) | covered |  |
-| 5.6.2 | Business deployment | SR-5.02; SR-5.04; MEM-069 (delivered, #133) | covered | multi-person project permissions wait on 13.2 |
-| 5.6.3 | Enterprise deployment | none | blocked | depends on 13.4 |
-| 5.6.4 | Protocol conformance service | none | blocked | baseline 8.6 only |
-| 5.6.5 | Commercial integration services | none | blocked | baseline 8.6 only |
+| 5.6.2 | Business deployment | SR-5.02; SR-5.04; MEM-069 (delivered, #133); SO-2.14 | new | SR-5.02 owns the trial, SR-5.04 tier enforcement and MEM-069 team invites; SO-2.14 is multi-person project permissions and team administration, and waits on ADR 5 |
+| 5.6.3 | Enterprise deployment | WP16-04, WP13-03 (programme decomposition, proposed and unsigned) | covered | deployment by topology and trust boundary, not by computer count |
+| 5.6.4 | Protocol conformance service | WP18-03 (programme decomposition, proposed and unsigned) | covered | public conformance tests |
+| 5.6.5 | Commercial integration services | SO-2.13; WP15-01, WP15-02, WP16-07 (programme decomposition, proposed and unsigned) | new | SO-2.13 is the service boundary; the licence boundary and the pricing dimensions are the WPs |
 | 5.6.6 | Public product distribution | SR-6.01; SR-6.02; SR-6.03; SR-6.04; SR-6.11 | covered |  |
 | 5.6.7 | External security assurance | SR-1.20; SR-9.05 | covered |  |
 
@@ -528,6 +528,39 @@ Each new contract, with what it was checked against so that it does not repeat e
 | SO-1.09 | Artefacts: version history, comparison and previews that show verification state | SO-1.01 | SO-05-D†; SO-02-B† | the review says history and previews are new |
 | SO-1.10 | Fault classes: the addendum classes that F01 to F20 do not name, added to the failure suite | SO-1.01 | SO-11-A†; SO-09-A†; F01 to F20; test/fail-paths.test.mjs | only the six unmatched classes of 4.2 are taken; the others stay with SO-11-A† |
 | SO-1.11 | Reference project: the whole user journey as one integration gate | SO-1.01, SO-1.05, SO-1.06, SO-1.07, SO-1.08, SO-1.10 | SO-11-A†; SO-R-A to SO-R-D | the review says the fifteen steps are not in SO-11-A |
+| SO-2.01 | Organisational knowledge model: relationships between people, teams, projects, decisions, artefacts and evidence | none | src/engine/vault.mjs, graph and retrieval modules; baseline 8.3; addendum 13.2; WP08-04, WP10-01, WP14-04 | no overlap; WP08-04 and WP14-04 consume the model and WP10 defines the status of a fact, not the model |
+| SO-2.02 | Permission-aware knowledge access: retrieval governed by identity, project membership, classification, policy and jurisdiction | SO-2.01 | baseline 8.3; addendum 13.5; WP13-01, WP13-02 | WP13-01 is the publish boundary of a site; this is retrieval and action time and takes none of it |
+| SO-2.03 | Provenance, retention and invalidation of organisational knowledge | SO-2.01 | baseline 8.3; addendum 13.5; WP10-01 to WP10-04 | WP10-01 and WP10-02 are the status lattice and origin fields; this takes retention, deletion, invalidation and derived-record provenance only |
+| SO-2.04 | Cross-project intelligence: evidence-backed discovery across otherwise independent work | SO-2.01, SO-2.03 | baseline 8.3; addendum 13.6; WP08-04, WP14-04 | WP08-04 builds a prototype; this is the design record it consumes and builds nothing |
+| SO-2.05 | Cross-functional issue discovery without unrestricted access to private records | SO-2.02, SO-2.04 | baseline 8.3; addendum 13.2 and 13.6; WP08-04, WP14-04 | the routing and access rules only; WP08-04 and WP14-04 build on it |
+| SO-2.06 | Organisational intelligence acceptance: tests for false findings, leakage and lost provenance | SO-2.02, SO-2.03, SO-2.04, SO-2.05 | baseline 8.3; addendum 13.9; WP14-04 | WP14-04 names the demonstrators; this defines the acceptance tests of the organisational-intelligence one only |
+| SO-2.07 | Specialist knowledge systems: import, export, references, provenance and ownership at the boundary | SO-2.02, SO-2.03 | baseline 8.4; docs/IMPORT.md and MEM-105 (import of history); WP18 | no overlap; the import of history from AI apps is a different capability |
+| SO-2.08 | Agent frameworks and runtimes: a provider-neutral task adapter and capability mapping | SO-1.04 | baseline 8.4; addendum 5; docs/CLIENTS.md; WP18-02 | WP18-02 is the first adapter; this is every other framework and runtime |
+| SO-2.09 | Software delivery systems: other repository hosts and issue trackers | SO-1.06 | baseline 8.4; SO-O-B†, SO-O-C†; docs/CLIENTS.md; WP18 | GitHub stays with SO-O-B†; this is the others |
+| SO-2.10 | Business communication systems: authorised event ingestion and task linkage | SO-1.06, SO-2.03 | baseline 8.4; WP18 | no overlap |
+| SO-2.11 | Enterprise systems: explicit data contracts, least privilege, audit and retention | SO-1.06, SO-2.02, SO-2.03 | baseline 8.4; WP13-01, WP13-03; WP18 | no overlap; WP13 concerns sites of Memev, not enterprise systems |
+| SO-2.12 | Federated computation behind the provider boundary | none | baseline 8.5 and 10; WO-05-A; WP09-02, WP12, WP13 | WP09-02, WP12 and WP13 are prerequisites and are not repeated; no overlap with a task of the programme decomposition |
+| SO-2.13 | Commercial integration services that keep the open-core boundary neutral | none | baseline 8.6; addendum 10 and 13.7; WP15-01, WP15-02, WP16-07 | WP15 holds the licence boundary and WP16-07 the pricing dimensions; this is the service boundary only |
+| SO-2.14 | Business deployment: multi-person project permissions and team administration | none | baseline 8.6; SR-5.02, SR-5.04, MEM-069; ADR 5; WP16-01 | SR-5.02, SR-5.04 and MEM-069 stay with their owners; WP16-01 decides tier names and takes none of this |
+
+### 9.1 Overlap with the programme decomposition
+
+The programme decomposition (docs/scope-one/programme/ on branch docs/engine-decision-tiers-reconcile, 82 tasks in 18 work packages, proposed and unsigned) was read on 31 October 2026 against the contracts of this page. Where the two touch, the contract here is the design record and the task there is the build, unless the table says otherwise. The branch is not on main, so the task ids below are not checked by a test.
+
+| Contract | Programme task | Overlap | Disposition |
+| --- | --- | --- | --- |
+| SO-1.01 | WP07-01 to WP07-04 | wiring of the store, state machine and coordinator; branch feat/wire-project-engine cites SO-1.01 | the same work: SO-1.01 is the decision record and the branch builds it; the owner confirms that one is not signed twice |
+| SO-1.02 | WP08-01, WP17-01, WP17-02 | refresh of the register and the inventory and a disposition of every open pull request and branch | the same work: this page and sections 6 and 7 are that refresh and ledger; the tasks there should consume them, not repeat them |
+| SO-1.04 | WP08-02 | a provider-neutral execution adapter contract | SO-1.04 adds the four-way event distinction; WP08-02 is the adapter contract itself; to be sequenced, not merged |
+| SO-1.10, SO-1.11 | WP08-03 | a lifecycle test from intake to delivery | SO-1.11 is the fifteen-step reference project and WP08-03 is a lifecycle test; one of the two should own the gate |
+| SO-1.07 | WP10-04 | which version of a decision was authoritative at the time | the relationship model and staleness of SO-1.07 take no as-of query; no overlap found |
+| SO-2.01 to SO-2.06 | WP08-04, WP14-04, WP10-01 to WP10-04, WP13-01, WP13-02 | organisational intelligence prototype and demonstrator; knowledge status; sharing classes and disclosure | each SO-2 request states what it takes and what it leaves; the prototype and the demonstrator consume the records |
+| SO-2.08 | WP18-02 | the first framework adapter | WP18-02 is the first instance; SO-2.08 is every other framework and runtime |
+| SO-2.12 | WP09-02, WP12-01 to WP12-03, WP13-03 | contribution admission, transport and sites | prerequisites of federated computation, not repeated |
+| SO-2.13 | WP15-01, WP15-02, WP16-07 | licence boundary and pricing dimensions | SO-2.13 is the service boundary only |
+| SO-2.14 | WP16-01 | tier names | WP16-01 decides names and takes none of the permissions and administration |
+
+Rows of section 5 owned by the programme decomposition are marked covered with its task id. They stay covered only while the owner accepts that decomposition; a task there is not a signed contract.
 
 Ids with a dagger that this page cites and that cannot be checked here: D-SO-MEMORY-AUTHORITY, SO-02-A, SO-02-B, SO-03-A, SO-05-B, SO-05-C, SO-05-D, SO-08-B, SO-09-A, SO-11-A, SO-C-A, SO-C-C, SO-L-A, SO-MEMORY-AUTHORITY, SO-O-A, SO-O-B, SO-O-C, SO-R-C. They are exactly the ones the review table names.
 

@@ -57,7 +57,7 @@ test('SO-1.02 every contract of every manifest is a leaf of section 1 or 2, or a
 
 test('SO-1.02 every new owner named on a leaf is a contract of the scope-one manifest', () => {
   const ids = new Set(JSON.parse(read('contracts/scope-one/manifest.json')).contracts.map((c) => c.id));
-  for (const id of new Set(wbs.match(/\bSO-1\.\d\d\b/g) || [])) assert.ok(ids.has(id), `${id} is not in the manifest`);
+  for (const id of new Set(wbs.match(/\bSO-[12]\.\d\d\b/g) || [])) assert.ok(ids.has(id), `${id} is not in the manifest`);
   for (const id of ids) assert.ok(wbs.includes(id), `${id} is not named in the WBS`);
 });
 
