@@ -720,3 +720,14 @@ test('the reviewer key the gate trusts is the reviewer\'s, never the fixture tes
   assert.notEqual(keyId(REVIEWER_KEYS[0]), keyId(TEST_PUB));
   assert.notEqual(keyId(REVIEWER_KEYS[0]), keyId(FIXTURE_PUB));
 });
+
+test('T1-c37: an added answer folded as another criterion is judged by its folded_as: the folded criterion verbatim in the spec is SIGNABLE, an absent one or a string is refused', () => {
+  const fold = (f) => { const s = sc(); s.mutate((r) => { const a = r.rounds[0].answers[0]; a.folded_as = clone(a.criterion); a.criterion.statement += ' (as the reviewer worded it)'; f(a); }); return ev(s); };
+  signable(fold(() => {}), 'the proposal reworded, folded_as naming the criterion in the spec');
+  refused(fold((a) => { a.folded_as.statement += ' (not in the spec)'; }), 'added_verbatim', 'folded_as naming a criterion the spec lacks');
+  refused(fold((a) => { a.folded_as.verifier = { ...a.folded_as.verifier, cmd: `${a.folded_as.verifier.cmd ?? ''} --x` }; }), 'added_verbatim', 'folded_as with another verifier');
+  refused(fold((a) => { a.folded_as = a.folded_as.statement.slice(0, 80); }), 'added_verbatim', 'folded_as as a string prefix');
+  const s = sc(); s.mutate((r) => { r.rounds[0].answers[0].criterion.statement += ' (reworded)'; });
+  refused(ev(s), 'added_verbatim', 'a reworded proposal with no folded_as');
+});
+

@@ -100,7 +100,9 @@ kind in the spec's manifest row (`manifest_kind`).
 
 **The stopping rule.** A round is clean when it holds no answer of severity high and every answer is
 dispositioned: `added`, with its criterion then in the spec verbatim (task, statement and verifier),
-or `rejected` with a reason. Medium and low answers may remain in a clean round, each with its
+or `rejected` with a reason. When the build or the builder changes what an added answer proposed (the build's name guard rewrites a
+test command; an answer is folded in substance), the builder records `folded_as`: the criterion the answer became,
+as `{task, statement, verifier}`, and that criterion must be in the spec verbatim instead. Medium and low answers may remain in a clean round, each with its
 disposition. A spec is SIGNABLE when all of these hold:
 
 - its last round has verdict `clean`, holds no high answer, and reviewed the spec as it is on disk;

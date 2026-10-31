@@ -482,7 +482,13 @@ export function evaluate({ spec, cwd = process.cwd(), reviewerKeys, at } = {}) {
       const label = `round ${r.round} answer ${a.n}`;
       if (a.disposition !== 'added' && a.disposition !== 'rejected') fail('dispositions_all_rounds', `${label} ${a.disposition === undefined ? 'has no disposition' : `is ${JSON.stringify(a.disposition)}, not added or rejected`}`);
       if (a.disposition === 'rejected' && !(typeof a.reason === 'string' && a.reason.trim())) fail('rejected_reason', `${label} is rejected with no reason`);
-      if (a.disposition === 'added') { const p = addedProblem(disk, a.criterion); if (p) fail('added_verbatim', `${label} ${p}`); }
+      // folded_as, the criterion the answer became (task, statement, verifier), is a builder field: when present it is what must be
+      // in the spec verbatim, because the build rewrites commands (the name guard) and a builder may fold an answer in substance
+      if (a.disposition === 'added') {
+        const folded = a.folded_as !== undefined;
+        const p = addedProblem(disk, folded ? a.folded_as : a.criterion);
+        if (p) fail('added_verbatim', `${label} ${folded ? 'folded as a criterion that ' : ''}${p}`);
+      }
     }
   }
 
