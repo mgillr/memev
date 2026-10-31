@@ -72,7 +72,7 @@
       "closes": "The rate limiter bucket map is never evicted (http.mjs:69-77), an unbounded memory growth on a public tunnel",
       "depends_on": [],
       "tasks": 1,
-      "criteria": 28,
+      "criteria": 39,
       "spec": "specs/SR-1.05-a-bounded-rate-limiter.json"
     },
     {
