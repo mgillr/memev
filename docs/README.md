@@ -52,6 +52,7 @@ this folder links back here, and this page links down to every page.
 | [tiers/services.md](tiers/services.md) | services, support plans, response times |
 | [CONVERGENCE.md](CONVERGENCE.md) | the paid core: the crdt-merge convergence engine |
 | [PAID-CONVERGENCE.md](PAID-CONVERGENCE.md) | the specification of the paid convergence service: what the engine does, and the boundary it is called across |
+| [PAID-TRUST.md](PAID-TRUST.md) | the trust service (planned): which signed operations a shared vault would accept, and how a computer that should no longer write would be kept out of a concurrent edit |
 | [EXTENSION-POINTS.md](EXTENSION-POINTS.md) | the one place the core hands work to an outside program: the merge engine boundary |
 | [PRICING.md](PRICING.md) | the tier table, the computer limit, licences |
 | [CHECKOUT.md](CHECKOUT.md) | how checkout and licence keys fit together |
