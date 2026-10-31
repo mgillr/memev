@@ -1,0 +1,148 @@
+{
+  "title": "SR-1.04 Cloud connectors: no bearer in the URL, proof of possession",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G04: Connector URLs embed the bearer token in the path (logged by tunnel providers); cloud tokens are plain replayable bearers. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "OAuth-only connectors",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "memev cloud url prints a URL with no secret in it; claude.ai and ChatGPT connect through the OAuth flow",
+        "path tokens are refused after a one-version deprecation that warns in doctor"
+      ],
+      "description": "",
+      "scope": [
+        "src/cli/tunnel.mjs",
+        "src/server/http.mjs",
+        "src/server/oauth.mjs",
+        "docs/CLOUD.md",
+        "test/connector-url.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "No printed connector URL contains a token; a path token is refused",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/connector-url.test.mjs",
+            "cmd": "node --test test/connector-url.test.mjs"
+          }
+        },
+        {
+          "statement": "The cloud page states it",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CLOUD.md",
+            "pattern": "no secret in the URL"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Short-lived access tokens with rotation",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "access tokens live at most one hour, refresh tokens rotate on use and a reused refresh token revokes the family"
+      ],
+      "description": "",
+      "scope": [
+        "src/server/oauth.mjs",
+        "test/oauth.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "A reused refresh token revokes every token in its family",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oauth.test.mjs",
+            "cmd": "node --test test/oauth.test.mjs"
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Live connector test",
+      "phase": "verify",
+      "depends_on": [
+        "T2"
+      ],
+      "requirements": [
+        "the flow is run once against a real claude.ai custom connector and a real ChatGPT connector"
+      ],
+      "description": "",
+      "scope": [
+        "docs/testing/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The live run is recorded with dates and app versions",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/testing/connector-live-run.md"
+          }
+        },
+        {
+          "statement": "claude.ai passed",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/testing/connector-live-run.md",
+            "pattern": "claude\\.ai.*PASS"
+          }
+        },
+        {
+          "statement": "ChatGPT passed",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/testing/connector-live-run.md",
+            "pattern": "ChatGPT.*PASS"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
