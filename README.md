@@ -219,6 +219,7 @@ up. The main pages:
 | [AI apps](docs/CLIENTS.md) | what is changed in each app, hooks vs instructions, undoing it |
 | [Cloud access](docs/CLOUD.md) | the secure link, connector URLs, other computers, turning it on |
 | [Comms bus](docs/BUS.md) | how your AI apps talk to each other, the roster and comms checks |
+| [Set up your office](docs/OFFICE.md) | one vault, inviting teammates, the lead, the roster and what is shared |
 | [GitHub backup](docs/GITHUB.md) | `memev github setup` |
 | [Docker](docs/DOCKER.md) | running Memev in a container |
 | [Tiers and setup](docs/tiers/README.md) | Personal, Personal with more computers, Business and Corporate, and the services around them (draft) |

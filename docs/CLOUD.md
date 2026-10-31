@@ -40,6 +40,20 @@ from that page. The app exchanges the code at `/oauth/token` for a bearer token 
 `/oauth/revoke`. Each registered client shows up in `memev devices` as a cloud connector. The
 connector URL above stays available for apps that take only a URL.
 
+## What each plan allows
+
+The cloud apps gate MCP by plan, so the same connector URL does different things on different plans.
+Checked 2026-10-28 against the pages named in the sources below; the limits change, so re-check before relying on one:
+
+| App | Plan | What the connector can do |
+| --- | --- | --- |
+| ChatGPT | Plus, Pro (developer mode) | Developer mode adds custom MCP servers. The developer mode guide lists write actions on Plus and Pro; the help article describes Pro developer mode as read and fetch. Full MCP needs a Business, Enterprise or Edu seat. |
+| ChatGPT | Business, Enterprise, Edu | Full MCP: read and write tools. |
+| claude.ai | Free | One custom connector. |
+| claude.ai | Pro, Max | Custom connectors. |
+
+Sources: https://platform.openai.com/docs/guides/developer-mode (write actions on Plus and Pro) and https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt-beta (full write MCP on Business, Enterprise, Edu; Pro developer mode is read and fetch).
+
 Every app and computer has its own credential; there is no shared key. `memev devices` lists them:
 
 ```sh

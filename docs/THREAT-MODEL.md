@@ -18,6 +18,7 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md).
 | Disk corruption or a crash mid-write | log records are checksummed and sealed per segment; files are rebuilt from the log on start |
 | A tampered `cloudflared` download | pinned version and SHA-256 |
 | The GitHub key is stolen | it is a deploy key for one private repository only |
+| The agent binding shells out to `ssh-keygen`, an external binary | it is part of the optional Business and Corporate tiers, is present on every platform Memev runs on, and is guarded through `run()` with a timeout and no shell; the GitHub deploy key already uses it. A binding does not protect against a stolen SSH key, which binds whatever its holder signs |
 
 **Out of scope:** an attacker who already runs code as your user; the AI apps themselves; the
 security of Tailscale, Cloudflare and GitHub.

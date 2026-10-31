@@ -8,6 +8,7 @@ this folder links back here, and this page links down to every page.
 | Page | What it holds |
 |---|---|
 | [QUICKSTART.md](QUICKSTART.md) | install, first session, everyday commands, the vault layout, Windows (preview) |
+| [OFFICE.md](OFFICE.md) | one vault, inviting teammates, the lead, the roster and what is shared |
 | [INSTALL-FOR-AI.md](INSTALL-FOR-AI.md) | the install steps written for an AI app to follow |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | `memev doctor` and the fix for each symptom |
 | [SUPPORT.md](SUPPORT.md) | `memev doctor --bundle` and who answers |
@@ -25,6 +26,7 @@ this folder links back here, and this page links down to every page.
 | [PROJECTS.md](PROJECTS.md) | the project layer: task states, the transition table, derived project status |
 | [CLIENTS.md](CLIENTS.md) | what is added to each AI app; per-app pages below |
 | [CLOUD.md](CLOUD.md) | the secure link, devices, invites, joining another computer |
+| [AGENT-IDENTITY.md](AGENT-IDENTITY.md) | a person vouches for an agent role, and a third party checks it offline |
 | [RELAY.md](RELAY.md) | the relay protocol and the `memev cloud relay` client |
 | [GITHUB.md](GITHUB.md) | backup to your own private repository |
 | [DOCKER.md](DOCKER.md) | running Memev in a container |
