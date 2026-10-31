@@ -340,10 +340,11 @@
       "repo": "memev",
       "closes": "Closes G90: with bus.cloud_tasks on, a cloud seat's task to all is accepted (src/engine/bus.mjs:307 checks the type, not the address), while docs/BUS.md:100-101 grants a task to a local seat and nothing else. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence)",
       "depends_on": [
-        "QL-1.02"
+        "QL-1.02",
+        "SR-1.28"
       ],
       "tasks": 1,
-      "criteria": 17,
+      "criteria": 29,
       "spec": "specs/SR-1.25-a-cloud-seat-addresses-one-local-seat.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -391,7 +392,7 @@
         "QL-1.02"
       ],
       "tasks": 2,
-      "criteria": 30,
+      "criteria": 42,
       "spec": "specs/SR-1.28-the-bus-writes-its-own-routing-files.json",
       "status": "proposed: owner's go pending, signs after a clean red-team round"
     },
