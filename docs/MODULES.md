@@ -2,7 +2,7 @@
 
 Part of the [Memev documentation](README.md). Written by `node scripts/docs/module-graph.mjs` from the real imports in `bin/` and `src/`; do not edit it by hand. `node scripts/docs/module-graph.mjs --check` (and `test/docs-module-map.test.mjs`) fail when it is out of date. How the parts fit at a higher level: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-72 modules and 276 import edges (72 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
+73 modules and 276 import edges (72 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
 
 ## Layers
 
@@ -91,6 +91,7 @@ flowchart LR
     src_engine_license["license.mjs"]
     src_engine_merge["merge.mjs"]
     src_engine_milestones["milestones.mjs"]
+    src_engine_mutation_gate["mutation-gate.mjs"]
     src_engine_net["net.mjs"]
     src_engine_oplog["oplog.mjs"]
     src_engine_project_state["project-state.mjs"]
@@ -457,6 +458,7 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 | `src/engine/license.mjs` | Offline licence files | `engine/util.mjs` | `cli/agentid.mjs`, `cli/doctor.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/relay.mjs`, `cli/sync.mjs`, `cli/tunnel.mjs`, `engine/merge.mjs`, `server/http.mjs` |
 | `src/engine/merge.mjs` | The engine call gate | `engine/license.mjs` | `cli/sync.mjs` |
 | `src/engine/milestones.mjs` | Activation milestones, worked out on this computer from what the vault already keeps: its operation log, the comms bus and the invites file | `engine/oplog.mjs`, `engine/util.mjs` | `cli/onboarding.mjs` |
+| `src/engine/mutation-gate.mjs` | The mutation gate breaks each line a change added or edited, one mutant at a time, and fails when the tests still pass | none | none |
 | `src/engine/net.mjs` | Every request Memev makes goes through fetchOut, except a hook process's calls to the daemon on this computer, which use node:http (cli/common.mjs) | none | `cli/common.mjs`, `cli/doctor.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/mcp-stdio.mjs`, `cli/onboarding.mjs`, `cli/remote.mjs`, `cli/tunnel.mjs` |
 | `src/engine/oplog.mjs` | The operation log: append-only, segmented, snapshotted, streamed | `engine/util.mjs` | `cli/transcript.mjs`, `engine/index.mjs`, `engine/milestones.mjs`, `engine/project-store.mjs`, `engine/vault.mjs` |
 | `src/engine/project-state.mjs` | The project and task state machine: the eleven task states, the seven derived project statuses, one transition table, and the invariants of the... | none | none |
