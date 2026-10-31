@@ -65,6 +65,20 @@ current code already uses, so no contract is blocked on a guess.
 - Safe default: keep the entitlements module current gates. No new role or action is
   granted until the matrix is decided; anything ungated stays denied.
 
+## Owner decisions of 31 October 2026
+
+These are decided, in the owner's words of that day. Cite them as "owner decision 31 Oct 2026".
+
+- Topology: local-first. The cloud is only a relay and a backup.
+- Providers are neutral: every supported provider stands on equal footing, and no work or tier depends on one.
+- Tiers: the Free core, which includes cloud AI and is the trial; Personal at $12/month or $120/year for up to 3
+  computers; contact us for the higher tiers. There is no separate Personal trial (docs/BUSINESS-TRIAL.md).
+- Review: while the reviewer is out, the author acts as interim reviewer with one interim key
+  (docs/CONTRACTS.md, "The interim reviewer"). What it signs says so and waits for an independent re-review.
+
+These close the owner decisions the addendum review asked for first (topology, provider neutrality, tier set). They
+do not accept the addendum's other recommendations; those still need explicit acceptance one by one.
+
 ## Product-owner decision list
 
 These questions block specific contracts. Each lists the contracts it blocks (ids from the

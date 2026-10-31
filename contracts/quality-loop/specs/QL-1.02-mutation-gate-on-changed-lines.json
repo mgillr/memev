@@ -500,7 +500,7 @@
           "statement": "T2's own change to src/engine/contracts.mjs and src/engine/mutation-lint.mjs is judged by the gate against the tests that exercise it: survived == 0, with companion metrics mutants > 0 and ignored == 0 on the same cmd.",
           "verifier": {
             "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/gate-mutate-lint.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs\" --json",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/gate-mutate-lint.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs\" --scope src/engine/contracts.mjs --scope docs/CONTRACTS.md --scope test/gate-mutate-lint.test.mjs --scope 'test/helpers/**' --scope docs/MODULES.md --scope changelog.d/QL-1.02.md --scope src/engine/mutation-lint.mjs --json",
             "key": "survived",
             "op": "==",
             "value": 0,
@@ -535,7 +535,7 @@
           "statement": "T2's own change: the same gate run judged at least one mutant.",
           "verifier": {
             "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/gate-mutate-lint.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs\" --json",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/gate-mutate-lint.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs\" --scope src/engine/contracts.mjs --scope docs/CONTRACTS.md --scope test/gate-mutate-lint.test.mjs --scope 'test/helpers/**' --scope docs/MODULES.md --scope changelog.d/QL-1.02.md --scope src/engine/mutation-lint.mjs --json",
             "key": "mutants",
             "op": ">",
             "value": 0,
@@ -546,7 +546,7 @@
           "statement": "T2's own change: no changed line was ignored.",
           "verifier": {
             "type": "metric",
-            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/gate-mutate-lint.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs\" --json",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/gate-mutate-lint.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs\" --scope src/engine/contracts.mjs --scope docs/CONTRACTS.md --scope test/gate-mutate-lint.test.mjs --scope 'test/helpers/**' --scope docs/MODULES.md --scope changelog.d/QL-1.02.md --scope src/engine/mutation-lint.mjs --json",
             "key": "ignored",
             "op": "==",
             "value": 0,
