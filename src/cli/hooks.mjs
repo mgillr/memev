@@ -12,50 +12,69 @@
 // (loop_limit, default 5 there), and the hook itself stops following up once loop_count reaches it.
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { api, clientToken, resolveRoot, config } from './common.mjs';
 import { ensureDaemon } from './daemon.mjs';
-import { scanTranscript, todosToCheckpoint } from './transcript.mjs';
-import { readJson, writePrivateJson, sha256, slug, configDir } from '../engine/util.mjs';
-import { isVault } from '../engine/vault.mjs';
+import { readJson, writePrivateJson, sha256, slug, configDir, run } from '../engine/util.mjs';
+import { isVault } from '../engine/vault-marker.mjs';
 import { PROTOCOL } from '../engine/card.mjs';
 
 function readStdin() { try { return fs.readFileSync(0, 'utf8'); } catch { return ''; } }
-export function projectOf(cwd) {
+// The project a memory belongs to: a name pinned for this repository or folder (memev project set,
+// kept in the vault config), else the git top-level folder, else the folder itself.
+export function projectInfo(cwd, root) {
   if (!cwd) return null;
-  const r = spawnSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', timeout: 1500 });
-  return slug(path.basename(r.status === 0 && r.stdout.trim() ? r.stdout.trim() : cwd));
+  const abs = path.resolve(cwd);
+  const r = run('git', ['rev-parse', '--show-toplevel'], { cwd: abs, timeout: 1500 });
+  let top = r.ok && r.stdout.trim() ? r.stdout.trim() : abs;
+  try { top = fs.realpathSync(top); } catch {} // the app can report a path that no longer exists
+  const pin = root ? config(root).projects?.[top] : null;
+  if (pin) return { name: slug(pin), source: 'pinned', top };
+  return { name: slug(path.basename(top)), source: r.ok && r.stdout.trim() ? 'git' : 'folder', top };
 }
+export function projectOf(cwd, root) { return projectInfo(cwd, root)?.name ?? null; }
 
 // Output shapes: Claude Code and Codex share one; Gemini CLI uses it with its own event names;
 // Cursor takes { additional_context } at session start only.
 const GEMINI = { SessionStart: 'SessionStart', UserPromptSubmit: 'BeforeAgent' };
+// returns whether anything reached stdout, so a caller can tell a silent format (cursor on a
+// prompt event) from a printed notice
 function emit(format, event, context) {
-  if (!context) return;
-  if (format === 'plain') { process.stdout.write(`${context}\n`); return; }
-  if (format === 'cursor') { if (event === 'SessionStart') process.stdout.write(JSON.stringify({ additional_context: context })); return; }
+  if (!context) return false;
+  if (format === 'plain') { process.stdout.write(`${context}\n`); return true; }
+  if (format === 'cursor') { if (event === 'SessionStart') { process.stdout.write(JSON.stringify({ additional_context: context })); return true; } return false; }
   const name = format === 'gemini' ? GEMINI[event] || event : event;
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: name, additionalContext: context } }));
+  return true;
 }
 
 // A request to build something: the session is reminded to turn it into a signed contract first.
 const BUILD_RE = /\b(i have a (new )?project|build (me|us)\b|(build|make|create|write|implement|develop|set up) (me |us )?(an? |the )?[\w -]{0,40}\b(app|application|tool|cli|api|service|site|website|bot|library|script|feature|game|dashboard|server|extension|plugin|pipeline))/i;
 export const isBuildRequest = (p) => BUILD_RE.test(String(p || ''));
 // A prompt that only moves the conversation on: under 4 words, or a continuation phrase. Recall has nothing to match
-// it against, so the hook does not recall for it.
+// it against, so the hook does not recall for it. The count is script-aware: scripts written without spaces
+// (Japanese, Chinese, Thai) are segmented into words, so a sentence in one is not one word.
 const CONTINUATION = /^(continue|go on|go ahead|carry on|keep going|yes|yes please|yep|yeah|ok|okay|sure|thanks|thank you|fix it|do it|next|proceed|please continue)[\s.!]*$/i;
-export const isContinuation = (p) => { const s = String(p || '').trim(); return s.split(/\s+/).filter(Boolean).length < 4 || CONTINUATION.test(s); };
+const WORDS = new Intl.Segmenter(undefined, { granularity: 'word' });
+const wordCount = (s) => { let n = 0; for (const seg of WORDS.segment(s)) if (seg.isWordLike) n++; return n; };
+export const isContinuation = (p) => { const s = String(p || '').trim(); return wordCount(s) < 4 || CONTINUATION.test(s); };
 const BUILD_NUDGE = '[Memev] This is a build request. Before writing code: infer the requirements, call memev_contract_from_request (each requirement with a local check), then memev_contract_sign, and say in one line what you signed. If an open contract already covers it, use memev_contract_status instead.';
 
+// The prompt hook runs inside this budget. The app gives it 10 s, but the person is waiting on
+// every turn, so the hook decides for itself when it is done: what is in hand goes out, whatever is
+// still in flight is dropped. The other hooks keep their own timeouts: the stop hook's contract gate
+// is a safety check that must not fail open under load, and the pre-compact checkpoint must land
+// before the context is cut.
+const HOOK_BUDGET_MS = 1500;
 export async function runHook(event, flags, env = process.env) {
   const format = flags.format || 'claude';
   let input = {}; try { input = JSON.parse(readStdin() || '{}'); } catch {}
   const root = resolveRoot(flags.root, env);
   const client = String(flags.client || 'claude-code');
   const session = String(input.session_id || input.sessionId || input.conversation_id || env.MEMEV_SESSION || 'session').slice(0, 64);
-  const project = flags.project || projectOf(input.cwd || input.workspace_roots?.[0] || process.cwd());
-  const { loadRemote, remoteFetch } = await import('./remote.mjs');
-  const remote = !isVault(root) ? loadRemote(env) : null; // this computer uses a vault elsewhere (memev join)
+  const project = flags.project || projectOf(input.cwd || input.workspace_roots?.[0] || process.cwd(), root);
+  // remote.mjs (and the network stack it imports) loads only when there is no vault here
+  const { loadRemote, remoteFetch } = isVault(root) ? {} : await import('./remote.mjs');
+  const remote = loadRemote ? loadRemote(env) : null; // this computer uses a vault elsewhere (memev join)
   const stateFile = remote ? path.join(configDir(env), 'hooks', `${slug(session, 64)}.json`) : path.join(root, '.memev', 'hooks', `${slug(session, 64)}.json`);
   const st = readJson(stateFile, { offset: 0, todos: null });
   try {
@@ -66,9 +85,10 @@ export async function runHook(event, flags, env = process.env) {
       const token = clientToken(root, client);
       call = (route, body) => api(root, `/v1/${route}`, { body: { session, project, ...body }, token, timeoutMs: 4000 }).then((r) => { if (!r.ok) throw new Error(`${route}: ${r.status}`); return r.json; });
     }
-    const tr = input.transcript_path ? scanTranscript(input.transcript_path, { fromOffset: st.offset }) : null;
+    // the transcript scanner (and the oplog reader it uses) loads only when the app sent a transcript
+    const tr = input.transcript_path ? (await import('./transcript.mjs')).scanTranscript(input.transcript_path, { fromOffset: st.offset }) : null;
     const saveCheckpoint = async (source) => {
-      const cp = todosToCheckpoint(tr?.todos);
+      const cp = tr?.todos ? (await import('./transcript.mjs')).todosToCheckpoint(tr.todos) : null;
       const h = cp ? sha256(JSON.stringify(cp)) : null;
       if (cp && h !== st.todos) { await call('checkpoint', { ...cp, task: st.task || undefined, files: tr.files, source }); st.todos = h; return true; }
       if (source === 'pre-compact') { await call('checkpoint', { task: st.task || undefined, doing: tr?.lastUser ? `answering: ${tr.lastUser.slice(0, 300)}` : null, files: tr?.files || [], source }); return true; }
@@ -81,13 +101,23 @@ export async function runHook(event, flags, env = process.env) {
       const fresh = source !== 'compact' && source !== 'resume'; // startup or clear: a new context, so the rules as well
       const r = await call('session-start', { task: null });
       // whether the person still has to pick a lead: only at a fresh start, and only until the setup session has asked
-      // (bus/operator.json records it)
-      const asked = remote ? null : readJson(path.join(root, 'bus', 'operator.json'), null)?.asked;
-      const bus = await call('bus-pulse', { lead: fresh && !(typeof asked === 'string' && asked) }).catch(() => null);
+      // (bus/operator.json records it). The first fresh start is the setup session; it marks itself as having asked.
+      const opFile = remote ? null : path.join(root, 'bus', 'operator.json');
+      const op = opFile ? readJson(opFile, null) : null;
+      const asked = typeof op?.asked === 'string' && op.asked;
+      const isSetup = fresh && !asked;
+      const lead = await import('../engine/bus.mjs');
+      if (isSetup && opFile) lead.markLeadAsked(root);
+      const bus = await call('bus-pulse', { lead: isSetup }).catch(() => null);
+      // while no lead is set: the setup session gets the question with its own seat suggested; once it has
+      // asked, the others get one quiet line telling them not to ask again
+      const leadLines = [];
+      if (bus?.lead_needed && isSetup && bus.seat) leadLines.push(`[Memev bus] ${lead.leadSuggestion(bus.seat)}`);
+      if (bus?.lead_needed && fresh && asked) leadLines.push(`[Memev bus] ${lead.LEAD_ASKED_LINE}`);
       await call('journal', { role: 'event', text: `session ${source} (${client}${project ? `, ${project}` : ''})` }).catch(() => {});
       // the card goes in when the context does not hold it: at a fresh start, after a compaction, or when it changed
       const card = sha256(String(r.text || ''));
-      const parts = [fresh ? r.protocol || PROTOCOL : '', fresh || card !== st.card ? r.text : '', bus?.text || ''].filter(Boolean);
+      const parts = [fresh ? r.protocol || PROTOCOL : '', fresh || card !== st.card ? r.text : '', bus?.text || '', ...leadLines].filter(Boolean);
       st.card = card;
       emit(format, 'SessionStart', parts.join('\n\n'));
     } else if (event === 'prompt') {
@@ -95,14 +125,36 @@ export async function runHook(event, flags, env = process.env) {
       if (prompt) {
         if (!st.task) st.task = prompt.slice(0, 200);
         // never the same item twice in a session: the route leaves out what this session was already given
-        const r = isContinuation(prompt) ? null : await call('recall', { query: prompt.slice(0, 1000), limit: 4, exclude: st.injected || [] });
-        if (r?.hits?.length) st.injected = [...new Set([...(st.injected || []), ...r.hits.map((h) => `${h.path}#${h.heading || ''}`)])].slice(-500);
+        // recall and the bus pulse go out at the same time, and the journal is fire-and-forget: the
+        // person is waiting on the turn, and the journal can land after the hook has answered
+        const budget = Number(env.MEMEV_HOOK_BUDGET_MS) > 0 ? Number(env.MEMEV_HOOK_BUDGET_MS) : HOOK_BUDGET_MS;
+        const deadline = Date.now() + budget;
+        // each call gets whatever is left of the budget, and when it runs out the ones still in
+        // flight are dropped, so the hook returns what it has
+        const withBudget = (p) => new Promise((resolve, reject) => {
+          const t = setTimeout(() => reject(new Error('budget exceeded')), Math.max(1, deadline - Date.now()));
+          p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+        });
+        const recallP = isContinuation(prompt) ? null : withBudget(call('recall', { query: prompt.slice(0, 1000), limit: 4, exclude: st.injected || [] })).catch(() => null);
         // Cursor cannot show prompt context anyway, so it only peeks: a task that is already waiting
         // when the person types must stay unread for the stop hook's follow-up, not be swallowed here
-        const bus = await call('bus-pulse', { peek: format === 'cursor' }).catch(() => null);
-        await call('journal', { role: 'user', text: prompt });
+        const busP = withBudget(call('bus-pulse', { peek: format === 'cursor' })).catch(() => null);
+        call('journal', { role: 'user', text: prompt }).catch(() => {}); // no result is wanted; it must not hold the hook
+        const r = await recallP;
+        if (r?.hits?.length) st.injected = [...new Set([...(st.injected || []), ...r.hits.map((h) => `${h.path}#${h.heading || ''}`)])].slice(-500);
+        const bus = await busP;
         const contractsOn = remote || config(root).contracts?.enabled !== false;
         emit(format, 'UserPromptSubmit', [bus?.text, r?.text, contractsOn && isBuildRequest(prompt) ? BUILD_NUDGE : ''].filter(Boolean).join('\n\n'));
+        if (tr) st.offset = tr.offset;
+        writePrivateJson(stateFile, st);
+        // the app times the hook process, not this promise: once the output is written and the state
+        // is saved, end the process, so the calls the budget dropped and the fire-and-forget journal
+        // do not keep it open. The journal is accepted as lost when the vault is slow. In-process
+        // callers (the bench harness, the tests) are not the hook, so they just return.
+        if (process.argv[2] === 'hook') {
+          await new Promise((r) => process.stdout.write('', r));
+          process.exit(0);
+        }
       }
     } else if (event === 'pre-compact') {
       await saveCheckpoint('pre-compact');
@@ -133,7 +185,21 @@ export async function runHook(event, flags, env = process.env) {
     writePrivateJson(stateFile, st);
   } catch (e) {
     if (env.MEMEV_DEBUG) process.stderr.write(`[memev hook ${event}] ${e.message}\n`);
-    if (event === 'session-start') emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev is not reachable right now (${e.message}); run \`memev doctor\`.]`);
+    if (event === 'session-start') {
+      if (e?.moved && e.refresh !== false) emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev] vault address changed: the vault did not answer at its saved address. Run \`memev join --refresh\` to fetch the current address, or \`memev doctor\` if the address is right.`);
+      // no backup address or no address key: --refresh has nothing to follow, so name the way that works
+      else if (e?.moved) emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev] the vault did not answer at its saved address, and this computer has no signed address record to follow. On the vault's computer run \`memev invite\`, then here run \`memev join <code>\`; or run \`memev doctor\` if the address is right.`);
+      else emit(format, 'SessionStart', `${PROTOCOL}\n\n[Memev is not reachable right now (${e.message}); run \`memev doctor\`.]`);
+    } else if (event === 'prompt') {
+      // the mark is per session, beside the session's own state, so a later session sees the notice again;
+      // stop and pre-compact print nothing and leave it unset, so the next prompt still shows the notice
+      const markDir = remote || !isVault(root) ? path.join(configDir(env), 'hooks') : path.dirname(stateFile);
+      const noticeFile = path.join(markDir, `${slug(session, 64)}.notice`);
+      if (!fs.existsSync(noticeFile) && emit(format, 'UserPromptSubmit', `[Memev could not start (${e.message}); run \`memev doctor\`.]`)) {
+        // cursor prints nothing for a prompt event, so the mark is set only when the notice went out
+        try { fs.mkdirSync(markDir, { recursive: true }); fs.writeFileSync(noticeFile, '1'); } catch {}
+      }
+    }
   }
   return 0;
 }

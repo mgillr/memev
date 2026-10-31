@@ -6,6 +6,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { sandbox } from './helpers/cli.mjs';
 import { cleanup } from './helpers/tmp.mjs';
+import { stopDaemon } from '../src/cli/daemon.mjs';
 after(cleanup);
 
 const readme = Buffer.from('# Your Memev vault\n').toString('base64');
@@ -37,7 +38,7 @@ esac`);
   } finally { sb.stop(); }
 });
 
-test('MEM-022 AC02: With gh absent or signed out, init makes no GitHub call and proceeds', () => {
+test('MEM-022 AC02: With gh absent or signed out, init makes no GitHub call and proceeds', async () => {
   const sb = sandbox();
   try {
     const bin = path.join(sb.home, 'fakebin');
@@ -63,5 +64,6 @@ esac`);
     assert.equal(absent.code, 0, absent.out + absent.err);
     assert.match(absent.out, /Created your vault/);
     assert.equal(fs.existsSync(path.join(bare, 'gh')), false);
+    await stopDaemon(path.join(sb.home, 'other'));
   } finally { sb.stop(); }
 });

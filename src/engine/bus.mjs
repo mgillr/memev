@@ -152,6 +152,47 @@ export class Bus {
     if (op?.seat === from) { writeJson(this._p('operator.json'), { ...op, seat: newName }); this.commit(this._rel('operator.json')); }
     return rec;
   }
+  /**
+   * A computer's label changed: move every seat on it to the name its new label gives, so the seat's
+   * history, tasks and lead follow it, and its old names still find the seat.
+   */
+  renameDeviceSeats(deviceId) {
+    const device = this.devices.get(deviceId);
+    if (!device) return [];
+    const moved = [];
+    for (const s of this.seats()) {
+      if (s.device !== deviceId || s.removed) continue;
+      const base = this._seatNameAfterRename(s.seat, device);
+      if (!base || base === s.seat) continue;
+      // a name another computer already holds goes to the first free <app>@<machine>-2, -3 ..., as ownSeatName does
+      const [app, rest] = base.split('@'); const [machine, sub] = rest.split('/');
+      let next = null;
+      for (let i = 1; i < 100 && !next; i++) {
+        const n = i === 1 ? base : `${app}@${machine.slice(0, 41 - `-${i}`.length)}-${i}${sub ? `/${sub}` : ''}`;
+        const r = this.seat(n);
+        if (!r || r.seat === s.seat) next = n;
+      }
+      if (!next) throw new BusError('conflict', `no free seat name for ${base}`);
+      if (next === s.seat) continue;
+      moved.push(this.renameSeat(s.seat, next));
+    }
+    return moved;
+  }
+  /** The seat name a seat on this device takes once the device's label is what it is now. */
+  _seatNameAfterRename(name, device) {
+    const at = String(name).split('@');
+    if (at.length < 2) return null;
+    const [app, rest] = at;
+    const [machine, sub] = rest.split('/');
+    if (device.kind === 'cloud-connector') {
+      const app2 = label(device.label);
+      if (app2 === app) return null;
+      return `${app2}@${machine}${sub ? `/${sub}` : ''}`;
+    }
+    const machine2 = device.kind === 'remote-computer' ? label(device.label) : this.machineName();
+    if (machine2 === machine) return null;
+    return `${app}@${machine2}${sub ? `/${sub}` : ''}`;
+  }
   /** A seat's name and the names it had before a rename: messages to or from any of them are its own. */
   _names(seat) {
     const rec = this.seat(seat);
@@ -217,7 +258,9 @@ export class Bus {
     if (seat) {
       // the terminal on the vault's computer may act for any seat on that computer (memev bus watch)
       const rec = this.seat(seat);
-      const mine = ctx.cli && ctx.local ? (rec ? rec.device === computer.id : this._onHost(seat)) : rec ? rec.device === computer.id : seat.split('/')[0] === own;
+      // an app posts only as its own seat: a recorded seat must be on this computer and registered by this app, so a local
+      // app cannot speak as another app's seat, the lead's included (issue 263)
+      const mine = ctx.cli && ctx.local ? (rec ? rec.device === computer.id : this._onHost(seat)) : rec ? rec.device === computer.id && rec.client === label(ctx.client) : seat.split('/')[0] === own;
       if (!mine) throw new BusError('forbidden', `${seat} belongs to another app or computer; you can only post as your own seat (${own})`);
     }
     let rec = this.seat(name);
@@ -412,6 +455,20 @@ export class Bus {
     const r = this.roster({ at });
     return { seats: r.seats.filter((s) => s.seat).length, live: r.seats.filter((s) => s.state === 'live').length, stale: r.seats.filter((s) => s.state === 'stale').map((s) => `${s.seat} (${s.minutes_since} min)`), never: r.seats.filter((s) => s.state === 'never joined').length, operator: r.operator, bad_lines: bad, messages: this.all().length };
   }
+}
+
+/** The one line other sessions get while no lead is set and the setup session has asked: it overrides the protocol's ask rule. */
+export const LEAD_ASKED_LINE = 'The lead AI is not chosen yet. The person was already asked at setup, so do not ask again; `memev bus operator <seat>` sets it.';
+/** The suggestion the setup session gets with the question: its own seat, for the person to accept or not. */
+export const leadSuggestion = (seat) => `Suggested: ${seat} (the app in this session, which ran first after setup). The person decides.`;
+
+/** Record that the setup session has asked which AI should lead, so other sessions get a quiet line instead of the question. */
+export function markLeadAsked(root) {
+  const f = path.join(root, BUS_DIR, 'operator.json');
+  const op = readJson(f, null) || {};
+  if (op.asked) return;
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  writeJson(f, { ...op, asked: now() });
 }
 
 /** answered, ready (answers on its next turn), not opened yet, or a rejected credential. */

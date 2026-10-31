@@ -83,5 +83,5 @@ test('the Personal description in the tiers pages matches the pricing table and 
   assert.match(personal, /up to 3 computers/);
   assert.match(personal, /comms bus/);
   assert.match(personal, /Planned, not built, and not part of the price/);
-  assert.match(read('docs/PRICING.md'), /Personal is sold for what exists today/);
+  assert.match(read('docs/PRICING.md'), /Personal with more computers is sold for what exists today/);
 });

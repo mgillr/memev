@@ -40,7 +40,7 @@ test('MEM-074 AC01: a fresh install sends nothing and the setting is off', async
     assert.deepEqual(reportSettings(env), { enabled: false, asked: false, id: null, sent: {} });
     assert.equal(fs.existsSync(reportFile(env)), false);
     // install and set up with an address available to it: nothing is sent
-    const init = await cli(['init', '--no-connect', '--local-only'], env);
+    const init = await cli(['init', '--port', String(sb.port), '--no-connect', '--local-only'], env);
     assert.equal(init.code, 0, init.out + init.err);
     assert.match(init.out, /Anonymous milestone report: off, as it is for everyone until they choose/);
     for (const args of [['onboarding'], ['onboarding', '--milestones'], ['report'], ['report', 'status'], ['report', 'show']]) assert.equal((await cli(args, env)).code, 0, args.join(' '));

@@ -1,26 +1,27 @@
 # Pricing and licensing: DRAFT
 
-Part of the [Memev documentation](README.md). Up: the [README](../README.md#which-tier). Down: [tiers/](tiers/README.md),
+Part of the [Memev documentation](README.md). Up: the [README](../README.md). Down: [tiers/](tiers/README.md),
 [CHECKOUT.md](CHECKOUT.md), [REFERRAL.md](REFERRAL.md), [CONVERGENCE.md](CONVERGENCE.md).
 
 > **DRAFT. Not an offer and not in force.** The list below is the current table (decided 28 October
 > 2026). The Memev core is free. Self-serve checkout is Personal only, through Stripe, in test mode
 > first. The checkout program reads product ids, prices and the computer cap from config. Business and
-> Corporate have no public price: contact us. Hosted features are planned, with no date. A Business
-> trial is planned (see below). What the licence enforces today is how many computers can use one
-> vault. One computer with no licence gets the Free tier ([CHARTER.md](../CHARTER.md)). The Memev core
+> Corporate have no public price: contact us. Hosted features are planned, with no date. There is no
+> Personal trial; Business has a time-limited trial (planned, see below). What the licence enforces
+> today is how many computers can use one
+> vault. One computer with no licence gets the Personal tier ([CHARTER.md](../CHARTER.md)). The Memev core
 > is licensed under Apache-2.0 and stays that way ([LICENSING-NOTICE.md](LICENSING-NOTICE.md)).
 
 ## Tiers (draft)
 
-| | Free | Personal with more computers | Business | Corporate |
+| | Personal | Personal with more computers | Business | Corporate |
 |---|---|---|---|---|
-| Price | free | $12/month or $120/year (CHF 10 or CHF 100) | contact us | contact us |
+| Price | free | $12/month or $120/year | contact us | contact us |
 | People | 1 | 1, non-transferable | counted once per organisation | counted once per organisation |
 | Computers using one vault | 1 | up to 3 | counted once per organisation, by computer | counted once per organisation, by computer |
 | Local AI apps on a computer | unlimited | unlimited | unlimited | unlimited |
 | Cloud AI connectors | 5 | 10 | based on your requirements | based on your requirements |
-| Trial | not needed | none | 5 members and 10 computers, planned | sales-assisted pilot, planned |
+| Trial | no Personal trial | no Personal trial | time-limited trial: 5 members and 10 computers, 14 days with one 14-day extension (planned), see [BUSINESS-TRIAL.md](BUSINESS-TRIAL.md) | sales-assisted pilot (planned) |
 | Vault, recall, graph, contracts, doctor, your own tunnel | ✓ | ✓ | ✓ | ✓ |
 | Backup to your own GitHub (one writer) | ✓ | ✓ | ✓ | ✓ |
 | One memory for every AI app, and the comms bus between them | ✓ | ✓ | ✓ | ✓ |
@@ -36,17 +37,18 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md#whic
 | Rules for what reaches the AI provider, egress log | | | planned | planned |
 | SCIM, SIEM and audit export, retention, legal hold, high availability | | | | planned |
 
-Personal is sold for what exists today: the Free core on up to 3 computers, so the AI apps on all of
-them share one memory and one comms bus. A person can connect several cloud AI apps side by side
-(Claude and ChatGPT today, more coming soon) and local coding tools over MCP. A cell marked *planned*
-is not built and is not part of what you pay for. The Personal price is an early-supporter price: it
-stays locked for as long as the subscription runs, and it is labelled that way while sync and the
-relay are planned. Business and Corporate are one model at two scales and are chosen by need
-(a company vault, sign-in, roles, high availability), not by size. Office and Team are not tiers.
-Hosted sync and the hosted relay are not part of Business, because its company server runs on the
-company's own server. Sync, the relay, the company server, sign-in, roles, labels and the egress log
-are planned, not built, and no date is given. See [tiers/](tiers/README.md) for how each tier is set
-up.
+Personal with more computers is sold for what exists today: the free core on up to 3 computers, so the
+AI apps on all of them share one memory and one comms bus. A person can connect several cloud AI apps
+side by side (Claude and ChatGPT today, more coming soon) and local coding tools over MCP. A cell
+marked *planned* is not built and is not part of what you pay for. The Personal with more computers
+price is an early-supporter price: it stays locked for as long as the subscription runs, and it is
+labelled that way while sync and the relay are planned. Business and Corporate are one model at two
+scales and are chosen by need (a company vault, sign-in, roles, high availability), not by size.
+A team of people buys Business and contacts us for a price. Office and Team are not tiers. Hosted sync
+and the hosted relay are not part of Business, because its
+company server runs on the company's own server. Sync, the relay, the company server, sign-in, roles,
+labels and the egress log are planned, not built, and no date is given. See [tiers/](tiers/README.md)
+for how each tier is set up.
 
 **Business and Corporate connect to one AI provider** for the whole organisation, either one cloud AI
 service or an on-premises LLM. Business has one company vault; all members' work data syncs into it
@@ -56,9 +58,11 @@ Corporate has one main corporate vault.
 **Licences count once per organisation, by person and by computer.** Today the vault counts
 computers only; counting people is planned with Business.
 
-**Business trial (planned):** 5 members and 10 computers, self-serve for an organisation that uses a
-single hosted cloud AI provider. Organisations that are on-premises, air-gapped or led by compliance
-get a sales-assisted pilot instead.
+**Business trial (planned):** a time-limited trial, 5 members and 10 computers, 14 days with one
+14-day extension. Self-serve for an organisation that uses hosted AI providers, or a mix of hosted
+providers and local tools; a sales-assisted pilot for organisations that are on-premises,
+air-gapped or led by compliance. The terms, the two paths and what happens at the end:
+[BUSINESS-TRIAL.md](BUSINESS-TRIAL.md).
 
 **The paid engine.** The features marked *crdt-merge* rest on the convergence engine crdt-merge, which
 lives in its own repository and is called by Memev as an external dependency. See
@@ -82,7 +86,7 @@ The full mechanism: [REFERRAL.md](REFERRAL.md).
 
 ## Support (draft)
 
-Free: community help, best effort. Personal with more computers: priority support, which starts from
+Personal: community help, best effort. Personal with more computers: priority support, which starts from
 `memev doctor --bundle`, the one file that tells support what it needs, with no secrets in it. How it
 works and what the file holds: [SUPPORT.md](SUPPORT.md). Business and Corporate service agreements
 are under [Services for Business and Corporate](#services-for-business-and-corporate). Prices there
@@ -139,7 +143,7 @@ A licence is a small signed file (`~/.config/memev/license.json`, installed with
 connectors, issue and expiry dates and grace days. It holds no name, e-mail, machine or vault
 information. It is checked offline against the vendor public key built into
 `src/engine/license.mjs`; Memev never calls home to check it. A licence that has been edited, or was
-signed with any other key, is ignored and the vault counts as Free. Licences are issued with
+signed with any other key, is ignored and the vault counts as Personal. Licences are issued with
 `scripts/license/issue.mjs` by whoever holds the vendor private key, which is never in this
 repository.
 
@@ -150,7 +154,7 @@ checked on this computer against the vendor public key before it is stored. A ke
 an answer that does not verify, an expired licence, or a licence that carries a name, e-mail or machine
 leaves no file, and the command prints why. After that the licence is checked offline, as above.
 
-- **Free:** one computer, no licence, no network needed.
+- **Personal:** one computer, no licence, no network needed.
 - **Personal with more computers:** as in the table, with the number of computers in the licence.
 - **Business and Corporate:** the number of computers in the licence, issued once per organisation.
 

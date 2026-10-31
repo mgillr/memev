@@ -20,6 +20,7 @@ const WRITE = [
   'memev_remember', 'memev_review', 'memev_checkpoint', 'memev_write', 'memev_append', 'memev_link',
   'memev_claim', 'memev_feedback', 'memev_tournament_match', 'memev_contract_draft', 'memev_contract_sign',
   'memev_contract_verify', 'memev_contract_from_request', 'memev_contract_amend', 'memev_contract_decompose',
+  'memev_contract_approve',
   'bus_unread', 'bus_send', 'bus_check', 'bus_set_operator',
 ];
 

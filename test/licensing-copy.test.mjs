@@ -9,7 +9,7 @@ import { seatPolicy, TIERS } from '../src/engine/entitlements.mjs';
 import { deviceKeygen } from '../src/engine/devices.mjs';
 after(cleanup);
 
-const freeCopy = () => `Free covers this computer. Adding more computers is part of Personal (up to ${TIERS.personal.computers} computers). Run memev upgrade to see plans.`;
+const freeCopy = () => `Personal covers this computer. Adding more computers is part of Personal with more computers (up to ${TIERS.personal.computers} computers). Run memev upgrade to see plans, or move the vault to this computer with your own GitHub backup (docs/GITHUB.md).`;
 
 test('MEM-062 AC01: on Free, enrolling a second computer prints the tier-aware text with the count from the entitlement table and never suggests memev devices remove', () => {
   // the policy the vault uses to refuse the second computer carries the tier-aware text

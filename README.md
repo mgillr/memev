@@ -6,14 +6,18 @@
 
 <h1>Memev</h1>
 
-<p><strong>One memory for every AI app you use, on your own computer.</strong><br>
-Memory and recall for local coding tools and cloud AI apps alike.</p>
+<p><strong>Shared context and coordination for the AI tools you already use.</strong><br>
+Keep project knowledge consistent across AI sessions, and give supported agents a shared place to coordinate work.</p>
 
 <p>
 <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue">
 <img alt="Node 22 or newer" src="https://img.shields.io/badge/node-%3E%3D22-brightgreen">
 <img alt="Speaks MCP" src="https://img.shields.io/badge/protocol-MCP-informational">
 <img alt="No runtime dependencies" src="https://img.shields.io/badge/runtime%20dependencies-none-success">
+</p>
+
+<p>
+<code>npm install -g . && memev init</code>
 </p>
 
 <p>
@@ -24,23 +28,30 @@ Memory and recall for local coding tools and cloud AI apps alike.</p>
 <a href="CHANGELOG.md">Changelog</a>
 </p>
 
-<p>Start a project in Claude Code on Monday, and Cursor knows the context on Tuesday.<br>
-Memev keeps what your AI apps learn in a folder of plain notes on your own computer,<br>
-hands the right notes to whichever app you open next, and backs everything up to<br>
-a private GitHub repository that you own.</p>
+<p>Move between supported AI tools without rebuilding the project context every time.<br>
+Memev keeps shared project knowledge in plain Markdown on your own computer, makes relevant context available to connected tools, and provides a communications bus for agent presence, checks and task handoffs.<br>
+Your notes remain inspectable and can be backed up to a private GitHub repository that you own.</p>
 
-<p><strong>One memory and one team channel, both on computers you own.</strong></p>
+<p><strong>One shared working context. One coordination layer. Your data stays under your control.</strong></p>
 
 </div>
 
 ## How it fits together
 
+Memev connects three parts of AI work that are usually handled separately:
+
+- **Shared context:** keep project decisions, constraints and useful prior work available across supported tools and sessions.
+- **Coordination:** let connected sessions discover one another, check presence and hand off tasks through a shared communications bus.
+- **Defined work:** describe expected outcomes and acceptance criteria in work contracts, then retain verification results where those checks are available.
+
+The vault and coordination bus provide the common working layer. What happens next depends on the connected AI client and workflow: Memev supplies the shared context and coordination mechanisms, while agents and people carry out the work.
+
 ```mermaid
 flowchart LR
     subgraph computer["Your computer"]
         apps["AI apps<br/>Claude Code, Codex, Gemini CLI,<br/>Cursor, Claude Desktop and more"]
-        vault[("Memev<br/>runs quietly in the background<br/>your notes, in plain Markdown")]
-        bus["Comms bus<br/>every app has a seat"]
+        vault[("Shared context<br/>Markdown vault, decisions,<br/>project state and recall")]
+        bus["Coordination bus<br/>presence, messages,<br/>task handoffs"]
         apps <--> vault
         apps <--> bus
         bus --- vault
@@ -53,31 +64,40 @@ flowchart LR
     laptop -. "the same secure link" .-> vault
 ```
 
-## What happens when you chat
+## How shared context and coordination work
 
 ```mermaid
-flowchart LR
-    a["You open a session"] --> b["Memev hands the app<br/>where you left off"]
-    b --> c["You ask something"]
-    c --> d["Memev adds the few notes<br/>that match"]
-    d --> e["The AI answers"]
-    e --> f["Decisions and facts worth<br/>keeping are saved"]
-    f --> c
+flowchart TD
+    a["Open a supported AI session"] --> b["Load relevant project context"]
+    b --> c["Work on a task"]
+    c --> d["Record useful decisions and state"]
+    d --> e["Share task or status through the comms bus"]
+    e --> f["Another connected session picks up the handoff"]
+    f --> g["Check the result against task requirements"]
+    g --> h["Save the outcome for the next session"]
+    h --> b
 ```
 
-You don't have to ask for any of this. Memev refuses small talk and duplicates, so the notes stay
-worth reading.
+Memev keeps project context available without making you copy the same background into every new session. Retrieval is scoped and relevance-based, so the shared context stays useful rather than becoming a transcript dump. Connected sessions can coordinate through the communications bus, and work contracts provide a way to state what a task must deliver and retain verification results where the relevant checks are available.
+
+<p align="center">
+<img src="docs/assets/demo.gif" alt="Tell Claude, Cursor knows: one app saves a fact, the next session in another app recalls it" width="480">
+</p>
 
 ## Install
 
 You need Node 22 or newer and git. Every path below sets up the same thing: it creates your notes
-folder, starts Memev, connects the AI apps it finds on your computer and runs a self-test.
+folder, starts Memev, connects the AI apps it finds on your computer and runs a self-test. The
+command at the top of this page installs Memev from this folder with npm; run it in a copy of this
+repository. The rest of this section covers the other paths.
 
 Memev runs on macOS and Linux. **Windows (preview):** setup, app connections, hooks and the doctor
 have Windows code paths and tests, and a Windows job runs them on every change to `main`, but
 Windows has not had a full lab run yet. Memev starts at login there through a per-user Task Scheduler
 entry that `memev service install` creates. [docs/QUICKSTART.md](docs/QUICKSTART.md#windows-preview) says
 what differs.
+
+### All the install paths
 
 | Path | Who it's for | What happens on its own |
 |---|---|---|
@@ -106,15 +126,18 @@ After setup, two things may need you: one browser sign-in for the GitHub backup
 (`memev github setup`), and a click in apps that ask before they trust a new tool. The checklist
 says which. Details are in [docs/QUICKSTART.md](docs/QUICKSTART.md).
 
-To see it work, run `memev ready` and open a new session in each app. It prints each app as it
-joins, then "Ready: <app> and <app> share one memory" once one of them recalls something another
-one saved.
+To see shared context working, run `memev ready` and open a new session in each app. It prints each
+app as it joins, then confirms that connected apps share project context when one recalls something
+another saved. For coordination, see [docs/BUS.md](docs/BUS.md); for defined work and verification,
+see [docs/CONTRACTS.md](docs/CONTRACTS.md).
 
-## Which tier?
+## Choose how you deploy Memev
+
+The same core—shared context, coordination and defined work—applies across tiers. The difference is how many people and computers share a vault, and how much organisational control the deployment needs.
 
 | | Personal | Personal with more computers | Business (coming) | Corporate (coming) |
 |---|---|---|---|---|
-| For | one person, one computer at a time | one person, several computers at once | a company: all members' work data in one company vault that the company can see and search | the same model as Business, at larger scale, with one main corporate vault |
+| For | one person using several AI tools with shared project context | one person continuing work across several computers | a team sharing work context and coordinating AI-assisted work under company control | organisations needing the Business model at greater scale and with stricter deployment controls |
 | AI apps | several cloud AI apps side by side (Claude, ChatGPT; more coming soon) and local coding tools via MCP | the same, on each computer | ONE AI provider for the organisation: one cloud AI service or an on-premises LLM | the same, with an air-gapped option |
 | Runs on | your computer, backed up to your own GitHub | your computers | your company server | your data centre, high availability, air-gapped option |
 | Two computers | one at a time: switch computers, lose nothing | edit on two machines at once, nothing to resolve (planned) | coming | coming |
@@ -133,7 +156,7 @@ next to your local coding tools over MCP.
 That merging is done by crdt-merge, the paid convergence engine; see
 [The paid core: crdt-merge](#the-paid-core-crdt-merge). It is planned, not built yet.
 
-**Business and Corporate are the same model at different scale, and both are coming.** Every
+**Business and Corporate use the same organisational model at different scale.** Every
 member's computer syncs its work data into one vault: one company vault for Business, one main
 corporate vault for Corporate. The company can see and search everything in it. Each organisation
 connects to **one AI provider**, either one cloud AI service or an on-premises LLM, over MCP. Members
@@ -167,21 +190,21 @@ never vault data. See [docs/CONVERGENCE.md](docs/CONVERGENCE.md).
 
 ## What you get
 
-Your notes are plain Markdown in `~/memev`, kept in git. Every change is written to a checksummed
-log first, so a crash or a bad edit can't lose anything. Claude Code, Codex, Gemini CLI, Cursor,
-Claude Desktop, Windsurf, VS Code and Zed all use the same notes, and cloud AI apps such as Claude and
-ChatGPT can too, side by side, through the optional secure link.
+### Shared context
 
-Your AI apps can also talk to each other. Each one gets a seat on a comms bus kept in the vault,
-joins on its own, and keeps a heartbeat, so from one Claude Code session you can see who is there,
-run a comms check, hand out tasks and put an app on hold. See [docs/BUS.md](docs/BUS.md).
+Your project knowledge lives as plain Markdown in `~/memev`, kept in git. Every change is written to a checksummed log first. Claude Code, Codex, Gemini CLI, Cursor, Claude Desktop, Windsurf, VS Code and Zed can use the same notes, and cloud AI apps such as Claude and ChatGPT can connect side by side through the optional secure link. Session resume cards, project-aware recall, provenance and the graph help connected tools pick up relevant context instead of starting from scratch. See [docs/DESIGN.md](docs/DESIGN.md) and [docs/CLIENTS.md](docs/CLIENTS.md).
 
-You can check what Memev holds. `memev why` shows why a note came back, `memev audit` lists junk and
-stale notes, and nothing is deleted behind your back. Notes from one project don't turn up in
-another, and notes in Chinese, Japanese, Korean, Cyrillic, Greek or Arabic are searchable like any
-other. There is no telemetry by default and nothing to install besides Node and git. One short anonymous
-milestone report exists; it is off unless you turn it on with `memev report on`, and `memev report show`
-prints exactly what it would send ([docs/METRICS.md](docs/METRICS.md)).
+### Coordination between connected sessions
+
+Each connected app gets a seat on Memev's communications bus, joins the roster and reports a heartbeat. From one session, you can see which peers are present, run a communications check, hand out tasks and put an app on hold. The bus gives supported agents a shared coordination channel; the exact execution of a handoff depends on the connected client and workflow. See [docs/BUS.md](docs/BUS.md).
+
+### Defined work and verification
+
+Work contracts let you record the task, expected deliverables, acceptance criteria and stop conditions. Where checks are run, their outcomes and receipts can be retained alongside the work. This makes it possible to distinguish a task being assigned from evidence that its requirements were met. See [docs/CONTRACTS.md](docs/CONTRACTS.md).
+
+### Trust and control
+
+You can inspect what Memev holds. `memev why` shows why a note came back, and `memev audit` lists junk and stale notes. Notes from one project are scoped away from another, and notes in Chinese, Japanese, Korean, Cyrillic, Greek or Arabic are searchable like any other. The vault stays on your computer and can be backed up to your own private GitHub repository. Cloud access is optional and off until you enable it; when you connect a cloud AI provider, that provider's own data handling still applies. Memev has no telemetry by default. The anonymous milestone report is off unless you turn it on with `memev report on`, and `memev report show` prints exactly what it would send ([docs/METRICS.md](docs/METRICS.md)).
 
 ## Documentation
 
@@ -213,8 +236,7 @@ up. The main pages:
 
 ## For developers
 
-Memev is a local MCP server over a Markdown vault. Each session starts with a resume card, each
-prompt gets the most relevant notes (in apps with hooks), and state is saved before a compaction.
+Memev is a local MCP server and coordination layer built around a Markdown vault. Each session starts with a resume card, supported prompts can receive relevant project context (in apps with hooks), and state is saved before a compaction. The same core exposes the communications bus and work-contract mechanisms, bringing context, coordination and verification into one project workflow.
 The graph holds entities, links and claims with a status (fact, theory, conjecture) and provenance.
 Recall is BM25 over note sections, filtered by project and permissions before ranking. Node 22,
 nothing else. See [docs/DESIGN.md](docs/DESIGN.md), the [module map](docs/MODULES.md) and

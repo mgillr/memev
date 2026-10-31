@@ -1,6 +1,6 @@
 # Corporate (coming)
 
-Part of the [tiers pages](README.md). Up: the [README](../../README.md#which-tier). Architecture chart:
+Part of the [tiers pages](README.md). Up: the [README](../../README.md). Architecture chart:
 [ARCHITECTURE.md](../ARCHITECTURE.md#corporate-coming).
 
 > **DRAFT and coming.** Everything specific to this tier is planned; see the
@@ -17,7 +17,7 @@ local cache is wiped and what they synced stays in the main vault.
 
 A licence counts once per organisation, by person and by computer. Corporate has no public price:
 contact us. Organisations that are on-premises, air-gapped or led by compliance get a sales-assisted
-pilot rather than a self-serve trial.
+pilot rather than a self-serve trial. The trial terms: [BUSINESS-TRIAL.md](../BUSINESS-TRIAL.md).
 
 What Corporate adds is scale: identity sync by SCIM, audit export to a SIEM, retention rules, legal
 hold and high availability, often with several sites or rules about where data may go:
