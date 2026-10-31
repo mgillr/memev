@@ -2,7 +2,7 @@
   "title": "SR-1.33 A test count that means behaviour",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G99: the seed-stage analysis (E1, E8). About a fifth of the test files read documents rather than run code: on main 5e1a1e05, 25 of 165 test files import nothing from src/ or bin/ and start no memev process, so the pass count overstates what is tested. The lab walk of every command (scripts/lab/cli-walk.sh) compares each command's exit code with an expected one that has gone stale, and nothing runs it. Repository: memev. Depends on contracts: none.",
+  "request": "Closes G99: the seed-stage analysis (E1, E8). About a fifth of the test files read documents rather than run code: on main 5e1a1e05, 25 of 165 test files import nothing from src/ or bin/ and start no memev process, so the pass count overstates what is tested. The lab walk of every command (scripts/lab/cli-walk.sh) compares each command's exit code with an expected one that has gone stale, and nothing runs it. Repository: memev. Depends on contracts: SR-1.16, SR-3.05, SR-5.04, SR-6.01. It lands after SR-1.16, SR-3.05, SR-5.04 and SR-6.01, unsigned specs whose criteria name a document-only test it moves (the lead, batch 65).",
   "tasks": [
     {
       "id": "T1",
@@ -14,7 +14,8 @@
         "npm test runs both and prints two lines, behaviour tests: N pass, M fail and document checks: N pass, M fail; CI's job summary shows both",
         "scripts/test-kinds.mjs, run by npm test, fails naming the file when a test file outside test/docs/ neither calls code from src/, bin/ or scripts/ inside a test nor starts a process of it, or when a file under test/docs/ does either; importing a constant (such as PKG from ./helpers/tmp.mjs) or a module it never calls does not count",
         "wherever the README or docs/DEVELOPING.md give a test count, it is the behaviour count",
-        "npm test exits non-zero when any behaviour test or document check fails, is cancelled or never runs, and when scripts/test-kinds.mjs fails; each count line comes from the run it reports"
+        "npm test exits non-zero when any behaviour test or document check fails, is cancelled or never runs, and when scripts/test-kinds.mjs fails; each count line comes from the run it reports",
+        "any unsigned spec under contracts/ that names a moved test path has that path updated in the same change; signed contracts are not touched"
       ],
       "scope": [
         "test/**",
@@ -24,7 +25,9 @@
         "README.md",
         ".github/workflows/**",
         "changelog.d/SR-1.33.md",
-        "docs/scope-one/TRACEABILITY.md"
+        "docs/scope-one/TRACEABILITY.md",
+        "contracts/seed-readiness/specs/**",
+        "contracts/quality-loop/specs/**"
       ],
       "criteria": [
         {

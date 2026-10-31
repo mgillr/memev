@@ -2,7 +2,7 @@
   "title": "SR-2.09 The coming-soon provider: build it or stop showing it",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G29: The site shows a third cloud AI provider as coming soon; nothing in the product repo supports it. Repository: memev. Depends on contracts: none.",
+  "request": "Closes G29: The site shows a third cloud AI provider as coming soon; nothing in the product repo supports it. Repository: memev. Depends on contracts: SR-5.04.",
   "tasks": [
     {
       "id": "T1",
@@ -11,7 +11,12 @@
       "depends_on": [],
       "requirements": [
         "a decision record says whether the coming-soon provider is supported; if yes, a connector with a test; if no, the site drops it (SR-6.06)",
-        "if the decision is build, the connector has a test that runs it against a recorded fixture of the provider's API; if drop, no status-table row is left for a provider without a connector, so the site's claims check (SR-6.10) fails on any page that still shows it"
+        "if the decision is build, the connector has a test that runs it against a recorded fixture of the provider's API; if drop, no status-table row is left for a provider without a connector, so the site's claims check (SR-6.10) fails on any page that still shows it",
+        "the record holds exactly one line that is wholly 'Decision: build' or 'Decision: drop', and the tests read the decision from that line",
+        "under drop, no page in README.md, docs/ or the template site pairs the supported cloud apps with 'more coming soon', and the demo video and poster are re-cut by the owner or no longer linked",
+        "under build, memev cloud connect accepts the provider by its role id, and a test replays the provider's recorded inbound requests",
+        "the drop check reads SR-5.04's status rows, and a connector is a clientDefs id or a cloud-connect id that src/cli/tunnel.mjs exports",
+        "the provider is named only by its role id in the record, the fixtures, the code and the commit messages"
       ],
       "description": "",
       "scope": [
@@ -19,7 +24,19 @@
         "docs/decisions/**",
         "src/cli/clients.mjs",
         "test/clients.test.mjs",
-        "docs/status.json"
+        "docs/status.json",
+        "README.md",
+        "docs/ARCHITECTURE.md",
+        "docs/PRICING.md",
+        "docs/tiers/**",
+        "site/web/**",
+        "media/**",
+        "src/cli/tunnel.mjs",
+        "src/cli/onboarding.mjs",
+        "test/cloud-connect.test.mjs",
+        "test/fixtures/coming-soon-provider/**",
+        "docs/CLOUD.md",
+        "scripts/status-table.mjs"
       ],
       "criteria": [
         {
@@ -38,11 +55,59 @@
           }
         },
         {
+          "statement": "The record has exactly one line that is wholly 'Decision: build' or 'Decision: drop', and no other line that starts with 'Decision:' in any case or list or quote prefix. The outcome test reads the decision from that same anchored line and fails when there is not exactly one.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=docs/decisions/coming-soon-provider.md; [ \"$(grep -cE '^Decision: (build|drop)$' \"$f\")\" = 1 ] && [ \"$(grep -ciE '^[[:space:]>*-]*decision:' \"$f\")\" = 1 ]",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The leak scan is clean over every tracked file and every commit message, so the record, any fixture and the commits name the provider only by role.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0
+          }
+        },
+        {
           "statement": "SR-2.09 outcome: with the decision record saying build, the provider's connector test runs against its recorded fixture; with drop, docs/status.json holds no provider row without a connector in src/cli/clients.mjs; a fixture status row for a provider with no connector fails under drop",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/clients.test.mjs",
             "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.09 outcome' test/clients.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.09 outcome$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With 'Decision: drop', no line of README.md, docs/**/*.md (outside docs/decisions/) or site/web/*.html pairs Claude or ChatGPT with 'more coming soon' or 'more are coming soon'. Red at base on the seven lines listed. README.md either no longer links the demo media, or neither media/memev-tiers.mp4 nor media/memev-tiers-poster.png still equals its base file. The base sha256 values are e2185373f138efc046350ec235fdc1333f399049d5f5ebdaf7a473a9c9445e4b for the video and a5499c342cc4f50fd4c5ecd2db626ce3d47f669af5cba014975354b360824b89 for the poster. The owner confirms the re-cut; the check only blocks shipping the unchanged media. With 'Decision: build' it exits 0, and answer 2 covers build.",
+          "verifier": {
+            "type": "command",
+            "cmd": "d=$(sed -nE 's/^Decision: (build|drop)$/\\1/p' docs/decisions/coming-soon-provider.md 2>/dev/null); [ \"$d\" = build ] && exit 0; [ \"$d\" = drop ] || exit 1; ! grep -rnE --exclude-dir=decisions '(Claude|ChatGPT)[^|.]*more (are )?coming soon' README.md docs site/web || exit 1; ! grep -q 'memev-tiers' README.md || node -e 'const c=require(\"crypto\"),f=require(\"fs\"),h=(p)=>c.createHash(\"sha256\").update(f.readFileSync(p)).digest(\"hex\");process.exit(h(\"media/memev-tiers.mp4\")===\"e2185373f138efc046350ec235fdc1333f399049d5f5ebdaf7a473a9c9445e4b\"||h(\"media/memev-tiers-poster.png\")===\"a5499c342cc4f50fd4c5ecd2db626ce3d47f669af5cba014975354b360824b89\"?1:0)'",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "With 'Decision: build', a test named exactly 'SR-2.09 build' (not a suite) in test/cloud-connect.test.mjs spawns `memev cloud connect <role-id>` the way test/cloud-connect.test.mjs:17-25 does. It then replays recorded inbound requests from test/fixtures/coming-soon-provider/ against /mcp with the credential memev cloud connect sets up (SR-1.04 refuses path tokens): the provider's own initialize and tools/list calls with its user-agent, captured from a real session and kept under the role id, never the vendor name. It asserts exit 0, a <role-id>@cloud seat, and no new id in clientDefs ids (src/cli/clients.mjs:234-304). At base, with no decision record, the command exits 1. With a decision record and the old tunnel.mjs:259, the build test fails because the command throws 'memev cloud connect chatgpt|claude'. With 'Decision: drop' it exits 0.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cloud-connect.test.mjs",
+            "cmd": "d=$(sed -nE 's/^Decision: (build|drop)$/\\1/p' docs/decisions/coming-soon-provider.md 2>/dev/null); [ -n \"$d\" ] || exit 1; [ \"$d\" = drop ] && exit 0; out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.09 build$' test/cloud-connect.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.09 build$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "docs/status.json exists. A test named exactly 'SR-2.09 table' in test/clients.test.mjs reads SR-5.04's row array (the rows scripts/status-table.mjs renders) and fails when the array is missing or empty. With 'Decision: drop', no row with status planned names an AI app or provider whose id is outside the connector set of answer 4. The negative case uses the real file's shape: a copy of the real docs/status.json gets one row cloned from its own first app row, with part set to the coming-soon provider's role id and status planned, and the checker exported from src/cli/clients.mjs must report that row. Red at base because docs/status.json is absent.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients.test.mjs",
+            "cmd": "test -f docs/status.json || exit 1; out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.09 table$' test/clients.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.09 table$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A test named exactly 'SR-2.09 connectors' in test/clients.test.mjs asserts that the connector set the SR-2.09 checker uses equals clientDefs({}, 'memev').map(d => d.id) plus the cloud-connect allowlist exported from src/cli/tunnel.mjs, and nothing else. Against a fixture table, a built row for 'cline' (unsupported, src/cli/clients.mjs:322) is reported, a planned row for the coming-soon provider's role id is reported under drop, and built rows for chatgpt and claude are not reported.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.09 connectors$' test/clients.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.09 connectors$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {

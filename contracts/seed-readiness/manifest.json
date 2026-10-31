@@ -197,7 +197,7 @@
       "closes": "project-state.mjs (330 lines) and the oplog HLC merge helpers have no production caller; entitlements name features with nothing behind them",
       "depends_on": [],
       "tasks": 1,
-      "criteria": 4,
+      "criteria": 11,
       "spec": "specs/SR-1.15-no-code-without-a-caller.json"
     },
     {
@@ -209,7 +209,7 @@
       "closes": "Help omits real subcommands; CLIENTS.md says sync every few minutes (default 30); delete is not reconciled; dependency claim overstated",
       "depends_on": [],
       "tasks": 3,
-      "criteria": 9,
+      "criteria": 23,
       "spec": "specs/SR-1.16-docs-and-code-say-the.json"
     },
     {
@@ -468,7 +468,12 @@
       "title": "A test count that means behaviour",
       "repo": "memev",
       "closes": "Closes G99: the seed-stage analysis (E1, E8). About a fifth of the test files read documents rather than run code: on main 5e1a1e05, 25 of 165 test files import nothing from src/ or bin/ and start no memev process, so the pass count overstates what is tested. The lab walk of every command (scripts/lab/cli-walk.sh) compares each command's exit code with an expected one that has gone stale, and nothing runs it",
-      "depends_on": [],
+      "depends_on": [
+        "SR-1.16",
+        "SR-3.05",
+        "SR-5.04",
+        "SR-6.01"
+      ],
       "tasks": 2,
       "criteria": 17,
       "spec": "specs/SR-1.33-a-test-count-that-means-behaviour.json",
@@ -509,7 +514,7 @@
       "closes": "Codex, Gemini and Windsurf env markers admitted unverified (common.mjs:80); a vendor change silently breaks hooks",
       "depends_on": [],
       "tasks": 2,
-      "criteria": 7,
+      "criteria": 17,
       "spec": "specs/SR-2.03-every-client-hook-verified-against.json"
     },
     {
@@ -521,7 +526,7 @@
       "closes": "Claude Desktop, VS Code, Zed and Windsurf get instructions only; the compaction benchmark across apps is planned",
       "depends_on": [],
       "tasks": 3,
-      "criteria": 10,
+      "criteria": 24,
       "spec": "specs/SR-2.04-continuity-measured-in-every-app.json"
     },
     {
@@ -579,9 +584,11 @@
       "title": "The coming-soon provider: build it or stop showing it",
       "repo": "memev",
       "closes": "The site shows a third cloud AI provider as coming soon; nothing in the product repo supports it",
-      "depends_on": [],
+      "depends_on": [
+        "SR-5.04"
+      ],
       "tasks": 1,
-      "criteria": 4,
+      "criteria": 10,
       "spec": "specs/SR-2.09-coming-soon-provider-build-it-or-stop.json"
     },
     {
@@ -709,7 +716,7 @@
         "SR-9.01"
       ],
       "tasks": 1,
-      "criteria": 8,
+      "criteria": 23,
       "spec": "specs/SR-6.01-the-repository-goes-public.json"
     },
     {
@@ -723,7 +730,7 @@
         "SR-6.01"
       ],
       "tasks": 1,
-      "criteria": 5,
+      "criteria": 13,
       "spec": "specs/SR-6.02-npx-memev-init-works.json"
     },
     {
@@ -764,7 +771,8 @@
       "depends_on": [
         "SR-5.04",
         "SR-6.10",
-        "QL-1.06"
+        "QL-1.06",
+        "SR-1.13"
       ],
       "tasks": 1,
       "criteria": 12,
