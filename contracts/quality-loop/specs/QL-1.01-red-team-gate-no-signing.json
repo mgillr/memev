@@ -152,7 +152,7 @@
           }
         },
         {
-          "statement": "Each round carries sig, a DSSE envelope from vendor/attest/signature.mjs sign() over canonical({...round without sig, snapshot_sha256, previous round in full with its dispositions and amendments}). The signing key's keyid must be in the gate's REVIEWER_KEYS and must not be a key under contracts/keys/. Refused with review_sig: (a) a single clean round with no sig; (b) a round signed by the contract-signing key; (c) r1.spec.json and rounds[0].spec_sha256 rewritten together after r2 was signed; (d) a round-1 disposition or a round-2 amendment edited after the next round was signed. A correctly signed chain, made with test keys under test/fixtures/redteam/, is SIGNABLE.",
+          "statement": "Each round carries sig, a DSSE envelope from vendor/attest/signature.mjs sign() over canonical({...round without sig, snapshot_sha256, previous round in full with its dispositions and amendments}). The signing key's keyid must be in the gate's REVIEWER_KEYS and must not be a key under contracts/keys/. Refused with review_sig: (a) a single clean round with no sig; (b) a round signed by the contract-signing key; (c) r1.spec.json and rounds[0].spec_sha256 rewritten together after r2 was signed; (d) a round-1 disposition or a round-2 amendment edited after the next round was signed. A correctly signed chain, made with test keys under test/fixtures/redteam/, is SIGNABLE when the test public key is injected through evaluate's reviewerKeys.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
@@ -328,7 +328,7 @@
       "requirements": [
         "test/redteam-gate.test.mjs also runs the gate in --report mode over the repository's own spec directories, so npm test and CI fail on a malformed record or a signed contract without a SIGNABLE record, while NO RECORD is reported and not failed",
         "docs/CONTRACTS.md gains a section that states the rule, the record path, the hash definition and the one-line runbook: gate, then memev contract new, then memev contract sign, in one command",
-        "memev contract new refuses a spec the gate reports NOT SIGNABLE or NO RECORD when the workdir holds scripts/gate/redteam-gate.mjs, naming the reasons; memev contract sign and the MCP sign tool refuse a draft whose source spec hash has no clean signed record; a repository without the gate script is unaffected",
+        "memev contract new refuses a spec the gate reports NOT SIGNABLE or NO RECORD, naming the reasons, and memev contract sign and the MCP sign tool refuse a draft whose source spec hash has no clean signed record, wherever the repository holds red-team records or contracts.redteam_required is on; whether the gate script exists in the repository plays no part",
         "memev_contract_draft, memev_contract_sign, memev_contract_from_request and memev_contract_amend call evaluate() before they write anything, for local callers and tunnel callers alike, wherever the repository holds red-team records or the vault setting contracts.redteam_required is on"
       ],
       "description": "",
