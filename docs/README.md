@@ -105,3 +105,4 @@ The record a builder takes over with: what exists, what is missing, and the orde
 | [scope-one/DECISIONS.md](scope-one/DECISIONS.md) | the open ADRs and the questions only the owner can answer |
 | [scope-one/SLICE-PLAN.md](scope-one/SLICE-PLAN.md) | the ordered slices and the deferred work |
 | [scope-one/WBS.md](scope-one/WBS.md) | the work breakdown: every requirement, contract, pull request and branch once, with its status and owner |
+| [scope-one/design/organisational-knowledge-model.md](scope-one/design/organisational-knowledge-model.md) | the SO-2.01 decision record: the organisational knowledge model, with its open owner decisions |
