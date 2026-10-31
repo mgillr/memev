@@ -1,0 +1,61 @@
+{
+  "title": "SR-2.02 A public memory benchmark",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G22: No LongMemEval or LoCoMo number; buyers ask for one. Repository: memev. Depends on contracts: SR-2.01.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Harness and published result",
+      "phase": "verify",
+      "depends_on": [],
+      "requirements": [
+        "a reproducible harness runs LongMemEval-S retrieval through Memev recall",
+        "results, config and hardware are published"
+      ],
+      "description": "",
+      "scope": [
+        "scripts/bench/**",
+        "bench/public/**",
+        "docs/BENCH.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The result file exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "bench/public/longmemeval-s.json"
+          }
+        },
+        {
+          "statement": "BENCH.md reports it with method",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/BENCH.md",
+            "pattern": "LongMemEval"
+          }
+        },
+        {
+          "statement": "A recall figure is recorded",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/bench/longmemeval.mjs --from bench/public/longmemeval-s.json --json",
+            "key": "recall_at_10",
+            "op": ">",
+            "value": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

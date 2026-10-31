@@ -8,14 +8,48 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { configDir, randomToken, slug, now, readJson, writePrivate, exists, truncate } from './util.mjs';
+import { Worker } from 'node:worker_threads';
+import { configDir, randomToken, slug, now, readJson, writePrivate, exists, truncate, run as spawn } from './util.mjs';
 import { git } from './git.mjs';
 import * as A from '../../vendor/attest/contract.mjs';
 import { decompose as attestDecompose } from '../../vendor/attest/decompose.mjs';
 import { sign as dsseSign, verify as dsseVerify, keyId, generateKeyPair, canonicalHash } from '../../vendor/attest/signature.mjs';
 
 const STOP_AMEND = 'If the requirements change: do not edit this contract. Amend it (memev_contract_amend), which signs a new version that supersedes this one.';
+
+// A remote caller supplies the pattern. It is length-capped and runs in a worker that is terminated
+// when it does not finish in time, so a pathological pattern cannot hang a verify. The match blocks this
+// process while it runs, so the grep time of one verify with remote patterns is capped as a whole too.
+export const GREP_PATTERN_MAX = 200;
+export const GREP_TIMEOUT_MS = 1000;
+export const GREP_VERIFY_BUDGET_MS = 2000;
+const GREP_WORKER = `
+const { parentPort } = require('node:worker_threads');
+parentPort.on('message', (m) => {
+  const flag = new Int32Array(m.sab);
+  let r = 2;
+  try { r = new RegExp(m.pattern, m.flags).test(m.text) ? 1 : 0; } catch { r = 2; }
+  Atomics.store(flag, 0, r);
+  Atomics.store(flag, 1, 1);
+  Atomics.notify(flag, 1);
+});
+`;
+function grepMatch(pattern, flags, text, timeoutMs = GREP_TIMEOUT_MS) {
+  const sab = new SharedArrayBuffer(8);
+  const flag = new Int32Array(sab);
+  let w;
+  try { w = new Worker(GREP_WORKER, { eval: true }); } catch { return { error: 'the match could not be started' }; }
+  w.on('error', () => {});
+  try { w.postMessage({ pattern, flags, text, sab }); } catch { w.terminate(); return { error: 'the match could not be started' }; }
+  const deadline = Date.now() + timeoutMs;
+  while (Atomics.load(flag, 1) === 0) {
+    if (Date.now() >= deadline) { w.terminate(); return { timeout: true }; }
+    Atomics.wait(flag, 1, 0, Math.max(1, Math.min(50, deadline - Date.now())));
+  }
+  const r = Atomics.load(flag, 0);
+  w.terminate();
+  return r === 1 ? { ok: true } : r === 0 ? { ok: false } : { error: 'the pattern is not a usable regular expression' };
+}
 
 /** Requirements from free text: bullet or numbered lines, else the parts of "build X with A, B and C". */
 export function inferRequirements(text) {
@@ -97,7 +131,7 @@ export function attach(Vault) {
     return { id, path: `contracts/drafts/${id}.json`, tasks: c.tasks.length };
   };
 
-  P.contractSign = function (identity, { id, client = null, session = null }) {
+  P.contractSign = function (identity, { id, client = null, session = null, local = true }) {
     this._need(identity, 'write', `${SIGNED}/${id}.json`);
     const draft = this._read(`contracts/drafts/${id}.json`);
     if (!draft) throw new ContractError('not_found', `no draft contract ${id}`);
@@ -105,12 +139,14 @@ export function attach(Vault) {
     const c = JSON.parse(draft);
     const errs = A.validate(c); if (errs.length) throw new ContractError('invalid', errs.join('; '));
     const key = signingKey(this.opts.keyDir || path.join(configDir(), 'keys'));
+    const origin = local ? 'local' : 'remote';
+    c.origin = origin;
     const env_ = dsseSign(c, key.priv);
     const body = `${JSON.stringify(c, null, 2)}\n`;
     if (this._read(`${KEYS}/${key.id}.pub`) === null) this.write(identity, { path: `${KEYS}/${key.id}.pub`, body: key.pub, client, internal: true });
     this.write(identity, { path: `${SIGNED}/${id}.json`, body, client, internal: true });
     this.write(identity, { path: `${SIGNED}/${id}.sig.json`, body: `${JSON.stringify(env_, null, 2)}\n`, client, internal: true });
-    this._applyMisc(this.log.append({ type: 'contract.signed', path: null, agent: identity.agent, client, data: { id, hash: canonicalHash(c), keyid: key.id, session, supersedes: c.supersedes || null } }));
+    this._applyMisc(this.log.append({ type: 'contract.signed', path: null, agent: identity.agent, client, data: { id, hash: canonicalHash(c), keyid: key.id, session, supersedes: c.supersedes || null, origin } }));
     // the signed contract is a memory: a decision anyone can recall, linked to its project, the
     // session that signed it, the decisions it rests on and the version it replaces (provenance)
     const project = c.project && c.project !== 'memev' ? c.project : null;
@@ -120,7 +156,44 @@ export function attach(Vault) {
     if (session || c.provenance?.session) this.link(identity, { from: node, to: `session ${String(session || c.provenance.session).slice(0, 16)}`, type: 'derived_from', why: 'signed in this conversation', client });
     for (const d of c.provenance?.decisions || []) this.link(identity, { from: node, to: String(d), type: 'derived_from', why: 'a decision the contract rests on', client });
     if (c.supersedes) this.link(identity, { from: node, to: `contract ${c.supersedes}`, type: 'supersedes', why: 'new version', client });
-    return { id, signed: true, version: c.version || 1, supersedes: c.supersedes || null, hash: canonicalHash(c), keyid: key.id, path: `${SIGNED}/${id}.json`, memory: mem.path || null, next: 'build the tasks in order; run memev_contract_verify after each one' };
+    return { id, signed: true, version: c.version || 1, supersedes: c.supersedes || null, hash: canonicalHash(c), keyid: key.id, path: `${SIGNED}/${id}.json`, origin, memory: mem.path || null, next: 'build the tasks in order; run memev_contract_verify after each one' };
+  };
+
+  P.contractApprove = function (identity, { id, local = true }) {
+    if (!local) throw new ContractError('forbidden', 'approval is a local operator action; run it on this machine (memev contract approve ' + id + ')');
+    this._need(identity, 'admin', null);
+    if (this._read(`${SIGNED}/${id}.json`) === null) throw new ContractError('not_found', `contract ${id} is not signed`);
+    // the approval sits beside the signed contract, under the protected path: no plain write can create it
+    // (a remote caller included), and it is written once, since the vault hook refuses a change under signed/
+    if (this._contractApproved(id)) return { approved: true, id };
+    this.write(identity, { path: `${SIGNED}/${id}.approval.txt`, body: `${JSON.stringify({ id, at: now(), by: identity.agent }, null, 2)}\n`, client: null, internal: true });
+    this._applyMisc(this.log.append({ type: 'contract.approved', path: null, agent: identity.agent, data: { id } }));
+    return { approved: true, id };
+  };
+
+  P._contractOrigin = function (id) {
+    const body = this._read(`${SIGNED}/${id}.json`);
+    if (!body) return null;
+    try { return JSON.parse(body).origin || 'local'; } catch { return 'local'; }
+  };
+
+  P._contractApproved = function (id) {
+    return this._read(`${SIGNED}/${id}.approval.txt`) !== null;
+  };
+
+  const _origOpenContracts = P._openContracts;
+  P._openContracts = function () {
+    return _origOpenContracts.call(this).map((k) => ({ ...k, origin: this._contractOrigin(k.id) || 'local', approved: this._contractApproved(k.id) }));
+  };
+
+  P._confinePath = function (workdir, p, { inVault = false } = {}) {
+    const raw = String(p);
+    if (path.isAbsolute(raw)) throw new ContractError('forbidden', `absolute paths are not allowed: ${p}`);
+    if (raw.split(/[\\/]/).includes('..')) throw new ContractError('forbidden', `path escapes the vault: ${p}`);
+    const abs = path.resolve(workdir, raw);
+    const rel = path.relative(this.root, abs);
+    if (inVault && (rel.startsWith('..') || path.isAbsolute(rel))) throw new ContractError('forbidden', `outside the vault: ${p} in ${workdir}`);
+    return abs;
   };
 
   P.contractCheckSignature = function (id) {
@@ -138,18 +211,27 @@ export function attach(Vault) {
     const s = this.contractCheckSignature(id);
     if (!s.ok) return { id, ok: false, signature: s.detail, tasks: [] };
     const c = s.contract; const wd = c.workdir ? path.resolve(c.workdir) : this.root;
+    const origin = c.origin || 'local';
+    const approved = this._contractApproved(id);
+    const needsApproval = origin === 'remote' && !approved;
+    // file-based criteria stay inside the vault root when the caller is remote or the contract was signed
+    // remotely (its receipt is readable remotely, so a local verify must not prove anything outside it either)
+    const inVault = !local || origin === 'remote';
+    // the same callers supply grep patterns: past the budget their remaining grep criteria fail unchecked
+    let grepLeft = inVault ? GREP_VERIFY_BUDGET_MS : Infinity;
     const run = (crit) => {
       const v = crit.verifier;
       if (v.type === 'command') {
+        if (needsApproval) return { status: 'BLOCKED', detail: 'remote-signed contract needs local operator approval (memev contract approve ' + id + ')' };
         if (!local && this.config.contracts?.exec_local_only !== false) return { status: 'BLOCKED', detail: 'commands run only from this machine' };
         if (this.config.contracts?.exec === false) return { status: 'BLOCKED', detail: 'running commands is switched off (contracts.exec)' };
-        const r = spawnSync('sh', ['-c', v.cmd], { cwd: wd, encoding: 'utf8', timeout: (v.timeout_s || 300) * 1000 });
+        const r = spawn('sh', ['-c', v.cmd], { cwd: wd, timeout: (v.timeout_s || 300) * 1000 });
         const want = v.expect_exit ?? 0;
-        return { status: r.status === want ? 'PASS' : 'FAIL', detail: `exit ${r.status}${r.status === want ? '' : `: ${truncate(`${r.stderr || ''}${r.stdout || ''}`.trim(), 300)}`}` };
+        return { status: r.status === want ? 'PASS' : 'FAIL', detail: `exit ${r.status}${r.status === want ? '' : `: ${r.error || truncate(`${r.stderr}${r.stdout}`.trim(), 300)}`}` };
       }
-      if (v.type === 'file_exists') return exists(path.join(wd, v.path)) ? { status: 'PASS', detail: v.path } : { status: 'FAIL', detail: `${v.path} is missing` };
-      if (v.type === 'test_exists') return exists(path.join(wd, v.test_file)) ? { status: 'PASS', detail: v.test_file } : { status: 'FAIL', detail: `${v.test_file} is missing` };
-      if (v.type === 'grep') { let t = ''; try { t = fs.readFileSync(path.join(wd, v.file), 'utf8'); } catch { return { status: 'FAIL', detail: `${v.file} is missing` }; } return new RegExp(v.pattern, v.flags || '').test(t) ? { status: 'PASS', detail: `${v.file} matches` } : { status: 'FAIL', detail: `${v.file} does not match ${v.pattern}` }; }
+      if (v.type === 'file_exists') { let p; try { p = this._confinePath(wd, v.path, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.path } : { status: 'FAIL', detail: `${v.path} is missing` }; }
+      if (v.type === 'test_exists') { let p; try { p = this._confinePath(wd, v.test_file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.test_file } : { status: 'FAIL', detail: `${v.test_file} is missing` }; }
+      if (v.type === 'grep') { let p; try { p = this._confinePath(wd, v.file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } const pat = String(v.pattern ?? ''); if (!pat) return { status: 'FAIL', detail: 'the pattern is missing' }; if (pat.length > GREP_PATTERN_MAX) return { status: 'FAIL', detail: `a pattern over ${GREP_PATTERN_MAX} characters is not checked` }; let t = ''; try { t = fs.readFileSync(p, 'utf8'); } catch { return { status: 'FAIL', detail: `${v.file} is missing` }; } if (grepLeft <= 0) return { status: 'FAIL', detail: 'not checked: the grep time for this verify is used up' }; const limit = Math.min(GREP_TIMEOUT_MS, grepLeft); const g0 = Date.now(); const m = grepMatch(pat, String(v.flags || ''), t, limit); grepLeft -= Date.now() - g0; if (m.timeout) return { status: 'FAIL', detail: `the pattern did not finish within ${limit} ms and is not checked` }; if (m.error) return { status: 'FAIL', detail: 'the pattern is not a usable regular expression' }; return m.ok ? { status: 'PASS', detail: `${v.file} matches` } : { status: 'FAIL', detail: `${v.file} does not match ${v.pattern}` }; }
       return { status: 'BLOCKED', detail: `${v.type} criteria are checked by a person or CI, not here` };
     };
     const tasks = c.tasks.map((t) => ({ id: t.id, title: t.title, criteria: t.criteria.map((cr) => ({ id: cr.id, statement: cr.statement || `${cr.verifier?.type || "check"} check`, mandatory: cr.mandatory !== false, ...run(cr) })) }));

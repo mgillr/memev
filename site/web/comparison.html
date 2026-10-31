@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How Memev compares</title>
+  <meta name="description" content="The facts about how Memev works and the open standards it builds on, so you can compare its local-first approach with hosted memory services on your own terms.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="name" href="index.html">Memev</a>
+    <nav>
+      <a href="quickstart.html">Quickstart</a>
+      <a href="personal.html">Personal</a>
+      <a href="business.html">Business</a>
+      <a href="trial.html">Trial</a>
+      <a href="video.html">Video</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+  </div>
+</header>
+<main>
+  <h1>How Memev compares</h1>
+
+  <p>Part of the Memev documentation. Up: the README.</p>
+
+  <p>Memev is a local-first memory and team channel for AI apps. This page states the facts about how Memev works and the open standards it builds on, so you can compare its approach with hosted alternatives on your own terms.</p>
+
+  <h2>Install</h2>
+  <p>In a copy of the Memev repository, run the install command:</p>
+  <pre class="install"><code>npm install -g . && memev init</code></pre>
+  <p>Then follow the <a href="quickstart.html">quickstart</a>.</p>
+
+  <h2>The approach</h2>
+
+  <table>
+    <thead>
+      <tr><th>Question</th><th>Memev</th><th>A typical hosted memory service</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Where your notes live</td><td>A folder of plain Markdown on your own computer</td><td>On the vendor's servers</td></tr>
+      <tr><td>Who can read them</td><td>You, unless you choose to share</td><td>The vendor, subject to its policy</td></tr>
+      <tr><td>Backup</td><td>A private GitHub repository under your own account</td><td>The vendor's storage</td></tr>
+      <tr><td>How apps receive context</td><td>The Model Context Protocol, an open standard</td><td>Usually a proprietary API</td></tr>
+      <tr><td>Team sharing</td><td>One channel between computers you own, with no server in the middle</td><td>Through the vendor's cloud</td></tr>
+      <tr><td>If you stop paying</td><td>The notes are plain files you keep</td><td>Access may end</td></tr>
+      <tr><td>Turning the cloud link off</td><td>The optional web link can be switched off</td><td>Often not applicable</td></tr>
+    </tbody>
+  </table>
+
+  <p>Memev keeps notes as plain Markdown, so they stay readable and portable with no special tool. It hands context to apps over the Model Context Protocol, the open standard that many editors and assistants already support. It backs up to a private GitHub repository under your own account.</p>
+
+  <h2>Sources</h2>
+
+  <ul>
+    <li>Model Context Protocol, the open standard Memev uses to hand context to apps: <a href="https://modelcontextprotocol.io">https://modelcontextprotocol.io</a></li>
+    <li>GitHub private repositories, where Memev stores your backup under your own account: <a href="https://docs.github.com/en/repositories/creating-and-managing-repositories/about-repositories">https://docs.github.com/en/repositories/creating-and-managing-repositories/about-repositories</a></li>
+    <li>CommonMark, the plain-text Markdown format Memev writes your notes in: <a href="https://commonmark.org">https://commonmark.org</a></li>
+  </ul>
+
+  <p>The "typical hosted memory service" column describes the common cloud-hosted pattern rather than any single product. Check each product's own documentation for its current terms.</p>
+</main>
+<footer class="site">
+  <div class="wrap">
+    <p>{{companyName}}. <a href="privacy.html">Privacy</a> and <a href="imprint.html">imprint</a>.
+    <a href="contact.html">Contact</a>.</p>
+  </div>
+</footer>
+</body>
+</html>

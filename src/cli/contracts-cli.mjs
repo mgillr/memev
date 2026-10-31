@@ -5,13 +5,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { healthy, startDaemon } from './daemon.mjs';
-import { api, clientToken } from './common.mjs';
+import { api, clientToken, config, saveConfig, adminToken } from './common.mjs';
 import { FOOTER, footerEnabled } from '../engine/card.mjs';
 
 export const GATE_HOOK = (launcher, wd) => `#!/bin/sh
 # memev: refuse to push while a signed contract for this directory does not verify (runs locally).
 exec "${launcher}" gate --workdir "${wd}"
 `;
+
+async function reloadDaemon(root) { const t = adminToken(root); if (!t) return false; try { return (await api(root, '/v1/reload', { token: t })).ok; } catch { return false; } }
 
 export async function command(cmd, pos, flags, { root, env }) {
   const sub = cmd === 'verify' ? 'verify-cmd' : cmd === 'gate' ? 'gate' : pos[0] || 'list';
@@ -25,6 +27,30 @@ export async function command(cmd, pos, flags, { root, env }) {
     const res = r.json?.result; if (!res) throw new Error(r.text);
     console.log(res.content[0].text); return res.isError ? 1 : (res.structuredContent?.ok === false ? 1 : 0);
   };
+  // approve is an admin action; the CLI's client token is read+write, so it goes over the admin token
+  const callAdmin = async (name, args) => {
+    const t = adminToken(root); if (!t) throw new Error('no admin token found; run memev init');
+    const r = await api(root, '/mcp', { token: t, body: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, timeoutMs: 600000 });
+    const res = r.json?.result; if (!res) throw new Error(r.text);
+    console.log(res.content[0].text); return res.isError ? 1 : (res.structuredContent?.ok === false ? 1 : 0);
+  };
+  if (cmd === 'contracts') {
+    if (sub === 'on' || sub === 'off') {
+      const cfg = config(root);
+      cfg.contracts = { ...cfg.contracts, enabled: sub === 'on' };
+      saveConfig(root, cfg);
+      const live = await reloadDaemon(root);
+      console.log(sub === 'on' ? 'Contracts are on. Build requests get a contract nudge, and the Stop hook blocks while a signed contract is not verified. Turn them off with: memev contracts off' : 'Contracts are off. Build requests get no nudge, and the Stop hook never blocks on a contract. Turn them back on with: memev contracts on');
+      if (!live) console.log('  ! the daemon is not running; the change applies when it starts');
+      return 0;
+    }
+    if (sub === 'status') {
+      const on = config(root).contracts?.enabled !== false;
+      console.log(`Contracts: ${on ? 'on' : 'off'}`);
+      return 0;
+    }
+    throw new Error('memev contracts on | off | status');
+  }
   if (!(await healthy(root))) await startDaemon(root, { quiet: true });
   if (sub === 'list') return call('memev_contract_list', {});
   if (sub === 'status') { const code = await call('memev_contract_status', { id: pos[1], project: flags.project, all: !!flags.all }); if (code === 0 && footerEnabled(root)) console.log(`\n${FOOTER}`); return code; }
@@ -58,9 +84,10 @@ export async function command(cmd, pos, flags, { root, env }) {
   }
   if (sub === 'new') { const spec = JSON.parse(fs.readFileSync(pos[1], 'utf8')); return call('memev_contract_draft', spec); }
   if (sub === 'sign') return call('memev_contract_sign', { id: pos[1] });
+  if (sub === 'approve') return callAdmin('memev_contract_approve', { id: pos[1] });
   if (sub === 'verify') return call('memev_contract_verify', { id: pos[1] });
   if (sub === 'amend') return call('memev_contract_amend', { id: pos[1], title: flags.title });
   if (sub === 'decompose') return call('memev_contract_decompose', { scope: JSON.parse(fs.readFileSync(pos[1], 'utf8')) });
-  throw new Error('memev contract list | status [id] | from-request <text> | new <spec.json> | sign <id> | verify <id> | amend <id> | decompose <scope.json> | hook [dir]');
+  throw new Error('memev contract list | status [id] | from-request <text> | new <spec.json> | sign <id> | approve <id> | verify <id> | amend <id> | decompose <scope.json> | hook [dir]');
 }
 

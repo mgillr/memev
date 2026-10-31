@@ -40,7 +40,7 @@ test('MEM-050 AC01: the marker is read as the sandbox sets it: a value of 0 mean
   assert.equal(sandboxMarker({ CODEX_SANDBOX: '' }), null);
   assert.equal(sandboxMarker({}), null);
   assert.equal(sandboxMarker({ CODEX_MANAGED_BY_NPM: '1' }), null, 'an npm-managed install is not a sandbox');
-  assert.equal(initCommand({ port: '7790', 'local-only': true, root: '/a b' }), 'memev init --port 7790 --local-only', 'only plain values are copied into the command');
+  assert.equal(initCommand({ port: '91', 'local-only': true, root: '/a b' }), 'memev init --port 91 --local-only', 'only plain values are copied into the command');
   assert.match(sandboxStop({ env: { CODEX_SANDBOX: 'seatbelt' } }), /^This session runs inside a sandbox/);
 });
 

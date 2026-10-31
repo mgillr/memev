@@ -24,6 +24,7 @@ export const OPERATOR = 'operator';
 const MAX_BODY = 4000;
 export const LEAD_NEEDED = 'No lead AI is set for this vault. Ask the user which AI should lead and coordinate the others (bus_roster lists the seats), then call bus_set_operator with the seat and their answer. Never choose yourself or another app without asking.';
 const SEAT_RE = /^[a-z0-9][a-z0-9._-]{0,40}@[a-z0-9][a-z0-9._-]{0,40}(\/[a-z0-9._-]{1,24})?$/;
+const REF_RE = /^[A-Za-z0-9._:-]{1,64}$/;
 const PULSE_COMMIT_MS = 5 * 60e3;
 
 export class BusError extends Error { constructor(code, message) { super(message); this.code = code; this.name = 'BusError'; } }
@@ -38,6 +39,7 @@ export class Bus {
   constructor({ root, devices, commit = () => {}, config = {} }) {
     this.root = root; this.devices = devices; this.commit = commit;
     this.liveMin = config.live_min ?? 15;
+    this.cloudTasks = !!config.cloud_tasks;
     this.dir = path.join(root, BUS_DIR);
     this._cache = new Map(); this._pulseCommitted = new Map(); this._last = new Map();
   }
@@ -150,6 +152,47 @@ export class Bus {
     if (op?.seat === from) { writeJson(this._p('operator.json'), { ...op, seat: newName }); this.commit(this._rel('operator.json')); }
     return rec;
   }
+  /**
+   * A computer's label changed: move every seat on it to the name its new label gives, so the seat's
+   * history, tasks and lead follow it, and its old names still find the seat.
+   */
+  renameDeviceSeats(deviceId) {
+    const device = this.devices.get(deviceId);
+    if (!device) return [];
+    const moved = [];
+    for (const s of this.seats()) {
+      if (s.device !== deviceId || s.removed) continue;
+      const base = this._seatNameAfterRename(s.seat, device);
+      if (!base || base === s.seat) continue;
+      // a name another computer already holds goes to the first free <app>@<machine>-2, -3 ..., as ownSeatName does
+      const [app, rest] = base.split('@'); const [machine, sub] = rest.split('/');
+      let next = null;
+      for (let i = 1; i < 100 && !next; i++) {
+        const n = i === 1 ? base : `${app}@${machine.slice(0, 41 - `-${i}`.length)}-${i}${sub ? `/${sub}` : ''}`;
+        const r = this.seat(n);
+        if (!r || r.seat === s.seat) next = n;
+      }
+      if (!next) throw new BusError('conflict', `no free seat name for ${base}`);
+      if (next === s.seat) continue;
+      moved.push(this.renameSeat(s.seat, next));
+    }
+    return moved;
+  }
+  /** The seat name a seat on this device takes once the device's label is what it is now. */
+  _seatNameAfterRename(name, device) {
+    const at = String(name).split('@');
+    if (at.length < 2) return null;
+    const [app, rest] = at;
+    const [machine, sub] = rest.split('/');
+    if (device.kind === 'cloud-connector') {
+      const app2 = label(device.label);
+      if (app2 === app) return null;
+      return `${app2}@${machine}${sub ? `/${sub}` : ''}`;
+    }
+    const machine2 = device.kind === 'remote-computer' ? label(device.label) : this.machineName();
+    if (machine2 === machine) return null;
+    return `${app}@${machine2}${sub ? `/${sub}` : ''}`;
+  }
   /** A seat's name and the names it had before a rename: messages to or from any of them are its own. */
   _names(seat) {
     const rec = this.seat(seat);
@@ -249,14 +292,19 @@ export class Bus {
   }
   _toMe(who, m, names = this._names(who.seat)) { return !names.includes(m.from) && (m.to === 'all' || names.includes(m.to) || (m.to === OPERATOR && who.operator)); }
 
-  send(ctx, { to = 'all', type, body = '', ref = null, project = null, seat = null, release = false, check = false } = {}) {
+  send(ctx, { to, type, body = '', ref = null, project = null, seat = null, release = false, check = false } = {}) {
     if (!TYPES.includes(type)) throw new BusError('bad_request', `type must be one of: ${TYPES.join(', ')}`);
     body = String(body ?? '');
     if (body.length > MAX_BODY) throw new BusError('too_large', `keep a message under ${MAX_BODY} characters; put long text in a note and send its path`);
     const secrets = findSecrets(body);
     if (secrets.length) throw new BusError('secret', `refused: the message looks like it holds a credential (${secrets.join(', ')}). Never send keys or tokens over the bus`);
+    if (ref != null && !REF_RE.test(String(ref))) throw new BusError('bad_request', 'ref must be a message or task id: letters, digits and . _ : -, at most 64 characters');
     const who = this.resolve(ctx, { seat, project, need: 'write' });
-    to = String(to || 'all');
+    to = String(to || (who.device?.kind === 'cloud-connector' ? OPERATOR : 'all'));
+    if (who.device?.kind === 'cloud-connector') {
+      const toOperator = to === OPERATOR || (!!this.operator() && to === this.operator());
+      if (!toOperator && !(this.cloudTasks && type === 'task')) throw new BusError('forbidden', 'a cloud seat may post only to the operator; to let a cloud app assign a task to a seat, the person turns on the bus cloud_tasks setting');
+    }
     if (to !== 'all' && to !== OPERATOR && !this.seat(to)) throw new BusError('not_found', `no seat ${to}; bus_roster lists them`);
     const all = this.all();
     if (['claim', 'restate'].includes(type)) {
@@ -381,13 +429,21 @@ export class Bus {
     return { check: msg.id, seq: msg.seq, waited_ms: Date.now() - start, answered, missing };
   }
 
-  /** Tasks with who claimed them, the restatement, the latest status and the verdict. */
+  /** Has this seat not seen this message yet (its read pointer is still behind it)? */
+  unreadFor(seat, m) {
+    const p = this._pulse(seat);
+    return m.dseq > (p.read?.[m.device] || 0);
+  }
+  /** Tasks with who claimed them, the restatement, the latest status and the verdict. An unclaimed
+   * task to a live seat that has not read it yet waits for that seat's next turn. */
   tasks(ctx, { open = false } = {}) {
     const who = this.resolve(ctx); const all = this.all().filter((m) => this._visible(who, m));
+    const live = new Set(this.roster().seats.filter((r) => r.seat && r.state === 'live').map((r) => r.seat));
     return all.filter((m) => m.type === 'task').map((t) => {
       const rel = all.filter((m) => m.ref === t.id);
       const claim = rel.find((m) => m.type === 'claim'); const verdict = rel.filter((m) => m.type === 'verdict').at(-1);
-      return { id: t.id, seq: t.seq, from: t.from, operator: t.operator, to: t.to, body: t.body, claimed_by: claim?.from || null, restated: rel.filter((m) => m.type === 'restate').at(-1)?.body || null, status: rel.filter((m) => m.type === 'status').at(-1)?.body || null, verdict: verdict?.body || null, state: verdict ? 'done' : claim ? 'claimed' : 'open' };
+      const state = verdict ? 'done' : claim ? 'claimed' : live.has(t.to) && this.unreadFor(t.to, t) ? 'waiting for next turn' : 'open';
+      return { id: t.id, seq: t.seq, from: t.from, operator: t.operator, to: t.to, body: t.body, claimed_by: claim?.from || null, restated: rel.filter((m) => m.type === 'restate').at(-1)?.body || null, status: rel.filter((m) => m.type === 'status').at(-1)?.body || null, verdict: verdict?.body || null, state };
     }).filter((t) => !open || t.state !== 'done');
   }
 
@@ -397,6 +453,20 @@ export class Bus {
     const r = this.roster({ at });
     return { seats: r.seats.filter((s) => s.seat).length, live: r.seats.filter((s) => s.state === 'live').length, stale: r.seats.filter((s) => s.state === 'stale').map((s) => `${s.seat} (${s.minutes_since} min)`), never: r.seats.filter((s) => s.state === 'never joined').length, operator: r.operator, bad_lines: bad, messages: this.all().length };
   }
+}
+
+/** The one line other sessions get while no lead is set and the setup session has asked: it overrides the protocol's ask rule. */
+export const LEAD_ASKED_LINE = 'The lead AI is not chosen yet. The person was already asked at setup, so do not ask again; `memev bus operator <seat>` sets it.';
+/** The suggestion the setup session gets with the question: its own seat, for the person to accept or not. */
+export const leadSuggestion = (seat) => `Suggested: ${seat} (the app in this session, which ran first after setup). The person decides.`;
+
+/** Record that the setup session has asked which AI should lead, so other sessions get a quiet line instead of the question. */
+export function markLeadAsked(root) {
+  const f = path.join(root, BUS_DIR, 'operator.json');
+  const op = readJson(f, null) || {};
+  if (op.asked) return;
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  writeJson(f, { ...op, asked: now() });
 }
 
 /** answered, ready (answers on its next turn), not opened yet, or a rejected credential. */

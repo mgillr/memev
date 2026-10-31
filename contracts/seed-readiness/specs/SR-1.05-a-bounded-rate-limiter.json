@@ -1,0 +1,389 @@
+{
+  "title": "SR-1.05 A bounded rate limiter",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G05: The rate limiter bucket map is never evicted (http.mjs:69-77), an unbounded memory growth on a public tunnel. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Evicting buckets",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "idle buckets older than two minutes are dropped",
+        "the map is capped (10,000 keys) with oldest-first eviction",
+        "createServer exposes the limiter it builds as server.rateLimiter (read only, for tests), and exports MAX_BUCKETS = 10000; the limiter at http.mjs:108 is built with the cap",
+        "the cap bounds every key family the limiter holds (ip: and t: keys alike, and any map it splits into), checked after every take(), not only after a sweep",
+        "at the cap, eviction removes a bucket holding at least one token (least recently used first) before any exhausted bucket (fewer than one token); eviction is amortized O(1), never a scan of the map per insert, and a new key is always admitted",
+        "a bucket is idle when no take() touched it for 120,000 ms (time since its last take, b.at), and only idle buckets are dropped by the idle rule; any sweep timer is unref'd and cleared when the server closes",
+        "the remote rate-limit key follows the tunnel that actually carries the request, which the daemon passes into createServer (an activeTunnel() option set from the running provider, beside tunnelKey): through Cloudflare, quick or named, it is cf-connecting-ip, which Cloudflare's edge sets and overwrites; through a provider or relay whose client header is not verified, and with no tunnel, it is the socket address; remote.trusted_proxy, whose only accepted value is the string 'x-forwarded-for', means the last X-Forwarded-For element is the client address, and it applies only when no tunnel is active; an active tunnel always wins over it; IPv6 addresses are keyed by their /64. Tests that simulate distinct remote callers by header pass activeTunnel to createServer and change no assertion (memev twin finding F-2, red-team round 2 answers 1 and 10)",
+        "one rule decides which bucket a remote request takes: a request whose token verifies is limited by its token bucket (t:) alone; every other request (no token, a bearer or a /c/ path whose token does not verify, the OAuth and invite routes) takes the address bucket; an unverified token adds no t: entry, so a bearer header can neither skip the pre-auth throttle nor fill the limiter, and a token holder behind a flooded or shared address is never locked out",
+        "every structure the limiter keeps for ordering or eviction is bounded by the same cap as the map, and at the cap with every bucket exhausted a new key is still admitted by evicting the least recently used bucket",
+        "the test never asserts the value of MAX_BUCKETS and takes its loop bounds from literals, so the mutation check fails only when the cap stops being enforced",
+        "docs/CLOUD.md states the limit, which address each tunnel is limited by, remote.trusted_proxy and the per-token rule",
+        "the daemon passes the running provider into createServer: src/server/main.mjs builds the server with activeTunnel reading the provider the tunnel supervisor actually started (supervise exposes it), never a value a test supplies, and the request path spawns no process to find it",
+        "the limiter's counting API is size (every entry of every structure it keeps) and has(key); the cap and idle tests use only createServer, size and has",
+        "each red-green criterion of this task that runs test/rate-limit.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
+      ],
+      "description": "",
+      "scope": [
+        "src/server/http.mjs",
+        "test/rate-limit.test.mjs",
+        "docs/MODULES.md",
+        "src/server/main.mjs",
+        "src/cli/tunnel.mjs",
+        "docs/CLOUD.md",
+        "test/oauth.test.mjs",
+        "test/http.test.mjs",
+        "test/remote-proof-order.test.mjs",
+        "test/connectors-unlimited.test.mjs",
+        "changelog.d/SR-1.05.md"
+      ],
+      "criteria": [
+        {
+          "statement": "After 50,000 distinct keys the map holds at most 10,000 entries",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The cap is a named constant",
+          "verifier": {
+            "type": "grep",
+            "file": "src/server/http.mjs",
+            "pattern": "MAX_BUCKETS"
+          }
+        },
+        {
+          "statement": "Mutation check: in a clean copy of the committed tree with MAX_BUCKETS replaced by Infinity (and a check that the replacement actually applied), test/rate-limit.test.mjs FAILS. This proves the test depends on the cap being enforced. A red at base on a brand-new file cannot prove that.",
+          "verifier": {
+            "type": "command",
+            "cmd": "d=$(mktemp -d) && git archive HEAD | tar -x -C \"$d\" && perl -pi -e 's/(MAX_BUCKETS\\s*=\\s*)[0-9_.e]+/${1}Infinity/' \"$d/src/server/http.mjs\" && grep -q 'MAX_BUCKETS *= *Infinity' \"$d/src/server/http.mjs\" && cd \"$d\" && ! node --test test/rate-limit.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Guard test 'exhausted key stays limited' in test/rate-limit.test.mjs, with activeTunnel () => 'cloudflare' passed to createServer. Freeze the clock with mock.timers.enable({ apis: ['Date'] }) and set remote.rate_per_min = 5 before createServer. Remote address A (cf-connecting-ip) sends GET /healthz/x and gets 5 non-429 responses, then 429. Then MAX_BUCKETS + 1 requests come from distinct cf-connecting-ip values. A's next request must still be 429. This guard is green at base, so it runs as a named command and the pass count must be at least 1. It fails under LRU, FIFO, most-depleted-first or clear().",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='exhausted key stays limited' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^exhausted key stays limited$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "test/rate-limit.test.mjs takes the limiter instance that createServer(v) itself builds, through a handle the change exposes (the contract should name it, e.g. server.rateLimiter), not a separately constructed Buckets. It calls take() on that instance with MAX_BUCKETS + 1,000 distinct 'ip:' keys and asserts the entry count <= MAX_BUCKETS. At base it is red with an AssertionError, because assert.ok(server.rateLimiter) fails, not with a module-load error.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Use mock.timers on Date, setTimeout and setInterval, rate_per_min = 6, and the limiter that createServer built. (a) Exhaust key A, advance 1,000 ms, call take() once on a fresh key (to trigger any on-insert sweep) and tick any interval sweep: take(A) is still refused. (b) Take key B once, advance 120,001 ms, call one more take() or tick the sweep: B is no longer among the limiter's entries. Red at base on (b).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Guard test 'new caller served during flood', with activeTunnel () => 'cloudflare' passed to createServer. With the clock frozen (mock.timers Date) and remote.rate_per_min = 5, send MAX_BUCKETS + 1 remote requests from distinct cf-connecting-ip values. A never-seen address must then get a status other than 429 on GET /healthz/x (401 is expected). Green at base, so it runs as a named command with a pass-count check.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='new caller served during flood' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^new caller served during flood$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Through HTTP with Date frozen and activeTunnel () => 'cloudflare' passed to createServer, send 6,000 remote GET /healthz/x requests. Each has a distinct cf-connecting-ip and a distinct 'Authorization: Bearer mv_<8 hex>_<32 hex>'. These tokens are unverified, so under the single token rule only the 6,000 address keys reach the limiter. All responses must be 401, not 429. Afterwards the total entry count across every map the createServer-built limiter keeps must be <= MAX_BUCKETS.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The existing server and limiter tests, the module-map check and the new test all pass, and every test process exits before the timeout. This covers pre-auth throttling (http.test.mjs:66-71, oauth.test.mjs:136-141), docs/MODULES.md agreement and clean exit.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-reporter=tap test/http.test.mjs test/oauth.test.mjs test/remote-proof-order.test.mjs test/connectors-unlimited.test.mjs test/docs-module-map.test.mjs test/rate-limit.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Enable mock.timers for Date, setTimeout and setInterval before createServer, so no sweep can fire on its own. Call take() on the createServer-built limiter for 50,000 distinct keys and assert the entry count <= MAX_BUCKETS after every call, not only after the loop.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c10:' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "For the createServer-built limiter, the average cost of a fresh-key take() at the cap (20,000 inserts, each evicting) is at most 5 times the cost below the cap. Amortized O(1) eviction, such as a batch trim, passes; a full scan per insert does not.",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node --input-type=module -e \"import { newVault, cleanup } from './test/helpers/tmp.mjs'; import { createServer, MAX_BUCKETS } from './src/server/http.mjs'; const { v } = newVault(); const L = createServer(v).rateLimiter; const run = (n, p) => { const s = process.hrtime.bigint(); for (let i = 0; i < n; i++) L.take(p + i); return Number(process.hrtime.bigint() - s) / n; }; run(2000, 'ip:w'); const below = run(MAX_BUCKETS / 4, 'ip:a'); run(MAX_BUCKETS, 'ip:b'); const at = run(20000, 'ip:c'); console.log(JSON.stringify({ ratio: at / below })); v.close(); cleanup();\"",
+            "key": "ratio",
+            "op": "<=",
+            "value": 5
+          }
+        },
+        {
+          "statement": "Guard test 'busy key not reset at two minutes'. With rate_per_min = 6 and Date mocked, call take('ip:A') on the createServer-built limiter once per simulated second for 180 seconds. At most 24 calls are allowed: a correct bucket allows 6 + 179 x 0.1 = 23, and an age-based reset at 120 s adds about 5. The idle-unit bug in answer 4 also fails this guard.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='busy key not reset at two minutes' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^busy key not reset at two minutes$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "http.mjs exports MAX_BUCKETS equal to 10000. The tests above need this export anyway. Together with answer 1's mutation check, this proves the constant has the right value and is load-bearing.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --input-type=module -e \"const m = await import('./src/server/http.mjs'); process.exit(m.MAX_BUCKETS === 10000 ? 0 : 1)\"",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "Proxy-header trust follows the tunnel that carries the request, not leftover config. Date is frozen, rate_per_min = 5, remote.enabled is on and every request comes from the loopback socket. (a) 'quick tunnel callers are distinct': activeTunnel () => 'cloudflare' passed to createServer and no remote.cloudflare. cf-connecting-ip 203.0.113.1 gets 401 five times, then 429. cf-connecting-ip 203.0.113.2 then gets 401. (b) 'funnel cannot spoof cf-connecting-ip': activeTunnel () => 'tailscale' passed to createServer, remote.funnelConsent = true and a leftover remote.cloudflare = {name:'n', hostname:'h'}. One socket rotating cf-connecting-ip gets 429 on its sixth request.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='quick tunnel callers are distinct|funnel cannot spoof cf-connecting-ip' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^quick tunnel callers are distinct$|^funnel cannot spoof cf-connecting-ip$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "'own budget holds at the cap': Date frozen, rate_per_min = 5, activeTunnel () => cloudflare passed to createServer. Fill server.rateLimiter to MAX_BUCKETS entries with take('ip:fill' + i). Then send 6 remote GET /healthz/x from one cf-connecting-ip, each with a different 'Authorization: Bearer mv_<8 hex>_<32 hex>': responses 1-5 are 401 and the 6th is 429. Then, on server.rateLimiter directly, alternate take('ip:N') with take('t:fresh' + i) six times: the first five take('ip:N') return true, the sixth returns false, and the entry count stays <= MAX_BUCKETS throughout.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='own budget holds at the cap' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^own budget holds at the cap$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Rewrite 'request path fills the exposed limiter' to agree with R8 as amended in answer 6: a verified token takes only its t: bucket, and any other request takes only the address bucket. Use activeTunnel () => 'cloudflare', a frozen Date and rate_per_min = 5. Send 300 remote GET /healthz/x, each from a distinct cf-connecting-ip with a distinct bearer of the form 'Bearer mv_<8 hex>_<32 hex>' that does not verify. Every response is 401 and server.rateLimiter.size === 300, because an unverified token adds no t: entry. Then 100 POST tools/list to /c/<token_i>/mcp, using 100 distinct valid cloud-connector tokens from 100 new cf-connecting-ip values. Every response is 200 and size === 400: one t: entry each and no address entry.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='request path fills the exposed limiter' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^request path fills the exposed limiter$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Fill the createServer-built limiter to the cap. Then 2,000,000 take() calls on one hot key (mostly refused) plus 300,000 fresh t: keys may grow the V8 heap by at most 4 MB, measured after two full GCs. A correct limiter stays at its cap: about 1-2 MB in all, with a few hundred KB of Map backing-store slack. An order queue, an uncounted index or a second map retains tens of MB.",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node --expose-gc --input-type=module -e \"import { newVault, cleanup } from './test/helpers/tmp.mjs'; import { createServer, MAX_BUCKETS } from './src/server/http.mjs'; const { v } = newVault(); const L = createServer(v).rateLimiter; const heap = () => { globalThis.gc(); globalThis.gc(); return process.memoryUsage().heapUsed; }; for (let i = 0; i < 2 * MAX_BUCKETS; i++) L.take('ip:w' + i); const h0 = heap(); for (let i = 0; i < 2000000; i++) L.take('ip:hot'); for (let i = 0; i < 300000; i++) L.take('t:' + i); const h1 = heap(); console.log(JSON.stringify({ growth_mb: (h1 - h0) / 1048576 })); v.close(); cleanup();\"",
+            "key": "growth_mb",
+            "op": "<=",
+            "value": 4
+          }
+        },
+        {
+          "statement": "'cap holds when every bucket is exhausted': Date frozen, rate_per_min = 2, using the createServer-built limiter. For MAX_BUCKETS + 500 distinct keys, take() each key three times; the third take is refused, so every stored bucket ends exhausted. Every key's first take() returns true, and the total entry count is <= MAX_BUCKETS after every call. Then the first take() of two never-seen keys each returns true, and the count is still <= MAX_BUCKETS.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='cap holds when every bucket is exhausted' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^cap holds when every bucket is exhausted$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With rate_per_min = 2 and the createServer-built limiter, first fill the map with MAX_BUCKETS exhausted buckets (three takes each). Then the average cost per take() of 20,000 rounds of (one fresh key, plus one repeat take of a stored exhausted key) is at most 5 times the cost of a fresh insert below the cap.",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node --input-type=module -e \"import { newVault, cleanup } from './test/helpers/tmp.mjs'; import { createServer, MAX_BUCKETS } from './src/server/http.mjs'; const { v } = newVault(); v.config.remote = { ...v.config.remote, rate_per_min: 2 }; const L = createServer(v).rateLimiter; const run = (n, f) => { const s = process.hrtime.bigint(); for (let i = 0; i < n; i++) f(i); return Number(process.hrtime.bigint() - s) / n; }; run(2000, (i) => L.take('ip:w' + i)); const below = run(MAX_BUCKETS / 4, (i) => L.take('ip:a' + i)); for (let i = 0; i < MAX_BUCKETS; i++) { L.take('ip:x' + i); L.take('ip:x' + i); L.take('ip:x' + i); } const at = run(20000, (i) => { L.take('ip:c' + i); L.take('ip:x' + ((i * 7919) % MAX_BUCKETS)); }) / 2; console.log(JSON.stringify({ ratio: at / below })); v.close(); cleanup();\"",
+            "key": "ratio",
+            "op": "<=",
+            "value": 5
+          }
+        },
+        {
+          "statement": "Each behavioural test is red at base for its own reason. Take a clean copy of the committed tree and restore src/server/http.mjs from be457dbd829c89e48fbd3f19b72d43864cd97fd8. test/rate-limit.test.mjs then loads (no missing-export link error), and its TAP output has a 'not ok' line for each of the tests 'rotating proxy headers are one caller', 'map bounded after every take', 'idle bucket dropped after two minutes' and 'http flood keeps every map bounded'. The rotating-headers test sends no Authorization header and opens a new connection for each of its six requests (agent: false or Connection: close).",
+          "verifier": {
+            "type": "command",
+            "cmd": "d=$(mktemp -d) && git archive HEAD | tar -x -C \"$d\" && git show be457dbd829c89e48fbd3f19b72d43864cd97fd8:src/server/http.mjs > \"$d/src/server/http.mjs\" && cd \"$d\" && out=$(node --test --test-reporter=tap test/rate-limit.test.mjs 2>&1); for n in 'rotating proxy headers are one caller' 'map bounded after every take' 'idle bucket dropped after two minutes' 'http flood keeps every map bounded'; do printf '%s\\n' \"$out\" | grep -Eq \"^ *not ok [0-9]+ - $n\" || exit 1; done; ! printf '%s\\n' \"$out\" | grep -q 'does not provide an export named'",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "In both guards, remote.enabled is on and activeTunnel () => 'cloudflare' is passed to createServer; Date is frozen and rate_per_min = 5. Every one of the MAX_BUCKETS + 1 flood responses is exactly 401. In 'new caller served during flood' the never-seen address then gets exactly 401. In 'exhausted key stays limited', A's sixth request and its request after the flood are both 429.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='new caller served during flood|exhausted key stays limited' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^new caller served during flood$|^exhausted key stays limited$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Guard 'busy key not reset at two minutes': enable mock.timers for Date, setTimeout and setInterval before createServer, and advance with mock.timers.tick(1000), so any sweep interval fires during the 180 simulated seconds; at most 24 of the 180 take('ip:A') calls are allowed. New guard 'busy key survives the sweep', in the same setup: after the 180 seconds, ip:A is still among the limiter's entries.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='busy key not reset at two minutes|busy key survives the sweep' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^busy key not reset at two minutes$|^busy key survives the sweep$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "'trusted proxy keys on the hop it added': remote.trusted_proxy is configured with the exact value the contract defines; Date frozen, rate_per_min = 5, one loopback socket. Six requests whose X-Forwarded-For is '<random>, 198.51.100.9' (first element rotating, last fixed) get 401 five times, then 429. A request with X-Forwarded-For '198.51.100.10' then gets 401.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='trusted proxy keys on the hop it added' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^trusted proxy keys on the hop it added$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "'a known token id cannot lock out its owner': Date frozen, rate_per_min = 5, activeTunnel () => cloudflare passed to createServer, and a real cloud-connector token mv_<id>_<secret>. From cf-connecting-ip 198.51.100.1, send five GET /healthz/x with 'Bearer mv_<id>_<32 wrong hex>'. Then the real token, from cf-connecting-ip 198.51.100.2, posts tools/list to /c/<token>/mcp and gets 200. This is red at base, where t:<id> is exhausted at :131.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='a known token id cannot lock out its owner' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^a known token id cannot lock out its owner$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "'an IPv6 /64 is one caller': activeTunnel () => cloudflare passed to createServer, Date frozen, rate_per_min = 5. Six requests with cf-connecting-ip '2001:db8:1:2::' + (i + 1) (same /64, rotating interface id) get 401 five times, then 429. Then '2001:db8:1:3::1' gets 401. Two IPv4 addresses in one /24 stay separate callers.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='an IPv6 /64 is one caller' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^an IPv6 /64 is one caller$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "New test 'daemon keys by the running tunnel' in test/rate-limit.test.mjs. Write a fake executable 'tailscale' into a temp bin dir: 'status --json' prints {\"BackendState\":\"Running\",\"Self\":{\"DNSName\":\"v.example.ts.net.\"}}, 'serve status --json' prints {}, and any other call exits 0. Prepend that dir to PATH. Use newVault with remote = { enabled: true, provider: 'auto', funnelConsent: true, rate_per_min: 5, cloudflare: { name: 'n', hostname: 'h' } }. Pick a free port in the test, because main.mjs writes port 0 to daemon.json for --port 0. Spawn node src/server/main.mjs --root <root> --port <p> with MEMEV_NO_TUNNEL deleted from the child env and MEMEV_NO_DOWNLOAD=1 set, so cloudflaredPath (tunnel.mjs:41-49) can never download. Setting MEMEV_NO_TUNNEL is not an allowed fix, because it turns the tunnel off. Wait until .memev/tunnel.json shows provider 'tailscale' and state 'up'. Then six loopback GET /healthz/x requests, each with a different cf-connecting-ip and no Authorization, get 401 five times and then 429. Second half: a fake 'cloudflared' in the same bin dir that prints https://ab-cd.trycloudflare.com to stderr and then sleeps, with provider 'quick'. Once tunnel.json shows provider 'quick' and state 'up', cf-connecting-ip 203.0.113.1 gets 401 five times and then 429, and 203.0.113.2 then gets 401. SIGTERM the daemon in a finally block. Red at base, because base trusts cf-connecting-ip and the funnel half gets a sixth 401.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='daemon keys by the running tunnel' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^daemon keys by the running tunnel$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "This needs the R8 amendment proposed in answer 6: a verified token takes only its t: bucket. New test 'token holder served through an untrusted tunnel'. Freeze Date with mock.timers, set rate_per_min = 5, and enroll a real cloud-connector token with v.devices.enroll. Run it once with activeTunnel () => 'tailscale' and once with () => null. Send ten anonymous GET /healthz/x from the loopback socket with rotating cf-connecting-ip and x-forwarded-for: requests six to ten are 429. Then POST tools/list to /c/<token>/mcp twice, with the relay's header shape (x-forwarded-for: 198.51.100.40, x-forwarded-host: v.example, x-forwarded-proto: https). Both return 200. Red at base, where the rotating headers are separate callers and the anonymous flood is never limited.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='token holder served through an untrusted tunnel' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^token holder served through an untrusted tunnel$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "New test 'a bearer does not skip the pre-auth bucket', consistent with the answer 6 rule that only a verified token leaves the address bucket. Use activeTunnel () => 'tailscale', rate_per_min = 5 and a frozen Date. Six anonymous GET /healthz/x from loopback with rotating cf-connecting-ip: the sixth is 429. Then send four requests, each with a new random 'Authorization: Bearer mv_<8 hex>_<32 hex>': GET /healthz/x, POST /oauth/register with a valid JSON body, GET /oauth/authorize, and POST /c/mv_<8 hex>_<32 hex>/v1/invite-redeem. Each returns 429. The line count of .memev/access.jsonl, read after a 200 ms settle, does not grow across the four. Red at base, where rotating cf-connecting-ip is never limited.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='a bearer does not skip the pre-auth bucket' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^a bearer does not skip the pre-auth bucket$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Rewrite 'request path fills the exposed limiter' to agree with R8 as amended in answer 6: a verified token takes only its t: bucket, and any other request takes only the address bucket. Use activeTunnel () => 'cloudflare', a frozen Date and rate_per_min = 5. Send 300 remote GET /healthz/x, each from a distinct cf-connecting-ip with a distinct bearer of the form 'Bearer mv_<8 hex>_<32 hex>' that does not verify. Every response is 401 and server.rateLimiter.size === 300, because an unverified token adds no t: entry. Then 100 POST tools/list to /c/<token_i>/mcp, using 100 distinct valid cloud-connector tokens from 100 new cf-connecting-ip values. Every response is 200 and size === 400: one t: entry each and no address entry.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='request path fills the exposed limiter' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^request path fills the exposed limiter$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Every changed line in the four existing server tests is setup: a diff against the base shows no added or removed line except ones that contain createServer( or activeTunnel.",
+          "verifier": {
+            "type": "command",
+            "cmd": "git cat-file -e be457dbd829c89e48fbd3f19b72d43864cd97fd8 && ! git diff -U0 be457dbd829c89e48fbd3f19b72d43864cd97fd8 HEAD -- test/http.test.mjs test/oauth.test.mjs test/connectors-unlimited.test.mjs test/remote-proof-order.test.mjs | grep -E '^[-+]' | grep -vE '^(\\+\\+\\+|---) ' | grep -vE 'createServer\\(|activeTunnel'",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "This needs R8 amended to: 'a request whose token verifies is limited by its token bucket alone; a request without a valid token takes the address bucket'. The same amendment resolves the R8/R9 conflict in answer 2 and is what answers 3 and 4 assume. New test 'token holder behind a flooded address'. Use activeTunnel () => 'cloudflare', rate_per_min = 5, a frozen Date and a real cloud-connector token. Ten anonymous GET /healthz/x with cf-connecting-ip 198.51.100.60: requests six to ten are 429. Then POST tools/list to /c/<token>/mcp with cf-connecting-ip 198.51.100.60 returns 200. Repeat with an anonymous flood from 2001:db8:7:7::1 and the token from 2001:db8:7:7::2, in the same /64: 200. Red at base, where the token request gets 429 at the address take.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='token holder behind a flooded address' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^token holder behind a flooded address$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "New test 'an IPv6 /64 is one caller in compressed form'. Use activeTunnel () => 'cloudflare', rate_per_min = 5 and a frozen Date. Six requests with cf-connecting-ip '2001:db8::' + (i + 1) + ':1:1:1' (all in 2001:db8:0:0::/64, rotating the fifth group) get 401 five times, then 429. '2001:db8:0:1::1' then gets 401. Separately, '::ffff:203.0.113.5' sent six times gets five 401s and then 429, after which '::ffff:203.0.113.6' gets 401. Red at base, where each full address is its own key.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='an IPv6 /64 is one caller in compressed form' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^an IPv6 /64 is one caller in compressed form$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Red for its own reason, against a shimmed base. In a clean copy with base http.mjs, a one-line shim exposes the base limiter: server.rateLimiter = limiter, a size getter, has(k), and export MAX_BUCKETS = 10000. Each of the three cap and idle tests, run alone, then prints 'not ok' with ERR_ASSERTION and no TypeError, ReferenceError or RangeError. The contract must name size and has as the counting API, and these tests' setup may use only createServer, size and has.",
+          "verifier": {
+            "type": "command",
+            "cmd": "d=$(mktemp -d) && git archive HEAD | tar -x -C \"$d\" && git show be457dbd829c89e48fbd3f19b72d43864cd97fd8:src/server/http.mjs > \"$d/src/server/http.mjs\" && cd \"$d\" && perl -0pi -e 's/(class Buckets \\{\\n)/$1  get size() { return this.m.size; }\\n  has(k) { return this.m.has(k); }\\n/; s/(  server\\.headersTimeout = 15000;)/  server.rateLimiter = limiter;\\n$1/; $_ .= \"export const MAX_BUCKETS = 10000;\\n\"' src/server/http.mjs && grep -q 'server.rateLimiter = limiter' src/server/http.mjs && grep -q 'get size()' src/server/http.mjs && for n in 'map bounded after every take' 'idle bucket dropped after two minutes' 'http flood keeps every map bounded'; do o=$(node --test --test-reporter=tap --test-name-pattern=\"$n\" test/rate-limit.test.mjs 2>&1); printf '%s\\n' \"$o\" | grep -Eq \"^ *not ok [0-9]+ - $n\" && printf '%s\\n' \"$o\" | grep -q 'ERR_ASSERTION' && ! printf '%s\\n' \"$o\" | grep -Eq 'TypeError|ReferenceError|RangeError' || exit 1; done",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Count-free bound: once the createServer-built limiter holds MAX_BUCKETS fresh keys, inserting 5 x MAX_BUCKETS more fresh keys grows the V8 heap, measured after two full GCs, by at most 1.5 MB. A limiter that truly stays at the cap grows by close to zero apart from Map backing-store slack; a real bound of 3 x the cap grows by over 2 MB.",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node --expose-gc --input-type=module -e \"import { newVault, cleanup } from './test/helpers/tmp.mjs'; import { createServer, MAX_BUCKETS } from './src/server/http.mjs'; const { v } = newVault(); const L = createServer(v).rateLimiter; const heap = () => { globalThis.gc(); globalThis.gc(); return process.memoryUsage().heapUsed; }; for (let i = 0; i < MAX_BUCKETS; i++) L.take('ip:f' + i); const h0 = heap(); for (let i = 0; i < 5 * MAX_BUCKETS; i++) L.take('ip:g' + i); const h1 = heap(); console.log(JSON.stringify({ growth_mb: (h1 - h0) / 1048576 })); v.close(); cleanup();\"",
+            "key": "growth_mb",
+            "op": "<=",
+            "value": 1.5
+          }
+        },
+        {
+          "statement": "This needs R7 amended to fix the value of remote.trusted_proxy and state that activeTunnel wins. New test 'leftover trusted_proxy does not override the tunnel': with remote.trusted_proxy set to that value, activeTunnel () => 'tailscale', rate_per_min = 5 and a frozen Date, six loopback requests whose X-Forwarded-For and cf-connecting-ip both rotate get 429 on the sixth. Red at base, where the rotating cf-connecting-ip is a new caller each time.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='leftover trusted_proxy does not override the tunnel' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^leftover trusted_proxy does not override the tunnel$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Guard 'no process is spawned on the request path'. The test prepends a temp dir to process.env.PATH holding executable 'which', 'tailscale' and 'cloudflared' scripts, each of which appends its name to a log file. It builds createServer(v) with no activeTunnel option and remote.provider 'auto', then reads the log, or notes that it does not exist; one spawn at startup is allowed. It sends 50 remote GET /healthz/x and 10 tools/list with a remote token (x-forwarded-for set), and asserts the log is byte-for-byte unchanged. It is green at base, so it runs as a named command with a pass count.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='no process is spawned on the request path' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^no process is spawned on the request path$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "With no active tunnel (activeTunnel returning null) and no trusted proxy configured, one connection rotating cf-connecting-ip and x-forwarded-for values is limited as one caller: at rate_per_min 5 the sixth request in a frozen minute gets 429 (memev twin finding F-2)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c37:' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c37:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Every test file that imports src/server/http.mjs passes, so no server behaviour outside the limiter changes",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-reporter=tap $(grep -l 'server/http.mjs' test/*.test.mjs)",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "One full run of test/rate-limit.test.mjs passes every labelled subtest (T1-c01, T1-c05, T1-c06, T1-c08, T1-c10, T1-c37) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/rate-limit.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c05:|^T1-c06:|^T1-c08:|^T1-c10:|^T1-c37:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

@@ -14,22 +14,24 @@ const BARE = /(^|[\s(`'"·:;,])memev (init|connect|disconnect|clients|status|doc
 
 test('MEM-040 AC01: When the launcher dir is not on PATH, every memev hint in the init output uses the full launcher path', () => {
   const sb = sandbox();
-  const launcher = path.join(sb.env.MEMEV_CONFIG_DIR, 'bin', 'memev');
-  const off = { PATH: process.env.PATH }; // the launcher folder is not on PATH, as after a source install
-  assert.equal(onPath(path.dirname(launcher), { ...sb.env, ...off }), false);
-  const r = sb.run(['init', '--port', String(sb.port)], { extraEnv: off });
-  assert.equal(r.code, 0, r.out + r.err);
-  const text = r.out + r.err;
-  assert.doesNotMatch(text, BARE, `a bare memev hint is left:\n${text.split('\n').filter((l) => BARE.test(l)).join('\n')}`);
-  assert.match(text, new RegExp(`${launcher.replace(/[/.]/g, '\\$&')} github setup`), 'the backup hint names the launcher');
-  assert.match(text, /memev command: not on your PATH yet/);
-  // with the folder on PATH the hints stay short
-  const on = sb.run(['onboarding']); // the sandbox PATH holds the launcher folder
-  assert.match(on.out, /memev github setup/);
-  assert.ok(!on.out.includes(`${launcher} github`));
-  assert.match(on.out, /memev command: on your PATH/);
-  // machine-readable output is left alone
-  assert.doesNotThrow(() => JSON.parse(sb.run(['onboarding', '--json'], { extraEnv: off }).out));
+  try {
+    const launcher = path.join(sb.env.MEMEV_CONFIG_DIR, 'bin', 'memev');
+    const off = { PATH: process.env.PATH }; // the launcher folder is not on PATH, as after a source install
+    assert.equal(onPath(path.dirname(launcher), { ...sb.env, ...off }), false);
+    const r = sb.run(['init', '--port', String(sb.port)], { extraEnv: off });
+    assert.equal(r.code, 0, r.out + r.err);
+    const text = r.out + r.err;
+    assert.doesNotMatch(text, BARE, `a bare memev hint is left:\n${text.split('\n').filter((l) => BARE.test(l)).join('\n')}`);
+    assert.match(text, new RegExp(`${launcher.replace(/[/.]/g, '\\$&')} github setup`), 'the backup hint names the launcher');
+    assert.match(text, /memev command: not on your PATH yet/);
+    // with the folder on PATH the hints stay short
+    const on = sb.run(['onboarding']); // the sandbox PATH holds the launcher folder
+    assert.match(on.out, /memev github setup/);
+    assert.ok(!on.out.includes(`${launcher} github`));
+    assert.match(on.out, /memev command: on your PATH/);
+    // machine-readable output is left alone
+    assert.doesNotThrow(() => JSON.parse(sb.run(['onboarding', '--json'], { extraEnv: off }).out));
+  } finally { sb.stop(); }
 });
 
 test('MEM-040 AC01: hints are rewritten only for real commands, in the console output of init and onboarding', async () => {

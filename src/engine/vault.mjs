@@ -12,7 +12,7 @@ import { sha256, readJson, writeJson, writePrivateJson, exists, now, stamp, slug
 import { OpLog } from './oplog.mjs';
 import { RecallIndex, tokenize, sections } from './index.mjs';
 import { TokenStore, allowed } from './tokens.mjs';
-import { CommitQueue, git } from './git.mjs';
+import { CommitQueue, git, gitInitMain } from './git.mjs';
 import { lineSplice, applySplice } from './diff.mjs';
 import { findSecrets, redactSecrets } from './secrets.mjs';
 import { Graph } from './graph.mjs';
@@ -20,12 +20,13 @@ import { Tournament, ROUNDS } from './tournament.mjs';
 import { loadTuning } from './tuning.mjs';
 import { attach as attachContracts, installVaultHooks } from './contracts.mjs';
 import { assess, DEFAULT_GATE } from './quality.mjs';
+import { STATE, isVault } from './vault-marker.mjs';
 
-export const VERSION = '0.1.0';
-export const STATE = '.memev';
+export const VERSION = readJson(new URL('../../package.json', import.meta.url), {}).version;
+export { STATE, isVault };
 const KINDS = { decision: 'decisions', gotcha: 'gotchas', fact: 'facts', pattern: 'patterns', win: 'wins', person: 'people', note: 'notes', preference: 'preferences' };
 const PROTECTED = [/^contracts\/signed\//, /^contracts\/keys\//];
-const DEFAULT_CONFIG = { version: 1, port: 7787, remote: { enabled: true, provider: 'auto', rate_per_min: 120 }, sync: { interval_min: 30 }, recall: { per_prompt: true, max_chars: 1500, min_score: 1.0, scope: 'project' }, memory: { ...DEFAULT_GATE }, journal: { enabled: true, max_chars: 2000 }, contracts: { exec_local_only: true } };
+const DEFAULT_CONFIG = { version: 1, port: 7787, remote: { enabled: false, provider: 'auto', rate_per_min: 120 }, sync: { interval_min: 5 }, recall: { per_prompt: true, max_chars: 1500, min_score: 1.0, scope: 'project' }, memory: { ...DEFAULT_GATE }, journal: { enabled: true, max_chars: 2000 }, contracts: { enabled: false, exec_local_only: true } };
 
 export class VaultError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
@@ -36,14 +37,15 @@ export function checkPath(p) {
   return s;
 }
 
-export function isVault(root) { return exists(path.join(root, STATE, 'config.json')); }
-
 export class Vault extends EventEmitter {
   constructor(root, opts = {}) { super(); this.root = path.resolve(root); this.opts = opts; this.state = path.join(this.root, STATE); }
 
   open() {
     if (!isVault(this.root)) throw new VaultError('not_a_vault', `${this.root} is not a Memev vault (memev init)`);
-    this.config = { ...DEFAULT_CONFIG, ...readJson(path.join(this.state, 'config.json'), {}) };
+    const fileCfg = readJson(path.join(this.state, 'config.json'), {});
+    this.config = { ...DEFAULT_CONFIG, ...fileCfg };
+    // existing vaults predate the opt-in: contracts stay on for them
+    if (!fileCfg.contracts || fileCfg.contracts.enabled === undefined) this.config.contracts = { ...DEFAULT_CONFIG.contracts, ...fileCfg.contracts, enabled: true };
     this.tokens = new TokenStore(path.join(this.state, 'tokens.json'));
     this.host = hostDevice(this.root);
     this.log = new OpLog(path.join(this.state, 'oplog'), { segmentBytes: this.opts.segmentBytes, snapshotEvery: this.opts.snapshotEvery, fsync: this.opts.fsync ?? true, deviceId: this.host.id }).open();
@@ -85,10 +87,15 @@ export class Vault extends EventEmitter {
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }
-  _read(p) { try { return fs.readFileSync(this.abs(p), 'utf8'); } catch { return null; } }
+  /** Read a note; a journal file that retention moved to work/archive is still readable at its old path. */
+  _read(p) {
+    try { return fs.readFileSync(this.abs(p), 'utf8'); } catch {}
+    if (p.startsWith('work/')) { try { return fs.readFileSync(this.abs(`work/archive/${p.slice(5)}`), 'utf8'); } catch {} }
+    return null;
+  }
   allNotes(dir = '') {
     const out = []; const base = dir ? this.abs(dir) : this.root;
-    const walk = (d, rel) => { let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of ents) { if (e.name.startsWith('.') || e.name === 'node_modules') continue; const r = rel ? `${rel}/${e.name}` : e.name; if (e.isDirectory()) walk(path.join(d, e.name), r); else if (e.name.endsWith('.md')) out.push(r); } };
+    const walk = (d, rel) => { let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of ents) { if (e.name.startsWith('.') || e.name === 'node_modules') continue; const r = rel ? `${rel}/${e.name}` : e.name; if (e.isDirectory()) { if (r === 'work/archive') continue; walk(path.join(d, e.name), r); } else if (e.name.endsWith('.md')) out.push(r); } };
     walk(base, dir.replace(/\/$/, '')); return out.sort();
   }
   reindexAll() { for (const p of this.allNotes()) { const b = this._read(p); this.index.update(p, b); this.graph.indexNote(p, b); } this.index.save(); }
@@ -587,6 +594,100 @@ export class Vault extends EventEmitter {
   }
   _saveGraph() { writePrivateJson(path.join(this.state, 'graph.json'), { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()], reviews: [...this.reviews.entries()], contract_sessions: [...this.contractSessions.entries()], contract_results: [...this.contractResults.entries()] }); }
 
+  // ---- retention and compaction
+  /** Total bytes of every file under a directory (recursive). */
+  _dirBytes(d) {
+    let s = 0; let ents = [];
+    try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return 0; }
+    for (const e of ents) { const f = path.join(d, e.name); if (e.isDirectory()) s += this._dirBytes(f); else { try { s += fs.statSync(f).size; } catch {} } }
+    return s;
+  }
+  /** Number of files under a directory (recursive), only those ending in `ext` when given. */
+  _dirFiles(d, ext = null) {
+    let n = 0; let ents = [];
+    try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return 0; }
+    for (const e of ents) { const f = path.join(d, e.name); if (e.isDirectory()) n += this._dirFiles(f, ext); else if (!ext || e.name.endsWith(ext)) { try { fs.statSync(f); n++; } catch {} } }
+    return n;
+  }
+  /** Bytes of the .jsonl segment files directly in a directory (not its subdirectories). */
+  _segBytes(d) {
+    let s = 0; let ents = [];
+    try { ents = fs.readdirSync(d); } catch { return 0; }
+    for (const n of ents) if (n.endsWith('.jsonl')) { try { s += fs.statSync(path.join(d, n)).size; } catch {} }
+    return s;
+  }
+
+  /** Measured sizes, from the file system, not estimates: op-log, journal, index and git objects. */
+  sizeReport() {
+    const oplogDir = path.join(this.state, 'oplog');
+    const segs = this.log.manifest.segments;
+    const indexFile = path.join(this.state, 'index.jsonl');
+    return {
+      oplog: { bytes: this._dirBytes(oplogDir), segments: segs.length, archived: segs.filter((s) => s.archived).length, activeBytes: this._segBytes(oplogDir), archivedBytes: this._segBytes(path.join(oplogDir, 'archive')) },
+      journal: { bytes: this._dirBytes(this.abs('work/sessions')), files: this._dirFiles(this.abs('work/sessions'), '.md') },
+      index: { bytes: fs.existsSync(indexFile) ? fs.statSync(indexFile).size : 0 },
+      git: { bytes: this._dirBytes(path.join(this.root, '.git', 'objects')) },
+    };
+  }
+
+  /**
+   * Move journal session files older than `journal.retention_days` out of the index into work/archive.
+   * The files are renamed, not deleted, and stay readable at their old path (see _read). When the vault
+   * is a git repository the move is a git mv committed on its own, so the archive reaches the backup
+   * and the working tree stays clean. Returns the number of files moved.
+   */
+  _journalRetention() {
+    const days = Number(this.config.journal?.retention_days ?? 90);
+    const cutoff = Date.now() - days * 86400000;
+    const srcDir = this.abs('work/sessions');
+    let ents = [];
+    try { ents = fs.readdirSync(srcDir, { withFileTypes: true }); } catch { return 0; }
+    const hasGit = exists(path.join(this.root, '.git'));
+    let moved = 0;
+    const paths = [];
+    for (const e of ents) {
+      if (!e.isFile() || !e.name.endsWith('.md')) continue;
+      const m = /^(\d{4}-\d{2}-\d{2})/.exec(e.name);
+      let age = m ? Date.parse(m[1]) : NaN;
+      if (Number.isNaN(age)) { try { age = fs.statSync(path.join(srcDir, e.name)).mtimeMs; } catch { continue; } }
+      if (age >= cutoff) continue;
+      const from = `work/sessions/${e.name}`, to = `work/archive/sessions/${e.name}`;
+      fs.mkdirSync(path.dirname(this.abs(to)), { recursive: true });
+      // git mv when the vault is a repository, so the move reaches the backup; a plain rename when it is not
+      const tracked = hasGit && git(this.root, ['mv', '--', from, to]).ok;
+      if (!tracked) fs.renameSync(this.abs(from), this.abs(to));
+      paths.push(tracked ? [from, to] : [to]);
+      this.index.remove(from);
+      moved++;
+    }
+    if (moved) {
+      this.index.save();
+      if (hasGit) {
+        const all = paths.flat();
+        git(this.root, ['add', '-A', '--', ...all]);
+        if (!git(this.root, ['diff', '--cached', '--quiet', '--', ...all]).ok) git(this.root, ['commit', '-q', '-m', `memev: archive ${moved} journal sessions`]);
+      }
+    }
+    return moved;
+  }
+
+  /**
+   * Compact the vault. A dry run only measures and reports. A real run seals and archives the op-log
+   * segments, applies journal retention, and rewrites the index and graph. Nothing is deleted: archived
+   * segments are renamed and still verify and materialize, and retained journal files stay readable.
+   */
+  compact({ dryRun = false } = {}) {
+    const before = this.sizeReport();
+    if (dryRun) return { dryRun: true, before };
+    this.log.roll();
+    const archived = this.log.archiveSealed();
+    const retained = this._journalRetention();
+    this.index.save();
+    this._saveGraph();
+    const after = this.sizeReport();
+    return { dryRun: false, before, after, archived, retained };
+  }
+
   status() {
     const mu = process.memoryUsage();
     return { version: VERSION, vault: this.root, started: this.started, oplog: this.log.stats(), index: this.index.stats(), graph: this.graph.stats(), memory: { rss_mb: Math.round(mu.rss / 1048576), heap_mb: Math.round(mu.heapUsed / 1048576) }, recovered: this.recovered?.length || 0, imported: this.imported?.length || 0 };
@@ -599,6 +700,18 @@ attachContracts(Vault);
 /** Create a new vault in `root` from the template. Idempotent. Returns the admin token when one is minted. */
 export function initVault(root, { template, port = null } = {}) {
   root = path.resolve(root);
+  const madeRoot = !exists(root);
+  const madeGit = !exists(path.join(root, '.git'));
+  if (madeGit) {
+    // git init runs first, before anything is written, so a failure never leaves a half built vault.
+    if (madeRoot) fs.mkdirSync(root, { recursive: true });
+    const init = gitInitMain(root);
+    if (!init.ok) {
+      if (madeRoot) { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} }
+      else { try { fs.rmSync(path.join(root, '.git'), { recursive: true, force: true }); } catch {} }
+      throw new VaultError('git_failed', `git init failed for the vault at ${root}: ${init.err || `exit ${init.status}`}`);
+    }
+  }
   fs.mkdirSync(path.join(root, STATE), { recursive: true, mode: 0o700 });
   try { fs.chmodSync(root, 0o700); } catch {}
   const copy = (src, dst) => { for (const e of fs.readdirSync(src, { withFileTypes: true })) { const s = path.join(src, e.name), d = path.join(dst, e.name); if (e.isDirectory()) { fs.mkdirSync(d, { recursive: true }); copy(s, d); } else if (!exists(d)) fs.copyFileSync(s, d); } };
@@ -608,8 +721,7 @@ export function initVault(root, { template, port = null } = {}) {
   else if (port) { const c = readJson(cfgFile); c.port = port; writeJson(cfgFile, c, 0o600); }
   const gi = path.join(root, '.gitignore'); if (!exists(gi)) fs.writeFileSync(gi, '.memev/\n*.tmp\n');
   const ga = path.join(root, '.gitattributes'); if (!exists(ga)) fs.writeFileSync(ga, 'memory/**/*.md merge=union\nwork/**/*.md merge=union\n');
-  if (!exists(path.join(root, '.git'))) {
-    git(root, ['init', '-q', '-b', 'main']);
+  if (madeGit) {
     if (!git(root, ['config', 'user.email']).out) { git(root, ['config', 'user.name', 'Memev']); git(root, ['config', 'user.email', 'memev@localhost']); }
     git(root, ['add', '-A']); git(root, ['commit', '-q', '-m', 'memev: a new vault']);
   }

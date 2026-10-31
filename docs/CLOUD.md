@@ -1,14 +1,23 @@
 # Cloud access
 
-Cloud AI apps cannot reach `127.0.0.1`, so Memev opens a tunnel when remote access is on. On a
-personal install it is on by default; `memev init --local-only` or `memev cloud off` turns it off,
-`memev cloud on` back on. An organisation install (`memev init --org`) starts with it off, and
-`memev cloud on --yes` is needed to switch it on, because whatever recall returns through the tunnel
-goes to the cloud AI app that asked for it.
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
+Cloud AI apps cannot reach `127.0.0.1`, so Memev opens a tunnel when remote access is on. Remote
+access is off by default, on a personal install as on an organisation one. `memev init` on a
+terminal offers it once; `memev cloud on` turns it on and `memev cloud off` turns it off. An
+organisation install (`memev init --org`) needs `memev cloud on --yes`, because whatever recall
+returns through the tunnel goes to the cloud AI app that asked for it.
 
 The tunnel is chosen in this order (`memev cloud use auto|tailscale|cloudflare|quick` to pin one):
 
-1. **Tailscale serve** if `tailscale` is installed and logged in: a stable `https://<machine>.<tailnet>.ts.net` address, reachable only from your tailnet (Memev never opens a Funnel).
+1. **Tailscale** if `tailscale` is installed and logged in: a stable `https://<machine>.<tailnet>.ts.net`
+   address. The default is `tailscale serve`, reachable only from your tailnet, and choosing the
+   provider (`memev cloud use tailscale`) keeps it that way. A Funnel opens the machine to the
+   public internet, so Memev never opens one on its own: `memev cloud funnel on --yes` is the
+   explicit consent that switches it on, and `memev cloud funnel off` withdraws it. Memev uses https
+   port 443 on the machine. If something else already serves or funnels that port, Memev leaves it
+   exactly as it is, with or without consent: it does not start its own tunnel there, never turns
+   that one off, and `memev cloud status` says the port is in use.
 2. **A named Cloudflare tunnel** if you set one up: `memev cloud use cloudflare --name <tunnel> --hostname <host>`.
 3. **A Cloudflare quick tunnel**: no account, works anywhere, but the address changes when it restarts.
    Memev downloads a pinned `cloudflared` release and checks its SHA-256 before running it.
@@ -19,6 +28,17 @@ The tunnel is chosen in this order (`memev cloud use auto|tailscale|cloudflare|q
   secret: treat it like a password; `memev token revoke <id>` kills it.
 - the plain MCP URL plus the header apps with header support should send:
   `Authorization: Bearer <token>`.
+
+Apps that speak OAuth 2.1 use the standard flow instead of a URL with a secret in it. The server
+publishes its metadata at `/.well-known/oauth-authorization-server` and
+`/.well-known/oauth-protected-resource`. The app registers itself at `/oauth/register` (dynamic
+client registration) and gets a client id, then starts the authorization code grant with PKCE at
+`/oauth/authorize`. A remote app is sent a link to open on the vault's machine, where the consent
+page is served and the owner approves or denies it; the form carries a one-time value and only works
+from that page. The app exchanges the code at `/oauth/token` for a bearer token it sends as
+`Authorization: Bearer <token>`, refreshes it with the refresh token, and gives it back at
+`/oauth/revoke`. Each registered client shows up in `memev devices` as a cloud connector. The
+connector URL above stays available for apps that take only a URL.
 
 Every app and computer has its own credential; there is no shared key. `memev devices` lists them:
 
@@ -56,5 +76,20 @@ Apps set up before per-device credentials still send `X-Memev-Key`; it keeps wor
 longer needed.
 
 Remote requests always need a token issued for remote use, are rate limited (120 a minute by
-default) and are logged to `.memev/access.jsonl`. Contract signing and admin routes are local only.
-`memev cloud rotate-key` changes the legacy shared key, for apps that still send it.
+default) and are logged to `.memev/access.jsonl`. Admin routes are local only. Contract signing is
+available remotely; a contract signed from a remote origin records that origin, and its command
+criteria do not run on this machine until a local operator approves it with
+`memev contract approve <id>`. `memev cloud rotate-key` changes the legacy shared key, for apps
+that still send it.
+
+## Which computers can join
+
+Joining another computer through the secure link, as on this page, is the paid tier, Personal with
+more computers: the vault refuses to enroll a computer past the number in its licence, and with no
+licence that number is one. Personal on one computer is free and uses one computer at a time. To
+switch computers, back the vault up to your own GitHub repository and let `memev init` on the new
+computer join that backup ([GITHUB.md](GITHUB.md)). Git sync is single-writer backup: a second
+computer that also pushes gets a warning from `memev doctor` that concurrent edits can conflict.
+
+A personal vault never joins a Business or Corporate vault, and a company vault never joins a
+personal one. They have separate identities and keys, with no grants, mounts or mixing.
