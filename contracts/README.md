@@ -44,3 +44,14 @@ its gate lands.
 | [QL-1.02](quality-loop/specs/QL-1.02-mutation-gate-on-changed-lines.json) | [`k-ql-1-02-mutation-gate-th-956ebe`](signed/k-ql-1-02-mutation-gate-th-956ebe.json) | 2 | 50 |
 | [QL-1.03](quality-loop/specs/QL-1.03-sensitive-path-checklist-before-merge.json) | [`k-ql-1-03-security-checkli-c328ad`](signed/k-ql-1-03-security-checkli-c328ad.json) | 2 | 37 |
 | [QL-1.04](quality-loop/specs/QL-1.04-claims-ledger-check-in-every-repository.json) | [`k-ql-1-04-the-claims-check-75de75`](signed/k-ql-1-04-the-claims-check-75de75.json) | 1 | 28 |
+
+## Amended after signing
+
+QL-1.01 task 1 was amended from building it: the scope gains docs/CONTRACTS.md and docs/MODULES.md, and c04, c15 and c27
+change as `quality-loop/AMENDMENTS.md` records. The reviewer seat agreed the text, and it was signed on 31 October with memev's
+own `contractAmend` from main at 3f9c8e2e, in the same signing vault, under the same key. The new version names the one it
+supersedes; memev retires the earlier one once the new version, signed on this computer, passes its own verify.
+
+| Spec | Contract | Version | Supersedes | Tasks | Criteria |
+|---|---|---|---|---|---|
+| [QL-1.01](quality-loop/specs/QL-1.01-red-team-gate-no-signing.json) | [`k-ql-1-01-red-team-gate-no-f0e136`](signed/k-ql-1-01-red-team-gate-no-f0e136.json) | 2 | [`k-ql-1-01-red-team-gate-no-296339`](signed/k-ql-1-01-red-team-gate-no-296339.json) | 2 | 50 |
