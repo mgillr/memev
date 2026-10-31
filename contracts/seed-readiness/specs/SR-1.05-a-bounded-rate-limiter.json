@@ -68,7 +68,7 @@
           "statement": "Guard test 'exhausted key stays limited' in test/rate-limit.test.mjs, with activeTunnel () => 'cloudflare' passed to createServer. Freeze the clock with mock.timers.enable({ apis: ['Date'] }) and set remote.rate_per_min = 5 before createServer. Remote address A (cf-connecting-ip) sends GET /healthz/x and gets 5 non-429 responses, then 429. Then MAX_BUCKETS + 1 requests come from distinct cf-connecting-ip values. A's next request must still be 429. This guard is green at base, so it runs as a named command and the pass count must be at least 1. It fails under LRU, FIFO, most-depleted-first or clear().",
           "verifier": {
             "type": "command",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='exhausted key stays limited' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^# pass [1-9]'",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='exhausted key stays limited' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'exhausted key stays limited')\" -ge 1 ]",
             "expect_exit": 0,
             "timeout_s": 300
           }
@@ -93,7 +93,7 @@
           "statement": "Guard test 'new caller served during flood', with activeTunnel () => 'cloudflare' passed to createServer. With the clock frozen (mock.timers Date) and remote.rate_per_min = 5, send MAX_BUCKETS + 1 remote requests from distinct cf-connecting-ip values. A never-seen address must then get a status other than 429 on GET /healthz/x (401 is expected). Green at base, so it runs as a named command with a pass-count check.",
           "verifier": {
             "type": "command",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='new caller served during flood' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^# pass [1-9]'",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='new caller served during flood' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'new caller served during flood')\" -ge 1 ]",
             "expect_exit": 0,
             "timeout_s": 300
           }
@@ -137,7 +137,7 @@
           "statement": "Guard test 'busy key not reset at two minutes'. With rate_per_min = 6 and Date mocked, call take('ip:A') on the createServer-built limiter once per simulated second for 180 seconds. At most 24 calls are allowed: a correct bucket allows 6 + 179 x 0.1 = 23, and an age-based reset at 120 s adds about 5. The idle-unit bug in answer 4 also fails this guard.",
           "verifier": {
             "type": "command",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='busy key not reset at two minutes' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^# pass [1-9]'",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='busy key not reset at two minutes' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'busy key not reset at two minutes')\" -ge 1 ]",
             "expect_exit": 0,
             "timeout_s": 300
           }
@@ -156,7 +156,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test --test-name-pattern='quick tunnel callers are distinct|funnel cannot spoof cf-connecting-ip' test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='quick tunnel callers are distinct|funnel cannot spoof cf-connecting-ip' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'quick tunnel callers are distinct|funnel cannot spoof cf-connecting-ip')\" -ge 2 ]"
           }
         },
         {
@@ -164,7 +164,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test --test-name-pattern='own budget holds at the cap' test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='own budget holds at the cap' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'own budget holds at the cap')\" -ge 1 ]"
           }
         },
         {
@@ -172,7 +172,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test --test-name-pattern='request path fills the exposed limiter' test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='request path fills the exposed limiter' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'request path fills the exposed limiter')\" -ge 1 ]"
           }
         },
         {
@@ -190,7 +190,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test --test-name-pattern='cap holds when every bucket is exhausted' test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='cap holds when every bucket is exhausted' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'cap holds when every bucket is exhausted')\" -ge 1 ]"
           }
         },
         {
@@ -216,7 +216,7 @@
           "statement": "In both guards, remote.enabled is on and activeTunnel () => 'cloudflare' is passed to createServer; Date is frozen and rate_per_min = 5. Every one of the MAX_BUCKETS + 1 flood responses is exactly 401. In 'new caller served during flood' the never-seen address then gets exactly 401. In 'exhausted key stays limited', A's sixth request and its request after the flood are both 429.",
           "verifier": {
             "type": "command",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='new caller served during flood|exhausted key stays limited' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([2-9]|[1-9][0-9]+)'",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='new caller served during flood|exhausted key stays limited' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'new caller served during flood|exhausted key stays limited')\" -ge 2 ]",
             "expect_exit": 0,
             "timeout_s": 300
           }
@@ -225,7 +225,7 @@
           "statement": "Guard 'busy key not reset at two minutes': enable mock.timers for Date, setTimeout and setInterval before createServer, and advance with mock.timers.tick(1000), so any sweep interval fires during the 180 simulated seconds; at most 24 of the 180 take('ip:A') calls are allowed. New guard 'busy key survives the sweep', in the same setup: after the 180 seconds, ip:A is still among the limiter's entries.",
           "verifier": {
             "type": "command",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='busy key not reset at two minutes|busy key survives the sweep' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([2-9]|[1-9][0-9]+)'",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='busy key not reset at two minutes|busy key survives the sweep' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'busy key not reset at two minutes|busy key survives the sweep')\" -ge 2 ]",
             "expect_exit": 0,
             "timeout_s": 300
           }
@@ -235,7 +235,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test --test-name-pattern='trusted proxy keys on the hop it added' test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='trusted proxy keys on the hop it added' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'trusted proxy keys on the hop it added')\" -ge 1 ]"
           }
         },
         {
@@ -243,7 +243,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test --test-name-pattern='a known token id cannot lock out its owner' test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='a known token id cannot lock out its owner' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'a known token id cannot lock out its owner')\" -ge 1 ]"
           }
         },
         {
@@ -251,7 +251,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test --test-name-pattern='an IPv6 /64 is one caller' test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='an IPv6 /64 is one caller' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'an IPv6 /64 is one caller')\" -ge 1 ]"
           }
         },
         {
@@ -259,7 +259,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test --test-name-pattern='daemon keys by the running tunnel' test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='daemon keys by the running tunnel' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'daemon keys by the running tunnel')\" -ge 1 ]"
           }
         },
         {
@@ -267,7 +267,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test --test-name-pattern='token holder served through an untrusted tunnel' test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='token holder served through an untrusted tunnel' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'token holder served through an untrusted tunnel')\" -ge 1 ]"
           }
         },
         {
@@ -275,7 +275,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test --test-name-pattern='a bearer does not skip the pre-auth bucket' test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='a bearer does not skip the pre-auth bucket' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'a bearer does not skip the pre-auth bucket')\" -ge 1 ]"
           }
         },
         {
@@ -283,7 +283,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test --test-name-pattern='request path fills the exposed limiter' test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='request path fills the exposed limiter' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'request path fills the exposed limiter')\" -ge 1 ]"
           }
         },
         {
@@ -300,7 +300,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test --test-name-pattern='token holder behind a flooded address' test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='token holder behind a flooded address' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'token holder behind a flooded address')\" -ge 1 ]"
           }
         },
         {
@@ -308,7 +308,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test --test-name-pattern='an IPv6 /64 is one caller in compressed form' test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='an IPv6 /64 is one caller in compressed form' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'an IPv6 /64 is one caller in compressed form')\" -ge 1 ]"
           }
         },
         {
@@ -335,14 +335,14 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test --test-name-pattern='leftover trusted_proxy does not override the tunnel' test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='leftover trusted_proxy does not override the tunnel' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'leftover trusted_proxy does not override the tunnel')\" -ge 1 ]"
           }
         },
         {
           "statement": "Guard 'no process is spawned on the request path'. The test prepends a temp dir to process.env.PATH holding executable 'which', 'tailscale' and 'cloudflared' scripts, each of which appends its name to a log file. It builds createServer(v) with no activeTunnel option and remote.provider 'auto', then reads the log, or notes that it does not exist; one spawn at startup is allowed. It sends 50 remote GET /healthz/x and 10 tools/list with a remote token (x-forwarded-for set), and asserts the log is byte-for-byte unchanged. It is green at base, so it runs as a named command with a pass count.",
           "verifier": {
             "type": "command",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='no process is spawned on the request path' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^# pass [1-9]'",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='no process is spawned on the request path' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && [ \"$(printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -vE '\\.test\\.m?js$|# (SKIP|TODO)' | grep -cE 'no process is spawned on the request path')\" -ge 1 ]",
             "expect_exit": 0,
             "timeout_s": 300
           }

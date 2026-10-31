@@ -359,7 +359,20 @@
       "tasks": 2,
       "criteria": 20,
       "spec": "specs/SR-1.26-one-write-can-never-make-the-vault-unopenable.json",
-      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+      "status": "proposed: owner's go pending, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.27",
+      "gap": "G92",
+      "area": "SR-1",
+      "title": "Done comes only from a passing verify",
+      "repo": "memev",
+      "closes": "Closes G92 (issue #242) and the PROTECTED part of issue #243: contractList sets a signed contract's state to done whenever a file named contracts/closed/<id>.json exists (src/engine/contracts.mjs:262-265), and nothing checks what the file holds or who wrote it. PROTECTED covers only contracts/signed/ and contracts/keys/ (src/engine/vault.mjs:27), verify writes contracts/closed/ through the caller's own identity (contracts.mjs:248), and contracts/receipts/ is unprotected. So any token with write scope over contracts/**, including the token a paired device gets (src/engine/devices.mjs:85) and a cloud connector's (src/engine/oauth.mjs:17), takes a contract out of the Stop-hook gate and the pre-push gate with no contract.verified record, and can rewrite its receipts. Found by the SR-0.03 red-team round and reproduced on 31 October 2026 on the main source",
+      "depends_on": [],
+      "tasks": 2,
+      "criteria": 17,
+      "spec": "specs/SR-1.27-done-comes-only-from-a-passing-verify.json",
+      "status": "proposed: owner's go pending, signs after a clean red-team round"
     },
     {
       "id": "SR-2.01",
