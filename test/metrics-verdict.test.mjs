@@ -33,8 +33,8 @@ const FIXTURE = {
     { day: '2026-10-22', licence_id: 'L3', result: 'refused' },
   ],
   milestones: [
-    { name: 'installed', date: '2026-10-19' },
-    { name: 'business_pilot_completed', date: '2026-10-25' },
+    { id: 'r1', name: 'installed', date: '2026-10-19' },
+    { id: 'r1', name: 'business_pilot_completed', date: '2026-10-25' },
   ],
 };
 
@@ -326,7 +326,7 @@ test('WO-12-A AC01: a month with a gate file that holds no monthly gates prints 
   }
 });
 
-test('WO-12-A AC01: the installs gate reads downloads, package and release together in the shipped file, printed as downloads, with the installed milestone rows of the opt-in report under it as a floor of confirmed installs', async () => {
+test('WO-12-A AC01: the installs gate reads downloads, package and release together in the shipped file, printed as downloads, with the distinct report ids that sent the installed milestone under it as a floor of confirmed installs', async () => {
   const dir = tmpdir('wo12a-');
   const f = writeFixtures(dir);
   // the shipped file: 47 package and 10 release downloads, and one installed row among the milestones
@@ -335,16 +335,19 @@ test('WO-12-A AC01: the installs gate reads downloads, package and release toget
   const page = r.out.split('\n');
   const i = page.indexOf('  installs at or above 5,000 by month 6: measured 57 downloads, threshold 5000, miss');
   assert.notEqual(i, -1, r.out);
-  assert.equal(page[i + 1], '    confirmed installs, a floor: 1 (the installed milestone rows of the opt-in report)', r.out);
+  assert.equal(page[i + 1], '    confirmed installs, a floor: 1 (distinct report ids with the installed milestone; a report turned off and on again gets a new id, so one install can count twice)', r.out);
   assert.ok(page.includes('  installs proxy: downloads (a download is not an install)'), r.out);
   // the verdict reads the same 57 downloads
   assert.ok(verdict(page).includes('  installs at or above 5,000 with the package and the directory listings live: measured 57 downloads, threshold 5000, due month 6, miss'), r.out);
-  // the floor counts the rows named installed and nothing else
+  // the floor counts installations, never rows: the report resends every recorded milestone under one id whenever a new
+  // one appears, so r1's installed row arriving again counts once; a second id counts; a row with no id is shown apart
   const ms = path.join(dir, 'milestones3.json');
-  fs.writeFileSync(ms, JSON.stringify([...FIXTURE.milestones, { name: 'installed', date: '2026-10-20' }, { name: 'installed', date: '2026-10-21' }, { name: 'invite_sent', date: '2026-10-21' }]));
+  fs.writeFileSync(ms, JSON.stringify([...FIXTURE.milestones, { id: 'r1', name: 'installed', date: '2026-10-19' }, { id: 'r1', name: 'invite_sent', date: '2026-10-21' }, { id: 'r2', name: 'installed', date: '2026-10-21' }, { name: 'installed', date: '2026-10-22' }]));
   const m = await run(['--package', f.package, '--release', f.release, '--activations', f.activations, '--milestones', ms]);
   assert.equal(m.code, 0, m.err);
-  assert.ok(m.out.split('\n').includes('    confirmed installs, a floor: 3 (the installed milestone rows of the opt-in report)'), m.out);
+  const pm = m.out.split('\n');
+  assert.ok(pm.includes('    confirmed installs, a floor: 2 (distinct report ids with the installed milestone; a report turned off and on again gets a new id, so one install can count twice)'), m.out);
+  assert.ok(pm.includes('    installed rows with no report id, not counted: 1'), m.out);
   // with no milestone input the floor is not measured, never 0
   const n = await run(['--package', f.package, '--release', f.release, '--activations', f.activations]);
   assert.equal(n.code, 0, n.err);

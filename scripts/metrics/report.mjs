@@ -114,7 +114,7 @@ function shown(g, value) {
 // The header gates read the same counted values as the monthly verdict, so one page never gives two
 // answers for one number: with no installs choice in the file both gates are open, and a gate whose
 // count file was not handed in is not measured, never 0 and a miss. Under each installs gate the
-// installed milestone rows of the opt-in report print as a floor of confirmed installs.
+// distinct report ids with the installed milestone print as a floor of confirmed installs.
 function gateLines(gates, counted, label) {
   const lines = [`Gates (${label}):`];
   const proxy = gates.installs_proxy;
@@ -132,7 +132,8 @@ function gateLines(gates, counted, label) {
     if (g.metric === 'installs') {
       lines.push(counted.installed === null
         ? '    confirmed installs, a floor: not measured (no milestone input)'
-        : `    confirmed installs, a floor: ${counted.installed} (the installed milestone rows of the opt-in report)`);
+        : `    confirmed installs, a floor: ${counted.installed} (distinct report ids with the installed milestone; a report turned off and on again gets a new id, so one install can count twice)`);
+      if (counted.installedNoId > 0) lines.push(`    installed rows with no report id, not counted: ${counted.installedNoId}`);
     }
   }
   if (chosen) lines.push(`  installs proxy: ${proxy} (a download is not an install)`);
@@ -203,7 +204,11 @@ export function renderReport({ packageRows = [], releaseRows = [], activationRow
     activations: given.activations ? act.total : null,
     paidLicences: given.activations ? new Set(activationRows.filter((r) => r && paid(r) && r.licence_id).map((r) => r.licence_id)).size : null,
     milestones: given.milestones ? names : null,
-    installed: given.milestones ? names.get('installed') || 0 : null,
+    // installations, never rows: the opt-in report sends every recorded milestone again whenever a new one appears, so
+    // one installation sends its installed row many times under one id. A row with no id cannot be told from a resend,
+    // so it stays out of the floor and is counted on its own line.
+    installed: given.milestones ? new Set(milestoneRows.filter((r) => r && r.name === 'installed' && r.id).map((r) => String(r.id))).size : null,
+    installedNoId: given.milestones ? milestoneRows.filter((r) => r && r.name === 'installed' && !r.id).length : 0,
   };
 
   const lines = ['Memev weekly funnel report'];

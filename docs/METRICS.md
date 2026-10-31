@@ -66,8 +66,9 @@ There is no telemetry by default. The one report Memev can make is opt-in:
 - **See it first.** `memev report show` prints exactly the text that would be sent, and
   `memev report status` says whether it is on.
 - **Where it goes.** To the address in `MEMEV_REPORT_URL` (https, or plain http for this computer).
-  There is no built-in address, so with the report on and no address set nothing is sent. Only
-  milestones not yet reported are sent, with a short time limit and no retry loop.
+  There is no built-in address, so with the report on and no address set nothing is sent. It is sent
+  when a milestone is new, and each send holds every recorded milestone under the same id, so whoever
+  counts reports counts by id, never by row. A send has a short time limit and no retry loop.
 - **Separate from the milestone code.** The code that works out milestones makes no network call; the
   report is a small separate step that only runs when it is on.
 
@@ -173,8 +174,8 @@ person's computer.
   (`{ "day": "<date>", "licence_id": "...", "result": "issued" or "refused" }`, one row per
   activation, with `"trial": true` or `"trial": 1` on the row of a trial licence; an export of the
   table above, such as `sqlite3 -json`, gives 1). `--milestones`
-  optionally holds the opt-in milestone rows (the report payload above, one row per milestone:
-  `{ "name": "...", "date": "<date>" }`). A row without a date, or with one that is not a real
+  optionally holds the opt-in milestone rows (the report payload above, one row per milestone with
+  the payload's id: `{ "id": "<the report's id>", "name": "...", "date": "<date>" }`). A row without a date, or with one that is not a real
   calendar date such as 2026-13-45, counts in the total only. With no milestone input the page says
   so in one line and still renders.
 - **The page.** For each count set: the count per day, per week (ISO week) and the total. The
@@ -201,10 +202,12 @@ person's computer.
   not counted, and a gate that reads it says not measured, never 0 and a miss: in the header and in
   the monthly verdict alike, because both read the same counted values. The `downloads` choice
   reads both download files, so with only one of them installs are not measured.
-- **A floor of confirmed installs.** Under the installs gate the header prints how many of the
-  opt-in milestone rows are `installed`: a floor of confirmed installs. Only people who turned the
-  report on are in it, so the installs are at least that many. With no milestone input the floor is
-  not measured.
+- **A floor of confirmed installs.** Under the installs gate the header prints how many distinct
+  report ids sent the `installed` milestone: a floor of confirmed installs. It counts ids, never rows,
+  because every send repeats every recorded milestone. Only people who turned the report on are in it,
+  so the installs are at least that many, except that a report turned off and on again gets a new id,
+  so one install can count twice. An `installed` row with no id is not counted and is shown on a line
+  of its own. With no milestone input the floor is not measured.
 - **The monthly verdict.** With `--month N`, the page adds a monthly verdict below the gates: each
   of the file's monthly gates as a row with the gate, its threshold, the measured value, the month
   it falls due and pass or miss. N is a whole number of months, 1 or more; anything else is refused
