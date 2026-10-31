@@ -2,7 +2,7 @@
   "title": "SR-5.02 The Business trial can actually start",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G43: invite.trialAvailable() returns false (MEM-067); the site offers a trial no one can start. Repository: memev. Depends on contracts: SR-4.02, SR-7.02.",
+  "request": "Closes G43: invite.trialAvailable() returns false, and the comment on it waits for MEM-067, which will not ship because there is no Personal trial (the free core is the trial; docs/BUSINESS-TRIAL.md); the Business trial lands through MEM-129, MEM-130 and MEM-134 instead; the site offers a trial no one can start. Repository: memev. Depends on contracts: SR-4.02, SR-7.02.",
   "tasks": [
     {
       "id": "T1",
