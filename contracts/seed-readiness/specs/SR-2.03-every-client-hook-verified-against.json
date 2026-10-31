@@ -12,7 +12,13 @@
       "requirements": [
         "for each of 8 clients a recorded fixture of the real hook payload and env, captured from a named app version",
         "docs/CLIENTS.md has a supported-versions table",
-        "for each client, the conformance fixture shows whether the hook's output reaches the model (for Cursor's prompt hook, src/cli/hooks.mjs:45); where it does not, docs/CLIENTS.md says so for that client and event"
+        "for each client, the conformance fixture shows whether the hook's output reaches the model (for Cursor's prompt hook, src/cli/hooks.mjs:45); where it does not, docs/CLIENTS.md says so for that client and event",
+        "the 8 clients are claude-code, codex, gemini-cli, cursor, claude-desktop, windsurf, vscode and zed; each fixture names the app, its --version output, captured_at and the capture command, and each hook client has a fixture for every hook event memev registers for it",
+        "each env marker in ENV_MARKERS is confirmed by a recorded launch fixture of its app (the env and parent process name the memev mcp process saw), and the running-app markers in src/cli/bus-cli.mjs agree with them; test/helpers/cli.mjs no longer calls any marker unverified",
+        "the hook reads each payload field the fixture records (session id, project, prompt) under the app's own field name, never falling back to a default for a field the app sends",
+        "the hook registration memev writes (event keys, matcher form, timeout unit, version fields) matches the config the named app version accepts, and the Cursor loop cut-off is read from one place",
+        "docs/CLIENTS.md has a 'Hook limits' table whose (client, event) rows are exactly the pairs whose output does not reach the model, and a Supported versions table with one row per client whose version equals its fixture's",
+        "npm test runs the conformance suite, and no registered hook event is dropped to avoid recording a limit"
       ],
       "description": "",
       "scope": [
@@ -20,7 +26,10 @@
         "docs/CLIENTS.md",
         "src/cli/common.mjs",
         "src/cli/clients.mjs",
-        "src/cli/hooks.mjs"
+        "src/cli/hooks.mjs",
+        "package.json",
+        "src/cli/bus-cli.mjs",
+        "test/helpers/cli.mjs"
       ],
       "criteria": [
         {
@@ -28,7 +37,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/clients-conformance/conformance.test.mjs",
-            "cmd": "node --test test/clients-conformance/"
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap 'test/clients-conformance/*.test.mjs' > \"$f\" 2>&1; rc=$?; tail -30 \"$f\"; [ $rc -eq 0 ] && grep -qx '# skipped 0' \"$f\" && grep -qx '# todo 0' \"$f\""
           }
         },
         {
@@ -47,11 +56,81 @@
           }
         },
         {
-          "statement": "SR-2.03 reaches the model: each client's fixture records whether hook output reaches the model; a client whose output does not reach it and is not listed as a limit in docs/CLIENTS.md fails the test",
+          "statement": "For every [VAR, client] in ENV_MARKERS imported from src/cli/common.mjs, the client's recorded MCP-server launch fixture (the env and parent process name seen by the `memev mcp` process that the named app version launched) has VAR set to a non-empty value. The fixture's recorded parent process name, normalised as common.mjs:91 does, must not map to another app through PARENT_NAME_AS_APP (common.mjs:90) or KNOWN_APPS (common.mjs:87), so the seat cannot be relabelled at common.mjs:111-113. A marker whose client has no launch fixture fails, and so does a claude-code launch fixture without CLAUDECODE. Do not use an effectiveClient(client, env, 0) equality: with ppid 0 it returns the claim for any env (common.mjs:95,116).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-conformance/markers.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.03 markers match the recorded launch env' test/clients-conformance/markers.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.03 markers match the recorded launch env$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "For each of the 8 clients there is a test named 'SR-2.03 conformance <client>'. It JSON.parses the fixture's recorded stdin itself (not through runHook), then runs `memev hook session-start` with that stdin, env and format against a live sandbox vault (sandbox() + init) whose card holds a seeded sentinel. It asserts that stdout parses in the client's recorded output shape, contains the sentinel, and contains neither 'not reachable' nor 'could not start'. Instructions-mode clients assert the same sentinel in the MCP initialize instructions.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-conformance/conformance.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.03 conformance ' test/clients-conformance/conformance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.03 conformance claude-code$|^SR-2.03 conformance codex$|^SR-2.03 conformance gemini-cli$|^SR-2.03 conformance cursor$|^SR-2.03 conformance claude-desktop$|^SR-2.03 conformance windsurf$|^SR-2.03 conformance vscode$|^SR-2.03 conformance zed$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "For each hook client's prompt fixture, the test runs the prompt hook against a sandbox vault seeded with a memory matching the fixture's prompt. It asserts the journal holds a user entry whose text equals the fixture's prompt, under the session id taken from the fixture's own recorded field (session_id or conversation_id, never 'session'), with project equal to the slug of the fixture's cwd or workspace_roots[0]. For every client whose prompt output reaches the model, the seeded memory's text appears in stdout.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-conformance/conformance.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.03 payload fields reach the hook' test/clients-conformance/conformance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.03 payload fields reach the hook$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "For each hook client, the fixture carries the hook config as accepted by the named app version: event keys, matcher form, timeout unit and any version field. The test applies that client's clientDefs(env,'memev','linux') edits to {} (as snippets() does, clients.mjs:390-394) and asserts four things: every event key memev writes appears in the recorded config; matcher and timeout values match the recorded form and unit; Cursor's version field and loop_limit key match the recording; and hooks.mjs's loop_count cut-off equals the loop_limit written.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-conformance/conformance.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.03 registration matches the app' test/clients-conformance/conformance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.03 registration matches the app$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Parse docs/CLIENTS.md for the markdown table under a 'Supported versions' heading. Assert one row for each of the 8 clients, and that each row's version cell equals the version field of that client's fixture.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-conformance/conformance.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.03 supported versions match fixtures' test/clients-conformance/conformance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.03 supported versions match fixtures$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The registered hook events per client are pinned. claude-code and codex: SessionStart, UserPromptSubmit, PreCompact, Stop. gemini-cli: SessionStart, BeforeAgent, PreCompress, AfterAgent. cursor: sessionStart, beforeSubmitPrompt, preCompact, stop. Each is read from clientDefs(env,'memev','linux') edits applied to {}, and the cursor prompt hook still journals the prompt.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.03 registered events unchanged' test/clients-conformance/conformance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.03 registered events unchanged$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-2.03 reaches the model, per event: the test derives the (client, event) pairs from clientDefs hook entries (clients.mjs:239-274) plus one 'mcp-instructions' pair per instructions-mode client, and requires a fixture record for each pair. reaches=true requires the hook's actual stdout for that fixture to be non-empty in the client's recorded output shape, so the Cursor prompt pair must be false per hooks.mjs:44. docs/CLIENTS.md must hold a 'Hook limits' table whose (client, event) rows equal exactly the set of pairs with reaches=false, with none missing and none stale.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/clients-conformance/reach.test.mjs",
             "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.03 reaches the model' test/clients-conformance/reach.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.03 reaches the model$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A test named 'SR-2.03 fixture inventory' asserts the fixture set holds exactly the client ids claude-code, codex, gemini-cli, cursor, claude-desktop, windsurf, vscode and zed. Each fixture must carry app, version (the app's --version string), captured_at and capture_command. Each hook-mode client needs a fixture for every hook event clientDefs registers for it.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-conformance/conformance.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.03 fixture inventory' test/clients-conformance/conformance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.03 fixture inventory$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The npm test script reaches the conformance directory.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node -e \"const s=require('./package.json').scripts.test; process.exit(/test\\/clients-conformance\\//.test(s)?0:1)\""
+          }
+        },
+        {
+          "statement": "For each recorded launch fixture of an app listed in RUNNING, runningApp(fixture.env) === fixture.client.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-conformance/markers.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.03 running-app markers match the recorded env' test/clients-conformance/markers.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.03 running-app markers match the recorded env$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -74,12 +153,14 @@
         "T1"
       ],
       "requirements": [
-        "a weekly job checks each client's latest release notes and hook schema and opens an issue on change"
+        "a weekly job checks each client's latest release notes and hook schema and opens an issue on change",
+        "the drift job runs weekly with issues: write, compares each client's current version and hook schema with the Supported versions table and the task 1 fixtures, opens one issue per changed client, and treats the vendor's text as data it never runs"
       ],
       "description": "",
       "scope": [
         ".github/workflows/clients-drift.yml",
-        "scripts/clients-drift.mjs"
+        "scripts/clients-drift.mjs",
+        "test/clients-drift.test.mjs"
       ],
       "criteria": [
         {
@@ -87,6 +168,14 @@
           "verifier": {
             "type": "file_exists",
             "path": ".github/workflows/clients-drift.yml"
+          }
+        },
+        {
+          "statement": "Run scripts/clients-drift.mjs --dry-run against a local directory of per-client release-notes and hook-schema snapshots, using the baseline from the docs/CLIENTS.md Supported versions table and the T1 fixtures. With one client's latest version or hook schema changed, stdout JSON lists exactly one open-issue action naming that client and its old and new values. With nothing changed, it lists none. The test also reads the text of .github/workflows/clients-drift.yml and asserts a weekly `schedule` cron, `permissions: issues: write`, and a step that runs `node scripts/clients-drift.mjs`.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-drift.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.03 drift opens an issue on change' test/clients-drift.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.03 drift opens an issue on change$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {

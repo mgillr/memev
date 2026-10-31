@@ -146,11 +146,13 @@
         "no test reaches a real gh, ssh, ssh-keygen or service manager, or the network: the suite passes with logging shims for them first on PATH and only loopback up",
         "no test is deleted, renamed, skipped or marked todo to make the suite pass; the hermetic run reports fail 0, cancelled 0, todo 0 and only the skips that need MEMEV_CONTRACT_BASE",
         "the one git helper also keeps system config away (GIT_CONFIG_NOSYSTEM=1), so a person's hooks path, signing and URL rewrites never reach a test, and the two file:// tests keep file:// remotes",
-        "each service test sets MEMEV_NO_SERVICE itself, or clears it and injects both the platform and the runner, so the suite passes whether or not the caller exports it and no test reaches a real service manager"
+        "each service test sets MEMEV_NO_SERVICE itself, or clears it and injects both the platform and the runner, so the suite passes whether or not the caller exports it and no test reaches a real service manager",
+        "test/helpers/no-network.mjs, loaded with node --import, makes every net, tls, dgram and dns connection attempt to anything but loopback throw, and sandbox() in test/helpers/cli.mjs passes the caller's NODE_OPTIONS through to the processes it starts"
       ],
       "description": "",
       "scope": [
-        "test/**"
+        "test/**",
+        "test/helpers/no-network.mjs"
       ],
       "criteria": [
         {
@@ -162,10 +164,10 @@
           }
         },
         {
-          "statement": "On Linux CI: shims for gh, ssh, ssh-keygen, launchctl, systemctl, loginctl and schtasks come first on PATH. Each appends its argv to a log and exits 127. The suite runs in a network namespace with only loopback up, it passes, and the log stays empty.",
+          "statement": "Shims for gh, ssh, ssh-keygen, launchctl, systemctl, loginctl and schtasks come first on PATH. Each appends its argv to a log and exits 127. The suite runs with a fresh HOME and NODE_OPTIONS loading test/helpers/no-network.mjs, which makes every net, tls, dgram and dns connection attempt to anything but loopback throw (a fixture test that opens a socket fails under it and passes without it); it passes, and the log stays empty.",
           "verifier": {
             "type": "command",
-            "cmd": "S=$(mktemp -d) && H=$(mktemp -d) && N=$(dirname $(command -v node)) && for b in gh ssh ssh-keygen launchctl systemctl loginctl schtasks; do printf '#!/bin/sh\\necho \"$0 $*\" >> %s/log\\nexit 127\\n' \"$S\" > \"$S/$b\" && chmod +x \"$S/$b\"; done && unshare -rn sh -c \"ip link set lo up && env -i PATH=$S:/usr/bin:/bin:$N HOME=$H MEMEV_NO_SERVICE=1 npm test\" && test ! -s \"$S/log\"",
+            "cmd": "F=$(mktemp -d) && printf \"import test from 'node:test';\\nimport net from 'node:net';\\ntest('opens a socket', () => { const s = net.connect(9, '192.0.2.1'); s.on('error', () => {}); s.destroy(); });\\n\" > \"$F/sock.test.mjs\" && node --test \"$F/sock.test.mjs\" >/dev/null 2>&1 && ! NODE_OPTIONS=\"--import=$PWD/test/helpers/no-network.mjs\" node --test \"$F/sock.test.mjs\" >/dev/null 2>&1 && S=$(mktemp -d) && H=$(mktemp -d) && N=$(dirname $(command -v node)) && for b in gh ssh ssh-keygen launchctl systemctl loginctl schtasks; do printf '#!/bin/sh\\necho \"$0 $*\" >> %s/log\\nexit 127\\n' \"$S\" > \"$S/$b\" && chmod +x \"$S/$b\"; done && env -i PATH=\"$S:/usr/bin:/bin:$N\" HOME=\"$H\" MEMEV_NO_SERVICE=1 npm_config_update_notifier=false NODE_OPTIONS=\"--import=$PWD/test/helpers/no-network.mjs\" npm test && test ! -s \"$S/log\"",
             "timeout_s": 1800
           }
         },
