@@ -7,6 +7,20 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 export const sha256 = (data) => crypto.createHash('sha256').update(data).digest('hex');
+/** True when a symbolic link is on the way from `root` down to `abs` (the existing segments below root, `abs` included), or when
+ * `abs` is outside root. Engine code that writes the vault with its own file calls checks it first, so a link that arrived from
+ * disk or a synced backup never sends a write outside the vault (issue 256). */
+export function linkedUnder(root, abs) {
+  const rel = path.relative(root, abs);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) return true;
+  let cur = root;
+  for (const seg of rel.split(path.sep).filter(Boolean)) {
+    cur = path.join(cur, seg);
+    let st; try { st = fs.lstatSync(cur); } catch { return false; }
+    if (st.isSymbolicLink()) return true;
+  }
+  return false;
+}
 export const now = () => new Date().toISOString();
 export const stamp = (d = new Date()) => d.toISOString().slice(0, 16).replace('T', ' ') + 'Z';
 export const exists = (p) => { try { fs.accessSync(p); return true; } catch { return false; } };

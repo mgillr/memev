@@ -11,7 +11,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { git } from '../engine/git.mjs';
 import { gitVia443, alt443, cloneOffer } from './github.mjs';
 import { signAddressRecord } from '../engine/devices.mjs';
-import { now, readJson, writeJson } from '../engine/util.mjs';
+import { now, readJson, writeJson, linkedUnder } from '../engine/util.mjs';
 import { resolveMerge, ENGINE_MAX_BUFFER } from '../engine/merge.mjs';
 import { licenseFile } from '../engine/license.mjs';
 
@@ -107,6 +107,9 @@ export function resolveConflicts(root, vault, opts = {}) {
   const files = st.out.split('\n').filter(Boolean);
   // every side is read before anything is written, so a side that cannot be read leaves the merge to be aborted
   try { for (const p of files) for (const stage of [1, 2, 3]) stageContent(root, stage, p); } catch (e) { return { files, conflicts: [], ok: false, error: e.message }; }
+  // a conflicted path that goes through a symbolic link (a pulled commit can carry one) is never written, so the merge is aborted
+  // before anything is: the write would land wherever the link points (issue 256)
+  for (const p of files) if (linkedUnder(root, path.join(root, ...p.split('/')))) return { files, conflicts: [], ok: false, error: `${p} goes through a symbolic link` };
   const adds = [];
   const conflicts = files.map((p) => {
     const abs = path.join(root, ...p.split('/'));
@@ -194,8 +197,9 @@ export function commitAddressFile(root) {
 
 /** Write the signed address into the vault and commit it on the git backup. */
 export function publishAddressRecord(root, url) {
-  const body = `${JSON.stringify(signAddressRecord(root, url), null, 2)}\n`;
   const file = path.join(root, ADDRESS_FILE);
+  if (linkedUnder(root, file)) return { url, committed: false, skipped: `${ADDRESS_FILE} is a symbolic link; memev does not write through links in the vault` };
+  const body = `${JSON.stringify(signAddressRecord(root, url), null, 2)}\n`;
   let prev = null;
   try { prev = fs.readFileSync(file, 'utf8'); } catch { prev = null; }
   if (prev !== body) fs.writeFileSync(file, body);
@@ -326,7 +330,9 @@ export const WRITERS_DIR = '.memev-writers';
  * on it) and report other computers that wrote in the last 30 days. Report only.
  */
 export function writerCheck(vault, { root, at = Date.now() }) {
-  const dir = path.join(root, WRITERS_DIR); fs.mkdirSync(dir, { recursive: true });
+  const dir = path.join(root, WRITERS_DIR);
+  if (linkedUnder(root, path.join(dir, `${vault.host?.id}.json`))) return { writers: [], warning: null, skipped: `${WRITERS_DIR} goes through a symbolic link; memev does not write through links in the vault` };
+  fs.mkdirSync(dir, { recursive: true });
   const id = vault.host?.id; const mine = path.join(dir, `${id}.json`);
   const day = new Date(at).toISOString().slice(0, 10);
   let rec = readJson(mine, null);
