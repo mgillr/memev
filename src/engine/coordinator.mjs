@@ -12,8 +12,23 @@
 // the tests pass a self-contained double with the same API. The per-task generation token lives in
 // the task record, not the store's global generation, so ownership versions are per task.
 
+// With `lifecycle: true` (how the vault builds it, the only place it is built) every status change goes
+// through the one transition table of project-state.mjs, and each move is appended to the store's log as a
+// task.transitioned event with its record (actor, time, reason, previous and new state, scope version,
+// correlation id, evidence). A report then moves a task to VERIFYING, never to a finished state: VERIFIED
+// comes only from verify(), which needs evidence bound to the scope version and the artifact hash. The rest of
+// the table is wired here too: pause and resume (a paused project dispatches nothing), amendScope (a scope change
+// makes the evidence bound to the old version stale and replans the affected tasks), requestCancellation and
+// reassign (each a move through the table with its record in the log), applyUpdate (a stale or competing update
+// surfaces a conflict instead of being overwritten) and EventLog (the history is read back through it).
+// Without it the coordinator keeps its original READY/IN_PROGRESS/DONE statuses, which is what the unit
+// tests over a store double use.
+
 import { randomToken } from './util.mjs';
-import { transition, projectStatus, TASK_STATES } from './project-state.mjs';
+import {
+  transition, projectStatus, TASK_STATES,
+  amendScope, reassign, pause, resume, requestCancellation, eligibleForDispatch, applyUpdate, EventLog,
+} from './project-state.mjs';
 
 // Retry policies for external actions. SO-03-A's policy module is not on main yet, so the
 // coordinator reads these local defaults; when the module lands it is passed in as `policies`.
@@ -21,6 +36,9 @@ export const DEFAULT_POLICIES = {
   idempotent: { allowResend: true, maxAttempts: 3 },
   nonIdempotent: { allowResend: false, maxAttempts: 1 },
 };
+
+// The descriptive fields of a task an update may change. Everything else on a task is authoritative state.
+const PATCHABLE = ['title', 'note', 'priority', 'labels'];
 
 // A busy-wait that does not need async: the store's lock is held only for a few milliseconds, so a
 // short spin is enough to let the other writer finish its turn.
@@ -86,18 +104,230 @@ export class Coordinator {
     return { ok: true, view: cur, records };
   }
 
+
+  // ---- the project record: the flags and the scope version that belong to the project, not to one task
+
+  _project(s, project) {
+    return s.snapshot('project')[project] ?? { name: project, paused: false, scope_version: 1 };
+  }
+  _putProject(s, project, data) {
+    s.append({ type: 'project.upserted', entity: { kind: 'project', id: project, data } });
+  }
+  // A project-level event (pause, resume, scope change, reassignment, cancellation outcome), in the same log.
+  _logEvent(s, type, fields) {
+    s.append({ type: 'task.event', entity: { kind: 'event', data: { type, ...fields } } });
+  }
+  _putTask(s, id, data) {
+    s.append({ type: 'task.upserted', entity: { kind: 'task', id, data } });
+  }
+  _tasksOf(s, project) {
+    return Object.entries(s.snapshot('task')).filter(([, t]) => t.project === project);
+  }
+  _off() { return { ok: false, error: 'lifecycle_off' }; }
+  _ctx(actor, reason, correlationId) { return { actor, time: this.now(), reason, correlationId }; }
+
+  // pause(project): stop new dispatch and keep the truth. In-flight tasks stay IN_PROGRESS and carry a cancellation
+  // field of requested; the project record keeps the checkpoint resume() needs.
+  pause(project, { actor = 'operator', reason = 'paused' } = {}) {
+    if (!this.lifecycle) return this._off();
+    return this._withWrite((s) => {
+      const proj = this._project(s, project);
+      if (proj.paused) return { ok: false, code: 'ALREADY_PAUSED', reason: 'the project is already paused' };
+      const tasks = this._tasksOf(s, project);
+      const view = { paused: false, scopeVersion: proj.scope_version, tasks: tasks.map(([id, t]) => ({ id, state: t.status, ...(t.cancellation ? { cancellation: t.cancellation } : {}) })) };
+      const p = pause(view);
+      for (const [id, t] of tasks) {
+        const nt = p.tasks.find((x) => x.id === id);
+        if (nt.cancellation !== t.cancellation) this._putTask(s, id, { ...t, cancellation: nt.cancellation });
+      }
+      const checkpoint = { scopeVersion: p.checkpoint.scopeVersion, tasks: p.checkpoint.tasks.map((x) => ({ id: x.id, state: x.state, ...(x.cancellation ? { cancellation: x.cancellation } : {}) })) };
+      this._putProject(s, project, { ...proj, paused: true, pause_checkpoint: checkpoint, paused_reason: reason });
+      this._logEvent(s, 'project.paused', { project, ...this._ctx(actor, reason, `pause:${project}:${this.now()}`) });
+      return { ok: true, paused: true };
+    });
+  }
+
+  // resume(project): dispatch is allowed again; what happened during the pause is kept, and only the cancellation
+  // request the pause itself made is withdrawn.
+  resume(project, { actor = 'operator', reason = 'resumed' } = {}) {
+    if (!this.lifecycle) return this._off();
+    return this._withWrite((s) => {
+      const proj = this._project(s, project);
+      const tasks = this._tasksOf(s, project);
+      const view = { paused: !!proj.paused, scopeVersion: proj.scope_version, checkpoint: proj.pause_checkpoint ?? null, tasks: tasks.map(([id, t]) => ({ id, state: t.status, ...(t.cancellation ? { cancellation: t.cancellation } : {}) })) };
+      const r = resume(view);
+      if (r.ok === false) return { ok: false, code: r.code, reason: r.reason };
+      for (const [id, t] of tasks) {
+        const nt = r.tasks.find((x) => x.id === id);
+        if (nt.cancellation !== t.cancellation) { const { cancellation, ...rest } = t; this._putTask(s, id, nt.cancellation === undefined ? rest : { ...rest, cancellation: nt.cancellation }); }
+      }
+      this._putProject(s, project, { ...proj, paused: false, pause_checkpoint: null, paused_reason: null });
+      this._logEvent(s, 'project.resumed', { project, ...this._ctx(actor, reason, `resume:${project}:${this.now()}`) });
+      return { ok: true, paused: false };
+    });
+  }
+
+  // amendScope(project, { paths }, { actor, reason }): a scope change bumps the project's scope version, marks the
+  // evidence bound to the tasks that touch those paths stale, and moves their VERIFIED and VERIFYING tasks back to
+  // ACCEPTED through the table, each move with its record. A task keeps its own scope version, so evidence bound to the
+  // old one can never verify it again.
+  amendScope(project, change, { actor = 'operator', reason = 'scope amended' } = {}) {
+    if (!this.lifecycle) return this._off();
+    if (!Array.isArray(change?.paths) || !change.paths.length || change.paths.some((x) => typeof x !== 'string' || !x)) return { ok: false, code: 'NO_PATHS', reason: 'a scope change names the paths it changes' };
+    return this._withWrite((s) => {
+      const proj = this._project(s, project);
+      const tasks = this._tasksOf(s, project);
+      const ids = new Set(tasks.map(([id]) => id));
+      const view = {
+        scopeVersion: proj.scope_version,
+        tasks: tasks.map(([id, t]) => ({ id, state: t.status, scope: [...(t.artifacts || []), ...(t.scope || [])], scopeVersion: t.scope_version ?? 1 })),
+        evidence: Object.entries(s.snapshot('evidence')).filter(([, e]) => ids.has(e.task_id)).map(([id, e]) => ({ id, taskId: e.task_id, criterion: e.criterion, scopeVersion: e.scope_version, artifactHash: e.artifact_hash, stale: !!e.stale })),
+      };
+      const correlationId = `scope:${project}:${this.now()}`;
+      const r = amendScope(view, change, { actor, time: this.now(), correlationId });
+      if (!r.ok) return { ok: false, code: r.code, reason: r.reason };
+      const records = [...r.records];
+      for (const nt of r.project.tasks) {
+        const old = tasks.find(([id]) => id === nt.id)[1];
+        if (nt.state === old.status && nt.scopeVersion === (old.scope_version ?? 1)) continue;
+        this._putTask(s, nt.id, { ...old, status: nt.state, scope_version: nt.scopeVersion, ...(nt.replanReason ? { replan_reason: nt.replanReason } : {}) });
+        if (nt.state !== old.status) this._logMoves(s, nt.id, [records.shift()]);
+      }
+      let staled = 0;
+      for (const e of r.project.evidence) {
+        if (!e.stale) continue;
+        const old = s.snapshot('evidence')[e.id];
+        if (old && !old.stale) { s.append({ type: 'evidence.upserted', entity: { kind: 'evidence', id: e.id, data: { ...old, stale: true } } }); staled++; }
+      }
+      this._putProject(s, project, { ...proj, scope_version: r.project.scopeVersion });
+      this._logEvent(s, 'scope.amended', { project, paths: change.paths, from_version: proj.scope_version, to_version: r.project.scopeVersion, affected_tasks: r.affected.tasks.map((t) => t.id), stale_evidence: staled, actor, reason, time: this.now(), correlationId });
+      return { ok: true, scope_version: r.project.scopeVersion, affected: { tasks: r.affected.tasks.map((t) => t.id), evidence: staled } };
+    });
+  }
+
+  // cancel(taskId, { adapter }): a hard cancellation of an in-flight task is recorded only when the adapter confirms it;
+  // until then the task keeps its state with a cancellation field of requested or unsupported. A task nobody is
+  // working on has nothing in flight and is cancelled directly. Both go through requestCancellation and the table.
+  cancel(taskId, { actor = 'operator', reason = 'cancelled', adapter = 'requested' } = {}) {
+    if (!this.lifecycle) return this._off();
+    return this._withWrite((s) => {
+      const task = s.snapshot('task')[taskId];
+      if (!task) return { ok: false, error: 'no_such_task' };
+      const inflight = task.status === TASK_STATES.IN_PROGRESS;
+      const view = { ...this._view(taskId, task), ...(task.cancellation ? { cancellation: task.cancellation } : {}) };
+      const t = this.now();
+      const r = requestCancellation(view, inflight ? adapter : 'confirmed', { actor, time: t, reason, correlationId: `cancel:${taskId}:${t}` });
+      if (!r.ok) {
+        if (r.code === 'CANCELLATION_PENDING' || r.code === 'CANCELLATION_UNSUPPORTED') {
+          this._putTask(s, taskId, { ...task, cancellation: r.task.cancellation });
+          this._logEvent(s, 'task.cancellation', { task_id: taskId, outcome: r.task.cancellation, actor, reason, time: t });
+        }
+        return { ok: false, code: r.code, reason: r.reason ?? null, cancellation: r.task?.cancellation ?? null };
+      }
+      if (task.lease_id) {
+        const l = s.snapshot('lease')[task.lease_id];
+        if (l) s.append({ type: 'lease.upserted', entity: { kind: 'lease', id: task.lease_id, data: { ...l, status: 'cancelled', cancelled: t } } });
+      }
+      this._putTask(s, taskId, { ...task, status: r.task.state, cancelReason: reason, cancellation: 'confirmed', generation: (task.generation || 0) + 1, lease_id: null, locks: [] });
+      this._logMoves(s, taskId, [r.record]);
+      return { ok: true, state: r.task.state };
+    });
+  }
+
+  // reassign(taskId, { to, override }): hand a task to another holder. It needs a released or expired lease, or an
+  // authorised override (which revokes the live lease); it records the attempts it inspected, bumps the task's
+  // generation so the old holder's writes are stale, and makes the task READY again through the table, reserved for
+  // the new holder.
+  reassign(taskId, { to, actor = 'operator', reason = 'reassigned', override = false } = {}) {
+    if (!this.lifecycle) return this._off();
+    return this._withWrite((s) => {
+      const task = s.snapshot('task')[taskId];
+      if (!task) return { ok: false, error: 'no_such_task' };
+      if (![TASK_STATES.IN_PROGRESS, TASK_STATES.BLOCKED, TASK_STATES.READY, TASK_STATES.ACCEPTED].includes(task.status)) return { ok: false, code: 'NOT_REASSIGNABLE', reason: `a ${task.status} task is not reassigned` };
+      const live = task.lease_id ? s.snapshot('lease')[task.lease_id] : null;
+      const leaseView = { taskId, state: live && live.status === 'active' ? 'active' : 'released' };
+      const attempts = Object.entries(s.snapshot('attempt')).filter(([, a]) => a.task_id === taskId).map(([id]) => ({ id }));
+      const t = this.now();
+      const correlationId = `reassign:${taskId}:${t}`;
+      const r = reassign({ ...this._view(taskId, task), holder: live?.agent ?? task.holder ?? null, generation: task.generation ?? 0, version: task.version ?? 1 }, { lease: leaseView, override: { authorised: override === true }, to, actor, time: t, reason, correlationId, attempts });
+      if (!r.ok) return { ok: false, code: r.code, reason: r.reason };
+      const ctx = { actor, correlationId };
+      const steps = [];
+      if (task.status === TASK_STATES.IN_PROGRESS) steps.push([TASK_STATES.BLOCKED, { ...ctx, reason: `reassigned: ${reason}` }]);
+      if (task.status !== TASK_STATES.READY) steps.push([TASK_STATES.READY, { ...ctx, reason: `reassigned to ${to}` }]);
+      const c = this._chain(s, this._view(taskId, task), steps);
+      if (!c.ok) return { ok: false, code: c.code, reason: c.reason };
+      if (live && live.status === 'active') s.append({ type: 'lease.upserted', entity: { kind: 'lease', id: task.lease_id, data: { ...live, status: 'revoked', revoked: t } } });
+      this._putTask(s, taskId, { ...task, status: c.view.state, holder: to, generation: r.task.generation, version: r.task.version, lease_id: null, locks: [], blocked_reason: null });
+      this._logMoves(s, taskId, c.records);
+      this._logEvent(s, 'task.reassigned', { task_id: taskId, ...r.record });
+      return { ok: true, holder: to, generation: r.task.generation };
+    });
+  }
+
+  // update(taskId, { patch, base_version, generation, source }): a versioned edit of a task's descriptive fields.
+  // A current update applies; two updates from different sources on the same version surface a conflict (the task is
+  // CONFLICTED where the table allows it) instead of the last write winning; a stale generation is refused. The fields
+  // that are authoritative state (status, lease, generation, scope, hashes, holder, locks) are never patchable.
+  update(taskId, { patch = {}, base_version, generation, source = 'unknown', ref = null } = {}, { actor = source } = {}) {
+    if (!this.lifecycle) return this._off();
+    const bad = Object.keys(patch).filter((k) => !PATCHABLE.includes(k));
+    if (bad.length || !Object.keys(patch).length) return { ok: false, code: 'FORBIDDEN_FIELD', reason: bad.length ? `not patchable: ${bad.join(', ')}` : 'an update names at least one field' };
+    return this._withWrite((s) => {
+      const task = s.snapshot('task')[taskId];
+      if (!task) return { ok: false, error: 'no_such_task' };
+      const t = this.now();
+      const entity = { id: taskId, state: task.status, scopeVersion: task.scope_version ?? 1, version: task.version ?? 1, generation: task.generation ?? 0, lastWrite: task.lastWrite, ...(task.conflict ? { conflict: task.conflict } : {}), ...Object.fromEntries(PATCHABLE.filter((k) => task[k] !== undefined).map((k) => [k, task[k]])) };
+      const r = applyUpdate(entity, { baseVersion: base_version, generation, source, ref: ref ?? `${source}:${t}`, patch }, { actor, time: t, correlationId: `update:${taskId}:${t}` });
+      if (r.ok) {
+        this._putTask(s, taskId, { ...task, ...patch, version: r.entity.version, lastWrite: r.entity.lastWrite });
+        return { ok: true, version: r.entity.version };
+      }
+      if (r.code === 'CONFLICT') {
+        this._putTask(s, taskId, { ...task, status: r.entity.state, conflict: r.entity.conflict });
+        if (r.record) this._logMoves(s, taskId, [r.record]);
+        this._logEvent(s, 'task.conflict', { task_id: taskId, ...r.entity.conflict, time: t });
+      }
+      return { ok: false, code: r.code, reason: r.reason };
+    });
+  }
+
+  // fail(taskId): a VERIFYING task whose mandatory check failed goes to FAILED through the table.
+  fail(taskId, { actor = 'contract-verify', reason = 'a mandatory check failed' } = {}) {
+    if (!this.lifecycle) return this._off();
+    return this._withWrite((s) => {
+      const task = s.snapshot('task')[taskId];
+      if (!task) return { ok: false, error: 'no_such_task' };
+      const c = this._chain(s, this._view(taskId, task), [[TASK_STATES.FAILED, { actor, reason, correlationId: `fail:${taskId}:${this.now()}` }]]);
+      if (!c.ok) return { ok: false, code: c.code, reason: c.reason };
+      this._putTask(s, taskId, { ...task, status: c.view.state });
+      this._logMoves(s, taskId, c.records);
+      return { ok: true, state: c.view.state };
+    });
+  }
+
+  // The history of task moves, read back through the append-only EventLog: unique ids, frozen entries, in log order.
+  history(taskId = null) {
+    const log = new EventLog();
+    for (const [id, e] of Object.entries(this.store.snapshot('event'))) {
+      if (e.type === 'task.transitioned' && (!taskId || e.task_id === taskId)) log.append({ ...e, id });
+    }
+    return log.entries();
+  }
+
   // The project's tasks as the state machine sees them, and the derived project status.
-  status(project) {
+  status(project, { history = false } = {}) {
     const tasks = {};
     const states = [];
+    const proj = this.store.snapshot('project')[project] ?? {};
     for (const [id, t] of Object.entries(this.store.snapshot('task'))) {
       if (t.project !== project) continue;
-      tasks[id] = { state: t.status, title: t.title, deps: t.deps || [], lease_id: t.lease_id ?? null, blocked_reason: t.blocked_reason ?? null, artifact_hash: t.artifact_hash ?? null };
+      tasks[id] = { state: t.status, title: t.title, deps: t.deps || [], lease_id: t.lease_id ?? null, blocked_reason: t.blocked_reason ?? null, artifact_hash: t.artifact_hash ?? null, scope_version: t.scope_version ?? 1, holder: t.holder ?? null, cancellation: t.cancellation ?? null, contract: t.contract_id ? { id: t.contract_id, task: t.contract_task } : null };
       states.push({ state: t.status, cancelReason: t.cancelReason });
     }
     const counts = {};
     for (const x of states) counts[x.state] = (counts[x.state] || 0) + 1;
-    return { project, status: projectStatus(states), counts, tasks, eligible: this.eligible(project) };
+    return { project, status: projectStatus(states, { paused: !!proj.paused, cancelled: !!proj.cancelled }), paused: !!proj.paused, scope_version: proj.scope_version ?? 1, counts, tasks, eligible: this.eligible(project), ...(history ? { history: this.history().filter((e) => tasks[e.task_id]).slice(-100) } : {}) };
   }
 
   // verify(taskId, { actor, evidence }) is the only way to VERIFIED. Each evidence item names the criterion it
@@ -183,7 +413,7 @@ export class Coordinator {
               blocked_reason: null,
               checkpoint: null,
               overlap: overlapWith,
-              ...(this.lifecycle ? { scope_version: 1, criteria: spec.criteria || [], artifact_hash: spec.artifact_hash ?? null } : {}),
+              ...(this.lifecycle ? { scope_version: 1, criteria: spec.criteria || [], artifact_hash: spec.artifact_hash ?? null, ...(spec.contract ? { contract_id: spec.contract.id, contract_task: spec.contract.task } : {}) } : {}),
             },
           },
           key: `plan:${project}:${spec.id}`,
@@ -210,9 +440,12 @@ export class Coordinator {
     for (const [id, t] of Object.entries(tasks)) {
       if (t.status === doneStatus && t.project === project) done.add(id);
     }
+    const proj = this.lifecycle ? (this.store.snapshot('project')[project] ?? {}) : {};
     const out = [];
     for (const [id, t] of Object.entries(tasks)) {
       if (!openStatuses.includes(t.status) || t.project !== project) continue;
+      // a paused project dispatches nothing; an ACCEPTED task whose dependencies are verified is dispatchable as READY
+      if (this.lifecycle && !eligibleForDispatch({ state: TASK_STATES.READY }, { paused: !!proj.paused })) continue;
       if (!(t.deps || []).every((d) => done.has(d))) continue;
       if (this._lockSet(t).some((r) => locked.has(r))) continue;
       out.push(id);
@@ -241,6 +474,8 @@ export class Coordinator {
       const tasks = s.snapshot('task');
       const task = tasks[taskId];
       if (!task) return { ok: false, error: 'no_such_task' };
+      if (this.lifecycle && this._project(s, task.project).paused) return { ok: false, paused: true, reason: 'the project is paused: nothing is dispatched until it is resumed' };
+      if (this.lifecycle && task.holder && agent !== task.holder && !String(agent).startsWith(`${task.holder}/`)) return { ok: false, reserved: { holder: task.holder }, reason: `the task was reassigned to ${task.holder}` };
       // lifecycle: an ACCEPTED task whose dependencies are all VERIFIED is made READY in the same turn
       const promote = this.lifecycle && task.status === TASK_STATES.ACCEPTED;
       if (task.status !== 'READY' && !promote) {
@@ -285,7 +520,7 @@ export class Coordinator {
           entity: {
             kind: 'task',
             id: taskId,
-            data: { ...task, status, generation, lease_id: leaseId, locks: this._lockSet(task) },
+            data: { ...task, status, generation, lease_id: leaseId, holder: null, locks: this._lockSet(task) },
           },
         });
       } catch (e) {
@@ -493,6 +728,8 @@ export class Coordinator {
   // sending again.
   dispatch(taskId, agent, key, payload, send) {
     return this._withWrite((s) => {
+      const owner = s.snapshot('task')[taskId];
+      if (this.lifecycle && owner && this._project(s, owner.project).paused) return { ok: false, paused: true, sent: false, reason: 'the project is paused' };
       const existing = Object.values(s.snapshot('attempt')).find((a) => a.kind === 'dispatch' && a.key === key);
       if (existing) return { ok: true, sent: false, duplicate: true, result: existing.result ?? null };
       const result = send ? send(payload) : { sent: true };

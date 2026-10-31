@@ -22,6 +22,7 @@ const WRITE = [
   'memev_contract_verify', 'memev_contract_from_request', 'memev_contract_amend', 'memev_contract_decompose',
   'memev_contract_approve',
   'memev_task_plan', 'memev_task_claim', 'memev_task_heartbeat', 'memev_task_report', 'memev_task_release', 'memev_task_verify',
+  'memev_project_pause', 'memev_project_resume', 'memev_scope_amend', 'memev_task_cancel', 'memev_task_reassign', 'memev_task_update',
   'bus_unread', 'bus_send', 'bus_check', 'bus_set_operator',
 ];
 
