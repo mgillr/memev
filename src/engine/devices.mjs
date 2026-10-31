@@ -91,8 +91,14 @@ export class DeviceRegistry {
   get(idOrLabel) { return this.data.devices[idOrLabel] || Object.values(this.data.devices).find((d) => d.label === idOrLabel) || null; }
   list() { return Object.values(this.data.devices).map(({ origins, ...d }) => ({ ...d, origins_seen: (origins || []).length })); }
 
+  /** The admin credential is not a device: it lives in .memev/admin.json and is managed with memev token (issue 282). */
+  _notAdmin(tokens, d) {
+    const rec = d.token_id ? tokens.list().find((t) => t.id === d.token_id) : null;
+    if (rec && (rec.scopes || []).includes('admin')) throw new Error(`${d.label || d.id} is this vault's admin credential, not a computer or an app; it is managed with memev token, and memev token rotate ${d.token_id} keeps .memev/admin.json in step`);
+  }
   revoke(tokens, id) {
     const d = this.get(id); if (!d) throw new Error(`no device ${id}`);
+    this._notAdmin(tokens, d);
     if (d.kind === 'host') throw new Error('this computer is the host; it cannot be revoked');
     if (d.token_id) tokens.revoke(d.token_id);
     d.status = 'revoked'; d.revoked = now(); this.byToken.delete(d.token_id); this.save();
@@ -104,6 +110,7 @@ export class DeviceRegistry {
 
   rotate(tokens, id) {
     const d = this.get(id); if (!d || d.status !== 'active' || !d.token_id) throw new Error(`no active device ${id} with a token`);
+    this._notAdmin(tokens, d);
     const t = tokens.rotate(d.token_id); d.rotated = now(); d.flags = d.flags.filter((f) => f.type !== 'reuse'); this.save();
     return { device: d, token: t.token };
   }
@@ -131,6 +138,7 @@ export class DeviceRegistry {
     const added = [];
     for (const t of tokens.list()) {
       if (t.revoked || this.byToken.has(t.id) || (t.expires && Date.parse(t.expires) < Date.now())) continue;
+      if ((t.scopes || []).includes('admin')) continue; // the admin credential is not a device (issue 282)
       if (Object.values(this.data.devices).some((d) => d.token_id === t.id)) continue;
       const kind = !t.remote ? 'local-client' : /cloud connector|device cloud-connector/.test(t.note || '') ? 'cloud-connector' : 'remote-computer';
       added.push(this._add({ kind, label: t.agent, tokenId: t.id, inferred: true }));
