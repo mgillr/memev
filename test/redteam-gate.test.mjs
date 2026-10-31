@@ -853,6 +853,29 @@ test('T1-c42: an added answer folded into the spec its task moved to is judged t
     refused(r, 'added_verbatim', what);
     assert.match(reason(r, 'added_verbatim'), /round 1 answer 3 folded into/, what);
   }
+  // a task removed as moved is accepted only when the receiving task holds all of it, following that spec's own replacements
+  const t2 = specV2().tasks[1];
+  const taskMove = (receiving = {}, rec2, atSplit = []) => {
+    const v2 = specV2(); v2.tasks = [v2.tasks[0]];
+    const rounds = baseRounds(); rounds[1].amendments = [{ kind: 'move', task: 'T2', to_spec: 'QL-0.02', to_task: 'T1', answer: '1.1' }, ...atSplit];
+    const recv = { ...specV2(), title: 'QL-0.02 The receiving contract', tasks: [{ ...clone(t2), id: 'T1', depends_on: [], ...receiving }] };
+    const extra = { 'contracts/quality-loop/manifest.json': manifest(['QL-0.01', 'QL-0.02']), 'contracts/quality-loop/specs/QL-0.02.json': `${JSON.stringify(recv, null, 2)}\n` };
+    if (rec2) extra['contracts/quality-loop/redteam/QL-0.02.json'] = `${JSON.stringify(rec2, null, 2)}\n`;
+    return ev(sc({ snapshots: [specV1(), v2], disk: v2, rounds, extra }));
+  };
+  const without = (st) => clone(t2.criteria).filter((c) => c.statement !== st);
+  signable(taskMove(), 'task T2 moved whole to QL-0.02 T1');
+  const renamedC = clone(t2.criteria).map((c) => (c.statement === 'b answers fast' ? { ...c, statement: 'b answers within 50 ms' } : c));
+  signable(taskMove({ criteria: renamedC }, { schema: 'memev-redteam/1', spec_id: 'QL-0.02', rounds: [{ round: 1, amendments: [{ task: 'T1', field: 'statement', from: 'b answers fast', to: 'b answers within 50 ms', answer: '1.1' }] }] }), 'task T2 moved, one statement then replaced in QL-0.02');
+  const lacks = taskMove({ criteria: without('b answers fast') });
+  weakened(lacks, 'T2', null, 'the receiving task lacks one moved criterion');
+  assert.match(reason(lacks, 'never_weakens'), /task T2 removed and its move is refused: QL-0\.02 T1 lacks the criterion "b answers fast"/);
+  weakened(taskMove({ requirements: [] }), 'T2', null, 'the receiving task lacks the moved requirement');
+  // a requirement reworded at the split counts through its From/To in the round that records the move, and only through it
+  const reworded = 'src/b.mjs re-exports a from QL-0.01';
+  signable(taskMove({ requirements: [reworded] }, undefined, [{ task: 'T2', field: 'requirement', from: 'src/b.mjs re-exports a', to: reworded, answer: '1.1' }]), 'a moved requirement present through the replacement recorded at the split');
+  weakened(taskMove({ requirements: [reworded] }), 'T2', null, 'the reworded requirement with no replacement recorded');
+  weakened(taskMove({ requirements: ['c prints a banner'], criteria: [{ statement: 'c prints a banner', verifier: { type: 'grep', file: 'src/c.mjs', pattern: 'banner' } }] }), 'T2', null, 'the receiving task is an unrelated stub');
 });
 
 test('T1-c43: a stop decision whose key is under contracts/keys/ only in the working tree is refused with stop_decision; with the key committed it is SIGNABLE AT STOP', () => {
@@ -915,6 +938,25 @@ test('T1-c45: a reworded requirement, a rewritten statement and a changed timeou
     weakened(twoRound(change, [{ ...am }]), task, null, `${what}: citing nothing`);
     weakened(twoRound(change, [{ ...am, reviewer_note: 1 }], { reviewer_notes: notes(generateKeyPair().privateKey) }), task, null, `${what}: a reviewer note signed by a key outside REVIEWER_KEYS`);
   }
+  // an implementation round's answer is a citation only for a spec round recorded after that implementation round
+  const [rchange, ram, rtask] = changes.requirement;
+  const ordered = (citeIn) => {
+    const v = specV2(); rchange(v);
+    const cite = [{ ...ram, answer: '3.1' }];
+    const impl = { kind: 'implementation', verdict: 'findings', answers: [{ n: 1, severity: 'medium', how: 'the code shows the text is wrong', disposition: 'added' }] };
+    const rounds = [baseRounds()[0], { verdict: 'findings', answers: [], ...(citeIn === 2 ? { amendments: cite } : {}) }, impl, { ...baseRounds()[1], ...(citeIn === 4 ? { amendments: cite } : {}) }];
+    return ev(sc({ snapshots: citeIn === 2 ? [specV1(), v, null, v] : [specV1(), specV2(), null, v], disk: v, rounds }));
+  };
+  weakened(ordered(2), rtask, null, 'round 2 citing an answer of implementation round 3, recorded after it');
+  signable(ordered(4), 'round 4 citing an answer of implementation round 3, recorded before it');
+  // a command change cites like any other change: a reviewer note that says the command was narrowed needs no other word
+  const NARROW = "node --test --test-name-pattern='^a ' test/a.test.mjs";
+  const narrowed = (text) => {
+    const v2 = specV2(); v2.tasks[0].criteria[2].verifier.cmd = NARROW;
+    const rounds = baseRounds(); rounds[1].amendments = [{ task: 'T1', field: 'verifier.cmd', statement: 'the tests of a pass', from: 'node --test test/a.test.mjs', to: NARROW, reviewer_note: 1 }];
+    return ev(sc({ snapshots: [specV1(), v2], disk: v2, rounds, record: { reviewer_notes: [{ n: 1, text, sig: sign({ spec_id: 'QL-0.01', n: 1, text }, TEST_PRIV) }] } }));
+  };
+  signable(narrowed('the build narrowed the command to its own labelled subtest'), 'a narrowed command cited by a reviewer note that says narrowed');
   // a scope glob: the entry cites an added answer of the previous round whose criterion reads a path under it
   const crit = { statement: 'T1-c06: a handles a new case', verifier: { type: 'test_red_green', test_file: 'test/new/x.test.mjs', cmd: 'node --test test/new/x.test.mjs' } };
   const glob = (amendments) => {
@@ -926,4 +968,18 @@ test('T1-c45: a reworded requirement, a rewritten statement and a changed timeou
   weakened(glob([]), 'T1', null, 'a glob with no entry');
   weakened(glob([{ task: 'T1', field: 'scope', to: 'test/new/**', answer: '1.1' }]), 'T1', null, 'a glob citing an answer that reads nothing under it');
   weakened(glob([{ task: 'T1', field: 'scope', to: 'test/new/**', note: '1.1' }]), 'T1', null, 'a glob citing a note');
+  // the cited answer is judged by the criterion it became: its folded_as, not the raw proposal
+  const foldedGlob = (raw, fa) => {
+    const v2 = specV2(); v2.tasks[0].scope.push('test/new/**'); v2.tasks[0].criteria.splice(4, 0, clone(crit));
+    const rounds = baseRounds(); rounds[0].answers.push({ n: 3, severity: 'medium', how: 'a new case is untested', criterion: { task: 'T1', ...clone(raw) }, disposition: 'added', folded_as: { task: 'T1', ...clone(fa) } }); rounds[1].amendments = [{ task: 'T1', field: 'scope', to: 'test/new/**', answer: '1.3' }];
+    return ev(sc({ snapshots: [specV1(), v2], disk: v2, rounds }));
+  };
+  const rawA = { statement: 'a handles a new case', verifier: { type: 'test_red_green', test_file: 'test/a.test.mjs', cmd: 'node --test test/a.test.mjs' } };
+  signable(foldedGlob(rawA, crit), 'the proposal reads test/a.test.mjs, the criterion it was folded as reads test/new/x.test.mjs');
+  weakened(foldedGlob(crit, specV2().tasks[0].criteria[3]), 'T1', null, 'the proposal reads under the glob, the criterion it was folded as does not');
+  // one path added through the field form cites like any change; the landed scope_add form keeps its own rule
+  const onePath = (am, record) => { const v2 = specV2(); v2.tasks[0].scope.push('docs/a.md'); const rounds = baseRounds(); rounds[1].amendments = [am]; return ev(sc({ snapshots: [specV1(), v2], disk: v2, rounds, ...(record ? { record } : {}) })); };
+  signable(onePath({ task: 'T1', field: 'scope', to: 'docs/a.md', reviewer_note: 1 }, { reviewer_notes: notes(TEST_PRIV) }), 'one path in the field form citing a reviewer note');
+  signable(onePath({ task: 'T1', field: 'scope', to: 'docs/a.md', note: '1.2' }), 'one path in the field form citing a note point');
+  weakened(onePath({ task: 'T1', scope_add: 'docs/a.md', reviewer_note: 1 }, { reviewer_notes: notes(TEST_PRIV) }), 'T1', null, 'the scope_add form citing a reviewer note');
 });

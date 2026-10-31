@@ -212,7 +212,6 @@ function notePoint(notes, p) {
   return notes.slice(marks[p - 1], marks[p] ?? notes.length);
 }
 
-const CONTRA = /contradict|impossib/i;
 const GLOB = /[*?[\]{}]/;
 
 /** The paths a verifier reads: its file keys, its paths list and the path-like words of its command. */
@@ -236,8 +235,8 @@ function readsPath(v, g) {
  * null when an amendment's citation is acceptable, else why not. A citation (requirement 11) is an answer of the previous spec
  * round or of an implementation round recorded after it ('<round>.<n>'), a numbered point of the previous round's notes
  * ('<round>.<point>'), or reviewer_note <n>, an entry of the record's reviewer_notes signed by a reviewer key over {spec_id, n,
- * text}. kind cmd: a command replaced; the cited answer proposes that criterion, and the cited text names it contradictory or
- * impossible. kind scope: a scope path or glob added; only an added answer of the previous round whose criterion reads a path
+ * text}. kind cmd: a command replaced; a cited answer proposes that criterion. kind scope: a scope glob added, or a path added in
+ * the scope_add form; only an added answer of the previous round whose criterion (its folded_as, when it has one) reads a path
  * under it. kind text: any other change; a cited answer is added. ctx: {prev, cur (the round number holding the amendments,
  * Infinity at a stop), rounds, notes, specId, trusted, refused}.
  */
@@ -255,13 +254,14 @@ function citationProblem(am, ctx, kind, task, subjects) {
     const a = arr(r.answers).find((x) => isObj(x) && x.n === Number(m[2]));
     if (!a) return `round ${rn} has no answer ${m[2]}`;
     if (kind === 'text') return a.disposition === 'added' ? null : `answer ${am.answer} is not added`;
-    if (a.criterion?.task !== task) return `answer ${am.answer} concerns task ${a.criterion?.task}, not ${task}`;
+    // a scope citation judges the criterion the answer became (its folded_as), a command citation the criterion it proposes
+    const crit = kind === 'scope' && isObj(a.folded_as) ? a.folded_as : a.criterion;
+    if (crit?.task !== task) return `answer ${am.answer} concerns task ${crit?.task}, not ${task}`;
     if (kind === 'cmd') {
-      if (!subj.includes(a.criterion?.statement)) return `answer ${am.answer} proposes a criterion for a different criterion`;
-      if (!CONTRA.test(String(a.how ?? ''))) return `answer ${am.answer} does not name the criterion contradictory or impossible`;
+      if (!subj.includes(crit?.statement)) return `answer ${am.answer} proposes a criterion for a different criterion`;
     } else {
       if (a.disposition !== 'added') return `answer ${am.answer} is not added`;
-      if (!readsPath(a.criterion?.verifier, subj[0])) return `answer ${am.answer} proposes a criterion that reads no path under ${subj[0]}`;
+      if (!readsPath(crit?.verifier, subj[0])) return `answer ${am.answer} proposes a criterion that reads no path under ${subj[0]}`;
     }
     return null;
   }
@@ -272,7 +272,6 @@ function citationProblem(am, ctx, kind, task, subjects) {
     if (Number(m[1]) !== prev.round) return `its note ${am.note} is not a note of the previous round (${prev.round})`;
     const pt = notePoint(prev.notes, Number(m[2]));
     if (pt === null) return `round ${prev.round}'s notes have no point ${m[2]}`;
-    if (kind === 'cmd' && !CONTRA.test(pt)) return `note ${am.note} does not name anything contradictory or impossible`;
     return null;
   }
   if (am.reviewer_note !== undefined) {
@@ -281,7 +280,6 @@ function citationProblem(am, ctx, kind, task, subjects) {
     if (!Number.isInteger(n) || !note || typeof note.text !== 'string') return `the record has no reviewer note ${am.reviewer_note}`;
     const p = envelopeProblem(reviewerNotePayload(ctx.specId, note), note.sig, ctx.trusted ?? new Map(), ctx.refused ?? new Set());
     if (p) return `reviewer note ${n}'s signature ${p}`;
-    if (kind === 'cmd' && !CONTRA.test(note.text)) return `reviewer note ${n} does not name anything contradictory or impossible`;
     return null;
   }
   return 'it cites no answer of the previous round';
@@ -334,7 +332,8 @@ export function weakenings(A, B, { amendments = [], prev = null, ...ctx } = {}) 
     const t2 = tb.get(id);
     if (!t2) {
       const i = entry((a) => a.kind === 'move' && a.task === id);
-      let why = i < 0 ? null : (() => { const r = cx.root ? resolveSpecId(cx.root, ams[i].to_spec) : { problem: 'no tree to resolve it in' }; if (r.problem) return r.problem; let to = null; try { to = JSON.parse(fs.readFileSync(r.abs, 'utf8')); } catch { /* judged below */ } return taskMap(to).has(ams[i].to_task) ? null : `${ams[i].to_spec} has no task ${ams[i].to_task}`; })();
+      const own = [...arr(cx.rounds).flatMap((r) => arr(r?.amendments)), ...arr(cx.stopAmendments)].filter((x) => isObj(x) && x.task === id && x.kind === undefined);
+      let why = i < 0 ? null : cx.root ? movedTaskProblem(cx.root, ams[i], ta, own) : 'there is no tree to resolve the receiving spec in';
       if (i >= 0 && !why) why = take(i, 'text', id, null);
       if (i < 0 || why) out.push(`task ${id} removed${why ? ` and its move is refused: ${why}` : ''}`);
       continue;
@@ -357,7 +356,8 @@ export function weakenings(A, B, { amendments = [], prev = null, ...ctx } = {}) 
       if (i >= 0 && GLOB.test(g)) why = 'a scope_add must name one path, not a glob';
       if (i < 0) i = entry((a) => a.field === 'scope' && a.task === id && a.to === g);
       if (i < 0) why = 'with no scope_add amendment';
-      if (!why) { const c = take(i, 'scope', id, GLOB.test(g) ? g : normPath(g)); if (c) why = `its amendment is refused: ${c}`; }
+      // a glob, or a path in the scope_add form, cites an added answer that reads under it; a path in the field form cites like any change
+      if (!why) { const c = take(i, GLOB.test(g) || ams[i].field !== 'scope' ? 'scope' : 'text', id, GLOB.test(g) ? g : normPath(g)); if (c) why = `its amendment is refused: ${c}`; }
       if (why) out.push(`task ${id}: scope glob ${g} added ${why}`);
     }
     // criteria are matched by statement, so reordering is not a removal; equal pairs are matched first
@@ -423,23 +423,15 @@ function addedProblem(spec, c) {
   return null;
 }
 
-/**
- * Requirement 15: null when an added answer folded into another spec (folded_as {spec, task, statement, verifier}) has its move
- * recorded ({kind: move, task, to_spec, to_task} in an amendments list of this record), the spec id resolves through a manifest,
- * and the criterion is verbatim there, following that spec's own amendments (statement and verifier replacements) from what the
- * answer was folded as; else why not.
- */
-function movedProblem(root, rounds, stop, a, fa) {
-  const entries = [...rounds.flatMap((r) => arr(r?.amendments)), ...arr(stop?.amendments)].filter(isObj);
-  const r = resolveSpecId(root, fa.spec);
-  if (r.problem) return r.problem;
-  if (!entries.some((x) => x.kind === 'move' && x.task === a.criterion?.task && x.to_spec === fa.spec && x.to_task === fa.task)) return `no amendments list records the move of task ${a.criterion?.task} to ${fa.spec} ${fa.task}`;
-  let spec = null;
-  try { spec = JSON.parse(fs.readFileSync(r.abs, 'utf8')); } catch { return `${fa.spec}'s spec is not JSON`; }
-  let other = null;
-  try { other = JSON.parse(fs.readFileSync(locate(r.abs, fa.spec).record, 'utf8')); } catch { /* no record there: no replacements to follow */ }
-  const ams = [...arr(other?.rounds).flatMap((x) => arr(x?.amendments)), ...arr(other?.stop?.amendments)].filter((x) => isObj(x) && x.task === fa.task);
-  let c = { task: fa.task, statement: fa.statement, verifier: fa.verifier };
+/** The amendments entries for `task` in the record beside the spec file `abs` (id `sid`): every round's list and the stop's. */
+function receivingAmendments(abs, sid, task) {
+  let rec = null;
+  try { rec = JSON.parse(fs.readFileSync(locate(abs, sid).record, 'utf8')); } catch { /* no record there: no replacements to follow */ }
+  return [...arr(rec?.rounds).flatMap((x) => arr(x?.amendments)), ...arr(rec?.stop?.amendments)].filter((x) => isObj(x) && x.task === task);
+}
+
+/** Criterion c ({task, statement, verifier}) followed through the statement and verifier replacements in `ams` until `spec` has it verbatim, or as far as they go. */
+function followCriterion(spec, ams, c) {
   for (let k = 0; k < 64 && addedProblem(spec, c); k++) {
     let next = c;
     const st = ams.find((x) => x.field === 'statement' && x.from === c.statement && typeof x.to === 'string');
@@ -453,6 +445,56 @@ function movedProblem(root, rounds, stop, a, fa) {
     if (canonical(next) === canonical(c)) break;
     c = next;
   }
+  return c;
+}
+
+/** Whether `list` holds text q itself or the end of its replacement chain in `ams` (entries {field, from, to} of that field). */
+function holdsText(list, ams, field, q) {
+  const seen = new Set();
+  while (!arr(list).includes(q)) {
+    if (seen.has(q)) return false;
+    seen.add(q);
+    const x = ams.find((a) => a.field === field && a.from === q && typeof a.to === 'string');
+    if (!x) return false;
+    q = x.to;
+  }
+  return true;
+}
+
+/**
+ * A removed task is accepted as moved only when the move entry's spec id resolves through a manifest and its to_task holds every
+ * requirement, criterion and stop rule of the task, itself or the end of its From/To chain: the replacements this record lists for
+ * the moved task (`own`, as at the split), then the receiving spec's own for to_task. null, else why not.
+ */
+function movedTaskProblem(root, mv, ta, own = []) {
+  const r = resolveSpecId(root, mv.to_spec);
+  if (r.problem) return r.problem;
+  let spec = null;
+  try { spec = JSON.parse(fs.readFileSync(r.abs, 'utf8')); } catch { return `${mv.to_spec}'s spec is not JSON`; }
+  const to = taskMap(spec).get(mv.to_task);
+  if (!to) return `${mv.to_spec} has no task ${mv.to_task}`;
+  const ams = [...own, ...receivingAmendments(r.abs, mv.to_spec, mv.to_task)];
+  const where = `${mv.to_spec} ${mv.to_task}`;
+  for (const q of arr(ta.requirements)) if (!holdsText(to.requirements, ams, 'requirement', q)) return `${where} lacks the requirement "${short(q)}"`;
+  for (const x of arr(ta.stop_rules)) if (!holdsText(to.stop_rules, ams, 'stop_rule', x)) return `${where} lacks the stop rule "${short(x)}"`;
+  for (const c of arr(ta.criteria).filter(isObj)) if (addedProblem(spec, followCriterion(spec, ams, { task: mv.to_task, statement: c.statement, verifier: c.verifier }))) return `${where} lacks the criterion "${short(c.statement)}"`;
+  return null;
+}
+
+/**
+ * Requirement 15: null when an added answer folded into another spec (folded_as {spec, task, statement, verifier}) has its move
+ * recorded ({kind: move, task, to_spec, to_task} in an amendments list of this record), the spec id resolves through a manifest,
+ * and the criterion is verbatim there, following that spec's own amendments (statement and verifier replacements) from what the
+ * answer was folded as; else why not.
+ */
+function movedProblem(root, rounds, stop, a, fa) {
+  const entries = [...rounds.flatMap((r) => arr(r?.amendments)), ...arr(stop?.amendments)].filter(isObj);
+  const r = resolveSpecId(root, fa.spec);
+  if (r.problem) return r.problem;
+  if (!entries.some((x) => x.kind === 'move' && x.task === a.criterion?.task && x.to_spec === fa.spec && x.to_task === fa.task)) return `no amendments list records the move of task ${a.criterion?.task} to ${fa.spec} ${fa.task}`;
+  let spec = null;
+  try { spec = JSON.parse(fs.readFileSync(r.abs, 'utf8')); } catch { return `${fa.spec}'s spec is not JSON`; }
+  const c = followCriterion(spec, receivingAmendments(r.abs, fa.spec, fa.task), { task: fa.task, statement: fa.statement, verifier: fa.verifier });
   const p = addedProblem(spec, c);
   return p ? `in ${fa.spec}, the answer ${p.replace(/^is added, but /, '')}` : null;
 }
@@ -698,7 +740,7 @@ export function evaluate({ spec, cwd = process.cwd(), reviewerKeys, at } = {}) {
 
   // never_weakens: snapshot to snapshot (and on to the disk after a stop), workdir null, no criterion optional
   const chain = specRounds.map((r) => ({ r, s: snapOf.get(r) })).filter((x) => x.s);
-  const ctx = { rounds, notes: arr(rec.reviewer_notes), specId: id, trusted, refused, root };
+  const ctx = { rounds, stopAmendments: arr(stop?.amendments), notes: arr(rec.reviewer_notes), specId: id, trusted, refused, root };
   for (let k = 1; k < chain.length; k++) for (const w of weakenings(chain[k - 1].s, chain[k].s, { amendments: chain[k].r.amendments, prev: chain[k - 1].r, cur: chain[k].r.round, ...ctx })) fail('never_weakens', `round ${chain[k].r.round}: ${w}`);
   // at a stop, the change from the last spec round's snapshot to the disk is judged with the stop's own amendments (requirement 12)
   if (stop && chain.length) for (const w of weakenings(chain[chain.length - 1].s, disk, { amendments: stop.amendments, prev: chain[chain.length - 1].r, cur: Infinity, ...ctx })) fail('never_weakens', `the spec on disk: ${w}`);

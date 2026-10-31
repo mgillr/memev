@@ -125,12 +125,18 @@ list records it with a citation, and the next round judges whether it weakens:
 - a criterion's statement rewritten: `{task, field: "statement", from, to, <citation>}`;
 - any other key of a criterion's verifier changed: `{task, field: "verifier.<key>", statement, from, to,
   <citation>}`, where `statement` names the criterion;
-- a command replaced: `{task, statement, from, to, <citation>}` (or with `field: "verifier.cmd"`), where the
-  cited answer proposes that criterion and the cited text names it contradictory or impossible;
-- a scope path added: `{task, scope_add, answer}`, one path and no glob; or a scope path or glob added:
-  `{task, field: "scope", to, answer}`. Either cites an added answer of the previous round whose criterion
-  reads that path, or a path under the glob;
-- a task moved to another spec at a split: `{kind: "move", task, to_spec, to_task, <citation>}`.
+- a command replaced: `{task, statement, from, to, <citation>}` (or with `field: "verifier.cmd"`), where a
+  cited answer proposes that criterion;
+- a scope path added: `{task, scope_add, answer}`, one path and no glob, citing an added answer of the previous
+  round whose criterion reads that path; or `{task, field: "scope", to, <citation>}` with one path, citing as
+  any other change;
+- a scope glob added: `{task, field: "scope", to, answer}`, citing an added answer of the previous round whose
+  criterion reads a path under the glob. A cited answer that carries `folded_as` is judged by that criterion,
+  the one it became;
+- a task moved to another spec at a split: `{kind: "move", task, to_spec, to_task, <citation>}`, accepted
+  only when the receiving task holds every requirement, criterion and stop rule of the moved task, itself or
+  the end of its From/To chain: the replacements this record lists for the moved task (as made at the split),
+  then the receiving spec's own.
 
 A citation is `answer: "<round>.<n>"`, an answer of the previous spec round or of an implementation round
 recorded after it; `note: "<round>.<point>"`, a numbered point of the previous round's notes; or
