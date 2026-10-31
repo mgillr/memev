@@ -312,7 +312,7 @@
         "QL-1.02"
       ],
       "tasks": 1,
-      "criteria": 17,
+      "criteria": 28,
       "spec": "specs/SR-1.23-verify-sees-a-removed-tail.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },

@@ -20,7 +20,13 @@
         "verify() judges each path against the records it reads in one pass, so records another process appends after this instance opened are never reported as a mismatch",
         "verify() streams the segments and holds only the per-path heads in memory, whatever the size of the log",
         "the tail and head errors come before the per-record errors in verify().errors, so the 20-error cut never drops them",
-        "the header comment of oplog.mjs names the snapshot and manifest comparisons and states their limits: records written after the last snapshot are not covered, and snapshot.json carries no key, so a writer of the log folder can rewrite it consistently",
+        "the header comment of oplog.mjs names the snapshot and manifest comparisons and states their limits: records written after the last snapshot are not covered, and snapshot.json carries no key, so a writer of the log folder can rewrite it consistently; records without a path get no chain and no head check",
+        "open() never lets this.seq fall below the highest last seq any segment records in manifest.json, and append() never lowers a segment's recorded last, so the next append after a cut tail leaves a seq gap that verify() reports",
+        "the head check reads the heads from snapshot.json on disk and compares each with the last record of that path at or below the snapshot's seq, never with this instance's in-memory heads, so a rewritten snapshot-covered record is caught even when the path has later records",
+        "verify() reads manifest.json and snapshot.json fresh from disk as one consistent pair (the manifest is read again after the snapshot, and the pair is read again if it changed) into local variables, judges the segments that fresh manifest lists, and never assigns this.manifest, this.active, this.sinceSnapshot, this.recovered or this.clock",
+        "verify() never throws for a damaged log: a missing segment file, an archived segment missing from archive/, a line that parses to anything but a record object, and an active segment deleted while the log is open are each reported as an error naming the segment or the seqs",
+        "open() skips and reports a line after the snapshot offset that parses to anything but a record object (null, a number, an array), as it does for an unreadable line, so such a line never stops the vault opening",
+        "a test that checks that an error names a number matches it as a whole word",
         "each red-green criterion of this task that runs test/oplog-tail.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
@@ -164,10 +170,103 @@
           }
         },
         {
-          "statement": "One full run of test/oplog-tail.test.mjs passes every labelled subtest (T1-c01, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c15) with nothing skipped and nothing todo.",
+          "statement": "T1-c16: (a) After close(), remove the last three records of the active segment and delete snapshot.json; reopen, append one record, close(), reopen: verify() returns ok:false. (b) The same with snapshot.json kept. (c) At Vault level: a vault with several notes written through Vault is closed; remove the last three op-log records and delete snapshot.json; after new Vault(root, { git: false }).open(), whose recover() appends, log.verify().ok is false, and it is still false after close() and another open(). This forces either open() never to let this.seq fall below any segment's recorded last in the manifest (so the next append leaves a permanent seq gap) or append() never to lower a recorded last.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-tail.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c16:' test/oplog-tail.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c16:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c17: Build a.md@1, b.md@2, a.md@3 and close. Rewrite a.md@3 with different data.content, keeping seq, ts, prev and byte length, and recompute its hash. Then append a hand-built a.md@4 whose prev is the new hash and whose hash is recomputed. After reopen, verify() returns ok:false and an error names a.md. Second shape: call snapshot() after a.md@3, append a.md@4 and b.md@5 without a snapshot, and copy the directory while the log is open. In the copy, rewrite a.md@3 and a.md@4 consistently (same lengths, recomputed hashes and prev). Opening the copy, verify() returns ok:false naming a.md. The untouched copy, and the untouched log with a.md@4 appended through append(), both verify ok.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-tail.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c17:' test/oplog-tail.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c18: A opens with segmentBytes 1024, appends to a.md and b.md, and snapshots; B opens the same directory read-only. A appends a.md records until log.stats().segments is at least 3, then closes: B.verify() is ok with errors []. A reopens, calls archiveSealed() and closes: B.verify() is again ok with errors [] and reports the same ops as A's own verify().",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-tail.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c18:' test/oplog-tail.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c18:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c19: In each case verify() must not throw and must return ok:false. (a) A log with segmentBytes 1024, rolled at least twice and closed, has seg-000001.jsonl deleted (and, separately, archived first and then deleted from archive/): an error names seg-000001. (b) After close(), the last record's line is replaced by 'null' padded with spaces to the same byte length: an error names the snapshot's seq and the highest seq still on disk. (c) After reopen, the active segment file is deleted while the log is open: an error names the snapshot's seq and the highest seq on disk.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-tail.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c19:' test/oplog-tail.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c19:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c20: On an open writer with records appended since the last snapshot, JSON.stringify(log.manifest), log.sinceSnapshot, JSON.stringify(log.recovered) and log.clock are identical before and after verify(). After three more appends, log.active.bytes equals fs.statSync(<active segment file>).size. After close() and reopen, log.recovered deep-equals [].",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-tail.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c20:' test/oplog-tail.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c20:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The first 40 lines of oplog.mjs name the manifest comparison (highest seq on disk against the manifest's recorded last), say that snapshot.json and manifest.json carry no key, and say that records without a path have no chain or head check.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/oplog-tail.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "cmd": "h=$(head -40 src/engine/oplog.mjs | tr '\\n' ' '); printf '%s' \"$h\" | grep -Eqi 'highest seq[^.]*manifest|manifest[^.]*highest' && printf '%s' \"$h\" | grep -Eqi '(no key|not signed|unsigned|unkeyed)' && printf '%s' \"$h\" | grep -Eqi '(without a|no|null) path[^.]*(no|not|never)[^.]*(chain|head)'",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "T1-c22: (a) Build a.md@1, b.md@2, a.md@3, b.md@4 (delete) and close; insert 25 unreadable lines mid-segment and replace b.md@4 with a rehashed put that keeps the same seq and prev: verify().errors contains an error naming b.md. (b) Insert 25 unreadable lines, remove the last three records and delete snapshot.json: verify().errors contains the error naming the manifest's recorded last and the highest seq on disk.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-tail.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c22:' test/oplog-tail.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c22:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Against the base tree, every labelled tamper subtest (T1-c01, c06, c07, c09, c10, c15, and the new c16, c17, c19, c22) is reported 'not ok' at any nesting depth, and none is reported 'ok'.",
+          "verifier": {
+            "type": "metric",
+            "cmd": "d=$(mktemp -d) && git archive \"$MEMEV_CONTRACT_BASE\" | tar -x -C \"$d\" && cp test/oplog-tail.test.mjs \"$d/test/\" && cp -R test/helpers/. \"$d/test/helpers/\" && cd \"$d\" && { node --test --test-reporter=tap test/oplog-tail.test.mjs > base.tap; node -e 'const t=require(\"fs\").readFileSync(\"base.tap\",\"utf8\");const red=new Set([...t.matchAll(/^\\s*not ok \\d+ - T1-c(\\d\\d):/gm)].map(m=>m[1]));const green=[...t.matchAll(/^\\s*ok \\d+ - T1-c(\\d\\d):/gm)].map(m=>m[1]);const L=[\"01\",\"06\",\"07\",\"09\",\"10\",\"15\",\"16\",\"17\",\"19\",\"22\"];console.log(JSON.stringify({labelled_not_red_at_base:L.filter(n=>!red.has(n)||green.includes(n)).length}))'; }",
+            "key": "labelled_not_red_at_base",
+            "op": "==",
+            "value": 0
+          }
+        },
+        {
+          "statement": "verify() of a 500,000-record log over 10 paths returns ok with every op counted inside a 20 MB old-space limit. A verify() that does not stream, or that keeps something per record, runs out of heap and prints nothing.",
+          "verifier": {
+            "type": "metric",
+            "cmd": "d=$(mktemp -d) && node -e 'import(\"./src/engine/oplog.mjs\").then(({OpLog})=>{const l=new OpLog(process.argv[1],{fsync:false}).open();for(let i=0;i<500000;i++)l.append({type:\"put\",path:\"n\"+(i%10)+\".md\",data:{c:i}});l.close()})' \"$d\" && node --max-old-space-size=20 -e 'import(\"./src/engine/oplog.mjs\").then(({OpLog})=>{const r=new OpLog(process.argv[1],{fsync:false}).open().verify();console.log(JSON.stringify({verified_ops:r.ok?r.ops:-1}))})' \"$d\"; rm -rf \"$d\"",
+            "key": "verified_ops",
+            "op": "==",
+            "value": 500000,
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "The contract base already contains SR-1.01's read-only open and QL-1.02's mutation script.",
+          "verifier": {
+            "type": "command",
+            "cmd": "git cat-file -e \"$MEMEV_CONTRACT_BASE:scripts/gate/mutate.mjs\" && git show \"$MEMEV_CONTRACT_BASE:src/engine/oplog.mjs\" | grep -q readOnly",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "After close(), the line 'null' is appended to the active segment, and separately the line '7': open() succeeds, log.seq is unchanged, and verify() returns ok:false with an error naming the line's segment.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-tail.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c26:' test/oplog-tail.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c26:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/oplog-tail.test.mjs passes every labelled subtest (T1-c01, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c15, T1-c16, T1-c17, T1-c18, T1-c19, T1-c20, T1-c22, T1-c26) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/oplog-tail.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c15:|^T1-c16:|^T1-c17:|^T1-c18:|^T1-c19:|^T1-c20:|^T1-c22:|^T1-c26:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
             "timeout_s": 600
           }
         },
