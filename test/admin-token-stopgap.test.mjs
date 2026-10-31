@@ -81,4 +81,5 @@ test('issue 282 follow-up: rotating the admin token leaves admin.json private an
   if (process.platform !== 'win32') assert.equal(fs.statSync(file).mode & 0o777, 0o600, 'admin.json is readable by others after the rotate');
   assert.doesNotMatch(r.stdout, /pasted again|memev cloud url/, 'the admin token is never pasted into a cloud app, so the rotate must not ask for it');
   assert.match(r.stdout, /admin\.json holds the new secret/);
+  assert.equal(fs.existsSync(`${file}.tmp`), false, 'the temp file an earlier rotate left, which may hold an admin secret, is still on disk');
 });
