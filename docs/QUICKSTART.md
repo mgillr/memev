@@ -26,6 +26,9 @@ and show me the checklist it prints."
    or `memev cloud on` turns it on; `--local-only` and `--org` (an install for an organisation) skip the question,
 6. prints a checklist: what is connected, what needs one click from you, and how to back up to GitHub.
 
+On a terminal, init also offers an optional step to import what you have already worked on
+(see [IMPORT.md](IMPORT.md)). It is off unless you say yes, and it never blocks init.
+
 Run `memev ready`, then open a new session or chat in each connected app. It prints "<app> joined at
 HH:MM" as each one starts, and "Ready: <app> and <app> share one memory" once one app recalls a
 memory another one saved: ask one to remember something and another about it. `--timeout SECONDS`
