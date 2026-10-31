@@ -5,6 +5,7 @@
 // registers here, and the core holds no convergence logic of its own. When the licence does not
 // allow the engine, or the engine is not registered, refuses, or fails, both versions are kept
 // whole and a line names the reason.
+import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { verifyLicense, LICENSE_KEYS } from './license.mjs';
 
@@ -37,22 +38,33 @@ export function registerMergeProvider(provider) {
  * and the base to the command's standard input as one JSON line, and reads one JSON line back:
  * `{ "text": "..." }` is the merged note, `{ "refuse": true }` keeps both versions. The command
  * is not a package dependency of this repository: it is a program the install points at, and
- * nothing in this repository imports it.
+ * nothing in this repository imports it. A failure names the engine by its id (the command's file
+ * name unless the install gives one), never by a path, because the reason lands in the conflict
+ * record and on the card. The answer may be up to maxBuffer bytes, so a large note still merges.
  */
-export function commandProvider(command, { args = [], timeoutMs = 30000 } = {}) {
+export const ENGINE_MAX_BUFFER = 64 * 1024 * 1024;
+export function commandProvider(command, { args = [], timeoutMs = 30000, maxBuffer = ENGINE_MAX_BUFFER, id = path.basename(String(command)) } = {}) {
+  const fail = (what) => new Error(`${what} (${id})`);
   return {
     kind: 'command',
+    id,
     resolve({ a, b, base }) {
       const input = JSON.stringify({ a, b, base: base ?? null });
-      const r = spawnSync(command, args, { input, encoding: 'utf8', timeout: timeoutMs });
-      if (r.error || r.status !== 0) {
-        throw new Error(r.error ? r.error.message : (r.stderr || '').trim() || `exit ${r.status}`);
+      const r = spawnSync(command, args, { input, encoding: 'utf8', timeout: timeoutMs, maxBuffer });
+      if (r.error) {
+        const code = r.error.code;
+        if (code === 'ETIMEDOUT') throw fail(`no answer within ${timeoutMs} ms`);
+        if (code === 'ENOBUFS') throw fail(`the answer is larger than ${maxBuffer} bytes`);
+        if (code === 'ENOENT' || code === 'EACCES') throw fail('the engine could not be started');
+        throw fail(`the engine could not be run (${code || 'unknown error'})`);
       }
+      if (r.status !== 0) throw fail(r.signal ? `stopped by ${r.signal}` : `exit ${r.status}`);
       const line = String(r.stdout).split('\n').map((l) => l.trim()).find(Boolean);
-      if (!line) throw new Error('no answer');
-      const out = JSON.parse(line);
+      if (!line) throw fail('no answer');
+      let out;
+      try { out = JSON.parse(line); } catch { throw fail('the answer is not JSON'); }
       if (out && out.refuse) return { refuse: true };
-      if (!out || typeof out.text !== 'string') throw new Error('no merged text in the answer');
+      if (!out || typeof out.text !== 'string') throw fail('no merged text in the answer');
       return { text: out.text };
     },
   };

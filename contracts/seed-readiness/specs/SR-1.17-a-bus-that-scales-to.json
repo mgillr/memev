@@ -1,0 +1,55 @@
+{
+  "title": "SR-1.17 A bus that scales to a team",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G17: Bus.all() re-sorts every message per call; roster and tasks are O(seats x messages). Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Indexed bus",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "append is O(1) for its own seq",
+        "roster and tasks read a maintained index",
+        "the bench prints the CPU count, the CPU model and the 1-minute load beside roster_ms_p95"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/bus.mjs",
+        "scripts/bench/**",
+        "test/bus-scale.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "50 seats and 100,000 messages: roster under 50 ms",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-scale.test.mjs",
+            "cmd": "node --test test/bus-scale.test.mjs"
+          }
+        },
+        {
+          "statement": "Roster p95 < 50 ms at 50 seats, 100k messages",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/bench/bus.mjs --seats 50 --messages 100000 --json",
+            "key": "roster_ms_p95",
+            "op": "<",
+            "value": 50
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

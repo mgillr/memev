@@ -1,0 +1,55 @@
+{
+  "title": "SR-3.02 An engine conformance suite in the core",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G31: The service contract in PAID-CONVERGENCE.md has no executable test any engine must pass. Repository: memev. Depends on contracts: SR-3.01.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Conformance corpus and runner",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "at least 300 three-way cases from real vault edits: disjoint sections, same section different lines, reorder, delete-vs-edit, tables, front matter, CJK",
+        "pass means: every non-conflicting change kept, no merge markers, valid Markdown, refuse only on true conflicts",
+        "runs any engine command given with --engine"
+      ],
+      "description": "",
+      "scope": [
+        "test/merge-conformance/**",
+        "scripts/merge-conformance.mjs",
+        "docs/EXTENSION-POINTS.md"
+      ],
+      "criteria": [
+        {
+          "statement": "At least 300 cases",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/merge-conformance.mjs --count --json",
+            "key": "cases",
+            "op": ">=",
+            "value": 300
+          }
+        },
+        {
+          "statement": "A stub engine that drops a change fails the suite",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/merge-conformance/runner.test.mjs",
+            "cmd": "node --test test/merge-conformance/"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

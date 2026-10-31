@@ -1,0 +1,340 @@
+{
+  "title": "QL-1.03 Security checklist before merge on every change that touches command execution, auth, tokens, the tunnel or the oplog",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes quality-loop principle 7. Repository: memev. Depends on contracts: none. Quality-loop principle set of 30 October 2026 (owner's order: implement as a gate for all dev).",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Sensitive-path gate",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "scripts/gate/sensitive-paths.json lists the sensitive globs by area: command execution (src/engine/contracts.mjs, src/cli/runner.mjs, src/cli/setup-remote.mjs, src/engine/setup-channel.mjs, src/cli/contracts-cli.mjs), auth and tokens (src/server/oauth.mjs, src/engine/tokens.mjs, src/engine/devices.mjs, src/engine/sshsig.mjs when it exists), the tunnel and relay (src/cli/tunnel.mjs, src/engine/relay*.mjs, src/server/http.mjs), the oplog (src/engine/oplog.mjs, src/engine/vault.mjs)",
+        "scripts/gate/sensitive-paths.mjs --base <sha> lists the changed files that match; when any does, it requires security/checklists/<head-sha-12>.md (or the file named by --checklist) with the four headings Who can call this, What runs, What survives a restart, What happens with two processes, each followed by at least one non-empty line that names a file:line, and a line Head: <40-hex> equal to the head being checked",
+        "exit 1 with the missing answers named; exit 0 when no sensitive file changed or the checklist is complete; the script has no dependencies and carries a version: comment",
+        "the checklist is bound to content, not to a commit: the gate computes the sensitive diff id, the sha256 over the sorted lines '<path> <blob id at the head>' (or '<path> deleted') of every sensitive path that differs between base and the head, and requires security/checklists/<first 12 hex of that id>.md with a line Diff: <the full id>; the id is the same on the pull request branch, on its merge ref and on main after a squash or a rebase merge, and any later change to a sensitive file changes it, so the binding goes stale; a checklist copied to another change applies only when that change carries the identical sensitive content",
+        "the gate fails closed: when the changed files cannot be computed (unknown base, the all-zero sha, no merge base, a shallow history) it exits non-zero naming why, or treats every file as changed",
+        "the sensitive globs are read from the base commit and from the head and merged, so a change that removes a glob cannot excuse itself; a change to the gate script, its glob file, ci.yml or the hook template is itself sensitive",
+        "an answer counts only when it is not TODO, n/a or a repeat of another answer, and cites a file:line that exists at the head being checked",
+        "every run judges with the base's gate: CI runs the gate script and the glob file read from the base commit (git show <base>:scripts/gate/...), never the copy in the change under review; the pre-push hook runs the copy at the remote's head of the pushed branch, or of main for a new branch, and refuses when that copy is missing",
+        "the gate takes --head as well as --base and the hook passes the pushed sha from pre-push stdin, so pushing a branch from another checkout is judged on what is pushed",
+        "the checklist and every cited file are read through git at the head being checked (git show and git cat-file with execFile argument arrays, never a shell string), never from the working tree; a cited path or a ref with shell metacharacters is refused",
+        "callers of the command wrappers (src/engine/util.mjs run, src/engine/git.mjs) and vendor/attest are command-execution files for the sensitive list, found by scanning imports of those modules, not only of node:child_process",
+        "merge commits are judged on their combined content against the base, so an evil merge or a parallel branch cannot carry a sensitive change past a checklist written for another diff",
+        "each red-green criterion of this task that runs test/gate-sensitive.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
+      ],
+      "description": "",
+      "scope": [
+        "scripts/gate/sensitive-paths.mjs",
+        "scripts/gate/sensitive-paths.json",
+        "security/checklists/README.md",
+        "test/gate-sensitive.test.mjs",
+        "test/fixtures/sensitive/**",
+        "test/helpers/**",
+        "security/checklists/**",
+        "changelog.d/QL-1.03.md",
+        "docs/DEVELOPING.md"
+      ],
+      "criteria": [
+        {
+          "statement": "A diff touching oplog.mjs without a checklist fails, with a checklist missing one answer fails naming it, with a complete checklist for the same head passes, and a docs-only diff passes without one",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The checklist folder explains the four questions",
+          "verifier": {
+            "type": "file_exists",
+            "path": "security/checklists/README.md"
+          }
+        },
+        {
+          "statement": "In a fixture repo: (a) commit A edits src/engine/oplog.mjs; commit B adds only the checklist made by the procedure in security/checklists/README.md; then `git merge --no-ff` onto the base to mimic refs/pull/N/merge. Run the gate the way ci.yml runs it: exit 0. (b) Commit C edits oplog.mjs again with no new checklist: exit 1, naming the stale binding. (c) A checklist saved under the current head's file name but with Head: naming commit A: exit 1. (d) --checklist pointing at a complete checklist whose Head is another commit: exit 1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Cases on a fixture with an oplog.mjs change and the correct Head: (i) four headings with empty bodies and one 'src/engine/oplog.mjs:1' after the last heading: exit 1, naming the first three questions. (ii) Each answer 'TODO' or 'n/a': exit 1, naming all four. (iii) An answer citing src/engine/nope.mjs:1, or a line past the end of an existing file at head: exit 1. (iv) The same 'localhost:7777' line under every heading: exit 1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Each case has an oplog.mjs change and no checklist, and each must exit non-zero, never 0. The cases: --base set to an unknown 40-hex sha; --base 0000000000000000000000000000000000000000; no --base; a `git clone --depth 1 file://` of the fixture with --base set to its parent; a detached HEAD; a single root commit. Each failure names why the changed files could not be computed. For the root-commit and zero-sha cases, the gate may instead treat every file as changed and exit 1 naming oplog.mjs.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "(a) Every tracked src/**/*.mjs that imports node:child_process, imports engine/tokens.mjs or engine/oplog.mjs, or contains timingSafeEqual, 'authorization', 'Bearer', localOnly or ssh-keygen is matched by a glob in sensitive-paths.json, so a new such file fails the suite until it is listed. (b) Every glob not marked optional matches at least one tracked file. (c) For each path in the requirement, plus util.mjs, mcp.mjs, common.mjs, agentid-bind.mjs, cli/relay.mjs and server/relay-dev.mjs, a fixture diff touching only that path exits 1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "In a fixture: `git mv src/server/http.mjs src/server/gateway.mjs` plus an edit to src/server/main.mjs: exit 1, naming src/server/http.mjs. A rename that also rewrites about 40% of the file: exit 1. Deleting src/engine/oplog.mjs: exit 1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c07:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A fixture diff that removes the oplog entry from scripts/gate/sensitive-paths.json and edits src/engine/oplog.mjs exits 1; the globs are read from `git show <base>:scripts/gate/sensitive-paths.json` merged with head's. A diff that touches only scripts/gate/sensitive-paths.mjs, or only .github/workflows/ci.yml, exits 1 when there is no checklist.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Extract the checklist template from security/checklists/README.md, fill each answer with a real file:line and the Head line, and run the gate on a fixture oplog.mjs change: exit 0. Remove any one heading from the filled template: exit 1, naming it. Also assert that docs/DEVELOPING.md names every area key in sensitive-paths.json and all four headings.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c09:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Fixture: base O; PR branch with A (edits src/engine/oplog.mjs) and B (adds the checklist the security/checklists/README.md procedure produces). (a) Squash A..B onto O as commit S and run the gate the way the push-to-main step runs it (--base O, HEAD S): exit 0. (b) Re-create A and B with new shas onto O (git rebase --force-rebase, as GitHub's rebase merge does): exit 0. (c) Same as (a), but S also edits src/engine/tokens.mjs, which the checklisted branch never contained: exit 1 naming tokens.mjs. (d) A checklist copied from an unrelated earlier squashed change, whose Head is unreachable: exit 1. The current sha rule cannot pass (a) and (b), so the owner must change the binding (for example to a patch-id or blob hash of the sensitive-path diff).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c10:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "(a) A edits oplog.mjs, B adds a complete checklist bound to A, then a merge commit whose resolution adds an edit to src/engine/tokens.mjs that neither parent has: the gate (--base O) exits 1 naming tokens.mjs. (b) Branch L edits oplog.mjs with a checklist for L; branch E edits tokens.mjs with an earlier committer date; HEAD is a clean merge of both: exit 1 naming E and tokens.mjs. (c) Control: git merge --no-ff of A+B onto a base that has advanced with a non-sensitive change exits 0.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c11:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Every tracked file under src/** and vendor/** that does any of the following is matched by a glob: imports child_process in any form (static node:child_process or child_process, dynamic import(), createRequire); imports run from src/engine/util.mjs or vendor/attest/util.mjs; imports git from src/engine/git.mjs; or imports vendor/attest/signature.mjs. At base this flags src/cli/service.mjs, src/cli/hooks.mjs, src/cli/preflight.mjs, src/engine/git.mjs and vendor/attest/*.mjs. A fixture diff touching only src/cli/service.mjs, or only vendor/attest/util.mjs, exits 1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c12:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "On an oplog commit: (a) a complete, correctly bound checklist present only as an untracked file gives exit 1; (b) the same file staged but not committed gives exit 1; (c) a committed checklist citing a file:line that exists only in an untracked file, or at HEAD but not at the bound commit, gives exit 1 naming the citation. The gate reads the checklist and each cited file with git show <commit>:<path>.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c13:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "On an oplog fixture with the correct Head: (i) each answer is 'TODO: src/engine/oplog.mjs:N' or 'n/a src/engine/oplog.mjs:N' (valid, distinct N): exit 1 naming all four; (ii) the identical valid line 'src/engine/oplog.mjs:1 see code' under every heading: exit 1 naming the repeats; (iii) the README template verbatim with only the Head line added: exit 1 naming all four; (iv) four distinct answers citing only package.json:1-4: exit 1 naming src/engine/oplog.mjs as a changed sensitive file no answer cites.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c14:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c14:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Repeat each fail-closed case with a complete, correctly bound checklist committed, so a missing checklist cannot be the reason. Unknown 40-hex base, --base '', --base= and no --base: exit non-zero with a message naming the base. A shallow clone with --base set to its missing parent: same. Zero sha on history O to A (oplog) to B (README only) without a checklist: exit 1 naming oplog.mjs. A detached HEAD on a git merge --no-ff merge ref with a valid checklist: exit 0.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c15:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Checklist answers cite src/$(touch PWNED).mjs:1, a;touch PWNED;b.mjs:1 and `touch PWNED`.mjs:1, and --checklist names a path containing $(touch PWNED): the gate exits 1 and no PWNED file exists in the fixture or the cwd. The script never uses exec, execSync or shell: true; this last part is a secondary grep check.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c16:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c16:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/gate-sensitive.test.mjs passes every labelled subtest (T1-c01, T1-c03, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c11, T1-c12, T1-c13, T1-c14, T1-c15, T1-c16) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-sensitive.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c03:|^T1-c04:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c12:|^T1-c13:|^T1-c14:|^T1-c15:|^T1-c16:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Wired into CI and the push hook",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "the CI workflow runs the gate against the pull request's base on every pull request and on push to main",
+        "memev contract hook installs a pre-push hook that runs the gate beside memev gate",
+        "docs/DEVELOPING.md names the sensitive areas and the four questions",
+        "the hook is written where git reads it (git rev-parse --git-path hooks/pre-push), so linked worktrees and core.hooksPath work; it reads the refs from pre-push stdin; it runs the sensitive-path gate only in a repository that has scripts/gate/sensitive-paths.mjs and exits 0 in a plain user project",
+        "the CI steps that run the gate check out full history (fetch-depth 0), take the base from the event through env, carry no continue-on-error and no || , and run on pull requests and on push to main; docs/DEVELOPING.md states that the check must be a required status on main, a repository setting the owner turns on",
+        "the wiring check also refuses a step-level if: that can skip the step, set +e or any shell construct that discards the exit status, and job-level continue-on-error; pushes to main are never cancelled by a later run (cancel-in-progress applies to pull requests only)",
+        "each red-green criterion of this task that runs test/gate-sensitive-wiring.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest"
+      ],
+      "description": "",
+      "scope": [
+        ".github/workflows/ci.yml",
+        "src/cli/contracts-cli.mjs",
+        "docs/DEVELOPING.md",
+        "test/gate-sensitive-wiring.test.mjs",
+        "test/helpers/**",
+        "security/checklists/**",
+        "changelog.d/QL-1.03.md",
+        "docs/CONTRACTS.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The workflow file runs scripts/gate/sensitive-paths.mjs on pull requests and the installed pre-push hook calls it",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-wiring.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c01:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The developing page lists the four questions",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/DEVELOPING.md",
+            "pattern": "What happens with two processes"
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Parse ci.yml and find each step whose run invokes node scripts/gate/sensitive-paths.mjs. Assert that one such step runs on pull_request and one on push to main (the job's if: allows the event). Each such job checks out with fetch-depth: 0. No such step has continue-on-error, and its run has no '||'. --base comes from github.event.pull_request.base.sha or github.event.before, passed through env. Then run that line in a fixture repo that has an oplog.mjs change and no checklist, with the ${{ }} expressions replaced by fixture shas, and assert exit 1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-wiring.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c04:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Set up a sandbox repo with scripts/gate copied in and a bare remote, then install the hook with `memev contract hook` (or GATE_HOOK with a stub launcher that exits 0). With HEAD on a clean main, commit an oplog.mjs change with no checklist on branch feat. `git push origin feat` exits non-zero and `git --git-dir=<bare> rev-parse refs/heads/feat` fails. After a valid checklist is added, the push succeeds. With a stub launcher that exits 1, the push is refused even with a checklist.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-wiring.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c05:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Install the hook (stub launcher that exits 0) in a repository without scripts/gate, a plain user project, and assert an ordinary `git push` succeeds. Install it in a memev-layout fixture with an oplog.mjs change and no checklist, and assert the push is refused, with the hook output naming the sensitive-path gate.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-wiring.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c06:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Install with `memev contract hook` in a `git worktree add` worktree and in a repo with core.hooksPath set. Assert the hook lands at `git rev-parse --git-path hooks/pre-push`, and that a push carrying an oplog.mjs change without a checklist is refused.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-wiring.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c07:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The gate passes on the contract's own change against the base commit. This makes the owner add security/checklists/*.md (and the changelog note) to T2's scope rather than leave them as hidden breaches.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/gate/sensitive-paths.mjs --base be457dbd829c89e48fbd3f19b72d43864cd97fd8",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Fixture whose head edits src/engine/oplog.mjs (no checklist) and replaces scripts/gate/sensitive-paths.mjs with process.exit(0). (a) The ci.yml gate step, run as written with BASE set to the fixture base, exits 1, because it executes the gate as stored at the base (git show \"$BASE\":scripts/gate/sensitive-paths.mjs, globs from both sides) and uses the head's copy only when the base has none. (b) git push through the installed hook is refused; the hook takes the gate from the base or remote commit, not the working tree. (c) A head that deletes the gate file and edits oplog.mjs: push refused. (d) A head that only renames the top-level key of sensitive-paths.json and edits oplog.mjs: exit 1, because base globs that fail to parse or yield none fail closed. (e) sensitive-paths.json matches both test/gate-sensitive*.test.mjs files.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-wiring.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c09:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "For each event, pull_request (payload with pull_request.base.sha set to the fixture base and no before) and push to refs/heads/main (before set to the fixture base and no pull_request), evaluate ci.yml. The gate step's job if: and step if: must both be true. Run the step's whole run block with its effective shell (its shell:, else bash -e {0}), its env evaluated from that payload, and cwd set to the fixture. Assert exit 1 on an oplog change with no checklist and exit 0 on the same change with a valid committed checklist. Assert no continue-on-error on the step or its job. For a push of refs/tags/v1.0.0 with before = 40 zeros, assert no gate step is selected.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-wiring.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c10:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "(a) main stays checked out and clean; feat already exists on the bare remote; an oplog commit is added to feat without checking it out (git worktree add, or commit-tree plus update-ref); git push origin feat is refused and the bare feat is unchanged. (b) git push origin main feat, where only feat (the second stdin line) carries the change: refused. (c) A new branch with two commits, an oplog change then a README-only change: refused; after a checklist for the oplog commit is committed, accepted. (d) git push origin :feat (a deletion, local sha zeros): accepted.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-wiring.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c11:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Parse ci.yml: for the job that runs the gate on push to main, the effective cancel-in-progress evaluates to false for event push (for example ${{ github.event_name == 'pull_request' }}). Simulate two pushes, P1 (oplog change, no checklist) then P2 (test-only change), each with before set to the previous tip, with P1's run dropped: the configuration must not allow dropping it. An alternative fix is to make the push-run base the last commit that passed the gate rather than github.event.before.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-wiring.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c12:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Move the DEVELOPING.md assertion from T1 c9 here. The ci.yml gate step's run text, with expressions evaluated, invokes exactly the command T1 c3(a) uses, read from one constant in test/helpers; this test executes the step itself (see n5). docs/DEVELOPING.md names every area key in sensitive-paths.json, the four headings, and that the check must be a required status on main.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-wiring.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c13:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/gate-sensitive-wiring.test.mjs passes every labelled subtest (T2-c01, T2-c04, T2-c05, T2-c06, T2-c07, T2-c09, T2-c10, T2-c11, T2-c12, T2-c13) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-sensitive-wiring.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c04:|^T2-c05:|^T2-c06:|^T2-c07:|^T2-c09:|^T2-c10:|^T2-c11:|^T2-c12:|^T2-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

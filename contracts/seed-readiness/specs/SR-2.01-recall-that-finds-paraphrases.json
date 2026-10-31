@@ -1,0 +1,114 @@
+{
+  "title": "SR-2.01 Recall that finds paraphrases",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G21: Recall is BM25 only; a query with no shared words scores zero. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Paraphrase evaluation set",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "200 query-note pairs where the query shares no content word with the note, in English and German"
+      ],
+      "description": "",
+      "scope": [
+        "bench/paraphrase/**",
+        "scripts/bench/**"
+      ],
+      "criteria": [
+        {
+          "statement": "At least 200 pairs",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/bench/paraphrase.mjs --count --json",
+            "key": "pairs",
+            "op": ">=",
+            "value": 200
+          }
+        },
+        {
+          "statement": "BM25 baseline recorded",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/bench/paraphrase.mjs --json",
+            "key": "bm25_recall_at_5",
+            "op": ">=",
+            "value": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Optional local embedding rerank",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "when an Ollama embedding model is configured, recall unions BM25 and vector candidates and reranks; off by default",
+        "no text leaves the machine; why still explains both parts"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/embed.mjs",
+        "src/engine/index.mjs",
+        "src/engine/vault.mjs",
+        "docs/DESIGN.md",
+        "test/embed.test.mjs",
+        "scripts/bench/paraphrase.mjs",
+        "bench/paraphrase/**"
+      ],
+      "criteria": [
+        {
+          "statement": "With a stub embedder a paraphrase query returns its note",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/embed.test.mjs",
+            "cmd": "node --test test/embed.test.mjs"
+          }
+        },
+        {
+          "statement": "Recall@5 on paraphrases >= 0.70 with embeddings",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/bench/paraphrase.mjs --embed --json",
+            "key": "recall_at_5",
+            "op": ">=",
+            "value": 0.7
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
