@@ -11,7 +11,10 @@
       "depends_on": [],
       "requirements": [
         "memev cloud url prints a URL with no secret in it; claude.ai and ChatGPT connect through the OAuth flow",
-        "path tokens are refused after a one-version deprecation that warns in doctor"
+        "path tokens, and cloud-connector mv_ tokens sent in the Authorization header, are refused through the tunnel under the default configuration; memev doctor warns, naming the connector, while a cloud connector still holds an mv_ token and has no OAuth grant, and says how to reconnect it through OAuth",
+        "memev cloud url, memev cloud status --show-secrets and memev cloud connect print no token, encode none in the QR block and mint none, and connect reports success once an OAuth client completes the flow and calls /mcp",
+        "docs/CLOUD.md documents no connector URL that carries a token, and no code comment says the /c/<token> form stays",
+        "each red-green criterion of this task that runs test/connector-url.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
       "scope": [
@@ -19,7 +22,14 @@
         "src/server/http.mjs",
         "src/server/oauth.mjs",
         "docs/CLOUD.md",
-        "test/connector-url.test.mjs"
+        "test/connector-url.test.mjs",
+        "src/cli/doctor.mjs",
+        "test/http.test.mjs",
+        "test/seats.test.mjs",
+        "test/cloud-connect.test.mjs",
+        "test/connectors-unlimited.test.mjs",
+        "test/relay.test.mjs",
+        "test/oauth.test.mjs"
       ],
       "criteria": [
         {
@@ -27,7 +37,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/connector-url.test.mjs",
-            "cmd": "node --test test/connector-url.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/connector-url.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -36,6 +46,54 @@
             "type": "grep",
             "file": "docs/CLOUD.md",
             "pattern": "no secret in the URL"
+          }
+        },
+        {
+          "statement": "Setup: remote access on, tunnel headers, User-Agent 'Claude-User', no X-Memev-Client. A cloud-connector mv_ token (one from clientToken(root,'claude',{remote:true}), one from devices.enroll kind cloud-connector) is refused (401) both as /c/<token>/mcp and as `Authorization: Bearer <token>` on POST /mcp. An OAuth access token sent from the same IP and UA is served (200), so the refusal is tied to the credential and not to the caller.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/connector-url.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/connector-url.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "In a fresh sandbox, the stdout and stderr of `memev cloud url`, `memev cloud status --show-secrets` and `memev cloud connect claude --timeout 1` contain no match of /mv_[0-9a-f]{8}_[0-9a-f]{32,}/ and no '/c/'. The QR block that connect prints equals qrText(`${tunnelUrl}/mcp`) (imported from vendor/qr.mjs), and connect still reports success once an OAuth client completes the flow and calls /mcp.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/connector-url.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/connector-url.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "On a vault with default config and no env flags, with remote access on, tunnel headers, User-Agent 'Claude-User' and no X-Memev-Client, a POST to /c/<valid unrevoked cloud-connector mv_ token>/mcp gets 401 with an error code that does not exist at base (for example error === 'path_token'), so the refusal comes from the new check.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/connector-url.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/connector-url.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "docs/CLOUD.md documents no connector URL that carries a token",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -nE '/c/(<token>|mv_)' docs/CLOUD.md",
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "One full run of test/connector-url.test.mjs passes every labelled subtest (T1-c01, T1-c03, T1-c04, T1-c05) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/connector-url.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c03:|^T1-c04:|^T1-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
           }
         },
         {
@@ -60,7 +118,14 @@
       "requirements": [
         "access tokens live at most one hour, refresh tokens rotate on use and a reused refresh token revokes the family",
         "access tokens are bound to a key the client holds (DPoP, RFC 9449): the token names the key's thumbprint, every request carries a fresh proof signed by that key over the method, the URL and a time, and the server refuses a token presented without a matching proof or with a replayed one",
-        "a client that cannot hold a key (a connector that supports only bearer tokens) is listed in docs/CLOUD.md by name with the reason, and its tokens live at most 15 minutes"
+        "a client that cannot hold a key (a connector that supports only bearer tokens) is listed in docs/CLOUD.md by name with the reason, and its tokens live at most 15 minutes",
+        "the server verifies the proof's signature with the public key in its header, accepting only the algorithms its metadata lists and never alg none, before it compares that key's RFC 7638 thumbprint with the token's",
+        "a DPoP-bound token needs a valid proof on every route, /mcp and each /v1 route alike, and is refused in the Bearer scheme whether or not a proof comes with it",
+        "a token request with no proof is refused unless the client's registered name is on the bearer-only list that src/server/oauth.mjs exports; each name on the list is in docs/CLOUD.md with its reason, and its access tokens live at most 900 seconds",
+        "the authorization-server metadata lists dpop_signing_alg_values_supported, the protected-resource metadata lists the DPoP method, and a 401 carries a DPoP challenge",
+        "a refresh of a DPoP-bound pair needs a fresh proof from the key the pair is bound to, and the new access token stays bound to it",
+        "a proof is accepted only with iat no more than 5 minutes from the server's clock, htm equal to the request method and htu equal to the request URL as the client sent it; a used jti is remembered across a restart for as long as its proof could be accepted",
+        "reusing a refresh token revokes its whole family, the newer pair included; the record of used refresh tokens survives a restart, and a refresh token the store does not know revokes nothing"
       ],
       "description": "",
       "scope": [
@@ -87,11 +152,59 @@
           }
         },
         {
+          "statement": "Test 'SR-1.04 possession signature'. The test builds its proofs itself with node:crypto as RFC 9449 compact JWS (typ dpop+jwt, ES256, ieee-p1363 signature), not with a helper imported from src/. Three proofs carry the token's own public JWK in their header and a fresh jti, iat, htm and htu: (a) signed by another key, (b) with one signature byte flipped, (c) with alg 'none' and an empty signature. Each gets 401 on POST /mcp through the tunnel. The same proof correctly signed gets 200.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oauth.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.04 possession signature$' test/oauth.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.04 possession signature$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Test 'SR-1.04 possession downgrade'. A DPoP-bound access token sent through the tunnel with no DPoP header gets 401 in both the `Bearer` and the `DPoP` scheme on POST /mcp, GET /v1/notes/memory/x.md, PUT /v1/notes/memory/x.md and POST /v1/recall. A valid proof sent alongside the Bearer scheme is also refused. Afterwards memory/x.md was not written.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oauth.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.04 possession downgrade$' test/oauth.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.04 possession downgrade$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Test 'SR-1.04 bearer fallback'. A client registered under a name that is not on the server's bearer-only list asks for a token with no DPoP proof and is refused (400). A client on the list gets token_type Bearer with expires_in <= 900, its oauth.json access record expires no more than 900 s after issue, and its token gets 401 once that expiry is moved into the past. Every name on the list (exported from src/server/oauth.mjs) appears in docs/CLOUD.md.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oauth.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.04 bearer fallback$' test/oauth.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.04 bearer fallback$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Test 'SR-1.04 possession refresh'. A token pair is issued under key A. A refresh through the tunnel (a) with no DPoP proof and (b) with a valid proof from key B is refused (400), and the original pair still works with key A. A refresh (c) with a fresh proof from key A succeeds, and the new access token is served only with key A's proofs and refused with key B's.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oauth.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.04 possession refresh$' test/oauth.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.04 possession refresh$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Test 'SR-1.04 possession freshness'. Each proof below has the right key and an unused jti, and each gets 401 on POST /mcp through the tunnel: iat 10 minutes in the past; iat 10 minutes in the future; htm GET; htu ending in /oauth/token. A proof accepted once by createServer(v) is refused by a second createServer(v) on the same vault, which simulates a restart.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oauth.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.04 possession freshness$' test/oauth.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.04 possession freshness$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Test 'SR-1.04 family'. Run the flow to get (A1,R1), refresh R1 to get (A2,R2), then reuse R1: the reuse gets 400, A1 and A2 get 401 on /mcp, and R2 gets 400 at /oauth/token. A junk refresh token sent with a live client's client_id leaves that client's tokens working. Reuse is still detected through a second createServer(v) on the same vault.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oauth.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.04 family$' test/oauth.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.04 family$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
           "statement": "SR-1.04 possession: an access token presented with no proof, with a proof signed by another key, or with a proof replayed from an earlier request is refused; with a fresh proof from its own key it is served; a server that accepts the token alone fails the test",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/oauth.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.04 possession' test/oauth.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.04 possession$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.04 possession$' test/oauth.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.04 possession$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -142,6 +255,13 @@
             "type": "grep",
             "file": "docs/testing/connector-live-run.md",
             "pattern": "ChatGPT.*PASS"
+          }
+        },
+        {
+          "statement": "For each app, the record holds exactly one table row with a date, an app version containing a digit, the flow 'OAuth', the token type, the OAuth client id (oc_...) the vault registered, and PASS. This still cannot prove that a live run happened, but it rules out placeholder lines and runs that did not use OAuth.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=docs/testing/connector-live-run.md; grep -Eq '^\\| claude\\.ai \\| 20[0-9]{2}-[0-9]{2}-[0-9]{2} \\| [^|]*[0-9][^|]* \\| OAuth \\| [^|]+ \\| oc_[A-Za-z0-9_-]+ \\| PASS \\|$' \"$f\" && grep -Eq '^\\| ChatGPT \\| 20[0-9]{2}-[0-9]{2}-[0-9]{2} \\| [^|]*[0-9][^|]* \\| OAuth \\| [^|]+ \\| oc_[A-Za-z0-9_-]+ \\| PASS \\|$' \"$f\""
           }
         },
         {
