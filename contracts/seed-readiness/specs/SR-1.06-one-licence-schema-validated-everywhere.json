@@ -25,7 +25,9 @@
         "the trial record is written before license.json, and a failure writing it refuses the install or the activation with no licence written",
         "the size limit is measured in UTF-8 bytes on both paths",
         "verifyLicense returns trial, org and trial_ext with the other fields it returns, so every reader of the verified licence can apply the trial-in-grace rule that src/engine/merge.mjs applies",
-        "each red-green criterion of this task that runs test/license-schema.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
+        "verifyLicense takes floor, the latest time this vault recorded, and judges exp and grace at the later of now and floor, so winding the clock back does not revive a lapsed trial or licence (MEM-129 AC05); loadLicense keeps the floor in license-clock.json in the config directory, raising it to now on each check and never lowering it, and passes it to verifyLicense; engineAllowed in src/engine/merge.mjs passes the same floor",
+        "each red-green criterion of this task that runs test/license-schema.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest",
+        "each red-green criterion of this task that runs test/merge-entitlement.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c40: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
       "scope": [
@@ -36,7 +38,8 @@
         "test/merge-entitlement.test.mjs",
         "docs/PRICING.md",
         "changelog.d/SR-1.06.md",
-        "src/cli/relay.mjs"
+        "src/cli/relay.mjs",
+        "src/engine/merge.mjs"
       ],
       "criteria": [
         {
@@ -346,10 +349,34 @@
           }
         },
         {
-          "statement": "One full run of test/license-schema.test.mjs passes every labelled subtest (T1-c01, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c11, T1-c13, T1-c14, T1-c15, T1-c16, T1-c17, T1-c18, T1-c19, T1-c20, T1-c21, T1-c22, T1-c24, T1-c25, T1-c26, T1-c28, T1-c29, T1-c30, T1-c31, T1-c32, T1-c33, T1-c34, T1-c35, T1-c36, T1-c37) with nothing skipped and nothing todo.",
+          "statement": "T1-c39: A signed trial whose exp plus grace_days is three days before now reads expired at now. verifyLicense of it with now set ten days earlier (inside its validity) and floor set to the real now returns expired, and engineAllowed with the same now and floor returns false; with no floor the earlier now reads valid. loadLicense, called at the real now and then at a now one day earlier, leaves license-clock.json holding the real now.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c39:' test/license-schema.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c39:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c40: MEM-130 AC01 keeps passing with this contract's licences: in test/merge-entitlement.test.mjs, engineAllowed is true for a signed paid licence with the merge service in its valid window and in grace, true for a signed trial with the merge service in its valid window, and false for the same trial in grace, for a licence without the merge service, and for no licence.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/license-schema.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c04:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c13:|^T1-c14:|^T1-c15:|^T1-c16:|^T1-c17:|^T1-c18:|^T1-c19:|^T1-c20:|^T1-c21:|^T1-c22:|^T1-c24:|^T1-c25:|^T1-c26:|^T1-c28:|^T1-c29:|^T1-c30:|^T1-c31:|^T1-c32:|^T1-c33:|^T1-c34:|^T1-c35:|^T1-c36:|^T1-c37:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c40:' test/merge-entitlement.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c40:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "One full run of test/license-schema.test.mjs passes every labelled subtest (T1-c01, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c11, T1-c13, T1-c14, T1-c15, T1-c16, T1-c17, T1-c18, T1-c19, T1-c20, T1-c21, T1-c22, T1-c24, T1-c25, T1-c26, T1-c28, T1-c29, T1-c30, T1-c31, T1-c32, T1-c33, T1-c34, T1-c35, T1-c36, T1-c37, T1-c39) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/license-schema.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c04:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c13:|^T1-c14:|^T1-c15:|^T1-c16:|^T1-c17:|^T1-c18:|^T1-c19:|^T1-c20:|^T1-c21:|^T1-c22:|^T1-c24:|^T1-c25:|^T1-c26:|^T1-c28:|^T1-c29:|^T1-c30:|^T1-c31:|^T1-c32:|^T1-c33:|^T1-c34:|^T1-c35:|^T1-c36:|^T1-c37:|^T1-c39:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "One full run of test/merge-entitlement.test.mjs passes every labelled subtest (T1-c40) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/merge-entitlement.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c40:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
             "timeout_s": 600
           }
         },
