@@ -26,8 +26,8 @@ Ask the person which path fits, and explain the one you choose before you run it
 - The one-line installer is coming soon. Do not look for it.
 
 Every path sets up the same thing: it creates the notes folder, starts Memev and runs a self-test.
-`--no-connect` keeps init from connecting the AI apps it finds; connect each app only after the person
-approves it. The person already has a copy of the repository, or names the release to install; there
+`--no-connect` keeps init itself from connecting the AI apps it finds, but Memev still connects the apps
+it detects a few seconds after it starts (see "Connect only the clients the user approved"). The person already has a copy of the repository, or names the release to install; there
 is no other source.
 
 ## Ask permission before each privileged action
@@ -47,8 +47,9 @@ a version yourself, and do not write one down from memory. Run the install comma
 with `--no-connect` as above, then show the person the whole checklist it prints, keeping every line
 that asks them to do something. The install copies Memev to `~/.config/memev/runtime`, adds the
 launcher, starts Memev on `127.0.0.1:7787`, and installs a login service. With `--no-connect`, init
-does not connect the AI apps itself: connect each one only after the person approves it, as "Connect
-only the clients the user approved" says, before the smoke test, which needs them.
+does not connect the AI apps itself, but Memev connects the apps it detects a few seconds after it
+starts: before the smoke test, which needs connected clients, check `memev clients` with the person
+and disconnect each app they do not approve, as "Connect only the clients the user approved" says.
 
 ## Verify the installed version and health
 
