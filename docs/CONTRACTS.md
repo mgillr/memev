@@ -102,26 +102,48 @@ kind in the spec's manifest row (`manifest_kind`).
 dispositioned: `added`, with its criterion then in the spec verbatim (task, statement and verifier),
 or `rejected` with a reason. When the build or the builder changes what an added answer proposed (the build's name guard rewrites a
 test command; an answer is folded in substance), the builder records `folded_as`: the criterion the answer became,
-as `{task, statement, verifier}`, and that criterion must be in the spec verbatim instead. Medium and low answers may remain in a clean round, each with its
-disposition. A spec is SIGNABLE when all of these hold:
+as `{task, statement, verifier}`, and that criterion must be in the spec verbatim instead. A `folded_as` never names a
+criterion already verbatim in its round's own snapshot: that answer added nothing, so it is rejected with a reason
+instead. Medium and low answers may remain in a clean round, each with its disposition. A spec is SIGNABLE when all of
+these hold:
 
 - its last round has verdict `clean`, holds no high answer, and reviewed the spec as it is on disk;
 - every answer of every round is dispositioned, and every rejected answer has a reason;
 - no round weakens what an earlier one required: no task, criterion, requirement, stop rule or
-  dependency removed, no statement or verifier changed, no metric loosened, no scope glob added, no
-  workdir set, no criterion made optional;
+  dependency removed, no requirement reworded, no statement or verifier key changed, no metric loosened,
+  no scope glob added, no workdir set, no criterion made optional, except as an amendment records it;
 - every implement task has a mandatory `test_red_green` criterion whose command runs its own test
   file, unless the manifest row says `docs` or `evidence`;
 - since the reviewed commit, no file in the spec's scope and no listed input under `src/` changed.
   This is judged at HEAD for a spec not yet signed, and at the commit that signed the contract for one
   that is signed, so the signed contract's own work never makes it stale.
 
-**Amendments.** A criterion's command may change between two rounds only when the later round's
-`amendments` list records `{task, statement, from, to, answer}`, and the cited answer (`<round>.<n>`)
-of the previous round names that criterion contradictory or impossible. A numbered point of the
-previous round's notes may be cited instead, as `note: "<round>.<point>"`. A scope path may be added
-only as `{task, scope_add, answer}`: one path, no glob, citing an added answer of the previous round
-whose criterion reads that path.
+**Amendments.** A change between two snapshots is accepted only when the later round's `amendments`
+list records it with a citation, and the next round judges whether it weakens:
+
+- a requirement reworded: `{task, field: "requirement", from, to, <citation>}`;
+- a criterion's statement rewritten: `{task, field: "statement", from, to, <citation>}`;
+- any other key of a criterion's verifier changed: `{task, field: "verifier.<key>", statement, from, to,
+  <citation>}`, where `statement` names the criterion;
+- a command replaced: `{task, statement, from, to, <citation>}` (or with `field: "verifier.cmd"`), where the
+  cited answer proposes that criterion and the cited text names it contradictory or impossible;
+- a scope path added: `{task, scope_add, answer}`, one path and no glob; or a scope path or glob added:
+  `{task, field: "scope", to, answer}`. Either cites an added answer of the previous round whose criterion
+  reads that path, or a path under the glob;
+- a task moved to another spec at a split: `{kind: "move", task, to_spec, to_task, <citation>}`.
+
+A citation is `answer: "<round>.<n>"`, an answer of the previous spec round or of an implementation round
+recorded after it; `note: "<round>.<point>"`, a numbered point of the previous round's notes; or
+`reviewer_note: <n>`, an entry of the record's `reviewer_notes` list. Each reviewer note is `{n, text, sig}`,
+where `sig` is a reviewer key's DSSE envelope over `{spec_id, n, text}`, so every citation rests on a reviewer
+key's signature. A cited answer must be added. A removed criterion, requirement or stop rule has no amendment
+form.
+
+**Moves.** An added answer whose task moved to another spec at a split is folded as `{spec, task, statement,
+verifier}`. The gate resolves the spec id through the manifests under `contracts/` (a row with that id, and
+the one spec file of that id in that area), never through a path the record gives. It requires the move
+recorded in an amendments list of the record, and the criterion verbatim in that spec, following that spec's
+own statement and verifier replacements from what the answer was folded as.
 
 **Signatures.** Each round carries `sig`, a DSSE envelope (`vendor/attest/signature.mjs`) by a
 reviewer key over the round without what the builder writes after the reviewer answered (each
@@ -132,6 +154,9 @@ amendments are therefore covered by the next round's signature, and those of the
 dispositions and amendments. The gate holds the reviewer public keys it accepts, never accepts a key
 under `contracts/keys/` (those sign contracts), and refuses an unsigned round, a round signed by any
 other key, and any edit to an earlier round, snapshot or disposition after a later round was signed.
+Every round's signature counts, the implementation rounds after the last spec round included. A round
+whose kind, or whose reviewer part (everything but `sig`, `closing` and the builder's fields), differs in
+a later committed version of the record from the version that first committed it is refused as well.
 
 A limit of this setup: while the builder and the reviewer run as one user on one machine, the reviewer key is
 readable by both. The signature then makes tampering visible in history, but it is not separation.
@@ -142,8 +167,11 @@ of SR-9.05.
 a decision to sign or to split, signed by a contract-signing key under `contracts/keys/`, over the spec
 id, the spec_sha256 of the spec on disk, the decider, the date, the decision, the open items (every
 answer that is not added, as round and number) and the sha256 of every round's dispositions and
-amendments. The gate then prints `SIGNABLE AT STOP (<n> open items)`, and `--report` lists the open
-items. A stop after fewer than three rounds, signed by any other key, over another spec hash, with an
+amendments. Its key's `.pub` must be committed at the judged commit (HEAD for a spec not yet signed, the
+signing commit for one that is signed): a key only in the working tree never signs a stop. The stop decision
+may carry an `amendments` list, which its signature covers; the change from the last spec round's snapshot to
+the spec on disk is judged with it, the last spec round being the previous round for its citations. The gate
+then prints `SIGNABLE AT STOP (<n> open items)`, and `--report` lists the open items. A stop after fewer than three rounds, signed by any other key, over another spec hash, with an
 open list that leaves out an answer that is not added, or followed by a change to any disposition or
 amendment, is refused.
 
@@ -151,10 +179,17 @@ amendment, is refused.
 It follows every rule a spec round follows (numbered after the rounds before it, signed by a reviewer
 key, every answer dispositioned, clean only when it holds no high answer, dispositions covered by a
 closing envelope) and names the commit it reviewed. It judges the code at that commit against the
-signed contract and never changes whether the spec is SIGNABLE. For a contract whose record ends with
+signed contract and never changes whether the spec is SIGNABLE, apart from its signature: an unsigned
+trailing round, or one signed by another key, is refused. For a contract whose record ends with
 a stop decision, `memev contract verify` stays BLOCKED until the record holds a clean implementation
 round whose reviewed commit has the same in-scope files as the commit being verified (task T2 of
 QL-1.01 wires this into verify).
+
+**Signed contracts in `--report`.** Each signed contract is judged against the commit that added what its
+record's verdict rests on now: the clean round the record ends with, or its stop decision, never an older
+commit whose record held another clean round on the same hash. A signed contract that a later signed version
+supersedes (version N+1 whose `supersedes` names it) is listed as superseded, and only the last version of
+each chain must equal the spec's drafted tasks and the hash its record makes signable.
 
 Reason codes: `schema`, `spec_id`, `rounds_contiguous`, `last_clean`, `last_high`, `hash`,
 `dispositions_all_rounds`, `added_verbatim`, `rejected_reason`, `never_weakens`,
