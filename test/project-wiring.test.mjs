@@ -203,7 +203,7 @@ import { Coordinator } from ${JSON.stringify(path.join(PKG, 'src/engine/coordina
 const c = new Coordinator(new ProjectStore(${JSON.stringify(root)}, { id: 'race', fsync: false }).open(), { lifecycle: true });
 const r = c.claim('R', process.argv[1], 60000);
 console.log(JSON.stringify({ ok: r.ok === true }));`;
-  const run = (who) => new Promise((res) => { let out = ''; const p = spawn(process.execPath, ['--input-type=module', '-e', script, who], { stdio: ['ignore', 'pipe', 'inherit'] }); p.stdout.on('data', (d) => { out += d; }); p.on('close', () => res(JSON.parse(out.trim().split('\n').pop()))); });
+  const run = (who) => new Promise((res) => { let out = ''; let err = ''; const p = spawn(process.execPath, ['--input-type=module', '-e', script, who], { stdio: ['ignore', 'pipe', 'pipe'] }); p.stdout.on('data', (d) => { out += d; }); p.stderr.on('data', (d) => { err += d; }); p.on('close', () => res(out.trim() ? JSON.parse(out.trim().split('\n').pop()) : { ok: false, crashed: err.trim().split('\n').slice(0, 6).join(' | ') })); });
   const results = await Promise.all([run('p1'), run('p2')]);
   assert.equal(results.filter((r) => r.ok).length, 1, JSON.stringify(results));
   v.close();

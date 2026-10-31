@@ -275,12 +275,20 @@ export class ProjectStore {
   // dead one (or our own leftover) is stale and is taken over. Reentrant within one process.
   _tryAcquireLock() {
     if (this._lockDepth > 0) { this._lockDepth++; return false; }
-    if (exists(this.lockPath)) {
-      const pid = parseInt(fs.readFileSync(this.lockPath, 'utf8').trim(), 10);
+    // The holder can release between any two of these calls, so a vanished lock file means free, never an error.
+    let held = null;
+    try { held = fs.readFileSync(this.lockPath, 'utf8'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    if (held !== null) {
+      const pid = parseInt(held.trim(), 10);
       if (pid !== process.pid && pidAlive(pid)) return true;
       // a lock file with no pid in it is a writer caught between creating and filling it: busy, not stale
-      if (!Number.isInteger(pid) && Date.now() - fs.statSync(this.lockPath).mtimeMs < 5000) return true;
-      try { fs.unlinkSync(this.lockPath); } catch {}
+      if (!Number.isInteger(pid)) {
+        let age = Infinity;
+        try { age = Date.now() - fs.statSync(this.lockPath).mtimeMs; } catch {}
+        if (age < 5000) return true;
+      }
+      // remove it only if it is still the stale lock read above, not a live one taken over in the meantime
+      try { if (fs.readFileSync(this.lockPath, 'utf8') === held) fs.unlinkSync(this.lockPath); } catch {}
     }
     // The lock appears whole or not at all: the pid is written to a private file, which is then linked to the lock
     // name (atomic, and refused when the name exists). Creating the lock and then writing the pid left a moment in
