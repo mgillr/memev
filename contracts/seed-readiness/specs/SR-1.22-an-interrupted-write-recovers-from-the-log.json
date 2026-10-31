@@ -49,7 +49,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c01:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c01:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c01:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -98,7 +98,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c04:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c04:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c04:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -113,7 +113,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c06:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c06:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c06:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -121,7 +121,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c07:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c07:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c07:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -129,7 +129,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c08:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c08:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c08:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -137,7 +137,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c09:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c09:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c09:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -145,7 +145,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c10:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c10:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c10:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -153,7 +153,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c11:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c11:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c11:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -161,7 +161,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c12:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c12:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c12:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -169,7 +169,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c13:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c13:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c13:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -177,7 +177,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c14:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c14:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c14:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c14:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -185,7 +185,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c15:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c15:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c15:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -193,7 +193,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c17:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c17:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c17:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
           }
         },
         {
@@ -201,7 +201,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c18:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c18:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c18:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c18:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
           }
         },
         {
@@ -209,7 +209,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c19:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c19:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c19:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c19:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
           }
         },
         {
@@ -217,7 +217,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c20:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c20:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c20:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c20:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
           }
         },
         {
@@ -232,7 +232,7 @@
           "statement": "c21 a non-UTF-8 outside edit is never destroyed (command guard: base already passes). Write B successfully and close. By hand replace the file with Latin-1 bytes (for example Buffer.from('caf' + String.fromCharCode(0xe9) + ' edited by hand', 'latin1')) with its mtime 10 s after the put. After reopen the file's bytes are unchanged (Buffer equality), v2.imported includes p, and the last record for p is external. Criterion 14's 'or invalid UTF-8' clause is dropped; only a logged prefix followed by NUL bytes counts as torn.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c21:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c21:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c21:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c21:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]",
             "expect_exit": 0,
             "timeout_s": 300
           }
@@ -242,7 +242,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c22:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c22:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c22:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c22:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
           }
         },
         {
@@ -250,7 +250,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c23:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c23:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c23:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c23:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
           }
         },
         {
@@ -258,7 +258,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c25:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c25:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c25:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c25:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
           }
         },
         {
@@ -266,7 +266,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c26:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c26:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c26:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c26:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
           }
         },
         {
@@ -274,7 +274,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c27:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c27:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c27:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c27:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
           }
         },
         {
@@ -282,14 +282,14 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c28:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c28:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c28:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c28:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c28:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c28:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c28:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c28:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
           }
         },
         {
           "statement": "c29 an interrupted extension write completes (command guard: base already passes). (a) Write A (50 lines), then write B = A plus two new lines with the directory read-only so the write throws; the last record for p is a splice. (b) The same, with B = A plus a section longer than A, so the record is a put. Make the directory writable and reopen: the file reads B, v2.recovered includes p, and no record for p has agent 'external'. Add c29 to the full-run list.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c29:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c29:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c29:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c29:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c29:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c29:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c29:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c29:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
             "expect_exit": 0,
             "timeout_s": 300
           }
@@ -299,14 +299,14 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c30:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c30:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c30:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c30:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c30:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c30:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c30:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c30:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
           }
         },
         {
           "statement": "c31 an outside edit made while a write is pending is kept (command guard: base already passes). After write(B) throws (read-only directory), make the directory writable and, without reopening, write A' (different from both A and B) by hand with its mtime 10 s after the put. Then call v.append(OWNER,{path:p,text:'tail'}): the file equals A' followed by the appended line, the record just before the append is an external put of A', and no line unique to B is in the file. With v.syncFromDisk(p,'git-pull') as the next call instead, the file still reads A' and the last record for p is an external put of A'.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c31:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c31:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c31:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c31:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c31:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c31:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c31:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c31:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
             "expect_exit": 0,
             "timeout_s": 300
           }
@@ -315,7 +315,7 @@
           "statement": "c32 a UTF-16 outside edit is never destroyed (command guard: base already passes). Write B and close. By hand, replace the file with the bytes FF FE followed by Buffer.from('edited in Notepad', 'utf16le'), with its mtime 10 s after the put. Reopen: the file's bytes are unchanged (Buffer equality), v2.imported includes p, v2.recovered does not, and the last record for p is external. The same bytes written while v2 is open, followed by v2.syncFromDisk(p,'git-pull'), also stay unchanged.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c32:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c32:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c32:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c32:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c32:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c32:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c32:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c32:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
             "expect_exit": 0,
             "timeout_s": 300
           }
@@ -325,7 +325,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c33:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c33:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c33:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c33:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c33:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c33:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c33:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c33:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
           }
         },
         {
@@ -333,7 +333,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c34:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c34:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c34:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c34:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c34:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c34:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c34:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c34:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
           }
         },
         {
@@ -341,7 +341,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c35:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c35:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c35:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c35:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c35:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c35:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c35:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c35:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
           }
         },
         {
@@ -349,7 +349,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c36:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c36:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c36:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c36:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c36:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c36:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c36:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c36:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
           }
         },
         {
@@ -357,7 +357,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c38:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c38:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c38:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c38:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c38:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c38:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c38:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c38:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
           }
         },
         {
@@ -374,7 +374,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c37:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c37:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c37:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c37:$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c37:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c37:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c37:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c37:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
           }
         },
         {

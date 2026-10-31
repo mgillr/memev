@@ -18,6 +18,13 @@
         "the gate job and its steps carry no if:, the job carries no continue-on-error, and pushes to main are never cancelled by a later run (cancel-in-progress applies to pull requests only)",
         ".github/workflows/release.yml checks out with fetch-depth: 0 and, before any build step, refuses with a non-zero exit a v* tag whose commit is not an ancestor of origin/main",
         "docs/DEVELOPING.md names the gate job of sensitive-gate.yml as the status that must be required on main, a repository setting the owner turns on, and says why the workflow uses pull_request_target and runs nothing from the pull request",
+        "the gate job has exactly one actions/checkout step, whose ref evaluates as requirement 3 says for each event and never to the pull request head, and the gate step's argv carries --head equal to pull_request.head.sha (github.sha for a push); a test that reads the workflow keeps every child of a with: block",
+        "no step's run text holds a ${{ }} expression, so no event field reaches bash as code; the base and the head arrive only through env",
+        "sensitive-gate.yml has exactly one job, the gate job, with no needs:; the gate step is its last step, and every step is actions/checkout with no path, actions/setup-node with no cache, a run made only of git config commands, or the gate step",
+        "the gate's concurrency group for a push to main is keyed on github.ref and github.sha and shares no group with ci.yml or release.yml, so no later run, push or pull request, cancels or replaces a push run's verdict",
+        "docs/DEVELOPING.md names the two cases CI cannot refuse, a push to main whose own commit rewrites the gate step and a v* tag on an off-main commit whose release.yml drops the ancestry step, and the repository settings that refuse them: main accepts changes only through pull requests, with no one exempt from that rule, and a tag ruleset restricts creating and moving v* tags; turning them on is the owner's act",
+        "docs/DEVELOPING.md requires, beside the gate status, that a branch be up to date with main before it merges, and says why: the verdict holds for one base sha and pull_request_target does not run again when main moves; the gate names a checklist bound against an older base as stale",
+        "GIT_NO_REPLACE_OBJECTS=1 is shown to matter by a fixture in which a replace ref on the head commit, or on a head blob, would change the gate's verdict",
         "each red-green criterion of this task that runs test/gate-sensitive-ci.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
@@ -49,7 +56,7 @@
           }
         },
         {
-          "statement": "In a fixture with an oplog.mjs change and no checklist, the gate step run as written exits 1 (a) after refs/replace maps the base's gate blob to a blob holding process.exit(0), and (b) with NODE_OPTIONS=--import=<a module that calls process.exit(0)> in the inherited environment.",
+          "statement": "In a fixture with an oplog.mjs change and no checklist, the gate step run as written exits 1 (a) after the judging checkout, with refs/replace/<head commit> planted pointing at <base commit>, and in a second case with the head's oplog.mjs blob replaced by the base's blob (the same step with GIT_NO_REPLACE_OBJECTS removed from its env exits 0, which proves the fixture tells the two apart), and (b) with NODE_OPTIONS=--import=<a module that calls process.exit(0)> in the inherited environment.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive-ci.test.mjs",
@@ -73,7 +80,7 @@
           }
         },
         {
-          "statement": "For the gate job, the effective cancel-in-progress evaluates to false for a push to main; with two pushes to main, P1 (an oplog.mjs change with no checklist) then P2 (a test-only change), the configuration never drops P1's run.",
+          "statement": "Evaluate the concurrency group and cancel-in-progress of sensitive-gate.yml, ci.yml and release.yml for push P0, push P1 and push P2 to main, for pull_request_target synchronize on PR 7 into main, and for pull_request on PR 7. Apply GitHub's rules: groups are shared across workflows; a group holds at most one running and one pending run; a newcomer with cancel-in-progress true cancels the running run; a newcomer replaces any pending run. Use the arrival order P0, PR7 (target), P1, PR7 (ci), P2. Assert that no gate run for P0, P1 or P2 is cancelled or replaced. Mutants that must fail: a group keyed on github.ref; ci.yml's group copied; a push group without github.sha.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive-ci.test.mjs",
@@ -114,10 +121,50 @@
           }
         },
         {
-          "statement": "One full run of test/gate-sensitive-ci.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08) with nothing skipped and nothing todo.",
+          "statement": "T1-c11: the harness builds the job's working tree only by evaluating each actions/checkout step's with.ref and with.path from the payload against a fixture origin. The fixture's base carries the repository's scripts/gate/** byte for byte. The workflow has exactly one checkout step. Its evaluated ref is pull_request.base.sha for pull_request_target synchronize into main, main's tip for a PR into x, and event.before for a push to main. The gate step's evaluated argv carries --head equal to pull_request.head.sha (or github.sha for a push). The judging tree's HEAD is never the PR head. Each of these mutants must make the subtest fail: ref set to head.sha; ref left out; a second checkout of head.sha; --head dropped from the gate step.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-ci.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c11:' test/gate-sensitive-ci.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c12: parse sensitive-gate.yml and assert that no step's run contains '${{' and that the gate step's run contains no '||'. Then run the gate step as in T1-c02 with a payload whose pull_request.title is '\"; exit 0; #', whose head.ref and github.head_ref are 'x\";exit${IFS}0;#', and whose body is '$(touch PWNED)', with GITHUB_EVENT_NAME, GITHUB_REF, GITHUB_SHA, GITHUB_BASE_REF and GITHUB_HEAD_REF set as the runner sets them. Assert exit 1 and that no PWNED file exists. Mutants that must fail the subtest: an echo of ${{ github.event.pull_request.title }}; an '|| [ \"$GITHUB_EVENT_NAME\" = push ]' tail.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-ci.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c12:' test/gate-sensitive-ci.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c13: sensitive-gate.yml has exactly one job, the gate job. That job has no needs:, the gate step is its last step, and every step is one of: actions/checkout with no path, actions/setup-node with no cache, a run made only of git config commands, or the gate step. Each of these mutants must fail the subtest: a trailing step that runs node; a second job that checks out head.sha; needs: on a job with if: false.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-ci.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c13:' test/gate-sensitive-ci.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c14: build a fixture where PR head H edits oplog.mjs with a checklist bound against base B1, and main then advances to B2, which also edits oplog.mjs. The gate step run with the synchronize payload for B1 exits 0. Run with B2 as the base, it exits 1 and names the stale binding. The subtest then asserts that docs/DEVELOPING.md requires, alongside the gate status, that branches be up to date before merging (strict), and says why: the verdict is per base sha, and pull_request_target does not run again when main moves.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-ci.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c14:' test/gate-sensitive-ci.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c14:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c15: the harness loads each workflow the way GitHub does: for pull_request_target, the base branch tip's copy; for a push to a branch or a tag, the copy at github.sha. It records two cases as not refused by CI: a push to main whose commit also replaces the gate step with run: true, and a v1.0.0 tag on an off-main commit whose release.yml drops the ancestry step. It then asserts that docs/DEVELOPING.md names these two cases and the repository settings that refuse them: main accepts changes only through pull requests, with no one exempt from that rule; and creating or moving v* tags is restricted by a tag ruleset.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-ci.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c15:' test/gate-sensitive-ci.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/gate-sensitive-ci.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08, T1-c11, T1-c12, T1-c13, T1-c14, T1-c15) with nothing skipped and nothing todo.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-sensitive-ci.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c02:|^T1-c03:|^T1-c04:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-sensitive-ci.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c02:|^T1-c03:|^T1-c04:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c11:|^T1-c12:|^T1-c13:|^T1-c14:|^T1-c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
             "timeout_s": 600
           }
         },

@@ -72,7 +72,7 @@
         "QL-1.03"
       ],
       "tasks": 1,
-      "criteria": 12,
+      "criteria": 17,
       "spec": "specs/QL-1.05-sensitive-path-gate-in-ci-from-the-base-workflow.json",
       "status": "proposed: owner's quality-loop order of 30 Oct, signs after a clean red-team round"
     },
@@ -88,7 +88,7 @@
         "SR-5.04"
       ],
       "tasks": 1,
-      "criteria": 19,
+      "criteria": 31,
       "spec": "specs/QL-1.06-claims-check-shipped-to-every-repository.json",
       "status": "proposed: owner's quality-loop order of 30 Oct, signs after a clean red-team round"
     }
