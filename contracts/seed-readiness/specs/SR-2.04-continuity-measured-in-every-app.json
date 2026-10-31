@@ -1,0 +1,101 @@
+{
+  "title": "SR-2.04 Continuity measured in every app, including those without hooks",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G24: Claude Desktop, VS Code, Zed and Windsurf get instructions only; the compaction benchmark across apps is planned. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Compaction benchmark across apps",
+      "phase": "verify",
+      "depends_on": [],
+      "requirements": [
+        "for each of 8 apps, the share of 20 seeded decisions still known after a compaction or new session"
+      ],
+      "description": "",
+      "scope": [
+        "scripts/bench/**",
+        "bench/continuity/**",
+        "docs/BENCH.md"
+      ],
+      "criteria": [
+        {
+          "statement": "Results exist",
+          "verifier": {
+            "type": "file_exists",
+            "path": "bench/continuity/results.json"
+          }
+        },
+        {
+          "statement": "All 8 apps measured",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/bench/continuity.mjs --from bench/continuity/results.json --json",
+            "key": "apps",
+            "op": "==",
+            "value": 8
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Keep the task visible without hooks",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "MCP tool results carry a short current-task line in apps with no hooks"
+      ],
+      "description": "",
+      "scope": [
+        "src/server/mcp.mjs",
+        "src/engine/card.mjs",
+        "test/no-hook-continuity.test.mjs",
+        "scripts/bench/continuity.mjs",
+        "bench/continuity/**"
+      ],
+      "criteria": [
+        {
+          "statement": "A recall from a no-hook client carries the current task line",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/no-hook-continuity.test.mjs",
+            "cmd": "node --test test/no-hook-continuity.test.mjs"
+          }
+        },
+        {
+          "statement": "Every no-hook app keeps >= 60% of decisions",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/bench/continuity.mjs --from bench/continuity/results.json --json",
+            "key": "min_no_hook_retention",
+            "op": ">=",
+            "value": 0.6
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
