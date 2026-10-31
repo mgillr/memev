@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { evaluate, gate, RULES, REVIEWER_KEYS, GRANDFATHERED } from '../scripts/gate/redteam-gate.mjs';
 import { canonicalHash, sign, keyId, generateKeyPair } from '../vendor/attest/signature.mjs';
 import { makeTask, skeleton } from '../vendor/attest/contract.mjs';
-import { HERE, ROOT, KEYS, TEST_PRIV, TEST_PUB, FIXTURE_PUB, GIT_ENV, scenario, fresh, specV1, specV2, baseRounds, clone, specHash, stopDecision, contractKey, git, FILES, signRecord, closingBody } from './fixtures/redteam/lib.mjs';
+import { HERE, ROOT, KEYS, TEST_PRIV, TEST_PUB, FIXTURE_PUB, GIT_ENV, scenario, fresh, specV1, specV2, baseRounds, clone, specHash, stopDecision, contractKey, git, FILES, signRecord, closingBody, roundBody } from './fixtures/redteam/lib.mjs';
 
 const GATE = path.join(ROOT, 'scripts', 'gate', 'redteam-gate.mjs');
 const BASE = path.join(HERE, 'base');
@@ -72,8 +72,8 @@ const plainRounds = (n = 2) => Array.from({ length: n }, (_, i) => ({ verdict: i
 
 const drafted = (spec) => spec.tasks.map((t, i) => makeTask({ id: t.id || `T${i + 1}`, title: t.title, phase: t.phase || 'implement', depends_on: t.depends_on || [], requirements: t.requirements || [], description: t.description || '', scope: t.scope || ['**'], criteria: t.criteria || [], stop_rules: t.stop_rules || [] }));
 /** contracts/signed/<id>.json drafted from `spec` and signed by a contract key under contracts/keys/. */
-function signContract(dir, spec, { id = 'k-xyz-abc123', key = contractKey(dir), provenance, tasks, title, sig = true } = {}) {
-  const c = { ...skeleton('memev'), id, title: title ?? spec.title, workdir: null, created: '2026-10-31T00:00:00Z', version: 1, provenance: provenance === undefined ? { spec_sha256: specHash(spec) } : provenance, tasks: tasks ?? drafted(spec) };
+function signContract(dir, spec, { id = 'k-xyz-abc123', key = contractKey(dir), provenance, tasks, title, sig = true, extra = {} } = {}) {
+  const c = { ...skeleton('memev'), id, title: title ?? spec.title, workdir: null, created: '2026-10-31T00:00:00Z', version: 1, provenance: provenance === undefined ? { spec_sha256: specHash(spec) } : provenance, tasks: tasks ?? drafted(spec), ...extra };
   if (c.provenance === null) delete c.provenance;
   fs.mkdirSync(path.join(dir, 'contracts', 'signed'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'contracts', 'signed', `${id}.json`), `${JSON.stringify(c, null, 2)}\n`);
@@ -658,7 +658,8 @@ test('T1-c35: a stop decision after three unclean rounds, signed by a contract k
     3: [{ n: 1, severity: 'high', how: 'speed', disposition: 'rejected', reason: 'the baseline is measured' }, { n: 2, severity: 'low', how: 'grep', criterion: { task: 'T1', ...clone(v.tasks[0].criteria[1]) }, disposition: 'added' }],
   })[round];
   const make = (n = 3) => sc({ snapshots: [specV1(), ...Array.from({ length: n - 1 }, () => specV2())], rounds: Array.from({ length: n }, (_, i) => ({ verdict: 'findings', answers: answersOf(i + 1), ...(i === 1 ? { amendments: [{ task: 'T2', statement: 'the lint passes', from: 'x', to: 'y', answer: '1.2' }] } : {}) })) });
-  const stop = (s, priv, extra = {}) => s.mutate((r) => { r.stop = stopDecision(r, s.disk(), priv, extra); });
+  // the stop decision and its contract key are committed together: a key only in the working tree never signs a stop
+  const stop = (s, priv, extra = {}) => { s.mutate((r) => { r.stop = stopDecision(r, s.disk(), priv, extra); }); s.commit('the stop decision and its key'); };
   const s = make(); const key = contractKey(s.dir);
   stop(s, key.privateKey);
   const r = ev(s);
@@ -699,7 +700,7 @@ test('T1-c36: a last round with medium or low answers needs a valid closing enve
   assert.match(reason(re, 'review_sig'), /closing envelope covers other content/);
 });
 
-test('an implementation round appended after the clean round never changes SIGNABLE, and its own verdict is reported', () => {
+test('a signed implementation round appended after the clean round leaves SIGNABLE as it is, an unsigned one is refused, and its own verdict is reported', () => {
   const impl = (round) => sc({ snapshots: [specV1(), specV2(), null], rounds: [...baseRounds(), { kind: 'implementation', verdict: 'clean', answers: [], ...round }] });
   const good = ev(impl({}));
   signable(good, 'a clean implementation round');
@@ -709,7 +710,7 @@ test('an implementation round appended after the clean round never changes SIGNA
   assert.equal(high.implementation.clean, false);
   const s = impl({}); s.mutate((r) => { delete r.rounds[2].sig; }, { sign: false });
   const unsigned = ev(s);
-  signable(unsigned, 'an unsigned implementation round');
+  refused(unsigned, 'review_sig', 'an unsigned implementation round');
   assert.equal(unsigned.implementation.clean, false);
   assert.match(unsigned.implementation.reasons.join(' '), /review_sig/);
 });
@@ -731,3 +732,278 @@ test('T1-c37: an added answer folded as another criterion is judged by its folde
   refused(ev(s), 'added_verbatim', 'a reworded proposal with no folded_as');
 });
 
+/** A record of three findings rounds on specV1, specV2, specV2, none clean (as T1-c35 builds it), for a stop decision. */
+const threeRounds = (o = {}) => {
+  const v = specV2();
+  const answersOf = (round) => ({
+    1: [{ n: 1, severity: 'high', how: 'a missing input', criterion: { task: 'T1', ...clone(v.tasks[0].criteria[3]) }, disposition: 'added' }, { n: 2, severity: 'medium', how: 'scope', disposition: 'rejected', reason: 'the scope is two files' }],
+    2: [{ n: 1, severity: 'high', how: 'a cycle', disposition: 'rejected', reason: 'b has no imports of its own' }],
+    3: [{ n: 1, severity: 'high', how: 'speed', disposition: 'rejected', reason: 'the baseline is measured' }, { n: 2, severity: 'low', how: 'grep', criterion: { task: 'T1', ...clone(v.tasks[0].criteria[1]) }, disposition: 'added' }, ...(o.answers3 ?? [])],
+  })[round];
+  return sc({ snapshots: [specV1(), specV2(), specV2()], disk: o.disk, rounds: [1, 2, 3].map((n) => ({ verdict: 'findings', answers: answersOf(n) })) });
+};
+const stopWith = (s, key, extra = {}) => s.mutate((r) => { r.stop = stopDecision(r, s.disk(), key.privateKey, extra); });
+
+test('T1-c38: a round relabelled kind implementation in a later commit is refused with review_sig naming it; a trailing round unsigned or signed by another key is refused; a signed trailing implementation round with a high answer leaves the spec SIGNABLE', () => {
+  const v1 = specV2(); const v2 = specV2(); v2.tasks[1].criteria.splice(1, 0, { statement: 'T2-c08: b refuses a cycle', verifier: { type: 'test_red_green', test_file: 'test/b.test.mjs', cmd: 'node --test test/b.test.mjs' } });
+  const relabelled = (answer, { resign = false } = {}) => {
+    const s = sc({ snapshots: [v1, v2], rounds: [{ verdict: 'clean', answers: [], manifest_kind: 'feature' }, { verdict: 'findings', answers: [clone(answer)] }] });
+    s.mutate((r) => { r.rounds[1].kind = 'implementation'; }, { sign: resign });
+    s.setDisk(v1);
+    s.commit('round 2 relabelled as an implementation round, spec v1 restored');
+    return ev(s);
+  };
+  for (const [what, answer] of [['one pending answer', { n: 1, severity: 'medium', how: 'a gap' }], ['one high answer', { n: 1, severity: 'high', how: 'a hole' }]]) {
+    const r = relabelled(answer);
+    refused(r, 'review_sig', `${what}, relabelled without signing again`);
+    assert.match(reason(r, 'review_sig'), /round 2/, what);
+    const again = relabelled(answer, { resign: true });
+    refused(again, 'review_sig', `${what}, relabelled and signed again`);
+    assert.match(reason(again, 'review_sig'), /round 2 is of kind implementation in .* but of kind spec in/, what);
+  }
+  const impl = () => sc({ snapshots: [specV1(), specV2(), null], rounds: [...baseRounds(), { kind: 'implementation', verdict: 'findings', answers: [{ n: 1, severity: 'high', how: 'a bug', disposition: 'added', criterion: { task: 'T1', statement: 'x', verifier: { type: 'scope' } } }] }] });
+  signable(ev(impl()), 'a signed trailing implementation round holding a high answer');
+  const unsigned = impl(); unsigned.mutate((r) => { delete r.rounds[2].sig; }, { sign: false });
+  const ru = ev(unsigned);
+  refused(ru, 'review_sig', 'an unsigned trailing implementation round');
+  assert.match(reason(ru, 'review_sig'), /round 3/);
+  const foreign = impl(); const k = generateKeyPair();
+  foreign.mutate((r) => { r.rounds[2].sig = sign(roundBody(r.rounds, 2, null), k.privateKey); }, { sign: false });
+  const rf = ev(foreign);
+  refused(rf, 'review_sig', 'a trailing implementation round signed by a key outside reviewerKeys');
+  assert.match(reason(rf, 'review_sig'), /round 3/);
+});
+
+test('T1-c39: --report judges a signed contract against the commit that added the clean round the record ends with, not an earlier clean round on the same hash', () => {
+  const spec = oneTask();
+  const make = (signBeforeR3) => {
+    const s = sc({ snapshots: [spec], rounds: [{ verdict: 'clean', answers: [] }] });
+    const r1 = s.record().rounds[0];
+    const round = (n, verdict, answers, extra = {}) => s.mutate((r) => { r.rounds.push({ round: n, spec_sha256: specHash(spec), base_commit: r1.base_commit, inputs: clone(r1.inputs), verdict, answers, ...extra }); });
+    s.setSnapshot(2, spec);
+    round(2, 'findings', [{ n: 1, severity: 'high', how: 'a hole in the check', disposition: 'rejected', reason: 'the check is the base test' }]);
+    s.commit('round 2: findings with one high answer');
+    if (signBeforeR3) { signContract(s.dir, spec); s.commit('sign k-xyz-abc123'); }
+    s.setSnapshot(3, spec);
+    round(3, 'clean', [], { manifest_kind: 'feature' });
+    s.commit('round 3: clean on the same spec');
+    if (!signBeforeR3) { signContract(s.dir, spec); s.commit('sign k-xyz-abc123'); }
+    return gate({ cwd: s.dir, report: true, reviewerKeys: KEYS });
+  };
+  const early = make(true);
+  assert.notEqual(early.exit, 0, early.lines.join('\n'));
+  assert.match(early.lines.join('\n'), /committed before the record's clean round/);
+  const late = make(false);
+  assert.equal(late.exit, 0, late.lines.join('\n'));
+});
+
+test('T1-c40: --report lists a contract a later signed version supersedes as superseded and judges only the last version; without that version it fails on the old tasks', () => {
+  const s1 = oneTask();
+  const s2 = oneTask(); s2.tasks[0].criteria.splice(1, 0, { statement: 'T1-c02: a refuses a missing input', verifier: { type: 'test_red_green', test_file: 'test/a.test.mjs', cmd: 'node --test test/a.test.mjs' } });
+  const make = (withV2) => {
+    const s = sc({ snapshots: [s1], rounds: [{ verdict: 'clean', answers: [] }] });
+    const key = contractKey(s.dir);
+    signContract(s.dir, s1, { id: 'k-one-task-v1aaaa', key }); s.commit('sign v1');
+    const r1 = s.record().rounds[0];
+    s.setSnapshot(2, s2); s.setDisk(s2);
+    s.mutate((r) => { r.rounds.push({ round: 2, spec_sha256: specHash(s2), base_commit: r1.base_commit, inputs: clone(r1.inputs), manifest_kind: 'feature', verdict: 'clean', answers: [] }); });
+    s.commit('S1 amended to S2 through a new clean round');
+    if (withV2) { signContract(s.dir, s2, { id: 'k-one-task-v2bbbb', key, extra: { version: 2, supersedes: 'k-one-task-v1aaaa' } }); s.commit('sign v2'); }
+    return gate({ cwd: s.dir, report: true, reviewerKeys: KEYS });
+  };
+  const two = make(true);
+  assert.equal(two.exit, 0, two.lines.join('\n'));
+  assert.match(two.lines.join('\n'), /contracts\/signed\/k-one-task-v1aaaa\.json: superseded by contracts\/signed\/k-one-task-v2bbbb\.json/);
+  const one = make(false);
+  assert.notEqual(one.exit, 0, one.lines.join('\n'));
+  assert.match(one.lines.join('\n'), /k-one-task-v1aaaa\.json .*its tasks are not the tasks drafted from the spec/);
+});
+
+test('T1-c41: an added answer folded as a criterion already verbatim in its round\'s own snapshot is refused with added_verbatim; folded as one new since that snapshot it is SIGNABLE', () => {
+  const v2 = specV2();
+  const fold = (round, n, target) => { const s = sc(); s.mutate((r) => { const a = r.rounds[round - 1].answers.find((x) => x.n === n); a.folded_as = clone(target); a.criterion.statement += ' (as the reviewer worded it)'; }); return ev(s); };
+  signable(fold(1, 1, { task: 'T1', ...v2.tasks[0].criteria[3] }), 'round 1 answer 1 folded as T1-c04, new since the round 1 snapshot');
+  for (const [round, n] of [[1, 1], [2, 2]]) {
+    const r = fold(round, n, { task: 'T1', ...v2.tasks[0].criteria[1] });
+    refused(r, 'added_verbatim', `round ${round} answer ${n} folded as a criterion its own snapshot holds`);
+    assert.deepEqual(r.codes, ['added_verbatim'], r.reasons.join(' | '));
+    assert.match(reason(r, 'added_verbatim'), new RegExp(`round ${round} answer ${n} .*round ${round}'s own snapshot`));
+  }
+});
+
+test('T1-c42: an added answer folded into the spec its task moved to is judged there, through the manifest and that spec\'s own replacements; an unrecorded move, an id the manifest does not resolve, a path, or an absent criterion is refused with added_verbatim', () => {
+  const moved = { statement: 'b refuses a cycle', verifier: { type: 'test_red_green', test_file: 'test/b.test.mjs', cmd: 'node --test test/b.test.mjs' } };
+  const other = (crit) => ({ ...specV2(), title: 'QL-0.02 The receiving contract', tasks: [{ ...specV2().tasks[1], id: 'T1', depends_on: [], criteria: [...specV2().tasks[1].criteria.slice(0, 1), ...(crit ? [crit] : []), ...specV2().tasks[1].criteria.slice(1)] }] });
+  const manifest = (ids) => `${JSON.stringify({ schema: 'memev-quality-loop/1', contracts: ids.map((id) => ({ id, kind: 'feature' })) }, null, 2)}\n`;
+  const make = ({ to = 'QL-0.02', recorded = true, ids = ['QL-0.01', 'QL-0.02'], crit = clone(moved), otherRecord } = {}) => {
+    const rounds = baseRounds();
+    rounds[0].answers.push({ n: 3, severity: 'medium', how: 'b has no cycle check', criterion: { task: 'T2', ...clone(moved) }, disposition: 'added', folded_as: { spec: to, task: 'T1', ...clone(moved) } });
+    if (recorded) rounds[1].amendments = [{ kind: 'move', task: 'T2', to_spec: to, to_task: 'T1', answer: '1.3' }];
+    const extra = { 'contracts/quality-loop/manifest.json': manifest(ids), 'contracts/quality-loop/specs/QL-0.02.json': `${JSON.stringify(other(crit), null, 2)}\n` };
+    if (otherRecord) extra['contracts/quality-loop/redteam/QL-0.02.json'] = `${JSON.stringify(otherRecord, null, 2)}\n`;
+    return ev(sc({ rounds, extra }));
+  };
+  signable(make(), 'the move recorded, the id resolved through the manifest, the criterion verbatim there');
+  const renamed = { ...clone(moved), statement: 'b refuses an import cycle' };
+  const otherRecord = { schema: 'memev-redteam/1', spec_id: 'QL-0.02', rounds: [{ round: 1, amendments: [{ task: 'T1', field: 'statement', from: moved.statement, to: renamed.statement, answer: '1.1' }] }] };
+  signable(make({ crit: renamed, otherRecord }), 'after a From/To replacement in the receiving spec');
+  refused(make({ crit: renamed }), 'added_verbatim', 'the replacement not recorded there');
+  for (const [what, o] of [['the move not recorded', { recorded: false }], ['an id the manifest does not resolve', { ids: ['QL-0.01'] }], ['a path instead of an id', { to: 'contracts/quality-loop/specs/QL-0.02.json' }], ['the criterion absent there', { crit: null }]]) {
+    const r = make(o);
+    refused(r, 'added_verbatim', what);
+    assert.match(reason(r, 'added_verbatim'), /round 1 answer 3 folded into/, what);
+  }
+  // a task removed as moved is accepted only when the receiving task holds all of it, following that spec's own replacements
+  const t2 = specV2().tasks[1];
+  const taskMove = (receiving = {}, rec2, atSplit = []) => {
+    const v2 = specV2(); v2.tasks = [v2.tasks[0]];
+    const rounds = baseRounds(); rounds[1].amendments = [{ kind: 'move', task: 'T2', to_spec: 'QL-0.02', to_task: 'T1', answer: '1.1' }, ...atSplit];
+    const recv = { ...specV2(), title: 'QL-0.02 The receiving contract', tasks: [{ ...clone(t2), id: 'T1', depends_on: [], ...receiving }] };
+    const extra = { 'contracts/quality-loop/manifest.json': manifest(['QL-0.01', 'QL-0.02']), 'contracts/quality-loop/specs/QL-0.02.json': `${JSON.stringify(recv, null, 2)}\n` };
+    if (rec2) extra['contracts/quality-loop/redteam/QL-0.02.json'] = `${JSON.stringify(rec2, null, 2)}\n`;
+    return ev(sc({ snapshots: [specV1(), v2], disk: v2, rounds, extra }));
+  };
+  const without = (st) => clone(t2.criteria).filter((c) => c.statement !== st);
+  signable(taskMove(), 'task T2 moved whole to QL-0.02 T1');
+  const renamedC = clone(t2.criteria).map((c) => (c.statement === 'b answers fast' ? { ...c, statement: 'b answers within 50 ms' } : c));
+  signable(taskMove({ criteria: renamedC }, { schema: 'memev-redteam/1', spec_id: 'QL-0.02', rounds: [{ round: 1, amendments: [{ task: 'T1', field: 'statement', from: 'b answers fast', to: 'b answers within 50 ms', answer: '1.1' }] }] }), 'task T2 moved, one statement then replaced in QL-0.02');
+  const lacks = taskMove({ criteria: without('b answers fast') });
+  weakened(lacks, 'T2', null, 'the receiving task lacks one moved criterion');
+  assert.match(reason(lacks, 'never_weakens'), /task T2 removed and its move is refused: QL-0\.02 T1 lacks the criterion "b answers fast"/);
+  weakened(taskMove({ requirements: [] }), 'T2', null, 'the receiving task lacks the moved requirement');
+  // a requirement reworded at the split counts through its From/To in the round that records the move, and only through it
+  const reworded = 'src/b.mjs re-exports a from QL-0.01';
+  signable(taskMove({ requirements: [reworded] }, undefined, [{ task: 'T2', field: 'requirement', from: 'src/b.mjs re-exports a', to: reworded, answer: '1.1' }]), 'a moved requirement present through the replacement recorded at the split');
+  weakened(taskMove({ requirements: [reworded] }), 'T2', null, 'the reworded requirement with no replacement recorded');
+  // the replacements at the split count only with their own citations: uncited, they cannot rename a task into a stub
+  const small = { id: 'T2', title: 'The module b', phase: 'implement', depends_on: ['T1'], requirements: ['b refuses a cycle'], description: '', scope: ['src/b.mjs', 'test/b.test.mjs'], criteria: [{ statement: 'b refuses a cycle', verifier: { type: 'test_red_green', test_file: 'test/b.test.mjs', cmd: 'node --test test/b.test.mjs' } }], stop_rules: [] };
+  const stub = { ...specV2(), title: 'QL-0.02 The receiving contract', tasks: [{ ...clone(small), id: 'T1', depends_on: [], requirements: ['c prints a banner'], criteria: [{ statement: 'c prints a banner', verifier: { type: 'test_red_green', test_file: 'test/c.test.mjs', cmd: 'node --test test/c.test.mjs' } }] }] };
+  const renames = [
+    { task: 'T2', field: 'requirement', from: 'b refuses a cycle', to: 'c prints a banner' },
+    { task: 'T2', field: 'statement', from: 'b refuses a cycle', to: 'c prints a banner' },
+    { task: 'T2', field: 'verifier.test_file', statement: 'c prints a banner', from: 'test/b.test.mjs', to: 'test/c.test.mjs' },
+    { task: 'T2', field: 'verifier.cmd', statement: 'c prints a banner', from: 'node --test test/b.test.mjs', to: 'node --test test/c.test.mjs' },
+  ];
+  const intoStub = (cite, record) => {
+    const v1 = specV1(); v1.tasks[1] = clone(small);
+    const v2 = specV2(); v2.tasks = [v2.tasks[0]];
+    const rounds = baseRounds(); rounds[1].amendments = [{ kind: 'move', task: 'T2', to_spec: 'QL-0.02', to_task: 'T1', answer: '1.1' }, ...renames.map((x, k) => ({ ...x, ...cite(k) }))];
+    const extra = { 'contracts/quality-loop/manifest.json': manifest(['QL-0.01', 'QL-0.02']), 'contracts/quality-loop/specs/QL-0.02.json': `${JSON.stringify(stub, null, 2)}\n` };
+    return ev(sc({ snapshots: [v1, v2], disk: v2, rounds, extra, ...(record ? { record } : {}) }));
+  };
+  const noteText = 'the split renames the moved task for its new contract';
+  const stubNotes = { reviewer_notes: [{ n: 1, text: noteText, sig: sign({ spec_id: 'QL-0.01', n: 1, text: noteText }, TEST_PRIV) }] };
+  const uncited = intoStub(() => ({}));
+  weakened(uncited, 'T2', null, 'uncited replacements renaming the moved task into a stub');
+  assert.match(reason(uncited, 'never_weakens'), /task T2 removed and its move is refused: QL-0\.02 T1 lacks the requirement "b refuses a cycle"/);
+  weakened(intoStub((k) => (k === 3 ? {} : { answer: '1.1' })), 'T2', null, 'one of the four replacements uncited');
+  signable(intoStub(() => ({ answer: '1.1' })), 'each replacement citing an added answer of the previous round');
+  signable(intoStub(() => ({ reviewer_note: 1 }), stubNotes), 'each replacement citing a reviewer note');
+  weakened(taskMove({ requirements: ['c prints a banner'], criteria: [{ statement: 'c prints a banner', verifier: { type: 'grep', file: 'src/c.mjs', pattern: 'banner' } }] }), 'T2', null, 'the receiving task is an unrelated stub');
+});
+
+test('T1-c43: a stop decision whose key is under contracts/keys/ only in the working tree is refused with stop_decision; with the key committed it is SIGNABLE AT STOP', () => {
+  const s = threeRounds(); const key = contractKey(s.dir);
+  stopWith(s, key);
+  const r = ev(s);
+  refused(r, 'stop_decision', 'the key not committed');
+  assert.match(reason(r, 'stop_decision'), /not committed/);
+  s.commit('the contract key and the stop decision');
+  const c = ev(s);
+  assert.equal(c.status, 'SIGNABLE AT STOP', c.reasons.join(' | '));
+});
+
+test('T1-c44: a stop over a spec that rewrites a round 3 statement is SIGNABLE AT STOP with a stop amendment citing an added round 3 answer; without it, or citing an answer not added, never_weakens; edited after signing, stop_decision', () => {
+  const OLD = 'b answers fast'; const NEW = 'b answers within 50 ms';
+  const disk = specV2(); disk.tasks[1].criteria[2].statement = NEW;
+  const a3 = { n: 3, severity: 'medium', how: 'the statement does not say how fast', criterion: { task: 'T2', ...clone(disk.tasks[1].criteria[2]) }, disposition: 'added' };
+  const make = (amendments) => {
+    const s = threeRounds({ disk, answers3: [a3] }); const key = contractKey(s.dir);
+    stopWith(s, key, amendments ? { amendments } : {}); s.commit('the stop decision and its key');
+    return s;
+  };
+  const entry = { task: 'T2', field: 'statement', from: OLD, to: NEW, answer: '3.3' };
+  const ok = ev(make([entry]));
+  assert.equal(ok.status, 'SIGNABLE AT STOP', ok.reasons.join(' | '));
+  const none = ev(make());
+  refused(none, 'never_weakens', 'no stop amendment');
+  assert.match(reason(none, 'never_weakens'), /the spec on disk: task T2 criterion "b answers fast"/);
+  refused(ev(make([{ ...entry, answer: '3.1' }])), 'never_weakens', 'citing a round 3 answer that is not added');
+  const edited = make([entry]);
+  edited.mutate((r) => { r.stop.amendments[0].answer = '3.2'; }, { sign: false });
+  refused(ev(edited), 'stop_decision', 'the stop amendment edited after the stop was signed');
+});
+
+test('T1-c45: a reworded requirement, a rewritten statement and a changed timeout_s, expect_exit or test_file are SIGNABLE with a cited amendment entry and refused without one; a scope glob needs an added answer that reads under it', () => {
+  const OLDR = 'src/a.mjs exports a'; const NEWR = 'src/a.mjs exports a and nothing else';
+  const changes = {
+    requirement: [(v) => { v.tasks[0].requirements[0] = NEWR; }, { task: 'T1', field: 'requirement', from: OLDR, to: NEWR }, 'T1'],
+    statement: [(v) => { v.tasks[1].criteria[2].statement = 'b answers in under 50 ms'; }, { task: 'T2', field: 'statement', from: 'b answers fast', to: 'b answers in under 50 ms' }, 'T2'],
+    timeout_s: [(v) => { v.tasks[0].criteria[2].verifier.timeout_s = 600; }, { task: 'T1', field: 'verifier.timeout_s', statement: 'the tests of a pass', from: 300, to: 600 }, 'T1'],
+    expect_exit: [(v) => { v.tasks[1].criteria[3].verifier.expect_exit = 1; }, { task: 'T2', field: 'verifier.expect_exit', statement: 'the lint passes', from: 0, to: 1 }, 'T2'],
+    test_file: [(v) => { v.tasks[0].criteria[0].verifier.test_file = 'test/a2.test.mjs'; }, { task: 'T1', field: 'verifier.test_file', statement: 'T1-c01: the test of a fails on the base and passes now', from: 'test/a.test.mjs', to: 'test/a2.test.mjs' }, 'T1'],
+  };
+  const notes = (key) => { const text = 'the change carries out round 1 answer 1'; return [{ n: 1, text, sig: sign({ spec_id: 'QL-0.01', n: 1, text }, key) }]; };
+  const twoRound = (change, amendments, record) => { const v2 = specV2(); change(v2); const rounds = baseRounds(); rounds[1].amendments = amendments; return ev(sc({ snapshots: [specV1(), v2], disk: v2, rounds, ...(record ? { record } : {}) })); };
+  const viaImpl = (change, amendment) => {
+    const v3 = specV2(); change(v3);
+    const rounds = [baseRounds()[0], { kind: 'implementation', verdict: 'findings', answers: [{ n: 1, severity: 'medium', how: 'the code shows the text is wrong', disposition: 'added' }] }, { ...baseRounds()[1], amendments: [{ ...amendment, answer: '2.1' }] }];
+    return ev(sc({ snapshots: [specV1(), null, v3], disk: v3, rounds }));
+  };
+  for (const [what, [change, am, task]] of Object.entries(changes)) {
+    signable(twoRound(change, [{ ...am, answer: '1.1' }]), `${what}: citing an added answer of the previous round`);
+    signable(twoRound(change, [{ ...am, note: '1.2' }]), `${what}: citing a note point of the previous round`);
+    signable(viaImpl(change, am), `${what}: citing an answer of an implementation round recorded after it`);
+    signable(twoRound(change, [{ ...am, reviewer_note: 1 }], { reviewer_notes: notes(TEST_PRIV) }), `${what}: citing a reviewer note`);
+    weakened(twoRound(change, []), task, null, `${what}: no entry`);
+    weakened(twoRound(change, [{ ...am, from: `${am.from}x`, answer: '1.1' }]), task, null, `${what}: a from that is not the earlier text`);
+    weakened(twoRound(change, [{ ...am, answer: '2.1' }]), task, null, `${what}: citing an answer of the round itself`);
+    weakened(twoRound(change, [{ ...am, answer: '1.2' }]), task, null, `${what}: citing an answer that is not added`);
+    weakened(twoRound(change, [{ ...am }]), task, null, `${what}: citing nothing`);
+    weakened(twoRound(change, [{ ...am, reviewer_note: 1 }], { reviewer_notes: notes(generateKeyPair().privateKey) }), task, null, `${what}: a reviewer note signed by a key outside REVIEWER_KEYS`);
+  }
+  // an implementation round's answer is a citation only for a spec round recorded after that implementation round
+  const [rchange, ram, rtask] = changes.requirement;
+  const ordered = (citeIn) => {
+    const v = specV2(); rchange(v);
+    const cite = [{ ...ram, answer: '3.1' }];
+    const impl = { kind: 'implementation', verdict: 'findings', answers: [{ n: 1, severity: 'medium', how: 'the code shows the text is wrong', disposition: 'added' }] };
+    const rounds = [baseRounds()[0], { verdict: 'findings', answers: [], ...(citeIn === 2 ? { amendments: cite } : {}) }, impl, { ...baseRounds()[1], ...(citeIn === 4 ? { amendments: cite } : {}) }];
+    return ev(sc({ snapshots: citeIn === 2 ? [specV1(), v, null, v] : [specV1(), specV2(), null, v], disk: v, rounds }));
+  };
+  weakened(ordered(2), rtask, null, 'round 2 citing an answer of implementation round 3, recorded after it');
+  signable(ordered(4), 'round 4 citing an answer of implementation round 3, recorded before it');
+  // a command change cites like any other change: a reviewer note that says the command was narrowed needs no other word
+  const NARROW = "node --test --test-name-pattern='^a ' test/a.test.mjs";
+  const narrowed = (text) => {
+    const v2 = specV2(); v2.tasks[0].criteria[2].verifier.cmd = NARROW;
+    const rounds = baseRounds(); rounds[1].amendments = [{ task: 'T1', field: 'verifier.cmd', statement: 'the tests of a pass', from: 'node --test test/a.test.mjs', to: NARROW, reviewer_note: 1 }];
+    return ev(sc({ snapshots: [specV1(), v2], disk: v2, rounds, record: { reviewer_notes: [{ n: 1, text, sig: sign({ spec_id: 'QL-0.01', n: 1, text }, TEST_PRIV) }] } }));
+  };
+  signable(narrowed('the build narrowed the command to its own labelled subtest'), 'a narrowed command cited by a reviewer note that says narrowed');
+  // a scope glob: the entry cites an added answer of the previous round whose criterion reads a path under it
+  const crit = { statement: 'T1-c06: a handles a new case', verifier: { type: 'test_red_green', test_file: 'test/new/x.test.mjs', cmd: 'node --test test/new/x.test.mjs' } };
+  const glob = (amendments) => {
+    const v2 = specV2(); v2.tasks[0].scope.push('test/new/**'); v2.tasks[0].criteria.splice(4, 0, clone(crit));
+    const rounds = baseRounds(); rounds[0].answers.push({ n: 3, severity: 'medium', how: 'a new case is untested', criterion: { task: 'T1', ...clone(crit) }, disposition: 'added' }); rounds[1].amendments = amendments;
+    return ev(sc({ snapshots: [specV1(), v2], disk: v2, rounds }));
+  };
+  signable(glob([{ task: 'T1', field: 'scope', to: 'test/new/**', answer: '1.3' }]), 'a glob citing an added answer that reads test/new/x.test.mjs');
+  weakened(glob([]), 'T1', null, 'a glob with no entry');
+  weakened(glob([{ task: 'T1', field: 'scope', to: 'test/new/**', answer: '1.1' }]), 'T1', null, 'a glob citing an answer that reads nothing under it');
+  weakened(glob([{ task: 'T1', field: 'scope', to: 'test/new/**', note: '1.1' }]), 'T1', null, 'a glob citing a note');
+  // the cited answer is judged by the criterion it became: its folded_as, not the raw proposal
+  const foldedGlob = (raw, fa) => {
+    const v2 = specV2(); v2.tasks[0].scope.push('test/new/**'); v2.tasks[0].criteria.splice(4, 0, clone(crit));
+    const rounds = baseRounds(); rounds[0].answers.push({ n: 3, severity: 'medium', how: 'a new case is untested', criterion: { task: 'T1', ...clone(raw) }, disposition: 'added', folded_as: { task: 'T1', ...clone(fa) } }); rounds[1].amendments = [{ task: 'T1', field: 'scope', to: 'test/new/**', answer: '1.3' }];
+    return ev(sc({ snapshots: [specV1(), v2], disk: v2, rounds }));
+  };
+  const rawA = { statement: 'a handles a new case', verifier: { type: 'test_red_green', test_file: 'test/a.test.mjs', cmd: 'node --test test/a.test.mjs' } };
+  signable(foldedGlob(rawA, crit), 'the proposal reads test/a.test.mjs, the criterion it was folded as reads test/new/x.test.mjs');
+  weakened(foldedGlob(crit, specV2().tasks[0].criteria[3]), 'T1', null, 'the proposal reads under the glob, the criterion it was folded as does not');
+  // one path added through the field form cites like any change; the landed scope_add form keeps its own rule
+  const onePath = (am, record) => { const v2 = specV2(); v2.tasks[0].scope.push('docs/a.md'); const rounds = baseRounds(); rounds[1].amendments = [am]; return ev(sc({ snapshots: [specV1(), v2], disk: v2, rounds, ...(record ? { record } : {}) })); };
+  signable(onePath({ task: 'T1', field: 'scope', to: 'docs/a.md', reviewer_note: 1 }, { reviewer_notes: notes(TEST_PRIV) }), 'one path in the field form citing a reviewer note');
+  signable(onePath({ task: 'T1', field: 'scope', to: 'docs/a.md', note: '1.2' }), 'one path in the field form citing a note point');
+  weakened(onePath({ task: 'T1', scope_add: 'docs/a.md', reviewer_note: 1 }, { reviewer_notes: notes(TEST_PRIV) }), 'T1', null, 'the scope_add form citing a reviewer note');
+});
