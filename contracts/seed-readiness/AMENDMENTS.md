@@ -29,3 +29,9 @@ Applied by the lead seat on the reviewer seat's read of the specs against the co
 - SR-0.01: T2 requirement added: "the seed gate reads each contract's recorded verification (verdict, time and the commit it verified, from its closed record) and never re-runs verify on main, where a squash leaves no Contract-Task trailers; a PASS whose verified changes are not on main is reported as not landed" (reviewer observation on PR #227: per-task scope holds on the task branch, not on main after a squash) (spec not in this copy; applied in the programme copy)
 
 Not applied here, recorded for the repositories that do not exist yet: SR-3.03 (memev-merge) prints the hardware beside its p95 at 100 kB; SR-0.02, SR-5.05, SR-6.07, SR-6.08, SR-7.06, SR-7.13 and SR-8.06 name scripts outside their task scopes and gain them when their repositories are created.
+
+## Requirements replaced after a red-team round
+
+A requirement is replaced, never silently removed, only when a round's answer names it as contradictory or impossible; the next round judges the replacement.
+
+- SR-1.05 T1: requirement replaced after red-team round 2 answer 1 (keyed on configuration, every quick-tunnel caller shared the loopback socket, so anyone could lock the owner out, and test/oauth.test.mjs could not pass beside the new test). From: "the remote rate-limit key reads cf-connecting-ip only when the Cloudflare tunnel is configured (remote.cloudflare, the edge sets that header), reads x-forwarded-for only when remote.trusted_proxy names it, and otherwise keys on the socket address; tests that simulate distinct remote callers by cf-connecting-ip configure remote.cloudflare". To: "the remote rate-limit key follows the tunnel that actually carries the request, passed into createServer by the daemon (activeTunnel()); see the requirement in the spec for the full rule".

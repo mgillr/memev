@@ -10,9 +10,11 @@
       "title": "Red-team gate: no contract is signed without a clean record that matches its spec",
       "repo": "memev",
       "closes": "Closes quality-loop principle 1 (red-team each contract before signing) and the signing-time part of principle 2 (red-green primary, document-only checks never count toward done). A zero-dependency node script reads a contract spec and its red-team record and reports SIGNABLE, NOT SIGNABLE with reasons, or NO RECORD; a test proves every refusal rule; the seed-gate and the sign runbook call it",
-      "depends_on": [],
+      "depends_on": [
+        "SR-0.03"
+      ],
       "tasks": 2,
-      "criteria": 8,
+      "criteria": 32,
       "spec": "specs/QL-1.01-red-team-gate-no-signing.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -27,7 +29,7 @@
         "SR-0.03"
       ],
       "tasks": 2,
-      "criteria": 7,
+      "criteria": 20,
       "spec": "specs/QL-1.02-mutation-gate-on-changed-lines.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -40,7 +42,7 @@
       "closes": "Closes quality-loop principle 7",
       "depends_on": [],
       "tasks": 2,
-      "criteria": 7,
+      "criteria": 19,
       "spec": "specs/QL-1.03-sensitive-path-checklist-before-merge.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },

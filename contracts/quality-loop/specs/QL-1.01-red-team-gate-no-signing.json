@@ -2,7 +2,7 @@
   "title": "QL-1.01 Red-team gate: no contract is signed without a clean record that matches its spec",
   "project": "memev",
   "workdir": null,
-  "request": "Closes quality-loop principle 1 (red-team each contract before signing) and the signing-time part of principle 2 (red-green primary, document-only checks never count toward done). A zero-dependency node script reads a contract spec and its red-team record and reports SIGNABLE, NOT SIGNABLE with reasons, or NO RECORD; a test proves every refusal rule; the seed-gate and the sign runbook call it. Repository: memev. Depends on contracts: none.",
+  "request": "Closes quality-loop principle 1 (red-team each contract before signing) and the signing-time part of principle 2 (red-green primary, document-only checks never count toward done). A zero-dependency node script reads a contract spec and its red-team record and reports SIGNABLE, NOT SIGNABLE with reasons, or NO RECORD; a test proves every refusal rule; the seed-gate and the sign runbook call it. Repository: memev. Depends on contracts: SR-0.03.",
   "tasks": [
     {
       "id": "T1",
@@ -13,7 +13,10 @@
         "scripts/gate/redteam-gate.mjs takes spec paths (default: every file under contracts/seed-readiness/specs/ and contracts/quality-loop/specs/) and prints one line per spec: SIGNABLE, NOT SIGNABLE: <reasons>, or NO RECORD; exit 0 only when every named spec is SIGNABLE; --report mode exits 0 unless a record is malformed, a hash mismatch is claimed clean, or a signed contract under contracts/signed/ has a spec without a SIGNABLE record",
         "the record is contracts/<area>/redteam/<id>.json with schema memev-redteam/1 and snapshots <id>.r<n>.spec.json beside it; spec_sha256 is sha256 of the spec as canonical JSON (sorted keys, no whitespace, workdir null)",
         "SIGNABLE requires all of: record parses with the schema and the spec id; rounds numbered 1..n without gaps; the last round has verdict clean and an empty answers list; its spec_sha256 equals the spec on disk; every answer in every round has disposition added or rejected; every added criterion is present verbatim (task, statement, verifier type) in the spec on disk; every rejected answer has a non-empty reason; the sequence of snapshots never weakens (no task or criterion removed, no verifier type changed, no metric loosened, no command changed except as recorded in an amendments list the round names, no scope glob added or broadened); every implement task has at least one test_red_green criterion unless the spec's manifest row declares kind docs or evidence; every input file of the clean round whose blob at HEAD differs is reported, and under src/ it is NOT SIGNABLE",
-        "node 23 compatible, no dependencies, first lines carry // gate-version: 1 and the SPDX header"
+        "node 23 compatible, no dependencies, first lines carry // gate-version: 1 and the SPDX header",
+        "each round is a DSSE envelope signed by a reviewer key that is not a contract-signing key (not under contracts/keys/); the gate holds the reviewer public keys it accepts and refuses an unsigned round, a round signed by another key, and any edit to an earlier round, snapshot or disposition after a later round was signed. Honest limit, stated in docs/CONTRACTS.md: while the builder and reviewer run as one user on one machine the reviewer key is readable by both, so the signature makes tampering visible in history but is not separation; separation comes from a reviewer key the owner holds off the build machine or from the second human of SR-9.05",
+        "a replacement is accepted only when an answer of the previous round names the replaced requirement or criterion as contradictory or impossible, the round's amendments list records task, from, to and that answer number, and the next round judges it; a scope glob added is accepted only when an added criterion of that round reads a path under it, recorded with the answer number; the never-weakens check accepts exactly these and nothing else",
+        "staleness is judged at the signing commit for a contract already signed, and at HEAD for a spec not yet signed, so a signed contract's own landed work never makes it stale"
       ],
       "description": "",
       "scope": [
@@ -135,6 +138,95 @@
           }
         },
         {
+          "statement": "Independent of the test file's content: copy the committed base fixture test/fixtures/redteam/base/ (spec contracts/quality-loop/specs/QL-0.01.json, record contracts/quality-loop/redteam/QL-0.01.json) into a fresh temporary git repository for each case and run the real gate there, capturing stdout and stderr. Base: exit 0. One statement edited: non-zero, and the output names hash. Record deleted: non-zero, and NO RECORD is printed. Last round given one answer: non-zero. Last round's spec_sha256 replaced: non-zero. A gate that always exits 0, or always refuses, fails this check.",
+          "verifier": {
+            "type": "command",
+            "cmd": "R=$PWD; G=$R/scripts/gate/redteam-gate.mjs; S=contracts/quality-loop/specs/QL-0.01.json; F=contracts/quality-loop/redteam/QL-0.01.json; fresh(){ T=$(mktemp -d) && cp -R $R/test/fixtures/redteam/base/. $T && cd $T && git init -q && git add -A && git -c user.name=t -c user.email=t@t.invalid commit -qm b || exit 8; }; mut(){ node -e 'const fs=require(\"fs\"),[f,js]=process.argv.slice(1),o=JSON.parse(fs.readFileSync(f,\"utf8\"));new Function(\"o\",js)(o);fs.writeFileSync(f,JSON.stringify(o))' \"$1\" \"$2\" || exit 9; }; fresh; node $G $S || exit 1; fresh; mut $S 'o.tasks[0].criteria[0].statement+=\" x\"'; node $G $S >o.txt 2>&1 && exit 2; grep -q hash o.txt || exit 3; fresh; rm $F || exit 9; node $G $S >o.txt 2>&1 && exit 4; grep -q 'NO RECORD' o.txt || exit 5; fresh; mut $F 'o.rounds[o.rounds.length-1].answers=[{n:1,disposition:\"rejected\",reason:\"x\"}]'; node $G $S && exit 6; fresh; mut $F 'o.rounds[o.rounds.length-1].spec_sha256=\"0\".repeat(64)'; node $G $S && exit 7; exit 0",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Each round carries sig, a DSSE envelope from vendor/attest/signature.mjs sign() over canonical({...round without sig, snapshot_sha256, previous round in full with its dispositions and amendments}). The signing key's keyid must be in the gate's REVIEWER_KEYS and must not be a key under contracts/keys/. The RULES literal list in the existing RULES criterion gains review_sig (otherwise the two criteria cannot both pass). Refused with review_sig: (a) a single clean round with no sig; (b) a round signed by the contract-signing key; (c) r1.spec.json and rounds[0].spec_sha256 rewritten together after r2 was signed; (d) a round-1 disposition or a round-2 amendment edited after the next round was signed. A correctly signed chain, made with test keys under test/fixtures/redteam/, is SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "A fixture whose spec on disk differs from the clean round's snapshot only by workdir '/tmp/elsewhere' is NOT SIGNABLE with never_weakens naming workdir, although canonicalHash({...spec, workdir:null}) still equals the round's spec_sha256. The same spec with workdir null is SIGNABLE. (A workdir the operator needs belongs on the runbook command line, not in the spec.)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "Each is the only change between snapshot r1 and r2, with r2 clean and matching the disk, and each is NOT SIGNABLE with never_weakens naming the task (and the criterion, where there is one): scope glob broadened to '**'; scope glob added; verifier type test_red_green to command with the same cmd; metric value 0.9 to 0.5 under '>='; metric op '<' to '<='; metric key changed; task T2 deleted; the last criterion of T1 deleted; test_red_green cmd changed with no amendment; timeout_s 300 to 3000; grep flags 'i' added; phase implement to verify; a requirement reworded.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "An added answer whose matching spec criterion carries mandatory:false, or any key other than statement, verifier, id and mandatory:true, is refused with added_verbatim. Any criterion that first appears in a snapshot with mandatory:false is refused with never_weakens. The same criterion without the extra key, or with mandatory:true, is SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "red_green_required is evaluated on the tasks as makeTask/contractDraft would draft them, and counts only mandatory test_red_green criteria. The clean round records manifest_kind, which must equal the manifest row when the gate runs. Refused with red_green_required: (a) a task with no phase key and only grep criteria; (b) a task whose only test_red_green has mandatory:false; (c) a clean round recorded with manifest_kind feature while the manifest row now says docs. The same spec with one mandatory test_red_green per task is SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "The clean round names the reviewed commit. In a temporary git repository with the spec's scope ['src/**', 'scripts/x.mjs'] and inputs.files ['src/a.mjs'], a second commit makes the pre-sign gate run refuse with head_stale_src when (1) src/b.mjs, unlisted but in scope, changed; (2) src/new.mjs was added; (3) scripts/x.mjs, in scope but outside src/, changed. A change only to docs/x.md, outside the scope, stays SIGNABLE and is reported. This applies to the plain (pre-sign) run only; for an already-signed contract, --report evaluates staleness at the signing commit (see answer 10).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "In a temporary tree, --report exits non-zero and names the file when contracts/signed/k-xyz-abc123.json matches no spec by title or drafted tasks and its canonicalHash is not in the gate's GRANDFATHERED list. A copy of the real contracts/signed/k-memory-quality-multiling-4468b8.json in a temporary tree with both spec directories empty exits 0 (its hash is in GRANDFATHERED); the same copy with one character of its title changed exits non-zero as an orphan. --report also exits non-zero on a record that is not JSON, and on a record whose last round is clean but whose hash does not match.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "In a temporary git repository: a clean round lists src/x.mjs; contracts/signed/k-xyz-abc123.json (tasks equal to makeTask of the spec) is added and committed; a later commit changes src/x.mjs. --report exits 0, because for a signed contract it evaluates head_stale_src at the commit that added contracts/signed/<id>.json (git log --diff-filter=A). The plain run on the spec is still NOT SIGNABLE with head_stale_src. If src/x.mjs changed before the signing commit, --report exits non-zero.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "An added answer whose criterion names test_file test/new.test.mjs outside its task's scope is SIGNABLE when the next snapshot adds exactly that path (no glob) to the scope and that round's amendments list holds {task, scope_add: 'test/new.test.mjs', answer: '<round>.<n>'}. The same scope addition without that entry, or adding 'test/**' instead, is refused with never_weakens.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "A spec or snapshot whose raw text has a duplicate key at any depth (a verifier with cmd twice) is NOT SIGNABLE with schema, although its parsed canonical hash equals the round's spec_sha256.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
           "statement": "Changes stay in scope",
           "verifier": {
             "type": "scope"
@@ -155,12 +247,19 @@
       ],
       "requirements": [
         "test/redteam-gate.test.mjs also runs the gate in --report mode over the repository's own spec directories, so npm test and CI fail on a malformed record or a signed contract without a SIGNABLE record, while NO RECORD is reported and not failed",
-        "docs/CONTRACTS.md gains a section that states the rule, the record path, the hash definition and the one-line runbook: gate, then memev contract new, then memev contract sign, in one command"
+        "docs/CONTRACTS.md gains a section that states the rule, the record path, the hash definition and the one-line runbook: gate, then memev contract new, then memev contract sign, in one command",
+        "memev contract new refuses a spec the gate reports NOT SIGNABLE or NO RECORD when the workdir holds scripts/gate/redteam-gate.mjs, naming the reasons; memev contract sign and the MCP sign tool refuse a draft whose source spec hash has no clean signed record; a repository without the gate script is unaffected"
       ],
       "description": "",
       "scope": [
         "test/redteam-gate.test.mjs",
-        "docs/CONTRACTS.md"
+        "docs/CONTRACTS.md",
+        "src/cli/contracts-cli.mjs",
+        "src/engine/contracts.mjs",
+        "src/server/mcp.mjs",
+        "docs/MODULES.md",
+        "changelog.d/QL-1.01.md",
+        "test/contracts.test.mjs"
       ],
       "criteria": [
         {
@@ -193,6 +292,14 @@
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
             "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "Scope widened to src/cli/contracts-cli.mjs and test/contracts.test.mjs (an existing file, so the red half is real). For a spec inside a contracts/<area>/specs/ tree, `memev contract new <spec>` runs the gate first. When the gate says NOT SIGNABLE or NO RECORD, the command exits non-zero and no file appears under the vault's contracts/drafts/. When it says SIGNABLE, the draft is created and records provenance.spec_sha256. `memev contract sign <id>` refuses a draft carrying provenance.spec_sha256 whose tasks differ from makeTask applied to that spec.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts.test.mjs",
+            "cmd": "node --test test/contracts.test.mjs"
           }
         },
         {
