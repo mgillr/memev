@@ -67,6 +67,8 @@ The sections are lenses on the same work, so the total counts a thing once per l
 | 1.3.8 | Secure remote model | product owner | covered | product-owner question 4; safe default is customer-initiated only |
 | 1.3.9 | Paid conversion path | product owner | covered | product-owner question 5; the current conversion step stays |
 
+Reported, not confirmed: a parallel working team reports that the owner decided there is no in-house merge engine and that the external convergence engine is reached only through the WO-05-A provider boundary. If the owner confirms it, that supersedes PI-04 and PI-05 (section 7.1), SR-3.01 and SR-3.03 (absent from the manifest, see 1.2.4). Nothing here was built, re-signed or contracted for those four, and their rows above stay as they were until the owner confirms.
+
 ## 2. Platform readiness contracts (seed readiness)
 
 All 57 contracts of `contracts/seed-readiness/manifest.json`, one leaf each. The gap id is the manifest's. A contract is signed when `contracts/signed/` holds a file for it that `node scripts/gate/redteam-gate.mjs --report` accepts; a signature does not say the work is built.
