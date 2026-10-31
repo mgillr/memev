@@ -11,7 +11,7 @@ import { cloudSeat } from './tunnel.mjs';
 
 const ICON = { succeeded: '\u2713', added: '+', ready: '\u2713', 'needs-manual': '\u2192', failed: '\u2717', skipped: '-', unsupported: '\u00b7' };
 
-export async function checklist({ root, env, flags = {}, launcher, daemonUp = null, firstRun = false, platform = process.platform, icacls }) {
+export async function checklist({ root, env, flags = {}, launcher, daemonUp = null, firstRun = false, platform = process.platform, icacls, ask, input, output }) {
   const items = [];
   const add = (status, step, detail = '', more = {}) => items.push({ status, step, detail, ...more });
   add('succeeded', 'Vault', root);
@@ -55,6 +55,14 @@ export async function checklist({ root, env, flags = {}, launcher, daemonUp = nu
     else if (!(r.notes || []).length) add('needs-manual', 'Lead AI', bus.LEAD_LATER);
   } else add('failed', 'Agent comms bus', 'not set up: Memev is not running (memev doctor)');
   if (!found.some((x) => x.found)) add('needs-manual', 'AI apps', 'none found yet; install one and Memev connects it automatically within 30 minutes (or run memev connect)');
+  // history import: offered once at init, on a terminal; never fails the checklist
+  if (firstRun) {
+    try {
+      const imp = await import('./import.mjs');
+      const r = await imp.offerImport({ root, env, flags, ask, input, output, cwd: process.cwd(), home: env.HOME || '' });
+      if (r.asked) add(r.accepted ? 'succeeded' : 'skipped', 'History import', r.accepted ? `${r.result.imported} item(s) imported (memev import undo to remove)` : 'declined; memev import runs it any time');
+    } catch { /* the checklist never fails over an import */ }
+  }
   // service
   const svc = await import('./service.mjs');
   const u = svc.unitPaths(env);
@@ -133,8 +141,14 @@ export function print(items) {
   if (later.length) { console.log('\nLater, optional'); for (const i of later) console.log(line(i)); }
 }
 
+/** The history import is offered at init only on a terminal and never under init's --yes, so the person always sees the
+ * preview before anything is imported (memev import --yes is the explicit way without a question). firstRun passes its
+ * own stdin and stdout when it was given them, a test's, and the process's otherwise. */
+export function initImportPrompt(flags = {}, { stdin = process.stdin, stdout = process.stdout } = {}) {
+  return !flags.yes && stdin?.isTTY && stdout?.isTTY ? { ask: true, input: stdin, output: stdout } : {};
+}
 export async function firstRun(o) {
-  const items = await checklist({ ...o, firstRun: true }); print(items); await (await import('./pathsetup.mjs')).offer({ env: o.env });
+  const items = await checklist({ ...initImportPrompt(o.flags, o), ...o, firstRun: true }); print(items); await (await import('./pathsetup.mjs')).offer({ env: o.env });
   await finish(o);
   return items.some((i) => i.status === 'failed') ? 1 : 0;
 }

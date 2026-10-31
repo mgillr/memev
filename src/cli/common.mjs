@@ -13,7 +13,7 @@ export const STATE = '.memev';
 
 // The flags every memev command reads as booleans. main.mjs and the hook entry both parse with this list, so a hook
 // started through bin/memev.mjs sees exactly the flags it saw when it went through main.
-export const BOOLEAN_FLAGS = ['help', 'yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects', 'release', 'open', 'once', 'refresh', 'aider', 'local'];
+export const BOOLEAN_FLAGS = ['help', 'yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects', 'release', 'open', 'once', 'refresh', 'aider', 'local', 'ai-history', 'preview'];
 
 export function parseArgs(argv, booleans = []) {
   const flags = {}; const pos = [];
