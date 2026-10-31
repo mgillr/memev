@@ -11,7 +11,7 @@
       "closes": "Closes G85 (found 30 October 2026 while checking the WBS runbook against the code): memev verify runs only command, file_exists, test_exists and grep (src/engine/contracts.mjs:224-235); test_red_green, metric and scope criteria return BLOCKED as checked by a person or CI, so 213 of the 340 seed-readiness criteria (scope 118, test_red_green 64, metric 31) cannot PASS through the tool the WBS names, and no task of the 85 contracts can reach PASS because the attest lint requires a scope criterion per task",
       "depends_on": [],
       "tasks": 5,
-      "criteria": 26,
+      "criteria": 38,
       "spec": "specs/SR-0.03-verify-runs-every-verifier-type.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
