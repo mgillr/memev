@@ -63,6 +63,7 @@ Some symptoms have no check id, because the doctor cannot see them from the vaul
 - A cloud app gets 401. The token was not issued for remote use, or it was revoked: `memev cloud url` prints a fresh connector URL.
 - A cloud app cannot connect. `memev cloud status` shows the tunnel; a quick tunnel address changes on restart, so update the app, or use Tailscale or a named Cloudflare tunnel.
 - Cursor does not recall on every prompt. Expected: Cursor hooks inject only at session start, and the MCP instructions cover the rest.
+- `memev_recall` returns fewer hits than requested. The limit is clamped to 1-10; use `offset` to page through more results.
 - GitHub pushes fail. `memev doctor` shows the git error under `backup`; check that the deploy key still exists in the repository.
 - A note was edited by hand. Nothing to do: Memev imports the change into its log.
 - The vault looks wrong after a crash. `memev doctor` checks the log against the files, and anything missing is rebuilt from the log.

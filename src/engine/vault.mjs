@@ -21,11 +21,14 @@ import { loadTuning } from './tuning.mjs';
 import { attach as attachContracts, installVaultHooks } from './contracts.mjs';
 import { assess, DEFAULT_GATE } from './quality.mjs';
 import { STATE, isVault } from './vault-marker.mjs';
+import { ProjectStore } from './project-store.mjs';
 
 export const VERSION = readJson(new URL('../../package.json', import.meta.url), {}).version;
 export { STATE, isVault };
 const KINDS = { decision: 'decisions', gotcha: 'gotchas', fact: 'facts', pattern: 'patterns', win: 'wins', person: 'people', note: 'notes', preference: 'preferences' };
-const PROTECTED = [/^contracts\/signed\//, /^contracts\/keys\//];
+// written only by the engine itself: signing writes signed/ and keys/, verify writes closed/ and receipts/. Matched in any
+// letter case, because a case-insensitive disk writes contracts/Signed/ into contracts/signed/ (issues 242 and 243)
+const PROTECTED = [/^contracts\/signed\//i, /^contracts\/keys\//i, /^contracts\/closed\//i, /^contracts\/receipts\//i];
 const DEFAULT_CONFIG = { version: 1, port: 7787, remote: { enabled: false, provider: 'auto', rate_per_min: 120 }, sync: { interval_min: 5 }, recall: { per_prompt: true, max_chars: 1500, min_score: 1.0, scope: 'project' }, memory: { ...DEFAULT_GATE }, journal: { enabled: true, max_chars: 2000 }, contracts: { enabled: false, exec_local_only: true } };
 
 export class VaultError extends Error { constructor(code, message) { super(message); this.code = code; } }
@@ -33,9 +36,15 @@ export class VaultError extends Error { constructor(code, message) { super(messa
 export function checkPath(p) {
   const s = String(p || '').replace(/\\/g, '/').replace(/^\/+/, '');
   if (!s || s.split('/').some((x) => x === '..' || x === '' || x.startsWith('.'))) throw new VaultError('bad_path', `not a vault path: ${p}`);
+  // a control character (NUL included) is refused before anything is logged: no file system takes it, and once logged it
+  // stopped every open (issue 230)
+  if (/[\u0000-\u001f\u007f]/.test(s)) throw new VaultError('bad_path', `a vault path has no control characters: ${JSON.stringify(String(p))}`);
   if (!/\.(md|json|pub|txt)$/.test(s)) throw new VaultError('bad_path', `only .md, .json, .pub and .txt notes: ${p}`);
   return s;
 }
+
+/** The largest recall offset served: past it a page is empty and next is null, so one argument cannot ask the index to rank every match. */
+export const RECALL_OFFSET_MAX = 1000;
 
 export class Vault extends EventEmitter {
   constructor(root, opts = {}) { super(); this.root = path.resolve(root); this.opts = opts; this.state = path.join(this.root, STATE); }
@@ -87,15 +96,73 @@ export class Vault extends EventEmitter {
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }
+  /**
+   * True when a note's path, or any folder on the way to it, is a symbolic link. memev never follows a link in the vault:
+   * a link reached files outside it (issue 256), and a dangling link named like a note stopped the vault opening (230).
+   */
+  _linked(p) {
+    let cur = this.root;
+    for (const seg of String(p).split('/')) {
+      cur = path.join(cur, seg);
+      let st; try { st = fs.lstatSync(cur); } catch { return false; }
+      if (st.isSymbolicLink()) return true;
+    }
+    return false;
+  }
+  _noLink(p) { if (this._linked(p)) throw new VaultError('bad_path', `${p} goes through a symbolic link; memev does not follow links in the vault`); }
+  /**
+   * A note is refused when its path, or any folder on the way to it, differs from a live note's only in letter case or Unicode
+   * form, naming the existing spelling: a case-insensitive disk (macOS, Windows) keeps the two as one file or one folder, so the
+   * log would hold two histories over one body, and the vault syncs to such disks (issue 243). The fold (NFC, upper case, then
+   * lower case, NFC again) makes final sigma, long s, the sharp s against SS and the Kelvin sign equal to their plain forms, as
+   * APFS does; it is close to the disk's own table but not the table itself. Only a path with no live head is checked, so writing
+   * an existing note costs nothing extra; the check reads every live head once.
+   */
+  _noCaseTwin(p) {
+    const h = this.log.heads.get(p); if (h && !h.deleted) return;
+    const fold = (x) => x.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC');
+    const segs = p.split('/'); const want = []; let acc = '';
+    for (const sg of segs) { acc = acc ? `${acc}/${sg}` : sg; want.push([acc, fold(acc)]); }
+    for (const [q, hq] of this.log.heads) {
+      if (hq.deleted || q === p) continue;
+      const qs = q.split('/'); let qa = '';
+      for (let i = 0; i < Math.min(qs.length, want.length); i++) {
+        qa = qa ? `${qa}/${qs[i]}` : qs[i];
+        const [mine, key] = want[i];
+        if (qa === mine) continue;
+        // a folder of the path, or the note itself, matches the existing spelling only under the fold
+        if (fold(qa) === key && (i < segs.length - 1 ? i < qs.length - 1 : i === qs.length - 1)) throw new VaultError('bad_path', `${mine} differs from the existing ${i < qs.length - 1 ? 'folder' : 'note'} ${qa} only in letter case or Unicode form; a case-insensitive disk keeps them as one, so use the spelling ${qa}`);
+        break;
+      }
+    }
+  }
+  /**
+   * A write is refused before the log advances when the file system cannot take it: a note already sits where a folder of the
+   * path must be, or a folder with something in it sits at the path. An empty folder there, which a delete leaves behind, is
+   * removed. Before, the log took the write, the file system refused it, and every later open threw (issue 230).
+   */
+  _placeable(p) {
+    const segs = String(p).split('/'); let cur = this.root;
+    for (let i = 0; i < segs.length; i++) {
+      cur = path.join(cur, segs[i]);
+      let st; try { st = fs.lstatSync(cur); } catch { return; }
+      if (i < segs.length - 1 && !st.isDirectory()) throw new VaultError('bad_path', `${segs.slice(0, i + 1).join('/')} is a note, so nothing can be written under it`);
+      if (i === segs.length - 1 && st.isDirectory()) {
+        if (fs.readdirSync(cur).length) throw new VaultError('bad_path', `${p} is a folder with notes in it, so no note can be written there`);
+        fs.rmdirSync(cur);
+      }
+    }
+  }
   /** Read a note; a journal file that retention moved to work/archive is still readable at its old path. */
   _read(p) {
+    if (this._linked(p)) return null; // a link is never followed, for reading either
     try { return fs.readFileSync(this.abs(p), 'utf8'); } catch {}
-    if (p.startsWith('work/')) { try { return fs.readFileSync(this.abs(`work/archive/${p.slice(5)}`), 'utf8'); } catch {} }
+    if (p.startsWith('work/') && !this._linked(`work/archive/${p.slice(5)}`)) { try { return fs.readFileSync(this.abs(`work/archive/${p.slice(5)}`), 'utf8'); } catch {} }
     return null;
   }
   allNotes(dir = '') {
     const out = []; const base = dir ? this.abs(dir) : this.root;
-    const walk = (d, rel) => { let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of ents) { if (e.name.startsWith('.') || e.name === 'node_modules') continue; const r = rel ? `${rel}/${e.name}` : e.name; if (e.isDirectory()) { if (r === 'work/archive') continue; walk(path.join(d, e.name), r); } else if (e.name.endsWith('.md')) out.push(r); } };
+    const walk = (d, rel) => { let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of ents) { if (e.name.startsWith('.') || e.name === 'node_modules' || e.isSymbolicLink()) continue; const r = rel ? `${rel}/${e.name}` : e.name; if (e.isDirectory()) { if (r === 'work/archive') continue; walk(path.join(d, e.name), r); } else if (e.name.endsWith('.md')) out.push(r); } };
     walk(base, dir.replace(/\/$/, '')); return out.sort();
   }
   reindexAll() { for (const p of this.allNotes()) { const b = this._read(p); this.index.update(p, b); this.graph.indexNote(p, b); } this.index.save(); }
@@ -108,18 +175,24 @@ export class Vault extends EventEmitter {
    *                              version stays in the log), never overwritten
    */
   recover() {
-    const fixed = [], imported = [];
+    const fixed = [], imported = [], skipped = [];
+    // one path the file system cannot take (a NUL in it, a note where a folder must be, a folder where the note goes) is
+    // skipped with its reason, so the rest of the vault opens; before, it threw and the vault never opened again (issue 230)
+    const each = (p, fn) => { try { fn(); } catch (e) { skipped.push({ path: p, reason: e.code || e.message }); } };
     for (const [p, h] of this.log.heads) {
       if (h.deleted || !h.ch) continue;
-      const cur = this._read(p);
-      if (cur !== null && sha256(cur) === h.ch) continue;
-      const content = this.materialize(p);
-      if (content === null || sha256(content) !== h.ch) continue;
-      if (cur === null || (content.startsWith(cur) && cur.length < content.length)) { fs.mkdirSync(path.dirname(this.abs(p)), { recursive: true }); fs.writeFileSync(this.abs(p), content); fixed.push(p); }
-      else { this._importExternal(p, cur, 'startup'); imported.push(p); }
+      each(p, () => {
+        if (this._linked(p)) return; // never rebuilt through a link: the write would land wherever the link points
+        const cur = this._read(p);
+        if (cur !== null && sha256(cur) === h.ch) return;
+        const content = this.materialize(p);
+        if (content === null || sha256(content) !== h.ch) return;
+        if (cur === null || (content.startsWith(cur) && cur.length < content.length)) { fs.mkdirSync(path.dirname(this.abs(p)), { recursive: true }); fs.writeFileSync(this.abs(p), content); fixed.push(p); }
+        else { this._importExternal(p, cur, 'startup'); imported.push(p); }
+      });
     }
-    for (const p of this.allNotes()) if (!this.log.heads.has(p)) { this._importExternal(p, this._read(p), 'startup'); imported.push(p); }
-    this.recovered = fixed; this.imported = imported;
+    for (const p of this.allNotes()) if (!this.log.heads.has(p)) each(p, () => { this._importExternal(p, this._read(p), 'startup'); imported.push(p); });
+    this.recovered = fixed; this.imported = imported; this.skipped = skipped;
     return fixed;
   }
   _importExternal(p, body, source) {
@@ -148,6 +221,7 @@ export class Vault extends EventEmitter {
 
   /** A note changed on disk outside Memev (an editor, git pull): log it before touching it. */
   syncFromDisk(p, source = 'external') {
+    if (this._linked(p)) return null; // a link that replaced a note is neither imported nor taken as a delete
     const h = this.log.heads.get(p);
     const known = this._ncGet(p);
     if (known && h && !h.deleted && known.ch === h.ch) return null;
@@ -184,8 +258,9 @@ export class Vault extends EventEmitter {
       else if (rec.type === 'splice') cur.set(rec.path, applySplice(c ?? '', rec.data));
       else if (rec.type === 'delete') cur.delete(rec.path);
     }
-    for (const [p, c] of cur) { const f = path.join(dir, ...p.split('/')); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, c); }
-    return [...cur.keys()].sort();
+    const written = [];
+    for (const [p, c] of cur) { try { const f = path.join(dir, ...p.split('/')); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, c); written.push(p); } catch {} }
+    return written.sort();
   }
 
   // ---- auth helpers
@@ -194,7 +269,13 @@ export class Vault extends EventEmitter {
     if (!allowed(identity, scope, p)) throw new VaultError('forbidden', `this token may not ${scope}${p ? ` ${p}` : ''}`);
   }
   _guard(p, text, allowSecrets, internal) {
-    if (!internal && PROTECTED.some((re) => re.test(p))) throw new VaultError('immutable', `${p} is signed and immutable; amend it with a new contract (memev contract amend)`);
+    // the bus writes its own files (messages, seats, the lead record) without the note API, so no token writes under bus/
+    // in any letter case: a cloud connector's note writes there made it the lead and gave a local seat its alias (issue 250)
+    if (!internal && /^bus\//i.test(p)) throw new VaultError('immutable', `${p} is written only by the bus itself; post with the bus tools`);
+    if (!internal && PROTECTED.some((re) => re.test(p))) {
+      if (/^contracts\/(closed|receipts)\//i.test(p)) throw new VaultError('immutable', `${p} is written only by memev contract verify; a contract is done when its verify passes`);
+      throw new VaultError('immutable', `${p} is signed and immutable; amend it with a new contract (memev contract amend)`);
+    }
     if (!allowSecrets) { const hits = findSecrets(text); if (hits.length) throw new VaultError('secret', `refused: the text looks like a credential (${hits.join(', ')}); never store secrets in memory`); }
   }
   _after(p, rec, client, appended = null) {
@@ -217,8 +298,9 @@ export class Vault extends EventEmitter {
   list(identity, prefix = '') { this._need(identity, 'read', null); return this.allNotes(prefix ? prefix.replace(/\/$/, '') : '').filter((p) => allowed(identity, 'read', p)); }
 
   write(identity, { path: p, body, client = null, allow_secrets = false, internal = false }) {
-    p = checkPath(p); this._need(identity, 'write', p); body = String(body ?? '');
+    p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); this._placeable(p); body = String(body ?? '');
     this._guard(p, body, allow_secrets, internal);
+    this._noCaseTwin(p); // before syncFromDisk, which on a case-insensitive disk would read the other note's file under this spelling
     this.syncFromDisk(p);
     const old = this._read(p);
     let rec;
@@ -239,7 +321,7 @@ export class Vault extends EventEmitter {
   }
 
   append(identity, { path: p, text, client = null, allow_secrets = false, internal = false }) {
-    p = checkPath(p); this._need(identity, 'write', p);
+    p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); this._noCaseTwin(p); this._placeable(p);
     this.syncFromDisk(p);
     let ns = this._ncGet(p);
     if (!ns) { const cur = this._read(p); if (cur !== null) { this._ncSet(p, cur); ns = this._ncGet(p); } }
@@ -257,7 +339,7 @@ export class Vault extends EventEmitter {
   }
 
   delete(identity, { path: p, client = null }) {
-    p = checkPath(p); this._need(identity, 'write', p); this._guard(p, '', true, false);
+    p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); this._guard(p, '', true, false);
     if (this._read(p) === null) throw new VaultError('not_found', `no note ${p}`);
     const rec = this.log.append({ type: 'delete', path: p, agent: identity.agent, client, data: {} });
     fs.rmSync(this.abs(p)); this._nc?.delete(p); this.index.remove(p); this.graph.removeNote(p); this.commits.add(p, client); this._indexSaveSoon();
@@ -322,6 +404,11 @@ export class Vault extends EventEmitter {
     return { path: p, checkpoints: cps.length, at: last.split('\n')[0].replace(/^### /, ''), task: pick(/^Task: (.+)$/m), doing: pick(/^Doing: (.+)$/m), next, done: [...done.values()], files: pick(/^Files: (.+)$/m) };
   }
 
+  /** The canonical project store for one project, under this vault's .memev directory. One writer at a time. */
+  projectStore(projectId, opts = {}) {
+    return new ProjectStore(this.root, { id: projectId, deviceId: this.host?.id ?? null, fsync: this.opts.fsync ?? true, ...opts }).open();
+  }
+
   /** Record one turn of a session (continuous recording). */
   journal(identity, { session, client = null, role = 'user', text, project = null }) {
     if (!this.config.journal?.enabled) return { skipped: true };
@@ -357,9 +444,15 @@ export class Vault extends EventEmitter {
     return fn;
   }
   /** Recall: the index, filtered to what the token may read and the project, annotated with graph context; the use is logged. */
-  recall(identity, { query, project = null, all_projects = false, limit = 6, client = null, session = null, log = true }) {
+  recall(identity, { query, project = null, all_projects = false, limit = 6, offset = 0, client = null, session = null, log = true }) {
     this._need(identity, 'read', null);
-    const hits = this.index.query(query, { limit, project, boosts: this.tuning?.boosts, filter: this._recallFilter(identity, { project, all_projects }) });
+    const lim = limit == null ? 6 : Math.min(10, Math.max(1, Math.trunc(Number(limit)) || 1));
+    const off = Math.max(0, Math.trunc(Number(offset)) || 0);
+    // A far offset must not cost a full ranking: the index is asked for one page past the bound at most, and an offset
+    // past the bound is an empty page. A client that follows next never gets there; next stops at the bound.
+    const top = this.index.query(query, { limit: Math.min(off, RECALL_OFFSET_MAX) + lim, project, boosts: this.tuning?.boosts, filter: this._recallFilter(identity, { project, all_projects }) });
+    const total = top.total;
+    const hits = off > RECALL_OFFSET_MAX ? [] : top.slice(off, off + lim);
     for (const h of hits) {
       const key = `${h.path}#${h.heading || ''}`;
       const ents = this.graph.sectionEnts.get(key) || [];
@@ -369,6 +462,7 @@ export class Vault extends EventEmitter {
       const u = this.graph.usage.get(key); if (u) h.used = u.count;
     }
     if (log && hits.length) this._logUsage(identity, { client, session, query, items: hits.map((h) => `${h.path}#${h.heading || ''}`) });
+    hits.total = total;
     return hits;
   }
 

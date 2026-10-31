@@ -152,7 +152,22 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   else r.push(C('remote', 'remote access', 'ok', 'off (local only)'));
   const remote = run('git', ['remote'], { cwd: root }).stdout.trim();
   const jobs = readJson(path.join(state, 'jobs.json'), {});
-  r.push(C('backup', 'vault backed up off this machine', remote ? (jobs.sync?.error ? 'warn' : 'ok') : 'warn', remote ? (jobs.sync?.error ? `last sync: ${jobs.sync.error}` : `git remote ${remote}${jobs.sync?.at ? `, last sync ${jobs.sync.at}` : ''}`) : 'no backup yet: memev github setup'));
+  const relay = cfg.remote?.relay || {};
+  const relayState = readJson(path.join(state, 'relay-state.json'), null);
+  // the relay is the vault's address, not its backup. 'connecting' is not a failure yet, and 'off' with the setting on
+  // means the daemon is not holding the relay (stopped, or MEMEV_NO_TUNNEL), not that the relay is down
+  const fallback = `the relay address does not reach the vault${tun?.state === 'up' ? ' (the tunnel does)' : ''}, and your other computers still get its notes through this git backup`;
+  const relayHeld = env.MEMEV_NO_TUNNEL || relayState?.state === 'off';
+  const relayDown = relayState && !['up', 'connecting', 'off'].includes(relayState.state);
+  const relayLine = !remote ? ''
+    : relay.enabled && relayHeld
+      ? `; the relay is on but not running${env.MEMEV_NO_TUNNEL ? ' (MEMEV_NO_TUNNEL is set)' : ''}, so ${fallback}; memev cloud relay status shows the relay's state`
+      : relay.enabled && relayDown
+        ? `; the relay is on but unreachable, so ${fallback}; memev cloud relay status shows the relay's state`
+        : !relay.enabled && (relay.url || relay.domain)
+          ? `; the relay is off, so ${fallback}; memev cloud relay on switches it back on`
+          : '';
+  r.push(C('backup', 'vault backed up off this machine', remote ? (jobs.sync?.error ? 'warn' : 'ok') : 'warn', remote ? (jobs.sync?.error ? `last sync: ${jobs.sync.error}` : `git remote ${remote}${jobs.sync?.at ? `, last sync ${jobs.sync.at}` : ''}`) + relayLine : 'no backup yet: memev github setup'));
   if (jobs.sync?.warning) r.push(C('writers', 'one computer writes the git backup', 'warn', jobs.sync.warning));
   try {
     // report only: licence and seats never fail the doctor and never limit anything

@@ -13,7 +13,7 @@ export const ENFORCEMENT = 'computers';
 /** Everything local is free and unlimited, for everyone. */
 export const CORE_FEATURES = ['vault', 'recall', 'graph', 'contracts', 'doctor', 'local_clients', 'own_tunnel', 'git_backup', 'cloud_connectors'];
 /** Paid add-ons: hosted services and multi-computer or team use. Only extra computers exist so far. */
-export const PAID_FEATURES = ['sync_hosted', 'backup_hosted', 'relay_hosted', 'extra_computers', 'team_vault', 'sso', 'audit_export'];
+export const PAID_FEATURES = ['sync_hosted', 'backup_hosted', 'relay_hosted', 'extra_computers', 'team_vault', 'sso', 'audit_export', 'agent_binding'];
 
 /** Draft limits per tier (docs/PRICING.md). A licence's own seats and connectors win.
  * personal_more and corporate are the ids new licences use; personal and enterprise are the ids

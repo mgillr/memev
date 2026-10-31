@@ -16,7 +16,8 @@
         "docs/CONTRACTS.md documents the base and where verify reads it",
         "command, metric and red-green commands run with MEMEV_CONTRACT_BASE set to the recorded base sha in their environment, so a criterion can name the base (the mutation gate of QL-1.02 reads it)",
         "the base is recorded only when a contract is signed on this machine; a remote-signed contract gets its base recorded at local approval (memev contract approve), from the workdir HEAD at that moment; contractSign never runs git for a remote caller",
-        "memev contract new refuses a spec whose workdir is null unless --workdir is given, and records the absolute real path (fs.realpathSync), so commands, base and scope never fall back to the vault root by accident"
+        "memev contract new refuses a spec whose workdir is null unless --workdir is given, and records the absolute real path (fs.realpathSync), so commands, base and scope never fall back to the vault root by accident",
+        "each red-green criterion of this task that runs test/contracts-base.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c08: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
       "scope": [
@@ -85,6 +86,22 @@
             "type": "command",
             "cmd": "[ \"$MEMEV_CONTRACT_BASE\" = be457dbd829c89e48fbd3f19b72d43864cd97fd8 ] && [ \"$(git rev-parse --show-toplevel)\" = \"$(pwd -P)\" ]",
             "expect_exit": 0
+          }
+        },
+        {
+          "statement": "T1-c08: In a temporary git repository at commit H, a contract whose spec names the explicit base M, an earlier commit, records base.sha M when it is signed at H, and a contract whose spec names no base records H; in both cases the DSSE signature covers the recorded base.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/contracts-base.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/contracts-base.test.mjs passes every labelled subtest (T1-c08) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/contracts-base.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
           }
         },
         {

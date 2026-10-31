@@ -3,13 +3,15 @@
 // The secret is stored only as a hash. Redeeming the code enrolls one computer.
 // On a vault that cannot add a computer, it says so first, in the tier-aware copy of MEM-062,
 // and offers the upgrade or the trial; with no trial left it prints no code at all.
+// `memev invite --teammate <name>` is the same for a colleague, on the Team plan: their computer
+// joins under their name, and their apps' seats read <app>@<name>-<machine> on the bus.
 import path from 'node:path';
 import { readJson } from '../engine/util.mjs';
 import { mintInvite } from '../engine/devices.mjs';
 import { isVault } from '../engine/vault.mjs';
-import { qrText } from '../../vendor/qr.mjs';
-import { seatPolicy } from '../engine/entitlements.mjs';
 import { loadLicense } from '../engine/license.mjs';
+import { limitsFor, seatPolicy } from '../engine/entitlements.mjs';
+import { qrText } from '../../vendor/qr.mjs';
 import { registry } from './licensing.mjs';
 
 export function tunnelUrl(root) {
@@ -33,10 +35,17 @@ export function trialAvailable() {
   return false;
 }
 
-export async function command(_cmd, _pos, flags, { root, env, license = null }) {
+/** Teammate invites need the Team entitlement: a licence that is valid or in grace and includes the team service. */
+export const teamEntitled = (lic) => (limitsFor(lic).services || []).includes('team');
+
+const NAME_RE = /^[a-z0-9][a-z0-9._-]{0,39}$/;
+
+export async function command(_cmd, _pos, flags, { root, env = process.env, license = null }) {
   if (!isVault(root)) throw new Error(`no vault at ${root}; run memev init`);
   const ttl = flags.ttl ? Number(flags.ttl) : 15 * 60;
   if (!Number.isFinite(ttl) || ttl <= 0) throw new Error('--ttl is a number of seconds');
+  const teammate = flags.teammate !== undefined ? String(flags.teammate ?? '').trim().toLowerCase() : null;
+  if (teammate !== null && !NAME_RE.test(teammate)) throw new Error('--teammate is a short name: letters, digits, dots, dashes or underscores, starting with a letter or digit');
   const lic = license || loadLicense({ env });
   const { reg } = registry(root);
   const policy = seatPolicy({ license: lic, devices: reg.list() });
@@ -56,6 +65,19 @@ export async function command(_cmd, _pos, flags, { root, env, license = null }) 
   if (!tunnel) console.log('note: this address is loopback; only a computer that shares this machine can use it');
   // a vault that cannot add a computer, with no trial to offer, prints no code: the plan line above is the answer
   if (!policy.can_enroll && !trialAvailable()) return 1;
+  // a teammate's computer is a computer like any other: the seat policy and the address rule above come first
+  if (teammate !== null) {
+    if (!teamEntitled(lic)) {
+      console.log(`Teammate invites are on the Team plan. This vault is on the ${limitsFor(lic).tier} tier; install a Team licence (memev license install <file>) to invite a colleague.`);
+      return 0;
+    }
+    const minted = mintInvite(root, { address, ttlSec: ttl, teammate });
+    console.log(`teammate: ${teammate}`);
+    console.log(`code: ${minted.code}`);
+    console.log(`link: ${minted.link}`);
+    console.log(qrText(minted.link));
+    return 0;
+  }
   const minted = mintInvite(root, { address, ttlSec: ttl });
   console.log(`code: ${minted.code}`);
   console.log(`link: ${minted.link}`);

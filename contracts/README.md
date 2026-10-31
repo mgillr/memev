@@ -16,3 +16,31 @@ These files were copied from the vault the work was signed in:
 The contract's `workdir` is the checkout it was verified in, and `memev verify` runs checks only
 there. Every check is a plain file test, pattern or command (`npm test`,
 `node scripts/leak-scan.mjs --history`), so it can be run by hand from the repository root.
+
+## Signed at the three-round stop, 31 October 2026
+
+These sixteen specs from `seed-readiness/specs/` and `quality-loop/specs/` were signed on the owner's go, after three
+red-team rounds in which every answer has a disposition (the stopping rule in QL-1.01). Each was drafted and signed with
+memev's own contract functions from main at 385d5182, in a signing vault on the owner's computer, and
+`keys/9234819001ae43bd.pub` verifies each signature. Their `workdir` is null, as the specs have it, so `memev verify` on them
+is not meaningful until SR-0.03 and QL-1.01 task 2 give it the checkout. The stop decisions QL-1.01 asks for follow when
+its gate lands.
+
+| Spec | Contract | Tasks | Criteria |
+|---|---|---|---|
+| [SR-0.03](seed-readiness/specs/SR-0.03-verify-runs-every-verifier-type.json) | [`k-sr-0-03-verify-runs-ever-633b99`](signed/k-sr-0-03-verify-runs-ever-633b99.json) | 5 | 51 |
+| [SR-1.01](seed-readiness/specs/SR-1.01-one-writer-enforced-an-exclusive.json) | [`k-sr-1-01-one-writer-enfor-ceaa12`](signed/k-sr-1-01-one-writer-enfor-ceaa12.json) | 3 | 62 |
+| [SR-1.03](seed-readiness/specs/SR-1.03-replay-protection-that-survives-a.json) | [`k-sr-1-03-replay-protectio-6aeb51`](signed/k-sr-1-03-replay-protectio-6aeb51.json) | 1 | 35 |
+| [SR-1.05](seed-readiness/specs/SR-1.05-a-bounded-rate-limiter.json) | [`k-sr-1-05-a-bounded-rate-l-594b7f`](signed/k-sr-1-05-a-bounded-rate-l-594b7f.json) | 1 | 40 |
+| [SR-1.06](seed-readiness/specs/SR-1.06-one-licence-schema-validated-everywhere.json) | [`k-sr-1-06-one-licence-sche-e3e5e0`](signed/k-sr-1-06-one-licence-sche-e3e5e0.json) | 1 | 43 |
+| [SR-1.21](seed-readiness/specs/SR-1.21-a-missing-note-is-never-silent.json) | [`k-sr-1-21-a-missing-note-t-77741b`](signed/k-sr-1-21-a-missing-note-t-77741b.json) | 1 | 41 |
+| [SR-1.22](seed-readiness/specs/SR-1.22-an-interrupted-write-recovers-from-the-log.json) | [`k-sr-1-22-a-whole-note-wri-9746f4`](signed/k-sr-1-22-a-whole-note-wri-9746f4.json) | 1 | 41 |
+| [SR-1.24](seed-readiness/specs/SR-1.24-no-cli-write-beside-a-live-daemon.json) | [`k-sr-1-24-no-cli-command-w-a03500`](signed/k-sr-1-24-no-cli-command-w-a03500.json) | 1 | 38 |
+| [SR-1.25](seed-readiness/specs/SR-1.25-a-cloud-seat-addresses-one-local-seat.json) | [`k-sr-1-25-a-cloud-seat-all-c6de54`](signed/k-sr-1-25-a-cloud-seat-all-c6de54.json) | 1 | 41 |
+| [SR-1.26](seed-readiness/specs/SR-1.26-one-write-can-never-make-the-vault-unopenable.json) | [`k-sr-1-26-one-write-can-ne-e6ae4e`](signed/k-sr-1-26-one-write-can-ne-e6ae4e.json) | 2 | 51 |
+| [SR-1.27](seed-readiness/specs/SR-1.27-done-comes-only-from-a-passing-verify.json) | [`k-sr-1-27-done-comes-only--ce2666`](signed/k-sr-1-27-done-comes-only--ce2666.json) | 1 | 22 |
+| [SR-1.28](seed-readiness/specs/SR-1.28-the-bus-writes-its-own-routing-files.json) | [`k-sr-1-28-the-bus-writes-i-02c12e`](signed/k-sr-1-28-the-bus-writes-i-02c12e.json) | 2 | 56 |
+| [QL-1.01](quality-loop/specs/QL-1.01-red-team-gate-no-signing.json) | [`k-ql-1-01-red-team-gate-no-296339`](signed/k-ql-1-01-red-team-gate-no-296339.json) | 2 | 50 |
+| [QL-1.02](quality-loop/specs/QL-1.02-mutation-gate-on-changed-lines.json) | [`k-ql-1-02-mutation-gate-th-956ebe`](signed/k-ql-1-02-mutation-gate-th-956ebe.json) | 2 | 50 |
+| [QL-1.03](quality-loop/specs/QL-1.03-sensitive-path-checklist-before-merge.json) | [`k-ql-1-03-security-checkli-c328ad`](signed/k-ql-1-03-security-checkli-c328ad.json) | 2 | 37 |
+| [QL-1.04](quality-loop/specs/QL-1.04-claims-ledger-check-in-every-repository.json) | [`k-ql-1-04-the-claims-check-75de75`](signed/k-ql-1-04-the-claims-check-75de75.json) | 1 | 28 |
