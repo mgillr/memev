@@ -48,6 +48,7 @@ A requirement is replaced, never silently removed, only when a round's answer na
 - SR-1.05 T1: criterion replaced after red-team round 3 answer 1 and round 2 answer 1 (the R7 replacement) (configuration no longer decides trust; under the active-tunnel rule the original setup made every loopback request one caller). From: "'quick tunnel callers are distinct' and 'funnel cannot spoof' with remote.provider set and no active tunnel, plus an author instruction". To: "the same cases with activeTunnel () => 'cloudflare' and () => 'tailscale' passed to createServer, the instruction dropped".
 - SR-1.05 T1: criterion replaced after red-team round 3 answer 1 and round 2 answer 1 (the R7 replacement) (remote.cloudflare alone trusts no header, so the flood would share the loopback bucket). From: "both guards with remote.cloudflare configured". To: "both guards with activeTunnel () => 'cloudflare' passed to createServer".
 - SR-1.05 T1: criterion replaced after red-team round 3 answer round 2 answer 1 (the R7 replacement) (the requirement says such tests pass activeTunnel; the criteria now say it too). From: "three round-1 criteria simulating distinct callers by cf-connecting-ip without naming the tunnel". To: "the same criteria naming activeTunnel () => 'cloudflare'".
+- SR-1.27 request: request sentence replaced after red-team round 1 answer round 1 notes (its mutation criteria need QL-1.02, which depends on SR-0.03, so it cannot land ahead of SR-0.03). From: "Lands ahead of SR-0.03.". To: "It is urgent: until it lands, a stopgap fix ahead of it needs the owner's approval.".
 - SR-1.01 T1: requirement replaced after red-team round 1 answer 4 and 6 (the lock must come before the torn-tail truncate and the manifest rewrite, and a reader must never act on a half-written lock). From: "OpLog.open takes an exclusive lock file (O_EXCL with stale-pid recovery) before truncating or rewriting the manifest". To: "OpLog.open takes the lock before anything else: before it reads the manifest, truncates a torn tail, rewrites manifest.json or opens a segment for append. The lock is the file .memev/oplog/LOCK, created with an exclusive create (flag wx), written with pid, host, boot id (the boot time computed from os.uptime()), the holder's start time and a random token, and fsynced; its bytes never change while it is held".
 - SR-1.01 T1: requirement replaced after red-team round 1 answer 3 (a read-only flag that only skips the lock would become a second writer). From: "a read-only open mode exists that never mutates the log". To: "a read-only open (new Vault(root, { readOnly: true }) and new OpLog(dir, { readOnly: true })) takes no lock and writes nothing: no recover() import, no torn-tail truncate, no manifest, snapshot, device, index or graph write; it reads a torn tail as absent, and log.append() on it throws".
 - SR-1.01 T1: requirement replaced after red-team round 1 answer 2 and 6 (two writers in one process cannot show the holder's pid, and the snapshot is not what a second opener damages). From: "the test opens a second writable Vault the way memev claims does (src/cli/main.mjs:327, which opens the vault in process and rewrites .memev/oplog/snapshot.json) beside an open one and asserts VaultLocked and an unchanged snapshot". To: "the lock test opens the second writable Vault from a child process, the way memev claims does (src/cli/main.mjs:327), and asserts VaultLocked with the active segment, manifest.json, snapshot.json and device.json byte-identical; OpLog.open never writes snapshot.json, so an unchanged snapshot alone proves nothing".
@@ -74,6 +75,25 @@ A requirement is replaced, never silently removed, only when a round's answer na
 - SR-1.22 T1: criterion replaced after red-team round 2 answer 6 (a Latin-1 or Windows-1252 save is a real outside edit and must not be overwritten from the log). From: "After a failed write whose new body is in the log, the file is replaced by NUL bytes of the new body's length. The reopen reads the new body and adds no external record: a file containing NUL bytes, or invalid UTF-8, is treated as torn.". To: "After a failed write whose new body is in the log, the file is replaced by NUL bytes of the new body's length. The reopen reads the new body and adds no external record: a file containing NUL bytes is treated as torn.".
 - SR-1.22 T1: criterion replaced after red-team round 2 answer 1 and 9 (the daemon writes daemon.lock with its own pid before it opens, so keying recovery on daemon.lock would stop the daemon from ever recovering). From: "While a live pid holds .memev/daemon.lock, a second Vault.open() on a vault whose note lags the log changes no note file and appends no record (seq and file mtimes unchanged). Recovery happens only in the lock holder.". To: "While a child process holds the SR-1.01 vault lock on a vault whose note lags the log, a second writable Vault.open() throws VaultLocked, and a read-only open changes no note file and appends no record (seq and file mtimes unchanged). Recovery happens only in the lock holder.".
 - SR-1.22 T1: criterion replaced after red-team round 2 answer 11 (the requirement chooses the thrown logged_pending error; a returned result is not accepted as well). From: "c26 a logged-but-unfinished change says so. With the note file chmod 0444, append(p,'tail') throws a VaultError whose code is 'logged_pending' and which carries the logged seq (or returns {seq, pending:true}); a write(p,B) whose tmp write fails behaves the same. After restoring permissions and reopening, 'tail' appears exactly once and the file reads the logged body plus 'tail'.". To: "c26 a logged-but-unfinished change says so. With the note file chmod 0444, append(p,'tail') throws a VaultError whose code is 'logged_pending' and which carries the logged seq; a write(p,B) whose tmp write fails behaves the same. After restoring permissions and reopening, 'tail' appears exactly once and the file reads the logged body plus 'tail'.".
+- SR-1.27 T1: criterion replaced after red-team round 1 answer 6 (T2 makes the closed file a signed close record, and verify re-runs T1's criteria after T2). From: "A contract whose only criterion passes is verified by the owner: the verify result is PASS, contracts/closed/<id>.json holds that result, and the receipt gains one entry.". To: "A contract whose only criterion passes is verified by the owner: the verify result is PASS, contracts/closed/<id>.json is written for it through the internal path, and the receipt gains one entry.".
+- SR-1.27 T2: requirement replaced after red-team round 1 answer 6 and 1 (the log does not travel with the backup, so an honest close carries its own signature, as strong as a log record; the hash binds a pass to the contract as signed). From: "a signed contract is done when the log holds a contract.verified record for its id with ok true; the presence, absence or content of a file under contracts/closed/ plays no part in contractList, contractGate or the pre-push gate". To: "a signed contract is done when the log holds a contract.verified record for its id with ok true and the signed hash, or when contracts/closed/<id>.json is a close record whose signature verifies under the key that signed the contract and whose hash equals the signed hash; any other file under contracts/closed/ plays no part in contractList, contractGate or the pre-push gate".
+- SR-1.27 T2: criterion removed after red-team round 1 answer 3 (.memev/ is gitignored at any depth, so a committed fixture vault is empty in a clean clone; answer 3's criterion builds the vault with the base commit's own code at test time). From: "A fixture vault written by the code at the base, holding one contract closed by a passing verify and one with a hand-placed closed file, opens with the first done and the second open.". To: "(removed)".
+- SR-1.27 T2: scope removed after red-team round 1 answer 3 (no committed fixture vault (see the removed criterion)). From: "test/fixtures/contracts-closed/**". To: "(removed)".
+- SR-1.27 T2: criterion replaced after red-team round 1 answer round 1 notes (the pattern 'only a passing verify' also matches a negated sentence). From: "docs/CONTRACTS.md states that only a passing verify makes a contract done". To: "docs/CONTRACTS.md carries the sentence 'A contract is done only after a passing verify of the contract as signed.'".
+- SR-1.27 T2: requirement replaced after red-team round 1 answer 6 (in a clone an honest close has no log record but a valid signed close record, and must not be listed). From: "memev doctor lists every contract whose contracts/closed/<id>.json exists with no passing contract.verified record, as a contract to verify again; nothing is rewritten or deleted". To: "memev doctor lists every contract whose contracts/closed/<id>.json exists but which is not done under requirement 1, as a contract to verify again; nothing is rewritten or deleted".
+
+## Mutation companions added by the build
+
+QL-1.02 version 3 makes the canonical mutation criteria three metrics on one command: survived == 0, mutants > 0 and ignored == 0. A task that carried only survived gains the other two on the same command, and a survived metric without timeout_s gets 3600. Nothing is removed.
+
+- SR-1.01: 1 addition(s), including QL-1.02 in its dependencies, since its mutation criteria run the gate QL-1.02 builds.
+- SR-1.21: 3 addition(s).
+- SR-1.22: 3 addition(s).
+- SR-1.23: 3 addition(s).
+- SR-1.24: 3 addition(s).
+- SR-1.25: 3 addition(s).
+- SR-1.26: 6 addition(s).
+- SR-1.27: 1 addition(s), including QL-1.02 in its dependencies, since its mutation criteria run the gate QL-1.02 builds.
 
 ## Test-name guards added by the build
 
@@ -81,19 +101,22 @@ node's TAP output counts each test file as a passing test, so a name filter that
 
 History of the guard's form, 31 October 2026: (1) a count of matching passing lines against the number of alternatives (grep); (2) the same count, with describe() suite lines dropped (awk); (3) one match required for each alternative, matched against the test name, because a count let two tests matching one alternative stand in for another that never ran.
 
+- SR-1.01: name guard on 18 criterion command(s).
 - SR-1.03: name guard on 18 criterion command(s).
-- SR-1.05: name guard on 20 criterion command(s).
+- SR-1.05: name guard on 26 criterion command(s).
+- SR-1.06: name guard on 23 criterion command(s).
 - SR-1.11: name guard on 1 criterion command(s).
 - SR-1.21: name guard on 10 criterion command(s).
 - SR-1.22: name guard on 22 criterion command(s).
+- SR-1.26: name guard on 12 criterion command(s).
+- SR-1.27: name guard on 15 criterion command(s).
 
-## Mutation companions added by the build
+## Subtest labels added by the build
 
-QL-1.02 version 3 makes the canonical mutation criteria three metrics on one command: survived == 0, mutants > 0 and ignored == 0. A task that carried only survived gains the other two on the same command, and a survived metric without timeout_s gets 3600. Nothing is removed.
+When two or more red-green criteria of one task shared one whole-file command, one failing subtest at base and a green file passed them all (reviewer's finding, 31 October 2026). Each such criterion now runs its own subtest, named <task>-cNN: after its position in the task; the task gains a requirement naming the rule and a command criterion that one full run passes every labelled subtest with nothing skipped. Statements are unchanged.
 
-- SR-1.21: 3 addition(s).
-- SR-1.22: 3 addition(s).
-- SR-1.23: 3 addition(s).
-- SR-1.24: 3 addition(s).
-- SR-1.25: 3 addition(s).
-- SR-1.26: 6 addition(s).
+- SR-1.01: 18 criterion command(s) narrowed to labelled subtests.
+- SR-1.05: 6 criterion command(s) narrowed to labelled subtests.
+- SR-1.06: 23 criterion command(s) narrowed to labelled subtests.
+- SR-1.26: 12 criterion command(s) narrowed to labelled subtests.
+- SR-1.27: 15 criterion command(s) narrowed to labelled subtests.

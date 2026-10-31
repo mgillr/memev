@@ -22,7 +22,8 @@
         "the test never asserts the value of MAX_BUCKETS and takes its loop bounds from literals, so the mutation check fails only when the cap stops being enforced",
         "docs/CLOUD.md states the limit, which address each tunnel is limited by, remote.trusted_proxy and the per-token rule",
         "the daemon passes the running provider into createServer: src/server/main.mjs builds the server with activeTunnel reading the provider the tunnel supervisor actually started (supervise exposes it), never a value a test supplies, and the request path spawns no process to find it",
-        "the limiter's counting API is size (every entry of every structure it keeps) and has(key); the cap and idle tests use only createServer, size and has"
+        "the limiter's counting API is size (every entry of every structure it keeps) and has(key); the cap and idle tests use only createServer, size and has",
+        "each red-green criterion of this task that runs test/rate-limit.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
       "scope": [
@@ -44,7 +45,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -78,7 +79,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -86,7 +87,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -103,7 +104,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -120,7 +121,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c10:' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -352,7 +353,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
-            "cmd": "node --test test/rate-limit.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c37:' test/rate-limit.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c37:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -362,6 +363,14 @@
             "cmd": "node --test --test-reporter=tap $(grep -l 'server/http.mjs' test/*.test.mjs)",
             "expect_exit": 0,
             "timeout_s": 900
+          }
+        },
+        {
+          "statement": "One full run of test/rate-limit.test.mjs passes every labelled subtest (T1-c01, T1-c05, T1-c06, T1-c08, T1-c10, T1-c37) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/rate-limit.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c05:|^T1-c06:|^T1-c08:|^T1-c10:|^T1-c37:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
           }
         },
         {

@@ -20,7 +20,8 @@
         "the check is engine code that ships with memev: src/engine/redteam-gate.mjs exports evaluate({spec, cwd, reviewerKeys}), RULES, REVIEWER_KEYS and GRANDFATHERED, and scripts/gate/redteam-gate.mjs is a thin command-line wrapper over it, so the copies other repositories receive and the engine's own draft and sign paths run the same code",
         "the committed base fixture is signed once with the real reviewer key, whose private key is never committed; every other fixture is signed with the test key under test/fixtures/redteam/ and reaches the gate only through an injected reviewerKeys argument",
         "a round's signature covers its answers and its spec snapshot; that round's dispositions and amendments, written after the reviewer answered, are covered by the next round's signature, and the last round of a SIGNABLE record has none",
-        "a replacement may cite a previous round's answer number or a numbered point of that round's notes (round and point), recorded in the round's amendments list"
+        "a replacement may cite a previous round's answer number or a numbered point of that round's notes (round and point), recorded in the round's amendments list",
+        "each red-green criterion of this task that runs test/redteam-gate.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
       "scope": [
@@ -35,7 +36,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -43,7 +44,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c02:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -51,7 +52,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -67,7 +68,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -75,7 +76,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -83,7 +84,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c07:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -91,7 +92,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -99,7 +100,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c09:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -107,7 +108,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c10:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -115,7 +116,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c11:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -123,7 +124,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c12:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -131,7 +132,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c13:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -139,7 +140,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c14:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c14:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -156,7 +157,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c16:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c16:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -164,7 +165,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c17:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -172,7 +173,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c18:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c18:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -180,7 +181,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c19:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c19:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -188,7 +189,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c20:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c20:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -196,7 +197,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c21:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c21:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -204,7 +205,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c22:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c22:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -212,7 +213,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c23:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c23:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -220,7 +221,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c24:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c24:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -228,7 +229,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c25:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c25:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -263,7 +264,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c29:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c29:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -271,7 +272,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c30:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c30:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -279,7 +280,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c31:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c31:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -287,7 +288,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c32:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c32:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -295,7 +296,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c33:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c33:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -304,6 +305,14 @@
             "type": "command",
             "cmd": "R=$PWD; node --input-type=module -e \"import fs from 'node:fs'; import {canonicalHash} from 'file://$R/vendor/attest/signature.mjs'; const g=await import('file://$R/scripts/gate/redteam-gate.mjs'); const h=canonicalHash(JSON.parse(fs.readFileSync('$R/contracts/signed/k-memory-quality-multiling-4468b8.json','utf8'))); process.exit(JSON.stringify(g.GRANDFATHERED)===JSON.stringify([h])?0:1);\"",
             "expect_exit": 0
+          }
+        },
+        {
+          "statement": "One full run of test/redteam-gate.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03, T1-c05, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c11, T1-c12, T1-c13, T1-c14, T1-c16, T1-c17, T1-c18, T1-c19, T1-c20, T1-c21, T1-c22, T1-c23, T1-c24, T1-c25, T1-c29, T1-c30, T1-c31, T1-c32, T1-c33) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/redteam-gate.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c02:|^T1-c03:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c12:|^T1-c13:|^T1-c14:|^T1-c16:|^T1-c17:|^T1-c18:|^T1-c19:|^T1-c20:|^T1-c21:|^T1-c22:|^T1-c23:|^T1-c24:|^T1-c25:|^T1-c29:|^T1-c30:|^T1-c31:|^T1-c32:|^T1-c33:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
           }
         },
         {
@@ -329,7 +338,9 @@
         "test/redteam-gate.test.mjs also runs the gate in --report mode over the repository's own spec directories, so npm test and CI fail on a malformed record or a signed contract without a SIGNABLE record, while NO RECORD is reported and not failed",
         "docs/CONTRACTS.md gains a section that states the rule, the record path, the hash definition and the one-line runbook: gate, then memev contract new, then memev contract sign, in one command",
         "memev contract new refuses a spec the gate reports NOT SIGNABLE or NO RECORD, naming the reasons, and memev contract sign and the MCP sign tool refuse a draft whose source spec hash has no clean signed record, wherever the repository holds red-team records or contracts.redteam_required is on; whether the gate script exists in the repository plays no part",
-        "memev_contract_draft, memev_contract_sign, memev_contract_from_request and memev_contract_amend call evaluate() before they write anything, for local callers and tunnel callers alike, wherever the repository holds red-team records or the vault setting contracts.redteam_required is on"
+        "memev_contract_draft, memev_contract_sign, memev_contract_from_request and memev_contract_amend call evaluate() before they write anything, for local callers and tunnel callers alike, wherever the repository holds red-team records or the vault setting contracts.redteam_required is on",
+        "each red-green criterion of this task that runs test/redteam-gate.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest",
+        "each red-green criterion of this task that runs test/contracts.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c05: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
       "scope": [
@@ -350,7 +361,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c01:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -366,7 +377,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c03:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -374,7 +385,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
-            "cmd": "node --test test/redteam-gate.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c04:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -382,7 +393,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/contracts.test.mjs",
-            "cmd": "node --test test/contracts.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c05:' test/contracts.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -390,7 +401,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/contracts.test.mjs",
-            "cmd": "node --test test/contracts.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c06:' test/contracts.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -398,7 +409,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/contracts.test.mjs",
-            "cmd": "node --test test/contracts.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c07:' test/contracts.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -407,6 +418,22 @@
             "type": "command",
             "cmd": "awk '/^  pull_request:/{p=1;next} /^  push:/{p=0} p' .github/workflows/ci.yml | grep -q \"contracts/\\*\\*\"",
             "expect_exit": 0
+          }
+        },
+        {
+          "statement": "One full run of test/redteam-gate.test.mjs passes every labelled subtest (T2-c01, T2-c03, T2-c04) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/redteam-gate.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c03:|^T2-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "One full run of test/contracts.test.mjs passes every labelled subtest (T2-c05, T2-c06, T2-c07) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/contracts.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c05:|^T2-c06:|^T2-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
           }
         },
         {

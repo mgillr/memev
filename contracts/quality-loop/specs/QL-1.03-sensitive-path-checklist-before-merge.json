@@ -21,7 +21,8 @@
         "the gate takes --head as well as --base and the hook passes the pushed sha from pre-push stdin, so pushing a branch from another checkout is judged on what is pushed",
         "the checklist and every cited file are read through git at the head being checked (git show and git cat-file with execFile argument arrays, never a shell string), never from the working tree; a cited path or a ref with shell metacharacters is refused",
         "callers of the command wrappers (src/engine/util.mjs run, src/engine/git.mjs) and vendor/attest are command-execution files for the sensitive list, found by scanning imports of those modules, not only of node:child_process",
-        "merge commits are judged on their combined content against the base, so an evil merge or a parallel branch cannot carry a sensitive change past a checklist written for another diff"
+        "merge commits are judged on their combined content against the base, so an evil merge or a parallel branch cannot carry a sensitive change past a checklist written for another diff",
+        "each red-green criterion of this task that runs test/gate-sensitive.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
       "scope": [
@@ -41,7 +42,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive.test.mjs",
-            "cmd": "node --test test/gate-sensitive.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -56,7 +57,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive.test.mjs",
-            "cmd": "node --test test/gate-sensitive.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -64,7 +65,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive.test.mjs",
-            "cmd": "node --test test/gate-sensitive.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -72,7 +73,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive.test.mjs",
-            "cmd": "node --test test/gate-sensitive.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -80,7 +81,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive.test.mjs",
-            "cmd": "node --test test/gate-sensitive.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -88,7 +89,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive.test.mjs",
-            "cmd": "node --test test/gate-sensitive.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c07:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -96,7 +97,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive.test.mjs",
-            "cmd": "node --test test/gate-sensitive.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -104,7 +105,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive.test.mjs",
-            "cmd": "node --test test/gate-sensitive.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c09:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -112,7 +113,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive.test.mjs",
-            "cmd": "node --test test/gate-sensitive.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c10:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -120,7 +121,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive.test.mjs",
-            "cmd": "node --test test/gate-sensitive.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c11:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -128,7 +129,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive.test.mjs",
-            "cmd": "node --test test/gate-sensitive.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c12:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -136,7 +137,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive.test.mjs",
-            "cmd": "node --test test/gate-sensitive.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c13:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -144,7 +145,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive.test.mjs",
-            "cmd": "node --test test/gate-sensitive.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c14:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c14:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -152,7 +153,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive.test.mjs",
-            "cmd": "node --test test/gate-sensitive.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c15:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -160,7 +161,15 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive.test.mjs",
-            "cmd": "node --test test/gate-sensitive.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c16:' test/gate-sensitive.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c16:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/gate-sensitive.test.mjs passes every labelled subtest (T1-c01, T1-c03, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c11, T1-c12, T1-c13, T1-c14, T1-c15, T1-c16) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-sensitive.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c03:|^T1-c04:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c12:|^T1-c13:|^T1-c14:|^T1-c15:|^T1-c16:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
           }
         },
         {
@@ -188,7 +197,8 @@
         "docs/DEVELOPING.md names the sensitive areas and the four questions",
         "the hook is written where git reads it (git rev-parse --git-path hooks/pre-push), so linked worktrees and core.hooksPath work; it reads the refs from pre-push stdin; it runs the sensitive-path gate only in a repository that has scripts/gate/sensitive-paths.mjs and exits 0 in a plain user project",
         "the CI steps that run the gate check out full history (fetch-depth 0), take the base from the event through env, carry no continue-on-error and no || , and run on pull requests and on push to main; docs/DEVELOPING.md states that the check must be a required status on main, a repository setting the owner turns on",
-        "the wiring check also refuses a step-level if: that can skip the step, set +e or any shell construct that discards the exit status, and job-level continue-on-error; pushes to main are never cancelled by a later run (cancel-in-progress applies to pull requests only)"
+        "the wiring check also refuses a step-level if: that can skip the step, set +e or any shell construct that discards the exit status, and job-level continue-on-error; pushes to main are never cancelled by a later run (cancel-in-progress applies to pull requests only)",
+        "each red-green criterion of this task that runs test/gate-sensitive-wiring.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
       "scope": [
@@ -207,7 +217,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive-wiring.test.mjs",
-            "cmd": "node --test test/gate-sensitive-wiring.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c01:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -231,7 +241,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive-wiring.test.mjs",
-            "cmd": "node --test test/gate-sensitive-wiring.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c04:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -239,7 +249,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive-wiring.test.mjs",
-            "cmd": "node --test test/gate-sensitive-wiring.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c05:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -247,7 +257,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive-wiring.test.mjs",
-            "cmd": "node --test test/gate-sensitive-wiring.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c06:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -255,7 +265,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive-wiring.test.mjs",
-            "cmd": "node --test test/gate-sensitive-wiring.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c07:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -271,7 +281,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive-wiring.test.mjs",
-            "cmd": "node --test test/gate-sensitive-wiring.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c09:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -279,7 +289,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive-wiring.test.mjs",
-            "cmd": "node --test test/gate-sensitive-wiring.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c10:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -287,7 +297,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive-wiring.test.mjs",
-            "cmd": "node --test test/gate-sensitive-wiring.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c11:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -295,7 +305,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive-wiring.test.mjs",
-            "cmd": "node --test test/gate-sensitive-wiring.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c12:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -303,7 +313,15 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-sensitive-wiring.test.mjs",
-            "cmd": "node --test test/gate-sensitive-wiring.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c13:' test/gate-sensitive-wiring.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/gate-sensitive-wiring.test.mjs passes every labelled subtest (T2-c01, T2-c04, T2-c05, T2-c06, T2-c07, T2-c09, T2-c10, T2-c11, T2-c12, T2-c13) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-sensitive-wiring.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c04:|^T2-c05:|^T2-c06:|^T2-c07:|^T2-c09:|^T2-c10:|^T2-c11:|^T2-c12:|^T2-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
           }
         },
         {

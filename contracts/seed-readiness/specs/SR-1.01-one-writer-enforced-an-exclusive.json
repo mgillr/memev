@@ -2,7 +2,7 @@
   "title": "SR-1.01 One writer, enforced: an exclusive lock on the vault log",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G01: Single-writer rule is convention only; runner.mjs opens a Vault beside a live daemon and can corrupt the oplog. Repository: memev. Depends on contracts: none. Sequenced with SR-1.09, SR-1.15 and SR-1.20, which change the same CLI and server files; SR-1.24 depends on this contract. Sensitive path (the oplog): the QL-1.03 checklist applies before merge.",
+  "request": "Closes G01: Single-writer rule is convention only; runner.mjs opens a Vault beside a live daemon and can corrupt the oplog. Repository: memev. Depends on contracts: QL-1.02. Sequenced with SR-1.09, SR-1.15 and SR-1.20, which change the same CLI and server files; SR-1.24 depends on this contract. Sensitive path (the oplog): the QL-1.03 checklist applies before merge.",
   "tasks": [
     {
       "id": "T1",
@@ -19,7 +19,8 @@
         "stale recovery renames the lock to a unique name in the same folder, re-reads it, and proceeds only if its bytes equal the stale lock it judged; otherwise it puts the file back without replacing any lock created meanwhile and reports VaultLocked; two openers recovering the same stale lock never both hold the vault",
         "any error other than EEXIST while creating the lock (EACCES, ENOSPC, EROFS) fails the open with that error; it is never read as a held or a stale lock",
         "a second writable open in the process that holds the lock is refused with VaultLocked like any other; the lock is never re-entrant",
-        "VaultLocked is exported from src/engine/oplog.mjs, and a bare new OpLog(dir).open() takes the lock too"
+        "VaultLocked is exported from src/engine/oplog.mjs, and a bare new OpLog(dir).open() takes the lock too",
+        "each red-green criterion of this task that runs test/oplog-lock.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
       "scope": [
@@ -38,7 +39,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/oplog-lock.test.mjs",
-            "cmd": "node --test test/oplog-lock.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -54,7 +55,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/oplog-lock.test.mjs",
-            "cmd": "node --test test/oplog-lock.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -62,7 +63,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/oplog-lock.test.mjs",
-            "cmd": "node --test test/oplog-lock.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -70,7 +71,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/oplog-lock.test.mjs",
-            "cmd": "node --test test/oplog-lock.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -78,7 +79,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/oplog-lock.test.mjs",
-            "cmd": "node --test test/oplog-lock.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -86,7 +87,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/oplog-lock.test.mjs",
-            "cmd": "node --test test/oplog-lock.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c07:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -94,7 +95,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/oplog-lock.test.mjs",
-            "cmd": "node --test test/oplog-lock.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -102,7 +103,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/oplog-lock.test.mjs",
-            "cmd": "node --test test/oplog-lock.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c09:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -110,7 +111,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/oplog-lock.test.mjs",
-            "cmd": "node --test test/oplog-lock.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c10:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -118,7 +119,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/oplog-lock.test.mjs",
-            "cmd": "node --test test/oplog-lock.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c11:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -126,7 +127,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/oplog-lock.test.mjs",
-            "cmd": "node --test test/oplog-lock.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c12:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -168,6 +169,14 @@
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "One full run of test/oplog-lock.test.mjs passes every labelled subtest (T1-c01, T1-c03, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c11, T1-c12) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/oplog-lock.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c03:|^T1-c04:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
           }
         },
         {
@@ -191,7 +200,8 @@
       ],
       "requirements": [
         "runner.mjs no longer constructs new Vault(root) for writes; it calls the daemon over HTTP or opens read-only",
-        "both writable opens in runner.mjs go (:211 in the command and :188 in watch); memev runner watch holds no oplog lock while it runs"
+        "both writable opens in runner.mjs go (:211 in the command and :188 in watch); memev runner watch holds no oplog lock while it runs",
+        "each red-green criterion of this task that runs test/runner.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
       "scope": [
@@ -205,7 +215,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/runner.test.mjs",
-            "cmd": "node --test test/runner.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c01:' test/runner.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -221,7 +231,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/runner.test.mjs",
-            "cmd": "node --test test/runner.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c03:' test/runner.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -229,7 +239,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/runner.test.mjs",
-            "cmd": "node --test test/runner.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c04:' test/runner.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -237,7 +247,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/runner.test.mjs",
-            "cmd": "node --test test/runner.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c05:' test/runner.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -271,6 +281,14 @@
             "op": "==",
             "value": 0,
             "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "One full run of test/runner.test.mjs passes every labelled subtest (T2-c01, T2-c03, T2-c04, T2-c05) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/runner.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c03:|^T2-c04:|^T2-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
           }
         },
         {
@@ -296,7 +314,8 @@
         "the daemon's start (src/server/main.mjs) meets a held lock with exit code 4 within 2 s, a VaultLocked message naming the holder's pid, and no daemon.lock left behind; it never ends in an uncaught error",
         "memev start (startDaemon, src/cli/daemon.mjs) reports exit code 4 as the vault being locked by that pid, not as 'did not start'",
         "memev claims uses the daemon over HTTP when it is up and a read-only open when it is not; memev doctor without --fix opens read-only; memev doctor --fix and memev compact take the lock and, with a live daemon, refuse with VaultLocked naming the daemon's pid and saying to stop it first",
-        "compact's guard is the lock, not daemon.json"
+        "compact's guard is the lock, not daemon.json",
+        "each red-green criterion of this task that runs test/oplog-lock-cli.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T3-c01: for the first), and the criterion runs only that subtest"
       ],
       "scope": [
         "src/server/main.mjs",
@@ -315,7 +334,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/oplog-lock-cli.test.mjs",
-            "cmd": "node --test test/oplog-lock-cli.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c01:' test/oplog-lock-cli.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T3-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -323,7 +342,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/oplog-lock-cli.test.mjs",
-            "cmd": "node --test test/oplog-lock-cli.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c02:' test/oplog-lock-cli.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T3-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -331,7 +350,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/oplog-lock-cli.test.mjs",
-            "cmd": "node --test test/oplog-lock-cli.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c03:' test/oplog-lock-cli.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T3-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -373,6 +392,14 @@
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "One full run of test/oplog-lock-cli.test.mjs passes every labelled subtest (T3-c01, T3-c02, T3-c03) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/oplog-lock-cli.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T3-c01:|^T3-c02:|^T3-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
           }
         },
         {
