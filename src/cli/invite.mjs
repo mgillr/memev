@@ -30,7 +30,7 @@ export function vaultAddress(root) {
 
 /** A trial is available while the vault is on the free tier and has not started one. The record a
  *  started trial leaves in the vault is read by readTrialRecord; while it is absent a trial may
- *  still be started. Until the trial flow lands (MEM-067) no trial is offered, so this reports none. */
+ *  still be started. There is no Personal trial: the free core is the trial (owner decision 31 Oct 2026, docs/BUSINESS-TRIAL.md), so no trial is offered here and this reports none. */
 export function trialAvailable() {
   return false;
 }

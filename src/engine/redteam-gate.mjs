@@ -52,7 +52,7 @@ export const GRANDFATHERED = Object.freeze([
   'ef3125bf97ed5b6d0fccf31824a4069c752030549f2cd7e42403872ca0c03fad', // contracts/signed/k-memory-quality-multiling-4468b8.json
 ]);
 
-export const DEFAULT_SPEC_DIRS = Object.freeze(['contracts/seed-readiness/specs', 'contracts/quality-loop/specs']);
+export const DEFAULT_SPEC_DIRS = Object.freeze(['contracts/seed-readiness/specs', 'contracts/quality-loop/specs', 'contracts/scope-one/specs']);
 
 // Fields the builder writes after the reviewer answered. A round's own signature leaves them out; the next
 // round's signature (which covers the previous round in full) or the closing envelope covers them.

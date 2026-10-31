@@ -1,0 +1,173 @@
+{
+ "schema": "memev-scope-one/1",
+ "created": "2026-10-31",
+ "contracts": [
+  {
+   "id": "SO-1.01",
+   "gap": "G-SO-01",
+   "area": "SO-1",
+   "title": "Canonical execution integration: the store, the state machine and the coordinator as one authority",
+   "repo": "memev",
+   "closes": "Closes the integration gap between three delivered modules: src/engine/coordinator.mjs imports only util.mjs (line 15), src/engine/project-store.mjs imports no state machine, and nothing outside src/engine/vault.mjs (projectStore, line 408) imports project-state, project-store or coordinator, so the daemon, the CLI and the MCP routes use none of them",
+   "depends_on": [],
+   "tasks": 1,
+   "criteria": 12,
+   "spec": "specs/SO-1.01-canonical-execution-integration.json",
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+  },
+  {
+   "id": "SO-1.02",
+   "gap": "G-SO-02",
+   "area": "SO-1",
+   "title": "Reconciliation: one work breakdown that accounts for every requirement, contract, pull request and branch",
+   "repo": "memev",
+   "closes": "Closes the drift the addendum names: the takeover register and inventory were dated 30 October at 2909702d and main has moved 118 commits since; the new WBS (docs/scope-one/WBS.md) and its test hold every requirement, contract, pull request and branch once",
+   "depends_on": [],
+   "tasks": 1,
+   "criteria": 10,
+   "spec": "specs/SO-1.02-reconciliation-wbs.json",
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+  },
+  {
+   "id": "SO-1.03",
+   "gap": "G-SO-03",
+   "area": "SO-1",
+   "title": "Lead assignment: a default suitability analysis and an in-language user preference",
+   "repo": "memev",
+   "closes": "Closes the gap the review table names for row 2: the natural-language assignment override through the lead prompt and the default suitability analysis are not in SO-L-A as signed",
+   "depends_on": [
+    "SO-1.01"
+   ],
+   "tasks": 1,
+   "criteria": 10,
+   "spec": "specs/SO-1.03-lead-assignment-preference.json",
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+  },
+  {
+   "id": "SO-1.04",
+   "gap": "G-SO-04",
+   "area": "SO-1",
+   "title": "Dispatch events: a requested action, an accepted dispatch, an observed execution and a verified outcome stay apart",
+   "repo": "memev",
+   "closes": "Closes the gap the review table names for row 3: the requested, accepted, observed and verified distinction in the event history is not in SO-05-B or SO-05-D as signed",
+   "depends_on": [
+    "SO-1.01"
+   ],
+   "tasks": 1,
+   "criteria": 10,
+   "spec": "specs/SO-1.04-dispatch-event-distinction.json",
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+  },
+  {
+   "id": "SO-1.05",
+   "gap": "G-SO-05",
+   "area": "SO-1",
+   "title": "Workspace: the eleven project views and the persistent lead-agent area",
+   "repo": "memev",
+   "closes": "Closes the gap the review table names for row 5: the eleven views and the persistent lead-agent area go beyond SO-C-A to SO-C-C (overview, agents, comms, roster, changes, outstanding work, deliverables)",
+   "depends_on": [
+    "SO-1.01",
+    "SO-1.07"
+   ],
+   "tasks": 1,
+   "criteria": 20,
+   "spec": "specs/SO-1.05-workspace-views-and-lead-area.json",
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+  },
+  {
+   "id": "SO-1.06",
+   "gap": "G-SO-06",
+   "area": "SO-1",
+   "title": "Connections and access: the provider and tool connections screen and the internal resource readiness registry",
+   "repo": "memev",
+   "closes": "Closes the gap the review table names for row 6: the provider and tool connections screen and the internal resource readiness registry are not in SO-O-A to SO-O-C (folder grants, GitHub connection, publishing)",
+   "depends_on": [
+    "SO-1.01"
+   ],
+   "tasks": 1,
+   "criteria": 13,
+   "spec": "specs/SO-1.06-connections-and-resource-readiness.json",
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+  },
+  {
+   "id": "SO-1.07",
+   "gap": "G-SO-07",
+   "area": "SO-1",
+   "title": "Relationship model: explicit relations between project items, and change propagation that marks affected work stale",
+   "repo": "memev",
+   "closes": "Closes the gap the review table names for row 7: an explicit relationship model and change propagation that marks stale work are not in SO-07-A, SO-05-C or SO-05-D",
+   "depends_on": [
+    "SO-1.01"
+   ],
+   "tasks": 1,
+   "criteria": 14,
+   "spec": "specs/SO-1.07-relationship-model-and-staleness.json",
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+  },
+  {
+   "id": "SO-1.08",
+   "gap": "G-SO-08",
+   "area": "SO-1",
+   "title": "Decision queue: blockers and user decisions as one workflow with named states",
+   "repo": "memev",
+   "closes": "Closes the gap the review table names for row 8: the decision queue states (raised, awaiting user, answered, approved, rejected, deferred, resolved) are not in SO-03-A or SO-C-C",
+   "depends_on": [
+    "SO-1.01"
+   ],
+   "tasks": 1,
+   "criteria": 13,
+   "spec": "specs/SO-1.08-decision-queue.json",
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+  },
+  {
+   "id": "SO-1.09",
+   "gap": "G-SO-09",
+   "area": "SO-1",
+   "title": "Artefacts: version history, comparison and previews that show verification state",
+   "repo": "memev",
+   "closes": "Closes the gap the review table names for row 9: artefact version history and previews are not in SO-05-D or SO-02-B",
+   "depends_on": [
+    "SO-1.01"
+   ],
+   "tasks": 1,
+   "criteria": 11,
+   "spec": "specs/SO-1.09-artefact-history-and-previews.json",
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+  },
+  {
+   "id": "SO-1.10",
+   "gap": "G-SO-10",
+   "area": "SO-1",
+   "title": "Fault classes: the addendum classes that F01 to F20 do not name, added to the failure suite",
+   "repo": "memev",
+   "closes": "Closes the gap the review table names for row 11: the thirteen fault classes of addendum 11 differ from F01 to F20; by the author's mapping in docs/scope-one/WBS.md section 4 six of them have no failure test named for them (evidence that is missing or corrupt, access outside the approved workspace, UI reconstruction while events arrive, out-of-order events, permissions revoked while work is queued, provider failure during a task)",
+   "depends_on": [
+    "SO-1.01"
+   ],
+   "tasks": 1,
+   "criteria": 13,
+   "spec": "specs/SO-1.10-fault-classes-added-to-failure-suite.json",
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+  },
+  {
+   "id": "SO-1.11",
+   "gap": "G-SO-11",
+   "area": "SO-1",
+   "title": "Reference project: the whole user journey as one integration gate",
+   "repo": "memev",
+   "closes": "Closes the gap the review table names for row 12: the fifteen-step reference project is not in SO-11-A",
+   "depends_on": [
+    "SO-1.01",
+    "SO-1.05",
+    "SO-1.06",
+    "SO-1.07",
+    "SO-1.08",
+    "SO-1.10"
+   ],
+   "tasks": 1,
+   "criteria": 22,
+   "spec": "specs/SO-1.11-reference-project-acceptance.json",
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+  }
+ ]
+}

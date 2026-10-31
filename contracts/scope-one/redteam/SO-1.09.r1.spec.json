@@ -1,0 +1,117 @@
+{
+  "title": "SO-1.09 Artefacts: version history, comparison and previews that show verification state",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G-SO-09 (addendum 9, review row 9). Source: the Scope One addendum (PR #222, docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md at head a1757a0) and its review table (issuecomment-6534383323); owner request of 31 Oct 2026 that every aspect be decomposed in the WBS and built into contracts (t531u). The addendum names recommendations that become contracts on acceptance; this contract is the design-record stage, so it asks for the decision record and builds nothing. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository. Depends on contracts: SO-05-D, SO-02-B.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "Link each material artefact to its originating requirement, deliverable or work package, creation and revision events, relevant scope/plan version and verification status.",
+        "Support version history and comparison, and distinguish drafts, reviewed outputs and accepted deliverables.",
+        "Provide appropriate previews for supported formats, including documents, diagrams, flowcharts, code and web/application outputs.",
+        "Show verification evidence and outstanding limitations alongside the artefact. Do not imply that visual presence in the canvas means the output has passed acceptance.",
+        "Keep the underlying files in the user's chosen workspace or explicitly configured storage; the canvas should not create an opaque, proprietary copy as the only authoritative version."
+      ],
+      "description": "",
+      "scope": [
+        "docs/scope-one/design/artefact-history-and-previews.md",
+        "docs/README.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The decision record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/design/artefact-history-and-previews.md"
+          }
+        },
+        {
+          "statement": "The record decides requirement 1: Link each material artefact to its originating requirement, deliverable or work package, creation and revision events, relevant scope/plan version and...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/artefact-history-and-previews.md",
+            "pattern": "^## Requirement 1:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 2: Support version history and comparison, and distinguish drafts, reviewed outputs and accepted deliverables.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/artefact-history-and-previews.md",
+            "pattern": "^## Requirement 2:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 3: Provide appropriate previews for supported formats, including documents, diagrams, flowcharts, code and web/application outputs.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/artefact-history-and-previews.md",
+            "pattern": "^## Requirement 3:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 4: Show verification evidence and outstanding limitations alongside the artefact. Do not imply that visual presence in the canvas means the output has passed...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/artefact-history-and-previews.md",
+            "pattern": "^## Requirement 4:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 5: Keep the underlying files in the user's chosen workspace or explicitly configured storage; the canvas should not create an opaque, proprietary copy as the...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/artefact-history-and-previews.md",
+            "pattern": "^## Requirement 5:"
+          }
+        },
+        {
+          "statement": "The record names the artefact record",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/artefact-history-and-previews.md",
+            "pattern": "^Artefact record:"
+          }
+        },
+        {
+          "statement": "The record names the preview formats",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/artefact-history-and-previews.md",
+            "pattern": "^Preview formats:"
+          }
+        },
+        {
+          "statement": "The decision record passes the leak scan",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The documentation links and up-links stay valid",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-links.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

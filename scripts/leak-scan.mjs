@@ -21,7 +21,7 @@ const SELF = new Set(['scripts/leak-denylist.json']);
 // Commit messages already on main that can't be changed, because history is never rewritten. Only the
 // listed line of each is skipped; the rest of the message is still scanned. Merge pull requests with
 // an explicit subject (gh pr merge --subject) so this list doesn't grow.
-const ALLOW_COMMIT_LINE = new Map([['e5297abf3dd51b953cb0a6829b21927fc56567d4', 1], ['6f21fc3a96bde24ef6e4f36e4018d5c997fcf06f', 1], ['796af33b489ac1683178ac3bed0ff90beb8d6e3f', 9]]); // GitHub's default merge subjects for PR 7 and PR 55; the sign-off line of the 28 Oct docs hotfix
+const ALLOW_COMMIT_LINE = new Map([['e5297abf3dd51b953cb0a6829b21927fc56567d4', 1], ['6f21fc3a96bde24ef6e4f36e4018d5c997fcf06f', 1], ['796af33b489ac1683178ac3bed0ff90beb8d6e3f', 9], ['67bec9dea1c2122b45da0a6c440fda29f18cd792', 1]]); // GitHub's default merge subjects for PR 7 and PR 55; the sign-off line of the 28 Oct docs hotfix; the default merge subject of PR 323, which I merged without an explicit subject
 const OK_EMAIL = /(@(example\.(com|org|net)|[a-z0-9-]+\.invalid|localhost|users\.noreply\.github\.com)|^git@(ssh\.)?github\.com)$/i; // git@github.com and git@ssh.github.com (the port 443 SSH host) are SSH remotes, not addresses
 const OK_IP = (ip) => /^(127\.|0\.0\.0\.0$|10\.|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.|255\.)/.test(ip) || ip.split('.').some((x) => Number(x) > 255);
 const OK_HOME = new Set(['you', 'me', 'user', 'username', 'name', 'runner', 'example', 'alice', 'bob', 'node', '<name>', '<user>', 'ubuntu', 'shared', 'memev']);

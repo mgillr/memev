@@ -1,0 +1,199 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "Define one adapter contract with declared capabilities, identity, session discovery, dispatch, progress/result reporting, checkpointing, cancellation semantics and recovery.",
+        "Keep provider-specific behaviour inside adapters; the planner and coordinator must consume capability declarations rather than provider-specific conditionals.",
+        "Distinguish a requested action, an accepted dispatch, an observed execution and a verified outcome in the event history.",
+        "Never report successful completion merely because a provider returned a success-shaped response."
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "docs/scope-one/design/dispatch-event-distinction.md",
+          "docs/README.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "The decision record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/design/dispatch-event-distinction.md"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "The record decides requirement 1: Define one adapter contract with declared capabilities, identity, session discovery, dispatch, progress/result reporting, checkpointing, cancellation...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/dispatch-event-distinction.md",
+            "pattern": "^## Requirement 1:"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "The record decides requirement 2: Keep provider-specific behaviour inside adapters; the planner and coordinator must consume capability declarations rather than provider-specific conditionals.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/dispatch-event-distinction.md",
+            "pattern": "^## Requirement 2:"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "The record decides requirement 3: Distinguish a requested action, an accepted dispatch, an observed execution and a verified outcome in the event history.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/dispatch-event-distinction.md",
+            "pattern": "^## Requirement 3:"
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "The record decides requirement 4: Never report successful completion merely because a provider returned a success-shaped response.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/dispatch-event-distinction.md",
+            "pattern": "^## Requirement 4:"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "The record names the event kinds",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/dispatch-event-distinction.md",
+            "pattern": "^Event kinds:"
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "The record names the adapter contract",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/dispatch-event-distinction.md",
+            "pattern": "^Adapter contract:"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "The decision record passes the leak scan",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "The documentation links and up-links stay valid",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-links.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-so-1-04-dispatch-events-82855d",
+  "title": "SO-1.04 Dispatch events: a requested action, an accepted dispatch, an observed execution and a verified outcome stay apart",
+  "workdir": null,
+  "created": "2026-10-31T22:00:26.967Z",
+  "version": 1,
+  "request": "Closes G-SO-04 (addendum 3, review row 3). Source: the Scope One addendum (PR #222, docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md at head a1757a0) and its review table (issuecomment-6534383323); owner request of 31 Oct 2026 that every aspect be decomposed in the WBS and built into contracts (t531u). The addendum names recommendations that become contracts on acceptance; this contract is the design-record stage, so it asks for the decision record and builds nothing. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository. Depends on contracts: SO-05-B, SO-05-D, SO-08-A.",
+  "provenance": {
+    "spec_sha256": "33e3e59de69aa3322d2f0b0b5955dfc55104b5f5ba04b23fda0eca608fc1debf",
+    "record": "contracts/scope-one/redteam/SO-1.04.json",
+    "review": "interim solo review by the author, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}

@@ -106,3 +106,4 @@ The record a builder takes over with: what exists, what is missing, and the orde
 | [scope-one/RECONCILIATION.md](scope-one/RECONCILIATION.md) | the programme decomposition against the Scope One work breakdown, and the claim register |
 | [scope-one/programme/README.md](scope-one/programme/README.md) | the programme requirements, work packages and proposed contracts (unsigned) |
 | [scope-one/SLICE-PLAN.md](scope-one/SLICE-PLAN.md) | the ordered slices and the deferred work |
+| [scope-one/WBS.md](scope-one/WBS.md) | the work breakdown: every requirement, contract, pull request and branch once, with its status and owner |
