@@ -352,9 +352,12 @@
       "title": "One write can never make the vault unopenable",
       "repo": "memev",
       "closes": "Closes G91: writing notes/a.md and then notes/a.md/b.md is accepted by checkPath, the second put is appended to the op log and fdatasynced (src/engine/vault.mjs:226) before mkdirSync throws EEXIST (:235), and every later Vault.open() throws EEXIST from recover() (:119, called unguarded at :66), even after the file is deleted by hand, because recover() first rebuilds it. The daemon, the doctor, compact and the runner can never open the vault again. Any token with write scope over a matching path reaches it (MCP memev_write and memev_append, HTTP PUT and PATCH, the tunnel when remote access is on): a remote denial of service on the vault. Found by the SR-1.22 red-team round and reproduced on 31 October 2026 at main be457db",
-      "depends_on": [],
+      "depends_on": [
+        "SR-0.03",
+        "QL-1.02"
+      ],
       "tasks": 2,
-      "criteria": 8,
+      "criteria": 20,
       "spec": "specs/SR-1.26-one-write-can-never-make-the-vault-unopenable.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },

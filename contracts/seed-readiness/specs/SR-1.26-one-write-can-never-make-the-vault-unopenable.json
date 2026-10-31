@@ -2,7 +2,7 @@
   "title": "SR-1.26 One write can never make the vault unopenable",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G91: writing notes/a.md and then notes/a.md/b.md is accepted by checkPath, the second put is appended to the op log and fdatasynced (src/engine/vault.mjs:226) before mkdirSync throws EEXIST (:235), and every later Vault.open() throws EEXIST from recover() (:119, called unguarded at :66), even after the file is deleted by hand, because recover() first rebuilds it. The daemon, the doctor, compact and the runner can never open the vault again. Any token with write scope over a matching path reaches it (MCP memev_write and memev_append, HTTP PUT and PATCH, the tunnel when remote access is on): a remote denial of service on the vault. Found by the SR-1.22 red-team round and reproduced on 31 October 2026 at main be457db. Repository: memev. Depends on contracts: none. Lands ahead of the SR-1 queue. Sensitive path (the oplog and the vault): the QL-1.03 checklist applies before merge.",
+  "request": "Closes G91: writing notes/a.md and then notes/a.md/b.md is accepted by checkPath, the second put is appended to the op log and fdatasynced (src/engine/vault.mjs:226) before mkdirSync throws EEXIST (:235), and every later Vault.open() throws EEXIST from recover() (:119, called unguarded at :66), even after the file is deleted by hand, because recover() first rebuilds it. The daemon, the doctor, compact and the runner can never open the vault again. Any token with write scope over a matching path reaches it (MCP memev_write and memev_append, HTTP PUT and PATCH, the tunnel when remote access is on): a remote denial of service on the vault. Found by the SR-1.22 red-team round and reproduced on 31 October 2026 at main be457db. Repository: memev. Depends on contracts: SR-0.03, QL-1.02. Lands ahead of the SR-1 queue. Sensitive path (the oplog and the vault): the QL-1.03 checklist applies before merge.",
   "tasks": [
     {
       "id": "T1",
@@ -12,7 +12,11 @@
       "requirements": [
         "write, append and every other logging entry point refuse, before anything is appended to the log, a path one of whose parent segments is an existing note, and a path that names an existing folder of notes; the refusal names the conflicting path",
         "the refusal reaches every caller as a 4xx with that reason (MCP tools and HTTP PUT and PATCH), never a 500, and the log, the files and the recall index are unchanged by it",
-        "the check runs on the materialised view of the log, so a path that exists only in the log (a file deleted by hand) still conflicts"
+        "the check runs on the materialised view of the log, so a path that exists only in the log (a file deleted by hand) still conflicts",
+        "every logging entry point (write, append, remember, checkpoint, journal and the external-import path) asks the file system first: it creates the parent folders and writes the temporary file, and appends to the log only when that succeeded; a failure there refuses the operation with nothing logged; the rename after the append is the only step that can fail after logging, and SR-1.22 completes it from the log",
+        "checkPath refuses, before anything else: a NUL byte or any control character, a segment longer than 255 bytes, a segment ending in a dot or a space, any parent segment that ends in a note extension (matched without regard to case), and a path that equals an existing path or one of its parent folders once case and Unicode normalisation (NFC) are folded, so a vault moved between Linux, macOS and Windows cannot hold two names one file system sees as one",
+        "delete removes the folders it leaves empty up to the vault root, so a later write of a note with that folder's name is not refused by an empty folder",
+        "the task adds its helpers in new files under test/helpers/ and changes no existing helper, which 123 test files share"
       ],
       "scope": [
         "src/engine/vault.mjs",
@@ -51,6 +55,56 @@
           }
         },
         {
+          "statement": "Through vault.write, vault.append and HTTP PUT, PATCH and DELETE: write notes/a.md/b.md, delete it, then PUT and PATCH notes/a.md. Each call either succeeds (and a fresh Vault.open() reads that body at notes/a.md) or is refused with a VaultError or HTTP 4xx naming notes/a.md and log.seq unchanged. In every case a fresh new Vault(root).open() does not throw and records no skipped path.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-path-conflict.test.mjs",
+            "cmd": "node --test test/vault-path-conflict.test.mjs"
+          }
+        },
+        {
+          "statement": "For paths \"notes/a\\u0000.md\", \"notes/\" + \"x\".repeat(300) + \".md\" and one longer than 1024 bytes, through vault.write, vault.append, MCP memev_write and memev_append, and HTTP PUT and PATCH (%00 in the URL): each is refused with a VaultError, MCP isError or HTTP 4xx (never 500), log.seq is unchanged, and new Vault(root).open() succeeds.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-path-conflict.test.mjs",
+            "cmd": "node --test test/vault-path-conflict.test.mjs"
+          }
+        },
+        {
+          "statement": "With note notes/a.md present, each of notes/A.md/b.md, notes/a.MD/b.md, notes/a.md./b.md and 'notes/a.md /b.md' is refused through vault.write and vault.append, naming the conflicting path, with log.seq unchanged. The same holds for 'notes/cafe\\u0301.md/b.md' when note 'notes/caf\\u00e9.md' exists. With a folder notes/A.md/ holding a note, writing notes/a.md is refused. The comparison uses a fold key per segment (NFC, lower case, trailing dots and spaces stripped), so the test is red on Linux as well as on macOS.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-path-conflict.test.mjs",
+            "cmd": "node --test test/vault-path-conflict.test.mjs"
+          }
+        },
+        {
+          "statement": "The test is table-driven. Entry points: vault.write, vault.append, vault.remember, vault.checkpoint, MCP memev_write and memev_append, HTTP PUT and PATCH, POST /v1/remember. Shapes: notes/a.md/b.md over note notes/a.md; notes/a.md/x/y/b.md over note notes/a.md; notes/a.md over a folder holding notes/a.md/b.md; notes/a.md over a folder holding only notes/a.md/x/b.md; and the month file memory/facts/<YYYY-MM>.md over a pre-created folder. Each combination is refused (VaultError, MCP isError or HTTP 4xx) naming the conflicting path, with log.seq unchanged and no file or folder created, and new Vault(root).open() succeeds.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-path-conflict.test.mjs",
+            "cmd": "node --test test/vault-path-conflict.test.mjs"
+          }
+        },
+        {
+          "statement": "Write notes/a.md, fs.rmSync it outside the vault, then write and append notes/a.md/b.md through the vault, MCP and HTTP: each is refused naming notes/a.md, log.seq is unchanged, no folder notes/a.md/ exists on disk, and a fresh open rebuilds notes/a.md byte for byte. Converse: write notes/a.md/b.md, remove the folder notes/a.md/ by hand, write notes/a.md: refused naming notes/a.md/b.md, seq unchanged, and a reopen rebuilds notes/a.md/b.md.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-path-conflict.test.mjs",
+            "cmd": "node --test test/vault-path-conflict.test.mjs"
+          }
+        },
+        {
+          "statement": "The mutation tool exists (shipped by a named dependency contract, not by this one) and kills at least one mutant of the changed lines, alongside survived == 0. Add the same pair to T2 for test/vault-open-conflict.test.mjs.",
+          "verifier": {
+            "type": "metric",
+            "cmd": "test -f scripts/gate/mutate.mjs && node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/vault-path-conflict.test.mjs\" --json",
+            "key": "killed",
+            "op": ">",
+            "value": 0
+          }
+        },
+        {
           "statement": "Changes stay in scope",
           "verifier": {
             "type": "scope"
@@ -72,7 +126,9 @@
       "requirements": [
         "recover() handles each path on its own: a path that cannot be materialised is skipped with its reason recorded (the list SR-1.21 surfaces), and recovery continues with the other paths; Vault.open() never throws because of one path",
         "a vault whose log already holds the conflicting put written by the code at be457db opens, every other note reads its logged body, and memev doctor reports the conflicting path with the command that resolves it",
-        "nothing is appended to the log by recovery"
+        "nothing is appended to the log by recovery",
+        "per-path recovery covers recover(), rebuildInto and _importExternal: each handles every error class on one path (EEXIST, ENOTDIR, EISDIR, ERR_INVALID_ARG_VALUE, ENAMETOOLONG and any other), records the path, and continues; a test drives at least three error classes through each",
+        "a skipped head is marked unrecoverable in memory and is never turned into an external delete by syncFromDisk, a pull or the doctor's fix; writes to the good side of a conflict keep working"
       ],
       "scope": [
         "src/engine/vault.mjs",
@@ -81,7 +137,8 @@
         "test/fixtures/vault-conflict/**",
         "test/helpers/**",
         "docs/MODULES.md",
-        "changelog.d/SR-1.26.md"
+        "changelog.d/SR-1.26.md",
+        "src/cli/sync.mjs"
       ],
       "criteria": [
         {
@@ -108,6 +165,55 @@
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Three fixtures, each copied to a temp dir. (1) Note-first as now, with notes/other.md logged after the conflicting put and its file removed before open. (2) Folder-first: notes/a.md/b.md, then notes/a.md. (3) A put at \"notes/x\\u0000.md\" appended with vault.log.append. Each opens. notes/other.md is rebuilt from the log byte for byte. The surviving side of the conflict (notes/a.md in 1, notes/a.md/b.md in 2) reads its logged body, and the other side is absent from disk. The skipped list holds exactly the one bad path with its error. log.seq is unchanged.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-open-conflict.test.mjs",
+            "cmd": "node --test test/vault-open-conflict.test.mjs"
+          }
+        },
+        {
+          "statement": "After opening the fixture copy: run fileChecks({ root, vault }) and every fix it marks non-destructive; call vault.syncFromDisk('notes/a.md/b.md', 'git-pull'); call vault.write and vault.append on notes/a.md/b.md (both refused). Afterwards log.seq equals its value right after open, vault.log.heads.get('notes/a.md/b.md').deleted is not true, vault.materialize('notes/a.md/b.md') returns the logged body, and the doctor still names the path.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-open-conflict.test.mjs",
+            "cmd": "node --test test/vault-open-conflict.test.mjs"
+          }
+        },
+        {
+          "statement": "After opening the fixture copy, the test parses the resolving command for notes/a.md/b.md from the doctor's output and runs it (the CLI, or the API call it maps to). Afterwards the doctor no longer names the path; vault.append('notes/a.md') succeeds and notes/a.md holds its logged body plus the appended text; the body of notes/a.md/b.md can still be read (through materialize, or at the path it was moved to); and a fresh open records no skipped path.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-open-conflict.test.mjs",
+            "cmd": "node --test test/vault-open-conflict.test.mjs"
+          }
+        },
+        {
+          "statement": "With the daemon running on a copy of the fixture (sandbox() from test/helpers/cli.mjs, then memev start), `memev doctor --json` contains a check whose detail names notes/a.md/b.md and the resolving command. The same holds with the daemon stopped.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-open-conflict.test.mjs",
+            "cmd": "node --test test/vault-open-conflict.test.mjs"
+          }
+        },
+        {
+          "statement": "The fixture bricks the base code: Vault.open() from a git archive of $MEMEV_CONTRACT_BASE throws EEXIST or ENOTDIR on a copy of it. Running the T2 test leaves the fixture tree byte-identical.",
+          "verifier": {
+            "type": "command",
+            "cmd": "set -e; d=$(mktemp -d); git archive \"$MEMEV_CONTRACT_BASE\" | tar -x -C \"$d\"; cp -R test/fixtures/vault-conflict \"$d/v\"; node --input-type=module -e 'const { Vault } = await import(process.argv[1]); try { new Vault(process.argv[2], { git: false }).open(); process.exit(1); } catch (e) { process.exit([\"EEXIST\", \"ENOTDIR\"].includes(e.code) ? 0 : 1); }' \"$d/src/engine/vault.mjs\" \"$d/v\"; node --test test/vault-open-conflict.test.mjs; test -z \"$(git status --porcelain --untracked-files=all -- test/fixtures/vault-conflict)\"",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "A helper in test/helpers checks, after every case in both new test files, that no live head in vault.log.heads equals by fold key a segment-wise ancestor of another live head. One added case: write notes/a.md, close, replace the file by a folder holding b.md, and reopen. The vault opens, the log has no live notes/a.md/b.md head under a live notes/a.md, notes/a.md's logged body can still be read, the doctor names the path, and log.seq is unchanged by the open.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-open-conflict.test.mjs",
+            "cmd": "node --test test/vault-open-conflict.test.mjs"
           }
         },
         {
