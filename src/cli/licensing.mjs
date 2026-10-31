@@ -127,10 +127,12 @@ export function mergeAllowed(license, { now = Date.now(), keys = LICENSE_KEYS } 
 
 /**
  * The keep-both copies a sync left on disk, listed but never merged. Each is the other computer's
- * version of a note, kept whole next to this one, so a person decides what to keep.
+ * version of a note, kept whole next to this one, so a person decides what to keep. The record is
+ * the list the daemon's sync result holds, or the { at, files, conflicts } record a sync writes itself.
  */
 export function pendingMergeCopies(root) {
-  const conflicts = readJson(path.join(root, '.memev', 'jobs.json'), {})?.sync?.conflicts || [];
+  const rec = readJson(path.join(root, '.memev', 'jobs.json'), {})?.sync?.conflicts;
+  const conflicts = Array.isArray(rec) ? rec : Array.isArray(rec?.conflicts) ? rec.conflicts : [];
   const out = [];
   for (const c of conflicts) {
     if (c && c.kind === 'note' && c.copy && exists(path.join(root, ...String(c.copy).split('/')))) out.push({ path: c.path, copy: c.copy, how: c.how });

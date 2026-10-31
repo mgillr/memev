@@ -2,7 +2,7 @@
 // The memev command.
 import fs from 'node:fs';
 import path from 'node:path';
-import { PKG, parseArgs, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, saveConfig, out, tokenExpiryWarnings } from './common.mjs';
+import { PKG, parseArgs, BOOLEAN_FLAGS, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, saveConfig, out, tokenExpiryWarnings } from './common.mjs';
 import { ensureDaemon, startDaemon, stopDaemon, healthy, choosePort } from './daemon.mjs';
 import { initVault, isVault, VERSION } from '../engine/vault.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
@@ -29,12 +29,14 @@ Setup
   memev disconnect [client|all]    remove it again, restoring the app's config
   memev uninstall [--purge]        disconnect everything and stop; --purge also removes the service files
   memev clients                    which AI apps are installed and connected
-  memev ready [--timeout S]        wait for each connected app's first session, then for two of them to share a memory
+  memev ready [--timeout S] [--json]   wait for each connected app's first session, then for two of them to share a memory;
+                                    --json prints one machine readable object (ok, smoke, clients with id, name, joined,
+                                    joinedAt) and exits 0 when ready, 1 when not ready within the timeout, 2 on a usage error
   memev preflight [--port N]       check this computer first: Node 22 or newer, git, the port, a folder to write to
                                    (init runs it before it writes anything and stops with the fix for your system)
   memev path add|remove|status     put the memev command on your PATH (a line in your shell's startup file, or your user PATH on
                                    Windows) and take it out again; until it is there, init prints the full path in every hint
-  memev status | doctor [--fix] [--bundle]
+  memev status | doctor [--fix] [--bundle] [--json]
   memev deployment [set --mode M --ai T]   where this vault runs and what kind of AI provider it uses,
                                     and the trial path that fits; set writes the choice into the vault config
   memev cloud on|off|status|url    reach this vault from cloud AI apps through a private tunnel (off until you
@@ -52,6 +54,8 @@ Setup
   memev license status|activate <key>|install <file>|remove   the licence: how many computers may use this vault
   memev upgrade                    the plans and what each adds, and how to buy
   memev plan                       what this vault uses: computers used and allowed, connectors counted
+  memev agentid bind|verify|setup  bind an agent role to a person, verify a binding, or set one up
+                                   (Business and Corporate; verify is free)
   memev report [on|off|show|send]  the anonymous milestone report: off unless you turn it on; show prints what would be sent
   memev bus roster|check|send|tail|tasks|watch <seat>|operator <seat>   the comms bus between your AI apps
   memev runner on|off|watch|status <seat> [--max-runs-per-day N] [--command CMD]   an opt-in background runner: a headless turn of the
@@ -68,6 +72,9 @@ Daily
   memev audit [--json]             a read-only report on junk, duplicates and stale memories
   memev compact [--dry-run]        measure and shrink the vault: archive sealed op-log segments and move old
                                     journal sessions out of the index; --dry-run only prints the size report
+  memev import [--path DIR ...] [--ai-history] [--export FILE.zip ...] [--preview] [--yes] [--keep ID,ID]
+  memev import list                list previous imports
+  memev import undo [IMPORT-ID]    remove a previous import and its notes
   memev checkpoint --project P [--task T] [--done a,b] [--doing x] [--next c,d]
   memev claims [--status fact]  |  memev contract status|from-request|new|sign|approve|verify|list|amend|decompose|hook
   memev verify [id]  |  memev gate [--workdir DIR]   check signed contracts on this machine (never CI)
@@ -79,9 +86,11 @@ Integration (called by AI apps)
   memev mcp --client NAME           MCP over stdio
   memev hook session-start|prompt|pre-compact|stop --client NAME
 
+  memev --version                    the installed version, one line
+
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', deployment: './deployment.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', runner: './runner.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', update: './update.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs', compact: './compact.mjs', setup: './setup-remote.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', deployment: './deployment.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', runner: './runner.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', agentid: './agentid.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', update: './update.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs', compact: './compact.mjs', setup: './setup-remote.mjs', import: './import.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
@@ -159,7 +168,7 @@ export async function main(argv, env = process.env) {
 
 async function run(argv, env) {
   const [cmd = 'help', ...rest] = argv;
-  const { flags, pos } = parseArgs(rest, ['help', 'yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects', 'release', 'open', 'once', 'refresh', 'aider', 'local']);
+  const { flags, pos } = parseArgs(rest, BOOLEAN_FLAGS);
   const root = resolveRoot(flags.root, env);
   const need = () => { if (!isVault(root)) throw new Error(`no vault at ${root}; run memev init`); };
   const json = (o) => console.log(JSON.stringify(o, null, 2));
@@ -241,6 +250,9 @@ async function run(argv, env) {
       fs.writeFileSync(defaultVaultFile(env), `${root}\n`);
       const org = !!flags.org || env.MEMEV_PROFILE === 'org';
       if (flags['local-only'] || org) { const c = config(root); c.remote = { ...c.remote, enabled: false, asked: true }; if (org) c.profile = 'org'; fs.writeFileSync(path.join(root, '.memev', 'config.json'), `${JSON.stringify(c, null, 2)}\n`, { mode: 0o600 }); }
+      // --no-connect also turns off the daemon's background connect, which would otherwise connect every app it finds a few
+      // seconds after it starts (issue 284); memev connect with no app turns it back on
+      if (flags['no-connect']) { const c = config(root); c.clients = { ...c.clients, auto_connect: false }; fs.writeFileSync(path.join(root, '.memev', 'config.json'), `${JSON.stringify(c, null, 2)}\n`, { mode: 0o600 }); }
       const rt = installRuntime(env);
       if (fromUrl) {
         console.log(`Cloned your vault from ${fromUrl} into ${root}`);
@@ -271,7 +283,7 @@ async function run(argv, env) {
         const checks = fileChecks({ root, env }).filter((x) => x.id.startsWith('container-'));
         for (const c of checks.filter((x) => x.status === 'fail' || x.status === 'warn')) console.log(`doctor: ${c.status} ${c.title}: ${c.detail}`);
       }
-      console.log(`Connect an app: http://127.0.0.1:${config(root).port || 7787}/mcp with the header Authorization: Bearer <token>; get a token with: docker compose exec memev memev token issue <app-name>`);
+      console.log(`Connect an app: http://127.0.0.1:${Number(env.MEMEV_PORT) || config(root).port || 7787}/mcp with the header Authorization: Bearer <token>; get a token with: docker compose exec memev memev token issue <app-name>`);
       await import('../server/main.mjs'); return new Promise(() => {});
     }
     case 'selftest': {
@@ -331,7 +343,7 @@ async function run(argv, env) {
       if (sub === 'list') { for (const t of ts.list()) console.log(`${t.id}  ${t.agent.padEnd(16)} ${t.scopes.join('+').padEnd(16)} ${t.remote ? 'remote' : 'local '} ${t.revoked ? 'REVOKED' : t.expires ? `expires ${t.expires.slice(0, 10)}` : 'no expiry'}  ${t.paths.join(',')}`); return 0; }
       if (sub === 'issue') { const t = ts.issue({ agent: flags.agent || pos[1] || 'agent', scopes: String(flags.scopes || 'read,write').split(','), paths: String(flags.paths || '**').split(','), ttlDays: Number(flags.ttl ?? 180), remote: !!flags.remote, note: flags.note || '' }); console.log(`Token for ${flags.agent || pos[1] || 'agent'} (shown once):\n${t.token}`); return 0; }
       if (sub === 'revoke') { if (!pos[1]) throw new Error('memev token revoke <id>'); console.log(ts.revoke(pos[1]) ? `Revoked ${pos[1]}.` : `No token ${pos[1]}.`); return 0; }
-      if (sub === 'rotate') { if (!pos[1]) throw new Error('memev token rotate <id> [--ttl DAYS]'); const t = ts.rotate(pos[1], { ttlDays: Number(flags.ttl ?? 365) }); const f = path.join(root, '.memev', 'clients.json'); try { const all = JSON.parse(fs.readFileSync(f, 'utf8')); for (const k of Object.keys(all)) if (all[k].startsWith(`mv_${pos[1]}_`)) all[k] = t.token; fs.writeFileSync(f, JSON.stringify(all, null, 2), { mode: 0o600 }); } catch {} console.log(`Rotated ${pos[1]}; the credential now expires ${t.expires ? t.expires.slice(0, 10) : 'never'}. The old secret no longer works, so the link pasted into the cloud app must be pasted again: memev cloud url prints the new one. New token (shown once):\n${t.token}`); return 0; }
+      if (sub === 'rotate') { if (!pos[1]) throw new Error('memev token rotate <id> [--ttl DAYS]'); const adminFile = path.join(root, '.memev', 'admin.json'); let adminRec = null; try { adminRec = JSON.parse(fs.readFileSync(adminFile, 'utf8')); } catch {} const isAdmin = adminRec?.id === pos[1]; const t = ts.rotate(pos[1], { ttlDays: Number(flags.ttl ?? (isAdmin ? 0 : 365)) }); if (isAdmin) { writeAtomic(adminFile, JSON.stringify({ ...adminRec, token: t.token }, null, 2), 0o600); fs.rmSync(`${adminFile}.tmp`, { force: true }); } /* an earlier version's temp file, which may hold an old admin secret, does not outlive the rotate */ /* the admin token's new secret goes into admin.json at once, with no expiry unless --ttl is given, so the CLI's admin calls keep working (issue 282) */ const f = path.join(root, '.memev', 'clients.json'); try { const all = JSON.parse(fs.readFileSync(f, 'utf8')); for (const k of Object.keys(all)) if (all[k].startsWith(`mv_${pos[1]}_`)) all[k] = t.token; fs.writeFileSync(f, JSON.stringify(all, null, 2), { mode: 0o600 }); } catch {} console.log(isAdmin ? `Rotated ${pos[1]}, the admin token; it expires ${t.expires ? t.expires.slice(0, 10) : 'never'}. admin.json holds the new secret, so the CLI's admin commands keep working. New token (shown once):\n${t.token}` : `Rotated ${pos[1]}; the credential now expires ${t.expires ? t.expires.slice(0, 10) : 'never'}. The old secret no longer works, so the link pasted into the cloud app must be pasted again: memev cloud url prints the new one. New token (shown once):\n${t.token}`); return 0; }
       throw new Error('memev token list|issue|revoke|rotate');
     }
     case 'project': {

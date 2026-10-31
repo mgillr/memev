@@ -1,0 +1,266 @@
+{
+  "title": "SR-1.09 Code a second engineer can read",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G09: 300 to 600 character lines, server imports CLI, helpers duplicated three times, empty catch blocks hide faults. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Line length and format check",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "no line of a file under src/ or bin/, at any depth, is over 160 characters, counted as a JavaScript string's length with a trailing CR removed",
+        "a zero-dependency check script enforces it in npm test",
+        "the zero-dependency check also fails on an unused import, an unused top-level binding and a duplicate object key in src and bin, and runs in npm test",
+        "test/style.test.mjs runs the check on the real src/ and bin/, so npm test fails on any long line, unused import, unused top-level const, let, function or class, or duplicate key there; the unused imports in src/ today are removed",
+        "an aliased import counts by its local name, a multi-name import is checked name by name, a name that appears only in a comment or a string is unused, and a duplicate key is found when one copy is quoted",
+        "every check lives in the one zero-dependency script, scripts/longest-line.mjs, with no ignore list or pragma: it imports only node: built-ins and relative files and starts no other program, and package.json gains no dependency"
+      ],
+      "description": "",
+      "scope": [
+        "scripts/longest-line.mjs",
+        "src/**",
+        "bin/**",
+        "test/style.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "The style test fails on a 161-character line",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/style.test.mjs",
+            "cmd": "node --test test/style.test.mjs"
+          }
+        },
+        {
+          "statement": "Longest line in src and bin <= 160",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/longest-line.mjs src bin --json",
+            "key": "max",
+            "op": "<=",
+            "value": 160
+          }
+        },
+        {
+          "statement": "test/style.test.mjs passes on the tree. It then fails in a copy of the tree (made with mktemp, so the repository is never touched) after each of these additions in turn: a 161-character line in src/engine/importers/project.mjs (a subdirectory), an unused import in src/server/oauth.mjs, an unused top-level const in bin/memev.mjs, and a duplicate object key in src/engine/util.mjs. Each addition starts on a new line, so the copy still parses and fails only for the injected fault.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/style.test.mjs >/dev/null 2>&1 || { echo 'style test fails on the clean tree'; exit 1; }; for v in long:src/engine/importers/project.mjs imp:src/server/oauth.mjs cst:bin/memev.mjs dup:src/engine/util.mjs; do k=${v%%:*}; f=${v#*:}; d=$(mktemp -d); cp -R src bin scripts test vendor templates package.json \"$d\"/; case $k in long) printf '\\n// %0158d\\n' 0 >> \"$d/$f\";; imp) printf \"\\nimport { sep as srUnusedImport } from 'node:path';\\n\" >> \"$d/$f\";; cst) printf '\\nconst srUnusedConst = 1;\\n' >> \"$d/$f\";; dup) printf '\\nexport const srDupKey = { a: 1, a: 2 };\\n' >> \"$d/$f\";; esac; if (cd \"$d\" && node --test test/style.test.mjs >/dev/null 2>&1); then echo \"style test still passes with $k added to $f\"; rm -rf \"$d\"; exit 1; fi; rm -rf \"$d\"; done; exit 0",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "An independent recursive walk of every file under src/ and bin/ finds no line over 160 characters, and prints file:line for any it finds. Length is the JavaScript string length per line, with a trailing CR removed, so non-ASCII text counts as characters, not bytes.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --input-type=module -e 'import fs from \"node:fs\"; import path from \"node:path\"; const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]); const bad = []; for (const f of [...walk(\"src\"), ...walk(\"bin\")]) fs.readFileSync(f, \"utf8\").split(\"\\n\").forEach((l, i) => { const n = l.replace(/\\r$/, \"\").length; if (n > 160) bad.push(f + \":\" + (i + 1) + \" \" + n); }); console.log(bad.length + \" lines over 160\"); console.log(bad.slice(0, 40).join(\"\\n\")); process.exit(bad.length ? 1 : 0);'",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "A test named 'SR-1.09 unused pairs' in test/style.test.mjs runs the check on these faults: an unused name in a multi-name import, an unused aliased import (`x as y`), an unused default import, an unused top-level const, let, function and class, a duplicate key in an object written over several lines, and a duplicate key written once quoted and once bare. Each bad fixture must exit non-zero, with output containing its exact path:line and the rule. Each one has a twin that differs only in that the binding is used or the key renamed, and the twin must exit 0. One more fixture has an unused import whose name appears only in a comment and in a string, and it must still be flagged. The test must pass under TAP, and the guard below fails when no test of that name ran, because --test-name-pattern exits 0 when nothing matches.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/style.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.09 unused pairs$' test/style.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -qE '^[[:space:]]*ok [0-9]+ - SR-1\\.09 unused pairs$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.09 unused pairs$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-1.09 unused: a fixture module with an unused import, one with an unused top-level const and one with a duplicate object key each fail the check, naming file and line",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/style.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.09 unused$' test/style.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.09 unused$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The style check stays zero-dependency: scripts/longest-line.mjs imports only node: built-ins and relative files and uses no child process, and package.json lists no dependency",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --input-type=module -e 'import fs from \"node:fs\"; const t = fs.readFileSync(\"scripts/longest-line.mjs\", \"utf8\"); const bad = [...t.matchAll(/(?:from|import)\\s*\\(?\\s*[\"\\x27]([^\"\\x27]+)[\"\\x27]/g)].map((m) => m[1]).filter((s) => !s.startsWith(\"node:\") && !s.startsWith(\".\")); if (/child_process/.test(t)) bad.push(\"child_process\"); const p = JSON.parse(fs.readFileSync(\"package.json\", \"utf8\")); bad.push(...Object.keys({ ...p.dependencies, ...p.devDependencies })); console.log(bad.join(\"\\n\")); process.exit(bad.length ? 1 : 0);'",
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Layering",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "src/engine imports nothing from src/cli or src/server; src/server imports nothing from src/cli; shared code moves to src/lib",
+        "the layering rule holds for every import form scripts/docs/module-graph.mjs reads (static, re-export, import() and module paths held in a string table) at any depth of src/, and a src/lib module re-exports nothing from src/cli or src/server",
+        "every relative module path written as a string in src/ and bin/ resolves to a file that exists, so a moved supervisor cannot leave a path the daemon skips without a word",
+        "docs/MODULES.md is rewritten with node scripts/docs/module-graph.mjs"
+      ],
+      "description": "",
+      "scope": [
+        "src/**",
+        "test/layering.test.mjs",
+        "docs/MODULES.md",
+        "test/tunnel.test.mjs",
+        "test/tunnel-funnel.test.mjs",
+        "test/proxy.test.mjs",
+        "test/sync-schedule.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "The layering test fails when server imports cli",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/layering.test.mjs",
+            "cmd": "node --test test/layering.test.mjs"
+          }
+        },
+        {
+          "statement": "Every relative module path in src/** and bin/** written as a string literal ending in .mjs resolves to a file that exists. This covers static imports, import() and string tables such as server/main.mjs:41. It passes at base, and fails when a moved supervisor or helper leaves behind a dangling path that server/main.mjs:42 would swallow.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --input-type=module -e 'import fs from \"node:fs\"; import path from \"node:path\"; const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith(\".mjs\") ? [path.join(d, e.name)] : []); const bad = []; for (const f of [...walk(\"src\"), ...walk(\"bin\")]) for (const m of fs.readFileSync(f, \"utf8\").matchAll(/[\"\\x27](\\.{1,2}\\/[\\w.\\/-]+\\.mjs)[\"\\x27]/g)) if (!fs.existsSync(path.resolve(path.dirname(f), m[1]))) bad.push(f + \": \" + m[1]); console.log(bad.join(\"\\n\")); process.exit(bad.length ? 1 : 0);'",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "buildGraph in scripts/docs/module-graph.mjs reads every import in src/ and bin/, recursively: static, re-export, literal import() and module paths held in a string table (importsOf, module-graph.mjs:21-30). No edge it reports may go from src/engine/** or src/lib/** to src/cli/** or src/server/**, or from src/server/** to src/cli/**. At base this fails on server/main.mjs:9 and :41, server/mcp.mjs:5 and :152, and engine/importers/core.mjs:115 and :123.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --input-type=module -e 'import { buildGraph } from \"./scripts/docs/module-graph.mjs\"; const bad = buildGraph(process.cwd()).edges.filter((e) => { const up = e.to.startsWith(\"src/cli/\") || e.to.startsWith(\"src/server/\"); return ((e.from.startsWith(\"src/engine/\") || e.from.startsWith(\"src/lib/\")) && up) || (e.from.startsWith(\"src/server/\") && e.to.startsWith(\"src/cli/\")); }); for (const e of bad) console.log(e.from + \" -> \" + e.to + (e.dynamic ? \" (dynamic)\" : \"\")); process.exit(bad.length ? 1 : 0);'",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "One helper each, no silent catch",
+      "phase": "implement",
+      "depends_on": [
+        "T1",
+        "T2"
+      ],
+      "requirements": [
+        "which, pidAlive, reloadDaemon and the loopback check exist once",
+        "every catch {} carries a comment saying why it is safe or logs",
+        "each loopback check keeps its own set after the merge (the socket peers, the Host names compared with brackets stripped, the consent Origin names, the OAuth plain-http redirect hosts, the outbound https-or-loopback hosts and the hosts the proxy leaves out), and none accepts a host it refuses today",
+        "the one which returns the program's full path, which the tunnel code runs; the one pidAlive returns false for 0, a negative pid, NaN, an empty string and undefined",
+        "the silent-catch count covers statement and promise catches at any depth of src/"
+      ],
+      "description": "",
+      "scope": [
+        "src/**",
+        "test/style.test.mjs",
+        "scripts/count-silent-catch.mjs",
+        "docs/MODULES.md",
+        "test/helpers-once.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "No uncommented empty catch in src",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/count-silent-catch.mjs src --json",
+            "key": "silent",
+            "op": "==",
+            "value": 0
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "An independent recursive scan of src/** counts two kinds of silent catch. The first is a statement catch whose body is only whitespace: `catch {}`, `catch { }`, `catch (e) {}`, or the same split across lines. The second is a promise catch with an empty arrow body: `.catch(() => {})`, `.catch((e) => {})` or `.catch(e => {})`. A catch counts only when it has no // or /* comment inside the braces or after them on the same line. The count must be 0. It fails at base. A grep of src finds no comment that mentions `catch {}` or `catch(() =>` in prose, so the scan has no false hits at base.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --input-type=module -e 'import fs from \"node:fs\"; import path from \"node:path\"; const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith(\".mjs\") ? [path.join(d, e.name)] : []); const re = /catch\\s*(\\([^)]*\\))?\\s*\\{\\s*\\}|\\.catch\\(\\s*(\\(\\s*\\w*\\s*\\)|\\w+)\\s*=>\\s*\\{\\s*\\}\\s*\\)/g; const bad = []; for (const f of walk(\"src\")) { const t = fs.readFileSync(f, \"utf8\"); for (const m of t.matchAll(re)) { const end = t.indexOf(\"\\n\", m.index + m[0].length); const rest = t.slice(m.index + m[0].length, end < 0 ? t.length : end); if (!/\\/\\/|\\/\\*/.test(rest)) bad.push(f + \":\" + t.slice(0, m.index).split(\"\\n\").length); } } console.log(bad.length + \" silent\"); console.log(bad.slice(0, 40).join(\"\\n\")); process.exit(bad.length ? 1 : 0);'",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "Regression guard that passes at base and must still pass after the change. isDirectLocal accepts a loopback peer (127.0.0.1, ::1 or ::ffff:127.0.0.1) whose Host is 127.0.0.1, localhost or [::1]. It refuses a 127.0.0.1 peer whose Host is localhost.evil.example, 127.0.0.1.nip.io, evil.example or empty, and it refuses non-loopback peers, plain or IPv4-mapped. licenseEndpoint refuses http://localhost.evil.example/ and http://127.0.0.1.nip.io/ and accepts http://[::1]:9/.",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_TRUST_GATEWAY= MEMEV_GATEWAY= node --input-type=module -e 'import assert from \"node:assert/strict\"; import { isDirectLocal } from \"./src/server/http.mjs\"; import { licenseEndpoint } from \"./src/cli/licensing.mjs\"; const r = (peer, host) => ({ socket: { remoteAddress: peer }, headers: { host } }); for (const [p, h] of [[\"127.0.0.1\", \"127.0.0.1:7787\"], [\"127.0.0.1\", \"localhost:7787\"], [\"::1\", \"[::1]:7787\"], [\"::ffff:127.0.0.1\", \"localhost:7787\"]]) assert.equal(isDirectLocal(r(p, h)), true, p + \" \" + h); for (const h of [\"localhost.evil.example:7787\", \"127.0.0.1.nip.io:7787\", \"evil.example\", \"\"]) assert.equal(isDirectLocal(r(\"127.0.0.1\", h)), false, \"host \" + h); for (const p of [\"10.0.0.1\", \"::ffff:10.1.2.3\"]) assert.equal(isDirectLocal(r(p, \"127.0.0.1:7787\")), false, \"peer \" + p); for (const u of [\"http://localhost.evil.example/\", \"http://127.0.0.1.nip.io/\"]) assert.throws(() => licenseEndpoint({ env: { MEMEV_LICENSE_URL: u } }), u); assert.ok(licenseEndpoint({ env: { MEMEV_LICENSE_URL: \"http://[::1]:9/\" } }));'",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "Exactly one file in src holds the signal-0 probe, and exactly one holds the 'where'/'which' literals, however the lookup is spelled. Outside src/server, exactly one file holds the '/v1/reload' call. At most one file in src holds the '[::1]' literal. The single pidAlive returns false for 0, -1, NaN, '' and undefined, and true for process.pid. At base it fails: 3 files hold the probe and 3 hold the which literals.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(grep -rlE 'process\\.kill\\([^,]+, *0\\)' src); [ $(printf '%s\\n' \"$f\" | grep -c .) -eq 1 ] || { echo \"signal-0 probe in: $f\"; exit 1; }; [ $(grep -rlE \"'where'|'which'\" src | grep -c .) -eq 1 ] || { echo 'which/where lookup in more than one file'; exit 1; }; [ $(grep -rlF \"'/v1/reload'\" src | grep -v '^src/server/' | grep -c .) -eq 1 ] || { echo 'reload call in more than one file'; exit 1; }; [ $(grep -rlF \"'[::1]'\" src | grep -c .) -le 1 ] || { echo 'loopback host list in more than one file'; exit 1; }; node --input-type=module -e 'const m = await import(\"./\" + process.argv[1]); for (const x of [0, -1, NaN, \"\", undefined]) if (m.pidAlive(x) !== false) { console.log(\"pidAlive true for\", x); process.exit(1); } if (m.pidAlive(process.pid) !== true) process.exit(1);' \"$f\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "SR-1.09 which path: the test puts a stub of each tunnel program the CLI looks up (the names held in the test, taken from src/cli/tunnel.mjs) first on PATH. The shared lookup returns the stub's full path, and the tunnel module's own path lookup, with downloads off, returns that path too, not a boolean. The test imports the tunnel module from wherever task 2 puts it.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/helpers-once.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.09 which path$' test/helpers-once.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.09 which path$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

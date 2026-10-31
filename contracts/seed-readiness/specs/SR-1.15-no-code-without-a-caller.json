@@ -1,0 +1,134 @@
+{
+  "title": "SR-1.15 No code without a caller",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G15: project-state.mjs (330 lines) and the oplog HLC merge helpers have no production caller; entitlements name features with nothing behind them. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Wire or remove",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "project-state drives bus task status, or is removed",
+        "every exported function in src/ is imported by another src module or a bin entry",
+        "the oplog HLC merge helpers are kept and listed by name in the dead-code test as the functions SR-3.04 wires; the list is removed when SR-3.04 lands",
+        "OpLog.recovered (the skipped unreadable records, src/engine/oplog.mjs:105-106) is read by status() and by the doctor's oplog check, or removed with the comment that promises it is reported",
+        "every entitlement name in src/engine/entitlements.mjs (PAID_FEATURES and each tier's services) is checked by a code path that changes behaviour, or is a status-table row marked planned; sso, audit and the hosted services are not sold as built while nothing reads them",
+        "if project-state stays, bus_tasks reports only TASK_STATES values reached through TRANSITIONS, and a verdict alone never makes a task verified; an import that calls nothing is not wiring",
+        "an export counts as used only when a src or bin module names it, as an import specifier or a member read from a namespace or dynamic import; a test importer, a module-level edge or a path held in a string does not count, and every export form counts (functions, generators, arrow consts, export lists and classes)",
+        "status() reports the op log's skipped records in a field of its own, apart from the notes rebuilt at start, and still reports them after a restart; the doctor's oplog check names them",
+        "the SR-3.04 list is SR_3_04_PENDING in test/helpers/sr304-pending.mjs: at most the three HLC helpers, each still exported by src/engine/oplog.mjs, and an entry that gains a src importer fails the test",
+        "the entitlements test reads PAID_FEATURES and each tier's services from src/engine/entitlements.mjs when it runs, and a name counts as checked only where a code path changes behaviour on it",
+        "memev license status lists as included no service that nothing gates; a planned one appears only under a field marked planned"
+      ],
+      "description": "",
+      "scope": [
+        "src/**",
+        "test/**",
+        "scripts/docs/module-graph.mjs",
+        "docs/MODULES.md",
+        "docs/PROJECTS.md",
+        "docs/tiers/README.md",
+        "docs/status.json"
+      ],
+      "criteria": [
+        {
+          "statement": "An exported function with no importer fails the test",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/dead-code.test.mjs",
+            "cmd": "node --test test/dead-code.test.mjs"
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Pass if src/engine/project-state.mjs is gone and no src or bin file names it. Otherwise a test named exactly 'SR-1.15 bus task state' in test/bus.test.mjs must run and pass. The test drives a real Bus in a temp vault and asserts four things. (1) Every state bus.tasks() returns is a TASK_STATES value. (2) A task with only a verdict (no claim, no bound evidence) is not VERIFIED; base reports 'done' at bus.mjs:549. (3) A claim moves the task to IN_PROGRESS only through a transition TRANSITIONS allows. (4) A transition TRANSITIONS forbids is never shown as the task's state. The guard is the spec's own awk: the named test must pass as a test, not as a suite and not skipped, so a run with zero tests is not green.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus.test.mjs",
+            "cmd": "if [ ! -e src/engine/project-state.mjs ] && ! grep -rq 'project-state' src bin; then exit 0; fi; out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.15 bus task state' test/bus.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.15 bus task state$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Mutation check in a temp copy. Add three exported functions that no src or bin file imports: zzTestOnly in src/engine/util.mjs (a module others already import), imported only by a new test file; zzDispatched in src/cli/upgrade.mjs, reached only through the OPTIONAL dynamic dispatch; and zzStringPath in a new module src/engine/zz-probe.mjs, whose path appears only as a string literal in src/cli/doctor.mjs. The dead-code test must exit non-zero and name all three. The checker is expected to walk src/ on disk; a scan by git ls-files would not see the untracked probe module. The command runs no git.",
+          "verifier": {
+            "type": "command",
+            "cmd": "d=$(mktemp -d) && cp -R . \"$d/r\" && cd \"$d/r\" && printf '\\nexport function zzTestOnly() { return 1; }\\n' >> src/engine/util.mjs && printf \"import { zzTestOnly } from '../src/engine/util.mjs';\\nvoid zzTestOnly;\\n\" > test/zz-probe.test.mjs && printf '\\nexport function zzDispatched() { return 1; }\\n' >> src/cli/upgrade.mjs && printf 'export function zzStringPath() { return 1; }\\n' > src/engine/zz-probe.mjs && printf \"\\nconst zzPath = '../engine/zz-probe.mjs'; void zzPath;\\n\" >> src/cli/doctor.mjs || exit 1; out=$(node --test test/dead-code.test.mjs 2>&1); rc=$?; cd / && rm -rf \"$d\"; [ $rc -ne 0 ] || exit 1; for n in zzTestOnly zzDispatched zzStringPath; do printf '%s\\n' \"$out\" | grep -q \"$n\" || exit 1; done",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Mutation check in a temp copy. Append four unimported exports to src/engine/util.mjs: an arrow function, a generator, a function exported through an `export { }` list, and a class (classes are callable constructors; coordinator.mjs is why they count). The dead-code test must exit non-zero and name all four.",
+          "verifier": {
+            "type": "command",
+            "cmd": "d=$(mktemp -d) && cp -R . \"$d/r\" && cd \"$d/r\" && printf '\\nexport const zzArrow = () => 1;\\nexport function* zzGen() { yield 1; }\\nfunction zzListed() { return 1; }\\nexport { zzListed };\\nexport class ZzClass {}\\n' >> src/engine/util.mjs || exit 1; out=$(node --test test/dead-code.test.mjs 2>&1); rc=$?; cd / && rm -rf \"$d\"; [ $rc -ne 0 ] || exit 1; for n in zzArrow zzGen zzListed ZzClass; do printf '%s\\n' \"$out\" | grep -q \"$n\" || exit 1; done",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Four checks. (1) src/engine/oplog.mjs still exports compareRecords, formatHlc and parseHlc. (2) In a temp copy, an unimported `export function zzHlcProbe()` appended to oplog.mjs makes the dead-code test fail and name it, so oplog.mjs has no file-level exemption. (3) In a temp copy, adding `import { compareRecords as zzCr } from './oplog.mjs'` to src/engine/vault.mjs makes the dead-code test fail and name compareRecords as a stale list entry, so the list must shrink when SR-3.04 wires it. (4) The list is the exported array SR_3_04_PENDING in test/helpers/sr304-pending.mjs; every entry is an export of oplog.mjs and there are at most 3.",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$(grep -Ec '^export (function compareRecords|const formatHlc|function parseHlc)' src/engine/oplog.mjs)\" = 3 ] || exit 1; node --input-type=module -e \"import { SR_3_04_PENDING as l } from './test/helpers/sr304-pending.mjs'; import * as op from './src/engine/oplog.mjs'; if (!Array.isArray(l) || l.length > 3 || l.some((n) => !(n in op))) process.exit(1);\" || exit 1; d=$(mktemp -d) && cp -R . \"$d/a\" && cp -R . \"$d/b\" || exit 1; printf '\\nexport function zzHlcProbe() { return 1; }\\n' >> \"$d/a/src/engine/oplog.mjs\"; outa=$(cd \"$d/a\" && node --test test/dead-code.test.mjs 2>&1); rca=$?; printf \"\\nimport { compareRecords as zzCr } from './oplog.mjs'; void zzCr;\\n\" >> \"$d/b/src/engine/vault.mjs\"; outb=$(cd \"$d/b\" && node --test test/dead-code.test.mjs 2>&1); rcb=$?; rm -rf \"$d\"; [ $rca -ne 0 ] && printf '%s\\n' \"$outa\" | grep -q zzHlcProbe && [ $rcb -ne 0 ] && printf '%s\\n' \"$outb\" | grep -q compareRecords",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "SR-1.15 entitlements: an entitlement name that no src module reads and no status-table row marks planned fails the test, naming it",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/dead-code.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.15 entitlements' test/dead-code.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.15 entitlements$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Pass if OpLog has no recovered field and oplog.mjs no longer says a skipped record is reported. Otherwise a test named 'SR-1.15 oplog recovered' in test/oplog-recovery.test.mjs must run and pass. The test creates a vault, closes it, and appends an unreadable line and then a valid record to the active segment. It opens a Vault and asserts that vault.status() reports the skipped-record count (>= 1) in a field separate from the notes-rebuilt `recovered` count, and that the doctor's oplog check (fileChecks with that vault) names the skipped record. It then closes and reopens the vault (the snapshot now covers the line) and asserts that status() still reports it. This reopen step covers the restart case. The test fails at base because status() (vault.mjs:787) never reads log.recovered. The guard is the spec's own awk.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-recovery.test.mjs",
+            "cmd": "if ! grep -q 'recovered' src/engine/oplog.mjs && ! grep -q 'reported, and every valid record' src/engine/oplog.mjs; then exit 0; fi; out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.15 oplog recovered' test/oplog-recovery.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.15 oplog recovered$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Mutation check in a temp copy. Add 'zz_unwired_feature' to PAID_FEATURES and 'zz_unwired_service' to the business tier's services, and put both strings in a src string literal that is not an entitlement check. The dead-code test file must exit non-zero and name both. This fails a hard-coded list, a planned map inside the test, and a test that counts any mention of the string as a read.",
+          "verifier": {
+            "type": "command",
+            "cmd": "d=$(mktemp -d) && cp -R . \"$d/r\" && cd \"$d/r\" && sed -i.bak \"s/'agent_binding'\\]/'agent_binding', 'zz_unwired_feature']/\" src/engine/entitlements.mjs && sed -i.bak \"s/services: \\['team'\\] }/services: ['team', 'zz_unwired_service'] }/\" src/engine/entitlements.mjs && grep -q zz_unwired_feature src/engine/entitlements.mjs && grep -q zz_unwired_service src/engine/entitlements.mjs && printf \"\\nconst zzWords = 'zz_unwired_feature zz_unwired_service'; void zzWords;\\n\" >> src/cli/doctor.mjs || exit 1; out=$(node --test test/dead-code.test.mjs 2>&1); rc=$?; cd / && rm -rf \"$d\"; [ $rc -ne 0 ] && printf '%s\\n' \"$out\" | grep -q zz_unwired_feature && printf '%s\\n' \"$out\" | grep -q zz_unwired_service",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "For a live corporate licence and a live personal licence with no services field, report().limits.services (what `memev license status --json` prints) contains neither sso nor audit, nor, while src/services/providers.mjs still says a hosted service is not offered yet, sync, backup or relay; a planned name, if shown at all, appears only under a field marked planned. This fails at base because entitlements.mjs:89 returns TIERS.corporate.services. Once SR-4.07 wires the hosted services, which its provider gate reads from the licence, sync, backup and relay may be listed again.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --input-type=module -e \"import fs from 'node:fs'; import { report } from './src/engine/entitlements.mjs'; const hosted = !fs.readFileSync('src/services/providers.mjs', 'utf8').includes('not offered yet'); const names = ['sso', 'audit', ...(hosted ? [] : ['sync', 'backup', 'relay'])]; const bad = []; for (const tier of ['corporate', 'personal']) { const r = report({ license: { state: 'valid', tier, seats: 5, exp: '2099-01-01' }, seats: { connectors: 0 }, devices: [] }); for (const s of r.limits.services || []) if (names.includes(s)) bad.push(tier + ':' + s); } if (bad.length) { console.error('listed as included: ' + bad.join(', ')); process.exit(1); }\"",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

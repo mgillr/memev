@@ -1,0 +1,274 @@
+{
+  "title": "SR-1.16 Docs and code say the same thing",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G16: Help omits real subcommands; CLIENTS.md says sync every few minutes (default 30); delete is not reconciled; dependency claim overstated. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Help comes from the dispatch table",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "memev help lists every dispatched command and subcommand",
+        "help.test.mjs takes the dispatched commands from the dispatch code (OPTIONAL, the switch cases and each command module's sub === chains), never from what help is printed from",
+        "the refactor keeps every gate the command bodies hold: --yes before cloud on and before the public funnel, operator and rename only on the vault's own computer, and <command> --help printing help and doing nothing else",
+        "each red-green criterion of this task that runs test/help.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
+      ],
+      "description": "",
+      "scope": [
+        "src/cli/main.mjs",
+        "src/cli/bus-cli.mjs",
+        "src/cli/tunnel.mjs",
+        "test/help.test.mjs",
+        "src/cli/**"
+      ],
+      "criteria": [
+        {
+          "statement": "A dispatched subcommand missing from help fails the test",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/help.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/help.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "help.test.mjs takes the dispatched set from the dispatch source itself, not from whatever help is rendered from. It parses the OPTIONAL keys and `case '<x>':` labels in src/cli/main.mjs and every `sub === '<x>'` or `cmd === '<x>'` in each module OPTIONAL names. It then runs node bin/memev.mjs help and asserts that each command and subcommand appears. Run on a fixture module containing `if (sub === 'frobnicate')`, the same scanner reports frobnicate as missing from help.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/help.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c02:' test/help.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The consent, remote-refusal, --help and help-format tests still pass after the refactor",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/tunnel-funnel.test.mjs test/memory-quality.test.mjs test/init-bus.test.mjs test/agent-runbook.test.mjs test/preflight.test.mjs test/ready.test.mjs test/invite-address.test.mjs test/agentid-cli.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "memev help, run in a sandbox, shows each of these on a memev <command> synopsis: contract on, contract off, contract verify-cmd, service print, github status, report status, devices list, devices revoke, cloud relay, setup remote, selftest, backup status, bus since/unread/hello/rename, cloud use/funnel/rotate-key/connect.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/help.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/help.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/help.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c04) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/help.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c02:|^T1-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Claims fixed",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "sync interval stated from config default",
+        "delete reconciles like write",
+        "the README states the external tools memev needs: git, and optionally each tunnel program the CLI can start (the names held in the test)",
+        "memev's Business design (docs/tiers/business.md), FAQ (docs/FAQ.md, linked from docs/README.md) and tiers page (docs/tiers/README.md) carry SR-4.01's two trust-model sentences word for word (personal hosted services are end-to-end encrypted; the company server is customer-run and reads what members promote), and no page says the company sees everything",
+        "README.md and docs/GITHUB.md give the backup push interval as the sync.interval_min default, and no page in README.md or docs/ says every few minutes",
+        "README.md's 'runtime dependencies: none' says it counts npm packages, beside the external tools, and docs/DEVELOPING.md, docs/EXTENSION-POINTS.md and docs/SOLUTIONS.md say the same",
+        "delete runs the same case-twin guard as write before it imports a hand edit, the imported edit passes the secret scan a write applies, and deleting an unchanged note adds exactly one record",
+        "no page in README.md, docs/ or the template site says the company or its admin console sees, reads or searches everything",
+        "each red-green criterion of this task that runs test/vault.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest"
+      ],
+      "description": "",
+      "scope": [
+        "docs/**",
+        "src/engine/vault.mjs",
+        "test/vault.test.mjs",
+        "README.md",
+        "test/docs-trust-model.test.mjs",
+        "site/web/**",
+        "test/readme-tools.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "A hand-edited file deleted through the API is imported before the delete",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c01:' test/vault.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The README names git as a requirement",
+          "verifier": {
+            "type": "grep",
+            "file": "README.md",
+            "pattern": "needs git"
+          }
+        },
+        {
+          "statement": "A test inits a vault in a temp dir and reads sync.interval_min from .memev/config.json (initVault writes DEFAULT_CONFIG there, vault.mjs:814). It asserts that docs/GITHUB.md and README.md state 'every <n> minutes' for the backup push, and that no page in README.md or docs/ says 'every few minutes'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c03:' test/vault.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With notes/a.md live, v.delete(OWNER, {path: 'notes/A.md'}) throws a bad_path error naming notes/a.md. Afterwards notes/a.md is still on disk with its body, and the log has no head for notes/A.md. Red at base: not_found on a case-sensitive disk, a deleted file on a case-insensitive one.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c04:' test/vault.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-1.16 trust model: each of the Business design, FAQ and tiers pages holds both sentences verbatim; a fixture page saying the company sees everything fails the test",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/docs-trust-model.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.16 trust model' test/docs-trust-model.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.16 trust model$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "No page in README.md, docs/ or site/web/ says the company or its admin console sees, reads or searches everything. The check joins line breaks first, so a phrase wrapped across lines is still found. It is red at base: 7 files match today (dry-run in the worktree).",
+          "verifier": {
+            "type": "command",
+            "cmd": "bad=; for f in README.md $(find docs site/web \\( -name '*.md' -o -name '*.html' \\)); do tr '\\n' ' ' < \"$f\" | grep -qiE '(see|sees|search|searches|read|reads)( and (see|sees|search|searches|read|reads))?[[:space:]]+everything' && { echo \"$f\"; bad=1; }; done; [ -z \"$bad\" ]",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "docs/tiers/business.md, docs/tiers/README.md and docs/FAQ.md each hold both trust-model sentences word for word (whitespace and line wraps collapsed, case-insensitive): 'personal hosted services are end-to-end encrypted' and 'the company server is customer-run and reads what members promote', the literals SR-4.01 pins for memev-cloud. docs/README.md links docs/FAQ.md.",
+          "verifier": {
+            "type": "command",
+            "cmd": "S1='personal hosted services are end-to-end encrypted'; S2='the company server is customer-run and reads what members promote'; for f in docs/tiers/business.md docs/tiers/README.md docs/FAQ.md; do t=$(tr -s '[:space:]' ' ' < \"$f\") || exit 1; printf '%s' \"$t\" | grep -qiF \"$S1\" || { echo \"missing S1 in $f\"; exit 1; }; printf '%s' \"$t\" | grep -qiF \"$S2\" || { echo \"missing S2 in $f\"; exit 1; }; done; grep -qF '(FAQ.md)' docs/README.md",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "SR-1.16 tools: README.md names git as required and each tunnel program the CLI can start as optional (the names held in the test, taken from src/cli/tunnel.mjs).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/readme-tools.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.16 tools$' test/readme-tools.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.16 tools$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/vault.test.mjs passes every labelled subtest (T2-c01, T2-c03, T2-c04) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/vault.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c03:|^T2-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Checks that cannot pass without running",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "the documentation generators' main guard compares real paths (fs.realpathSync on both sides), so module-graph.mjs --check and changelog-assemble.mjs run when invoked through a symbolic link; a test invokes --check through a symlinked directory on a stale map and asserts exit 1 (twin finding F-10: it exited 0 printing nothing)",
+        "DEVELOPING.md's docs index rule and test/docs-links.test.mjs say the same thing: either every page under docs/ is listed in docs/README.md and the test enforces that, or the page states the reachability rule the test checks (twin finding F-8: nine pages unlisted while the page said the test fails on them)",
+        "both generators' main guards compare real paths, and each runs through a link with and without --preserve-symlinks and --preserve-symlinks-main",
+        "docs/README.md links every page under docs/, nested ones included, by relative path, unless docs/DEVELOPING.md states the reachability rule the test checks",
+        "each red-green criterion of this task that runs test/generator-guard.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T3-c01: for the first), and the criterion runs only that subtest"
+      ],
+      "description": "",
+      "scope": [
+        "scripts/docs/module-graph.mjs",
+        "scripts/changelog-assemble.mjs",
+        "test/docs-links.test.mjs",
+        "test/generator-guard.test.mjs",
+        "docs/DEVELOPING.md",
+        "docs/README.md"
+      ],
+      "criteria": [
+        {
+          "statement": "A stale module map checked through a symlinked path exits 1",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/generator-guard.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c01:' test/generator-guard.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T3-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The index rule and its test agree",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/docs-links.test.mjs",
+            "cmd": "node --test test/docs-links.test.mjs"
+          }
+        },
+        {
+          "statement": "Make a link with fs.symlinkSync to the repository's scripts/ folder (lstat confirms it is a link). Through it, node <link>/changelog-assemble.mjs --check --root <tmp> exits 1 with stderr matching /unknown section/ when <tmp>/changelog.d/X.md holds '### Bogus'. With a valid note and a CHANGELOG.md that has '## Unreleased', it exits 0 with stdout matching /would fold 1 note/. At base both runs exit 0 with empty output.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/generator-guard.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c03:' test/generator-guard.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T3-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Make a link with fs.symlinkSync to a temp copy of the repo layout. Through it, a stale docs/MODULES.md exits 1 with stderr /out of date/. An up-to-date one exits 0 with stdout /is up to date/. Without --check, the map is written through the link. All three are checked again with NODE_OPTIONS='--preserve-symlinks --preserve-symlinks-main'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/generator-guard.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c04:' test/generator-guard.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T3-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Unless docs/DEVELOPING.md states the reachability rule, docs/README.md links every docs/**/*.md except itself by relative path. Red at base on docs/IMPORT.md (dry-run in the worktree).",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -qiE 'can be reached|reachable' docs/DEVELOPING.md && exit 0; cd docs && for f in $(find . -name '*.md' ! -path ./README.md | sed 's|^\\./||'); do grep -qF \"]($f\" README.md || { echo \"unlisted: docs/$f\"; exit 1; }; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "One full run of test/generator-guard.test.mjs passes every labelled subtest (T3-c01, T3-c03, T3-c04) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/generator-guard.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T3-c01:|^T3-c03:|^T3-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

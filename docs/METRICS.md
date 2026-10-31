@@ -66,8 +66,9 @@ There is no telemetry by default. The one report Memev can make is opt-in:
 - **See it first.** `memev report show` prints exactly the text that would be sent, and
   `memev report status` says whether it is on.
 - **Where it goes.** To the address in `MEMEV_REPORT_URL` (https, or plain http for this computer).
-  There is no built-in address, so with the report on and no address set nothing is sent. Only
-  milestones not yet reported are sent, with a short time limit and no retry loop.
+  There is no built-in address, so with the report on and no address set nothing is sent. It is sent
+  when a milestone is new, and each send holds every recorded milestone under the same id, so whoever
+  counts reports counts by id, never by row. A send has a short time limit and no retry loop.
 - **Separate from the milestone code.** The code that works out milestones makes no network call; the
   report is a small separate step that only runs when it is on.
 
@@ -78,8 +79,12 @@ lands, at the licence endpoint, because that is the only place that sees it.
 
 - What the endpoint sees: the licence key and the time of the request. The client sends nothing
   else (no name, e-mail, machine, vault or version).
-- What is counted: one row per activation, holding the licence id, the day and the result
-  (`issued` or `refused`). Counts are per licence id and per day.
+- What is counted: one row per activation, holding the licence id, the day, the result
+  (`issued` or `refused`) and whether the licence is a trial. Counts are per licence id and per day.
+- Paid and trial are counted apart. A trial licence carries `trial: true`, and its activation row
+  says so with `true`, or with `1` as the table below holds it; a paid count never includes a trial.
+  `false` or `0` is paid, and so is a row with no trial field: the product reads a licence with no
+  trial field as paid (`src/cli/licensing.mjs`), and the count does the same.
 - What is not counted: licence checks. A licence is verified on the computer against the vendor
   public key, offline, so day-to-day use never reaches the endpoint and cannot be counted there.
 - Where the counts are kept: beside the licence endpoint, and run by the owner with it. The
@@ -88,15 +93,20 @@ lands, at the licence endpoint, because that is the only place that sees it.
   configuration (`MEMEV_REPORT_URL`) and there is no built-in address, so until one is set nothing
   is sent.
 
-The queries, written for a table `activations(licence_id, day, result)`:
+The queries, written for a table `activations(licence_id, day, result, trial)`, where `trial` is 1
+for a trial licence and 0 for a paid one:
 
 ```sql
--- activations per day, last 30 days
+-- paid activations per day, last 30 days
 SELECT day, count(*) FROM activations
-WHERE result = 'issued' AND day >= date('now', '-30 day') GROUP BY day ORDER BY day;
+WHERE result = 'issued' AND trial = 0 AND day >= date('now', '-30 day') GROUP BY day ORDER BY day;
 
--- distinct licences activated, all time
-SELECT count(DISTINCT licence_id) FROM activations WHERE result = 'issued';
+-- trial activations per day, last 30 days
+SELECT day, count(*) FROM activations
+WHERE result = 'issued' AND trial = 1 AND day >= date('now', '-30 day') GROUP BY day ORDER BY day;
+
+-- distinct paid licences activated, all time
+SELECT count(DISTINCT licence_id) FROM activations WHERE result = 'issued' AND trial = 0;
 
 -- activations per licence (a key used on more computers than it should be shows here)
 SELECT licence_id, count(*) AS n FROM activations
@@ -148,8 +158,74 @@ host's access log, counted by distinct day and file, with no address kept.
 | Number | Source | What it tells you |
 |---|---|---|
 | downloads | npm, releases | interest |
-| activations | licence endpoint | paid or trial licences taken up |
+| activations | licence endpoint | paid licences taken up, with trials counted apart |
 | milestones | your own `onboarding.json`; shared only if you turn on the opt-in report, which is off by default | what you reach after installing |
+
+## The weekly funnel report (a development tool)
+
+`scripts/metrics/report.mjs` renders the three numbers together in one page, for the owner. It is a
+development tool: it reads count files handed to it as flags, prints one page of dated numbers, and
+reports nothing anywhere. It is not in the npm package file list, and it derives no count from a
+person's computer.
+
+- **Inputs, as files.** `--package` holds the package download rows (the npm range answer, one row
+  per day: `{ "day": "<date>", "downloads": N }`), `--release` the release-host download rows (the
+  same shape, one row per day and file), and `--activations` the licence-activation rows
+  (`{ "day": "<date>", "licence_id": "...", "result": "issued" or "refused" }`, one row per
+  activation, with `"trial": true` or `"trial": 1` on the row of a trial licence; an export of the
+  table above, such as `sqlite3 -json`, gives 1). `--milestones`
+  optionally holds the opt-in milestone rows (the report payload above, one row per milestone with
+  the payload's id: `{ "id": "<the report's id>", "name": "...", "date": "<date>" }`). A row without a date, or with one that is not a real
+  calendar date such as 2026-13-45, counts in the total only. With no milestone input the page says
+  so in one line and still renders.
+- **The page.** For each count set: the count per day, per week (ISO week) and the total. The
+  licence activations are the paid ones: an issued row marked as a trial (`true` or `1`) is never
+  counted as paid. The trials print on a line of their own, and so do any refused activations. An
+  issued row with no trial field (or one that is not `true`, `1`, `false` or `0`) counts as paid,
+  and the page prints how many there were on a line of their own. Nothing is estimated
+  and nothing is typed into the program: every number on the page comes from the files.
+- **The gates.** The page header renders the gates from `scripts/metrics/gates.json`: the month-6
+  gates, installs at or above 5,000 by month 6, and free-to-paid at or above 1 percent once sync
+  has shipped. Free-to-paid is the paid activations over installs, as a percent; trials are not
+  counted in it. The thresholds live in the file, never in the program, because the owner moves
+  them. Each gate prints its measured value, its threshold and pass or miss.
+- **The installs choice.** A download is not an install, so the file also says which counted
+  number stands for installs (`installs_proxy`: `package_downloads`, `release_downloads` or
+  `downloads`). The file names `downloads` (D-WO-INSTALL-PROXY): the package downloads and the
+  release-host downloads together. Every choice is a download count, so the installs gate prints
+  its measured value as downloads, and the page says a download is not an install. Activations are
+  not a choice: free-to-paid divides paid activations by installs, so it would read 100 percent.
+  With no choice in the file (`null`) the page says open and both gates stay open. A value that is
+  not one of the choices leaves both gates open too, and the page says it is not a choice. Editing
+  the file changes the header with no change to the program.
+- **Not handed in is not measured.** A count file that was not handed in (no `--package`, say) is
+  not counted, and a gate that reads it says not measured, never 0 and a miss: in the header and in
+  the monthly verdict alike, because both read the same counted values. The `downloads` choice
+  reads both download files, so with only one of them installs are not measured.
+- **A floor of confirmed installs.** Under the installs gate the header prints how many distinct
+  report ids sent the `installed` milestone: a floor of confirmed installs. It counts ids, never rows,
+  because every send repeats every recorded milestone. Only people who turned the report on are in it,
+  so the installs are at least that many, except that a report turned off and on again gets a new id,
+  so one install can count twice. An `installed` row with no id is not counted and is shown on a line
+  of its own. With no milestone input the floor is not measured.
+- **The monthly verdict.** With `--month N`, the page adds a monthly verdict below the gates: each
+  of the file's monthly gates as a row with the gate, its threshold, the measured value, the month
+  it falls due and pass or miss. N is a whole number of months, 1 or more; anything else is refused
+  with an error and no page. A gate whose due month has not arrived is not yet due, never a miss; a
+  gate with no measured value is not measured, never a pass or a miss. A gate whose count file was
+  not handed in (no `--activations`, say) has no measured value. A missed gate prints the branch
+  text held for that gate in the file, word for word, and a met gate prints none. The branch text
+  lives in the file, not in the program, so the owner moves it with the thresholds. The measured
+  values come from the counted rows: installs through the installs choice, printed as downloads as
+  in the header, free-to-paid as the paid activations over installs, and paying users as the
+  distinct paid licences issued; trials are not counted as paying users. The Business pilot gate is
+  planned, not measured: no code records a completed Business pilot yet, so the file marks that
+  gate `planned` and its row says planned, not measured, whatever the milestone rows hold. A gate
+  file that holds no monthly gates gets one line, never nothing:
+  `Monthly verdict (month N): the gate file holds no monthly gates`. The file also holds the
+  conservative-case 2029 values as reference, not as month-12 milestones.
+- **Hosts nothing.** The counts are kept beside the licence endpoint on the owner's server; this
+  tool reads counts handed to it and hosts nothing.
 
 ## What is never counted
 

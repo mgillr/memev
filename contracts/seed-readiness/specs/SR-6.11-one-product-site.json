@@ -1,0 +1,135 @@
+{
+  "title": "SR-6.11 One product site",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G102: the seed-stage analysis (B9, B10). The product repository still holds the older template site (site/: web/, landing/, build.mjs, DEPLOY.md), whose pages carry titles and taglines of their own (site/web/business.html) beside the README's line and the deployed site's, and whose guard against certification, uptime and SLA claims (test/deploy-docs.test.mjs) checks pages no visitor sees. QL-1.06 runs the claims check over site/**/*.html, so the template is checked while the deployed site is not. Repository: memev. Depends on contracts: SR-5.04, SR-6.10, QL-1.06, SR-1.13. The template's own guard is test/site.test.mjs:256-269; test/deploy-docs.test.mjs guards memev's shipped deployment docs and stays as it is. It lands after SR-1.13, whose site criteria fail at base only while site/web exists (the lead, batch 65).",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "The template site is retired and its guard lives on where visitors are",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "the certification, uptime and SLA guard runs in memev-site's CI first (SR-6.10 task 2), and the change note names the memev-site commit and the CI run that show it",
+        "site/ is removed from the product repository, with the tests that only read it; nothing in memev's docs, tests, workflows or scripts refers to it afterwards, and the claims step no longer globs site/**/*.html",
+        "pages the template held that the deployed site lacks are listed in the change note for the site's owner; none is copied here",
+        "the README's tagline is the status table's positioning entry (SR-5.04), so the product repository states one line",
+        "test/deploy-docs.test.mjs, which guards memev's own shipped deployment docs, is not changed",
+        "package.json's description is the same one line as the README's tagline",
+        "no tracked file is a copy of a template page, and the template's pages are not moved elsewhere in the repository"
+      ],
+      "scope": [
+        "site/**",
+        "docs/**/*.md",
+        ".github/workflows/ci.yml",
+        "README.md",
+        "package.json",
+        "changelog.d/SR-6.11.md",
+        "test/site.test.mjs",
+        "test/site-evidence.test.mjs",
+        "test/site-retired.test.mjs",
+        "test/gate-sync.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "SR-6.11 retired: site/ does not exist, every workflow glob and docs link resolves to a file that exists, and no file outside changelog.d refers to site/web, site/landing or site/build.mjs; on the base tree the test fails",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/site-retired.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-6.11 retired' test/site-retired.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-6.11 retired$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The change note names the memev-site commit and CI run that carry the guard",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -qE 'memev-site [0-9a-f]{7,40}' changelog.d/SR-6.11.md && grep -qE 'actions/runs/[0-9]+' changelog.d/SR-6.11.md",
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The change note names a full 40-hex memev-site commit and a github.com/<owner>/memev-site/actions/runs/<id> URL. The run is memev-site's, its head_sha equals that commit, its conclusion is success, and it has a step whose name names the certification/uptime/SLA guard and whose conclusion is success (not skipped). This needs a gh token that can read memev-site; if the gate cannot hold one, the fallback is a sequencing gate that requires SR-6.10's signed contract under contracts/signed/. The fallback proves that SR-6.10 passed, not that the guard still runs.",
+          "verifier": {
+            "type": "command",
+            "timeout_s": 120,
+            "cmd": "n=changelog.d/SR-6.11.md; c=$(grep -oE 'memev-site [0-9a-f]{40}' \"$n\" | head -1 | cut -d' ' -f2); u=$(grep -oE 'github\\.com/[A-Za-z0-9_.-]+/memev-site/actions/runs/[0-9]+' \"$n\" | head -1); [ -n \"$c\" ] && [ -n \"$u\" ] || exit 1; repo=$(printf '%s' \"$u\" | cut -d/ -f2-3); id=${u##*/}; gh api \"repos/$repo/actions/runs/$id\" --jq '.head_sha + \" \" + .conclusion' | grep -qx \"$c success\" || exit 1; gh api \"repos/$repo/actions/runs/$id/jobs\" --jq '.jobs[].steps[] | select(.name | test(\"certif|uptime|SLA\"; \"i\")) | .conclusion' | grep -qx success"
+          }
+        },
+        {
+          "statement": "Subtest 'SR-6.11 one line' reads docs/status.json and takes its positioning entry (a named key, non-empty string). It asserts that README.md's tagline (the <strong> text in the first <p> after <h1>Memev</h1>, at README.md:9 today) equals it exactly and that package.json's description equals it. Red at base for the right reason: docs/status.json is missing, and README.md:9 differs from package.json:4.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/site-retired.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-6.11 one line$' test/site-retired.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -qE '^[[:space:]]*ok [0-9]+ - SR-6.11 one line$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-6.11 one line$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Subtest 'SR-6.11 claims step' parses .github/workflows/ci.yml and finds the step whose run: calls node scripts/gate/claims.mjs. Its job's and step's if: admit both pull_request and schedule. Its run text names README.md and 'docs/**/*.md' and contains no 'site/'. The subtest executes that run text verbatim with --json via bash -e -c (globstar off), and asserts exit 0 and that 'files' equals the line count of git ls-files ':(glob)README.md' ':(glob)docs/**/*.md', which must be above 0. Red at 30037c3 because there is no claims step; red after QL-1.06 because the step globs site/**/*.html.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/site-retired.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-6.11 claims step$' test/site-retired.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -qE '^[[:space:]]*ok [0-9]+ - SR-6.11 claims step$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-6.11 claims step$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Independent of the implementer's test, with the exclusions pinned in the criterion: no tracked file outside changelog.d/, contracts/ and test/site-retired.test.mjs contains a path segment 'site/' or a quoted 'site' path argument. .github/ is included.",
+          "verifier": {
+            "type": "command",
+            "timeout_s": 60,
+            "cmd": "hits=$(git grep -nIE -e '(^|[^A-Za-z0-9_-])site/' -e \"join\\(.*[\\\"']site[\\\"']\" -- . ':!changelog.d' ':!contracts' ':!test/site-retired.test.mjs'); [ -z \"$hits\" ] || { printf '%s\\n' \"$hits\"; exit 1; }"
+          }
+        },
+        {
+          "statement": "No tracked file is an .html or .htm file, and no tracked blob at HEAD has the same content as any blob under site/ at the recorded base.",
+          "verifier": {
+            "type": "command",
+            "timeout_s": 60,
+            "cmd": "[ -n \"$MEMEV_CONTRACT_BASE\" ] && [ -z \"$(git ls-files '*.html' '*.htm')\" ] && b=$(git ls-tree -r \"$MEMEV_CONTRACT_BASE\" -- site | awk '{print $3}' | sort -u) && [ -n \"$b\" ] && h=$(git ls-files -s | awk '{print $2}' | sort -u) && [ -z \"$({ printf '%s\\n' \"$b\"; printf '%s\\n' \"$h\"; } | sort | uniq -d)\" ]"
+          }
+        },
+        {
+          "statement": "changelog.d/SR-6.11.md names each template page with no memev-site route: solutions, comparison and quickstart.",
+          "verifier": {
+            "type": "command",
+            "timeout_s": 30,
+            "cmd": "for p in solutions comparison quickstart; do grep -qiE \"(^|[^a-z])$p(\\.html)?([^a-z]|$)\" changelog.d/SR-6.11.md || { echo \"not listed: $p\"; exit 1; }; done"
+          }
+        },
+        {
+          "statement": "test/deploy-docs.test.mjs is byte-identical to the recorded base (not deleted, the NO_CERT/NO_UPTIME lines at :117-124 intact) and passes on its own.",
+          "verifier": {
+            "type": "command",
+            "timeout_s": 120,
+            "cmd": "[ -n \"$MEMEV_CONTRACT_BASE\" ] && git diff --quiet \"$MEMEV_CONTRACT_BASE\" -- test/deploy-docs.test.mjs && node --test test/deploy-docs.test.mjs"
+          }
+        },
+        {
+          "statement": "At the memev-site commit the change note names, the workflow runs node scripts/gate/claims.mjs with --surfaces over the built pages (web/out/**/*.html and landing/out/**/*.html, after npm run build), so copy in .tsx sources is scanned as visitors see it. Residual: this proves the step is present, not that it fails on a planted claim. That stronger red-green belongs in SR-6.10 or QL-1.06, which this contract depends on.",
+          "verifier": {
+            "type": "command",
+            "timeout_s": 120,
+            "cmd": "n=changelog.d/SR-6.11.md; c=$(grep -oE 'memev-site [0-9a-f]{40}' \"$n\" | head -1 | cut -d' ' -f2); u=$(grep -oE 'github\\.com/[A-Za-z0-9_.-]+/memev-site/actions/runs/[0-9]+' \"$n\" | head -1); [ -n \"$c\" ] && [ -n \"$u\" ] || exit 1; repo=$(printf '%s' \"$u\" | cut -d/ -f2-3); id=${u##*/}; gh api -H 'Accept: application/vnd.github.raw' \"repos/$repo/contents/.github/workflows/ci.yml?ref=$c\" | grep -E 'node scripts/gate/claims\\.mjs' | grep -qE 'out/\\*\\*/\\*\\.html'"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

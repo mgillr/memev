@@ -124,13 +124,19 @@ export class Bench {
 
 // ---- reading results
 const itemOf = (h) => `${h.path}${h.heading ? `#${h.heading}` : ''}`;
-/** The items (path#heading) a recall result names, from its JSON or from "- [path#heading]" lines. */
+/**
+ * The items (path#heading) a recall result names, from its JSON or from "- [path#heading]" lines. memev_recall puts
+ * one continuation line after its JSON array when more hits match; the array is read without it.
+ */
 export function itemsOf(text) {
-  try {
-    const j = JSON.parse(text);
-    const hits = Array.isArray(j) ? j : Array.isArray(j?.hits) ? j.hits : Array.isArray(j?.result) ? j.result : null;
-    if (hits) return hits.filter((h) => h && h.path).map(itemOf);
-  } catch {}
+  const src = String(text || '');
+  for (const t of [src, src.slice(0, src.lastIndexOf(']') + 1)]) {
+    try {
+      const j = JSON.parse(t);
+      const hits = Array.isArray(j) ? j : Array.isArray(j?.hits) ? j.hits : Array.isArray(j?.result) ? j.result : null;
+      if (hits) return hits.filter((h) => h && h.path).map(itemOf);
+    } catch {}
+  }
   return lineItems(text);
 }
 export function lineItems(text) {

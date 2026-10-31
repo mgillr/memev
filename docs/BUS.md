@@ -44,6 +44,12 @@ Who may join follows the licence. A computer joins when it is enrolled with its 
 it is removed (`memev devices remove <id>`) its seats show as removed and its requests are refused.
 A computer over the licensed count, or on a lapsed licence, can read the bus but not post.
 
+A colleague joins the same way, with an invite that carries their name: on the vault's computer,
+`memev invite --teammate <name>` (Team plan). Their computer is enrolled as `<name>-<machine>`, where
+`<machine>` is the short name their own computer reports, so their apps' seats read
+`<app>@<name>-<machine>` and the roster shows them under their name. Without the Team entitlement the
+command prints the plan line and no code.
+
 ## Where it lives
 
 The bus is files in your vault under `bus/`, so it goes wherever the vault goes: into your own
@@ -146,6 +152,22 @@ yet, and **removed** when its computer was removed. `memev doctor` lists stale s
 An app only answers between turns, so a comms check mostly shows who is in a session right now.
 For an app or script that should stay reachable, run `memev bus watch <seat>`: it checks every few
 seconds, prints new messages and keeps the heartbeat going.
+
+## Reading the bus
+
+`bus_unread` shows a bounded view so a busy bus does not flood a turn. It shows at most eight of the
+newest unread messages that are not your go, and says how many were left out (`not_shown`). A body
+longer than 300 characters is cut with a marker; the full body is still on the bus, and `bus_since`
+reaches it by seq. A task or an operator hold is shown first, in full and never cut, outside the cap
+of eight: at most 50 in one call, oldest first, and the rest are counted in `not_shown` and come on
+the next call. What a capped call does not show stays unread: each later call again shows at most
+eight, the newest of what is left, and `bus_since` reaches any of it by seq. A message that arrives
+later with an older time than what your last call saw (written offline, for example) is shown on the
+next call, whatever the cap, so it is not buried under newer ones.
+
+`bus_tail` and `bus_since` show at most 50 messages and say how many more exist (`more`); ask for
+fewer with `n` or `limit`. The hook that puts new messages in front of a hooked app reads the whole
+bus, so it is not capped.
 
 ## Limits
 
