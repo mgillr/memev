@@ -1,0 +1,149 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP15-01",
+      "title": "Structural no-import guard: nothing under the Apache core imports the licensed engine package",
+      "phase": "verify",
+      "owner": "lane-product",
+      "depends_on": [],
+      "requirements": [
+        "MV-REC-06",
+        "MV-LIC-01"
+      ],
+      "description": "Repo: mgillr/memev. Existing test/licence-boundary.test.mjs checks wording; this checks imports and vendored paths.",
+      "scope": {
+        "allow": [
+          "test/no-engine-import.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP15-01-AC01",
+          "mandatory": true,
+          "statement": "guard test fails on a seeded import, passes on main",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/no-engine-import.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP15-01-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP15-01-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP15-02",
+      "title": "Licence boundary stated once: Apache-2.0 core, BSL-1.1 engine (change date 2028-03-29), ACFA-RS own licence, commercial services",
+      "phase": "design",
+      "owner": "lane-product",
+      "depends_on": [],
+      "requirements": [
+        "MV-LIC-04"
+      ],
+      "description": "Repo: mgillr/memev. Overlaps SR-3.05 in memev-ops (engine licence stated three ways); keep SR-3.05 as the owner and make this task consume its result.",
+      "scope": {
+        "allow": [
+          "docs/LICENSING-NOTICE.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP15-02-AC01",
+          "mandatory": true,
+          "statement": "notice names BSL change date",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/LICENSING-NOTICE.md",
+            "pattern": "2028-03-29",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP15-02-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP15-02-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP15-03",
+      "title": "Counsel review of the combined distribution against the BSL use restriction recorded",
+      "phase": "verify",
+      "owner": "owner",
+      "depends_on": [
+        "WP15-02"
+      ],
+      "requirements": [
+        "MV-LIC-03"
+      ],
+      "description": "Repo: mgillr/memev-ops. Owner action; the task holds the written result only. Related SR-3.05 and SR-3.06.",
+      "scope": {
+        "allow": [
+          "contracts/COUNSEL-REVIEW.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP15-03-AC01",
+          "mandatory": true,
+          "statement": "record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "contracts/COUNSEL-REVIEW.md"
+          }
+        },
+        {
+          "id": "WP15-03-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP15-03-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}

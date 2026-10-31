@@ -6,8 +6,8 @@
 
 <h1>Memev</h1>
 
-<p><strong>Shared context and coordination for the AI tools you already use.</strong><br>
-Keep project knowledge consistent across AI sessions, and give supported agents a shared place to coordinate work.</p>
+<p><strong>One shared, durable memory for the people, computers and AI agents working on a project.</strong><br>
+Context that survives every session, coordination between agents, and work that is checked against what was asked.</p>
 
 <p>
 <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue">
@@ -25,16 +25,49 @@ Keep project knowledge consistent across AI sessions, and give supported agents 
 <a href="docs/README.md">Documentation</a> &middot;
 <a href="docs/ARCHITECTURE.md">Architecture</a> &middot;
 <a href="docs/tiers/README.md">Tiers</a> &middot;
+<a href="docs/PRICING.md">Pricing</a> &middot;
 <a href="CHANGELOG.md">Changelog</a>
 </p>
 
-<p>Move between supported AI tools without rebuilding the project context every time.<br>
-Memev keeps shared project knowledge in plain Markdown on your own computer, makes relevant context available to connected tools, and provides a communications bus for agent presence, checks and task handoffs.<br>
-Your notes remain inspectable and can be backed up to a private GitHub repository that you own.</p>
-
-<p><strong>One shared working context. One coordination layer. Your data stays under your control.</strong></p>
-
 </div>
+
+## What Memev is, and why it matters
+
+AI work is spread across tools, sessions, computers and people, and each one starts from a blank page. A decision made in one app is unknown to the next. Two agents edit the same thing and one silently loses. A task is reported done and nobody can say what was checked.
+
+Memev is the shared layer underneath. It keeps project knowledge as plain Markdown that you own, makes the relevant part of it available to every connected tool, lets those tools coordinate through a communications bus, and records what a piece of work had to deliver and what was checked. It works with the AI tools you already use, over MCP, and it does not replace them.
+
+Three ideas run through everything:
+
+- **Shared, durable memory.** Decisions, constraints and prior work live in a vault on your own computer, written to a checksummed log first and kept in git. Any connected app can recall them. A new session starts from a resume card instead of from nothing.
+- **Merging that does not need a judge.** When several computers or agents change the same state, the convergence engine crdt-merge combines the copies with deterministic rules. The result does not depend on the order the changes arrive in, it works offline, deletes are explicit, and no language model is asked to decide what to keep. This is the direction for Memev state, and it is partly built: see [Plans and roadmap](#plans-and-roadmap) for what runs today.
+- **Work that is checked.** A work contract states the task, the deliverables, the acceptance criteria and the stop conditions. Memev keeps the outcome of the checks next to the work, so a task being assigned is not mistaken for a task being proven.
+
+Federation, where independent sites each keep their own records and still reconcile, is the roadmap, not something Memev ships today. The decisions behind the plans are recorded in [docs/scope-one/DECISIONS.md](docs/scope-one/DECISIONS.md), and how the plans line up with the work breakdown is in [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md).
+
+## Who it is for
+
+| If you are | What you get | Why it matters |
+|---|---|---|
+| One person using several AI tools | One vault that Claude Code, Codex, Gemini CLI, Cursor, Claude Desktop, Windsurf, VS Code and Zed can all read, plus cloud AI apps over the optional secure link | You stop re-explaining the project to every tool, and you can read and edit every note yourself |
+| One person on several computers | The same vault on up to 3 computers over the secure link, each computer with its own key (Personal) | Your work follows you. Automatic merging of simultaneous edits is planned, and today git sync is single-writer backup |
+| A developer building agents | An MCP server, a communications bus with seats, heartbeats and task handoffs, and work contracts with checks | A shared place for agents to coordinate, and a record that separates "assigned" from "verified" |
+| A team or an organisation | A conversation with us about a company vault, one AI provider for the organisation, sign-in and roles, services and support (contact us) | These are planned. We scope them with you rather than sell them before they exist |
+| An organisation with several sites | Federation across independent sites (contact us) | Planned, with no date. Each site would keep its own records and reconcile on reconnect |
+
+## Plans by tier
+
+The tier decision of 31 October 2026 is recorded in [docs/scope-one/DECISIONS.md](docs/scope-one/DECISIONS.md). There is no Federated tier: everything above Personal is a conversation.
+
+| | Free (core) | Personal | Contact us |
+|---|---|---|---|
+| For | one person, one computer at a time | one person, up to 3 computers | teams, organisations, and sites that want to federate |
+| Price | free, for good | $12/month or $120/year (CHF 10 or CHF 100), early-supporter price | contact us |
+| What it includes | the whole core: vault, recall, graph, hooks, contracts, comms bus, doctor, GitHub backup, several cloud AI apps side by side | everything in Free, with the same vault on up to 3 computers over the secure link, priority support | scoped with you: see below |
+| Trial | the free core is the trial | none | a Business trial and a sales-assisted pilot are planned ([docs/BUSINESS-TRIAL.md](docs/BUSINESS-TRIAL.md)) |
+| Status | available now | available now for what exists today; merging, hosted sync, backup and relay are planned | planned, no dates |
+
+The tier names in the app and the licence tooling today are Personal for the free core and Personal with more computers for the paid tier. [docs/PRICING.md](docs/PRICING.md) and [docs/tiers/README.md](docs/tiers/README.md) use those names and say what is built and what is planned for each. The free core is never limited ([CHARTER.md](CHARTER.md)).
 
 ## How it fits together
 
@@ -131,62 +164,35 @@ app as it joins, then confirms that connected apps share project context when on
 another saved. For coordination, see [docs/BUS.md](docs/BUS.md); for defined work and verification,
 see [docs/CONTRACTS.md](docs/CONTRACTS.md).
 
-## Choose how you deploy Memev
+## Plans and roadmap
 
-The same core—shared context, coordination and defined work—applies across tiers. The difference is how many people and computers share a vault, and how much organisational control the deployment needs.
+Every line below says whether it exists. Nothing in the second and third lists is available to use today.
 
-| | Personal | Personal with more computers | Business (coming) | Corporate (coming) |
-|---|---|---|---|---|
-| For | one person using several AI tools with shared project context | one person continuing work across several computers | a team sharing work context and coordinating AI-assisted work under company control | organisations needing the Business model at greater scale and with stricter deployment controls |
-| AI apps | several cloud AI apps side by side (Claude, ChatGPT; more coming soon) and local coding tools via MCP | the same, on each computer | ONE AI provider for the organisation: one cloud AI service or an on-premises LLM | the same, with an air-gapped option |
-| Runs on | your computer, backed up to your own GitHub | your computers | your company server | your data centre, high availability, air-gapped option |
-| Two computers | one at a time: switch computers, lose nothing | edit on two machines at once, nothing to resolve (planned) | coming | coming |
-| Price | free, for good | $12/month or $120/year (CHF 10 or CHF 100), early-supporter price | contact us | contact us |
-| Trial | not needed | none | 5 members and 10 computers (planned); a sales-assisted pilot for on-premises, air-gapped or compliance-led organisations | a sales-assisted pilot (planned) |
-| Support | GitHub issues | priority support | business hours, response times by priority | named or embedded engineer |
+### Available now
 
-**Personal is free and complete** ([CHARTER.md](CHARTER.md)). It is one computer at a time, and you
-move between computers through your own GitHub. Switch computers, lose nothing. Today git sync is
-single-writer backup: if a second computer also pushes the same vault, `memev doctor` warns that
-concurrent edits can conflict. Nothing is blocked, and a merge that conflicts is left for you. You
-can connect several cloud AI apps side by side, such as Claude and ChatGPT (more are coming soon),
-next to your local coding tools over MCP.
+- The vault: Markdown notes in git, a checksummed log, project-aware recall, provenance and the entity graph. `memev import` brings in existing project folders, AI history and chat exports.
+- MCP access for the supported AI apps, with hooks where an app supports them, and optional cloud AI connectors over a secure link.
+- The communications bus: seats, roster, heartbeats, communications checks, task handoffs and holds.
+- Work contracts with signed, immutable specs and checks that run through `memev verify`.
+- Device keys, a licence checked offline, and the computer limit.
+- Backup to your own private GitHub repository.
+- The call-out boundary to a separately licensed convergence engine (WO-05-A, [docs/CONVERGENCE.md](docs/CONVERGENCE.md)). The engine itself is not in this repository and no released Memev merges through it yet.
 
-**Personal with more computers is the paid tier**: edit on two machines at once, nothing to resolve.
-That merging is done by crdt-merge, the paid convergence engine; see
-[The paid core: crdt-merge](#the-paid-core-crdt-merge). It is planned, not built yet.
+### In progress
 
-**Business and Corporate use the same organisational model at different scale.** Every
-member's computer syncs its work data into one vault: one company vault for Business, one main
-corporate vault for Corporate. The company can see and search everything in it. Each organisation
-connects to **one AI provider**, either one cloud AI service or an on-premises LLM, over MCP. Members
-keep private work outside Memev. An org admin invites members into the company vault; there is no
-Team tier. A personal or home vault never crosses into a company: separate identities and keys, with
-no grants, mounts or mixing. Anyone who leaves a company loses all vault access: access ends, keys
-are revoked, devices are removed and the local cache is wiped. Licences count once per organisation,
-by person and by computer. The Business trial is planned: 5 members and 10 computers, self-serve for
-one hosted cloud AI provider; on-premises, air-gapped and compliance-led organisations get a
-sales-assisted pilot.
+- The project engine: the project store, the project state machine and the coordinator are merged and tested, and are being wired into one execution path. Tracked in the Scope One work breakdown (pull request [#324](https://github.com/mgillr/memev/pull/324)) and in [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md).
+- The paid-engine client behind a flag, off by default (pull request [#201](https://github.com/mgillr/memev/pull/201)), with the trial licence and entitlement work ([#154](https://github.com/mgillr/memev/pull/154), [#163](https://github.com/mgillr/memev/pull/163), [#177](https://github.com/mgillr/memev/pull/177)).
+- Correctness fixes in the crdt-merge engine itself, in its own repository.
+- The programme decomposition of the wider plan, as proposed and unsigned contracts: [docs/scope-one/programme/README.md](docs/scope-one/programme/README.md).
+- Documentation and tier alignment to the owner decisions of 31 October 2026.
 
-See [docs/tiers/](docs/tiers/README.md) for what each tier includes, how it is set up, its limits and
-a worked 20-person example, and [the architecture charts](docs/ARCHITECTURE.md#the-three-tiers) for
-Personal, Business and Corporate side by side. Business and Corporate, and the services around them,
-have no public price: contact us.
+### Planned
 
-## The paid core: crdt-merge
-
-The Memev core is open source (Apache-2.0) and free, and it stays that way. The convergence engine,
-**crdt-merge**, with its merge strategies, lives in its own repository under its original licence
-(currently BSL 1.1). It is never vendored into Memev: Memev calls it as an external dependency.
-
-It powers the paid features:
-
-- **Automatic merge across several computers at once** (Personal with more computers).
-- **Team and business vault convergence** (Business and Corporate, both coming).
-
-Free users get one computer at a time through their own GitHub. Nothing is overwritten, and when two
-copies conflict both versions are kept. Only licence information passes between an install and our side,
-never vault data. See [docs/CONVERGENCE.md](docs/CONVERGENCE.md).
+- Automatic merging when several computers edit one vault at once, through crdt-merge (Personal).
+- Hosted end-to-end encrypted sync, hosted encrypted backup and a stable relay address.
+- A company vault with an admin console, one AI provider per organisation, sign-in with Google Workspace or Microsoft Entra ID, roles, an egress log, and a Business trial.
+- A single replicated event model across the log, the bus and project state, and evidence receipts for accepted work.
+- Federation across independent sites, an architecture under review in pull request [#224](https://github.com/mgillr/memev/pull/224), and decided only in part. It is not available, and Memev makes no claim about it beyond this line.
 
 ## What you get
 
@@ -222,9 +228,11 @@ up. The main pages:
 | [Set up your office](docs/OFFICE.md) | one vault, inviting teammates, the lead, the roster and what is shared |
 | [GitHub backup](docs/GITHUB.md) | `memev github setup` |
 | [Docker](docs/DOCKER.md) | running Memev in a container |
-| [Tiers and setup](docs/tiers/README.md) | Personal, Personal with more computers, Business and Corporate, and the services around them (draft) |
+| [Tiers and setup](docs/tiers/README.md) | Free core, Personal, and the contact-us tiers, and the services around them (draft) |
 | [The paid core: crdt-merge](docs/CONVERGENCE.md) | what is open, what is paid, what passes between an install and us |
-| [Pricing (draft)](docs/PRICING.md) | the Personal price; Business and Corporate on request; the computer limit |
+| [Pricing (draft)](docs/PRICING.md) | the Personal price; everything above on request; the computer limit |
+| [Decisions](docs/scope-one/DECISIONS.md) | the owner decisions on the engine and the tiers |
+| [Reconciliation](docs/scope-one/RECONCILIATION.md) | how the plans line up with the Scope One work breakdown |
 | [Problems and solutions](docs/SOLUTIONS.md) | what users complain about and what Memev does about it |
 | [Contracts](docs/CONTRACTS.md) | signed, immutable work contracts |
 | [Troubleshooting](docs/TROUBLESHOOTING.md) | `memev doctor` and common fixes |
@@ -243,8 +251,10 @@ Recall is BM25 over note sections, filtered by project and permissions before ra
 nothing else. See [docs/DESIGN.md](docs/DESIGN.md), the [module map](docs/MODULES.md) and
 [docs/DEVELOPING.md](docs/DEVELOPING.md).
 
-## License
+## Licensing
 
-Apache-2.0. Includes a modified copy of Proofline (Apache-2.0); see [NOTICE](NOTICE). The crdt-merge
-convergence engine is a separate project under its own licence and is not part of this repository; see
-[docs/LICENSING-NOTICE.md](docs/LICENSING-NOTICE.md).
+- **Memev core: Apache-2.0.** The code in this repository is Apache-2.0 and stays that way. It includes a modified copy of Proofline (Apache-2.0); see [NOTICE](NOTICE).
+- **crdt-merge: BSL 1.1, separately licensed.** The convergence engine is a separate project in its own repository, licensed under the Business Source License 1.1 by its Licensor, Ryan Gillespie / Optitransfer, and it carries patents (see its PATENTS file). It is never copied or vendored into Memev. Memev reaches it only across the provider boundary, so including it can never relicense it. Its change date to Apache-2.0 is 2028-03-29; a lawyer review of that date is an open item.
+- **Commercial terms:** anything beyond the free core and Personal, including federated services, is agreed through contact us.
+
+See [docs/LICENSING-NOTICE.md](docs/LICENSING-NOTICE.md), [docs/CONVERGENCE.md](docs/CONVERGENCE.md) and [docs/PRICING.md](docs/PRICING.md).

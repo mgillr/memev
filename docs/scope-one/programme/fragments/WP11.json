@@ -1,0 +1,349 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP11-01",
+      "title": "Stage 1 recall: phrase matching, alias expansion, exact id lookup, temporal filters",
+      "phase": "implement",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP17-04"
+      ],
+      "requirements": [
+        "MV-REC-02"
+      ],
+      "description": "Repo: mgillr/memev. Existing BM25 stays; free recall is not weakened.",
+      "scope": {
+        "allow": [
+          "src/engine/vault.mjs",
+          "src/engine/graph.mjs",
+          "test/recall-stage1.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP11-01-AC01",
+          "mandatory": true,
+          "statement": "stage 1 tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recall-stage1.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP11-01-AC02",
+          "mandatory": true,
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP11-01-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP11-01-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP11-02",
+      "title": "Stage 1 recall: reciprocal rank fusion, decision and accepted-fact boost, superseded and contested handling",
+      "phase": "implement",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP11-01"
+      ],
+      "requirements": [
+        "MV-REC-02"
+      ],
+      "description": "Repo: mgillr/memev. Quality measured on the existing recall bench with before and after numbers.",
+      "scope": {
+        "allow": [
+          "src/engine/vault.mjs",
+          "test/recall-rrf.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP11-02-AC01",
+          "mandatory": true,
+          "statement": "rrf tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recall-rrf.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP11-02-AC02",
+          "mandatory": true,
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP11-02-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP11-02-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP11-03",
+      "title": "Stage 2 recall: graph-aware retrieval (decisions, amendments, dependent tasks, evidence, contracts, supersessions)",
+      "phase": "implement",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP11-02"
+      ],
+      "requirements": [
+        "MV-REC-03"
+      ],
+      "description": "Repo: mgillr/memev.",
+      "scope": {
+        "allow": [
+          "src/engine/graph.mjs",
+          "src/engine/vault.mjs",
+          "test/recall-graph.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP11-03-AC01",
+          "mandatory": true,
+          "statement": "graph recall tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recall-graph.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP11-03-AC02",
+          "mandatory": true,
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP11-03-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP11-03-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP11-04",
+      "title": "Stage 4 recall: trust-aware ranking by knowledge status",
+      "phase": "implement",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP11-03",
+        "WP10-02"
+      ],
+      "requirements": [
+        "MV-REC-05"
+      ],
+      "description": "Repo: mgillr/memev. Bridges to any Federated offering.",
+      "scope": {
+        "allow": [
+          "src/engine/vault.mjs",
+          "test/recall-trust.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP11-04-AC01",
+          "mandatory": true,
+          "statement": "trust recall tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recall-trust.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP11-04-AC02",
+          "mandatory": true,
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP11-04-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP11-04-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP11-05",
+      "title": "Stage 3 (local semantic retrieval) is delivered by the existing contract SR-2.01; this task only checks the interface",
+      "phase": "verify",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP11-02"
+      ],
+      "requirements": [
+        "MV-REC-04"
+      ],
+      "description": "Repo: mgillr/memev. Duplicate guard: do not re-specify SR-2.01 (memev-ops contracts/seed-readiness/specs/SR-2.01-recall-that-finds-paraphrases.json).",
+      "scope": {
+        "allow": [
+          "test/recall-semantic-interface.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP11-05-AC01",
+          "mandatory": true,
+          "statement": "interface test present",
+          "verifier": {
+            "type": "test_exists",
+            "test_file": "test/recall-semantic-interface.test.mjs"
+          }
+        },
+        {
+          "id": "WP11-05-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP11-05-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP11-06",
+      "title": "get and recall stay separate operations (regression guard)",
+      "phase": "verify",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP11-01"
+      ],
+      "requirements": [
+        "MV-REC-01"
+      ],
+      "description": "Repo: mgillr/memev. memev_get and memev_recall in src/server/mcp.mjs L127 and L138.",
+      "scope": {
+        "allow": [
+          "test/get-recall-separate.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP11-06-AC01",
+          "mandatory": true,
+          "statement": "guard test fails if recall is aliased to get",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/get-recall-separate.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP11-06-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP11-06-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}

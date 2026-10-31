@@ -1,0 +1,214 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP18-01",
+      "title": "A2A adapter alongside the existing MCP server; no replacement protocol",
+      "phase": "implement",
+      "owner": "lane-product",
+      "depends_on": [
+        "WP04-02"
+      ],
+      "requirements": [
+        "MV-ARCH-11"
+      ],
+      "description": "Repo: mgillr/memev.",
+      "scope": {
+        "allow": [
+          "src/server/a2a.mjs",
+          "test/a2a.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP18-01-AC01",
+          "mandatory": true,
+          "statement": "a2a tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/a2a.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP18-01-AC02",
+          "mandatory": true,
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP18-01-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP18-01-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP18-02",
+      "title": "SDK and a framework adapter (LangGraph first) so an existing agent can join a project, claim work, submit evidence and sync state",
+      "phase": "implement",
+      "owner": "lane-product",
+      "depends_on": [
+        "WP18-01",
+        "WP10-03"
+      ],
+      "requirements": [
+        "MV-PRD-10"
+      ],
+      "description": "Repo: mgillr/memev (or a new SDK repo; decide in WP17-03).",
+      "scope": {
+        "allow": [
+          "sdk/**"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP18-02-AC01",
+          "mandatory": true,
+          "statement": "sdk example test present",
+          "verifier": {
+            "type": "test_exists",
+            "test_file": "sdk/test/join-project.test.mjs"
+          }
+        },
+        {
+          "id": "WP18-02-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP18-02-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP18-03",
+      "title": "Public conformance tests that any implementation can run",
+      "phase": "verify",
+      "owner": "lane-product",
+      "depends_on": [
+        "WP18-02",
+        "WP02-04"
+      ],
+      "requirements": [
+        "MV-PRD-10"
+      ],
+      "description": "Repo: mgillr/memev.",
+      "scope": {
+        "allow": [
+          "conformance/**"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP18-03-AC01",
+          "mandatory": true,
+          "statement": "conformance runner exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "conformance/run.mjs"
+          }
+        },
+        {
+          "id": "WP18-03-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP18-03-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP18-04",
+      "title": "Payment after verified acceptance: x402 and Stripe adapters, idempotency, reconciliation; a payment receipt is never taken as proof of delivery",
+      "phase": "implement",
+      "owner": "lane-product",
+      "depends_on": [
+        "WP10-03"
+      ],
+      "requirements": [
+        "MV-PRD-11"
+      ],
+      "description": "Repo: mgillr/memev. Adapter only; no money moves without owner approval.",
+      "scope": {
+        "allow": [
+          "src/engine/payments.mjs",
+          "test/payments.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP18-04-AC01",
+          "mandatory": true,
+          "statement": "payment tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/payments.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP18-04-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP18-04-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}

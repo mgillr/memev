@@ -1,0 +1,187 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP06-01",
+      "title": "Acceptance state model: received, replicated, evaluated, accepted, rejected, superseded; transitions and who may make them",
+      "phase": "design",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP04-01",
+        "WP07-02"
+      ],
+      "requirements": [
+        "MV-ARCH-06"
+      ],
+      "description": "Repo: mgillr/memev. Resolves ADR 4 (policy defaults) for acceptance.",
+      "scope": {
+        "allow": [
+          "docs/ACCEPTANCE.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP06-01-AC01",
+          "mandatory": true,
+          "statement": "doc exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/ACCEPTANCE.md"
+          }
+        },
+        {
+          "id": "WP06-01-AC02",
+          "mandatory": true,
+          "statement": "doc names replicated is not accepted",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/ACCEPTANCE.md",
+            "pattern": "(?i)replicat.*not.*accept",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP06-01-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP06-01-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP06-02",
+      "title": "Acceptance evaluator implementing the seven questions (authorised, invariant, superseded dependency, auto-accept, verification, offline, global authority)",
+      "phase": "implement",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP06-01"
+      ],
+      "requirements": [
+        "MV-ARCH-07"
+      ],
+      "description": "Repo: mgillr/memev. One test per question.",
+      "scope": {
+        "allow": [
+          "src/engine/acceptance.mjs",
+          "test/acceptance.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP06-02-AC01",
+          "mandatory": true,
+          "statement": "evaluator tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/acceptance.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP06-02-AC02",
+          "mandatory": true,
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP06-02-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP06-02-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP06-03",
+      "title": "Acceptance is on the default path: a replicated operation does not change authoritative state until accepted",
+      "phase": "implement",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP06-02"
+      ],
+      "requirements": [
+        "MV-ARCH-06"
+      ],
+      "description": "Repo: mgillr/memev.",
+      "scope": {
+        "allow": [
+          "src/engine/project-store.mjs",
+          "src/engine/acceptance.mjs",
+          "test/acceptance-wired.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP06-03-AC01",
+          "mandatory": true,
+          "statement": "project-store references acceptance",
+          "verifier": {
+            "type": "wiring",
+            "entry": "src/engine/project-store.mjs",
+            "symbol": "evaluateAcceptance"
+          }
+        },
+        {
+          "id": "WP06-03-AC02",
+          "mandatory": true,
+          "statement": "wired test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/acceptance-wired.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP06-03-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP06-03-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}

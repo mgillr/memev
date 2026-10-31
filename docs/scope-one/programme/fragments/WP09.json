@@ -1,0 +1,229 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP09-01",
+      "title": "Signed node and agent identity with scoped delegation, revocation and admission, on top of agentkey and agentid-bind",
+      "phase": "implement",
+      "owner": "lane-trust",
+      "depends_on": [
+        "WP04-02"
+      ],
+      "requirements": [
+        "MV-TRU-01",
+        "MV-FED-05"
+      ],
+      "description": "Repo: mgillr/memev. Reuse agentkey (github.com/mgillr/agentkey) and devices.mjs; no second key scheme.",
+      "scope": {
+        "allow": [
+          "src/engine/agentid-bind.mjs",
+          "src/engine/devices.mjs",
+          "src/engine/admission.mjs",
+          "test/admission.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP09-01-AC01",
+          "mandatory": true,
+          "statement": "admission tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/admission.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP09-01-AC02",
+          "mandatory": true,
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP09-01-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP09-01-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP09-02",
+      "title": "ACFA-RS adapter boundary: numeric contributions only, agreed contributor set, Krum n>=2f+3 and Bulyan n>=4f+3 enforced, trusted-identity pinned verification",
+      "phase": "implement",
+      "owner": "lane-trust",
+      "depends_on": [
+        "WP09-01"
+      ],
+      "requirements": [
+        "MV-TRU-04",
+        "MV-TRU-05"
+      ],
+      "description": "Repo: mgillr/memev. Boundary only; no ACFA code in the core; refuses text memories and confidence averages.",
+      "scope": {
+        "allow": [
+          "docs/EXTENSION-POINTS.md",
+          "src/engine/acfa-boundary.mjs",
+          "test/acfa-boundary.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP09-02-AC01",
+          "mandatory": true,
+          "statement": "boundary tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/acfa-boundary.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP09-02-AC02",
+          "mandatory": true,
+          "statement": "licence boundary test green",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/licence-boundary.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP09-02-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP09-02-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP09-03",
+      "title": "Equivocation and suspicious-contribution handler: evidence goes to Memev authority and exclusion policy",
+      "phase": "implement",
+      "owner": "lane-trust",
+      "depends_on": [
+        "WP09-01",
+        "WP06-02"
+      ],
+      "requirements": [
+        "MV-TRU-07"
+      ],
+      "description": "Repo: mgillr/memev.",
+      "scope": {
+        "allow": [
+          "src/engine/exclusion.mjs",
+          "test/exclusion.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP09-03-AC01",
+          "mandatory": true,
+          "statement": "exclusion tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/exclusion.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP09-03-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP09-03-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP09-04",
+      "title": "ACFA-RS patent and licence check recorded before any release package is designed",
+      "phase": "verify",
+      "owner": "owner",
+      "depends_on": [],
+      "requirements": [
+        "MV-LIC-02"
+      ],
+      "description": "Repo: mgillr/memev-ops. Owner or counsel task: LICENSE is Apache-2.0; patent position unverified.",
+      "scope": {
+        "allow": [
+          "contracts/ACFA-LICENCE-CHECK.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP09-04-AC01",
+          "mandatory": true,
+          "statement": "record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "contracts/ACFA-LICENCE-CHECK.md"
+          }
+        },
+        {
+          "id": "WP09-04-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP09-04-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}

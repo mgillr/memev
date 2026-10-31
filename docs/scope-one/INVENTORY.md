@@ -1,6 +1,6 @@
 # Scope One contract and work-item inventory
 
-Dated 2026-10-30, at the baseline commit recorded in BASELINE.md. One row per contract and work item the author can see: the signed set, open branches, delivered (merged) contracts, open pull requests, and owner-held work. Contract ids and lane words stand for owners; no person, seat, server or client product is named on this page.
+Dated 2026-10-30, at the baseline commit recorded in BASELINE.md; the open pull request section is refreshed to 31 October 2026. One row per contract and work item the author can see: the signed set, open branches, delivered (merged) contracts, open pull requests, and owner-held work. Contract ids and lane words stand for owners; no person, seat, server or client product is named on this page.
 
 [Back to the documentation index](../README.md)
 
@@ -22,7 +22,7 @@ Dated 2026-10-30, at the baseline commit recorded in BASELINE.md. One row per co
 ## Open branches
 | id | source | requirement ids covered | status | owner | last known activity | overlaps and conflicts | disposition |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| dev-integration-specs | git branch | none | in progress | unowned | 1 commits ahead of main | none | MERGE |
+| dev-integration-specs | git branch | none | in progress | unowned | 1 commits ahead of main; branch not modified | PI-04 and PI-05 are superseded by owner decision 31 Oct 2026 (ADR 6 in DECISIONS.md): crdt-merge is reached only across the call-out boundary and is never vendored; the other specs on the branch are unaffected | REPAIR |
 | MEM-001 | git branch | none | verified | unowned | 2 commits ahead of main | none | KEEP |
 | MEM-002 (2) | git branch | none | verified | unowned | 17 commits ahead of main | twin branch of MEM-002 | KEEP |
 | MEM-002 (1) | git branch | none | verified | unowned | 9 commits ahead of main | twin branch of MEM-002 | KEEP |
@@ -121,7 +121,13 @@ Dated 2026-10-30, at the baseline commit recorded in BASELINE.md. One row per co
 ## Open pull requests
 | id | source | requirement ids covered | status | owner | last known activity | overlaps and conflicts | disposition |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 27 open draft pull requests (unlisted) | market analysis, section 7 | none | unknown | unowned | not individually listed in any input of this set | overlaps the open branches above | NEW |
+| #324 | gh pr list, 31 Oct 2026 | none | in progress | SO-1.02 | open, not draft; WBS.md, test/wbs.test.mjs and SO-1.01 to SO-1.11 | none | MERGE |
+| #224 | gh pr list, 31 Oct 2026 | none | in progress | unowned | open, draft; federation and deployment documentation, created 30 Oct | federation is planned, not available; the tier decision names no Federated tier | REPAIR |
+| #222 | gh pr list, 31 Oct 2026 | none | in progress | unowned | open, draft; Scope One architecture and delivery addendum, created 30 Oct | advisory: only recommendations the owner accepts become contracts | KEEP |
+| #201 | gh pr list, 31 Oct 2026 | none | in progress | WO-05-B | open, draft; paid-engine client behind a flag, created 30 Oct | one lifecycle with #154, #163 and #177; the engine stays external behind the WO-05-A call-out boundary | INTEGRATE |
+| #177 | gh pr list, 31 Oct 2026 | none | in progress | MEM-134 | open, draft; separation and abuse guards for the trial, created 29 Oct | #154, #163 and #201 | INTEGRATE |
+| #163 | gh pr list, 31 Oct 2026 | none | in progress | MEM-130 | open, draft; merge-engine entitlement and trial seat policy, created 29 Oct | #154, #177 and #201 | INTEGRATE |
+| #154 | gh pr list, 31 Oct 2026 | none | in progress | MEM-129 | open, draft; trial licence format and verification, created 29 Oct | #163, #177 and #201 | INTEGRATE |
 
 ## Owner-held work
 | id | source | requirement ids covered | status | owner | last known activity | overlaps and conflicts | disposition |
@@ -129,4 +135,4 @@ Dated 2026-10-30, at the baseline commit recorded in BASELINE.md. One row per co
 | owner-held (unlisted) | author statement | none | unknown | unowned | not in any branch or pull request of this set | none | NEW |
 
 ## Sources not read
-- The 27 open draft pull requests named in the market analysis (section 7) are not listed in any input of this set, so their contents could not be read; they are recorded above as unknown.
+- The open pull requests above are the live `gh pr list` state of mgillr/memev on 31 October 2026. The earlier line that named 27 open draft pull requests, taken from the market analysis (section 7), is replaced by it: seven pull requests are open, one of them not a draft. Pull requests #319 to #323 were merged on 31 October and #132 was closed; MEM-067 is cancelled (see its row above).

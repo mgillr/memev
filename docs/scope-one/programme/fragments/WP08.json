@@ -1,0 +1,218 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP08-01",
+      "title": "Refresh the Scope One requirement register (98 SO-REQ) against current main and publish the fresh counts",
+      "phase": "plan",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP17-01"
+      ],
+      "requirements": [
+        "MV-S1-06"
+      ],
+      "description": "Repo: mgillr/memev. The recorded 4 implemented / 17 partial / 58 documented-only / 19 not-implemented split is the 30 Oct baseline.",
+      "scope": {
+        "allow": [
+          "docs/scope-one/REQUIREMENTS.md",
+          "docs/scope-one/BASELINE.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP08-01-AC01",
+          "mandatory": true,
+          "statement": "baseline names a refresh date after 2026-10-31",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/BASELINE.md",
+            "pattern": "Refreshed: 2026-1[1-2]|Refreshed: 2027",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP08-01-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP08-01-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP08-02",
+      "title": "Provider-neutral execution adapter contract: discovery, session lifecycle, dispatch, checkpoint, progress, cancellation, recovery",
+      "phase": "implement",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP07-03"
+      ],
+      "requirements": [
+        "MV-S1-05"
+      ],
+      "description": "Repo: mgillr/memev.",
+      "scope": {
+        "allow": [
+          "docs/ADAPTERS.md",
+          "src/engine/adapter-contract.mjs",
+          "test/adapter-contract.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP08-02-AC01",
+          "mandatory": true,
+          "statement": "contract tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/adapter-contract.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP08-02-AC02",
+          "mandatory": true,
+          "statement": "doc exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/ADAPTERS.md"
+          }
+        },
+        {
+          "id": "WP08-02-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP08-02-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP08-03",
+      "title": "Lifecycle test: intake, spec with approvals, contract and work packages, execution, verification, delivery with evidence",
+      "phase": "implement",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP07-03",
+        "WP10-03"
+      ],
+      "requirements": [
+        "MV-S1-01",
+        "MV-S1-02"
+      ],
+      "description": "Repo: mgillr/memev. Dashboard acceptance criteria (SLICE-PLAN slice 7) are written by the existing Scope One contract effort; this task is the end-to-end spine only.",
+      "scope": {
+        "allow": [
+          "test/lifecycle.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP08-03-AC01",
+          "mandatory": true,
+          "statement": "lifecycle test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/lifecycle.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP08-03-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP08-03-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP08-04",
+      "title": "Organisational intelligence prototype: evidence-linked cross-project dependency and conflict detection; both original plans preserved until an authorised change",
+      "phase": "implement",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP10-02",
+        "WP11-03"
+      ],
+      "requirements": [
+        "MV-S1-03"
+      ],
+      "description": "Repo: mgillr/memev.",
+      "scope": {
+        "allow": [
+          "src/engine/org-intel.mjs",
+          "test/org-intel.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP08-04-AC01",
+          "mandatory": true,
+          "statement": "org-intel tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/org-intel.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP08-04-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP08-04-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,247 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP04-01",
+      "title": "Envelope specification: fields, versioning, deterministic serialisation, hash rules",
+      "phase": "design",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP17-03"
+      ],
+      "requirements": [
+        "MV-INT-02"
+      ],
+      "description": "Repo: mgillr/memev. Fields from the notes: origin identity and node, operation id, causal dependencies, project and object id, type and payload, authorisation evidence, contract or policy reference, content hash, verification status. Resolve ADR 2 (id and event ordering) in the same change.",
+      "scope": {
+        "allow": [
+          "docs/OPERATION-ENVELOPE.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP04-01-AC01",
+          "mandatory": true,
+          "statement": "spec exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/OPERATION-ENVELOPE.md"
+          }
+        },
+        {
+          "id": "WP04-01-AC02",
+          "mandatory": true,
+          "statement": "spec names the verification status field",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/OPERATION-ENVELOPE.md",
+            "pattern": "verification_status",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP04-01-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP04-01-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP04-02",
+      "title": "Envelope module: build, canonical-serialise, hash and validate an envelope",
+      "phase": "implement",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP04-01"
+      ],
+      "requirements": [
+        "MV-INT-02"
+      ],
+      "description": "Repo: mgillr/memev.",
+      "scope": {
+        "allow": [
+          "src/engine/envelope.mjs",
+          "test/envelope.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP04-02-AC01",
+          "mandatory": true,
+          "statement": "envelope tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/envelope.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP04-02-AC02",
+          "mandatory": true,
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP04-02-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP04-02-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP04-03",
+      "title": "Adapters: the oplog record, the bus message and project-store events convert to and from the envelope without loss",
+      "phase": "implement",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP04-02"
+      ],
+      "requirements": [
+        "MV-INT-03"
+      ],
+      "description": "Repo: mgillr/memev. Round-trip test for each of the three record shapes.",
+      "scope": {
+        "allow": [
+          "src/engine/envelope-adapters.mjs",
+          "test/envelope-adapters.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP04-03-AC01",
+          "mandatory": true,
+          "statement": "round-trip tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/envelope-adapters.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP04-03-AC02",
+          "mandatory": true,
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP04-03-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP04-03-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP04-04",
+      "title": "Envelope is reachable from the real write path (oplog append), not only from tests",
+      "phase": "implement",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP04-03"
+      ],
+      "requirements": [
+        "MV-INT-03"
+      ],
+      "description": "Repo: mgillr/memev. Rule SR-1.15: no code without a caller.",
+      "scope": {
+        "allow": [
+          "src/engine/oplog.mjs",
+          "src/engine/index.mjs",
+          "test/envelope-wired.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP04-04-AC01",
+          "mandatory": true,
+          "statement": "oplog default path references the envelope",
+          "verifier": {
+            "type": "wiring",
+            "entry": "src/engine/index.mjs",
+            "symbol": "buildEnvelope"
+          }
+        },
+        {
+          "id": "WP04-04-AC02",
+          "mandatory": true,
+          "statement": "wired test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/envelope-wired.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP04-04-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP04-04-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}

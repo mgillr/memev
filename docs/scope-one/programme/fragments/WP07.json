@@ -1,0 +1,241 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP07-01",
+      "title": "Wire project-store into a caller on the default path (CLI or server)",
+      "phase": "implement",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP17-01"
+      ],
+      "requirements": [
+        "MV-S1-04"
+      ],
+      "description": "Repo: mgillr/memev. docs/MODULES.md L446 and L464: project-state.mjs and coordinator.mjs are imported by no other module.",
+      "scope": {
+        "allow": [
+          "src/cli/**",
+          "src/server/**",
+          "src/engine/project-store.mjs",
+          "test/project-store-wired.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP07-01-AC01",
+          "mandatory": true,
+          "statement": "project-store reachable from the CLI entry",
+          "verifier": {
+            "type": "wiring",
+            "entry": "src/cli/main.mjs",
+            "symbol": "projectStore"
+          }
+        },
+        {
+          "id": "WP07-01-AC02",
+          "mandatory": true,
+          "statement": "wired test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-store-wired.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP07-01-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP07-01-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP07-02",
+      "title": "Wire project-state (state machine and ten invariants) so that every task transition goes through it",
+      "phase": "implement",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP07-01"
+      ],
+      "requirements": [
+        "MV-S1-04",
+        "MV-INT-07"
+      ],
+      "description": "Repo: mgillr/memev. SO-04-A (6ad655f) landed the module.",
+      "scope": {
+        "allow": [
+          "src/cli/**",
+          "src/server/**",
+          "src/engine/project-state.mjs",
+          "test/project-state-wired.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP07-02-AC01",
+          "mandatory": true,
+          "statement": "project-state referenced on the default path",
+          "verifier": {
+            "type": "wiring",
+            "entry": "src/cli/main.mjs",
+            "symbol": "transitionTask"
+          }
+        },
+        {
+          "id": "WP07-02-AC02",
+          "mandatory": true,
+          "statement": "wired test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-state-wired.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP07-02-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP07-02-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP07-03",
+      "title": "Wire coordinator (atomic claims, leases, generation tokens) behind the MCP and CLI claim path",
+      "phase": "implement",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP07-02"
+      ],
+      "requirements": [
+        "MV-S1-04"
+      ],
+      "description": "Repo: mgillr/memev. SO-08-A (7de636b) landed the module. Settle ADR 3 (lease semantics) first.",
+      "scope": {
+        "allow": [
+          "src/server/**",
+          "src/cli/**",
+          "src/engine/coordinator.mjs",
+          "test/coordinator-wired.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP07-03-AC01",
+          "mandatory": true,
+          "statement": "coordinator referenced from the MCP server path",
+          "verifier": {
+            "type": "wiring",
+            "entry": "src/server/mcp.mjs",
+            "symbol": "claimTask"
+          }
+        },
+        {
+          "id": "WP07-03-AC02",
+          "mandatory": true,
+          "statement": "wired test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/coordinator-wired.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP07-03-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP07-03-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP07-04",
+      "title": "Single-authority guard: a test fails if a second state store or coordinator is introduced",
+      "phase": "verify",
+      "owner": "lane-core",
+      "depends_on": [
+        "WP07-03"
+      ],
+      "requirements": [
+        "MV-ARCH-09"
+      ],
+      "description": "Repo: mgillr/memev. Static check over src/ for a second implementation of claim or project state.",
+      "scope": {
+        "allow": [
+          "test/single-authority.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP07-04-AC01",
+          "mandatory": true,
+          "statement": "guard test fails on a seeded duplicate fixture, passes on main",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/single-authority.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP07-04-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP07-04-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}

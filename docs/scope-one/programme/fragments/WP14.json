@@ -1,0 +1,264 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP14-01",
+      "title": "Federated prototype: three independent nodes, concurrent agents, a partition, recovery and a verifiable outcome",
+      "phase": "implement",
+      "owner": "lane-fed",
+      "depends_on": [
+        "WP12-03",
+        "WP13-04"
+      ],
+      "requirements": [
+        "MV-DEM-01"
+      ],
+      "description": "Repo: mgillr/memev. Deliverable 3 of the notes.",
+      "scope": {
+        "allow": [
+          "scripts/demo-federation.mjs",
+          "test/demo-federation.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP14-01-AC01",
+          "mandatory": true,
+          "statement": "demo test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/demo-federation.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP14-01-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP14-01-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP14-02",
+      "title": "End-to-end workflow: a fact originates on node A, replicates, is evaluated on B and C, informs independent work and becomes an accepted verifiable outcome",
+      "phase": "implement",
+      "owner": "lane-fed",
+      "depends_on": [
+        "WP14-01",
+        "WP10-03"
+      ],
+      "requirements": [
+        "MV-DEM-02"
+      ],
+      "description": "Repo: mgillr/memev.",
+      "scope": {
+        "allow": [
+          "test/demo-workflow.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP14-02-AC01",
+          "mandatory": true,
+          "statement": "workflow test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/demo-workflow.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP14-02-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP14-02-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP14-03",
+      "title": "Adversarial participant is excluded with evidence inside the demonstration",
+      "phase": "implement",
+      "owner": "lane-fed",
+      "depends_on": [
+        "WP14-01",
+        "WP09-03"
+      ],
+      "requirements": [
+        "MV-DEM-04"
+      ],
+      "description": "Repo: mgillr/memev.",
+      "scope": {
+        "allow": [
+          "test/demo-adversary.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP14-03-AC01",
+          "mandatory": true,
+          "statement": "adversary test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/demo-adversary.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP14-03-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP14-03-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP14-04",
+      "title": "Three architectural acceptance demonstrators: autonomous project delivery, organisational intelligence, independent-site federation",
+      "phase": "verify",
+      "owner": "lane-fed",
+      "depends_on": [
+        "WP14-02",
+        "WP08-04"
+      ],
+      "requirements": [
+        "MV-DEM-03"
+      ],
+      "description": "Repo: mgillr/memev.",
+      "scope": {
+        "allow": [
+          "docs/DEMONSTRATORS.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP14-04-AC01",
+          "mandatory": true,
+          "statement": "doc exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/DEMONSTRATORS.md"
+          }
+        },
+        {
+          "id": "WP14-04-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP14-04-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP14-05",
+      "title": "Public federation benchmark under realistic failures",
+      "phase": "release",
+      "owner": "lane-fed",
+      "depends_on": [
+        "WP14-01",
+        "WP03-02"
+      ],
+      "requirements": [
+        "MV-DEM-05"
+      ],
+      "description": "Repo: mgillr/memev. Numbers published with method; no claim without a measured value.",
+      "scope": {
+        "allow": [
+          "scripts/bench/federation.mjs",
+          "docs/BENCH-FEDERATION.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP14-05-AC01",
+          "mandatory": true,
+          "statement": "bench script exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "scripts/bench/federation.mjs"
+          }
+        },
+        {
+          "id": "WP14-05-AC02",
+          "mandatory": true,
+          "statement": "doc exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/BENCH-FEDERATION.md"
+          }
+        },
+        {
+          "id": "WP14-05-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP14-05-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}

@@ -102,5 +102,7 @@ The record a builder takes over with: what exists, what is missing, and the orde
 | [scope-one/INVENTORY.md](scope-one/INVENTORY.md) | every branch, contract and source, with status and disposition |
 | [scope-one/BASELINE.md](scope-one/BASELINE.md) | the commit, working tree and test run the record is taken from |
 | [scope-one/DEPENDENCIES.md](scope-one/DEPENDENCIES.md) | the build-order edges between contracts |
-| [scope-one/DECISIONS.md](scope-one/DECISIONS.md) | the open ADRs and the questions only the owner can answer |
+| [scope-one/DECISIONS.md](scope-one/DECISIONS.md) | the open ADRs, the decided ones (engine boundary, tiers) and the questions only the owner can answer |
+| [scope-one/RECONCILIATION.md](scope-one/RECONCILIATION.md) | the programme decomposition against the Scope One work breakdown, and the claim register |
+| [scope-one/programme/README.md](scope-one/programme/README.md) | the programme requirements, work packages and proposed contracts (unsigned) |
 | [scope-one/SLICE-PLAN.md](scope-one/SLICE-PLAN.md) | the ordered slices and the deferred work |
