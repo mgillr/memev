@@ -113,7 +113,7 @@ export class DeviceRegistry {
   /**
    * Existing installs: every active token that is not yet a device becomes one. Local tokens are
    * local clients; remote tokens made for a cloud app are connectors; other remote tokens are
-   * remote computers until their traffic says otherwise.
+   * remote computers. Their traffic never changes that (issue 266): only the person makes a connector.
    */
   migrate(tokens) {
     const added = [];
@@ -152,8 +152,10 @@ export class DeviceRegistry {
     d.first_seen ||= t; d.last_seen = t;
     const cls = this.classify({ local, connectorUrl, userAgent, device: d });
     d.last_class = cls;
-    // a token issued by hand that a cloud AI app uses is a connector; the other way round only flags
-    if (d.inferred && !local && d.kind === 'remote-computer' && cls === 'cloud-connector') d.kind = cls;
+    // A User-Agent is the caller's choice, so it never changes what a device is (issue 266): a computer credential that
+    // a cloud AI app uses is only flagged, and it still needs its device proof. For a cloud AI app the person makes a
+    // connector link (memev cloud url). A connector used by something else is flagged too.
+    if (!local && d.kind === 'remote-computer' && cls === 'cloud-connector') this._flag(d, 'cloud-app-on-computer-credential', 'a cloud AI app used a computer credential; it is refused until it signs with a device key. For a cloud AI app, make a connector link with memev cloud url');
     if (d.kind === 'cloud-connector' && cls === 'remote-computer') this._flag(d, 'connector-used-by-computer', 'a connector credential was used by something that is not a cloud AI app; it is counted as a computer');
     if (proof) { if (proof.ok) d.proof = 'ok'; else this._flag(d, 'proof', proof.reason); }
     else if (d.pubkey && !local) this._flag(d, 'unsigned', 'this device has a key but sent an unsigned request');

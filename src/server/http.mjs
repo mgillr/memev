@@ -241,10 +241,10 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       vault.devices.fresh();
       let dev = vault.devices.get(vault.devices.byToken.get(identity.id) || '');
       let proof = null;
-      // The proof requirement is decided from the device kind as stored before observe() runs:
-      // observe() may reclassify an inferred record from the User-Agent, and that must not let a
-      // keyless computer through the gate. A token with no record yet is judged by its note, the
-      // same way observe() will store it.
+      // The proof requirement is decided from the device kind as stored, which only the person sets:
+      // observe() never changes it from the User-Agent (issue 266), so a keyless computer cannot get
+      // through the gate by naming a cloud app. A token with no record yet is judged by its note,
+      // the same way observe() will store it.
       const needsProof = !local && (dev ? dev.kind === 'remote-computer' : !/cloud connector/.test(identity.note || ''));
       if (needsProof) {
         if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) await getBody();
