@@ -59,6 +59,14 @@ this folder links back here, and this page links down to every page.
 | [LICENSING-NOTICE.md](LICENSING-NOTICE.md) | which licence covers what |
 | [../CHARTER.md](../CHARTER.md) | the free tier is never limited |
 
+## For buyers
+
+| Page | What it holds |
+|---|---|
+| [SECURITY-BRIEF.md](SECURITY-BRIEF.md) | the customer security brief: where notes live, what leaves the computer, credentials, the threat model, built against planned |
+| [DATA-FLOW.md](DATA-FLOW.md) | the one-page data-flow map: every outbound call a default install can make, and nothing else |
+| [PILOT-CHECKLIST.md](PILOT-CHECKLIST.md) | the two to four week pilot checklist, week for week with the Business setup table |
+
 ## Plans and drafts
 
 | Page | What it holds |
