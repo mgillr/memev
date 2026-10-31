@@ -19,14 +19,19 @@
         "when the vault has a git backup, the doctor names the last backup commit that held the lost path as the recovery source",
         "a write, append, remember, checkpoint, journal turn or sync to an unrebuildable path is refused with a VaultError whose code is unrecoverable and whose message points at memev doctor; nothing is logged for it, whether the file is missing, incomplete or unreadable",
         "the doctor names, as the recovery source, the newest backup commit that still holds the path (the deletion commit never), reading git directly when the daemon is down; with no backup, memev doctor --resolve <path> ends the report only after a confirmation, by logging a delete of the path with the reason",
-        "the unrecoverable list is computed at each open from the log and the disk, never stored, so it clears once the file holds the bytes its head expects; a path that compact() archived is never reported",
+        "the unrecoverable list is computed at each open from the log and the disk, plus the paths a damaged line was found to break: when open() meets a line it cannot apply, it records that path and the reason in .memev/unrecoverable.json (never in the log), so the report survives the next snapshot; a path leaves the list once its file holds the bytes its head expects or --resolve ends it; a healthy note whose file is removed is rebuilt from the log at open, as before; a path that compact() archived is never reported",
         "status(), memev_status, memev_doctor, memev_session_start and POST /v1/session-start name an unrecoverable path only to a token whose path scope covers it; other callers, remote connectors included, see the count",
         "the rendered session card text, the MCP text, memev card and plain memev status carry the count and 'memev doctor' in their first lines, so the card's 6000-character cut never drops them",
         "the oplog check lists unrecoverable paths whether or not verify() is ok",
-        "a record that parses as JSON but cannot be applied (data null, a splice whose ins is not an array) is treated as unreadable; Vault.open() never throws because of one path",
+        "a record that parses as JSON but cannot be applied (data null, a splice whose ins is not an array, a put whose content is not a string, a line that is not an object) is treated as unreadable; Vault.open() never throws because of one path",
         "iterate() reports a line it cannot parse with its segment and offset, and materialize attributes it to the path whose chain it breaks, so each path gets its own reason",
-        "a present file that is a strict prefix of the content the log holds for the path, even when that content fails its hash, is incomplete and kept as it is; any other present file is an outside edit and is imported",
-        "docs/TROUBLESHOOTING.md's oplog row names the note-cannot-be-rebuilt failure and its recovery from the named backup commit"
+        "a present file whose bytes equal any state of the note that verifies (the head after any record whose hash checks, the named backup commit's copy included) clears the report and is imported as one outside edit; a present file that is a strict prefix of the last verified content, or of the content the log holds even when it fails its hash, is incomplete and kept as it is; any other present file is an outside edit and is imported",
+        "docs/TROUBLESHOOTING.md's oplog row names the note-cannot-be-rebuilt failure and its recovery from the named backup commit",
+        "memev doctor --resolve <path> asks for confirmation on a terminal and needs --yes otherwise; it refuses a path that is not unrecoverable or skipped, acts by the path's state (for an unrecoverable path it ends the report as requirement 9 says; for a path SR-1.26 skips it moves the note as SR-1.26 says), and goes through the daemon when it is running",
+        "the oplog check's detail, verify() errors included, names a path only to a token whose path scope covers it; other callers see counts",
+        "the unrecoverable refusal runs after the caller's access check, so a caller without access to the path gets the access refusal, never 'unrecoverable'",
+        "the git-pull loop in src/cli/sync.mjs catches the unrecoverable refusal per path, keeps the path reported and goes on; the pull still commits and pushes the other paths",
+        "every caller of status() passes the caller's identity, src/server/http.mjs included, so requirement 11's scope rule holds on every route"
       ],
       "description": "",
       "scope": [
@@ -35,7 +40,7 @@
         "docs/DESIGN.md",
         "docs/THREAT-MODEL.md",
         "test/recover-unrebuildable.test.mjs",
-        "test/helpers/**",
+        "test/helpers/recover-*.mjs",
         "src/cli/main.mjs",
         "src/engine/card.mjs",
         "src/server/http.mjs",
@@ -44,7 +49,8 @@
         "changelog.d/SR-1.21.md",
         "src/engine/oplog.mjs",
         "docs/TROUBLESHOOTING.md",
-        "src/engine/diff.mjs"
+        "src/engine/diff.mjs",
+        "src/cli/sync.mjs"
       ],
       "criteria": [
         {
@@ -287,6 +293,94 @@
             "type": "grep",
             "file": "docs/TROUBLESHOOTING.md",
             "pattern": "\\| `oplog` \\|[^\\n]*cannot be rebuilt"
+          }
+        },
+        {
+          "statement": "Test 'resolve asks first', in a sandbox() vault with no remote and the 5-byte-prefix fixture for notes/x.md plus a healthy notes/ok.md: (1) daemon down, `memev doctor --resolve notes/x.md` with stdin not a TTY and no --yes exits non-zero, log.seq is unchanged and status().unrecoverable still lists p after reopen; (2) `memev doctor --resolve notes/ok.md --yes` is refused, ok.md bytes unchanged, no record appended; (3) `memev doctor --resolve notes/x.md --yes` appends exactly one record for p, of type 'delete' with a non-empty data.reason, the 5 bytes on disk are unchanged, and after reopen p is not listed; (4) the same with the daemon running: after memev stop, v.log.verify().ok is true and the seq values in the log are strictly increasing with no duplicate; (5) DELETE /v1/notes/notes/x.md with the owner token on the prefix fixture returns error 'unrecoverable' and the bytes stay.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='resolve asks first' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'resolve asks first' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^resolve asks first$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Test 'no path leaks when verify fails': notes/x.md gets a put, an append and a second append; the first append's line is replaced by unparseable bytes (newline kept) and the file is removed, so verify() reports a chain break on notes/x.md. A token limited to ['projects/a/**'] and clientToken(root,'x',{remote:true}) call memev_doctor, memev_status, GET /v1/status and memev_session_start: no response body contains 'x.md', the oplog check is 'fail' and the unrecoverable count is 1. With the owner token, the memev_doctor oplog detail names notes/x.md.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='no path leaks when verify fails' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'no path leaks when verify fails' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^no path leaks when verify fails$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Test 'refused with unrecoverable': for each of the missing, 5-byte-prefix and chmod-000 fixtures (the last skipped on win32 or as root), each of v.write, v.append, v.remember (p is that kind's month file), v.checkpoint (p is work/active/<slug>.md), v.journal (p is the session file) and v.syncFromDisk(p,'git-pull') throws an error that is instanceof VaultError with e.code === 'unrecoverable' and /memev doctor/ in e.message; v.log.seq and the segment's byte length are identical before and after each call; PUT and PATCH /v1/notes/<p> with the owner token return a body whose error is 'unrecoverable'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='refused with unrecoverable' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'refused with unrecoverable' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^refused with unrecoverable$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Test 'unsnapshotted record stays reported': in fixture (b), with a healthy notes/q.md written before v1 whose file is also removed: after the first reopen, close and reopen twice more; each time status().unrecoverable lists notes/x.md, notes/x.md does not exist, notes/x.md is not in v.recovered and log.seq equals its value after the first reopen. The owner must state in the spec what happens to notes/q.md in this vault (rebuilt byte for byte, or listed with a stated reason) and the test asserts that outcome.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='unsnapshotted record stays reported' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'unsnapshotted record stays reported' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^unsnapshotted record stays reported$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Test 'pull with a lost note': sandbox vault with a bare remote; notes/x.md is unrebuildable with its deletion committed and pushed; a second clone writes the first 5 bytes of the original x back, edits notes/y.md, commits and pushes; syncOnce(vault,{root}) returns with error null and pushed true, notes/y.md has a new 'put' with data.external and client 'git-pull', no record is appended for notes/x.md and status().unrecoverable still lists it. Separately, with x unrebuildable and notes/y.md hand-edited, running the drift fix.run() imports y as an external put.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='pull with a lost note' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'pull with a lost note' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^pull with a lost note$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Test 'open never throws': with a healthy notes/ok.md alongside, for each of (i) splice ins:null, (ii) splice ins:5, (iii) put content:42, (iv) put content:{} (hash recomputed each time, snapshot covering), (v) p's line replaced by 'null', (vi) a line '42' in the replayed tail after restoring the earlier snapshot, and (vii) an intact log with p's file chmod 000 (skipped on win32 or as root): Vault.open() does not throw, Number.isInteger(v.log.seq), v.log.verify() returns, fileChecks' oplog check is produced, status().unrecoverable lists p with 'record unreadable' ((vii): 'file unreadable', bytes and mode unchanged), and notes/ok.md is not listed.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='open never throws' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'open never throws' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^open never throws$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Test 'card warning comes first': in the padded fixture, renderCard(card,{maxChars:1e9}).length > 6000 is asserted (add a session journal with 6 long turns and long active-project checkpoints if the decisions alone fall short); renderCard(card,{maxChars:200}) contains 'memev doctor' and the count; and in renderCard(card), in memev_session_start content[0].text after the protocol text, in POST /v1/session-start .text and in `memev card` stdout, the first line containing 'memev doctor' is within the first 3 lines of the card.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='card warning comes first' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'card warning comes first' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^card warning comes first$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Test 'names the newest backup commit': bare remote; C1 writes notes/x.md as v1, C2 changes it to v2, C3 changes only notes/other.md; push; make x unrebuildable WITHOUT committing the deletion. For `memev doctor --json` with the daemon down and up, the oplog detail contains a short hash H for which `git show H:notes/x.md` prints exactly v2, and does not contain C1's short hash.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='names the newest backup commit' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'names the newest backup commit' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^names the newest backup commit$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Test 'loss while open is refused': open v, write notes/x.md, then without closing tamper its record (hash recomputed) and remove the file; v.append(OWNER,{path:'notes/x.md',text:'x'}) throws a VaultError with code 'unrecoverable', v.log.seq is unchanged, no record of type 'delete' exists for p, and after close and reopen status().unrecoverable lists p.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='loss while open is refused' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'loss while open is refused' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^loss while open is refused$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Test 'backup restore clears': notes/x.md gets a put v0 (committed and pushed as C1), an append a1 (not pushed) and an append a2 whose line is made unparseable; the file is removed; the doctor names C1; the bytes of `git show C1:notes/x.md` are written into place and the vault reopened: status().unrecoverable is empty, the restored bytes are recorded as one external put, and v.append to notes/x.md succeeds. (If the owner decides otherwise, the spec must say what ends the report after the documented recovery and the test asserts that.)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='backup restore clears' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'backup restore clears' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^backup restore clears$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Test 'doctor with the daemon up': in each 'daemon up' run the test asserts `memev start` exited 0 and the doctor JSON has a check with id 'daemon' and status 'ok' before reading the oplog check; with that, the oplog check's detail names notes/x.md.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='doctor with the daemon up' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'doctor with the daemon up' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^doctor with the daemon up$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
