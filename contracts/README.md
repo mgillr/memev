@@ -52,6 +52,11 @@ change as `quality-loop/AMENDMENTS.md` records. The text was agreed in review, a
 own `contractAmend` from main at 3f9c8e2e, in the same signing vault, under the same key. The new version names the one it
 supersedes; memev retires the earlier one once the new version, signed on this computer, passes its own verify.
 
+SR-1.22 was amended for a build defect (#303): 33 of its guarded commands had their cNN: labels anchored with `$`, so a
+subtest whose name goes on after the colon could never match. Each filter is the label prefix again, as in its round 3 text. It
+was signed on 31 October from main at 0eb46bc8, at the three-round stop, in the same signing vault under the same key.
+
 | Spec | Contract | Version | Supersedes | Tasks | Criteria |
 |---|---|---|---|---|---|
 | [QL-1.01](quality-loop/specs/QL-1.01-red-team-gate-no-signing.json) | [`k-ql-1-01-red-team-gate-no-f0e136`](signed/k-ql-1-01-red-team-gate-no-f0e136.json) | 2 | [`k-ql-1-01-red-team-gate-no-296339`](signed/k-ql-1-01-red-team-gate-no-296339.json) | 2 | 50 |
+| [SR-1.22](seed-readiness/specs/SR-1.22-an-interrupted-write-recovers-from-the-log.json) | [`k-sr-1-22-a-whole-note-wri-26f4da`](signed/k-sr-1-22-a-whole-note-wri-26f4da.json) | 2 | [`k-sr-1-22-a-whole-note-wri-9746f4`](signed/k-sr-1-22-a-whole-note-wri-9746f4.json) | 1 | 41 |
