@@ -54,8 +54,7 @@ a slice never lands a contract whose prerequisite is in a later slice. The
 
 ### Slice 5: Licence, tiers and conversion
 
-- Lands: MEM-129, MEM-137, MEM-141, MEM-133, MEM-067, MEM-077, MEM-057, MEM-134, MEM-065,
-  MEM-069
+- Lands: MEM-129, MEM-137, MEM-141, MEM-133, MEM-077, MEM-057, MEM-134, MEM-065, MEM-069
 - Test: `node --test test/licence.test.mjs`
 - Done: the trial licence format verifies; the tier names are consistent across code and
   docs; the paid conversion path is in place; a lead is asked once; team buyers map onto

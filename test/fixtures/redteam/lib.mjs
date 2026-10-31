@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { sign, canonical, canonicalHash, generateKeyPair, keyId } from '../../../vendor/attest/signature.mjs';
+import { sign, canonical, canonicalHash, generateKeyPair, keyId, pae } from '../../../vendor/attest/signature.mjs';
 
 export const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(HERE, '..', '..', '..');
@@ -23,6 +23,8 @@ export const TEST_PRIV = RUN.privateKey;
 export const TEST_PUB = RUN.publicKey;
 /** The reviewer keys the tests inject: the fixture key and this run's key. */
 export const KEYS = [FIXTURE_PUB, TEST_PUB];
+/** The payload type of a stop decision's envelope, as docs/CONTRACTS.md states it. */
+export const STOP_PAYLOAD = 'application/vnd.memev.redteam-stop-sha256';
 
 export const sha256 = (b) => crypto.createHash('sha256').update(b).digest('hex');
 export const specHash = (spec) => canonicalHash({ ...spec, workdir: null });
@@ -72,12 +74,20 @@ export function signRecord(rec, redteamDir, priv = TEST_PRIV, { closing = true, 
   return rec;
 }
 
-/** A stop decision over the spec, signed by a contract-signing key. */
+/** A DSSE envelope over obj's canonical hash under `payloadType` (a stop decision's own, unless a test names another). */
+export function signAs(obj, priv, payloadType = STOP_PAYLOAD) {
+  const hash = canonicalHash(obj);
+  const key = crypto.createPrivateKey(priv);
+  const pub = crypto.createPublicKey(key).export({ type: 'spki', format: 'pem' });
+  return { payloadType, payload: Buffer.from(hash).toString('base64'), signatures: [{ keyid: keyId(pub), sig: crypto.sign(null, pae(payloadType, Buffer.from(hash)), key).toString('base64') }] };
+}
+
+/** A stop decision over the spec, signed by `priv` under the stop's payload type. */
 export function stopDecision(rec, spec, priv, extra = {}) {
   const open = [];
   for (const r of rec.rounds) for (const a of r.answers || []) if (a.disposition !== 'added') open.push({ round: r.round, n: a.n });
   const body = { spec_id: rec.spec_id, spec_sha256: specHash(spec), decider: 'the owner', date: '2026-10-31', decision: 'sign', open, dispositions: sha256(canonical(rec.rounds.map(late))), ...extra };
-  return { ...body, sig: sign(body, priv) };
+  return { ...body, sig: signAs(body, priv) };
 }
 
 export function contractKey(dir) {

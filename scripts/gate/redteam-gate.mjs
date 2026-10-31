@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { gate } from '../../src/engine/redteam-gate.mjs';
 
-export { evaluate, gate, RULES, REVIEWER_KEYS, GRANDFATHERED } from '../../src/engine/redteam-gate.mjs';
+export { evaluate, gate, RULES, REVIEWER_KEYS, STOP_KEYS, STOP_PAYLOAD_TYPE, GRANDFATHERED } from '../../src/engine/redteam-gate.mjs';
 
 export function main(argv, cwd = process.cwd()) {
   const report = argv.includes('--report');
