@@ -327,8 +327,8 @@
         "SR-1.01",
         "QL-1.02"
       ],
-      "tasks": 2,
-      "criteria": 44,
+      "tasks": 1,
+      "criteria": 38,
       "spec": "specs/SR-1.24-no-cli-write-beside-a-live-daemon.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -344,7 +344,7 @@
         "SR-1.28"
       ],
       "tasks": 1,
-      "criteria": 29,
+      "criteria": 41,
       "spec": "specs/SR-1.25-a-cloud-seat-addresses-one-local-seat.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -392,7 +392,7 @@
         "QL-1.02"
       ],
       "tasks": 2,
-      "criteria": 55,
+      "criteria": 56,
       "spec": "specs/SR-1.28-the-bus-writes-its-own-routing-files.json",
       "status": "proposed: owner's go pending, signs after a clean red-team round"
     },
@@ -407,7 +407,7 @@
         "QL-1.02"
       ],
       "tasks": 1,
-      "criteria": 10,
+      "criteria": 19,
       "spec": "specs/SR-1.29-a-hook-starts-without-loading-the-whole.json",
       "status": "proposed: owner's go pending, signs after a clean red-team round"
     },
@@ -425,6 +425,24 @@
       "tasks": 1,
       "criteria": 32,
       "spec": "specs/SR-1.30-done-holds-across-computers-and-clones.json",
+      "status": "proposed: lead's decision under the owner's delegation, 31 Oct; signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.31",
+      "gap": "G96",
+      "area": "SR-1",
+      "title": "Every other CLI state writer goes through the daemon or the lock",
+      "repo": "memev",
+      "closes": "Closes G96: SR-1.24 routes five CLI commands' state writes through the daemon, or the SR-1.01 vault lock when no daemon runs, and gates the daemon's state routes on a local request with the admin scope. Every other CLI process that writes vault state still writes it beside a live daemon: token revoke and rotate, devices enroll, remove and rotate, the cloud and relay commands, contracts on and off, deployment set, github setup, invite, memev init on an existing vault, license activate with a relay, the per-session hook and mcp processes when they mint a missing client token, the cli and doctor tokens that memev recall, card, claims, doctor and every bus subcommand reissue, the session-start hook's lead mark, onboarding and report, and the relay address command, which rewrites the relay's key file. Split from SR-1.24 at its three-round stop (lead decision under the owner's delegation, 31 October 2026): SR-1.24 keeps task 1; this contract takes SR-1.24's task 2 with round 3's answers about these writers, the token-mint route (a local request with the admin scope only) and the admin token's own rotation",
+      "depends_on": [
+        "SR-1.24",
+        "SR-1.28",
+        "SR-1.01",
+        "QL-1.02"
+      ],
+      "tasks": 1,
+      "criteria": 21,
+      "spec": "specs/SR-1.31-every-other-cli-state-writer-goes-through-the-daemon.json",
       "status": "proposed: lead's decision under the owner's delegation, 31 Oct; signs after a clean red-team round"
     },
     {
