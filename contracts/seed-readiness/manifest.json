@@ -374,8 +374,8 @@
       "depends_on": [
         "QL-1.02"
       ],
-      "tasks": 2,
-      "criteria": 42,
+      "tasks": 1,
+      "criteria": 22,
       "spec": "specs/SR-1.27-done-comes-only-from-a-passing-verify.json",
       "status": "proposed: owner's go pending, signs after a clean red-team round"
     },
@@ -410,6 +410,22 @@
       "criteria": 10,
       "spec": "specs/SR-1.29-a-hook-starts-without-loading-the-whole.json",
       "status": "proposed: owner's go pending, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.30",
+      "gap": "G95",
+      "area": "SR-1",
+      "title": "Done holds across computers and clones",
+      "repo": "memev",
+      "closes": "Closes G95: a contract's done state must mean the same on every computer and clone of a vault, and come only from a passing verify of the contract as signed. Split from SR-1.27 at its three-round stop (lead decision under the owner's delegation, 31 October 2026): SR-1.27 keeps task 1, which protects contracts/closed/ and contracts/receipts/ in every path form; this contract takes SR-1.27's task 2, the done state that comes from the verify record, with round 3's answers about pre-upgrade closes, close keys, swapped bodies, supersession and pulls. The stopgap #273 already refuses a key id that is not 16 hex, a signed body whose id is not the contract asked for, and a supersede that was not signed on this computer and passed",
+      "depends_on": [
+        "SR-1.27",
+        "QL-1.02"
+      ],
+      "tasks": 1,
+      "criteria": 32,
+      "spec": "specs/SR-1.30-done-holds-across-computers-and-clones.json",
+      "status": "proposed: lead's decision under the owner's delegation, 31 Oct; signs after a clean red-team round"
     },
     {
       "id": "SR-2.01",
