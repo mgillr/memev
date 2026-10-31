@@ -15,7 +15,7 @@ import { deviceKeygen } from '../src/engine/devices.mjs';
 import { fileChecks } from '../src/cli/doctor.mjs';
 import { setRelay, relayStateFile } from '../src/cli/relay.mjs';
 import { selectProvider } from '../src/services/providers.mjs';
-import { installLicense, registry } from '../src/cli/licensing.mjs';
+import { installLicense } from '../src/cli/licensing.mjs';
 import { initVault } from '../src/engine/vault.mjs';
 import { sha256 } from '../src/engine/util.mjs';
 
@@ -108,8 +108,15 @@ test('WO-11-A AC01: with the relay down, the vault keeps working through the git
   const relay = fileChecks({ root, env: { MEMEV_CONFIG_DIR: tmpdir('conf-') }, vault: v }).find((c) => c.id === 'relay');
   assert.ok(relay, 'the doctor has a relay check');
   assert.equal(relay.status, 'warn', 'the relay check is a warning while the relay is down');
-  assert.match(relay.detail, /down or not started/, 'the relay check names the down state');
+  assert.match(relay.detail, /on but unreachable/, 'the relay check names the down state');
   assert.match(relay.detail, /git backup/, 'the relay check names the git backup fallback');
+  assert.doesNotMatch(relay.detail, /vault is reached/, 'the git backup carries the notes; it is not the way in');
+  // a first connect under way is not a failure, and a relay the daemon is not holding is not running, not unreachable
+  const relayCheck = (e = {}) => fileChecks({ root, env: { MEMEV_CONFIG_DIR: tmpdir('conf-'), ...e }, vault: v }).find((c) => c.id === 'relay');
+  fs.writeFileSync(relayStateFile(root), JSON.stringify({ state: 'connecting', updated: new Date(NOW).toISOString() }));
+  assert.equal(relayCheck().status, 'ok', 'connecting is not a warning');
+  fs.writeFileSync(relayStateFile(root), JSON.stringify({ state: 'cannot reach the relay (retrying)', updated: new Date(NOW).toISOString() }));
+  assert.match(relayCheck({ MEMEV_NO_TUNNEL: '1' }).detail, /on but not running \(MEMEV_NO_TUNNEL is set\)/, 'a relay held off by MEMEV_NO_TUNNEL is not running');
   v.close();
 });
 
@@ -208,7 +215,7 @@ test('WO-11-A AC04: installing a licence over a lapsed one restores writing and 
 
 test('WO-11-A AC05: the doctor reports one check for each paid path, and each check id has its troubleshooting row', () => {
   const { v, root } = newVault();
-  const ids = ['relay', 'merge', 'license-expired', 'license-change'];
+  const ids = ['relay', 'merge', 'license-expired'];
   const checks = fileChecks({ root, env: { MEMEV_CONFIG_DIR: tmpdir('conf-') }, vault: v });
   for (const id of ids) {
     const found = checks.filter((c) => c.id === id);
@@ -238,25 +245,16 @@ test('WO-11-A AC05: after a same-note conflict the merge check warns and names t
   v.close();
 });
 
-test('WO-11-A AC05: the license-expired check warns on an expired licence, and license-change names the tier with an added computer writing', () => {
-  // the doctor as the CLI runs it with no vault open: the vault and its device registry on disk
+test('WO-11-A AC05: the license-expired check warns on a licence past its grace period and not on a valid one', () => {
+  // the doctor as the CLI runs it with no vault open: the vault on disk
   const root = path.join(tmpdir(), 'vault');
   initVault(root, { template: path.join(PKG, 'templates', 'vault') });
   const env = { MEMEV_CONFIG_DIR: tmpdir('conf-') };
-  const current = verified(paidLicence(day(30)));
-  const { reg, tokens } = registry(root);
-  reg.enroll(tokens, { kind: 'remote-computer', label: 'laptop', pubkey: deviceKeygen().publicKey, policy: seatPolicy({ license: current, devices: reg.list() }) });
   const check = (license, id) => fileChecks({ root, env, license }).find((c) => c.id === id);
-  // an expired licence past its grace: a warning; the added computer only reads, which is not a regression, and the tier is Personal
   const expired = check(verified(paidLicence(day(-30))), 'license-expired');
   assert.equal(expired.status, 'warn', `an expired licence is a warning: ${expired.detail}`);
   assert.match(expired.detail, /past its grace period/);
-  const lapsed = check(verified(paidLicence(day(-30))), 'license-change');
-  assert.equal(lapsed.status, 'ok', lapsed.detail);
-  assert.match(lapsed.detail, /^Personal tier/, 'the license-change check names the tier in force');
-  // a valid licence: no expiry warning, and the added computer within the seat count writes
-  assert.equal(check(current, 'license-expired').status, 'ok');
-  const valid = check(current, 'license-change');
-  assert.equal(valid.status, 'ok', valid.detail);
-  assert.match(valid.detail, /^Business tier/, 'the license-change check names the tier in force');
+  assert.equal(check(verified(paidLicence(day(30))), 'license-expired').status, 'ok');
+  // the constant licence-change line could not fail, so it is gone
+  assert.equal(check(verified(paidLicence(day(30))), 'license-change'), undefined);
 });

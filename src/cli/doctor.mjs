@@ -12,10 +12,9 @@ import { redactSecrets, findSecrets } from '../engine/secrets.mjs';
 import { VERSION, isVault } from '../engine/vault.mjs';
 import { PKG, daemonInfo, pidAlive, config, out, clientsFile, tokenExpiryWarnings } from './common.mjs';
 import { EXPIRY_WARNING_DAYS } from '../engine/tokens.mjs';
-import { licensingStatus, licencePhrase, pendingMergeCopies, registry } from './licensing.mjs';
-import { relaySetting, relayState } from './relay.mjs';
+import { licensingStatus, licencePhrase, pendingMergeCopies } from './licensing.mjs';
+import { relaySetting, relayState as readRelayState } from './relay.mjs';
 import { loadLicense } from '../engine/license.mjs';
-import { seatPolicy } from '../engine/entitlements.mjs';
 import { alt443, githubReachable } from './github.mjs';
 import { label } from '../engine/bus.mjs';
 import { fetchOut } from '../engine/net.mjs';
@@ -180,13 +179,18 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   // run, and one file that cannot be read is reported on its own check instead of ending the run.
   try {
     const relay = relaySetting(root);
-    const rstate = relayState(root);
-    const rUp = rstate && rstate.state === 'up';
+    // as the backup line says it: the relay is the vault's address and the git backup carries the notes; a first connect
+    // under way is not a failure, and a relay the daemon is not holding (stopped, or MEMEV_NO_TUNNEL) is not running
+    const rs = readRelayState(root); const st = rs?.state;
+    const backup = 'your other computers still get its notes through the git backup';
+    const held = env.MEMEV_NO_TUNNEL || !st || st === 'off';
     r.push(C('relay', 'relay reachable (falls back to the git backup)',
-      !relay.enabled ? 'ok' : rUp ? 'ok' : 'warn',
-      !relay.enabled ? 'off; the vault is reached through the git backup'
-        : rUp ? `up at ${rstate.address || relay.url}`
-        : `down or not started (${rstate?.state || 'not started'}); the vault is reached through the git backup`));
+      !relay.enabled || st === 'up' || st === 'connecting' ? 'ok' : 'warn',
+      !relay.enabled ? `off; ${backup}`
+        : st === 'up' ? `up at ${rs.address || relay.url}`
+        : st === 'connecting' ? 'connecting to the relay'
+        : held ? `on but not running${env.MEMEV_NO_TUNNEL ? ' (MEMEV_NO_TUNNEL is set)' : ''}, so the relay address does not reach the vault; ${backup}`
+        : `on but unreachable (${st}), so the relay address does not reach the vault; ${backup}`));
   } catch (e) { r.push(C('relay', 'relay reachable (falls back to the git backup)', 'ok', `not checked: ${e.message}`)); }
   try {
     const pending = pendingMergeCopies(root);
@@ -203,18 +207,6 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
     licState === 'expired'
       ? 'the licence is past its grace period: this computer keeps full read and write access, added computers can read but not write, and nothing is deleted'
       : `licence ${licState}; this computer is never limited`));
-  // with a valid licence every active added computer within the seat count writes; one that still only reads means
-  // installing the licence did not restore writing
-  try {
-    const devices = vault?.devices ? vault.devices.list() : registry(root).reg.list();
-    const policy = seatPolicy({ license: lic, devices });
-    const added = devices.filter((d) => d.kind === 'remote-computer' && d.status === 'active').sort((a, b) => String(a.created).localeCompare(String(b.created)));
-    const within = licState === 'valid' ? added.slice(0, Math.max(0, (lic.seats || 1) - 1)) : [];
-    const stuck = within.filter((d) => policy.read_only.includes(d.id));
-    r.push(C('license-change', 'changing the licence needs no re-enrolment', stuck.length ? 'warn' : 'ok', stuck.length
-      ? `the licence is valid for ${lic.seats} computer(s), but ${stuck.map((d) => d.label).join(', ')} within that count can still only read; memev license status shows the seats`
-      : `${policy.tier_label} tier; installing a licence restores writing and removing it returns to Personal; the vault, its computers and its notes are unchanged by either`));
-  } catch (e) { r.push(C('license-change', 'changing the licence needs no re-enrolment', 'ok', `not checked: ${e.message}`)); }
   try { const s = fs.statfsSync(root); const freePct = (s.bavail / s.blocks) * 100; const inodePct = s.files ? (s.ffree / s.files) * 100 : 100; r.push(C('disk', 'disk space', freePct < 3 || inodePct < 3 ? 'warn' : 'ok', `${freePct.toFixed(0)}% space, ${inodePct.toFixed(0)}% inodes free`)); } catch {}
   const upd = updateLine(root, env);
   if (upd) r.push(C('update', 'update available', 'warn', upd));
