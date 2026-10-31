@@ -86,8 +86,8 @@ node scripts/gate/redteam-gate.mjs [spec.json ...]   # one line per spec; exit 0
 node scripts/gate/redteam-gate.mjs --report          # also checks contracts/signed/; fails only on a broken record
 ```
 
-With no spec named, the gate reads every spec under `contracts/seed-readiness/specs/` and
-`contracts/quality-loop/specs/`. Each line says `SIGNABLE`, `SIGNABLE AT STOP (<n> open items)`,
+With no spec named, the gate reads every spec under `contracts/seed-readiness/specs/`,
+`contracts/quality-loop/specs/`, `contracts/scope-one/specs/` and `contracts/programme/specs/`. Each line says `SIGNABLE`, `SIGNABLE AT STOP (<n> open items)`,
 `NOT SIGNABLE: <reasons>` or `NO RECORD`. The same check is `evaluate()` in
 `src/engine/redteam-gate.mjs`.
 
