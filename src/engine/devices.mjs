@@ -108,6 +108,18 @@ export class DeviceRegistry {
     return { device: d, token: t.token };
   }
 
+  /**
+   * A record that a User-Agent switched to cloud-connector before issue 266 was fixed goes back to remote-computer, so
+   * upgrading closes the hole for a credential that was already switched. The caller decides that the token was not
+   * made for a cloud app.
+   */
+  restoreSwitched(id) {
+    const d = this.get(id); if (!d) return d;
+    d.kind = 'remote-computer';
+    this._flag(d, 'kind-restored', 'this computer credential had been counted as a cloud connector because of a User-Agent; it is a computer again and needs its device key. For a cloud AI app, make a connector link with memev cloud url');
+    this.save(); return d;
+  }
+
   rename(id, label) { const d = this.get(id); if (!d) throw new Error(`no device ${id}`); d.label = String(label).slice(0, 60); this.save(); return d; }
 
   /**

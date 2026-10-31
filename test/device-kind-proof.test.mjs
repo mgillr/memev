@@ -29,6 +29,7 @@ test('issue 266: a keyless computer token that names a cloud app stays refused o
   const legacy = v.tokens.issue({ agent: 'old-laptop', remote: true, note: 'old computer' }).token;
   v.devices.migrate(v.tokens); // a token from before the registry: inferred as a computer
   let s = await serve(v);
+  try {
   for (const tok of [fresh, legacy]) {
     for (let i = 0; i < 3; i++) {
       const r = await s.req(tok, 'GET', '/v1/status');
@@ -41,7 +42,7 @@ test('issue 266: a keyless computer token that names a cloud app stays refused o
     assert.ok(deviceOf(v, tok).flags.some((f) => f.type === 'cloud-app-on-computer-credential'), 'the device is not flagged');
   }
   assert.equal(fs.existsSync(path.join(root, 'memory', 'planted.md')), false, 'a refused write reached the disk');
-  await s.close(); v.close();
+  } finally { await s.close(); v.close(); }
   const v2 = new Vault(root, { commitDelayMs: 10, fsync: false, keyDir: path.join(root, '..', 'keys'), git: false }).open();
   s = await serve(v2);
   try {
@@ -60,4 +61,30 @@ test('issue 266: a cloud connector enrolled without a device key still passes', 
     assert.equal((await s.req(token, 'GET', '/v1/status')).status, 200);
     assert.equal(deviceOf(v, token).kind, 'cloud-connector');
   } finally { await s.close(); v.close(); }
+});
+
+test('issue 266: a record an earlier version switched to cloud-connector goes back to a computer, and stays refused', async () => {
+  const { v, root } = newVault({ git: false });
+  const legacy = v.tokens.issue({ agent: 'old-laptop', remote: true, note: 'old computer' }).token;
+  const connector = v.tokens.issue({ agent: 'chatgpt', remote: true, note: 'cloud connector' }).token; // made for a cloud app
+  v.devices.migrate(v.tokens);
+  // the record as main's code leaves it after one request with a cloud User-Agent
+  const id = v.devices.byToken.get(v.tokens.verify(legacy).id);
+  v.devices.data.devices[id].kind = 'cloud-connector'; v.devices.save();
+  assert.equal(deviceOf(v, connector).kind, 'cloud-connector');
+  let s = await serve(v);
+  try {
+    for (let i = 0; i < 2; i++) assert.equal((await s.req(legacy, 'GET', '/v1/status')).status, 401, `request ${i + 1} on the switched record was let through`);
+    assert.equal((await s.req(legacy, 'PUT', '/v1/notes/memory/after-upgrade.md', { body: 'x\n' })).status, 401);
+    assert.equal(deviceOf(v, legacy).kind, 'remote-computer');
+    assert.ok(deviceOf(v, legacy).flags.some((f) => f.type === 'kind-restored'), 'the restored record is not flagged');
+    assert.equal((await s.req(connector, 'GET', '/v1/status')).status, 200, 'a connector made for a cloud app was refused');
+  } finally { await s.close(); v.close(); }
+  assert.equal(fs.existsSync(path.join(root, 'memory', 'after-upgrade.md')), false, 'a refused write reached the disk');
+  const v2 = new Vault(root, { commitDelayMs: 10, fsync: false, keyDir: path.join(root, '..', 'keys'), git: false }).open();
+  s = await serve(v2);
+  try {
+    assert.equal((await s.req(legacy, 'GET', '/v1/status')).status, 401, 'after a restart the switched record was let through');
+    assert.equal(deviceOf(v2, legacy).kind, 'remote-computer');
+  } finally { await s.close(); v2.close(); }
 });
