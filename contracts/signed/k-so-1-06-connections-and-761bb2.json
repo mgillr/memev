@@ -1,0 +1,232 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "Allow users to connect supported providers and tools (the supported providers and tools listed in docs/CLIENTS.md) and remote computers where their tier and configuration permit them. This is configuration of available resources, not a request for users to decide which resource gets which task.",
+        "Provide straightforward connect, reconnect, test, inspect permissions and disconnect/revoke actions. Keep secrets and tokens out of the UI, logs and project artefacts; use appropriate secure operating-system facilities and make permission changes auditable.",
+        "The settings area may confirm that an integration is configured and that its permission grant is valid. It should not expose internal task eligibility, routing scores, agent assignments, leases or provider-specific execution states as things the customer must manage.",
+        "Internally, Memev must continuously determine whether a resource is authenticated, reachable, authorised for the relevant operation, capable of performing it and currently usable. These checks feed the state machine and scheduler. They are internal operational facts, not user-facing workflow states.",
+        "If a configured resource becomes unavailable, Memev should update its internal resource registry, prevent invalid dispatch, safely retry or route work to another eligible resource where policy permits, and preserve project continuity.",
+        "Surface a user-facing blocker only if the issue cannot be resolved within the granted permissions and configured policy, for example, the user must reconnect an account, grant access to a new folder, approve a consequential action or make a genuine project decision. Explain the required user action in plain language without asking them to debug agents.",
+        "Never claim that an integration or permission is available unless Memev has verified it. Unknown state must remain unknown internally and must not be represented as ready."
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "docs/scope-one/design/connections-and-resource-readiness.md",
+          "docs/README.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "The decision record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/design/connections-and-resource-readiness.md"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "The record decides requirement 1: Allow users to connect supported providers and tools (the supported providers and tools listed in docs/CLIENTS.md) and remote computers where their tier and...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/connections-and-resource-readiness.md",
+            "pattern": "^## Requirement 1:"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "The record decides requirement 2: Provide straightforward connect, reconnect, test, inspect permissions and disconnect/revoke actions. Keep secrets and tokens out of the UI, logs and project...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/connections-and-resource-readiness.md",
+            "pattern": "^## Requirement 2:"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "The record decides requirement 3: The settings area may confirm that an integration is configured and that its permission grant is valid. It should not expose internal task eligibility,...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/connections-and-resource-readiness.md",
+            "pattern": "^## Requirement 3:"
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "The record decides requirement 4: Internally, Memev must continuously determine whether a resource is authenticated, reachable, authorised for the relevant operation, capable of performing...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/connections-and-resource-readiness.md",
+            "pattern": "^## Requirement 4:"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "The record decides requirement 5: If a configured resource becomes unavailable, Memev should update its internal resource registry, prevent invalid dispatch, safely retry or route work to...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/connections-and-resource-readiness.md",
+            "pattern": "^## Requirement 5:"
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "The record decides requirement 6: Surface a user-facing blocker only if the issue cannot be resolved within the granted permissions and configured policy, for example, the user must...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/connections-and-resource-readiness.md",
+            "pattern": "^## Requirement 6:"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "The record decides requirement 7: Never claim that an integration or permission is available unless Memev has verified it. Unknown state must remain unknown internally and must not be...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/connections-and-resource-readiness.md",
+            "pattern": "^## Requirement 7:"
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "The record names the connections screen",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/connections-and-resource-readiness.md",
+            "pattern": "^Connections screen:"
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "The record names the readiness registry",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/connections-and-resource-readiness.md",
+            "pattern": "^Readiness registry:"
+          }
+        },
+        {
+          "id": "T1-AC11",
+          "mandatory": true,
+          "statement": "The decision record passes the leak scan",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC12",
+          "mandatory": true,
+          "statement": "The documentation links and up-links stay valid",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-links.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC13",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-so-1-06-connections-and-761bb2",
+  "title": "SO-1.06 Connections and access: the provider and tool connections screen and the internal resource readiness registry",
+  "workdir": null,
+  "created": "2026-10-31T22:00:27.027Z",
+  "version": 1,
+  "request": "Closes G-SO-06 (addendum 6, review row 6; owner decision 31 Oct 2026: providers are neutral). Source: the Scope One addendum (PR #222, docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md at head a1757a0) and its review table (issuecomment-6534383323); owner request of 31 Oct 2026 that every aspect be decomposed in the WBS and built into contracts (t531u). The addendum names recommendations that become contracts on acceptance; this contract is the design-record stage, so it asks for the decision record and builds nothing. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository. Depends on contracts: SO-O-A, SO-O-B, SO-O-C, SO-05-B.",
+  "provenance": {
+    "spec_sha256": "0a9aaf8d6d4f3683568fa79475fc33d42a67f6b09370059d9979fc67f7b22701",
+    "record": "contracts/scope-one/redteam/SO-1.06.json",
+    "review": "interim solo review by the author, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}

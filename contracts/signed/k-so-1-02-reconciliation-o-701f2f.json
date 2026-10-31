@@ -1,0 +1,200 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "Reconcile every Scope One branch and open PR against current `main` before commissioning overlapping work.",
+        "Give each canonical requirement one owner, one implementation path, explicit dependencies and acceptance tests.",
+        "Mark work as implemented, merged, integrated and verified separately; do not use these terms interchangeably.",
+        "Close or supersede duplicate/twin contracts explicitly, preserving links and rationale.",
+        "Reconcile the takeover register whenever the baseline changes. Treat counts in old snapshots as historical, not live status."
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "docs/scope-one/design/reconciliation-wbs.md",
+          "docs/README.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "The decision record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/design/reconciliation-wbs.md"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "The record decides requirement 1: Reconcile every Scope One branch and open PR against current `main` before commissioning overlapping work.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reconciliation-wbs.md",
+            "pattern": "^## Requirement 1:"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "The record decides requirement 2: Give each canonical requirement one owner, one implementation path, explicit dependencies and acceptance tests.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reconciliation-wbs.md",
+            "pattern": "^## Requirement 2:"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "The record decides requirement 3: Mark work as implemented, merged, integrated and verified separately; do not use these terms interchangeably.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reconciliation-wbs.md",
+            "pattern": "^## Requirement 3:"
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "The record decides requirement 4: Close or supersede duplicate/twin contracts explicitly, preserving links and rationale.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reconciliation-wbs.md",
+            "pattern": "^## Requirement 4:"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "The record decides requirement 5: Reconcile the takeover register whenever the baseline changes. Treat counts in old snapshots as historical, not live status.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reconciliation-wbs.md",
+            "pattern": "^## Requirement 5:"
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "The record names the reconciliation cadence",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reconciliation-wbs.md",
+            "pattern": "^Reconciliation cadence:"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "The decision record passes the leak scan",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "The documentation links and up-links stay valid",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-links.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-so-1-02-reconciliation-o-701f2f",
+  "title": "SO-1.02 Reconciliation: one work breakdown that accounts for every requirement, contract, pull request and branch",
+  "workdir": null,
+  "created": "2026-10-31T22:00:26.908Z",
+  "version": 1,
+  "request": "Closes G-SO-02 (addendum 1, review row 1: reconciliation cadence not pinned). Source: the Scope One addendum (PR #222, docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md at head a1757a0) and its review table (issuecomment-6534383323); owner request of 31 Oct 2026 that every aspect be decomposed in the WBS and built into contracts (t531u). The addendum names recommendations that become contracts on acceptance; this contract is the design-record stage, so it asks for the decision record and builds nothing. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository. Depends on contracts: SO-T-A.",
+  "provenance": {
+    "spec_sha256": "67f27ee2fd75141ceb82149468f7c0d7c8ba2f53a7e7b504e3337f61aaeee650",
+    "record": "contracts/scope-one/redteam/SO-1.02.json",
+    "review": "interim solo review by the author, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}

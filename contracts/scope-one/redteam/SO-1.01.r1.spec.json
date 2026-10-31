@@ -1,0 +1,125 @@
+{
+  "title": "SO-1.01 Canonical execution integration: the store, the state machine and the coordinator as one authority",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G-SO-01 (addendum 2, review row 2; master baseline 3 and 8.2 name the integration as outstanding). Source: the Scope One addendum (PR #222, docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md at head a1757a0) and its review table (issuecomment-6534383323); owner request of 31 Oct 2026 that every aspect be decomposed in the WBS and built into contracts (t531u). The addendum names recommendations that become contracts on acceptance; this contract is the design-record stage, so it asks for the decision record and builds nothing. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository. Depends on contracts: SO-04-A, SO-07-A, SO-08-A, SO-08-B, SR-1.27.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "Make the project store the durable authority for project entities and append-only events.",
+        "Make the state machine and coordinator responsible for task lifecycle, claims, leases, generations, dependency-aware dispatch, resource selection, ownership, retries, recovery and execution scheduling.",
+        "Route state changes through the existing transition rules; adapters and UI code must not mutate authoritative state directly.",
+        "Define transaction and crash boundaries, idempotency keys, replay/recovery behaviour and schema migration rules.",
+        "Treat stale generations, expired leases, duplicate delivery and concurrent claims as normal adversarial test cases."
+      ],
+      "description": "",
+      "scope": [
+        "docs/scope-one/design/canonical-execution-integration.md",
+        "docs/README.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The decision record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/design/canonical-execution-integration.md"
+          }
+        },
+        {
+          "statement": "The record decides requirement 1: Make the project store the durable authority for project entities and append-only events.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/canonical-execution-integration.md",
+            "pattern": "^## Requirement 1:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 2: Make the state machine and coordinator responsible for task lifecycle, claims, leases, generations, dependency-aware dispatch, resource selection,...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/canonical-execution-integration.md",
+            "pattern": "^## Requirement 2:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 3: Route state changes through the existing transition rules; adapters and UI code must not mutate authoritative state directly.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/canonical-execution-integration.md",
+            "pattern": "^## Requirement 3:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 4: Define transaction and crash boundaries, idempotency keys, replay/recovery behaviour and schema migration rules.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/canonical-execution-integration.md",
+            "pattern": "^## Requirement 4:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 5: Treat stale generations, expired leases, duplicate delivery and concurrent claims as normal adversarial test cases.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/canonical-execution-integration.md",
+            "pattern": "^## Requirement 5:"
+          }
+        },
+        {
+          "statement": "The record names the store schema",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/canonical-execution-integration.md",
+            "pattern": "^Store schema:"
+          }
+        },
+        {
+          "statement": "The record names the coordinator",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/canonical-execution-integration.md",
+            "pattern": "^Coordinator:"
+          }
+        },
+        {
+          "statement": "The record names the state-machine routes",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/canonical-execution-integration.md",
+            "pattern": "^State-machine routes:"
+          }
+        },
+        {
+          "statement": "The decision record passes the leak scan",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The documentation links and up-links stay valid",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-links.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
