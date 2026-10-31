@@ -2,7 +2,7 @@
 
 Part of the [Memev documentation](README.md). Written by `node scripts/docs/module-graph.mjs` from the real imports in `bin/` and `src/`; do not edit it by hand. `node scripts/docs/module-graph.mjs --check` (and `test/docs-module-map.test.mjs`) fail when it is out of date. How the parts fit at a higher level: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-71 modules and 275 import edges (72 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
+72 modules and 276 import edges (72 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
 
 ## Layers
 
@@ -22,7 +22,7 @@ flowchart LR
   cli -->|"1"| services
   cli -->|"2"| vendor
   engine -->|"2"| cli
-  engine -->|"2"| vendor
+  engine -->|"3"| vendor
   server -->|"5"| cli
   server -->|"11"| engine
   services -->|"1"| cli
@@ -96,6 +96,7 @@ flowchart LR
     src_engine_project_state["project-state.mjs"]
     src_engine_project_store["project-store.mjs"]
     src_engine_quality["quality.mjs"]
+    src_engine_redteam_gate["redteam-gate.mjs"]
     src_engine_secrets["secrets.mjs"]
     src_engine_setup_channel["setup-channel.mjs"]
     src_engine_tokens["tokens.mjs"]
@@ -356,6 +357,7 @@ flowchart LR
   src_engine_project_store --> src_engine_secrets
   src_engine_project_store --> src_engine_util
   src_engine_quality --> src_engine_index
+  src_engine_redteam_gate --> vendor_attest
   src_engine_tokens --> src_engine_util
   src_engine_tuning --> src_engine_util
   src_engine_vault --> src_engine_bus
@@ -460,6 +462,7 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 | `src/engine/project-state.mjs` | The project and task state machine: the eleven task states, the seven derived project statuses, one transition table, and the invariants of the... | none | none |
 | `src/engine/project-store.mjs` | The project store: one canonical project state per project, under the vault's .memev directory | `engine/oplog.mjs`, `engine/secrets.mjs`, `engine/util.mjs` | `engine/vault.mjs` |
 | `src/engine/quality.mjs` | The write gate for memories | `engine/index.mjs` | `engine/vault.mjs` |
+| `src/engine/redteam-gate.mjs` | gate-version: 1 The red-team gate: whether a contract spec may be signed, judged from its red-team record | `vendor/attest` | none |
 | `src/engine/secrets.mjs` | The secrets guard: text that looks like a credential is refused unless the caller says allow_secrets | none | `cli/doctor.mjs`, `engine/bus.mjs`, `engine/importers/ai-history.mjs`, `engine/importers/exports.mjs`, `engine/importers/project.mjs`, `engine/project-store.mjs`, `engine/vault.mjs` |
 | `src/engine/setup-channel.mjs` | Outbound setup channel: mutual-auth handshake over node:crypto primitives, then an AES-256-GCM encrypted frame channel | none | `cli/setup-remote.mjs` |
 | `src/engine/tokens.mjs` | Capability tokens: mv_<id>_<secret> | `engine/util.mjs` | `cli/common.mjs`, `cli/doctor.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/tunnel.mjs`, `engine/bus.mjs`, `engine/card.mjs`, `engine/vault.mjs` |

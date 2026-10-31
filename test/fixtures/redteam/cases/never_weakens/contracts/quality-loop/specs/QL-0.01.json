@@ -1,0 +1,137 @@
+{
+  "title": "QL-0.01 Fixture contract for the red-team gate tests",
+  "project": "memev",
+  "workdir": "/tmp/elsewhere",
+  "request": "A fixture spec: a module a and its test, and a module b that depends on it.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "The module a",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "src/a.mjs exports a",
+        "the test of a fails before a exists and passes after"
+      ],
+      "description": "",
+      "scope": [
+        "src/a.mjs",
+        "test/a.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "T1-c01: the test of a fails on the base and passes now",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/a.test.mjs",
+            "cmd": "node --test --test-name-pattern='^T1-c01:' test/a.test.mjs"
+          }
+        },
+        {
+          "statement": "src/a.mjs exports a",
+          "verifier": {
+            "type": "grep",
+            "file": "src/a.mjs",
+            "pattern": "export const a"
+          }
+        },
+        {
+          "statement": "the tests of a pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/a.test.mjs",
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "T1-c04: a refuses a missing input",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/a.test.mjs",
+            "cmd": "node --test --test-name-pattern='^T1-c04:' test/a.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP and report the failing check and file:line."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "The module b",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "src/b.mjs re-exports a"
+      ],
+      "description": "",
+      "scope": [
+        "src/b.mjs",
+        "test/b.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "T2-c01: the test of b fails on the base and passes now",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/b.test.mjs",
+            "cmd": "node --test test/b.test.mjs"
+          }
+        },
+        {
+          "statement": "b keeps its speed",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node bench/b.mjs",
+            "key": "ratio",
+            "op": ">=",
+            "value": 0.9
+          }
+        },
+        {
+          "statement": "b answers fast",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node bench/b.mjs",
+            "key": "p50_ms",
+            "op": "<",
+            "value": 50
+          }
+        },
+        {
+          "statement": "the lint passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/lint.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "b is wired to a",
+          "verifier": {
+            "type": "wiring",
+            "entry": "src/b.mjs",
+            "symbol": "a"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP and report the failing check and file:line."
+      ]
+    }
+  ]
+}
