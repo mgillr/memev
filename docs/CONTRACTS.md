@@ -133,7 +133,7 @@ dispositions and amendments. The gate holds the reviewer public keys it accepts,
 under `contracts/keys/` (those sign contracts), and refuses an unsigned round, a round signed by any
 other key, and any edit to an earlier round, snapshot or disposition after a later round was signed.
 
-Honest limit: while the builder and the reviewer run as one user on one machine, the reviewer key is
+A limit of this setup: while the builder and the reviewer run as one user on one machine, the reviewer key is
 readable by both. The signature then makes tampering visible in history, but it is not separation.
 Separation comes from a reviewer key the owner holds off the build machine, or from the second human
 of SR-9.05.
