@@ -16,13 +16,26 @@
         "the cap bounds every key family the limiter holds (ip: and t: keys alike, and any map it splits into), checked after every take(), not only after a sweep",
         "at the cap, eviction removes a bucket holding at least one token (least recently used first) before any exhausted bucket (fewer than one token); eviction is amortized O(1), never a scan of the map per insert, and a new key is always admitted",
         "a bucket is idle when no take() touched it for 120,000 ms (time since its last take, b.at), and only idle buckets are dropped by the idle rule; any sweep timer is unref'd and cleared when the server closes",
-        "the remote rate-limit key reads cf-connecting-ip only when the Cloudflare tunnel is configured (remote.cloudflare, the edge sets that header), reads x-forwarded-for only when remote.trusted_proxy names it, and otherwise keys on the socket address; tests that simulate distinct remote callers by cf-connecting-ip configure remote.cloudflare (memev twin finding F-2: with headers rotated, 0 of 200 requests were limited against 140 with a fixed header)"
+        "the remote rate-limit key follows the tunnel that actually carries the request, which the daemon passes into createServer (an activeTunnel() option set from the running provider, beside tunnelKey): through Cloudflare, quick or named, it is cf-connecting-ip, which Cloudflare's edge sets and overwrites; through a provider or relay whose client header is not verified, and with no tunnel, it is the socket address; remote.trusted_proxy names a header for a self-hosted proxy and the last X-Forwarded-For element is used; IPv6 addresses are keyed by their /64. Tests that simulate distinct remote callers by header pass activeTunnel to createServer and change no assertion (memev twin finding F-2, red-team round 2 answers 1 and 10)",
+        "the token bucket (t:) is taken only after the token verifies, so a known token id cannot lock its owner out; before verification only the address bucket applies",
+        "when the address is the shared socket of a tunnel whose client header is not trusted, an authenticated caller is limited by its token bucket alone, so an anonymous flood through that tunnel cannot lock out token holders; anonymous callers share the pre-auth bucket, which keeps the invite and OAuth routes throttled",
+        "every structure the limiter keeps for ordering or eviction is bounded by the same cap as the map, and at the cap with every bucket exhausted a new key is still admitted by evicting the least recently used bucket",
+        "the test never asserts the value of MAX_BUCKETS and takes its loop bounds from literals, so the mutation check fails only when the cap stops being enforced",
+        "docs/CLOUD.md states the limit, which address each tunnel is limited by, remote.trusted_proxy and the per-token rule"
       ],
       "description": "",
       "scope": [
         "src/server/http.mjs",
         "test/rate-limit.test.mjs",
-        "docs/MODULES.md"
+        "docs/MODULES.md",
+        "src/server/main.mjs",
+        "src/cli/tunnel.mjs",
+        "docs/CLOUD.md",
+        "test/oauth.test.mjs",
+        "test/http.test.mjs",
+        "test/remote-proof-order.test.mjs",
+        "test/connectors-unlimited.test.mjs",
+        "changelog.d/SR-1.05.md"
       ],
       "criteria": [
         {
@@ -138,11 +151,123 @@
           }
         },
         {
+          "statement": "Proxy-header trust follows the tunnel that carries the request, not leftover config (requires first amending R7 and the scope: test/oauth.test.mjs or test/helpers/tmp.mjs, docs/CLOUD.md, and src/cli/tunnel.mjs or src/server/main.mjs if the active provider is passed in). Date is frozen, rate_per_min = 5, remote.enabled is on and every request comes from the loopback socket. (a) 'quick tunnel callers are distinct': remote.provider = 'quick' and no remote.cloudflare. cf-connecting-ip 203.0.113.1 gets 401 five times, then 429. cf-connecting-ip 203.0.113.2 then gets 401. (b) 'funnel cannot spoof cf-connecting-ip': remote.provider = 'tailscale', remote.funnelConsent = true and a leftover remote.cloudflare = {name:'n', hostname:'h'}. One socket rotating cf-connecting-ip gets 429 on its sixth request.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "node --test --test-name-pattern='quick tunnel callers are distinct|funnel cannot spoof cf-connecting-ip' test/rate-limit.test.mjs"
+          }
+        },
+        {
+          "statement": "'own budget holds at the cap': Date frozen, rate_per_min = 5, remote.cloudflare configured. Fill server.rateLimiter to MAX_BUCKETS entries with take('ip:fill' + i). Then send 6 remote GET /healthz/x from one cf-connecting-ip, each with a different 'Authorization: Bearer mv_<8 hex>_<32 hex>': responses 1-5 are 401 and the 6th is 429. Then, on server.rateLimiter directly, alternate take('ip:N') with take('t:fresh' + i) six times: the first five take('ip:N') return true, the sixth returns false, and the entry count stays <= MAX_BUCKETS throughout.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "node --test --test-name-pattern='own budget holds at the cap' test/rate-limit.test.mjs"
+          }
+        },
+        {
+          "statement": "'request path fills the exposed limiter': Date frozen, remote.cloudflare configured. Send 3,000 remote GET /healthz/x, each with a different cf-connecting-ip and a different bearer token: 6,000 keys, below the cap, so nothing is evicted. server.rateLimiter's total entry count is then exactly 6,000, which shows it is the instance used at :131 and that it holds both the ip: and the t: family. After 3,000 more such requests the count is <= MAX_BUCKETS.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "node --test --test-name-pattern='request path fills the exposed limiter' test/rate-limit.test.mjs"
+          }
+        },
+        {
+          "statement": "Fill the createServer-built limiter to the cap. Then 2,000,000 take() calls on one hot key (mostly refused) plus 300,000 fresh t: keys may grow the V8 heap by at most 4 MB, measured after two full GCs. A correct limiter stays at its cap: about 1-2 MB in all, with a few hundred KB of Map backing-store slack. An order queue, an uncounted index or a second map retains tens of MB.",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node --expose-gc --input-type=module -e \"import { newVault, cleanup } from './test/helpers/tmp.mjs'; import { createServer, MAX_BUCKETS } from './src/server/http.mjs'; const { v } = newVault(); const L = createServer(v).rateLimiter; const heap = () => { globalThis.gc(); globalThis.gc(); return process.memoryUsage().heapUsed; }; for (let i = 0; i < 2 * MAX_BUCKETS; i++) L.take('ip:w' + i); const h0 = heap(); for (let i = 0; i < 2000000; i++) L.take('ip:hot'); for (let i = 0; i < 300000; i++) L.take('t:' + i); const h1 = heap(); console.log(JSON.stringify({ growth_mb: (h1 - h0) / 1048576 })); v.close(); cleanup();\"",
+            "key": "growth_mb",
+            "op": "<=",
+            "value": 4
+          }
+        },
+        {
+          "statement": "'cap holds when every bucket is exhausted': Date frozen, rate_per_min = 2, using the createServer-built limiter. For MAX_BUCKETS + 500 distinct keys, take() each key three times; the third take is refused, so every stored bucket ends exhausted. Every key's first take() returns true, and the total entry count is <= MAX_BUCKETS after every call. Then the first take() of two never-seen keys each returns true, and the count is still <= MAX_BUCKETS.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "node --test --test-name-pattern='cap holds when every bucket is exhausted' test/rate-limit.test.mjs"
+          }
+        },
+        {
+          "statement": "With rate_per_min = 2 and the createServer-built limiter, first fill the map with MAX_BUCKETS exhausted buckets (three takes each). Then the average cost per take() of 20,000 rounds of (one fresh key, plus one repeat take of a stored exhausted key) is at most 5 times the cost of a fresh insert below the cap.",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node --input-type=module -e \"import { newVault, cleanup } from './test/helpers/tmp.mjs'; import { createServer, MAX_BUCKETS } from './src/server/http.mjs'; const { v } = newVault(); v.config.remote = { ...v.config.remote, rate_per_min: 2 }; const L = createServer(v).rateLimiter; const run = (n, f) => { const s = process.hrtime.bigint(); for (let i = 0; i < n; i++) f(i); return Number(process.hrtime.bigint() - s) / n; }; run(2000, (i) => L.take('ip:w' + i)); const below = run(MAX_BUCKETS / 4, (i) => L.take('ip:a' + i)); for (let i = 0; i < MAX_BUCKETS; i++) { L.take('ip:x' + i); L.take('ip:x' + i); L.take('ip:x' + i); } const at = run(20000, (i) => { L.take('ip:c' + i); L.take('ip:x' + ((i * 7919) % MAX_BUCKETS)); }) / 2; console.log(JSON.stringify({ ratio: at / below })); v.close(); cleanup();\"",
+            "key": "ratio",
+            "op": "<=",
+            "value": 5
+          }
+        },
+        {
+          "statement": "Each behavioural test is red at base for its own reason. Take a clean copy of the committed tree and restore src/server/http.mjs from be457dbd829c89e48fbd3f19b72d43864cd97fd8. test/rate-limit.test.mjs then loads (no missing-export link error), and its TAP output has a 'not ok' line for each of the tests 'rotating proxy headers are one caller', 'map bounded after every take', 'idle bucket dropped after two minutes' and 'http flood keeps every map bounded'. The rotating-headers test sends no Authorization header and opens a new connection for each of its six requests (agent: false or Connection: close).",
+          "verifier": {
+            "type": "command",
+            "cmd": "d=$(mktemp -d) && git archive HEAD | tar -x -C \"$d\" && git show be457dbd829c89e48fbd3f19b72d43864cd97fd8:src/server/http.mjs > \"$d/src/server/http.mjs\" && cd \"$d\" && out=$(node --test --test-reporter=tap test/rate-limit.test.mjs 2>&1); for n in 'rotating proxy headers are one caller' 'map bounded after every take' 'idle bucket dropped after two minutes' 'http flood keeps every map bounded'; do printf '%s\\n' \"$out\" | grep -Eq \"^ *not ok [0-9]+ - $n\" || exit 1; done; ! printf '%s\\n' \"$out\" | grep -q 'does not provide an export named'",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "In both guards, remote.enabled is on and remote.cloudflare is configured; Date is frozen and rate_per_min = 5. Every one of the MAX_BUCKETS + 1 flood responses is exactly 401. In 'new caller served during flood' the never-seen address then gets exactly 401. In 'exhausted key stays limited', A's sixth request and its request after the flood are both 429.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='new caller served during flood|exhausted key stays limited' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([2-9]|[1-9][0-9]+)'",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Guard 'busy key not reset at two minutes': enable mock.timers for Date, setTimeout and setInterval before createServer, and advance with mock.timers.tick(1000), so any sweep interval fires during the 180 simulated seconds; at most 24 of the 180 take('ip:A') calls are allowed. New guard 'busy key survives the sweep', in the same setup: after the 180 seconds, ip:A is still among the limiter's entries.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='busy key not reset at two minutes|busy key survives the sweep' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([2-9]|[1-9][0-9]+)'",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "'trusted proxy keys on the hop it added': remote.trusted_proxy is configured with the exact value the contract defines; Date frozen, rate_per_min = 5, one loopback socket. Six requests whose X-Forwarded-For is '<random>, 198.51.100.9' (first element rotating, last fixed) get 401 five times, then 429. A request with X-Forwarded-For '198.51.100.10' then gets 401.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "node --test --test-name-pattern='trusted proxy keys on the hop it added' test/rate-limit.test.mjs"
+          }
+        },
+        {
+          "statement": "'a known token id cannot lock out its owner': Date frozen, rate_per_min = 5, remote.cloudflare configured, and a real cloud-connector token mv_<id>_<secret>. From cf-connecting-ip 198.51.100.1, send five GET /healthz/x with 'Bearer mv_<id>_<32 wrong hex>'. Then the real token, from cf-connecting-ip 198.51.100.2, posts tools/list to /c/<token>/mcp and gets 200. This is red at base, where t:<id> is exhausted at :131.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "node --test --test-name-pattern='a known token id cannot lock out its owner' test/rate-limit.test.mjs"
+          }
+        },
+        {
+          "statement": "'an IPv6 /64 is one caller': remote.cloudflare configured, Date frozen, rate_per_min = 5. Six requests with cf-connecting-ip '2001:db8:1:2::' + (i + 1) (same /64, rotating interface id) get 401 five times, then 429. Then '2001:db8:1:3::1' gets 401. Two IPv4 addresses in one /24 stay separate callers.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "node --test --test-name-pattern='an IPv6 /64 is one caller' test/rate-limit.test.mjs"
+          }
+        },
+        {
           "statement": "Without a trusted proxy configured, one connection rotating cf-connecting-ip and x-forwarded-for values is limited as one caller: at rate_per_min 5 the sixth request in a frozen minute gets 429 (memev twin finding F-2)",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/rate-limit.test.mjs",
             "cmd": "node --test test/rate-limit.test.mjs"
+          }
+        },
+        {
+          "statement": "Every test file that imports src/server/http.mjs passes, so no server behaviour outside the limiter changes",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-reporter=tap $(grep -l 'server/http.mjs' test/*.test.mjs)",
+            "expect_exit": 0,
+            "timeout_s": 900
           }
         },
         {
