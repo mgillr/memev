@@ -1,0 +1,832 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Exclusive vault lock",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "OpLog.open takes the lock before anything else: before it reads the manifest, truncates a torn tail, rewrites manifest.json or opens a segment for append. The lock is the file .memev/oplog/LOCK, created with an exclusive create (flag wx), written with pid, host, boot id (the boot time computed from os.uptime()), the holder's own start time, read for its pid from the same source that judges a lock (the /proc or /bin/ps read of requirement 14), a per-boot machine identifier and a random token, and fsynced; its bytes never change while it is held",
+        "a second opener gets a VaultLocked error naming the holder pid",
+        "a read-only open (new Vault(root, { readOnly: true }) and new OpLog(dir, { readOnly: true })) takes no lock and writes nothing: no recover() import, no torn-tail truncate, no manifest, snapshot, device, index or graph write, no bus seeding and no commit; it reads a torn tail as absent, and log.append() on it throws",
+        "the lock test opens the second writable Vault from a child process, the way memev claims does (src/cli/main.mjs:327), and asserts VaultLocked with the active segment, manifest.json, snapshot.json and device.json byte-identical; OpLog.open never writes snapshot.json, so an unchanged snapshot alone proves nothing",
+        "a lock is stale only when: on the same host, the same boot and the same per-boot machine identifier (linux /proc/sys/kernel/random/boot_id, darwin /usr/sbin/sysctl -n kern.bootsessionuuid, read without PATH; boot times from os.uptime() within 120 s), compared together with the pid namespace before any pid rule, its pid is not alive, or is alive with a start time more than 2 s from the recorded one (pid reuse), or equals the reader's own pid while the reader holds no token for it (an earlier run in a restarted container); on another host or boot, the lock file's mtime is more than 90 s old. An empty or unparsable lock is held while its mtime is younger than 60 s and stale after. When a pid's start time cannot be read (Windows, or the read fails), the holder counts as alive, and memev doctor names the lock's pid, host and age so the owner can remove it once that process is gone. Node core has no flock or fcntl and Memev takes no dependency, so no OS advisory lock is used",
+        "the holder renews the lock every 15 s from a worker_threads worker by setting its mtime to now (fs.utimesSync) after checking that the lock still carries its token; the lock's bytes never change, and a main thread blocked in a long synchronous verify keeps the lock; MEMEV_LOCK_RENEW_MS shortens the interval for tests; clocks may differ between hosts by up to 60 s; before every write to the oplog folder (append, snapshot, manifest write, roll, archive and close) the holder checks that the lock still carries its token and fails closed with VaultLocked if it does not; a holder that lost the lock never renews, rewrites or deletes a lock that is not its own",
+        "stale recovery takes a recovery mutex, .memev/oplog/LOCK.recover, with an exclusive create, re-reads LOCK inside it and goes on only if LOCK's bytes still equal the stale lock it judged; only then does it rename the stale lock away and create its own LOCK with wx, releasing the mutex last; a live lock is never moved, so LOCK always exists while its holder runs; a mutex older than 10 s whose writer is not alive is itself stale; two openers recovering the same stale lock never both hold the vault",
+        "any error other than EEXIST while creating the lock (EACCES, ENOSPC, EROFS) fails the open with that error; it is never read as a held or a stale lock",
+        "a second writable open in the process that holds the lock is refused with VaultLocked like any other; the lock is never re-entrant",
+        "VaultLocked is exported from src/engine/oplog.mjs, and a bare new OpLog(dir).open() takes the lock too",
+        "on Linux the lock also records the pid namespace (readlink /proc/self/ns/pid), and a lock from another pid namespace counts as another host",
+        "a process's record of the locks it holds is keyed by the real path of the oplog folder (fs.realpathSync), so a symlink, a trailing slash or a '..' spelling of the same vault is the same lock",
+        "MEMEV_LOCK_TEST_PAUSE=after-judge:<ms> pauses a recoverer after it judges a lock stale and before it touches LOCK or the mutex, and after-rename:<ms> right after it renames a stale lock away, for tests",
+        "a pid's start time is read from /proc/<pid>/stat on Linux and from /bin/ps -o lstart= -p <pid> run with TZ=UTC and LC_ALL=C on macOS, never through PATH",
+        "T1 also turns the runner's two writable opens (src/cli/runner.mjs, in the command and in watch) into daemon calls or read-only opens, so test/runner.test.mjs and the full suite pass on T1's own commit; T2 then adds its criteria on top",
+        "a holder that lost the lock writes nothing on close: no index, graph, device or devices file, and no commit",
+        "the T1 tests also run in a linux container, so the linux-only branches (the /proc start time, the pid namespace, the boot id) run on a gate that is not linux",
+        "each red-green criterion of this task that runs test/oplog-lock.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "src/engine/oplog.mjs",
+          "src/engine/vault.mjs",
+          "src/engine/util.mjs",
+          "test/oplog-lock.test.mjs",
+          "src/engine/index.mjs",
+          "src/engine/devices.mjs",
+          "test/helpers/oplog-lock*.mjs",
+          "test/fixtures/oplog-lock/**",
+          "docs/MODULES.md",
+          "changelog.d/SR-1.01.md",
+          "src/cli/runner.mjs",
+          "test/runner.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "Two writers on one vault: the second is refused and the log verifies",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "The lock error exists in the oplog",
+          "verifier": {
+            "type": "grep",
+            "file": "src/engine/oplog.mjs",
+            "pattern": "VaultLocked"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "A child node process opens the vault writable, prints its pid and waits. The parent's writable open throws an error whose name or code is VaultLocked and whose message contains the child's pid, which differs from process.pid. Every file under .memev/oplog is byte-identical afterwards. After kill -9 of the child, the next writable open succeeds, appends, and log.verify().ok holds with consecutive seq.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "Setup: a child process holds the vault writable; one note has been edited on disk and one deleted on disk; a partial line (no newline) has been appended to the active segment. Then `new Vault(root, { readOnly: true }).open()`, materialize(), iterate() and close() must leave the sha256 and size of every file under .memev/oplog unchanged, along with .memev/index.jsonl, graph.json, device.json and devices.json. The note files must be untouched, and log.append() on the read-only log must throw.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "Eight child processes are released together (via a shared start file) against a vault whose lock file is (i) absent, (ii) present but empty with a fresh mtime, or (iii) naming a dead pid on this host and boot. Each child that opens writable appends 50 records and holds the vault for 1 s. In cases (i) and (iii) exactly one child opens and the others get VaultLocked. In case (ii) all eight get VaultLocked while the empty lock's mtime is younger than 60 s; with its mtime set 61 s in the past, exactly one opens and the others get VaultLocked. Afterwards log.verify().ok holds with seq 1..50 and no duplicates. Run 20 rounds.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "A child process opens the vault writable, taking the vault lock, and waits. The parent rewrites the lock file's host field to 'other-host' and asserts that its writable open throws VaultLocked; it then sets the boot id to 'other-boot' instead and asserts VaultLocked again. After kill -9 of the child, the parent rewrites the host to 'other-host' and asserts its open still throws VaultLocked while the lock's mtime is fresh; it then sets the lock's mtime 91 s in the past and asserts its open succeeds and log.verify().ok. The test also asserts: the lock the parent writes records a non-empty boot id on linux and on darwin; and, with no open in this process, a lock naming process.pid with this host and boot (left by an earlier run that had the same pid, as in a restarted container) is recovered.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "While the holder (a child process) has a partial line with no newline appended to its active segment, standing in for an in-flight write, the parent's second writable open throws VaultLocked. Afterwards the active segment's size and bytes (still ending in the partial fragment), manifest.json's bytes and mtime, snapshot.json, and device.json are all unchanged.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c07:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "Two processes each call new OpLog(dir).open() directly on the same directory. The second throws an error that is an instanceof the VaultLocked exported from src/engine/oplog.mjs.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "A child holds the vault writable with MEMEV_LOCK_RENEW_MS=200. The parent writes a lock with a different token to a temp file and renames it over LOCK, as a recoverer would. On a stdin command the child calls log.append() (must throw an error named VaultLocked), then log.snapshot() and vault.close(). Afterwards every segment, manifest.json and snapshot.json is byte-identical to before the command. LOCK still holds the parent's bytes, and LOCK's mtime does not change over the next 1 s, so the child neither deletes nor renews a lock that is not its own.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c09:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "Test three lock contents: 64 NUL bytes, the first 10 bytes of a real lock, and a JSON object with no pid field. With a fresh mtime, a writable open throws an error whose name is VaultLocked (not SyntaxError or TypeError), and no file under .memev/oplog changes. With the mtime set 61 s in the past, exactly one open succeeds, appends 50 records, and log.verify().ok holds.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c10:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC11",
+          "mandatory": true,
+          "statement": "The test parses the lock the implementation wrote and changes one field at a time. It never calls the implementation's boot or start-time helpers and computes this boot itself as Date.now() minus os.uptime(). Case A: a dead pid (a node child that has exited), host equal to os.hostname(), boot 'other-boot' and a fresh mtime: the writable open throws VaultLocked; with the mtime 91 s in the past it succeeds and log.verify().ok holds. Case B, linux only: the lock records the pid namespace (fs.readlinkSync('/proc/self/ns/pid')). With this host and boot, a dead pid and pid namespace 'pid:[1]', a fresh mtime gives VaultLocked.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c11:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC12",
+          "mandatory": true,
+          "statement": "In one process, open writable via fs.realpathSync(root). Then try three more writable opens: one through a symlink to the vault root, one through root + '/', and a bare new OpLog() on the oplog dir spelled with a '..' segment. Each must throw VaultLocked naming process.pid. LOCK's bytes are unchanged, and the first vault still appends and log.verify().ok holds.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c12:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC13",
+          "mandatory": true,
+          "statement": "A test-only pause (for example MEMEV_LOCK_TEST_PAUSE=after-rename:800, in the style of MEMEV_LOCK_RENEW_MS) makes opener B pause after it renames away a dead-pid lock it judged stale. While B is paused, the parent rewrites the renamed-away file, so B's byte check fails, and creates a new LOCK with token C. B must report VaultLocked. LOCK must still hold C's bytes, not replaced by B. The renamed-away file must not be moved over LOCK, and no other file under .memev/oplog may change.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c13:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC14",
+          "mandatory": true,
+          "statement": "A child holds the vault with TZ=UTC. A second child opener with TZ=Pacific/Kiritimati and LC_ALL=C must get VaultLocked. The pid-reuse case (a live child whose lock records a start time one hour before its real start), run in an opener whose PATH is empty, must still be judged stale on linux (start time read from /proc/<pid>/stat) and on darwin (ps run by absolute path).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c14:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c14:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC15",
+          "mandatory": true,
+          "statement": "With git enabled (default options), and bus/ deleted after the holder child seeded it, a readOnly open, materialize(), iterate() and close() create no file under bus/. git rev-parse HEAD and git status --porcelain are unchanged.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c15:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC16",
+          "mandatory": true,
+          "statement": "T1-c16: a holder child is started as /bin/sh -c 'sleep 3; exec \"$0\" \"$1\"' <process.execPath> holder.mjs, so its pid's kernel start time precedes node's start by 3 s, and it opens the vault writable. A second child opener gets VaultLocked naming that pid, LOCK's bytes are unchanged, and the holder then appends with log.verify().ok. Runs on darwin and linux.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c16:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T1-c16:' && ! printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T1-c16:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c16:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC17",
+          "mandatory": true,
+          "statement": "T1-c17: with no open in this process, starting from the implementation's own lock and changing one field at a time, locks naming process.pid with a fresh mtime and (a) host 'other-host', (b) boot 'other-boot', (c) on linux, this host and boot with pid namespace 'pid:[1]'. Each writable open throws VaultLocked naming process.pid and leaves LOCK's bytes unchanged. With the mtime 91 s old, (a) and (b) open and log.verify().ok holds.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c17:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T1-c17:' && ! printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T1-c17:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC18",
+          "mandatory": true,
+          "statement": "T1-c18: the lock records a per-boot machine identifier read without PATH (linux /proc/sys/kernel/random/boot_id; darwin /usr/sbin/sysctl -n kern.bootsessionuuid). The test parses the implementation's lock, keeps host, boot and pid namespace, sets a dead pid and replaces only that identifier with a random UUID. With a fresh mtime the writable open throws VaultLocked; with the mtime 91 s old it succeeds and log.verify().ok holds.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c18:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T1-c18:' && ! printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T1-c18:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c18:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC19",
+          "mandatory": true,
+          "statement": "T1-c19 (adds a pause point after-judge to MEMEV_LOCK_TEST_PAUSE): opener B pauses after it has judged a dead-pid lock stale and before it touches LOCK. During the pause the parent deletes that lock and child A opens writable. After B resumes, B throws VaultLocked naming A's pid; A appends one record every 10 ms throughout and every append succeeds; LOCK, read every 5 ms, always exists with A's bytes; afterwards .memev/oplog holds no file that was not there before B started. In T1-c05 each child also reports whether VaultLocked came from open() or append(), and every refusal must come from open(). (The spec's read-judge-rename order cannot pass this: the recoverer must re-read and compare LOCK immediately before renaming, or serialise recoverers and creators through an exclusive LOCK.recover.)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c19:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T1-c19:' && ! printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T1-c19:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c19:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC20",
+          "mandatory": true,
+          "statement": "T1-c20: as T1-c09, with the holder opened with segmentBytes 512 and enough records that at least two segments are sealed. After the parent replaces LOCK, on a stdin command the child calls vault.compact(); it throws an error named VaultLocked. Afterwards .memev/oplog has no archive/ folder and no new seg-* file, every segment, manifest.json and snapshot.json is byte-identical, and LOCK holds the parent's bytes.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c20:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T1-c20:' && ! printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T1-c20:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c20:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC21",
+          "mandatory": true,
+          "statement": "T1-c21: the pid-reuse case (a live child whose lock records a start time one hour before its real start) is judged by an opener whose PATH is only a temp dir holding an executable ps that creates a marker file and prints the child's recorded start time in ps -o lstart= format. The open succeeds (stale), log.verify().ok holds, and the marker file does not exist. Runs on darwin and linux. T1-c14's text is corrected to name criterion 18.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c21:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T1-c21:' && ! printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T1-c21:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c21:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC22",
+          "mandatory": true,
+          "statement": "src/cli/runner.mjs and test/runner.test.mjs move into T1's scope (or T1 and T2 merge), and test/runner.test.mjs passes on T1's own commit.",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test test/runner.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC23",
+          "mandatory": true,
+          "statement": "T1-c23: as T1-c09, and after the lost holder's vault.close() the files .memev/index.jsonl, graph.json, device.json and devices.json are byte-identical to before the stdin command, and git rev-parse HEAD is unchanged.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c23:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T1-c23:' && ! printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T1-c23:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c23:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC24",
+          "mandatory": true,
+          "statement": "With MEMEV_LOCK_RENEW_MS=500, the holder's main thread runs a busy loop for 2 s. During the loop the lock file's mtime advances at least twice. After the loop the holder's next append succeeds and the lock still carries its token.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c24:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c24:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC25",
+          "mandatory": true,
+          "statement": "Inside one process, a second writable open while the first is still open throws VaultLocked naming this process's pid, and the first stays usable.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c25:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c25:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC26",
+          "mandatory": true,
+          "statement": "A lock naming a live child process on this host and boot, with a recorded start time one hour earlier than the child's real start, is stale (pid reuse): the open succeeds, appends, and log.verify().ok holds.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c26:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c26:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC27",
+          "mandatory": true,
+          "statement": "With .memev/oplog made read-only (chmod 0555) so the lock cannot be created, a writable open fails with EACCES or EROFS, not VaultLocked, and no file under .memev/oplog changes. The test does not run as root.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c27:' test/oplog-lock.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c27:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC28",
+          "mandatory": true,
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/oplog-lock.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 14400
+          }
+        },
+        {
+          "id": "T1-AC29",
+          "mandatory": true,
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/oplog-lock.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 14400
+          }
+        },
+        {
+          "id": "T1-AC30",
+          "mandatory": true,
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/oplog-lock.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 14400
+          }
+        },
+        {
+          "id": "T1-AC31",
+          "mandatory": true,
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "T1-AC32",
+          "mandatory": true,
+          "statement": "The T1 tests pass in a linux container: docker run --rm with the repository mounted read-only and node 22 runs test/oplog-lock.test.mjs with nothing failed, skipped or todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "docker run --rm -v \"$PWD\":/src:ro node:22 sh -c 'cp -R /src /w && cd /w && node --test --test-reporter=tap test/oplog-lock.test.mjs' > \"${TMPDIR:-/tmp}/oplog-lock-linux.tap\" 2>&1; rc=$?; f=\"${TMPDIR:-/tmp}/oplog-lock-linux.tap\"; [ $rc -eq 0 ] && grep -Eq '^# fail 0$' \"$f\" && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\"",
+            "timeout_s": 900
+          }
+        },
+        {
+          "id": "T1-AC33",
+          "mandatory": true,
+          "statement": "One full run of test/oplog-lock.test.mjs passes every labelled subtest (T1-c01, T1-c03, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c11, T1-c12, T1-c13, T1-c14, T1-c15, T1-c16, T1-c17, T1-c18, T1-c19, T1-c20, T1-c21, T1-c23, T1-c24, T1-c25, T1-c26, T1-c27) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/oplog-lock.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c03:|^T1-c04:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c12:|^T1-c13:|^T1-c14:|^T1-c15:|^T1-c16:|^T1-c17:|^T1-c18:|^T1-c19:|^T1-c20:|^T1-c21:|^T1-c23:|^T1-c24:|^T1-c25:|^T1-c26:|^T1-c27:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC34",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Runner goes through the daemon",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "runner.mjs no longer constructs new Vault(root) for writes; it calls the daemon over HTTP or opens read-only",
+        "both writable opens in runner.mjs go (:211 in the command and :188 in watch); memev runner watch holds no oplog lock while it runs",
+        "with the daemon down the runner never opens the vault writable: it reads read-only or waits for the daemon, so a runner started before the daemon never locks it out",
+        "each red-green criterion of this task that runs test/runner.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "src/cli/runner.mjs",
+          "test/runner.test.mjs",
+          "test/helpers/runner-*.mjs",
+          "docs/MODULES.md",
+          "changelog.d/SR-1.01.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T2-AC01",
+          "mandatory": true,
+          "statement": "The runner with a live daemon leaves log.verify() ok and no duplicate seq",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/runner.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c01:' test/runner.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC02",
+          "mandatory": true,
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "T2-AC03",
+          "mandatory": true,
+          "statement": "Setup: the sandbox daemon is running (memev start; the sandbox sets MEMEV_NO_BACKGROUND=1), one note has been edited on disk and one new note added on disk, and the sha256 of every file under .memev/oplog is recorded. Then `memev runner on cursor@host --max-runs-per-day 1 --command echo` and `memev runner --json` both exit 0, runner.json gains the cursor@host entry, and every .memev/oplog file is byte-identical afterwards. A daemon write over HTTP then leaves log.verify().ok with consecutive seq. This is red at the base because the runner's writable Vault.open runs recover(), which appends import records with client 'startup' (vault.mjs:66, :120, :122). It is also red at a base that already includes T1, where the runner exits with VaultLocked.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/runner.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c03:' test/runner.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC04",
+          "mandatory": true,
+          "statement": "Setup: the daemon is running and writing (a loop of memev_write calls over HTTP), and a note has been edited on disk. `memev runner on cursor@host ...` and `memev runner watch cursor@host` (started with runAsync and stopped with SIGTERM once one operator task has run) both exit 0 and do their job: the runner.json entry exists and the stub ran exactly once. Across the whole run the oplog grows only by the records the test asked the daemon to write: the count matches the number of HTTP writes, and no record has client 'startup'. log.verify().ok holds with consecutive seq.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/runner.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c04:' test/runner.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC05",
+          "mandatory": true,
+          "statement": "`memev runner watch cursor@host`, run through the CLI (sandbox runAsync) beside a live daemon, starts, runs one operator task with the stub, and exits 0 on SIGTERM. While it runs, `memev stop` followed by `memev start` brings the daemon back healthy within 6 s, meaning the watch holds no oplog lock. log.verify().ok holds afterwards.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/runner.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c05:' test/runner.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC06",
+          "mandatory": true,
+          "statement": "T2-c06: with the daemon stopped and one note edited on disk, memev runner on cursor@host --max-runs-per-day 1 --command <stub> exits 0 and every file under .memev/oplog is byte-identical. Then memev runner watch cursor@host is started with runAsync; once it prints its banner, memev start brings the daemon up healthy within 6 s and .memev/oplog/LOCK names the daemon's pid, not the watch's. An operator task then runs the stub exactly once, SIGTERM exits 0, and log.verify().ok holds.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/runner.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c06:' test/runner.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T2-c06:' && ! printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T2-c06:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC07",
+          "mandatory": true,
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/runner.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "id": "T2-AC08",
+          "mandatory": true,
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/runner.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "id": "T2-AC09",
+          "mandatory": true,
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/runner.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "id": "T2-AC10",
+          "mandatory": true,
+          "statement": "One full run of test/runner.test.mjs passes every labelled subtest (T2-c01, T2-c03, T2-c04, T2-c05, T2-c06) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/runner.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c03:|^T2-c04:|^T2-c05:|^T2-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T2-AC11",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "The daemon and the CLI openers live with the lock",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "the daemon's start (src/server/main.mjs) meets a held lock with exit code 5 (code 4 already means it cannot listen) within 2 s, a VaultLocked message naming the holder's pid, and no daemon.lock left behind; it never ends in an uncaught error",
+        "memev start (startDaemon, src/cli/daemon.mjs) reports exit code 5 as the vault being locked by that pid, not as 'did not start'",
+        "memev claims uses the daemon over HTTP when it is up and a read-only open when it is not; memev doctor without --fix opens read-only; memev compact takes the lock and, with a live holder, refuses with VaultLocked naming its pid and saying to stop it first; memev doctor --fix with a live daemon repairs over HTTP and by restart as it does today, writes no record to .memev/oplog from the CLI, and names any oplog fix it cannot apply as needing the daemon stopped, with VaultLocked and the daemon's pid",
+        "compact's guard is the lock, not daemon.json",
+        "a daemon that cannot listen closes its vault, releasing the lock, before it exits with code 4",
+        "a daemon whose token check, made by the renew worker at every renewal and before every write, finds the lock taken by another holder exits with the VaultLocked code within 2 s, and its supervisor waits for the holder (requirement on the login units), instead of answering /healthz while it refuses writes",
+        "memev doctor names a held lock's pid, host and age in seconds and exits non-zero, and reports a lock whose holder is gone as stale and recoverable",
+        "the login units do not restart a daemon refused by a held lock every few seconds: systemd's unit carries RestartPreventExitStatus=5, and launchd's plist sets ThrottleInterval to at least 60",
+        "each red-green criterion of this task that runs test/oplog-lock-cli.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T3-c01: for the first), and the criterion runs only that subtest"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "src/server/main.mjs",
+          "src/cli/daemon.mjs",
+          "src/cli/main.mjs",
+          "src/cli/doctor.mjs",
+          "src/cli/compact.mjs",
+          "test/oplog-lock-cli.test.mjs",
+          "test/helpers/oplog-lock-cli*.mjs",
+          "docs/MODULES.md",
+          "changelog.d/SR-1.01.md",
+          "src/cli/service.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T3-AC01",
+          "mandatory": true,
+          "statement": "Starting the daemon (node src/server/main.mjs --root R) while a child process holds the oplog lock exits with code 5 within 2 s, prints a VaultLocked message naming the child's pid, and leaves no daemon.lock. memev start in the same state reports the vault as locked by that pid. After the child exits, memev start brings the daemon up healthy.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock-cli.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c01:' test/oplog-lock-cli.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T3-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T3-AC02",
+          "mandatory": true,
+          "statement": "memev claims --json, run while the daemon is starting and again with the daemon stopped, exits 0, leaves every file under .memev/oplog byte-identical, and does not stop the daemon from coming up.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock-cli.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c02:' test/oplog-lock-cli.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T3-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T3-AC03",
+          "mandatory": true,
+          "statement": "With a live daemon, memev compact exits non-zero with VaultLocked naming the daemon's pid and leaves every file under .memev/oplog byte-identical; memev doctor without --fix exits 0 and changes nothing.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock-cli.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c03:' test/oplog-lock-cli.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T3-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T3-AC04",
+          "mandatory": true,
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/oplog-lock-cli.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "id": "T3-AC05",
+          "mandatory": true,
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/oplog-lock-cli.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "id": "T3-AC06",
+          "mandatory": true,
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/oplog-lock-cli.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "id": "T3-AC07",
+          "mandatory": true,
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "T3-AC08",
+          "mandatory": true,
+          "statement": "(a) A child holds the vault writable and there is no daemon.json: memev compact exits non-zero, prints VaultLocked and the child's pid with no stack trace, and .memev/oplog is byte-identical. (b) daemon.json names a live process that is not a Memev daemon (a sleeping child) and no lock is held: memev compact exits 0 and archives the sealed segments.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock-cli.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c08:' test/oplog-lock-cli.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T3-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T3-AC09",
+          "mandatory": true,
+          "statement": "With a live daemon, tokens.json chmod 0644 and one note edited on disk, memev doctor --fix sets tokens.json back to 0600 and exits 0. Any oplog fix it does not apply is named as needing the daemon stopped, with VaultLocked and the daemon's pid. The CLI process writes no record to .memev/oplog. test/setup.test.mjs and test/init-bus.test.mjs pass unchanged.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock-cli.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c09:' test/oplog-lock-cli.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T3-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T3-AC10",
+          "mandatory": true,
+          "statement": "With the vault's port held by another program and no lock held, memev start exits 1, names the port, and its output does not match /locked|VaultLocked/. With a child holding the lock and the port free, the output names VaultLocked and the child's pid and does not mention the port. The daemon's VaultLocked exit code differs from its listen-failure exit code.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock-cli.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c10:' test/oplog-lock-cli.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T3-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T3-AC11",
+          "mandatory": true,
+          "statement": "A daemon runs with MEMEV_LOCK_RENEW_MS=200. The test replaces LOCK with a lock carrying another token. An HTTP write is refused, and within 2 s the daemon exits with the VaultLocked code. After the test removes the foreign lock, memev start brings the daemon back healthy, and an HTTP write succeeds with log.verify().ok.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock-cli.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c11:' test/oplog-lock-cli.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T3-c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T3-AC12",
+          "mandatory": true,
+          "statement": "A child holds the vault writable and no daemon runs. memev doctor --json contains a check that names the child's pid, os.hostname() and the lock's age in seconds, and exits non-zero. After kill -9 of the child, the same check reports the lock as stale and recoverable.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock-cli.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c12:' test/oplog-lock-cli.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T3-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T3-AC13",
+          "mandatory": true,
+          "statement": "T3-c13: no daemon and no lock holder; one note edited and one added on disk. memev doctor --json (no --fix) runs; every file under .memev/oplog is byte-identical (no record with client 'startup'), no LOCK exists afterwards, a child polling for .memev/oplog/LOCK every 5 ms during the run never sees one, and the drift check reports the edited note.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock-cli.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c13:' test/oplog-lock-cli.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T3-c13:' && ! printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T3-c13:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T3-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T3-AC14",
+          "mandatory": true,
+          "statement": "T3-c14: a daemon runs with MEMEV_LOCK_RENEW_MS=200. The test replaces LOCK with a lock carrying another token and sends no request. Within 2 s the daemon process has exited with the VaultLocked code (5), /healthz no longer answers, and LOCK still holds the test's bytes.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock-cli.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c14:' test/oplog-lock-cli.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T3-c14:' && ! printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T3-c14:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T3-c14:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T3-AC15",
+          "mandatory": true,
+          "statement": "T3-c15 (src/cli/service.mjs added to T3 scope): renderUnit('systemd', ...) contains RestartPreventExitStatus=5, and renderUnit('launchd', ...) sets ThrottleInterval to at least 60, so a daemon refused by a held lock is not started again every few seconds.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-lock-cli.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T3-c15:' test/oplog-lock-cli.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T3-c15:' && ! printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - T3-c15:.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T3-c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T3-AC16",
+          "mandatory": true,
+          "statement": "One full run of test/oplog-lock-cli.test.mjs passes every labelled subtest (T3-c01, T3-c02, T3-c03, T3-c08, T3-c09, T3-c10, T3-c11, T3-c12, T3-c13, T3-c14, T3-c15) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/oplog-lock-cli.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T3-c01:|^T3-c02:|^T3-c03:|^T3-c08:|^T3-c09:|^T3-c10:|^T3-c11:|^T3-c12:|^T3-c13:|^T3-c14:|^T3-c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T3-AC17",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-sr-1-01-one-writer-enfor-ceaa12",
+  "title": "SR-1.01 One writer, enforced: an exclusive lock on the vault log",
+  "workdir": null,
+  "created": "2026-10-31T10:19:21.901Z",
+  "version": 1,
+  "request": "Closes G01: Single-writer rule is convention only; runner.mjs opens a Vault beside a live daemon and can corrupt the oplog. Repository: memev. Depends on contracts: QL-1.02. Sequenced with SR-1.09, SR-1.15 and SR-1.20, which change the same CLI and server files; SR-1.24 depends on this contract. Sensitive path (the oplog): the QL-1.03 checklist applies before merge.",
+  "origin": "local"
+}
