@@ -30,7 +30,7 @@ Open, needs owner decision:
 
 - Whether severity or urgency (spec line 13 allows either) is the field, and its value set.
 - Where the queue is stored: a new entity kind in the project store, or the existing `approval` kind (`src/engine/project-store.mjs:20-29`). The store schema decision is ADR 1, status open, with the safe default "extend the existing store in place; do not create a second store" (`docs/scope-one/DECISIONS.md:18-27`).
-- How an item names its affected milestone, tasks and dependencies. Tasks carry `dependsOn` (`src/engine/project-state.mjs:64`) and the register has a dashboard requirement for "outstanding decisions, blockers" (`docs/scope-one/REQUIREMENTS.md:61`); the sources define no milestone record for an item to point at.
+- How an item names its affected milestone, tasks and dependencies. Tasks carry `dependsOn` (`src/engine/project-state.mjs:64`) and the register has a dashboard requirement for "outstanding decisions, blockers" (`docs/scope-one/REQUIREMENTS.md:61`); the sources define no project milestone record for an item to point at (`src/engine/milestones.mjs:2-8` holds product activation milestones worked out from the vault, not project milestones).
 
 ## Requirement 2: distinguish a genuine blocker requiring user action from an agent's internal retry, transient failure or routine subtask
 
@@ -130,7 +130,7 @@ Each needs an owner decision before a build contract can be written.
 
 1. Severity or urgency: which field, and its value set (requirement 1).
 2. Where the queue is stored: new entity kind or the existing `approval` kind; tied to ADR 1 (requirement 1).
-3. How an item references its milestone, tasks and dependencies; no milestone record is defined in the sources (requirement 1).
+3. How an item references its milestone, tasks and dependencies; no project milestone record is defined in the sources (requirement 1).
 4. The rule that separates a genuine blocker from an internal event; tied to ADR 4 and the SO-03-A policy module (requirement 2).
 5. Provider failover: no implementation or description in the sources (requirement 3).
 6. The retry and replacement limits at which an internal failure becomes a queue item (requirement 3).
