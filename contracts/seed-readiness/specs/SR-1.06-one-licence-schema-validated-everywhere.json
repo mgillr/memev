@@ -14,7 +14,8 @@
         "install and activate run the same validator",
         "the header comment matches what a licence may carry",
         "installLicense refuses a licence carrying name, email or machine exactly as activateLicense does, and writes no file; the test installs such a licence from file and asserts the refusal (the twin measured install writing a licence that activate refuses: src/cli/licensing.mjs:148-151 never calls extraFields, :90 does)",
-        "a trial licence and an org licence install from file and activate by key under the same rule; the schema header states which non-identity fields (trial, org, trial_ext) a licence may carry"
+        "a trial licence and an org licence install from file and activate by key under the same rule; the schema header states which non-identity fields (trial, org, trial_ext) a licence may carry",
+        "the schema check lives in verifyLicense, so install, activate, loadLicense and every reader apply one rule; the trial rules (one trial per organisation, a trial never replaces a live paid licence) live in one function that install and activate both call"
       ],
       "description": "",
       "scope": [
@@ -45,6 +46,103 @@
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "In a fresh MEMEV_CONFIG_DIR, sign a licence with the test key after adding name (then email, then machine) to it. installLicense must refuse it with a reason that matches /carries more than a licence may/, names the field and does not match /signature/. As a control, the same fields without the extra key, with the same keys and now, must install ok:true. fs.existsSync(licenseFile(env)) is false after the refusal. When a valid licence is already installed, its bytes stay unchanged and no trials.json appears. activateLicense with a fetchImpl that returns the same signed object gives the same ok and the same kind of reason.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "(a) With a signed trial for org_par0001 installed by file, activateLicense (fetchImpl returning a second signed trial for org_par0001 with a different lid and no trial_ext) returns ok:false with the same reason class as installLicense (/already had a trial/), and the licence file bytes are unchanged. (b) With a live paid licence installed, activating a signed trial returns ok:false (/paid licence is already active/). (c) Activating a first trial for a fresh org writes readTrialRecord(env)[org] with the same shape installLicense writes. (d) Activating a paid licence over a trial records ended/converted_to as install does.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "Install a signed trial for org_ext0001. A second signed trial for the same org, with a different lid and trial_ext:true, installs ok:true from file and activates ok:true by key (fetchImpl), and readTrialRecord(env).org_ext0001.extended === true. LICENSE_FIELDS includes 'trial', 'org' and 'trial_ext'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "A correctly signed licence carrying email, written directly to licenseFile(env), gives loadLicense({env, keys, now}).state === 'invalid' with a reason naming email, and mergeAllowed(raw, {keys, now}) === false. This means the schema check lives in verifyLicense, the one function every reader calls (merge.mjs needs no edit).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "In a fresh config dir, a signed licence that expired more than grace_days ago gets the same ok from installLicense(file) as from activateLicense(fetchImpl -> same object), and when refused, neither writes licenseFile(env). Either outcome is acceptable as long as it is the owner's choice and the same on both paths. Repeat for not_yet_valid.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "For each key in ['customer_id', 'hostname', 'Email', 'note', 'relay', 'seats_extra'], a licence signed with that key added is refused by installLicense and by activateLicense with a reason naming the key, and no file is written. A licence carrying only LICENSE_FIELDS keys is accepted by both.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "verifyLicense returns state 'invalid' for signed licences with trial:'true', trial:1, trial_ext:'no', org:123, org:{} and org:'jane@example.com' (org must match an opaque id such as /^org_[A-Za-z0-9_-]{4,64}$/), and installLicense and activateLicense both refuse them. A signed licence with trial:true and org:'org_ok0001' verifies valid.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "The test reads src/engine/license.mjs, takes the comment block before the first `import`, and checks three things: the set of quoted keys in its example equals the set of LICENSE_FIELDS; the block names trial, org and trial_ext as non-identity fields; every LICENSE_FIELDS entry appears in it. This is red at base because the header lacks trial/org/trial_ext.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "The new test file runs at least 4 passing tests, with none skipped, none todo and none failed.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap test/license-schema.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -qx '# skipped 0' && printf '%s\\n' \"$out\" | grep -qx '# todo 0' && printf '%s\\n' \"$out\" | grep -qx '# fail 0' && ! printf '%s\\n' \"$out\" | grep -Eqx '# pass [0-3]'",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "The test computes the signed bytes itself, without canonical() or signLicense: keys sorted recursively, sig removed, JSON.stringify, then crypto.sign with a test ed25519 key. It does this for a trial licence carrying trial, org and trial_ext; verifyLicense reports it valid, and installLicense and activateLicense accept it. Then, for each tamper (trial flipped, org changed, trial_ext removed or added, exp moved a year later, grace_days raised), installLicense and activateLicense refuse with /signature does not verify/, and loadLicense on the tampered file returns 'invalid'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "With an unsigned {v:1, lid:'lic_fake0001', trial:true, org:'org_fake0001'} written to licenseFile(env), installing a signed paid licence returns converted:false, and readTrialRecord(env) has no org_fake0001 key.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "activateLicense refuses an answer {license: <valid signed>, email: 'x@example.invalid'} and writes no file. A file containing exactly the wrapper activate accepts gets the same ok from installLicense, or the spec states that install takes only the bare licence.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
           }
         },
         {
