@@ -1,5 +1,5 @@
 #!/bin/sh
-# Docker persistence check (not run in CI; run it from the repository root). MEMEV_IMAGE names a
+# Docker persistence check, run by CI's check job and runnable from the repository root. MEMEV_IMAGE names a
 # published image to pull; without it the image is built locally. The script starts the container,
 # waits for the health check with a deadline (MEMEV_SMOKE_HEALTH_TIMEOUT, default 60 seconds),
 # checks that an MCP call without a token is refused with 401 through the published port and that
