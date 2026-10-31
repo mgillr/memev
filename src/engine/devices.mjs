@@ -60,10 +60,10 @@ export class DeviceRegistry {
     return this.data.devices[host.id];
   }
 
-  _add({ kind, label, tokenId = null, pubkey = null, inferred = false }) {
+  _add({ kind, label, tokenId = null, pubkey = null, inferred = false, teammate = null }) {
     if (!KINDS.includes(kind) || kind === 'host') throw new Error(`kind must be one of ${KINDS.filter((k) => k !== 'host').join(', ')}`);
     const id = `dev_${randomToken(8)}`;
-    this.data.devices[id] = { id, kind, label: String(label || kind).slice(0, 60), status: 'active', created: now(), first_seen: null, last_seen: null, token_id: tokenId, pubkey, flags: [], ...(inferred ? { inferred: true } : {}), origins: [] };
+    this.data.devices[id] = { id, kind, label: String(label || kind).slice(0, 60), status: 'active', created: now(), first_seen: null, last_seen: null, token_id: tokenId, pubkey, flags: [], ...(inferred ? { inferred: true } : {}), ...(teammate ? { teammate } : {}), origins: [] };
     if (tokenId) this.byToken.set(tokenId, id);
     this.dirty = true;
     return this.data.devices[id];
@@ -74,7 +74,7 @@ export class DeviceRegistry {
    * computer needs its device public key and a free seat under `policy` (the free tier when none is
    * given: no other computer).
    */
-  enroll(tokens, { kind, label, pubkey = null, ttlDays = 365, policy = null }) {
+  enroll(tokens, { kind, label, pubkey = null, ttlDays = 365, policy = null, teammate = null }) {
     if (pubkey) publicKeyFrom(pubkey); // throws if it is not an Ed25519 public key
     if (kind === 'remote-computer') {
       if (!pubkey) throw new SeatError('A computer joins with its own device key. Run `memev devices keygen` on that computer, then `memev devices enroll --kind remote-computer --pubkey <key>` here.');
@@ -83,7 +83,7 @@ export class DeviceRegistry {
     }
     const remote = kind !== 'local-client';
     const t = tokens.issue({ agent: String(label || kind).slice(0, 40), scopes: ['read', 'write'], paths: remote ? ['memory/**', 'work/**', 'contracts/**', 'bus/**'] : ['**'], ttlDays, remote, note: `device ${kind}` });
-    const d = this._add({ kind, label, tokenId: t.id, pubkey });
+    const d = this._add({ kind, label, tokenId: t.id, pubkey, teammate });
     this.save();
     return { device: d, token: t.token };
   }
@@ -91,8 +91,14 @@ export class DeviceRegistry {
   get(idOrLabel) { return this.data.devices[idOrLabel] || Object.values(this.data.devices).find((d) => d.label === idOrLabel) || null; }
   list() { return Object.values(this.data.devices).map(({ origins, ...d }) => ({ ...d, origins_seen: (origins || []).length })); }
 
+  /** The admin credential is not a device: it lives in .memev/admin.json and is managed with memev token (issue 282). */
+  _notAdmin(tokens, d) {
+    const rec = d.token_id ? tokens.list().find((t) => t.id === d.token_id) : null;
+    if (rec && (rec.scopes || []).includes('admin')) throw new Error(`${d.label || d.id} is this vault's admin credential, not a computer or an app; it is managed with memev token, and memev token rotate ${d.token_id} keeps .memev/admin.json in step`);
+  }
   revoke(tokens, id) {
     const d = this.get(id); if (!d) throw new Error(`no device ${id}`);
+    this._notAdmin(tokens, d);
     if (d.kind === 'host') throw new Error('this computer is the host; it cannot be revoked');
     if (d.token_id) tokens.revoke(d.token_id);
     d.status = 'revoked'; d.revoked = now(); this.byToken.delete(d.token_id); this.save();
@@ -104,8 +110,21 @@ export class DeviceRegistry {
 
   rotate(tokens, id) {
     const d = this.get(id); if (!d || d.status !== 'active' || !d.token_id) throw new Error(`no active device ${id} with a token`);
+    this._notAdmin(tokens, d);
     const t = tokens.rotate(d.token_id); d.rotated = now(); d.flags = d.flags.filter((f) => f.type !== 'reuse'); this.save();
     return { device: d, token: t.token };
+  }
+
+  /**
+   * A record that a User-Agent switched to cloud-connector before issue 266 was fixed goes back to remote-computer, so
+   * upgrading closes the hole for a credential that was already switched. The caller decides that the token was not
+   * made for a cloud app.
+   */
+  restoreSwitched(id) {
+    const d = this.get(id); if (!d) return d;
+    d.kind = 'remote-computer';
+    this._flag(d, 'kind-restored', 'this computer credential had been counted as a cloud connector because of a User-Agent; it is a computer again and needs its device key. For a cloud AI app, make a connector link with memev cloud url');
+    this.save(); return d;
   }
 
   rename(id, label) { const d = this.get(id); if (!d) throw new Error(`no device ${id}`); d.label = String(label).slice(0, 60); this.save(); return d; }
@@ -113,12 +132,13 @@ export class DeviceRegistry {
   /**
    * Existing installs: every active token that is not yet a device becomes one. Local tokens are
    * local clients; remote tokens made for a cloud app are connectors; other remote tokens are
-   * remote computers until their traffic says otherwise.
+   * remote computers. Their traffic never changes that (issue 266): only the person makes a connector.
    */
   migrate(tokens) {
     const added = [];
     for (const t of tokens.list()) {
       if (t.revoked || this.byToken.has(t.id) || (t.expires && Date.parse(t.expires) < Date.now())) continue;
+      if ((t.scopes || []).includes('admin')) continue; // the admin credential is not a device (issue 282)
       if (Object.values(this.data.devices).some((d) => d.token_id === t.id)) continue;
       const kind = !t.remote ? 'local-client' : /cloud connector|device cloud-connector/.test(t.note || '') ? 'cloud-connector' : 'remote-computer';
       added.push(this._add({ kind, label: t.agent, tokenId: t.id, inferred: true }));
@@ -152,8 +172,10 @@ export class DeviceRegistry {
     d.first_seen ||= t; d.last_seen = t;
     const cls = this.classify({ local, connectorUrl, userAgent, device: d });
     d.last_class = cls;
-    // a token issued by hand that a cloud AI app uses is a connector; the other way round only flags
-    if (d.inferred && !local && d.kind === 'remote-computer' && cls === 'cloud-connector') d.kind = cls;
+    // A User-Agent is the caller's choice, so it never changes what a device is (issue 266): a computer credential that
+    // a cloud AI app uses is only flagged, and it still needs its device proof. For a cloud AI app the person makes a
+    // connector link (memev cloud url). A connector used by something else is flagged too.
+    if (!local && d.kind === 'remote-computer' && cls === 'cloud-connector') this._flag(d, 'cloud-app-on-computer-credential', 'a cloud AI app used a computer credential; it is refused until it signs with a device key. For a cloud AI app, make a connector link with memev cloud url');
     if (d.kind === 'cloud-connector' && cls === 'remote-computer') this._flag(d, 'connector-used-by-computer', 'a connector credential was used by something that is not a cloud AI app; it is counted as a computer');
     if (proof) { if (proof.ok) d.proof = 'ok'; else this._flag(d, 'proof', proof.reason); }
     else if (d.pubkey && !local) this._flag(d, 'unsigned', 'this device has a key but sent an unsigned request');
@@ -277,14 +299,17 @@ export function decodeInvite(code) {
 
 function loadInvites(root) { return readJson(invitePath(root), null) || { version: 1, invites: {} }; }
 
-/** Mint a one-time secret. The file keeps the hash, the expiry and the address, never the secret. */
-export function mintInvite(root, { address, ttlSec = 15 * 60, at = Date.now() } = {}) {
+/**
+ * Mint a one-time secret. The file keeps the hash, the expiry and the address, never the secret.
+ * With `teammate`, the invite is for a colleague: their computer is enrolled under their name.
+ */
+export function mintInvite(root, { address, ttlSec = 15 * 60, at = Date.now(), teammate = null } = {}) {
   if (!address) throw new Error('an invite needs the vault address');
   const secret = crypto.randomBytes(16).toString('base64url');
   const expires = new Date(at + ttlSec * 1000).toISOString();
   const id = `inv_${randomToken(4)}`;
   const data = loadInvites(root);
-  data.invites[id] = { id, hash: inviteHash(secret), expires, address, used: false };
+  data.invites[id] = { id, hash: inviteHash(secret), expires, address, used: false, ...(teammate ? { teammate } : {}) };
   writePrivateJson(invitePath(root), data);
   const origin = git(root, ['remote', 'get-url', 'origin']);
   const code = encodeInvite({ address, secret, pubkey: addressKeypair(root).publicKey, backup: origin.ok ? origin.out : null });
@@ -293,7 +318,9 @@ export function mintInvite(root, { address, ttlSec = 15 * 60, at = Date.now() } 
 
 /**
  * Redeem a code once. A second try is refused. An invite past its expiry is refused with a message
- * that says it expired. On success one remote computer is enrolled.
+ * that says it expired. On success one remote computer is enrolled. A teammate invite enrolls the
+ * computer under the teammate's name: its label is <name>-<machine>, where <machine> is the label
+ * the joining computer reports.
  */
 export function redeemInvite(root, { code, pubkey, label, tokens, policy, at = Date.now() }) {
   const { address, secret } = decodeInvite(code);
@@ -303,7 +330,8 @@ export function redeemInvite(root, { code, pubkey, label, tokens, policy, at = D
   if (Date.parse(row.expires) <= at) throw new Error('this invite expired');
   if (row.used) throw new Error('this invite was already used');
   const reg = new DeviceRegistry(path.join(root, '.memev', 'devices.json'));
-  const enrolled = reg.enroll(tokens, { kind: 'remote-computer', label: label || 'invited computer', pubkey, policy });
+  const name = row.teammate ? `${row.teammate}-${label || 'computer'}` : (label || 'invited computer');
+  const enrolled = reg.enroll(tokens, { kind: 'remote-computer', label: name, pubkey, policy, teammate: row.teammate || null });
   row.used = true;
   row.device = enrolled.device.id;
   writePrivateJson(invitePath(root), data);

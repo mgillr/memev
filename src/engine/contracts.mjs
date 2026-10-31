@@ -138,6 +138,8 @@ export function attach(Vault) {
     if (this._read(`${SIGNED}/${id}.json`) !== null) throw new ContractError('immutable', `${id} is already signed; amend it instead`);
     const c = JSON.parse(draft);
     const errs = A.validate(c); if (errs.length) throw new ContractError('invalid', errs.join('; '));
+    // a draft is a note any contracts/** token can write, so the check contractDraft makes is made again here (issue 257)
+    if (!Array.isArray(c.tasks) || !c.tasks.length) throw new ContractError('bad_request', 'a contract needs at least one task');
     const key = signingKey(this.opts.keyDir || path.join(configDir(), 'keys'));
     const origin = local ? 'local' : 'remote';
     c.origin = origin;
@@ -200,7 +202,12 @@ export function attach(Vault) {
     const body = this._read(`${SIGNED}/${id}.json`); const sig = this._read(`${SIGNED}/${id}.sig.json`);
     if (!body || !sig) return { ok: false, detail: `${id} is not signed` };
     let c, env; try { c = JSON.parse(body); env = JSON.parse(sig); } catch { return { ok: false, detail: 'unreadable contract or signature' }; }
-    const pub = this._read(`${KEYS}/${env.signatures?.[0]?.keyid}.pub`);
+    // the key id names a file, so only the 16-hex form keyId() makes is accepted (issue 247: '../drafts/k' named a note
+    // any contracts/** token can write); and the signed body must be the contract asked for, not another one copied over it
+    const kid = env.signatures?.[0]?.keyid;
+    if (!/^[0-9a-f]{16}$/.test(String(kid))) return { ok: false, detail: 'the signature names no valid key id' };
+    if (c?.id !== undefined && c.id !== id) return { ok: false, detail: `the signed body is contract ${String(c.id).slice(0, 60)}, not ${id}` };
+    const pub = this._read(`${KEYS}/${kid}.pub`);
     if (!pub) return { ok: false, detail: 'the signing key is not in contracts/keys' };
     return { ...dsseVerify(c, env, pub), contract: c };
   };
@@ -245,7 +252,7 @@ export function attach(Vault) {
     const rp = `contracts/receipts/${id}.md`;
     this.append(identity, { path: rp, text: `${this._read(rp) === null ? `# Receipts for ${id}\n\nEvery verification of the signed contract, newest last.\n` : ''}${receipt.join('\n')}\n`, client, internal: true });
     this._applyMisc(this.log.append({ type: 'contract.verified', agent: identity.agent, client, data: { id, ok, tasks: Object.fromEntries(tasks.map((t) => [t.id, t.status])), failing: tasks.flatMap((t) => t.criteria.filter((cr) => cr.mandatory && cr.status !== 'PASS').map((cr) => cr.id)) } }));
-    if (ok) this.write(identity, { path: `contracts/closed/${id}.json`, body: `${JSON.stringify(result, null, 2)}\n`, client });
+    if (ok) this.write(identity, { path: `contracts/closed/${id}.json`, body: `${JSON.stringify(result, null, 2)}\n`, client, internal: true });
     result.receipts = rp;
     return result;
   };
@@ -261,7 +268,9 @@ export function attach(Vault) {
     const list = (dir) => { try { return fs.readdirSync(this.abs(dir)).filter((n) => n.endsWith('.json') && !n.endsWith('.sig.json')).map((n) => n.slice(0, -5)); } catch { return []; } };
     const closed = new Set(list('contracts/closed'));
     const raw = list(SIGNED).map((id) => ({ id, c: readJson(this.abs(`${SIGNED}/${id}.json`), {}) }));
-    const replaced = new Map(raw.filter((x) => x.c.supersedes).map((x) => [x.c.supersedes, x.id]));
+    // a newer version retires the one it supersedes only once it was signed on this computer and its own verify passed:
+    // a signed draft alone, made by any token, took a contract out of both gates (issue 257)
+    const replaced = new Map(raw.filter((x) => x.c.supersedes && x.c.origin === 'local' && closed.has(x.id)).map((x) => [x.c.supersedes, x.id]));
     const signed = raw.map(({ id, c }) => ({ id, title: c.title, project: c.project, version: c.version || 1, workdir: c.workdir || null, state: closed.has(id) ? 'done' : replaced.has(id) ? 'superseded' : 'open', supersedes: c.supersedes || null, superseded_by: replaced.get(id) || null, tasks: (c.tasks || []).length }));
     const drafts = list('contracts/drafts').filter((id) => !signed.some((s) => s.id === id)).map((id) => ({ id, title: readJson(this.abs(`contracts/drafts/${id}.json`), {}).title, state: 'draft' }));
     return [...signed, ...drafts];

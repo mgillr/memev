@@ -17,3 +17,5 @@ Keep building with contracts, and have different eyes check on a schedule agains
 | [QL-1.02](specs/QL-1.02-mutation-gate-on-changed-lines.json) | memev | Mutation gate: the changed lines are broken on purpose and the tests must catch every mutant | SR-0.03 |
 | [QL-1.03](specs/QL-1.03-sensitive-path-checklist-before-merge.json) | memev | Security checklist before merge on every change that touches command execution, auth, tokens, the tunnel or the oplog | none |
 | [QL-1.04](specs/QL-1.04-claims-ledger-check-in-every-repository.json) | memev | The claims check runs in every repository from one script: a claim ahead of its status row fails CI | SR-5.04 |
+| [QL-1.05](specs/QL-1.05-sensitive-path-gate-in-ci-from-the-base-workflow.json) | memev | The sensitive-path gate runs in CI from a workflow the pull request cannot change | QL-1.03 |
+| [QL-1.06](specs/QL-1.06-claims-check-shipped-to-every-repository.json) | memev | The claims check ships to every repository and runs in memev's CI | QL-1.04, SR-5.04 |

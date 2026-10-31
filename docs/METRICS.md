@@ -78,8 +78,12 @@ lands, at the licence endpoint, because that is the only place that sees it.
 
 - What the endpoint sees: the licence key and the time of the request. The client sends nothing
   else (no name, e-mail, machine, vault or version).
-- What is counted: one row per activation, holding the licence id, the day and the result
-  (`issued` or `refused`). Counts are per licence id and per day.
+- What is counted: one row per activation, holding the licence id, the day, the result
+  (`issued` or `refused`) and whether the licence is a trial. Counts are per licence id and per day.
+- Paid and trial are counted apart. A trial licence carries `trial: true`, and its activation row
+  says so with `true`, or with `1` as the table below holds it; a paid count never includes a trial.
+  `false` or `0` is paid, and so is a row with no trial field: the product reads a licence with no
+  trial field as paid (`src/cli/licensing.mjs`), and the count does the same.
 - What is not counted: licence checks. A licence is verified on the computer against the vendor
   public key, offline, so day-to-day use never reaches the endpoint and cannot be counted there.
 - Where the counts are kept: beside the licence endpoint, and run by the owner with it. The
@@ -88,15 +92,20 @@ lands, at the licence endpoint, because that is the only place that sees it.
   configuration (`MEMEV_REPORT_URL`) and there is no built-in address, so until one is set nothing
   is sent.
 
-The queries, written for a table `activations(licence_id, day, result)`:
+The queries, written for a table `activations(licence_id, day, result, trial)`, where `trial` is 1
+for a trial licence and 0 for a paid one:
 
 ```sql
--- activations per day, last 30 days
+-- paid activations per day, last 30 days
 SELECT day, count(*) FROM activations
-WHERE result = 'issued' AND day >= date('now', '-30 day') GROUP BY day ORDER BY day;
+WHERE result = 'issued' AND trial = 0 AND day >= date('now', '-30 day') GROUP BY day ORDER BY day;
 
--- distinct licences activated, all time
-SELECT count(DISTINCT licence_id) FROM activations WHERE result = 'issued';
+-- trial activations per day, last 30 days
+SELECT day, count(*) FROM activations
+WHERE result = 'issued' AND trial = 1 AND day >= date('now', '-30 day') GROUP BY day ORDER BY day;
+
+-- distinct paid licences activated, all time
+SELECT count(DISTINCT licence_id) FROM activations WHERE result = 'issued' AND trial = 0;
 
 -- activations per licence (a key used on more computers than it should be shows here)
 SELECT licence_id, count(*) AS n FROM activations
@@ -148,8 +157,48 @@ host's access log, counted by distinct day and file, with no address kept.
 | Number | Source | What it tells you |
 |---|---|---|
 | downloads | npm, releases | interest |
-| activations | licence endpoint | paid or trial licences taken up |
+| activations | licence endpoint | paid licences taken up, with trials counted apart |
 | milestones | your own `onboarding.json`; shared only if you turn on the opt-in report, which is off by default | what you reach after installing |
+
+## The weekly funnel report (a development tool)
+
+`scripts/metrics/report.mjs` renders the three numbers together in one page, for the owner. It is a
+development tool: it reads count files handed to it as flags, prints one page of dated numbers, and
+reports nothing anywhere. It is not in the npm package file list, and it derives no count from a
+person's computer.
+
+- **Inputs, as files.** `--package` holds the package download rows (the npm range answer, one row
+  per day: `{ "day": "<date>", "downloads": N }`), `--release` the release-host download rows (the
+  same shape, one row per day and file), and `--activations` the licence-activation rows
+  (`{ "day": "<date>", "licence_id": "...", "result": "issued" or "refused" }`, one row per
+  activation, with `"trial": true` or `"trial": 1` on the row of a trial licence; an export of the
+  table above, such as `sqlite3 -json`, gives 1). `--milestones`
+  optionally holds the opt-in milestone rows (the report payload above, one row per milestone:
+  `{ "name": "...", "date": "<date>" }`). A row without a date, or with one that is not a real
+  calendar date such as 2026-13-45, counts in the total only. With no milestone input the page says
+  so in one line and still renders.
+- **The page.** For each count set: the count per day, per week (ISO week) and the total. The
+  licence activations are the paid ones: an issued row marked as a trial (`true` or `1`) is never
+  counted as paid. The trials print on a line of their own, and so do any refused activations. An
+  issued row with no trial field (or one that is not `true`, `1`, `false` or `0`) counts as paid,
+  and the page prints how many there were on a line of their own. Nothing is estimated
+  and nothing is typed into the program: every number on the page comes from the files.
+- **The gates.** The page header renders the gates from `scripts/metrics/gates.json`: the month-6
+  gates, installs at or above 5,000 by month 6, and free-to-paid at or above 1 percent once sync
+  has shipped. Free-to-paid is the paid activations over installs, as a percent; trials are not
+  counted in it. The thresholds live in the file, never in the program, because the owner moves
+  them. Each gate prints its measured value, its threshold and pass or miss.
+- **The installs choice.** A download is not an install, so the file also says which counted
+  number stands for installs (`installs_proxy`: `package_downloads`, `release_downloads` or
+  `downloads`). The file names `downloads` (D-WO-INSTALL-PROXY): the package downloads and the
+  release-host downloads together. Every choice is a download count, so the installs gate prints
+  its measured value as downloads, and the page says a download is not an install. Activations are
+  not a choice: free-to-paid divides paid activations by installs, so it would read 100 percent.
+  With no choice in the file (`null`) the page says open and both gates stay open. A value that is
+  not one of the choices leaves both gates open too, and the page says it is not a choice. Editing
+  the file changes the header with no change to the program.
+- **Hosts nothing.** The counts are kept beside the licence endpoint on the owner's server; this
+  tool reads counts handed to it and hosts nothing.
 
 ## What is never counted
 
