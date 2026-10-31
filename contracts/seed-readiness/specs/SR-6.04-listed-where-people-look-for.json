@@ -2,7 +2,7 @@
   "title": "SR-6.04 Listed where people look for MCP servers",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G51: MCP and connector directory entries are drafts marked do not post. Repository: mgillr/memev. Depends on contracts: SR-6.02.",
+  "request": "Closes G51: MCP and connector directory entries are drafts marked do not post. Repository: memev. Depends on contracts: SR-6.02.",
   "tasks": [
     {
       "id": "T1",
@@ -14,7 +14,8 @@
       ],
       "description": "",
       "scope": [
-        "docs/directories/**"
+        "docs/directories/**",
+        "scripts/count-entries.mjs"
       ],
       "criteria": [
         {

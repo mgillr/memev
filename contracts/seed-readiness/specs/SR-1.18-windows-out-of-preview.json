@@ -2,7 +2,7 @@
   "title": "SR-1.18 Windows out of preview",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G18: parentProcName has no Windows path; installer is win-x64 only; Windows CI runs 6 files; no lab run. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G18: parentProcName has no Windows path; installer is win-x64 only; Windows CI runs 6 files; no lab run. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -11,7 +11,8 @@
       "depends_on": [],
       "requirements": [
         "parent app detection works on Windows",
-        "install.ps1 supports win-arm64"
+        "install.ps1 supports win-arm64",
+        "the test mocks process.platform and the Windows process table, so it goes red on the base and green after on macOS and Linux verifiers too"
       ],
       "description": "",
       "scope": [

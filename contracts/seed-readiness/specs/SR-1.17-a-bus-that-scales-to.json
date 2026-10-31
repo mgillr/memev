@@ -2,7 +2,7 @@
   "title": "SR-1.17 A bus that scales to a team",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G17: Bus.all() re-sorts every message per call; roster and tasks are O(seats x messages). Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G17: Bus.all() re-sorts every message per call; roster and tasks are O(seats x messages). Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -11,7 +11,8 @@
       "depends_on": [],
       "requirements": [
         "append is O(1) for its own seq",
-        "roster and tasks read a maintained index"
+        "roster and tasks read a maintained index",
+        "the bench prints the CPU count, the CPU model and the 1-minute load beside roster_ms_p95"
       ],
       "description": "",
       "scope": [

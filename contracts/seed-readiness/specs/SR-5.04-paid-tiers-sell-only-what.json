@@ -2,7 +2,7 @@
   "title": "SR-5.04 Paid tiers sell only what is built, on every surface",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G45: The $12 tier advertises automatic merge, which does not exist; the pricing test covers docs but not the site. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G45: The $12 tier advertises automatic merge, which does not exist; the pricing test covers docs but not the site. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",

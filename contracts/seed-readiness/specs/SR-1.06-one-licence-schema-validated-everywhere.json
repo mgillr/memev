@@ -2,7 +2,7 @@
   "title": "SR-1.06 One licence schema, validated everywhere",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G06: LICENSE_FIELDS omits trial, org and trial_ext that other modules read; installLicense skips the check activate applies. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G06: LICENSE_FIELDS omits trial, org and trial_ext that other modules read; installLicense skips the check activate applies. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -12,7 +12,9 @@
       "requirements": [
         "every field read anywhere is in the schema",
         "install and activate run the same validator",
-        "the header comment matches what a licence may carry"
+        "the header comment matches what a licence may carry",
+        "installLicense refuses a licence carrying name, email or machine exactly as activateLicense does, and writes no file; the test installs such a licence from file and asserts the refusal (the twin measured install writing a licence that activate refuses: src/cli/licensing.mjs:148-151 never calls extraFields, :90 does)",
+        "a trial licence and an org licence install from file and activate by key under the same rule; the schema header states which non-identity fields (trial, org, trial_ext) a licence may carry"
       ],
       "description": "",
       "scope": [
@@ -34,14 +36,15 @@
           "verifier": {
             "type": "grep",
             "file": "src/engine/license.mjs",
-            "pattern": "LICENSE_FIELDS[^\\n]*'trial'"
+            "pattern": "LICENSE_FIELDS\\s*=\\s*\\[[^\\]]*'trial'"
           }
         },
         {
           "statement": "The full suite passes",
           "verifier": {
             "type": "command",
-            "cmd": "npm test"
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
           }
         },
         {

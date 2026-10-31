@@ -2,7 +2,7 @@
   "title": "SR-2.02 A public memory benchmark",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G22: No LongMemEval or LoCoMo number; buyers ask for one. Repository: mgillr/memev. Depends on contracts: SR-2.01.",
+  "request": "Closes G22: No LongMemEval or LoCoMo number; buyers ask for one. Repository: memev. Depends on contracts: SR-2.01.",
   "tasks": [
     {
       "id": "T1",

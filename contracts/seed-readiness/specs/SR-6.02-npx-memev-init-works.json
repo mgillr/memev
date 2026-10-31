@@ -2,7 +2,7 @@
   "title": "SR-6.02 npx memev init works",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G49: Not on npm; the one-command install path is coming soon. Repository: mgillr/memev. Depends on contracts: SR-6.01.",
+  "request": "Closes G49: Not on npm; the one-command install path is coming soon. Repository: memev. Depends on contracts: SR-6.01.",
   "tasks": [
     {
       "id": "T1",

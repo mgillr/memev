@@ -2,7 +2,7 @@
   "title": "SR-1.03 Replay protection that survives a restart",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G03: The nonce cache is in-memory, so a daemon restart reopens the five-minute replay window. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G03: The nonce cache is in-memory, so a daemon restart reopens the five-minute replay window. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -32,7 +32,8 @@
           "statement": "The full suite passes",
           "verifier": {
             "type": "command",
-            "cmd": "npm test"
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
           }
         },
         {

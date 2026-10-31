@@ -1,0 +1,112 @@
+{
+  "title": "QL-1.03 Security checklist before merge on every change that touches command execution, auth, tokens, the tunnel or the oplog",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes quality-loop principle 7. Repository: memev. Depends on contracts: none. Quality-loop principle set of 30 October 2026 (owner's order: implement as a gate for all dev).",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Sensitive-path gate",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "scripts/gate/sensitive-paths.json lists the sensitive globs by area: command execution (src/engine/contracts.mjs, src/cli/runner.mjs, src/cli/setup-remote.mjs, src/engine/setup-channel.mjs, src/cli/contracts-cli.mjs), auth and tokens (src/server/oauth.mjs, src/engine/tokens.mjs, src/engine/devices.mjs, src/engine/sshsig.mjs when it exists), the tunnel and relay (src/cli/tunnel.mjs, src/engine/relay*.mjs, src/server/http.mjs), the oplog (src/engine/oplog.mjs, src/engine/vault.mjs)",
+        "scripts/gate/sensitive-paths.mjs --base <sha> lists the changed files that match; when any does, it requires security/checklists/<head-sha-12>.md (or the file named by --checklist) with the four headings Who can call this, What runs, What survives a restart, What happens with two processes, each followed by at least one non-empty line that names a file:line, and a line Head: <40-hex> equal to the head being checked",
+        "exit 1 with the missing answers named; exit 0 when no sensitive file changed or the checklist is complete; the script has no dependencies and carries a version: comment"
+      ],
+      "description": "",
+      "scope": [
+        "scripts/gate/sensitive-paths.mjs",
+        "scripts/gate/sensitive-paths.json",
+        "security/checklists/README.md",
+        "test/gate-sensitive.test.mjs",
+        "test/fixtures/sensitive/**",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "A diff touching oplog.mjs without a checklist fails, with a checklist missing one answer fails naming it, with a complete checklist for the same head passes, and a docs-only diff passes without one",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "node --test test/gate-sensitive.test.mjs"
+          }
+        },
+        {
+          "statement": "The checklist folder explains the four questions",
+          "verifier": {
+            "type": "file_exists",
+            "path": "security/checklists/README.md"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Wired into CI and the push hook",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "the CI workflow runs the gate against the pull request's base on every pull request and on push to main",
+        "memev contract hook installs a pre-push hook that runs the gate beside memev gate",
+        "docs/DEVELOPING.md names the sensitive areas and the four questions"
+      ],
+      "description": "",
+      "scope": [
+        ".github/workflows/ci.yml",
+        "src/cli/contracts-cli.mjs",
+        "docs/DEVELOPING.md",
+        "test/gate-sensitive-wiring.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The workflow file runs scripts/gate/sensitive-paths.mjs on pull requests and the installed pre-push hook calls it",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-wiring.test.mjs",
+            "cmd": "node --test test/gate-sensitive-wiring.test.mjs"
+          }
+        },
+        {
+          "statement": "The developing page lists the four questions",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/DEVELOPING.md",
+            "pattern": "What happens with two processes"
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

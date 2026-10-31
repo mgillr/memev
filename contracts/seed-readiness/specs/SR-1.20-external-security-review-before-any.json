@@ -2,7 +2,7 @@
   "title": "SR-1.20 External security review before any public launch",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G20: OAuth server, tunnel exposure, device signing, rate limiting and setup channel have had no outside review. Repository: mgillr/memev. Depends on contracts: SR-1.01, SR-1.02, SR-1.03, SR-1.04, SR-1.05, SR-1.07.",
+  "request": "Closes G20: OAuth server, tunnel exposure, device signing, rate limiting and setup channel have had no outside review. Repository: memev. Depends on contracts: SR-1.01, SR-1.02, SR-1.03, SR-1.04, SR-1.05, SR-1.07.",
   "tasks": [
     {
       "id": "T1",
@@ -10,7 +10,8 @@
       "phase": "verify",
       "depends_on": [],
       "requirements": [
-        "an independent reviewer tests the daemon, OAuth, tunnel, relay, device keys, bus injection and contracts"
+        "an independent reviewer tests the daemon, OAuth, tunnel, relay, device keys, bus injection and contracts",
+        "the reviewer is named in the public file only with their written consent, otherwise by firm"
       ],
       "description": "",
       "scope": [
@@ -58,7 +59,8 @@
       "scope": [
         "src/**",
         "test/**",
-        "docs/security/**"
+        "docs/security/**",
+        "scripts/security-findings.mjs"
       ],
       "criteria": [
         {
@@ -75,7 +77,8 @@
           "statement": "The full suite passes",
           "verifier": {
             "type": "command",
-            "cmd": "npm test"
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
           }
         },
         {

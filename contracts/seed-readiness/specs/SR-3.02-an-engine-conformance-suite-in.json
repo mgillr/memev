@@ -2,7 +2,7 @@
   "title": "SR-3.02 An engine conformance suite in the core",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G31: The service contract in PAID-CONVERGENCE.md has no executable test any engine must pass. Repository: mgillr/memev. Depends on contracts: SR-3.01.",
+  "request": "Closes G31: The service contract in PAID-CONVERGENCE.md has no executable test any engine must pass. Repository: memev. Depends on contracts: SR-3.01.",
   "tasks": [
     {
       "id": "T1",

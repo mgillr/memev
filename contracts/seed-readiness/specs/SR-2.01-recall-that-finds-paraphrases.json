@@ -2,7 +2,7 @@
   "title": "SR-2.01 Recall that finds paraphrases",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G21: Recall is BM25 only; a query with no shared words scores zero. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G21: Recall is BM25 only; a query with no shared words scores zero. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -67,7 +67,9 @@
         "src/engine/index.mjs",
         "src/engine/vault.mjs",
         "docs/DESIGN.md",
-        "test/embed.test.mjs"
+        "test/embed.test.mjs",
+        "scripts/bench/paraphrase.mjs",
+        "bench/paraphrase/**"
       ],
       "criteria": [
         {
@@ -92,7 +94,8 @@
           "statement": "The full suite passes",
           "verifier": {
             "type": "command",
-            "cmd": "npm test"
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
           }
         },
         {

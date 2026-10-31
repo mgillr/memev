@@ -1,0 +1,74 @@
+{
+  "title": "SR-1.21 A missing note the log cannot rebuild is reported, never silent",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G86: recover() skips a path whose logged content no longer matches its recorded hash with a bare continue (src/engine/vault.mjs:118); the note stays missing while verify() is ok, status().recovered is 0 and every doctor check passes, against DESIGN.md and THREAT-MODEL.md which say a missing file is rebuilt. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence). Repository: memev. Depends on contracts: SR-1.01, QL-1.02. Sensitive path (the oplog): the QL-1.03 checklist applies before merge.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Unrebuildable notes are counted and surfaced",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "recover() records every path it cannot rebuild with the reason (content hash mismatch, record unreadable) instead of continuing silently",
+        "status() reports unrecoverable with the paths, and memev doctor has an oplog check that fails naming them",
+        "DESIGN.md and THREAT-MODEL.md say what is rebuilt and what is reported"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/vault.mjs",
+        "src/cli/doctor.mjs",
+        "docs/DESIGN.md",
+        "docs/THREAT-MODEL.md",
+        "test/recover-unrebuildable.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "A note whose logged content was altered with its record hash recomputed and whose file was removed is listed by status() as unrecoverable and fails the doctor's oplog check",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "node --test test/recover-unrebuildable.test.mjs"
+          }
+        },
+        {
+          "statement": "The design page states the reported case",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/DESIGN.md",
+            "pattern": "cannot be rebuilt"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/recover-unrebuildable.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

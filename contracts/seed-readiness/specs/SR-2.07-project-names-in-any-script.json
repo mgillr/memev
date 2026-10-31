@@ -2,7 +2,7 @@
   "title": "SR-2.07 Project names in any script",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G27: Project names written only in non-Latin scripts collapse to the same file name. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G27: Project names written only in non-Latin scripts collapse to the same file name. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",

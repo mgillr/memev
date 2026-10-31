@@ -2,7 +2,7 @@
   "title": "SR-2.04 Continuity measured in every app, including those without hooks",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G24: Claude Desktop, VS Code, Zed and Windsurf get instructions only; the compaction benchmark across apps is planned. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G24: Claude Desktop, VS Code, Zed and Windsurf get instructions only; the compaction benchmark across apps is planned. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -62,7 +62,9 @@
       "scope": [
         "src/server/mcp.mjs",
         "src/engine/card.mjs",
-        "test/no-hook-continuity.test.mjs"
+        "test/no-hook-continuity.test.mjs",
+        "scripts/bench/continuity.mjs",
+        "bench/continuity/**"
       ],
       "criteria": [
         {

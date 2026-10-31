@@ -3,37 +3,24 @@
   "created": "2026-10-30",
   "contracts": [
     {
-      "id": "SR-0.01",
-      "gap": null,
+      "id": "SR-0.03",
+      "gap": "G85",
       "area": "SR-0",
-      "title": "Programme set-up: evidence repository, contract register and seed-gate script",
-      "repo": "mgillr/memev-ops",
-      "closes": "Enabler: a place to hold non-code evidence and one command that reports every contract",
+      "title": "Verify runs every verifier type the specs use: red-green tests, metrics and scope, behind the same local gates as commands",
+      "repo": "memev",
+      "closes": "Closes G85 (found 30 October 2026 while checking the WBS runbook against the code): memev verify runs only command, file_exists, test_exists and grep (src/engine/contracts.mjs:224-235); test_red_green, metric and scope criteria return BLOCKED as checked by a person or CI, so 213 of the 340 seed-readiness criteria (scope 118, test_red_green 64, metric 31) cannot PASS through the tool the WBS names, and no task of the 85 contracts can reach PASS because the attest lint requires a scope criterion per task",
       "depends_on": [],
-      "tasks": 2,
-      "criteria": 8,
-      "spec": "specs/SR-0.01-programme-set-up-evidence-repository.json"
-    },
-    {
-      "id": "SR-0.02",
-      "gap": "G84",
-      "area": "SR-0",
-      "title": "Seed gate: every seed-readiness contract verifies PASS",
-      "repo": "mgillr/memev-ops",
-      "closes": "Not investable at seed: every gap above must be closed (the analysis verdict)",
-      "depends_on": [
-        "ALL"
-      ],
-      "tasks": 2,
-      "criteria": 7,
-      "spec": "specs/SR-0.02-seed-gate-every-seed-readiness.json"
+      "tasks": 5,
+      "criteria": 13,
+      "spec": "specs/SR-0.03-verify-runs-every-verifier-type.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
     {
       "id": "SR-1.01",
       "gap": "G01",
       "area": "SR-1",
       "title": "One writer, enforced: an exclusive lock on the vault log",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Single-writer rule is convention only; runner.mjs opens a Vault beside a live daemon and can corrupt the oplog",
       "depends_on": [],
       "tasks": 2,
@@ -45,7 +32,7 @@
       "gap": "G02",
       "area": "SR-1",
       "title": "No AI-drafted command runs without local approval",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Contract verify runs sh -c commands a local session drafted and signed in one turn (contracts.mjs:213-228)",
       "depends_on": [],
       "tasks": 1,
@@ -57,7 +44,7 @@
       "gap": "G03",
       "area": "SR-1",
       "title": "Replay protection that survives a restart",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "The nonce cache is in-memory, so a daemon restart reopens the five-minute replay window",
       "depends_on": [],
       "tasks": 1,
@@ -69,7 +56,7 @@
       "gap": "G04",
       "area": "SR-1",
       "title": "Cloud connectors: no bearer in the URL, proof of possession",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Connector URLs embed the bearer token in the path (logged by tunnel providers); cloud tokens are plain replayable bearers",
       "depends_on": [],
       "tasks": 3,
@@ -81,7 +68,7 @@
       "gap": "G05",
       "area": "SR-1",
       "title": "A bounded rate limiter",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "The rate limiter bucket map is never evicted (http.mjs:69-77), an unbounded memory growth on a public tunnel",
       "depends_on": [],
       "tasks": 1,
@@ -93,7 +80,7 @@
       "gap": "G06",
       "area": "SR-1",
       "title": "One licence schema, validated everywhere",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "LICENSE_FIELDS omits trial, org and trial_ext that other modules read; installLicense skips the check activate applies",
       "depends_on": [],
       "tasks": 1,
@@ -105,7 +92,7 @@
       "gap": "G07",
       "area": "SR-1",
       "title": "Pinned TLS on the relay and a configured OAuth issuer",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Relay client uses rejectUnauthorized:false with name pinning; the OAuth issuer is derived from the Host header",
       "depends_on": [],
       "tasks": 2,
@@ -117,7 +104,7 @@
       "gap": "G08",
       "area": "SR-1",
       "title": "Remote setup session: allowlist that works, tested like the rest",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "setup-remote.mjs allowlists a deployment command the deployment module cannot accept; no SPDX header; one test file",
       "depends_on": [],
       "tasks": 2,
@@ -129,7 +116,7 @@
       "gap": "G09",
       "area": "SR-1",
       "title": "Code a second engineer can read",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "300 to 600 character lines, server imports CLI, helpers duplicated three times, empty catch blocks hide faults",
       "depends_on": [],
       "tasks": 3,
@@ -141,7 +128,7 @@
       "gap": "G10",
       "area": "SR-1",
       "title": "A suite that is green on any machine",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "12 tests need ssh-keygen, 8 need an authenticated gh and network, 3 fail when MEMEV_NO_SERVICE is set",
       "depends_on": [],
       "tasks": 2,
@@ -153,7 +140,7 @@
       "gap": "G11",
       "area": "SR-1",
       "title": "memev stop always ends inside its bound",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "REV-022 AC03 is a real flake: stop takes 5.2 s on 2 vCPU and the daemon is SIGKILLed mid shutdown-sync",
       "depends_on": [],
       "tasks": 1,
@@ -165,9 +152,12 @@
       "gap": "G12",
       "area": "SR-1",
       "title": "CI that protects main",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Linux tests run only on pull requests, docs-only changes skip CI although tests assert on docs, no macOS job, no coverage",
-      "depends_on": [],
+      "depends_on": [
+        "SR-1.10",
+        "SR-1.18"
+      ],
       "tasks": 2,
       "criteria": 5,
       "spec": "specs/SR-1.12-ci-that-protects-main.json"
@@ -177,7 +167,7 @@
       "gap": "G13",
       "area": "SR-1",
       "title": "Performance numbers anyone can reproduce",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Docs and site claim 1.1 ms recall and 160 MB heap with no hardware; measured 4.55 ms and 183 MB",
       "depends_on": [],
       "tasks": 2,
@@ -189,7 +179,7 @@
       "gap": "G14",
       "area": "SR-1",
       "title": "The multilingual claim runs in the suite",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "The 26-query, 9-script claim lives in an unwired lab script; the suite tests 7 queries",
       "depends_on": [],
       "tasks": 1,
@@ -201,7 +191,7 @@
       "gap": "G15",
       "area": "SR-1",
       "title": "No code without a caller",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "project-state.mjs (330 lines) and the oplog HLC merge helpers have no production caller; entitlements name features with nothing behind them",
       "depends_on": [],
       "tasks": 1,
@@ -213,11 +203,11 @@
       "gap": "G16",
       "area": "SR-1",
       "title": "Docs and code say the same thing",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Help omits real subcommands; CLIENTS.md says sync every few minutes (default 30); delete is not reconciled; dependency claim overstated",
       "depends_on": [],
-      "tasks": 2,
-      "criteria": 5,
+      "tasks": 3,
+      "criteria": 8,
       "spec": "specs/SR-1.16-docs-and-code-say-the.json"
     },
     {
@@ -225,7 +215,7 @@
       "gap": "G17",
       "area": "SR-1",
       "title": "A bus that scales to a team",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Bus.all() re-sorts every message per call; roster and tasks are O(seats x messages)",
       "depends_on": [],
       "tasks": 1,
@@ -237,7 +227,7 @@
       "gap": "G18",
       "area": "SR-1",
       "title": "Windows out of preview",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "parentProcName has no Windows path; installer is win-x64 only; Windows CI runs 6 files; no lab run",
       "depends_on": [],
       "tasks": 2,
@@ -249,7 +239,7 @@
       "gap": "G19",
       "area": "SR-1",
       "title": "The lab plan is run, not just written",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "143 manual lab cases; no evidence any were run",
       "depends_on": [],
       "tasks": 1,
@@ -261,7 +251,7 @@
       "gap": "G20",
       "area": "SR-1",
       "title": "External security review before any public launch",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "OAuth server, tunnel exposure, device signing, rate limiting and setup channel have had no outside review",
       "depends_on": [
         "SR-1.01",
@@ -276,11 +266,90 @@
       "spec": "specs/SR-1.20-external-security-review-before-any.json"
     },
     {
+      "id": "SR-1.21",
+      "gap": "G86",
+      "area": "SR-1",
+      "title": "A missing note the log cannot rebuild is reported, never silent",
+      "repo": "memev",
+      "closes": "Closes G86: recover() skips a path whose logged content no longer matches its recorded hash with a bare continue (src/engine/vault.mjs:118); the note stays missing while verify() is ok, status().recovered is 0 and every doctor check passes, against DESIGN.md and THREAT-MODEL.md which say a missing file is rebuilt. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence)",
+      "depends_on": [
+        "SR-1.01",
+        "QL-1.02"
+      ],
+      "tasks": 1,
+      "criteria": 5,
+      "spec": "specs/SR-1.21-a-missing-note-is-never-silent.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.22",
+      "gap": "G87",
+      "area": "SR-1",
+      "title": "A whole-note write interrupted after the log append recovers from the log, not from the old file",
+      "repo": "memev",
+      "closes": "Closes G87: write() appends the put to the log and then renames the file; when the rename fails, the next open() imports the old file as an external edit and the note reads the old body while the new body sits in the log (src/engine/vault.mjs:119-121, the prefix rule covers appends only), against README's log-first promise. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence)",
+      "depends_on": [
+        "SR-1.01",
+        "QL-1.02"
+      ],
+      "tasks": 1,
+      "criteria": 4,
+      "spec": "specs/SR-1.22-an-interrupted-write-recovers-from-the-log.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.23",
+      "gap": "G88",
+      "area": "SR-1",
+      "title": "verify() catches a removed tail of the active segment and a removed last record of a path",
+      "repo": "memev",
+      "closes": "Closes G88: removing the last records of the unsealed segment leaves a valid prefix, so verify() reports no gap in 10 of 10 cases although snapshot.json records a higher sequence; a removed or rehashed last record of a path is never caught (src/engine/oplog.mjs:218-234), against the file's own comments that every seal and per-path chain is checked. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence)",
+      "depends_on": [
+        "SR-1.01",
+        "QL-1.02"
+      ],
+      "tasks": 1,
+      "criteria": 4,
+      "spec": "specs/SR-1.23-verify-sees-a-removed-tail.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.24",
+      "gap": "G89",
+      "area": "SR-1",
+      "title": "No CLI command writes vault state beside a live daemon",
+      "repo": "memev",
+      "closes": "Closes G89: with the daemon stopped five CLI commands wrote vault files (token issue to .memev/tokens.json, project set and backup set to .memev/config.json, devices rename to .memev/devices.json and .memev/jobs.json, bus rename edits bus/ from the CLI process after starting a daemon), measured by hashing every vault file before and after; DESIGN.md says the daemon is the only writer. SR-1.01 closes the log-writing case (claims); this contract closes the state files. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence)",
+      "depends_on": [
+        "SR-1.01",
+        "QL-1.02"
+      ],
+      "tasks": 1,
+      "criteria": 5,
+      "spec": "specs/SR-1.24-no-cli-write-beside-a-live-daemon.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.25",
+      "gap": "G90",
+      "area": "SR-1",
+      "title": "A cloud seat allowed to assign tasks addresses one local seat, never all",
+      "repo": "memev",
+      "closes": "Closes G90: with bus.cloud_tasks on, a cloud seat's task to all is accepted (src/engine/bus.mjs:307 checks the type, not the address), while docs/BUS.md:100-101 grants a task to a local seat and nothing else. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence)",
+      "depends_on": [
+        "QL-1.02"
+      ],
+      "tasks": 1,
+      "criteria": 4,
+      "spec": "specs/SR-1.25-a-cloud-seat-addresses-one-local-seat.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+    },
+    {
       "id": "SR-2.01",
       "gap": "G21",
       "area": "SR-2",
       "title": "Recall that finds paraphrases",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Recall is BM25 only; a query with no shared words scores zero",
       "depends_on": [],
       "tasks": 2,
@@ -292,7 +361,7 @@
       "gap": "G22",
       "area": "SR-2",
       "title": "A public memory benchmark",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "No LongMemEval or LoCoMo number; buyers ask for one",
       "depends_on": [
         "SR-2.01"
@@ -306,7 +375,7 @@
       "gap": "G23",
       "area": "SR-2",
       "title": "Every client hook verified against the real app",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Codex, Gemini and Windsurf env markers admitted unverified (common.mjs:80); a vendor change silently breaks hooks",
       "depends_on": [],
       "tasks": 2,
@@ -318,7 +387,7 @@
       "gap": "G24",
       "area": "SR-2",
       "title": "Continuity measured in every app, including those without hooks",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Claude Desktop, VS Code, Zed and Windsurf get instructions only; the compaction benchmark across apps is planned",
       "depends_on": [],
       "tasks": 2,
@@ -330,7 +399,7 @@
       "gap": "G25",
       "area": "SR-2",
       "title": "Catch restatements and count confirmations",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "A restatement in different words gets through; a repeated save is discarded instead of counted",
       "depends_on": [],
       "tasks": 1,
@@ -342,7 +411,7 @@
       "gap": "G26",
       "area": "SR-2",
       "title": "One rules file for every app",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Planned: one rules file written into CLAUDE.md, AGENTS.md, GEMINI.md and Cursor rules",
       "depends_on": [],
       "tasks": 1,
@@ -354,7 +423,7 @@
       "gap": "G27",
       "area": "SR-2",
       "title": "Project names in any script",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Project names written only in non-Latin scripts collapse to the same file name",
       "depends_on": [],
       "tasks": 1,
@@ -366,7 +435,7 @@
       "gap": "G28",
       "area": "SR-2",
       "title": "A local read-only view of the vault",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Planned: a small read-only web view so a person can browse memory, why and provenance",
       "depends_on": [],
       "tasks": 1,
@@ -377,20 +446,20 @@
       "id": "SR-2.09",
       "gap": "G29",
       "area": "SR-2",
-      "title": "Grok: build it or stop showing it",
-      "repo": "mgillr/memev",
-      "closes": "The site shows Grok as coming soon; nothing in the product repo supports it",
+      "title": "The coming-soon provider: build it or stop showing it",
+      "repo": "memev",
+      "closes": "The site shows a third cloud AI provider as coming soon; nothing in the product repo supports it",
       "depends_on": [],
       "tasks": 1,
       "criteria": 3,
-      "spec": "specs/SR-2.09-grok-build-it-or-stop.json"
+      "spec": "specs/SR-2.09-coming-soon-provider-build-it-or-stop.json"
     },
     {
       "id": "SR-3.01",
       "gap": "G30",
       "area": "SR-3",
       "title": "Engine decision: what merges a note, where it lives, how it is licensed",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "crdt-merge is presented as the paid core but merges tensors and records, not Markdown; the engine has no design",
       "depends_on": [],
       "tasks": 1,
@@ -402,7 +471,7 @@
       "gap": "G31",
       "area": "SR-3",
       "title": "An engine conformance suite in the core",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "The service contract in PAID-CONVERGENCE.md has no executable test any engine must pass",
       "depends_on": [
         "SR-3.01"
@@ -412,25 +481,11 @@
       "spec": "specs/SR-3.02-an-engine-conformance-suite-in.json"
     },
     {
-      "id": "SR-3.03",
-      "gap": "G32",
-      "area": "SR-3",
-      "title": "The text merge engine, built and passing conformance",
-      "repo": "mgillr/memev-merge",
-      "closes": "The feature the $12 tier advertises, automatic merge across computers, does not exist",
-      "depends_on": [
-        "SR-3.02"
-      ],
-      "tasks": 3,
-      "criteria": 8,
-      "spec": "specs/SR-3.03-the-text-merge-engine-built.json"
-    },
-    {
       "id": "SR-3.04",
       "gap": "G33",
       "area": "SR-3",
       "title": "Several computers editing one vault at once, nothing to resolve",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Git sync is single-writer and advisory; the oplog HLC merge has no caller; a second writer leaves conflict copies",
       "depends_on": [
         "SR-3.03",
@@ -445,7 +500,7 @@
       "gap": "G34",
       "area": "SR-3",
       "title": "One licence for the engine, stated once",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "The engine licence is stated three ways (BSL 1.1, FSL-1.1-ALv2, draft BUSL-1.1 with licensor to be confirmed)",
       "depends_on": [],
       "tasks": 1,
@@ -453,126 +508,11 @@
       "spec": "specs/SR-3.05-one-licence-for-the-engine.json"
     },
     {
-      "id": "SR-3.06",
-      "gap": "G35",
-      "area": "SR-3",
-      "title": "Know what the patents cover",
-      "repo": "mgillr/memev-ops",
-      "closes": "Two UK patent applications on CRDT model merging; no claims map against Memev and no freedom-to-operate note",
-      "depends_on": [],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-3.06-know-what-the-patents-cover.json"
-    },
-    {
-      "id": "SR-4.01",
-      "gap": "G36",
-      "area": "SR-4",
-      "title": "One architecture for personal and company data",
-      "repo": "mgillr/memev-cloud",
-      "closes": "memev-cloud says servers never read vault content; the Business design says the company server reads everything",
-      "depends_on": [],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-4.01-one-architecture-for-personal-and.json"
-    },
-    {
-      "id": "SR-4.02",
-      "gap": "G37",
-      "area": "SR-4",
-      "title": "A licence server that issues and activates licences",
-      "repo": "mgillr/memev-cloud",
-      "closes": "No licence server exists; memev license activate has nothing to call",
-      "depends_on": [
-        "SR-4.01",
-        "SR-9.03"
-      ],
-      "tasks": 2,
-      "criteria": 5,
-      "spec": "specs/SR-4.02-a-licence-server-that-issues.json"
-    },
-    {
-      "id": "SR-4.03",
-      "gap": "G38",
-      "area": "SR-4",
-      "title": "End-to-end encrypted sync between one person's computers",
-      "repo": "mgillr/memev-cloud",
-      "closes": "Hosted E2E sync is planned and memev-cloud has no code",
-      "depends_on": [
-        "SR-4.01",
-        "SR-3.04"
-      ],
-      "tasks": 2,
-      "criteria": 4,
-      "spec": "specs/SR-4.03-end-to-end-encrypted-sync.json"
-    },
-    {
-      "id": "SR-4.04",
-      "gap": "G39",
-      "area": "SR-4",
-      "title": "A hosted relay with a stable address",
-      "repo": "mgillr/memev-cloud",
-      "closes": "The relay protocol and client exist; no hosted relay or stable address does",
-      "depends_on": [
-        "SR-4.01",
-        "SR-4.02"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-4.04-a-hosted-relay-with-a.json"
-    },
-    {
-      "id": "SR-4.05",
-      "gap": "G40",
-      "area": "SR-4",
-      "title": "Hosted encrypted backup",
-      "repo": "mgillr/memev-cloud",
-      "closes": "Hosted encrypted backup is planned; only GitHub backup exists",
-      "depends_on": [
-        "SR-4.03"
-      ],
-      "tasks": 1,
-      "criteria": 2,
-      "spec": "specs/SR-4.05-hosted-encrypted-backup.json"
-    },
-    {
-      "id": "SR-4.06",
-      "gap": "G41",
-      "area": "SR-4",
-      "title": "Run the hosted services like a business",
-      "repo": "mgillr/memev-cloud",
-      "closes": "No operations: no monitoring, status page, backups of the services themselves or incident process",
-      "depends_on": [
-        "SR-4.02",
-        "SR-4.03",
-        "SR-4.04"
-      ],
-      "tasks": 1,
-      "criteria": 5,
-      "spec": "specs/SR-4.06-run-the-hosted-services-like.json"
-    },
-    {
-      "id": "SR-5.01",
-      "gap": "G42",
-      "area": "SR-5",
-      "title": "People can pay: live checkout, webhook, licence by email",
-      "repo": "mgillr/memev-cloud",
-      "closes": "Stripe is in test mode; no webhook, no licence email; the paid tier cannot be bought",
-      "depends_on": [
-        "SR-4.02",
-        "SR-9.01",
-        "SR-9.02"
-      ],
-      "tasks": 2,
-      "criteria": 4,
-      "spec": "specs/SR-5.01-people-can-pay-live-checkout.json"
-    },
-    {
       "id": "SR-5.02",
       "gap": "G43",
       "area": "SR-5",
       "title": "The Business trial can actually start",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "invite.trialAvailable() returns false (MEM-067); the site offers a trial no one can start",
       "depends_on": [
         "SR-4.02",
@@ -583,25 +523,11 @@
       "spec": "specs/SR-5.02-the-business-trial-can-actually.json"
     },
     {
-      "id": "SR-5.03",
-      "gap": "G44",
-      "area": "SR-5",
-      "title": "Referral credit",
-      "repo": "mgillr/memev-cloud",
-      "closes": "REFERRAL.md is a draft spec with nothing built",
-      "depends_on": [
-        "SR-5.01"
-      ],
-      "tasks": 1,
-      "criteria": 2,
-      "spec": "specs/SR-5.03-referral-credit.json"
-    },
-    {
       "id": "SR-5.04",
       "gap": "G45",
       "area": "SR-5",
       "title": "Paid tiers sell only what is built, on every surface",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "The $12 tier advertises automatic merge, which does not exist; the pricing test covers docs but not the site",
       "depends_on": [],
       "tasks": 1,
@@ -609,37 +535,11 @@
       "spec": "specs/SR-5.04-paid-tiers-sell-only-what.json"
     },
     {
-      "id": "SR-5.05",
-      "gap": "G46",
-      "area": "SR-5",
-      "title": "A rate card for Business and Corporate",
-      "repo": "mgillr/memev-ops",
-      "closes": "Business and Corporate are contact-us with no price logic; services are day rates on request",
-      "depends_on": [
-        "SR-7.13"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-5.05-a-rate-card-for-business.json"
-    },
-    {
-      "id": "SR-5.06",
-      "gap": "G47",
-      "area": "SR-5",
-      "title": "Support the company can actually deliver",
-      "repo": "mgillr/memev-ops",
-      "closes": "Paid support has no address; Corporate promises 1-hour 24/7 response and embedded engineers a one-person company cannot give",
-      "depends_on": [],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-5.06-support-the-company-can-actually.json"
-    },
-    {
       "id": "SR-6.01",
       "gap": "G48",
       "area": "SR-6",
       "title": "The repository goes public",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "The repository is private, so no one can find, star or install it",
       "depends_on": [
         "SR-1.20",
@@ -654,7 +554,7 @@
       "gap": "G49",
       "area": "SR-6",
       "title": "npx memev init works",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Not on npm; the one-command install path is coming soon",
       "depends_on": [
         "SR-6.01"
@@ -668,7 +568,7 @@
       "gap": "G50",
       "area": "SR-6",
       "title": "Installers and a container anyone can fetch",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Installers have no download URL; the Docker image is on no registry",
       "depends_on": [
         "SR-6.01"
@@ -682,7 +582,7 @@
       "gap": "G51",
       "area": "SR-6",
       "title": "Listed where people look for MCP servers",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "MCP and connector directory entries are drafts marked do not post",
       "depends_on": [
         "SR-6.02"
@@ -692,398 +592,11 @@
       "spec": "specs/SR-6.04-listed-where-people-look-for.json"
     },
     {
-      "id": "SR-6.05",
-      "gap": "G52",
-      "area": "SR-6",
-      "title": "A site that leads to the product",
-      "repo": "mgillr/memev-site",
-      "closes": "The site links to no repository, registry or installer; every call to action is a mailto",
-      "depends_on": [
-        "SR-6.02"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-6.05-a-site-that-leads-to.json"
-    },
-    {
-      "id": "SR-6.06",
-      "gap": "G53",
-      "area": "SR-6",
-      "title": "The site says only what is true",
-      "repo": "mgillr/memev-site",
-      "closes": "The site shows automatic merge, a free cloud trial, a company vault and 24-hour offboarding as available; all are planned",
-      "depends_on": [
-        "SR-5.04"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-6.06-the-site-says-only-what.json"
-    },
-    {
-      "id": "SR-6.07",
-      "gap": "G54",
-      "area": "SR-6",
-      "title": "One positioning, chosen and used everywhere",
-      "repo": "mgillr/memev-ops",
-      "closes": "Three taglines in circulation; memory, coordination and governance all claimed; platform memory erodes the memory-only pitch",
-      "depends_on": [],
-      "tasks": 2,
-      "criteria": 6,
-      "spec": "specs/SR-6.07-one-positioning-chosen-and-used.json"
-    },
-    {
-      "id": "SR-6.08",
-      "gap": "G55",
-      "area": "SR-6",
-      "title": "Proof that people use it",
-      "repo": "mgillr/memev-ops",
-      "closes": "No users, waitlist, metrics or retention anywhere",
-      "depends_on": [
-        "SR-6.02",
-        "SR-6.04",
-        "SR-6.05"
-      ],
-      "tasks": 2,
-      "criteria": 6,
-      "spec": "specs/SR-6.08-proof-that-people-use-it.json"
-    },
-    {
-      "id": "SR-6.09",
-      "gap": "G56",
-      "area": "SR-6",
-      "title": "A name the company can own",
-      "repo": "mgillr/memev-ops",
-      "closes": "Memev collides with memecoin and MEV search results; no trademark search or filing for Memev or Proofline",
-      "depends_on": [],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-6.09-a-name-the-company-can.json"
-    },
-    {
-      "id": "SR-7.01",
-      "gap": "G57",
-      "area": "SR-7",
-      "title": "A company vault European works councils will accept",
-      "repo": "mgillr/memev-org",
-      "closes": "\"The company sees everything a member syncs\" will meet works-council and privacy objections in CH and the EU, as the FAQ admits",
-      "depends_on": [],
-      "tasks": 2,
-      "criteria": 6,
-      "spec": "specs/SR-7.01-a-company-vault-european-works.json"
-    },
-    {
-      "id": "SR-7.02",
-      "gap": "G58",
-      "area": "SR-7",
-      "title": "A company server with accounts",
-      "repo": "mgillr/memev-org",
-      "closes": "The company server, the host of every Business feature, does not exist",
-      "depends_on": [
-        "SR-7.01",
-        "SR-4.01"
-      ],
-      "tasks": 2,
-      "criteria": 5,
-      "spec": "specs/SR-7.02-a-company-server-with-accounts.json"
-    },
-    {
-      "id": "SR-7.03",
-      "gap": "G59",
-      "area": "SR-7",
-      "title": "Members, keys and invites",
-      "repo": "mgillr/memev-org",
-      "closes": "Member keys, org-admin invites and separate personal and company identities are planned",
-      "depends_on": [
-        "SR-7.02"
-      ],
-      "tasks": 2,
-      "criteria": 4,
-      "spec": "specs/SR-7.03-members-keys-and-invites.json"
-    },
-    {
-      "id": "SR-7.04",
-      "gap": "G60",
-      "area": "SR-7",
-      "title": "Promote up, company knowledge down",
-      "repo": "mgillr/memev-org",
-      "closes": "The company vault that members sync into and learn from is planned and depends on an engine that did not exist",
-      "depends_on": [
-        "SR-7.03",
-        "SR-3.03"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-7.04-promote-up-company-knowledge-down.json"
-    },
-    {
-      "id": "SR-7.05",
-      "gap": "G61",
-      "area": "SR-7",
-      "title": "An admin console",
-      "repo": "mgillr/memev-org",
-      "closes": "The admin console that sees and searches the company vault is planned",
-      "depends_on": [
-        "SR-7.04"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-7.05-an-admin-console.json"
-    },
-    {
-      "id": "SR-7.06",
-      "gap": "G62",
-      "area": "SR-7",
-      "title": "Offboarding inside the time the site promises",
-      "repo": "mgillr/memev-org",
-      "closes": "The site promises access removed within 24 hours; offboarding (revoke, remove devices, wipe cache) is planned",
-      "depends_on": [
-        "SR-7.03"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-7.06-offboarding-inside-the-time-the.json"
-    },
-    {
-      "id": "SR-7.07",
-      "gap": "G63",
-      "area": "SR-7",
-      "title": "Sign in with Google Workspace and Microsoft Entra ID",
-      "repo": "mgillr/memev-org",
-      "closes": "SSO is planned; companies will not buy without it",
-      "depends_on": [
-        "SR-7.02"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-7.07-sign-in-with-google-workspace.json"
-    },
-    {
-      "id": "SR-7.08",
-      "gap": "G64",
-      "area": "SR-7",
-      "title": "Roles and path grants from the org chart",
-      "repo": "mgillr/memev-org",
-      "closes": "Departments, roles and deny-by-default path grants are planned; oversharing is the top enterprise risk",
-      "depends_on": [
-        "SR-7.04"
-      ],
-      "tasks": 1,
-      "criteria": 2,
-      "spec": "specs/SR-7.08-roles-and-path-grants-from.json"
-    },
-    {
-      "id": "SR-7.09",
-      "gap": "G65",
-      "area": "SR-7",
-      "title": "Control what reaches the AI provider",
-      "repo": "mgillr/memev-org",
-      "closes": "Labels, egress rules, pseudonymising and an egress log are planned",
-      "depends_on": [
-        "SR-7.08"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-7.09-control-what-reaches-the-ai.json"
-    },
-    {
-      "id": "SR-7.10",
-      "gap": "G66",
-      "area": "SR-7",
-      "title": "One AI provider per organisation",
-      "repo": "mgillr/memev-org",
-      "closes": "Connecting one cloud AI service or an on-prem LLM for the organisation over MCP is planned",
-      "depends_on": [
-        "SR-7.09"
-      ],
-      "tasks": 1,
-      "criteria": 2,
-      "spec": "specs/SR-7.10-one-ai-provider-per-organisation.json"
-    },
-    {
-      "id": "SR-7.11",
-      "gap": "G67",
-      "area": "SR-7",
-      "title": "A Business trial that starts in minutes",
-      "repo": "mgillr/memev-org",
-      "closes": "The site offers a free self-serve cloud trial; there is no hosted company server to start it on",
-      "depends_on": [
-        "SR-7.02",
-        "SR-5.02",
-        "SR-4.06"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-7.11-a-business-trial-that-starts.json"
-    },
-    {
-      "id": "SR-7.12",
-      "gap": "G68",
-      "area": "SR-7",
-      "title": "The agent coordination control plane",
-      "repo": "mgillr/memev-org",
-      "closes": "The bull case, vendor-neutral coordination of many agents across many vendors, is unpositioned and unbuilt beyond one person's bus",
-      "depends_on": [
-        "SR-7.04",
-        "SR-7.08"
-      ],
-      "tasks": 2,
-      "criteria": 4,
-      "spec": "specs/SR-7.12-the-agent-coordination-control-plane.json"
-    },
-    {
-      "id": "SR-7.13",
-      "gap": "G69",
-      "area": "SR-7",
-      "title": "Two design partners in regulated SMEs",
-      "repo": "mgillr/memev-ops",
-      "closes": "No design partner, pilot or letter of intent; the Business thesis is untested",
-      "depends_on": [
-        "SR-7.01"
-      ],
-      "tasks": 2,
-      "criteria": 4,
-      "spec": "specs/SR-7.13-two-design-partners-in-regulated.json"
-    },
-    {
-      "id": "SR-8.01",
-      "gap": "G70",
-      "area": "SR-8",
-      "title": "High availability",
-      "repo": "mgillr/memev-org",
-      "closes": "Load-balanced, replicated, failover deployment for Corporate is planned",
-      "depends_on": [
-        "SR-7.05"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-8.01-high-availability.json"
-    },
-    {
-      "id": "SR-8.02",
-      "gap": "G71",
-      "area": "SR-8",
-      "title": "An air-gapped package",
-      "repo": "mgillr/memev-org",
-      "closes": "The air-gapped package with signed bundle updates is planned",
-      "depends_on": [
-        "SR-7.10"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-8.02-an-air-gapped-package.json"
-    },
-    {
-      "id": "SR-8.03",
-      "gap": "G72",
-      "area": "SR-8",
-      "title": "SCIM provisioning",
-      "repo": "mgillr/memev-org",
-      "closes": "SCIM is planned",
-      "depends_on": [
-        "SR-7.07"
-      ],
-      "tasks": 1,
-      "criteria": 2,
-      "spec": "specs/SR-8.03-scim-provisioning.json"
-    },
-    {
-      "id": "SR-8.04",
-      "gap": "G73",
-      "area": "SR-8",
-      "title": "Audit export, retention and legal hold",
-      "repo": "mgillr/memev-org",
-      "closes": "SIEM export, retention rules and legal hold are planned",
-      "depends_on": [
-        "SR-7.09"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-8.04-audit-export-retention-and-legal.json"
-    },
-    {
-      "id": "SR-8.05",
-      "gap": "G74",
-      "area": "SR-8",
-      "title": "Source escrow and a succession plan",
-      "repo": "mgillr/memev-ops",
-      "closes": "Escrow and succession are planned; a one-person vendor is a supplier risk for corporate buyers",
-      "depends_on": [
-        "SR-9.01"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-8.05-source-escrow-and-a-succession.json"
-    },
-    {
-      "id": "SR-8.06",
-      "gap": "G75",
-      "area": "SR-8",
-      "title": "A services catalogue matched to capacity",
-      "repo": "mgillr/memev-ops",
-      "closes": "Setup in 2 to 12 weeks, 1-hour 24/7 response and embedded engineers are offered with no one to deliver them",
-      "depends_on": [
-        "SR-9.05"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-8.06-a-services-catalogue-matched-to.json"
-    },
-    {
-      "id": "SR-9.01",
-      "gap": "G76",
-      "area": "SR-9",
-      "title": "A legal entity with a published imprint",
-      "repo": "mgillr/memev-ops",
-      "closes": "No legal form, address or UID; imprints read \"published shortly\"; Swiss UWG identity rules unmet; domicile unclear after the move",
-      "depends_on": [],
-      "tasks": 2,
-      "criteria": 5,
-      "spec": "specs/SR-9.01-a-legal-entity-with-a.json"
-    },
-    {
-      "id": "SR-9.02",
-      "gap": "G77",
-      "area": "SR-9",
-      "title": "Terms, privacy policy and DPA",
-      "repo": "mgillr/memev-ops",
-      "closes": "No terms of service, privacy policy for hosted services, data processing agreement or subprocessor list",
-      "depends_on": [
-        "SR-9.01"
-      ],
-      "tasks": 1,
-      "criteria": 5,
-      "spec": "specs/SR-9.02-terms-privacy-policy-and-dpa.json"
-    },
-    {
-      "id": "SR-9.03",
-      "gap": "G78",
-      "area": "SR-9",
-      "title": "The vendor signing key is safe and recoverable",
-      "repo": "mgillr/memev-ops",
-      "closes": "One person holds the licence private key; no custody, backup or rotation plan",
-      "depends_on": [],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-9.03-the-vendor-signing-key-is.json"
-    },
-    {
-      "id": "SR-9.04",
-      "gap": "G79",
-      "area": "SR-9",
-      "title": "A founder committed full time, and a focused portfolio",
-      "repo": "mgillr/memev-ops",
-      "closes": "Commitment unclear alongside a job search and relocation; attention spread over Memev, Memora, TOPC, Proofline and model-merging research",
-      "depends_on": [],
-      "tasks": 1,
-      "criteria": 4,
-      "spec": "specs/SR-9.04-a-founder-committed-full-time.json"
-    },
-    {
       "id": "SR-9.05",
       "gap": "G80",
       "area": "SR-9",
       "title": "A second engineer and two-person review",
-      "repo": "mgillr/memev",
+      "repo": "memev",
       "closes": "Bus factor of one; the code has never had a second human reader",
       "depends_on": [
         "SR-9.01",
@@ -1092,51 +605,8 @@
       "tasks": 2,
       "criteria": 5,
       "spec": "specs/SR-9.05-a-second-engineer-and-two.json"
-    },
-    {
-      "id": "SR-9.06",
-      "gap": "G81",
-      "area": "SR-9",
-      "title": "Commercial experience on the team",
-      "repo": "mgillr/memev-ops",
-      "closes": "No commercial co-founder or advisor who has sold self-hosted developer infrastructure to European mid-market buyers",
-      "depends_on": [
-        "SR-9.01"
-      ],
-      "tasks": 1,
-      "criteria": 2,
-      "spec": "specs/SR-9.06-commercial-experience-on-the-team.json"
-    },
-    {
-      "id": "SR-9.07",
-      "gap": "G82",
-      "area": "SR-9",
-      "title": "The company owns its IP",
-      "repo": "mgillr/memev-ops",
-      "closes": "Memev, crdt-merge, Proofline and the patent applications are held personally; an investor needs them in the company",
-      "depends_on": [
-        "SR-9.01",
-        "SR-3.05"
-      ],
-      "tasks": 1,
-      "criteria": 3,
-      "spec": "specs/SR-9.07-the-company-owns-its-ip.json"
-    },
-    {
-      "id": "SR-9.08",
-      "gap": "G83",
-      "area": "SR-9",
-      "title": "A data room an investor can work from",
-      "repo": "mgillr/memev-ops",
-      "closes": "No deck, financial model, cap table or use-of-funds plan",
-      "depends_on": [
-        "SR-9.07",
-        "SR-6.08",
-        "SR-5.05"
-      ],
-      "tasks": 1,
-      "criteria": 4,
-      "spec": "specs/SR-9.08-a-data-room-an-investor.json"
     }
-  ]
+  ],
+  "note": "Repository names are given without the account; all six live under the same GitHub account as this repository. SR-2.09 names the provider by its role because the vendor name is on this repository's leak denylist.",
+  "amended": "2026-10-30: see AMENDMENTS.md"
 }

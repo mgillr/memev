@@ -2,7 +2,7 @@
   "title": "SR-1.01 One writer, enforced: an exclusive lock on the vault log",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G01: Single-writer rule is convention only; runner.mjs opens a Vault beside a live daemon and can corrupt the oplog. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G01: Single-writer rule is convention only; runner.mjs opens a Vault beside a live daemon and can corrupt the oplog. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -12,7 +12,8 @@
       "requirements": [
         "OpLog.open takes an exclusive lock file (O_EXCL with stale-pid recovery) before truncating or rewriting the manifest",
         "a second opener gets a VaultLocked error naming the holder pid",
-        "a read-only open mode exists that never mutates the log"
+        "a read-only open mode exists that never mutates the log",
+        "the test opens a second writable Vault the way memev claims does (src/cli/main.mjs:327, which opens the vault in process and rewrites .memev/oplog/snapshot.json) beside an open one and asserts VaultLocked and an unchanged snapshot"
       ],
       "description": "",
       "scope": [
@@ -85,7 +86,8 @@
           "statement": "The full suite passes",
           "verifier": {
             "type": "command",
-            "cmd": "npm test"
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
           }
         },
         {

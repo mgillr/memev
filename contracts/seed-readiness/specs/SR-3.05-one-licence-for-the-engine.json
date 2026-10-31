@@ -2,7 +2,7 @@
   "title": "SR-3.05 One licence for the engine, stated once",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G34: The engine licence is stated three ways (BSL 1.1, FSL-1.1-ALv2, draft BUSL-1.1 with licensor to be confirmed). Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G34: The engine licence is stated three ways (BSL 1.1, FSL-1.1-ALv2, draft BUSL-1.1 with licensor to be confirmed). Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",

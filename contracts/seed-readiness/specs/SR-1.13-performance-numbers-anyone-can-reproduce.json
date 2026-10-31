@@ -2,7 +2,7 @@
   "title": "SR-1.13 Performance numbers anyone can reproduce",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G13: Docs and site claim 1.1 ms recall and 160 MB heap with no hardware; measured 4.55 ms and 183 MB. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G13: Docs and site claim 1.1 ms recall and 160 MB heap with no hardware; measured 4.55 ms and 183 MB. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",

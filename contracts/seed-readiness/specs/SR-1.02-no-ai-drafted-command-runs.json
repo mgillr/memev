@@ -2,7 +2,7 @@
   "title": "SR-1.02 No AI-drafted command runs without local approval",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G02: Contract verify runs sh -c commands a local session drafted and signed in one turn (contracts.mjs:213-228). Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G02: Contract verify runs sh -c commands a local session drafted and signed in one turn (contracts.mjs:213-228). Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -43,7 +43,8 @@
           "statement": "The full suite passes",
           "verifier": {
             "type": "command",
-            "cmd": "npm test"
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
           }
         },
         {

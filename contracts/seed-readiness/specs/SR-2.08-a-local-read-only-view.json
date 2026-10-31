@@ -2,7 +2,7 @@
   "title": "SR-2.08 A local read-only view of the vault",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G28: Planned: a small read-only web view so a person can browse memory, why and provenance. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G28: Planned: a small read-only web view so a person can browse memory, why and provenance. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",

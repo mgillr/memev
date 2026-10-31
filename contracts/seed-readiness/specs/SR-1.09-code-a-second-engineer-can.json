@@ -2,7 +2,7 @@
   "title": "SR-1.09 Code a second engineer can read",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G09: 300 to 600 character lines, server imports CLI, helpers duplicated three times, empty catch blocks hide faults. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G09: 300 to 600 character lines, server imports CLI, helpers duplicated three times, empty catch blocks hide faults. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -100,7 +100,8 @@
       "description": "",
       "scope": [
         "src/**",
-        "test/style.test.mjs"
+        "test/style.test.mjs",
+        "scripts/count-silent-catch.mjs"
       ],
       "criteria": [
         {
@@ -117,7 +118,8 @@
           "statement": "The full suite passes",
           "verifier": {
             "type": "command",
-            "cmd": "npm test"
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
           }
         },
         {

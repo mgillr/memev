@@ -2,7 +2,7 @@
   "title": "SR-2.03 Every client hook verified against the real app",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G23: Codex, Gemini and Windsurf env markers admitted unverified (common.mjs:80); a vendor change silently breaks hooks. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G23: Codex, Gemini and Windsurf env markers admitted unverified (common.mjs:80); a vendor change silently breaks hooks. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",

@@ -2,7 +2,7 @@
   "title": "SR-1.07 Pinned TLS on the relay and a configured OAuth issuer",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G07: Relay client uses rejectUnauthorized:false with name pinning; the OAuth issuer is derived from the Host header. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G07: Relay client uses rejectUnauthorized:false with name pinning; the OAuth issuer is derived from the Host header. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -65,7 +65,8 @@
           "statement": "The full suite passes",
           "verifier": {
             "type": "command",
-            "cmd": "npm test"
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
           }
         },
         {

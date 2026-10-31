@@ -1,8 +1,8 @@
 {
-  "title": "SR-2.09 Grok: build it or stop showing it",
+  "title": "SR-2.09 The coming-soon provider: build it or stop showing it",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G29: The site shows Grok as coming soon; nothing in the product repo supports it. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G29: The site shows a third cloud AI provider as coming soon; nothing in the product repo supports it. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -10,7 +10,7 @@
       "phase": "implement",
       "depends_on": [],
       "requirements": [
-        "a decision record says whether Grok is supported; if yes, a connector with a test; if no, the site drops it (SR-6.06)"
+        "a decision record says whether the coming-soon provider is supported; if yes, a connector with a test; if no, the site drops it (SR-6.06)"
       ],
       "description": "",
       "scope": [
@@ -24,14 +24,14 @@
           "statement": "The decision is recorded",
           "verifier": {
             "type": "file_exists",
-            "path": "docs/decisions/grok.md"
+            "path": "docs/decisions/coming-soon-provider.md"
           }
         },
         {
           "statement": "The decision is build or drop",
           "verifier": {
             "type": "grep",
-            "file": "docs/decisions/grok.md",
+            "file": "docs/decisions/coming-soon-provider.md",
             "pattern": "Decision:\\s*(build|drop)"
           }
         },

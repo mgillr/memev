@@ -2,7 +2,7 @@
   "title": "SR-1.04 Cloud connectors: no bearer in the URL, proof of possession",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G04: Connector URLs embed the bearer token in the path (logged by tunnel providers); cloud tokens are plain replayable bearers. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G04: Connector URLs embed the bearer token in the path (logged by tunnel providers); cloud tokens are plain replayable bearers. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -78,7 +78,8 @@
           "statement": "The full suite passes",
           "verifier": {
             "type": "command",
-            "cmd": "npm test"
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
           }
         },
         {

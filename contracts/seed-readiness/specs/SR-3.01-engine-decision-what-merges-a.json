@@ -2,7 +2,7 @@
   "title": "SR-3.01 Engine decision: what merges a note, where it lives, how it is licensed",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G30: crdt-merge is presented as the paid core but merges tensors and records, not Markdown; the engine has no design. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G30: crdt-merge is presented as the paid core but merges tensors and records, not Markdown; the engine has no design. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",

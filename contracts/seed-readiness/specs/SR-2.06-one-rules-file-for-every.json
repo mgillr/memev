@@ -2,7 +2,7 @@
   "title": "SR-2.06 One rules file for every app",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G26: Planned: one rules file written into CLAUDE.md, AGENTS.md, GEMINI.md and Cursor rules. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G26: Planned: one rules file written into CLAUDE.md, AGENTS.md, GEMINI.md and Cursor rules. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",

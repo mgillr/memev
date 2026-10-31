@@ -2,7 +2,7 @@
   "title": "SR-3.04 Several computers editing one vault at once, nothing to resolve",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G33: Git sync is single-writer and advisory; the oplog HLC merge has no caller; a second writer leaves conflict copies. Repository: mgillr/memev. Depends on contracts: SR-3.03, SR-1.01.",
+  "request": "Closes G33: Git sync is single-writer and advisory; the oplog HLC merge has no caller; a second writer leaves conflict copies. Repository: memev. Depends on contracts: SR-3.03, SR-1.01.",
   "tasks": [
     {
       "id": "T1",

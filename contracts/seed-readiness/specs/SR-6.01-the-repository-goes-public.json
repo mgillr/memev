@@ -2,7 +2,7 @@
   "title": "SR-6.01 The repository goes public",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G48: The repository is private, so no one can find, star or install it. Repository: mgillr/memev. Depends on contracts: SR-1.20, SR-9.01.",
+  "request": "Closes G48: The repository is private, so no one can find, star or install it. Repository: memev. Depends on contracts: SR-1.20, SR-9.01.",
   "tasks": [
     {
       "id": "T1",
@@ -46,7 +46,7 @@
           "statement": "The repository is public",
           "verifier": {
             "type": "command",
-            "cmd": "gh repo view mgillr/memev --json visibility -q .visibility | grep -qx PUBLIC"
+            "cmd": "gh repo view --json visibility -q .visibility | grep -qx PUBLIC"
           }
         },
         {

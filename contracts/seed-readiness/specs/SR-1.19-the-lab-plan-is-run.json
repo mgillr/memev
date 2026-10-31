@@ -2,7 +2,7 @@
   "title": "SR-1.19 The lab plan is run, not just written",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G19: 143 manual lab cases; no evidence any were run. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G19: 143 manual lab cases; no evidence any were run. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",

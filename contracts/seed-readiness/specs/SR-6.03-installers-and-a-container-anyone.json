@@ -2,7 +2,7 @@
   "title": "SR-6.03 Installers and a container anyone can fetch",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G50: Installers have no download URL; the Docker image is on no registry. Repository: mgillr/memev. Depends on contracts: SR-6.01.",
+  "request": "Closes G50: Installers have no download URL; the Docker image is on no registry. Repository: memev. Depends on contracts: SR-6.01.",
   "tasks": [
     {
       "id": "T1",

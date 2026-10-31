@@ -2,7 +2,7 @@
   "title": "SR-1.08 Remote setup session: allowlist that works, tested like the rest",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G08: setup-remote.mjs allowlists a deployment command the deployment module cannot accept; no SPDX header; one test file. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G08: setup-remote.mjs allowlists a deployment command the deployment module cannot accept; no SPDX header; one test file. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -59,7 +59,8 @@
       ],
       "description": "",
       "scope": [
-        "test/**"
+        "test/**",
+        "scripts/coverage-of.mjs"
       ],
       "criteria": [
         {

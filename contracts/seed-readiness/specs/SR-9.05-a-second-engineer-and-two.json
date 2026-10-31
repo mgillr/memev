@@ -2,7 +2,7 @@
   "title": "SR-9.05 A second engineer and two-person review",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G80: Bus factor of one; the code has never had a second human reader. Repository: mgillr/memev. Depends on contracts: SR-9.01, SR-1.09.",
+  "request": "Closes G80: Bus factor of one; the code has never had a second human reader. Repository: memev. Depends on contracts: SR-9.01, SR-1.09.",
   "tasks": [
     {
       "id": "T1",
@@ -50,14 +50,15 @@
       "description": "",
       "scope": [
         ".github/**",
-        "docs/DEVELOPING.md"
+        "docs/DEVELOPING.md",
+        "scripts/review-stats.mjs"
       ],
       "criteria": [
         {
           "statement": "Main requires an approving review",
           "verifier": {
             "type": "command",
-            "cmd": "gh api repos/mgillr/memev/branches/main/protection --jq .required_pull_request_reviews.required_approving_review_count | grep -qx 1"
+            "cmd": "gh api repos/{owner}/{repo}/branches/main/protection --jq .required_pull_request_reviews.required_approving_review_count | grep -qx 1"
           }
         },
         {

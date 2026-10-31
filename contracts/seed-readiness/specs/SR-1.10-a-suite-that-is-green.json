@@ -2,7 +2,7 @@
   "title": "SR-1.10 A suite that is green on any machine",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G10: 12 tests need ssh-keygen, 8 need an authenticated gh and network, 3 fail when MEMEV_NO_SERVICE is set. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G10: 12 tests need ssh-keygen, 8 need an authenticated gh and network, 3 fail when MEMEV_NO_SERVICE is set. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -68,7 +68,8 @@
           "statement": "The suite passes with no network, no ssh-keygen and a bare environment",
           "verifier": {
             "type": "command",
-            "cmd": "env -i PATH=/usr/bin:/bin:$(dirname $(command -v node)) HOME=/tmp/memev-hermetic npm test"
+            "cmd": "mkdir -p /tmp/memev-hermetic && env -i PATH=/usr/bin:/bin:$(dirname $(command -v node)) HOME=/tmp/memev-hermetic MEMEV_NO_SERVICE=1 npm test",
+            "timeout_s": 1800
           }
         },
         {

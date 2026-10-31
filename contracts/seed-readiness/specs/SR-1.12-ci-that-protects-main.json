@@ -2,7 +2,7 @@
   "title": "SR-1.12 CI that protects main",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G12: Linux tests run only on pull requests, docs-only changes skip CI although tests assert on docs, no macOS job, no coverage. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G12: Linux tests run only on pull requests, docs-only changes skip CI although tests assert on docs, no macOS job, no coverage. Repository: memev. Depends on contracts: SR-1.10, SR-1.18.",
   "tasks": [
     {
       "id": "T1",

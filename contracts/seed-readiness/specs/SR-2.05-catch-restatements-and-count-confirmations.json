@@ -2,7 +2,7 @@
   "title": "SR-2.05 Catch restatements and count confirmations",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G25: A restatement in different words gets through; a repeated save is discarded instead of counted. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G25: A restatement in different words gets through; a repeated save is discarded instead of counted. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -32,7 +32,8 @@
           "statement": "The full suite passes",
           "verifier": {
             "type": "command",
-            "cmd": "npm test"
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
           }
         },
         {

@@ -2,7 +2,7 @@
   "title": "SR-1.11 memev stop always ends inside its bound",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G11: REV-022 AC03 is a real flake: stop takes 5.2 s on 2 vCPU and the daemon is SIGKILLed mid shutdown-sync. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G11: REV-022 AC03 is a real flake: stop takes 5.2 s on 2 vCPU and the daemon is SIGKILLed mid shutdown-sync. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -11,7 +11,8 @@
       "depends_on": [],
       "requirements": [
         "the shutdown sync is cancelled at its deadline, child git processes are killed, and the daemon exits before SIGKILL",
-        "the 4.8 s bound in the test is unchanged"
+        "the 4.8 s bound in the test is unchanged",
+        "the 20-run check prints the CPU count, the CPU model and the 1-minute load with its result, so a timing read on other hardware is labelled"
       ],
       "description": "",
       "scope": [

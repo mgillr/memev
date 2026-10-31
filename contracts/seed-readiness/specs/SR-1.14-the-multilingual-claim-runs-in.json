@@ -2,7 +2,7 @@
   "title": "SR-1.14 The multilingual claim runs in the suite",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G14: The 26-query, 9-script claim lives in an unwired lab script; the suite tests 7 queries. Repository: mgillr/memev. Depends on contracts: none.",
+  "request": "Closes G14: The 26-query, 9-script claim lives in an unwired lab script; the suite tests 7 queries. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",

@@ -1,0 +1,101 @@
+{
+  "title": "QL-1.04 The claims check runs in every repository from one script: a claim ahead of its status row fails CI",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes quality-loop principle 4 (CI fails in any repo, site included, if a claim runs ahead of its row). Repository: memev. Depends on contracts: SR-5.04. Quality-loop principle set of 30 October 2026 (owner's order: implement as a gate for all dev).",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "One claims checker",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "scripts/gate/claims.mjs reads the status table of SR-5.04 (docs/status.json, or the path given by --status) and scans the files given by --surfaces (globs) for each feature's claim phrases; a feature whose row is planned and appears without the planned label, or a performance figure without a results file named in its row, is a finding",
+        "a planned row without a date older than four weeks is a warning and older than eight weeks is a finding that says give it a date, drop it, or move it to the roadmap (principle 5)",
+        "--json prints {features, claims, findings, warnings}; exit 1 on any finding; no dependencies; a version: comment on the first line"
+      ],
+      "description": "",
+      "scope": [
+        "scripts/gate/claims.mjs",
+        "test/gate-claims.test.mjs",
+        "test/fixtures/claims/**",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "A fixture page claiming a planned feature without its label fails; the same page with the label passes; a planned row nine weeks old without a date fails and five weeks old warns",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-claims.test.mjs",
+            "cmd": "node --test test/gate-claims.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Shipped to the other repositories",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "scripts/gate/sync-gates.mjs copies scripts/gate/** into a target checkout given by --to and prints the version of each file copied; a target whose copy is older than this repository's is reported",
+        "docs/DEVELOPING.md says the gate scripts are owned here and copied into memev-site, memev-cloud, memev-org and memev-ops, and that each of them runs claims.mjs in its CI"
+      ],
+      "description": "",
+      "scope": [
+        "scripts/gate/sync-gates.mjs",
+        "docs/DEVELOPING.md",
+        "test/gate-sync.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "Syncing into a temporary git checkout writes every gate script with its version and reports an older copy",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sync.test.mjs",
+            "cmd": "node --test test/gate-sync.test.mjs"
+          }
+        },
+        {
+          "statement": "The developing page names the four receiving repositories",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/DEVELOPING.md",
+            "pattern": "memev-site, memev-cloud, memev-org and memev-ops"
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,234 @@
+{
+  "title": "SR-0.03 Verify runs every verifier type the specs use: red-green tests, metrics and scope, behind the same local gates as commands",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G85 (found 30 October 2026 while checking the WBS runbook against the code): memev verify runs only command, file_exists, test_exists and grep (src/engine/contracts.mjs:224-235); test_red_green, metric and scope criteria return BLOCKED as checked by a person or CI, so 213 of the 340 seed-readiness criteria (scope 118, test_red_green 64, metric 31) cannot PASS through the tool the WBS names, and no task of the 85 contracts can reach PASS because the attest lint requires a scope criterion per task. Repository: memev. Depends on contracts: none. Sequenced with SR-1.02: both change the command-execution path of contracts.mjs, so the local-approval gate of SR-1.02 covers the new verifiers (red-green and metric spawn commands exactly as command criteria do and inherit every gate: remote-signed needs approval, exec_local_only, contracts.exec). Security checklist for this change (who can call: any holder of a read token over MCP or the CLI, as for verify today; what runs: the contract's own commands in its workdir, and the red run in a detached temporary worktree of the recorded base; what survives a restart: the base sha inside the signed contract, and temporary worktrees are removed in a finally block and pruned at the next run; two processes: each verify creates its own temporary worktree under its own name, and the green run is the contract's own command as today).",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Base revision recorded at signing",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "contractSign records base = { sha, recorded_at } from git rev-parse HEAD of the contract's workdir when the workdir is a git checkout, before the DSSE signature is made, so the signature covers it",
+        "memev contract new accepts an explicit base sha in the spec and refuses a value that is not 40 hex characters",
+        "a scope or test_red_green criterion of a contract without a recorded base returns BLOCKED with the detail no base revision recorded, never PASS",
+        "docs/CONTRACTS.md documents the base and where verify reads it",
+        "command, metric and red-green commands run with MEMEV_CONTRACT_BASE set to the recorded base sha in their environment, so a criterion can name the base (the mutation gate of QL-1.02 reads it)"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/contracts.mjs",
+        "src/cli/contracts-cli.mjs",
+        "docs/CONTRACTS.md",
+        "test/contracts-base.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "Signing in a git workdir records the base sha and a signed contract without one gets BLOCKED on its scope criterion",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base.test.mjs",
+            "cmd": "node --test test/contracts-base.test.mjs"
+          }
+        },
+        {
+          "statement": "The contracts page documents the base revision",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CONTRACTS.md",
+            "pattern": "base revision"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Scope verifier",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "a scope criterion lists the files changed between the recorded base and the working tree of the workdir (git diff --name-status with renames, plus untracked files not ignored) and matches each against the task's scope globs with the vendored matchAny",
+        "any changed file outside the globs is FAIL with the files named; no changed files or all inside is PASS with the count; a workdir that is not a git checkout is BLOCKED",
+        "the receipt path contracts/ inside the vault is never part of the comparison when the workdir is the vault itself"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/contracts.mjs",
+        "test/contracts-scope.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "A seeded change outside the task's globs fails the scope criterion and a change inside passes it",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope.test.mjs",
+            "cmd": "node --test test/contracts-scope.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Red-green verifier",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "a test_red_green criterion requires the test file to exist in the workdir, adds a detached temporary worktree of the recorded base, copies the test file and any support_files into it, runs the command with {test} substituted there (red) and in the workdir (green)",
+        "red exit 0 is FAIL (the test passes without the change and proves nothing); green non-zero is FAIL; exit 127 is BLOCKED (command not found); otherwise PASS, and the detail carries both exit codes and the base sha",
+        "the temporary worktree is removed in a finally block, and stale ones from an interrupted run are pruned before a new one is added",
+        "every gate that applies to a command criterion applies here: remote-signed without approval, exec_local_only and contracts.exec return the same BLOCKED details; the default timeout is 900 s and timeout_s overrides it"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/contracts.mjs",
+        "test/contracts-redgreen.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "A fixture whose test fails on the base and passes on the head gets PASS; one whose test passes on the base gets FAIL; a remote-signed unapproved contract gets BLOCKED; no worktree is left behind",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-redgreen.test.mjs",
+            "cmd": "node --test test/contracts-redgreen.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "Metric verifier",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "a metric criterion runs its command under the same gates as a command criterion, reads the last JSON object on stdout (or the file named by output_file), picks key as a dotted path and compares with op in <, <=, >, >= and == against value",
+        "no JSON, a missing key or a non-numeric value is FAIL with the detail; exit 127 is BLOCKED; a 1-minute load per CPU above the contract's defaults.max_load_per_cpu, when set, is BLOCKED as machine busy and the command is not run",
+        "the detail records the measured value, the threshold, the CPU count and the load, so a reading on other hardware is labelled"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/contracts.mjs",
+        "test/contracts-metric.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "A bench stub whose value meets the threshold passes, one that misses fails with the measured value in the detail, and a busy-machine setting blocks without running the command",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-metric.test.mjs",
+            "cmd": "node --test test/contracts-metric.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T5",
+      "title": "Behaviour apart from documents in every report",
+      "phase": "implement",
+      "depends_on": [
+        "T2",
+        "T3",
+        "T4"
+      ],
+      "requirements": [
+        "the verify result, the receipt and the CLI line count behaviour criteria (command, test_red_green, metric, scope) apart from document checks (grep, file_exists, test_exists), printing behaviour n/m and documents n/m per task",
+        "ok still requires every mandatory criterion to PASS; a task whose only passing criteria are document checks is reported as documents only and never as done",
+        "docs/CONTRACTS.md states that document checks never count toward done on their own"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/contracts.mjs",
+        "src/cli/contracts-cli.mjs",
+        "docs/CONTRACTS.md",
+        "test/contracts-report.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "A contract with one passing grep and one failing red-green test is reported documents only, not done",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-report.test.mjs",
+            "cmd": "node --test test/contracts-report.test.mjs"
+          }
+        },
+        {
+          "statement": "The contracts page says document checks never count toward done on their own",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CONTRACTS.md",
+            "pattern": "never count toward done"
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
