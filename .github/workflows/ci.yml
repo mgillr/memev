@@ -1,7 +1,9 @@
-# Memev's own development checks. One short job runs on every pull request and again on every push to main, so a
-# landing that breaks main shows on main itself. Actions minutes are a shared budget. Windows (a preview) runs only on a
-# push to main or a release tag, never on a pull request, so pull requests cost no Windows minutes. Slow suites (the Docker smoke test, the 170M-token growth bench, the macOS run) are
-# run locally before merging: scripts/docker-smoke.sh, scripts/growth-bench.mjs.
+# Memev's own development checks. One job runs on every pull request and again on every push to main, so a
+# landing that breaks main shows on main itself: the full suite, the changelog guard, the leak scan and gitleaks, then
+# it packs the package, installs it from the packed tarball, runs the CLI smoke on the installed copy, and runs the
+# Docker smoke, which builds the image and checks it. Actions minutes are a shared budget. Windows (a preview) runs only
+# on a push to main or a release tag, never on a pull request, so pull requests cost no Windows minutes. The 170M-token
+# growth bench and the macOS run are run locally before merging: scripts/growth-bench.mjs.
 # The Memev product never installs workflows into a user's repositories.
 name: ci
 on:
@@ -47,7 +49,7 @@ jobs:
     # pull requests, and every push to main (a release tag is built by release.yml instead)
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,6 +74,14 @@ jobs:
           echo "${SUM}  gl.tgz" | sha256sum -c -
           tar xzf gl.tgz gitleaks && rm gl.tgz
           ./gitleaks git --redact --no-banner --exit-code 1 .
+      - name: Pack, install and smoke the package
+        run: |
+          mkdir -p /tmp/memev-pack
+          npm pack --pack-destination /tmp/memev-pack
+          npm install --prefix /tmp/memev-install /tmp/memev-pack/*.tgz
+          scripts/smoke.sh /tmp/memev-install/node_modules/.bin/memev
+      - name: Docker smoke (builds the image, then runs it)
+        run: scripts/docker-smoke.sh
   windows:
     # the parts that differ on Windows: registering apps (node.exe, settings files), hooks, MCP and the doctor.
     # There are no dependencies and no lockfile, so there is nothing to install.
