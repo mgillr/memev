@@ -106,7 +106,7 @@
           }
         },
         {
-          "statement": "T1-c10: on T1-c04's three-row fixture, each of these sentences naming row B gives exactly one finding naming B, and naming row A gives none: '0.8 s', '2 seconds', '450 MB', '1.5 GB', '1,200 req/s', '10k ops/s', '3x faster', '3× faster'; each of 'version 1.10', 'v0.1.0', 'needs Node 22', 'a 14-day trial', '$12/month' and 'up to 3 computers' gives none. The spec must also state how a real hardware sentence such as '2 CPUs, 4 GB RAM, 10 GB disk' is exempted (a per-sentence marker with its own subtest), so T2-c07 cannot be met by narrowing this list.",
+          "statement": "T1-c10: on T1-c04's three-row fixture, each of these sentences naming row B gives exactly one finding naming B, and naming row A gives none: '0.8 s', '2 seconds', '450 MB', '1.5 GB', '1,200 req/s', '10k ops/s', '3x faster', '3× faster'; each of 'version 1.10', 'v0.1.0', 'needs Node 22', 'a 14-day trial', '$12/month' and 'up to 3 computers' gives none. The spec must also state how a real hardware sentence such as '2 CPUs, 4 GB RAM, 10 GB disk' is exempted (a per-sentence marker with its own subtest), so T2's run of claims.mjs over this repository's own surfaces cannot be met by narrowing this list.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-claims.test.mjs",
