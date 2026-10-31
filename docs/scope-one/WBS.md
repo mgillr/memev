@@ -61,7 +61,7 @@ The sections are lenses on the same work, so the total counts a thing once per l
 | 1.3.2 | ADR 5: permission matrix | product owner | blocked | DECISIONS.md ADR 5 is open; anything ungated stays denied until it is decided |
 | 1.3.3 | Memory authority (D-SO-MEMORY-AUTHORITY†) | owner | blocked | named open in the review, row 10 |
 | 1.3.4 | First supported clients and their order | product owner | covered | product-owner question 1; it has a safe default (DECISIONS.md) |
-| 1.3.5 | Tier names and trial length | owner | covered | closed by owner decision 31 Oct 2026: Free core (the trial), Personal at $12 per month or $120 per year for up to 3 computers, contact us for higher tiers |
+| 1.3.5 | Tier names and trial length | owner | covered | closed by owner decision 31 Oct 2026: Free core (the trial), Personal for up to 3 computers at the list price in docs/PRICING.md, contact us for higher tiers |
 | 1.3.6 | Deployment modes and topology | owner | covered | closed in part by owner decision 31 Oct 2026: local-first, the cloud only a relay and a backup; the Business and Enterprise topology of addendum 13.6.1 still needs its own decision |
 | 1.3.7 | Provider neutrality | owner | covered | closed by owner decision 31 Oct 2026: every supported provider on equal footing |
 | 1.3.8 | Secure remote model | product owner | covered | product-owner question 4; safe default is customer-initiated only |
