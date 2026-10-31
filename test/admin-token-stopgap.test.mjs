@@ -66,3 +66,19 @@ test('issue 282: memev token rotate on the admin token writes the new secret int
   assert.ok(ts.verify(after.token), 'the secret in admin.json does not verify');
   assert.equal(ts.verify(oldToken), null, 'the old admin secret still verifies');
 });
+
+test('issue 282 follow-up: rotating the admin token leaves admin.json private and asks for no cloud link to be pasted again', () => {
+  const { root, v } = newVault({ git: false });
+  const { id } = adminOf(root);
+  v.close();
+  const file = path.join(root, '.memev', 'admin.json');
+  // a temp file left by an interrupted rotate, readable by others: the new admin.json must not inherit its mode
+  fs.writeFileSync(`${file}.tmp`, '{}', { mode: 0o644 }); fs.chmodSync(`${file}.tmp`, 0o644);
+  const home = tmpdir('home-');
+  const r = spawnSync(process.execPath, [path.join(PKG, 'bin', 'memev.mjs'), 'token', 'rotate', id], {
+    env: { PATH: process.env.PATH, HOME: home, MEMEV_ROOT: root, MEMEV_CONFIG_DIR: path.join(home, 'cfg'), MEMEV_NO_SERVICE: '1' }, encoding: 'utf8', timeout: 60000 });
+  assert.equal(r.status, 0, `token rotate failed: ${r.stderr}`);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(file).mode & 0o777, 0o600, 'admin.json is readable by others after the rotate');
+  assert.doesNotMatch(r.stdout, /pasted again|memev cloud url/, 'the admin token is never pasted into a cloud app, so the rotate must not ask for it');
+  assert.match(r.stdout, /admin\.json holds the new secret/);
+});
