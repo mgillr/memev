@@ -88,3 +88,17 @@ this folder links back here, and this page links down to every page.
 | [READINESS-REVIEW.md](READINESS-REVIEW.md) | the readiness review that started this repository |
 | [../CHANGELOG.md](../CHANGELOG.md) | what changed; notes for the next release are in `changelog.d/` |
 | [../contracts/README.md](../contracts/README.md) | signed contracts for work on Memev itself |
+
+## Scope One takeover record
+
+The record a builder takes over with: what exists, what is missing, and the order to build it.
+
+| Page | What it holds |
+|---|---|
+| [scope-one/REQUIREMENTS.md](scope-one/REQUIREMENTS.md) | the full requirement register, one row per requirement |
+| [scope-one/TRACEABILITY.md](scope-one/TRACEABILITY.md) | each requirement traced to code, contract, dependency and test |
+| [scope-one/INVENTORY.md](scope-one/INVENTORY.md) | every branch, contract and source, with status and disposition |
+| [scope-one/BASELINE.md](scope-one/BASELINE.md) | the commit, working tree and test run the record is taken from |
+| [scope-one/DEPENDENCIES.md](scope-one/DEPENDENCIES.md) | the build-order edges between contracts |
+| [scope-one/DECISIONS.md](scope-one/DECISIONS.md) | the open ADRs and the questions only the owner can answer |
+| [scope-one/SLICE-PLAN.md](scope-one/SLICE-PLAN.md) | the ordered slices and the deferred work |
