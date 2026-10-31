@@ -26,8 +26,8 @@ Ask the person which path fits, and explain the one you choose before you run it
 - The one-line installer is coming soon. Do not look for it.
 
 Every path sets up the same thing: it creates the notes folder, starts Memev and runs a self-test.
-`--no-connect` keeps init itself from connecting the AI apps it finds, but Memev still connects the apps
-it detects a few seconds after it starts (see "Connect only the clients the user approved"). The person already has a copy of the repository, or names the release to install; there
+`--no-connect` keeps Memev from connecting the AI apps it finds, at init and afterwards: it also turns
+off the background connect that would otherwise connect each app a few seconds after Memev starts. The person already has a copy of the repository, or names the release to install; there
 is no other source.
 
 ## Ask permission before each privileged action
@@ -46,10 +46,9 @@ Install the release the person named: the folder they downloaded, or the tag the
 a version yourself, and do not write one down from memory. Run the install command for the chosen path,
 with `--no-connect` as above, then show the person the whole checklist it prints, keeping every line
 that asks them to do something. The install copies Memev to `~/.config/memev/runtime`, adds the
-launcher, starts Memev on `127.0.0.1:7787`, and installs a login service. With `--no-connect`, init
-does not connect the AI apps itself, but Memev connects the apps it detects a few seconds after it
-starts: before the smoke test, which needs connected clients, check `memev clients` with the person
-and disconnect each app they do not approve, as "Connect only the clients the user approved" says.
+launcher, starts Memev on `127.0.0.1:7787`, and installs a login service. With `--no-connect`, no AI
+app is connected until the person approves it: before the smoke test, which needs connected clients,
+connect the apps they approve, as "Connect only the clients the user approved" says.
 
 ## Verify the installed version and health
 
@@ -82,10 +81,11 @@ not ready, tell the person what the object says and run `memev ready --json --ti
 `memev clients` lists each client that is installed and whether it is connected. Show the person the
 list and ask about each client in turn. Run `memev connect <client>` for a client only after the person
 says yes to that client: one yes connects one client. It saves a copy of each file before it changes
-one. Memev also looks for AI apps in the background a few seconds after it starts, and connects each one
-it finds that nobody has disconnected, so `memev clients` may already show an app as connected that the
-person has not approved: tell the person, and run `memev disconnect <client>` for each one they do not
-want, which also stops Memev connecting it again. The ids are the file names in `docs/clients/`, and
+one. With `--no-connect`, Memev does not connect apps in the background either, and `memev connect
+<client>` keeps it that way. Do not run `memev connect` without a client: it connects every app it finds
+and turns the background connect back on. If `memev clients` shows an app as connected that the person
+has not approved, tell the person and run `memev disconnect <client>`, which also stops Memev connecting
+it again. The ids are the file names in `docs/clients/`, and
 the full list is in the [AI apps documentation](CLIENTS.md). If a client is not installed, say so and
 ask before you install it. If `memev connect` cannot edit a file, it names the file and the reason;
 show the person, and do not edit the file yourself.

@@ -365,7 +365,9 @@ export function supervise(vault, { root }) {
     try { return { provider: p.id, ...(await (p.id === 'git' ? syncOnceAsync(vault, { root, live }) : p.run(vault, { root }))) }; } finally { running = false; }
   }, 'sync');
   const redetect = every(vault.config.clients?.recheck_min ?? 30, async () => {
-    if (vault.config.clients?.auto_connect === false) return { skipped: 'auto_connect is off' };
+    // read from disk on every run, so memev init --no-connect and memev connect take effect on a daemon that is already running (issue 284)
+    const clientsCfg = readJson(path.join(root, '.memev', 'config.json'), {}).clients ?? vault.config.clients;
+    if (clientsCfg?.auto_connect === false) return { skipped: 'auto_connect is off' };
     const { connectAll, launcherPath } = await import('./clients.mjs');
     const { exists } = await import('../engine/util.mjs');
     if (!exists(launcherPath())) return { skipped: 'no launcher' };

@@ -7,8 +7,11 @@ file it saves a copy in `~/.config/memev/backups/`. `memev disconnect <app>` rem
 was added: if the file has not changed since, the backup is restored; if you edited it since, only
 the Memev entries are taken out and the rest of your changes stay. `memev clients` lists the state.
 
-New apps installed later are picked up automatically: the daemon checks every few minutes and
-connects them, unless you disconnected that app yourself.
+New apps installed later are picked up automatically: the daemon checks a few seconds after it starts
+and then every 30 minutes (`clients.recheck_min`), and connects them, unless you disconnected that app
+yourself. `memev init --no-connect` turns this background connect off, so no app is connected until you
+run `memev connect <app>` for it; `memev connect` with no app connects every app it finds and turns the
+background connect back on.
 
 | App | What Memev adds | Mode |
 |---|---|---|

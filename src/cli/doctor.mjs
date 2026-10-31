@@ -135,7 +135,11 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
     { desc: `${fixFor('node', platform)} Then run memev doctor --fix to point the launcher at it.`, destructive: false, cmd: 'runtime' }));
   const missing = Object.entries(clients.files || {}).filter(([f]) => { try { return !fs.readFileSync(f, 'utf8').includes('memev'); } catch { return true; } }).map(([f, rec]) => rec.client);
   const ids = Object.keys(clients.connected || {});
-  r.push(C('apps', 'AI apps connected', ids.length ? (missing.length ? 'warn' : 'ok') : 'warn', ids.length ? `${ids.join(', ')}${missing.length ? `; entries missing for ${[...new Set(missing)].join(', ')}` : ''}` : 'none yet', ids.length && !missing.length ? null : { desc: 'connect every installed app again', destructive: false, cmd: 'connect' }));
+  // after memev init --no-connect the person connects each app themselves, so --fix never connects them all (issue 284)
+  const chosen = config(root).clients?.auto_connect === false;
+  if (chosen && !ids.length) r.push(C('apps', 'AI apps connected', 'ok', 'none yet, as chosen with --no-connect: memev connect <app> connects one'));
+  else if (chosen && missing.length) r.push(C('apps', 'AI apps connected', 'warn', `${ids.join(', ')}; entries missing for ${[...new Set(missing)].join(', ')}: memev connect <app> for each, as chosen with --no-connect`));
+  else r.push(C('apps', 'AI apps connected', ids.length ? (missing.length ? 'warn' : 'ok') : 'warn', ids.length ? `${ids.join(', ')}${missing.length ? `; entries missing for ${[...new Set(missing)].join(', ')}` : ''}` : 'none yet', ids.length && !missing.length ? null : { desc: 'connect every installed app again', destructive: false, cmd: 'connect' }));
   const cfg = config(root);
   // deployment: report where the vault runs and what kind of AI provider it uses. Report only: it
   // never fails the run. The one warning is a choice that cannot work as written.

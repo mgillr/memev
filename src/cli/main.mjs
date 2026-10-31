@@ -250,6 +250,9 @@ async function run(argv, env) {
       fs.writeFileSync(defaultVaultFile(env), `${root}\n`);
       const org = !!flags.org || env.MEMEV_PROFILE === 'org';
       if (flags['local-only'] || org) { const c = config(root); c.remote = { ...c.remote, enabled: false, asked: true }; if (org) c.profile = 'org'; fs.writeFileSync(path.join(root, '.memev', 'config.json'), `${JSON.stringify(c, null, 2)}\n`, { mode: 0o600 }); }
+      // --no-connect also turns off the daemon's background connect, which would otherwise connect every app it finds a few
+      // seconds after it starts (issue 284); memev connect with no app turns it back on
+      if (flags['no-connect']) { const c = config(root); c.clients = { ...c.clients, auto_connect: false }; fs.writeFileSync(path.join(root, '.memev', 'config.json'), `${JSON.stringify(c, null, 2)}\n`, { mode: 0o600 }); }
       const rt = installRuntime(env);
       if (fromUrl) {
         console.log(`Cloned your vault from ${fromUrl} into ${root}`);
