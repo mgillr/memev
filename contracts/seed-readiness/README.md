@@ -89,3 +89,4 @@ The engine enabler and the gaps the memev twin measured, approved by the owner o
 | [SR-1.27](specs/SR-1.27-done-comes-only-from-a-passing-verify.json) | G92 | memev | Done comes only from a passing verify | none |
 | [SR-1.28](specs/SR-1.28-the-bus-writes-its-own-routing-files.json) | G93 | memev | The bus writes its own routing files | SR-1.27, SR-1.24, QL-1.02 |
 | [SR-1.29](specs/SR-1.29-a-hook-starts-without-loading-the-whole.json) | G94 | memev | A hook starts without loading the whole CLI | QL-1.02 |
+| [SR-1.30](specs/SR-1.30-done-holds-across-computers-and-clones.json) | G95 | memev | Done holds across computers and clones | SR-1.27, QL-1.02 |
