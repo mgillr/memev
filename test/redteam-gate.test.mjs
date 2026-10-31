@@ -722,10 +722,12 @@ test('a signed implementation round appended after the clean round leaves SIGNAB
 });
 
 test('the reviewer key the gate trusts is the reviewer\'s, never the fixture test key', () => {
-  assert.equal(REVIEWER_KEYS.length, 1);
-  assert.equal(keyId(REVIEWER_KEYS[0]), '1f6b4e7c00729bc7');
-  assert.notEqual(keyId(REVIEWER_KEYS[0]), keyId(TEST_PUB));
-  assert.notEqual(keyId(REVIEWER_KEYS[0]), keyId(FIXTURE_PUB));
+  // exactly the reviewer's key and the one interim key the owner approved on 31 October 2026, in this order; a third key fails here
+  assert.deepEqual(REVIEWER_KEYS.map(keyId), ['1f6b4e7c00729bc7', 'ba7f5a5b8f8aa026']);
+  for (const k of REVIEWER_KEYS) {
+    assert.notEqual(keyId(k), keyId(TEST_PUB));
+    assert.notEqual(keyId(k), keyId(FIXTURE_PUB));
+  }
 });
 
 test('T1-c37: an added answer folded as another criterion is judged by its folded_as: the folded criterion verbatim in the spec is SIGNABLE, an absent one or a string is refused', () => {

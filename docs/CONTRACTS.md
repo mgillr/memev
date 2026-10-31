@@ -193,6 +193,14 @@ readable by both. The signature then makes tampering visible in history, but it 
 Separation comes from a reviewer key the owner holds off the build machine, or from the second human
 of SR-9.05.
 
+**The interim reviewer.** While the reviewer is out, the gate also holds one interim reviewer key (key id
+`ba7f5a5b8f8aa026`, second in `REVIEWER_KEYS`), added on the owner's decision of 31 October 2026. Its private half
+is on the build machine, under the author's own home, never in the repository. Every round and every note it signs
+is an interim solo review by the author of the change, pending independent re-review, and says so in its own text.
+It sits in code and not under `contracts/keys/`, because the gate refuses a key listed there as a reviewer key.
+The stop decision keeps its own key (`STOP_KEYS`); the interim key never signs one. The key is removed from
+`REVIEWER_KEYS` once an independent reviewer has re-reviewed the records it signed.
+
 **The stop decision.** When three rounds have passed and none is clean, the record may end with `stop`:
 a decision to sign or to split, an object holding exactly `spec_id`, `spec_sha256` (of the spec on disk),
 `decider`, `date`, `decision`, `open` (every answer that is not added, as round and number),
