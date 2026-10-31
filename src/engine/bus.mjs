@@ -264,7 +264,9 @@ export class Bus {
     if (seat) {
       // the terminal on the vault's computer may act for any seat on that computer (memev bus watch)
       const rec = this.seat(seat);
-      const mine = ctx.cli && ctx.local ? (rec ? rec.device === computer.id : this._onHost(seat)) : rec ? rec.device === computer.id : seat.split('/')[0] === own;
+      // an app posts only as its own seat: a recorded seat must be on this computer and registered by this app, so a local
+      // app cannot speak as another app's seat, the lead's included (issue 263)
+      const mine = ctx.cli && ctx.local ? (rec ? rec.device === computer.id : this._onHost(seat)) : rec ? rec.device === computer.id && rec.client === label(ctx.client) : seat.split('/')[0] === own;
       if (!mine) throw new BusError('forbidden', `${seat} belongs to another app or computer; you can only post as your own seat (${own})`);
     }
     let rec = this.seat(name);
