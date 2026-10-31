@@ -161,7 +161,7 @@ QL-1.02 version 3 makes the canonical mutation criteria three metrics on one com
 
 node's TAP output counts each test file as a passing test, so a name filter that matches nothing exits 0 and prints '# pass 1' (measured on node 23.7, 31 October 2026). Each command below that filters tests by name now requires, for each alternative of its filter, a passing test line whose test name matches it; a skipped or todo test, a file line and a describe() suite line never count, and anchors in the filter apply to the test name. Statements are unchanged.
 
-History of the guard's form, 31 October 2026: (1) a count of matching passing lines against the number of alternatives (grep); (2) the same count, with describe() suite lines dropped (awk); (3) one match required for each alternative, matched against the test name, because a count let two tests matching one alternative stand in for another that never ran.
+History of the guard's form, 31 October 2026: (1) a count of matching passing lines against the number of alternatives (grep); (2) the same count, with describe() suite lines dropped (awk); (3) one match required for each alternative, matched against the test name, because a count let two tests matching one alternative stand in for another that never ran; (4) each alternative that is a test name, not a label, anchored at both ends, because a name that was a prefix of another criterion's test name in the same file let that test stand in for one never written.
 
 - SR-0.03: name guard on 2 criterion command(s).
 - SR-1.01: name guard on 30 criterion command(s).

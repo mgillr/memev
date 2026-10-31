@@ -221,7 +221,7 @@
         "memev_contract_status with no arguments and the session-start card list a done contract whose latest verify failed as done, with the failing tasks of that verify, never as active work: the card says neither 'Active contract' nor 'Build these' for it, and such contracts do not count toward the card's limit of open contracts; memev gate verifies only contracts that are not done, so a done contract never blocks a push and gate appends no verify record for it",
         "a supersedes link takes the superseded contract out of the open state, contractGate and the default status list only when the superseding contract was signed with local origin (decided by the transport, never by an argument), either in the superseded contract's session or by a caller with the admin scope, and has a counting pass of its own; until then the superseded contract stays open, in contractGate and in the default status list",
         "contractSign validates a draft as contractDraft does, at least one task and no top-level key that contractDraft does not write, and refuses an id that already has a contract.signed record in this log, even when its signed files are gone from disk",
-        "docs/CONTRACTS.md says that a new version retires the old contract only when it was signed in the old contract's session or by the owner and has passed a verify of its own, so an amend signed in a later session by a client without the admin scope leaves the old contract open until it passes",
+        "docs/CONTRACTS.md says that a new version retires the old contract only when it was signed with local origin, in the old contract's session or by the owner and has passed a verify of its own, so an amend signed in a later session by a client without the admin scope leaves the old contract open until it passes",
         "each red-green criterion of this task that runs test/contracts-done-from-log.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest"
       ],
       "scope": [
@@ -409,11 +409,11 @@
           }
         },
         {
-          "statement": "docs/CONTRACTS.md carries the sentence 'A new version retires the old contract only when it was signed in the old contract's session or by the owner, and has passed a verify of its own.'",
+          "statement": "docs/CONTRACTS.md carries the sentence 'A new version retires the old contract only when it was signed with local origin, in the old contract's session or by the owner, and has passed a verify of its own.'",
           "verifier": {
             "type": "grep",
             "file": "docs/CONTRACTS.md",
-            "pattern": "A new version retires the old contract only when it was signed in the old contract's session or by the owner, and has passed a verify of its own\\."
+            "pattern": "A new version retires the old contract only when it was signed with local origin, in the old contract's session or by the owner, and has passed a verify of its own\\."
           }
         },
         {
