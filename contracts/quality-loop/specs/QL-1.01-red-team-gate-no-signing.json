@@ -409,7 +409,7 @@
           }
         },
         {
-          "statement": "Between snapshots, a removed criterion, a removed requirement and a removed stop rule are each SIGNABLE with an amendments entry {task, field, from, to: null, answer} whose citation, of any kind requirement 11 allows (an answer, a note point, a reviewer note or '<spec>:<round>.<n>'), quotes the removed text verbatim and names it contradictory or impossible, and a removed criterion, requirement, stop rule or whole task is SIGNABLE with a move entry when it is verbatim in the receiving spec, following that spec's recorded replacements; each is refused with never_weakens without the entry, with a citation that does not quote it or does not name it contradictory or impossible, and with a move entry whose receiving spec lacks it.",
+          "statement": "Between snapshots, a removed criterion, a removed requirement and a removed stop rule are each SIGNABLE with an amendments entry {task, field, from, to: null, answer} whose citation quotes the removed text verbatim and, when it is an answer, a note point or '<spec>:<round>.<n>', names it contradictory or impossible (a reviewer note that quotes it and names where it is carried needs no such word, as T1-c53 states), and a removed criterion, requirement, stop rule or whole task is SIGNABLE with a move entry when it is verbatim in the receiving spec, following that spec's recorded replacements; each is refused with never_weakens without the entry, with a citation that does not quote it, with an answer or note point that does not name it contradictory or impossible, and with a move entry whose receiving spec lacks it.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
