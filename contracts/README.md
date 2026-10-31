@@ -48,7 +48,7 @@ its gate lands.
 ## Amended after signing
 
 QL-1.01 task 1 was amended from building it: the scope gains docs/CONTRACTS.md and docs/MODULES.md, and c04, c15 and c27
-change as `quality-loop/AMENDMENTS.md` records. The reviewer seat agreed the text, and it was signed on 31 October with memev's
+change as `quality-loop/AMENDMENTS.md` records. The text was agreed in review, and it was signed on 31 October with memev's
 own `contractAmend` from main at 3f9c8e2e, in the same signing vault, under the same key. The new version names the one it
 supersedes; memev retires the earlier one once the new version, signed on this computer, passes its own verify.
 
