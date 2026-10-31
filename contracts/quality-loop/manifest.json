@@ -72,7 +72,7 @@
         "QL-1.03"
       ],
       "tasks": 1,
-      "criteria": 17,
+      "criteria": 18,
       "spec": "specs/QL-1.05-sensitive-path-gate-in-ci-from-the-base-workflow.json",
       "status": "proposed: owner's quality-loop order of 30 Oct, signs after a clean red-team round"
     },
