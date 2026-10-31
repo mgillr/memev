@@ -25,7 +25,9 @@ import { STATE, isVault } from './vault-marker.mjs';
 export const VERSION = readJson(new URL('../../package.json', import.meta.url), {}).version;
 export { STATE, isVault };
 const KINDS = { decision: 'decisions', gotcha: 'gotchas', fact: 'facts', pattern: 'patterns', win: 'wins', person: 'people', note: 'notes', preference: 'preferences' };
-const PROTECTED = [/^contracts\/signed\//, /^contracts\/keys\//];
+// written only by the engine itself: signing writes signed/ and keys/, verify writes closed/ and receipts/. Matched in any
+// letter case, because a case-insensitive disk writes contracts/Signed/ into contracts/signed/ (issues 242 and 243)
+const PROTECTED = [/^contracts\/signed\//i, /^contracts\/keys\//i, /^contracts\/closed\//i, /^contracts\/receipts\//i];
 const DEFAULT_CONFIG = { version: 1, port: 7787, remote: { enabled: false, provider: 'auto', rate_per_min: 120 }, sync: { interval_min: 5 }, recall: { per_prompt: true, max_chars: 1500, min_score: 1.0, scope: 'project' }, memory: { ...DEFAULT_GATE }, journal: { enabled: true, max_chars: 2000 }, contracts: { enabled: false, exec_local_only: true } };
 
 export class VaultError extends Error { constructor(code, message) { super(message); this.code = code; } }
@@ -194,7 +196,10 @@ export class Vault extends EventEmitter {
     if (!allowed(identity, scope, p)) throw new VaultError('forbidden', `this token may not ${scope}${p ? ` ${p}` : ''}`);
   }
   _guard(p, text, allowSecrets, internal) {
-    if (!internal && PROTECTED.some((re) => re.test(p))) throw new VaultError('immutable', `${p} is signed and immutable; amend it with a new contract (memev contract amend)`);
+    if (!internal && PROTECTED.some((re) => re.test(p))) {
+      if (/^contracts\/(closed|receipts)\//i.test(p)) throw new VaultError('immutable', `${p} is written only by memev contract verify; a contract is done when its verify passes`);
+      throw new VaultError('immutable', `${p} is signed and immutable; amend it with a new contract (memev contract amend)`);
+    }
     if (!allowSecrets) { const hits = findSecrets(text); if (hits.length) throw new VaultError('secret', `refused: the text looks like a credential (${hits.join(', ')}); never store secrets in memory`); }
   }
   _after(p, rec, client, appended = null) {
