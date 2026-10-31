@@ -1,0 +1,679 @@
+{
+  "schema": "memev-seed-readiness/1",
+  "created": "2026-10-30",
+  "contracts": [
+    {
+      "id": "SR-0.03",
+      "gap": "G85",
+      "area": "SR-0",
+      "title": "Verify runs every verifier type the specs use: red-green tests, metrics and scope, behind the same local gates as commands",
+      "repo": "memev",
+      "closes": "Closes G85 (found 30 October 2026 while checking the WBS runbook against the code): memev verify runs only command, file_exists, test_exists and grep (src/engine/contracts.mjs:224-235); test_red_green, metric and scope criteria return BLOCKED as checked by a person or CI, so 213 of the 340 seed-readiness criteria (scope 118, test_red_green 64, metric 31) cannot PASS through the tool the WBS names, and no task of the 85 contracts can reach PASS because the attest lint requires a scope criterion per task",
+      "depends_on": [],
+      "tasks": 5,
+      "criteria": 49,
+      "spec": "specs/SR-0.03-verify-runs-every-verifier-type.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.01",
+      "gap": "G01",
+      "area": "SR-1",
+      "title": "One writer, enforced: an exclusive lock on the vault log",
+      "repo": "memev",
+      "closes": "Single-writer rule is convention only; runner.mjs opens a Vault beside a live daemon and can corrupt the oplog",
+      "depends_on": [
+        "QL-1.02"
+      ],
+      "tasks": 3,
+      "criteria": 62,
+      "spec": "specs/SR-1.01-one-writer-enforced-an-exclusive.json"
+    },
+    {
+      "id": "SR-1.02",
+      "gap": "G02",
+      "area": "SR-1",
+      "title": "No AI-drafted command runs without local approval",
+      "repo": "memev",
+      "closes": "Contract verify runs sh -c commands a local session drafted and signed in one turn (contracts.mjs:213-228)",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 4,
+      "spec": "specs/SR-1.02-no-ai-drafted-command-runs.json"
+    },
+    {
+      "id": "SR-1.03",
+      "gap": "G03",
+      "area": "SR-1",
+      "title": "Replay protection that survives a restart",
+      "repo": "memev",
+      "closes": "The nonce cache is in-memory, so a daemon restart reopens the five-minute replay window",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 35,
+      "spec": "specs/SR-1.03-replay-protection-that-survives-a.json"
+    },
+    {
+      "id": "SR-1.04",
+      "gap": "G04",
+      "area": "SR-1",
+      "title": "Cloud connectors: no bearer in the URL, proof of possession",
+      "repo": "memev",
+      "closes": "Connector URLs embed the bearer token in the path (logged by tunnel providers); cloud tokens are plain replayable bearers",
+      "depends_on": [],
+      "tasks": 3,
+      "criteria": 10,
+      "spec": "specs/SR-1.04-cloud-connectors-no-bearer-in.json"
+    },
+    {
+      "id": "SR-1.05",
+      "gap": "G05",
+      "area": "SR-1",
+      "title": "A bounded rate limiter",
+      "repo": "memev",
+      "closes": "The rate limiter bucket map is never evicted (http.mjs:69-77), an unbounded memory growth on a public tunnel",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 40,
+      "spec": "specs/SR-1.05-a-bounded-rate-limiter.json"
+    },
+    {
+      "id": "SR-1.06",
+      "gap": "G06",
+      "area": "SR-1",
+      "title": "One licence schema, validated everywhere",
+      "repo": "memev",
+      "closes": "LICENSE_FIELDS omits trial, org and trial_ext that other modules read; installLicense skips the check activate applies",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 40,
+      "spec": "specs/SR-1.06-one-licence-schema-validated-everywhere.json"
+    },
+    {
+      "id": "SR-1.07",
+      "gap": "G07",
+      "area": "SR-1",
+      "title": "Pinned TLS on the relay and a configured OAuth issuer",
+      "repo": "memev",
+      "closes": "Relay client uses rejectUnauthorized:false with name pinning; the OAuth issuer is derived from the Host header",
+      "depends_on": [],
+      "tasks": 2,
+      "criteria": 5,
+      "spec": "specs/SR-1.07-pinned-tls-on-the-relay.json"
+    },
+    {
+      "id": "SR-1.08",
+      "gap": "G08",
+      "area": "SR-1",
+      "title": "Remote setup session: allowlist that works, tested like the rest",
+      "repo": "memev",
+      "closes": "setup-remote.mjs allowlists a deployment command the deployment module cannot accept; no SPDX header; one test file",
+      "depends_on": [],
+      "tasks": 2,
+      "criteria": 5,
+      "spec": "specs/SR-1.08-remote-setup-session-allowlist-that.json"
+    },
+    {
+      "id": "SR-1.09",
+      "gap": "G09",
+      "area": "SR-1",
+      "title": "Code a second engineer can read",
+      "repo": "memev",
+      "closes": "300 to 600 character lines, server imports CLI, helpers duplicated three times, empty catch blocks hide faults",
+      "depends_on": [],
+      "tasks": 3,
+      "criteria": 8,
+      "spec": "specs/SR-1.09-code-a-second-engineer-can.json"
+    },
+    {
+      "id": "SR-1.10",
+      "gap": "G10",
+      "area": "SR-1",
+      "title": "A suite that is green on any machine",
+      "repo": "memev",
+      "closes": "12 tests need ssh-keygen, 8 need an authenticated gh and network, 3 fail when MEMEV_NO_SERVICE is set",
+      "depends_on": [],
+      "tasks": 2,
+      "criteria": 5,
+      "spec": "specs/SR-1.10-a-suite-that-is-green.json"
+    },
+    {
+      "id": "SR-1.11",
+      "gap": "G11",
+      "area": "SR-1",
+      "title": "memev stop always ends inside its bound",
+      "repo": "memev",
+      "closes": "REV-022 AC03 is a real flake: stop takes 5.2 s on 2 vCPU and the daemon is SIGKILLed mid shutdown-sync",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 2,
+      "spec": "specs/SR-1.11-memev-stop-always-ends-inside.json"
+    },
+    {
+      "id": "SR-1.12",
+      "gap": "G12",
+      "area": "SR-1",
+      "title": "CI that protects main",
+      "repo": "memev",
+      "closes": "Linux tests run only on pull requests, docs-only changes skip CI although tests assert on docs, no macOS job, no coverage",
+      "depends_on": [
+        "SR-1.10",
+        "SR-1.18"
+      ],
+      "tasks": 2,
+      "criteria": 5,
+      "spec": "specs/SR-1.12-ci-that-protects-main.json"
+    },
+    {
+      "id": "SR-1.13",
+      "gap": "G13",
+      "area": "SR-1",
+      "title": "Performance numbers anyone can reproduce",
+      "repo": "memev",
+      "closes": "Docs and site claim 1.1 ms recall and 160 MB heap with no hardware; measured 4.55 ms and 183 MB",
+      "depends_on": [],
+      "tasks": 2,
+      "criteria": 4,
+      "spec": "specs/SR-1.13-performance-numbers-anyone-can-reproduce.json"
+    },
+    {
+      "id": "SR-1.14",
+      "gap": "G14",
+      "area": "SR-1",
+      "title": "The multilingual claim runs in the suite",
+      "repo": "memev",
+      "closes": "The 26-query, 9-script claim lives in an unwired lab script; the suite tests 7 queries",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 2,
+      "spec": "specs/SR-1.14-the-multilingual-claim-runs-in.json"
+    },
+    {
+      "id": "SR-1.15",
+      "gap": "G15",
+      "area": "SR-1",
+      "title": "No code without a caller",
+      "repo": "memev",
+      "closes": "project-state.mjs (330 lines) and the oplog HLC merge helpers have no production caller; entitlements name features with nothing behind them",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 3,
+      "spec": "specs/SR-1.15-no-code-without-a-caller.json"
+    },
+    {
+      "id": "SR-1.16",
+      "gap": "G16",
+      "area": "SR-1",
+      "title": "Docs and code say the same thing",
+      "repo": "memev",
+      "closes": "Help omits real subcommands; CLIENTS.md says sync every few minutes (default 30); delete is not reconciled; dependency claim overstated",
+      "depends_on": [],
+      "tasks": 3,
+      "criteria": 8,
+      "spec": "specs/SR-1.16-docs-and-code-say-the.json"
+    },
+    {
+      "id": "SR-1.17",
+      "gap": "G17",
+      "area": "SR-1",
+      "title": "A bus that scales to a team",
+      "repo": "memev",
+      "closes": "Bus.all() re-sorts every message per call; roster and tasks are O(seats x messages)",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 3,
+      "spec": "specs/SR-1.17-a-bus-that-scales-to.json"
+    },
+    {
+      "id": "SR-1.18",
+      "gap": "G18",
+      "area": "SR-1",
+      "title": "Windows out of preview",
+      "repo": "memev",
+      "closes": "parentProcName has no Windows path; installer is win-x64 only; Windows CI runs 6 files; no lab run",
+      "depends_on": [],
+      "tasks": 2,
+      "criteria": 6,
+      "spec": "specs/SR-1.18-windows-out-of-preview.json"
+    },
+    {
+      "id": "SR-1.19",
+      "gap": "G19",
+      "area": "SR-1",
+      "title": "The lab plan is run, not just written",
+      "repo": "memev",
+      "closes": "143 manual lab cases; no evidence any were run",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 4,
+      "spec": "specs/SR-1.19-the-lab-plan-is-run.json"
+    },
+    {
+      "id": "SR-1.20",
+      "gap": "G20",
+      "area": "SR-1",
+      "title": "External security review before any public launch",
+      "repo": "memev",
+      "closes": "OAuth server, tunnel exposure, device signing, rate limiting and setup channel have had no outside review",
+      "depends_on": [
+        "SR-1.01",
+        "SR-1.02",
+        "SR-1.03",
+        "SR-1.04",
+        "SR-1.05",
+        "SR-1.07"
+      ],
+      "tasks": 2,
+      "criteria": 6,
+      "spec": "specs/SR-1.20-external-security-review-before-any.json"
+    },
+    {
+      "id": "SR-1.21",
+      "gap": "G86",
+      "area": "SR-1",
+      "title": "A missing note the log cannot rebuild is reported, never silent",
+      "repo": "memev",
+      "closes": "Closes G86: recover() skips a path whose logged content no longer matches its recorded hash with a bare continue (src/engine/vault.mjs:118); the note stays missing while verify() is ok, status().recovered is 0 and every doctor check passes, against DESIGN.md and THREAT-MODEL.md which say a missing file is rebuilt. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence)",
+      "depends_on": [
+        "SR-1.01",
+        "QL-1.02"
+      ],
+      "tasks": 1,
+      "criteria": 41,
+      "spec": "specs/SR-1.21-a-missing-note-is-never-silent.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.22",
+      "gap": "G87",
+      "area": "SR-1",
+      "title": "A whole-note write interrupted after the log append recovers from the log, not from the old file",
+      "repo": "memev",
+      "closes": "Closes G87: write() appends the put to the log and then renames the file; when the rename fails, the next open() imports the old file as an external edit and the note reads the old body while the new body sits in the log (src/engine/vault.mjs:119-121, the prefix rule covers appends only), against README's log-first promise. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence)",
+      "depends_on": [
+        "SR-1.01",
+        "QL-1.02",
+        "SR-1.26"
+      ],
+      "tasks": 1,
+      "criteria": 41,
+      "spec": "specs/SR-1.22-an-interrupted-write-recovers-from-the-log.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.23",
+      "gap": "G88",
+      "area": "SR-1",
+      "title": "verify() catches a removed tail of the active segment and a removed last record of a path",
+      "repo": "memev",
+      "closes": "Closes G88: removing the last records of the unsealed segment leaves a valid prefix, so verify() reports no gap in 10 of 10 cases although snapshot.json records a higher sequence; a removed or rehashed last record of a path is never caught (src/engine/oplog.mjs:218-234), against the file's own comments that every seal and per-path chain is checked. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence)",
+      "depends_on": [
+        "SR-1.01",
+        "QL-1.02"
+      ],
+      "tasks": 1,
+      "criteria": 28,
+      "spec": "specs/SR-1.23-verify-sees-a-removed-tail.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.24",
+      "gap": "G89",
+      "area": "SR-1",
+      "title": "No CLI command writes vault state beside a live daemon",
+      "repo": "memev",
+      "closes": "Closes G89: with the daemon stopped five CLI commands wrote vault files (token issue to .memev/tokens.json, project set and backup set to .memev/config.json, devices rename to .memev/devices.json and .memev/jobs.json, bus rename edits bus/ from the CLI process after starting a daemon), measured by hashing every vault file before and after; DESIGN.md says the daemon is the only writer. SR-1.01 closes the log-writing case (claims); this contract closes the state files. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence)",
+      "depends_on": [
+        "SR-1.01",
+        "QL-1.02"
+      ],
+      "tasks": 2,
+      "criteria": 44,
+      "spec": "specs/SR-1.24-no-cli-write-beside-a-live-daemon.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.25",
+      "gap": "G90",
+      "area": "SR-1",
+      "title": "A cloud seat allowed to assign tasks addresses one local seat, never all",
+      "repo": "memev",
+      "closes": "Closes G90: with bus.cloud_tasks on, a cloud seat's task to all is accepted (src/engine/bus.mjs:307 checks the type, not the address), while docs/BUS.md:100-101 grants a task to a local seat and nothing else. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence)",
+      "depends_on": [
+        "QL-1.02",
+        "SR-1.28"
+      ],
+      "tasks": 1,
+      "criteria": 29,
+      "spec": "specs/SR-1.25-a-cloud-seat-addresses-one-local-seat.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.26",
+      "gap": "G91",
+      "area": "SR-1",
+      "title": "One write can never make the vault unopenable",
+      "repo": "memev",
+      "closes": "Closes G91: writing notes/a.md and then notes/a.md/b.md is accepted by checkPath, the second put is appended to the op log and fdatasynced (src/engine/vault.mjs:226) before mkdirSync throws EEXIST (:235), and every later Vault.open() throws EEXIST from recover() (:119, called unguarded at :66), even after the file is deleted by hand, because recover() first rebuilds it. The daemon, the doctor, compact and the runner can never open the vault again. Any token with write scope over a matching path reaches it (MCP memev_write and memev_append, HTTP PUT and PATCH, the tunnel when remote access is on): a remote denial of service on the vault. Found by the SR-1.22 red-team round and reproduced on 31 October 2026 at main be457db",
+      "depends_on": [
+        "SR-0.03",
+        "QL-1.02"
+      ],
+      "tasks": 2,
+      "criteria": 51,
+      "spec": "specs/SR-1.26-one-write-can-never-make-the-vault-unopenable.json",
+      "status": "proposed: owner's go pending, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.27",
+      "gap": "G92",
+      "area": "SR-1",
+      "title": "Done comes only from a passing verify",
+      "repo": "memev",
+      "closes": "Closes G92 (issue #242) and the PROTECTED part of issue #243: contractList sets a signed contract's state to done whenever a file named contracts/closed/<id>.json exists (src/engine/contracts.mjs:262-265), and nothing checks what the file holds or who wrote it. PROTECTED covers only contracts/signed/ and contracts/keys/ (src/engine/vault.mjs:27), verify writes contracts/closed/ through the caller's own identity (contracts.mjs:248), and contracts/receipts/ is unprotected. So any token with write scope over contracts/**, including the token a paired device gets (src/engine/devices.mjs:85) and a cloud connector's (src/server/oauth.mjs:17), takes a contract out of the Stop-hook gate and the pre-push gate with no contract.verified record, and can rewrite its receipts. Found by the SR-0.03 red-team round and reproduced on 31 October 2026 on the main source",
+      "depends_on": [
+        "QL-1.02"
+      ],
+      "tasks": 2,
+      "criteria": 42,
+      "spec": "specs/SR-1.27-done-comes-only-from-a-passing-verify.json",
+      "status": "proposed: owner's go pending, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.28",
+      "gap": "G93",
+      "area": "SR-1",
+      "title": "The bus writes its own routing files",
+      "repo": "memev",
+      "closes": "Closes G93 (issue #250): connector and device tokens hold write on bus/** (src/engine/devices.mjs:85, src/server/oauth.mjs:17), and the bus's routing files are plain vault notes: bus/operator.json names the operator and bus/seats/<seat>.json carries renamed_from. So a note write makes a cloud connector the operator, its task to the 'operator' alias carries operator authority, and a runner turned on for a local seat starts its command headless with the connector's text as the prompt. Found by the SR-1.25 red-team round and reproduced on 31 October 2026 on the main source",
+      "depends_on": [
+        "SR-1.27",
+        "SR-1.24",
+        "QL-1.02"
+      ],
+      "tasks": 2,
+      "criteria": 55,
+      "spec": "specs/SR-1.28-the-bus-writes-its-own-routing-files.json",
+      "status": "proposed: owner's go pending, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.29",
+      "gap": "G94",
+      "area": "SR-1",
+      "title": "A hook starts without loading the whole CLI",
+      "repo": "memev",
+      "closes": "Closes G94: the MEM-098 latency test (test/hooks-latency.test.mjs:64: the prompt hook returns in under 1.5 s while each backend call takes 1 s) fails on the CI runner at 1589 to 1729 ms on 32 of 37 open pull requests, after passing on 28 to 30 October. The hook runs through bin/memev.mjs, which loads the whole CLI (src/cli/main.mjs) for every hook, and src/cli/hooks.mjs loads the engine at start through isVault (src/engine/vault.mjs) and the transcript scanner. Measured on 31 October 2026 on a development machine: node starts in 40 ms, importing main.mjs takes 110 ms and hooks.mjs 140 ms, and the test passes there at 1322 ms. Every hook event calls isVault, which lives in the engine module (src/engine/vault.mjs:39). The fix is to the hook's own start-up, never to the budget",
+      "depends_on": [
+        "QL-1.02"
+      ],
+      "tasks": 1,
+      "criteria": 10,
+      "spec": "specs/SR-1.29-a-hook-starts-without-loading-the-whole.json",
+      "status": "proposed: owner's go pending, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-2.01",
+      "gap": "G21",
+      "area": "SR-2",
+      "title": "Recall that finds paraphrases",
+      "repo": "memev",
+      "closes": "Recall is BM25 only; a query with no shared words scores zero",
+      "depends_on": [],
+      "tasks": 2,
+      "criteria": 7,
+      "spec": "specs/SR-2.01-recall-that-finds-paraphrases.json"
+    },
+    {
+      "id": "SR-2.02",
+      "gap": "G22",
+      "area": "SR-2",
+      "title": "A public memory benchmark",
+      "repo": "memev",
+      "closes": "No LongMemEval or LoCoMo number; buyers ask for one",
+      "depends_on": [
+        "SR-2.01"
+      ],
+      "tasks": 1,
+      "criteria": 4,
+      "spec": "specs/SR-2.02-a-public-memory-benchmark.json"
+    },
+    {
+      "id": "SR-2.03",
+      "gap": "G23",
+      "area": "SR-2",
+      "title": "Every client hook verified against the real app",
+      "repo": "memev",
+      "closes": "Codex, Gemini and Windsurf env markers admitted unverified (common.mjs:80); a vendor change silently breaks hooks",
+      "depends_on": [],
+      "tasks": 2,
+      "criteria": 6,
+      "spec": "specs/SR-2.03-every-client-hook-verified-against.json"
+    },
+    {
+      "id": "SR-2.04",
+      "gap": "G24",
+      "area": "SR-2",
+      "title": "Continuity measured in every app, including those without hooks",
+      "repo": "memev",
+      "closes": "Claude Desktop, VS Code, Zed and Windsurf get instructions only; the compaction benchmark across apps is planned",
+      "depends_on": [],
+      "tasks": 2,
+      "criteria": 6,
+      "spec": "specs/SR-2.04-continuity-measured-in-every-app.json"
+    },
+    {
+      "id": "SR-2.05",
+      "gap": "G25",
+      "area": "SR-2",
+      "title": "Catch restatements and count confirmations",
+      "repo": "memev",
+      "closes": "A restatement in different words gets through; a repeated save is discarded instead of counted",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 3,
+      "spec": "specs/SR-2.05-catch-restatements-and-count-confirmations.json"
+    },
+    {
+      "id": "SR-2.06",
+      "gap": "G26",
+      "area": "SR-2",
+      "title": "One rules file for every app",
+      "repo": "memev",
+      "closes": "Planned: one rules file written into CLAUDE.md, AGENTS.md, GEMINI.md and Cursor rules",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 2,
+      "spec": "specs/SR-2.06-one-rules-file-for-every.json"
+    },
+    {
+      "id": "SR-2.07",
+      "gap": "G27",
+      "area": "SR-2",
+      "title": "Project names in any script",
+      "repo": "memev",
+      "closes": "Project names written only in non-Latin scripts collapse to the same file name",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 2,
+      "spec": "specs/SR-2.07-project-names-in-any-script.json"
+    },
+    {
+      "id": "SR-2.08",
+      "gap": "G28",
+      "area": "SR-2",
+      "title": "A local read-only view of the vault",
+      "repo": "memev",
+      "closes": "Planned: a small read-only web view so a person can browse memory, why and provenance",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 2,
+      "spec": "specs/SR-2.08-a-local-read-only-view.json"
+    },
+    {
+      "id": "SR-2.09",
+      "gap": "G29",
+      "area": "SR-2",
+      "title": "The coming-soon provider: build it or stop showing it",
+      "repo": "memev",
+      "closes": "The site shows a third cloud AI provider as coming soon; nothing in the product repo supports it",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 3,
+      "spec": "specs/SR-2.09-coming-soon-provider-build-it-or-stop.json"
+    },
+    {
+      "id": "SR-3.01",
+      "gap": "G30",
+      "area": "SR-3",
+      "title": "Engine decision: what merges a note, where it lives, how it is licensed",
+      "repo": "memev",
+      "closes": "crdt-merge is presented as the paid core but merges tensors and records, not Markdown; the engine has no design",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 5,
+      "spec": "specs/SR-3.01-engine-decision-what-merges-a.json"
+    },
+    {
+      "id": "SR-3.02",
+      "gap": "G31",
+      "area": "SR-3",
+      "title": "An engine conformance suite in the core",
+      "repo": "memev",
+      "closes": "The service contract in PAID-CONVERGENCE.md has no executable test any engine must pass",
+      "depends_on": [
+        "SR-3.01"
+      ],
+      "tasks": 1,
+      "criteria": 3,
+      "spec": "specs/SR-3.02-an-engine-conformance-suite-in.json"
+    },
+    {
+      "id": "SR-3.04",
+      "gap": "G33",
+      "area": "SR-3",
+      "title": "Several computers editing one vault at once, nothing to resolve",
+      "repo": "memev",
+      "closes": "Git sync is single-writer and advisory; the oplog HLC merge has no caller; a second writer leaves conflict copies",
+      "depends_on": [
+        "SR-3.03",
+        "SR-1.01"
+      ],
+      "tasks": 2,
+      "criteria": 7,
+      "spec": "specs/SR-3.04-several-computers-editing-one-vault.json"
+    },
+    {
+      "id": "SR-3.05",
+      "gap": "G34",
+      "area": "SR-3",
+      "title": "One licence for the engine, stated once",
+      "repo": "memev",
+      "closes": "The engine licence is stated three ways (BSL 1.1, FSL-1.1-ALv2, draft BUSL-1.1 with licensor to be confirmed)",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 3,
+      "spec": "specs/SR-3.05-one-licence-for-the-engine.json"
+    },
+    {
+      "id": "SR-5.02",
+      "gap": "G43",
+      "area": "SR-5",
+      "title": "The Business trial can actually start",
+      "repo": "memev",
+      "closes": "invite.trialAvailable() returns false (MEM-067); the site offers a trial no one can start",
+      "depends_on": [
+        "SR-4.02",
+        "SR-7.02"
+      ],
+      "tasks": 1,
+      "criteria": 3,
+      "spec": "specs/SR-5.02-the-business-trial-can-actually.json"
+    },
+    {
+      "id": "SR-5.04",
+      "gap": "G45",
+      "area": "SR-5",
+      "title": "Paid tiers sell only what is built, on every surface",
+      "repo": "memev",
+      "closes": "The $12 tier advertises automatic merge, which does not exist; the pricing test covers docs but not the site",
+      "depends_on": [],
+      "tasks": 1,
+      "criteria": 3,
+      "spec": "specs/SR-5.04-paid-tiers-sell-only-what.json"
+    },
+    {
+      "id": "SR-6.01",
+      "gap": "G48",
+      "area": "SR-6",
+      "title": "The repository goes public",
+      "repo": "memev",
+      "closes": "The repository is private, so no one can find, star or install it",
+      "depends_on": [
+        "SR-1.20",
+        "SR-9.01"
+      ],
+      "tasks": 1,
+      "criteria": 5,
+      "spec": "specs/SR-6.01-the-repository-goes-public.json"
+    },
+    {
+      "id": "SR-6.02",
+      "gap": "G49",
+      "area": "SR-6",
+      "title": "npx memev init works",
+      "repo": "memev",
+      "closes": "Not on npm; the one-command install path is coming soon",
+      "depends_on": [
+        "SR-6.01"
+      ],
+      "tasks": 1,
+      "criteria": 3,
+      "spec": "specs/SR-6.02-npx-memev-init-works.json"
+    },
+    {
+      "id": "SR-6.03",
+      "gap": "G50",
+      "area": "SR-6",
+      "title": "Installers and a container anyone can fetch",
+      "repo": "memev",
+      "closes": "Installers have no download URL; the Docker image is on no registry",
+      "depends_on": [
+        "SR-6.01"
+      ],
+      "tasks": 1,
+      "criteria": 3,
+      "spec": "specs/SR-6.03-installers-and-a-container-anyone.json"
+    },
+    {
+      "id": "SR-6.04",
+      "gap": "G51",
+      "area": "SR-6",
+      "title": "Listed where people look for MCP servers",
+      "repo": "memev",
+      "closes": "MCP and connector directory entries are drafts marked do not post",
+      "depends_on": [
+        "SR-6.02"
+      ],
+      "tasks": 1,
+      "criteria": 2,
+      "spec": "specs/SR-6.04-listed-where-people-look-for.json"
+    },
+    {
+      "id": "SR-9.05",
+      "gap": "G80",
+      "area": "SR-9",
+      "title": "A second engineer and two-person review",
+      "repo": "memev",
+      "closes": "Bus factor of one; the code has never had a second human reader",
+      "depends_on": [
+        "SR-9.01",
+        "SR-1.09"
+      ],
+      "tasks": 2,
+      "criteria": 5,
+      "spec": "specs/SR-9.05-a-second-engineer-and-two.json"
+    }
+  ],
+  "note": "Repository names are given without the account; all six live under the same GitHub account as this repository. SR-2.09 names the provider by its role because the vendor name is on this repository's leak denylist.",
+  "amended": "2026-10-30: see AMENDMENTS.md"
+}

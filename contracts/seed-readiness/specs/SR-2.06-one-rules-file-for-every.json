@@ -1,0 +1,44 @@
+{
+  "title": "SR-2.06 One rules file for every app",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G26: Planned: one rules file written into CLAUDE.md, AGENTS.md, GEMINI.md and Cursor rules. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "memev rules sync",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "memev rules sync writes a marked block from rules.md into each connected app's instruction file and restores on uninstall"
+      ],
+      "description": "",
+      "scope": [
+        "src/cli/clients.mjs",
+        "src/cli/rules.mjs",
+        "src/cli/main.mjs",
+        "test/rules-sync.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "An edit to rules.md reaches all four instruction files; uninstall restores bytes",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rules-sync.test.mjs",
+            "cmd": "node --test test/rules-sync.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
