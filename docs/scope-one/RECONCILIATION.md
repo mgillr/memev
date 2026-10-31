@@ -38,7 +38,7 @@ A task takes the strongest class of the requirements it serves: conflicting, the
 
 [WBS.md](WBS.md) section 9.1 records where the programme tasks touch `SO-1.01` to `SO-2.14`; this page applies that table and does not restate it. In short: where a Scope One contract is the design record, the programme spec keeps only the build and test criteria the record does not hold.
 
-- `WP07-01` to `WP07-04` stay with the wiring pull request, which cites `SO-1.01` and does not replace it. `WP08-01`, `WP17-01` and `WP17-02` are `SO-1.02` and `WBS.md`; `WP08-02` follows `SO-1.04`; `WP08-03` follows `SO-1.10` and `SO-1.11`. None of those has a programme spec.
+- `WP07-01` to `WP07-04` stay with the wiring pull request, which cites `SO-1.01` and does not replace it. `WP08-01`, `WP17-01` and `WP17-02` are `SO-1.02` and `WBS.md`; `WP08-02` and `WP08-03` have one programme spec, `PG-08.1`, which cites `SO-1.04`, `SO-1.10`, `SO-1.11` and the signed `SO-11-A` and specifies only the build gaps those leave open. `WP08-01`, `WP17-01` and `WP17-02` have no programme spec.
 - `SO-2.03` keeps retention, deletion and invalidation; `WP10-01` and `WP10-02` keep the status lattice. `SO-2.02` keeps retrieval-time access; `WP13-01` keeps the publish boundary. `SO-2.04` and `SO-2.05` feed `WP08-04` and `WP14-04`; `SO-2.06` holds the acceptance tests of the organisational-intelligence demonstrator. `SO-2.08` treats `WP18-02` as its first instance. `SO-2.13` leaves the licence boundary to `WP15` and the pricing dimensions to the tier decision.
 - `SO-2.07` to `SO-2.11` require canonical operation contracts at their adapter layers; the `WP04` envelope is that contract and no programme spec defines an adapter for those systems.
 - No clash was found that needs a change to a Scope One file.
@@ -61,7 +61,7 @@ Who writes which task, so that two workstreams do not write the same one. Owners
 | `WP05-02`, `WP15-02` for memev-ops (SR-3.01 and SR-3.03 superseded, SR-3.05) | Programme | memev-ops, branch `docs/engine-decision-sr3` #13 | open |
 | Programme contract specs (`contracts/programme`, one per work package and one per work pull request) | Programme | memev, same branch as the row above #325 | open, unsigned; signing by the Lead |
 | Baseline 8.1 (dashboard and command centre, lead-agent single authority, release and installation readiness, failure-path suite, ADR 4 and ADR 5 drafts) | Lead | `SO-1.x` contracts and `WBS.md` | agreed split |
-| Baseline 8.2 (intake to end-to-end demo, extending `SO-1.x`), with `WP08-01` to `WP08-03` | Lead | `SO-1.02` (`WP08-01`, `WP17-01`, `WP17-02`), `SO-1.04` (`WP08-02`), `SO-1.10` and `SO-1.11` (`WP08-03`) | agreed split; no programme spec |
+| Baseline 8.2 (intake to end-to-end demo, extending `SO-1.x`), with `WP08-01` to `WP08-03` | Lead | `SO-1.02` (`WP08-01`, `WP17-01`, `WP17-02`), `SO-1.04` (`WP08-02`), `SO-1.10` and `SO-1.11` (`WP08-03`) | agreed split; `PG-08.1` (programme) holds the build gaps of `WP08-02` and `WP08-03` only, trim pending fold PR |
 | Baseline 8.3 (organisational intelligence, WBS 5.3.x and 4.3.2), with `WP08-04` | Lead (baseline scope); Dev 2 workstream (decision records `SO-2.01` to `SO-2.06`, branches `feat/so-2-0X-<slug>`, active) | `SO-2.01` to `SO-2.06` | agreed split; no programme spec |
 | Baseline 8.4 except A2A, SDK and payments (WBS 5.4.4 to 5.4.8 and the non-GitHub parts of 5.4.6), 5.5.11 federated computation, 5.6.5 commercial integration services | Lead | `SO-2.07` to `SO-2.13` | agreed split |
 | Baseline 8.6 personal multi-device, business deployment, enterprise deployment, public distribution and external security assurance, with `WP16-04` | Lead | `SO-2.14` and `WBS.md` | agreed split; no programme spec |
@@ -70,7 +70,7 @@ Who writes which task, so that two workstreams do not write the same one. Owners
 | `PG-02.1` (CRDT conformance gate; `WP02-01` to `WP02-04`) | Dev 2 workstream | crdt-merge, branch `feat/pg-02-1-crdt-conformance-gate` | queued after `SO-2.01` to `SO-2.06` |
 | `PG-03.1` (vectors, crdt-merge), `PG-03.2` (crdt-merge-ts), `PG-03.3` (crdt-merge-rs); one pull request per package | Dev 2 workstream | branches `feat/pg-03-1-*`, `feat/pg-03-2-*`, `feat/pg-03-3-*` | queued after `SO-2.01` to `SO-2.06` |
 | `PG-12.1` (multi-node gossip transport; `WP12-01` to `WP12-03`) | unclaimed | none | open, unclaimed |
-| Which layer to build against: the unsigned fold `SO-F-01` to `SO-F-13`, or the programme specs `PG-04.1`, `PG-05.1`, `PG-09.1`, `PG-09.2`, `PG-13.1`, `PG-14.1` | owner | none | PENDING OWNER DECISION |
+| Which layer to build against: the unsigned fold or the programme specs `PG-04.1`, `PG-05.1`, `PG-08.1`, `PG-09.1`, `PG-09.2`, `PG-13.1`, `PG-14.1` | lead workstream | decided: the unsigned fold is the build layer (lead workstream decision under owner delegation, 1 Nov 2026) | trim pending fold PR |
 | Upgrade, rollback, backup and restore, and uninstall (work breakdown 5.1.3, requirements 70 and 96) | signed vault contract `SO-R-C` | cited by id, no programme task | covered by the vault contract |
 | `SR-6.03` installers and public release | signed vault contracts `WO-02-A` and `MEM-015` | cited by id, no programme task | covered by the vault contracts |
 | `SR-0.03` tasks 1, 3 and 4 (one pull request) | Dev 3 workstream | branch `feat/sr-0-03-tasks-1-3-4` | active |
@@ -93,7 +93,8 @@ The owner vault holds signed contracts that already cover some programme work. T
 | `MEM-145, MEM-146, MEM-147` | human binding of agent roles (bind, verify, setup, roles listing) | foundation of WP09-01 (PG-09.1) |
 | `SO-05-B` | per-client capability records and an honest connection state | WP18-02 (PG-18.1) and SO-1.04 |
 | `SO-09-A` | authorisation matrix at every entry point | boundary of PG-13.1 with SO-2.02 |
-| `SO-11-A` | end-to-end acceptance of the delivery loop | WP08-03, with SO-1.10 and SO-1.11 |
+| `SO-11-A` | end-to-end acceptance of the delivery loop with two stub sessions, the failure matrix and the sixteen acceptance criteria | WP08-03 (PG-08.1), with SO-1.10 and SO-1.11 |
+| `SO-08-B` | recovery and control: disconnect recovery, restart reconstruction, pause, resume and cancel, with cancellation read from the adapter capability record | WP08-02 (PG-08.1) |
 | `SO-R-C` | upgrade, rollback, backup and restore, and uninstall paths, tested and documented | owner of WBS 5.1.3 and requirements 70 and 96 (SO-REQ-070, SO-REQ-096), which the work breakdown marks as having no owner; no programme task covers it |
 | `WO-02-A, MEM-015` | the published one-line install and the public release | SR-6.03; no programme task touches it, and any spec that does cites these |
 | `SO-14-A` | evidence class and checked date on public claims pages | PG-16.1 |
@@ -101,12 +102,12 @@ The owner vault holds signed contracts that already cover some programme work. T
 
 `WP05-05` (the paid-engine client, draft pull request #201) is owned by `WO-05-B` and is dropped from `PG-05.1`. Upgrade, rollback, backup and restore, and uninstall (requirements 70 and 96 of the work breakdown, which marks them as having no owner) are owned by `SO-R-C`; no programme task covers them.
 
-## Pending owner decisions
+## Decisions on layers and authority
 
 | Decision | Question | Overlaps | Status |
 | --- | --- | --- | --- |
-| Layer to build against | The unsigned Scope One fold `SO-F-01` to `SO-F-13` overlaps the programme specs: which layer is built against? | `PG-04.1`: `SO-F-03`; `PG-05.1`: `SO-F-02`, `SO-F-06`; `PG-09.1`: `SO-F-01`, `SO-F-08`; `PG-09.2`: `SO-F-01`, `SO-F-08`; `PG-13.1`: `SO-F-04`, `SO-F-05`, `SO-F-07`, `SO-F-12`, `SO-F-13`; `PG-14.1`: `SO-F-13` | PENDING OWNER DECISION: nothing is dropped and none of these specs is signed on the strength of either layer until it is decided |
-| Memory and project-state authority | Is the vault the only authority (local-first, no second database)? | all `SO-1.x`, `SO-2.x` and programme specs | proposed, pending owner confirmation: recorded as ADR 7 in [DECISIONS.md](DECISIONS.md); the owner decision of 31 Oct 2026 (local-first, the cloud only a relay and a backup) is the only part decided |
+| Layer to build against | The unsigned fold (`SO-A-01` to `SO-A-12`, `SO-R-E`, `SO-F-01` to `SO-F-13`, cited by id only) or the programme specs | `PG-04.1`: `SO-F-03`; `PG-05.1`: `SO-F-02`, `SO-F-06`; `PG-08.1`: `SO-A-03`, `SO-A-10`; `PG-09.1`: `SO-F-01`, `SO-F-08`; `PG-09.2`: `SO-F-01`, `SO-F-08`; `PG-13.1`: `SO-F-04`, `SO-F-05`, `SO-F-07`, `SO-F-12`, `SO-F-13`; `PG-14.1`: `SO-F-13` | DECIDED: the unsigned fold is the build layer (lead workstream decision under owner delegation, 1 Nov 2026). The programme specs will cite the fold ids and keep only what the fold does not cover; trim pending fold PR (the final fold ids come in the lead's separate pull request). Nothing is trimmed yet. |
+| Memory and project-state authority | Is the vault the only authority (local-first, no second database)? | all `SO-1.x`, `SO-2.x` and programme specs | PROPOSED, pending owner confirmation: recorded as ADR 7 in [DECISIONS.md](DECISIONS.md); the owner decision of 31 Oct 2026 (local-first, the cloud only a relay and a backup) is the only part decided |
 
 ## Requirement register
 

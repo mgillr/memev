@@ -128,6 +128,14 @@ These are decided, in the owner's words of that day. Cite them as "owner decisio
 These close the owner decisions the addendum review asked for first (topology, provider neutrality, tier set). They
 do not accept the addendum's other recommendations; those still need explicit acceptance one by one.
 
+## Decisions taken under owner delegation
+
+- Layer to build against (decided, lead workstream decision under owner delegation, 1 Nov 2026): the unsigned fold
+  (`SO-A-01` to `SO-A-12`, `SO-R-E`, `SO-F-01` to `SO-F-13`, cited by id only) is the build layer. The programme
+  specs `PG-04.1`, `PG-05.1`, `PG-08.1`, `PG-09.1`, `PG-09.2`, `PG-13.1` and `PG-14.1` will cite the fold ids and keep
+  only what the fold does not cover. Trim pending the fold pull request; nothing is trimmed yet.
+- ADR 7 (memory and project-state authority) stays proposed, pending owner confirmation.
+
 ## Product-owner decision list
 
 These questions block specific contracts. Each lists the contracts it blocks (ids from the

@@ -10,9 +10,10 @@
       "phase": "implement",
       "depends_on": [],
       "requirements": [
-        "MV-INT-06: Real multi-node gossip transport with reconnect and partition recovery (P1). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:45; evidence docs/scope-one/programme/DECOMPOSITION.md:91; baseline 8.5)"
+        "MV-INT-06: Real multi-node gossip transport with reconnect and partition recovery (P1). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:45; evidence docs/scope-one/programme/DECOMPOSITION.md:91; baseline 8.5)",
+        "Idempotent digest and delta anti-entropy is the transport-independent conformance test: the digest is the hash of the sorted ids, deltas are exchanged both ways, and a repeated round or a partition leaves the same state; the in-memory adapter passes it first (source: converge src/network.py and tests/test_network.py, described only; repository analysis of 1 Nov 2026, section 3.4 item C5)"
       ],
-      "description": "Repo: memev. Keeps the gossip boundary: engine supplies state and digests, Memev supplies transport and lifecycle. Must not become a standalone merge service (BSL restriction; OQ-10).",
+      "description": "Repo: memev. Keeps the gossip boundary: engine supplies state and digests, Memev supplies transport and lifecycle. Must not become a standalone merge service (BSL restriction; OQ-10). The conformance test is written fresh. The converge pattern is cited and described only: converge is BUSL-1.1 and no code is copied (counsel review is WP15-03).",
       "scope": [
         "src/engine/transport.mjs",
         "test/transport.test.mjs"
@@ -33,6 +34,22 @@
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "expect_exit": 0,
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The five anti-entropy conformance tests are present",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"anti-entropy: the digest is the hash of the sorted ids\" \"anti-entropy: deltas are exchanged both ways\" \"anti-entropy: repeating a round changes nothing\" \"anti-entropy: a partition heals to the same state\" \"anti-entropy: the in-memory adapter passes the conformance test\"; do grep -qF \"$n\" test/transport.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The anti-entropy conformance tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^anti-entropy:' test/transport.test.mjs",
+            "expect_exit": 0
           }
         },
         {

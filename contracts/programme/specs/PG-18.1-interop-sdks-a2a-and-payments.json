@@ -106,16 +106,25 @@
       "requirements": [
         "MV-PRD-10: SDKs, framework adapters and public conformance tests let existing agents (for example LangGraph) join a Memev project, claim work, submit evidence and sync state. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:103; evidence docs/scope-one/programme/DECOMPOSITION.md:131; baseline 8.6)"
       ],
-      "description": "Repo: memev.",
+      "description": "Repo: memev. The runner has a self-test that proves the check can fail (a pattern taken from the acfa-rs claim guards, Apache-2.0).",
       "scope": [
         "conformance/**"
       ],
       "criteria": [
         {
-          "statement": "conformance runner exists",
+          "statement": "The runner self-test passes and proves that the check can fail",
           "verifier": {
-            "type": "file_exists",
-            "path": "conformance/run.mjs"
+            "type": "command",
+            "cmd": "node conformance/run.mjs --self-test",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The runner lists a case for each of join, claim, evidence and sync (MV-PRD-10)",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in join claim evidence sync; do node conformance/run.mjs --list | grep -qi \"$n\" || exit 1; done",
+            "expect_exit": 0
           }
         },
         {

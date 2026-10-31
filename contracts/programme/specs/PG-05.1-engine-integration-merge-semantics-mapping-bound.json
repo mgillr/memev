@@ -2,7 +2,7 @@
   "title": "PG-05.1 Engine integration: merge semantics, mapping, boundary (memev)",
   "project": "memev",
   "workdir": null,
-  "request": "Programme contract for work package WP05 in memev: Engine integration: merge semantics, mapping, boundary. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP05.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP01-03, WP04-01, WP04-03, WP05-02, WP05-05. Depends on contracts: SO-2.12, SO-2.13, WO-05-B. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.12 and SO-2.13: WP05-06 degrades as SO-2.12 requirement 8 says when the paid engine is absent and keeps the paid interface behind SO-2.13 requirements 3 and 4; neither is restated here. Signed vault contract WO-05-A and WO-05-C (cited by id only): foundation: the call-out boundary and the external convergence service specification; this spec cites them and does not specify them again. Signed vault contract WO-05-B (cited by id only): the paid-engine client behind a flag, off by default (draft PR #201, still open); WP05-05 is dropped from this spec because that signed contract owns it, and WP05-06 depends on it. Pending owner decision (which layer to build against): the unsigned Scope One fold SO-F-01 to SO-F-13 (cited by id only) overlaps this spec at SO-F-02, SO-F-06. Which layer is built against is open and is the owner's call. This spec is not signed until it is decided, and nothing is dropped on the strength of the unsigned fold. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "request": "Programme contract for work package WP05 in memev: Engine integration: merge semantics, mapping, boundary. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP05.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP01-03, WP04-01, WP04-03, WP05-02, WP05-05. Depends on contracts: SO-2.12, SO-2.13, WO-05-B. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.12 and SO-2.13: WP05-06 degrades as SO-2.12 requirement 8 says when the paid engine is absent and keeps the paid interface behind SO-2.13 requirements 3 and 4; neither is restated here. Signed vault contract WO-05-A and WO-05-C (cited by id only): foundation: the call-out boundary and the external convergence service specification; this spec cites them and does not specify them again. Signed vault contract WO-05-B (cited by id only): the paid-engine client behind a flag, off by default (draft PR #201, still open); WP05-05 is dropped from this spec because that signed contract owns it, and WP05-06 depends on it. Build layer (lead workstream decision under owner delegation, 1 Nov 2026): the unsigned fold (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-13, cited by id only) is the build layer, and it overlaps this spec at SO-F-02, SO-F-06. This spec will cite those ids and keep only what the fold does not cover; trim pending fold PR (the final fold ids come in the lead's separate pull request, branch contracts/scope-one-fold-build-layer). Nothing is trimmed yet. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
   "tasks": [
     {
       "id": "WP05-01",
@@ -10,7 +10,8 @@
       "phase": "design",
       "depends_on": [],
       "requirements": [
-        "MV-ARCH-05: Merge semantics are chosen per object class (observations, metadata, membership, counters, task ownership, task state, contracts, approvals, external actions), never one CRDT for everything. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:14; evidence docs/scope-one/programme/DECOMPOSITION.md:69; baseline 8.5)"
+        "MV-ARCH-05: Merge semantics are chosen per object class (observations, metadata, membership, counters, task ownership, task state, contracts, approvals, external actions), never one CRDT for everything. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:14; evidence docs/scope-one/programme/DECOMPOSITION.md:69; baseline 8.5)",
+        "The call-out boundary WO-05-A sends one JSON line {a, b, base} of text and expects {text} or {refuse:true}, and crdt-merge has no three-way text merge, so a provider shim maps a note to structured state (for example lines to a set); the shim lives outside the Memev core (in memev-ops or on the crdt-merge side) (source: repository analysis of 1 Nov 2026, section 5; signed vault contract WO-05-A, cited by id only)"
       ],
       "description": "Repo: memev. Task ownership is a lease/claim, not a counter. Contracts and approvals are never silently merged.",
       "scope": [
@@ -29,6 +30,14 @@
           "verifier": {
             "type": "command",
             "cmd": "for n in observations metadata membership counters \"task ownership\" \"task state\" contracts approvals \"external action\"; do grep -qi \"$n\" docs/MERGE-SEMANTICS.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The table states that the engine has no three-way text merge and that a provider shim outside the core maps a note to structured state",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"provider shim\" \"three-way text merge\" \"structured state\" outside; do grep -qi \"$n\" docs/MERGE-SEMANTICS.md || exit 1; done",
             "expect_exit": 0
           }
         },
@@ -117,7 +126,8 @@
         "WP05-03"
       ],
       "requirements": [
-        "MV-INT-01: Memev vault data is represented in CRDT-compatible state (P0 agent memory integration). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:40; evidence docs/scope-one/programme/DECOMPOSITION.md:86; baseline 8.5)"
+        "MV-INT-01: Memev vault data is represented in CRDT-compatible state (P0 agent memory integration). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:40; evidence docs/scope-one/programme/DECOMPOSITION.md:86; baseline 8.5)",
+        "The representation is structured state that a provider shim can pass to the engine; the shim that translates the call-out line protocol lives outside the Memev core and the core holds no convergence logic (source: repository analysis of 1 Nov 2026, section 5; signed vault contract WO-05-A, cited by id only)"
       ],
       "description": "Repo: memev.",
       "scope": [
@@ -140,6 +150,22 @@
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "expect_exit": 0,
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The two named state-map tests are present",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"state map: a note maps to structured state and back without loss\" \"state map: the core holds no text merge, only the representation\"; do grep -qF \"$n\" test/state-map.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The state map contains no text-merge code",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eiq \"diff3|three-way|3-way|mergeText\" src/engine/state-map.mjs",
+            "expect_exit": 0
           }
         },
         {

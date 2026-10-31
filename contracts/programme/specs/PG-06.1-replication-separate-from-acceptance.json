@@ -25,7 +25,24 @@
           }
         },
         {
-          "statement": "doc names replicated is not accepted",
+          "statement": "The state model names all six states",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in received replicated evaluated accepted rejected superseded; do grep -qi \"$n\" docs/ACCEPTANCE.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The document says who may make each transition",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/ACCEPTANCE.md",
+            "pattern": "who may.*(accept|make)",
+            "flags": "is"
+          }
+        },
+        {
+          "statement": "The document says replicated is not accepted",
           "verifier": {
             "type": "grep",
             "file": "docs/ACCEPTANCE.md",
@@ -85,6 +102,22 @@
           }
         },
         {
+          "statement": "One test is present for each of the seven questions",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"acceptance: is the agent authorised\" \"acceptance: does it break an invariant\" \"acceptance: does it depend on a superseded decision\" \"acceptance: is it safe to auto-accept\" \"acceptance: does it need verification\" \"acceptance: may it proceed offline\" \"acceptance: does it need global authorisation\"; do grep -qF \"$n\" test/acceptance.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The seven question tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^acceptance:' test/acceptance.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
           "statement": "Changes stay in scope",
           "verifier": {
             "type": "scope"
@@ -112,7 +145,7 @@
       "requirements": [
         "MV-ARCH-06: Replication and acceptance are separate: a node may receive and replicate an operation without accepting its consequences into authoritative project state. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:15; evidence docs/scope-one/programme/DECOMPOSITION.md:70; baseline 8.5)"
       ],
-      "description": "Repo: memev.",
+      "description": "Repo: memev. Shares src/engine/project-store.mjs with PGP-1.02 (lands first) and PG-10.1 (lands after).",
       "scope": [
         "src/engine/project-store.mjs",
         "src/engine/acceptance.mjs",
@@ -120,11 +153,11 @@
       ],
       "criteria": [
         {
-          "statement": "project-store references acceptance",
+          "statement": "project-store.mjs calls evaluateAcceptance on the write path",
           "verifier": {
-            "type": "wiring",
-            "entry": "src/engine/project-store.mjs",
-            "symbol": "evaluateAcceptance"
+            "type": "command",
+            "cmd": "grep -q evaluateAcceptance src/engine/project-store.mjs",
+            "expect_exit": 0
           }
         },
         {
@@ -133,6 +166,14 @@
             "type": "test_red_green",
             "test_file": "test/acceptance-wired.test.mjs",
             "cmd": "node --test test/acceptance-wired.test.mjs"
+          }
+        },
+        {
+          "statement": "The wired test names the replicated-is-not-accepted behaviour",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"replicated operation does not change authoritative state until accepted\"; do grep -qF \"$n\" test/acceptance-wired.test.mjs || exit 1; done",
+            "expect_exit": 0
           }
         },
         {
