@@ -31,13 +31,16 @@ on:
       - 'scripts/**'
       - 'package.json'
       - 'CHANGELOG.md'
+      - 'changelog.d/**'
+      - 'docs/**'
       - 'Dockerfile'
       - '.github/workflows/**'
 permissions:
   contents: read
 concurrency:
-  # one run per pull request or per ref: a newer push to main cancels the run it supersedes
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  # one run per pull request, where a newer push cancels the run it supersedes; on main one run per commit, never
+  # cancelled, because each push's changelog guard checks only that push's commits (base = the commit before it)
+  group: ci-${{ github.event.pull_request.number || format('{0}@{1}', github.ref, github.sha) }}
   cancel-in-progress: true
 jobs:
   check:
