@@ -2,7 +2,7 @@
   "title": "SR-1.22 A whole-note write interrupted after the log append recovers from the log, not from the old file",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G87: write() appends the put to the log and then renames the file; when the rename fails, the next open() imports the old file as an external edit and the note reads the old body while the new body sits in the log (src/engine/vault.mjs:119-121, the prefix rule covers appends only), against README's log-first promise. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence). Repository: memev. Depends on contracts: SR-1.01, QL-1.02. Sensitive path (the oplog): the QL-1.03 checklist applies before merge.",
+  "request": "Closes G87: write() appends the put to the log and then renames the file; when the rename fails, the next open() imports the old file as an external edit and the note reads the old body while the new body sits in the log (src/engine/vault.mjs:119-121, the prefix rule covers appends only), against README's log-first promise. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence). Repository: memev. Depends on contracts: SR-1.01, QL-1.02, SR-1.26. Sensitive path (the oplog): the QL-1.03 checklist applies before merge.",
   "tasks": [
     {
       "id": "T1",
@@ -12,7 +12,8 @@
       "requirements": [
         "on open, a path whose last logged put is newer than the file on disk and whose file content equals the put's previous head is completed from the log, not imported as external",
         "a file that differs from both the logged head and the previous head is still imported as an external edit, so a real outside edit is never lost",
-        "README and DESIGN.md state log-first for writes and appends"
+        "README and DESIGN.md state log-first for writes and appends",
+        "the doctor's drift message and its fix describe log-first completion, not an import of the old file, and the fix never writes the old body over a logged newer one"
       ],
       "description": "",
       "scope": [
@@ -20,7 +21,10 @@
         "README.md",
         "docs/DESIGN.md",
         "test/write-interrupted.test.mjs",
-        "test/helpers/**"
+        "test/helpers/**",
+        "src/cli/doctor.mjs",
+        "docs/MODULES.md",
+        "changelog.d/SR-1.22.md"
       ],
       "criteria": [
         {
@@ -47,6 +51,103 @@
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Reopening succeeds when a logged write cannot be completed. (a) With the note's directory still read-only, Vault.open() does not throw and appends no external record for the path; after the directory is made writable, a second reopen reads the new body. (b) After write('notes/a.md') and a write('notes/a.md/b.md') that throws, Vault.open() does not throw, notes/a.md still reads its body, and an unrelated note deleted beforehand is still rebuilt, so one bad path does not abort recovery of the others.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "node --test test/write-interrupted.test.mjs"
+          }
+        },
+        {
+          "statement": "The new test fails when src/engine/vault.mjs is reverted to the contract base. The test uses only APIs that exist at base, and in its failed write the new body is neither an extension of the old body nor a first write.",
+          "verifier": {
+            "type": "command",
+            "cmd": "d=$(mktemp -d) && cp -R package.json src templates vendor test \"$d\"/ && git show \"$MEMEV_CONTRACT_BASE\":src/engine/vault.mjs > \"$d/src/engine/vault.mjs\" && cd \"$d\" && ! node --test test/write-interrupted.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "After the write throws and the directory is made writable, without reopening: v.append(OWNER,{path,text:'tail'}) leaves the file equal to the new body plus the appended line, materialize(path) equals the file, and no record with agent 'external' exists for the path. The same holds when the next call is v.syncFromDisk(path,'git-pull').",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "node --test test/write-interrupted.test.mjs"
+          }
+        },
+        {
+          "statement": "Two more cases, each adding no external record. (a) A 200-line note is edited on one line and the write fails; the last record for the path (via log.iterate) has type 'splice', and the reopen reads the new body. (b) A note created by three append() calls is rewritten by a write that fails, and the reopen reads the new body.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "node --test test/write-interrupted.test.mjs"
+          }
+        },
+        {
+          "statement": "Write A, then write B successfully, then close. Write A back to the file by hand and set its mtime 10 s after the put (fs.utimesSync). After reopen, the file reads A, v2.imported includes the path, v2.recovered does not, and the last record for the path is an external put of A.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "node --test test/write-interrupted.test.mjs"
+          }
+        },
+        {
+          "statement": "A child process opens the vault, replaces fs.renameSync so that the call for the note's tmp file sends SIGKILL to itself, and writes the new body. The parent asserts that the child died by SIGKILL, that the file still holds the old body, and that the last log record for the path is the new put, so the test cannot pass without a real interruption. It then reopens and reads the new body. The read-only-directory case asserts that write() throws and that the old body is on disk before the reopen.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "node --test test/write-interrupted.test.mjs"
+          }
+        },
+        {
+          "statement": "After the failed write, a different outside body is written to the same path with its mtime set 1 h before the put (fs.utimesSync). After reopen, the file reads the outside body and the last record for the path is an external put of it.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "node --test test/write-interrupted.test.mjs"
+          }
+        },
+        {
+          "statement": "Right after the failed write, log.heads.get(p).ch === sha256(newBody) and the last record for p carries the writer's agent. After reopen, v2.log.seq equals the seq before the reopen, the head seq for p is the failed write's seq, no record for p has agent 'external', and v2.log.verify().ok is true.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "node --test test/write-interrupted.test.mjs"
+          }
+        },
+        {
+          "statement": "After reopen, v2.recall(OWNER,{query:'<word only in the new body>'}) returns the path, and v2.recall(OWNER,{query:'<word only in the old body>'}) does not.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "node --test test/write-interrupted.test.mjs"
+          }
+        },
+        {
+          "statement": "Reopen with git enabled. After v2.commits.flush(), `git status --porcelain -- <path>` is empty and `git show HEAD:<path>` equals the new body.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "node --test test/write-interrupted.test.mjs"
+          }
+        },
+        {
+          "statement": "After a failed write whose new body is in the log, the file is replaced by NUL bytes of the new body's length. The reopen reads the new body and adds no external record: a file containing NUL bytes, or invalid UTF-8, is treated as torn.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "node --test test/write-interrupted.test.mjs"
+          }
+        },
+        {
+          "statement": "While a live pid holds .memev/daemon.lock, a second Vault.open() on a vault whose note lags the log changes no note file and appends no record (seq and file mtimes unchanged). Recovery happens only in the lock holder.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "node --test test/write-interrupted.test.mjs"
           }
         },
         {

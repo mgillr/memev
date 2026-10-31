@@ -1,0 +1,126 @@
+{
+  "title": "SR-1.26 One write can never make the vault unopenable",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G91: writing notes/a.md and then notes/a.md/b.md is accepted by checkPath, the second put is appended to the op log and fdatasynced (src/engine/vault.mjs:226) before mkdirSync throws EEXIST (:235), and every later Vault.open() throws EEXIST from recover() (:119, called unguarded at :66), even after the file is deleted by hand, because recover() first rebuilds it. The daemon, the doctor, compact and the runner can never open the vault again. Any token with write scope over a matching path reaches it (MCP memev_write and memev_append, HTTP PUT and PATCH, the tunnel when remote access is on): a remote denial of service on the vault. Found by the SR-1.22 red-team round and reproduced on 31 October 2026 at main be457db. Repository: memev. Depends on contracts: none. Lands ahead of the SR-1 queue. Sensitive path (the oplog and the vault): the QL-1.03 checklist applies before merge.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "No path under a note and no note over a folder is ever logged",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "write, append and every other logging entry point refuse, before anything is appended to the log, a path one of whose parent segments is an existing note, and a path that names an existing folder of notes; the refusal names the conflicting path",
+        "the refusal reaches every caller as a 4xx with that reason (MCP tools and HTTP PUT and PATCH), never a 500, and the log, the files and the recall index are unchanged by it",
+        "the check runs on the materialised view of the log, so a path that exists only in the log (a file deleted by hand) still conflicts"
+      ],
+      "scope": [
+        "src/engine/vault.mjs",
+        "src/server/http.mjs",
+        "src/server/mcp.mjs",
+        "test/vault-path-conflict.test.mjs",
+        "test/helpers/**",
+        "docs/MODULES.md",
+        "changelog.d/SR-1.26.md"
+      ],
+      "criteria": [
+        {
+          "statement": "Writing notes/a.md/b.md over the note notes/a.md, and notes/a.md over the folder notes/a.md/, is refused with the conflicting path named, through the vault, MCP and HTTP; the log's last sequence number, every file and the index are unchanged; the vault reopens",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-path-conflict.test.mjs",
+            "cmd": "node --test test/vault-path-conflict.test.mjs"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/vault-path-conflict.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "A vault that already holds such a record opens",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "recover() handles each path on its own: a path that cannot be materialised is skipped with its reason recorded (the list SR-1.21 surfaces), and recovery continues with the other paths; Vault.open() never throws because of one path",
+        "a vault whose log already holds the conflicting put written by the code at be457db opens, every other note reads its logged body, and memev doctor reports the conflicting path with the command that resolves it",
+        "nothing is appended to the log by recovery"
+      ],
+      "scope": [
+        "src/engine/vault.mjs",
+        "src/cli/doctor.mjs",
+        "test/vault-open-conflict.test.mjs",
+        "test/fixtures/vault-conflict/**",
+        "test/helpers/**",
+        "docs/MODULES.md",
+        "changelog.d/SR-1.26.md"
+      ],
+      "criteria": [
+        {
+          "statement": "A vault fixture whose log holds notes/a.md and then notes/a.md/b.md (written by the code at be457db) opens; notes/other.md reads its body; the doctor names notes/a.md/b.md; the log's last sequence number is unchanged by the open",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-open-conflict.test.mjs",
+            "cmd": "node --test test/vault-open-conflict.test.mjs"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/vault-open-conflict.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
