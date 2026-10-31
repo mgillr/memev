@@ -1,0 +1,89 @@
+{
+  "title": "SR-1.08 Remote setup session: allowlist that works, tested like the rest",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G08: setup-remote.mjs allowlists a deployment command the deployment module cannot accept; no SPDX header; one test file. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Allowlist matches the command surface",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "every allowlisted command is executed in a test and exits 0 or with its documented code"
+      ],
+      "description": "",
+      "scope": [
+        "src/cli/setup-remote.mjs",
+        "src/cli/deployment.mjs",
+        "test/setup-remote-allowlist.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "Each allowlisted command runs as allowlisted",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/setup-remote-allowlist.test.mjs",
+            "cmd": "node --test test/setup-remote-allowlist.test.mjs"
+          }
+        },
+        {
+          "statement": "The SPDX header is present",
+          "verifier": {
+            "type": "grep",
+            "file": "src/cli/setup-remote.mjs",
+            "pattern": "^// SPDX-License-Identifier: Apache-2.0"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Coverage for the session",
+      "phase": "verify",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "line coverage of setup-remote.mjs and setup-channel.mjs is at least 85%"
+      ],
+      "description": "",
+      "scope": [
+        "test/**",
+        "scripts/coverage-of.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "setup-remote.mjs line coverage >= 85%",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/coverage-of.mjs src/cli/setup-remote.mjs",
+            "key": "lines",
+            "op": ">=",
+            "value": 85
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

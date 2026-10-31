@@ -1,0 +1,440 @@
+{
+  "title": "SR-1.27 Done comes only from a passing verify",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G92 (issue #242) and the PROTECTED part of issue #243: contractList sets a signed contract's state to done whenever a file named contracts/closed/<id>.json exists (src/engine/contracts.mjs:262-265), and nothing checks what the file holds or who wrote it. PROTECTED covers only contracts/signed/ and contracts/keys/ (src/engine/vault.mjs:27), verify writes contracts/closed/ through the caller's own identity (contracts.mjs:248), and contracts/receipts/ is unprotected. So any token with write scope over contracts/**, including the token a paired device gets (src/engine/devices.mjs:85) and a cloud connector's (src/server/oauth.mjs:17), takes a contract out of the Stop-hook gate and the pre-push gate with no contract.verified record, and can rewrite its receipts. Found by the SR-0.03 red-team round and reproduced on 31 October 2026 on the main source. Repository: memev. Depends on contracts: QL-1.02. It is urgent: until it lands, a stopgap fix ahead of it needs the owner's approval. On a case-insensitive file system (macOS APFS, Windows) a case variant such as contracts/Signed/<id>.json also reaches a signed contract, because PROTECTED compares exact spelling. Sensitive path (contracts and tokens): the QL-1.03 checklist applies before merge. Also closes issue #247: contractCheckSignature joined an unchecked keyid into the key path (src/engine/contracts.mjs:203), so a forged signature verified with a key planted under contracts/drafts/.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Verify output is immutable to every caller",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "contracts/closed/ and contracts/receipts/ join PROTECTED; write, append and delete under either path are refused as immutable for every token, local or remote, owner included",
+        "verify writes the closed record and appends the receipt as internal writes, so its own output still lands",
+        "PROTECTED is matched on the folded path, Unicode NFC then toUpperCase() then toLowerCase(), so a case or long-s variant such as contracts/Signed/ or contracts/ſigned/ is refused like the exact spelling on every file system (issue #243: on a case-insensitive volume the variant reaches the protected file)",
+        "the refusal reaches MCP and HTTP callers as a 4xx naming the path as immutable, never a 500, and nothing is appended to the log by a refused call",
+        "PROTECTED is checked on the resolved target as well as the requested path: the folded path, relative to the vault root, of fs.realpathSync.native of the target when it exists, or else of its deepest existing folder followed by the remaining segments, so an 8.3 short name (CONTRA~1), a case variant in any segment, a directory symlink, a junction and a file symlink inside the vault all count as the protected path; a target that is a symbolic link whose destination cannot be resolved is refused for write, append and delete; the vault root itself is resolved with fs.realpathSync.native when the vault opens, so a vault opened through a link to its folder checks paths the same way",
+        "write, append and delete check PROTECTED before anything else, including the syncFromDisk that append runs first, so a refused call never logs",
+        "syncFromDisk and recover() never record a disk change or a deletion under contracts/receipts/ or contracts/closed/ as a new version or a delete: a file there with history in this vault's log that has changed or is missing on disk is restored from the log and the drift is reported; a file with no history (a clone, a restore, a pull from another computer) is left on disk unrecorded, since a close counts only through its signature and a receipt is informational",
+        "a refused write, append or delete under a protected path answers HTTP 409 with error immutable and the path in error_description, and MCP returns isError with text starting 'immutable:' and naming the path",
+        "write, append and delete are refused as immutable on any path whose file has more than one hard link (a link count above one), because another name of the same file may be protected; this holds for every note, not only under contracts/",
+        "the vault's pre-commit hook also refuses a commit that deletes or renames a file under contracts/closed/ or contracts/receipts/ (git diff --cached --diff-filter=DR); a change there stays allowed, because verify rewrites the close record and appends to the receipt",
+        "the first internal write or append to a path under contracts/receipts/ or contracts/closed/ with no history in this log is recorded as a whole-file version of the bytes it leaves on disk, never as a splice, so materialize matches the file",
+        "verify's internal writes land for every identity that may verify, the CLI client token, a device token and a remote read token included: the internal flag skips the path-scope check, and no admin or local condition is added to it",
+        "each red-green criterion of this task that runs test/contracts-closed-protected.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
+      ],
+      "scope": [
+        "src/engine/vault.mjs",
+        "src/engine/contracts.mjs",
+        "test/contracts-closed-protected.test.mjs",
+        "test/helpers/**",
+        "docs/MODULES.md",
+        "changelog.d/SR-1.27.md",
+        "src/server/http.mjs",
+        "src/server/mcp.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "With a token shaped like a paired device's (scopes read and write, paths memory/**, work/**, contracts/**, bus/**, remote true), and again with the owner's token, writing, appending or deleting contracts/closed/<id>.json and contracts/receipts/<id>.md is refused as immutable through the vault, MCP and HTTP. The log's last sequence number is unchanged by each refusal, and the contract stays open and in the Stop-hook gate.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/contracts-closed-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With a token shaped like a paired device's (scopes read and write, paths memory/**, work/**, contracts/**, bus/**, remote true), writes to contracts/Signed/<id>.json, contracts/SIGNED/<id>.json, contracts/Closed/<id>.json and contracts/ſigned/<id>.json (long s) are each refused as immutable, and the signed contract file's bytes are unchanged. The test runs the folded comparison on whatever volume it is on, so it fails on a case-sensitive file system too when the comparison is not folded.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c02:' test/contracts-closed-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A contract whose only criterion passes is verified by the owner: the verify result is PASS, contracts/closed/<id>.json is written for it through the internal path, and the receipt gains one entry.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/contracts-closed-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/contracts-closed-protected.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/contracts-closed-protected.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/contracts-closed-protected.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "With the owner identity and with a ['**'] local-client token, two sets of paths are each refused as immutable for write, append and delete, and both the target files' bytes and the log's last seq stay unchanged. (a) Every case combination of contracts/{signed,keys,closed,receipts}/, including first-segment variants (Contracts/, CONTRACTS/), the Kelvin sign and the long s. (b) A path through a directory symlink created on disk (a junction on Windows): memory/alias -> ../contracts/closed and memory/alias2 -> ../contracts/receipts. A guard that folds and compares the real path (fs.realpathSync.native of the target or its deepest existing folder, relative to the vault root) passes; a string-only fold fails (b).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/contracts-closed-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "After a verify writes contracts/receipts/<id>.md, change the file on disk. Neither vault.syncFromDisk(path, 'git-pull') nor a reopen (recover) records the disk content as a new version: no put, splice or delete record for a path under contracts/receipts/ or contracts/closed/ has agent 'external'. v.get returns the log's version, the file on disk is restored from the log, and the drift is reported.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c09:' test/contracts-closed-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "After a verify, hand-edit contracts/receipts/<id>.md on disk and hand-place contracts/closed/<other>.json. Then an append to each, by the device-shaped token through the vault, MCP and HTTP, is refused as immutable, and log.seq is unchanged after each refusal.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c10:' test/contracts-closed-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "HTTP PUT, PATCH and DELETE of /v1/notes/contracts/closed/<id>.json and /v1/notes/contracts/receipts/<id>.md, with the device token and with the admin token, return exactly 409 with error 'immutable' and the path in error_description. The MCP result has isError true and text that starts with 'immutable:' and names the path.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c11:' test/contracts-closed-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c12: Create on disk the file symlinks memory/r.md -> ../contracts/receipts/<id>.md, memory/c.json -> ../contracts/closed/<id>.json, memory/s.json -> ../contracts/signed/<id>.json and memory/k.pub -> ../contracts/keys/<kid>.pub, and a hard link memory/h.md to the receipt. With the device-shaped token and with the owner, append, write and delete of each path through the vault, MCP and HTTP are refused as immutable. Every target file's bytes and log.seq are unchanged.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c12:' test/contracts-closed-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T1-c12:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c13: (a) In a vault with no contracts/closed/ or contracts/receipts/ yet and a directory symlink memory/alias3 -> ../contracts, write memory/alias3/closed/<id>.json and append memory/alias3/receipts/<id>.md. Separately, with memory/alias -> ../contracts/closed, write memory/alias/sub/x.json. Each is refused as immutable, no folder or file is created under contracts/, and log.seq is unchanged. (b) The same vault, opened through a symlink to its root folder, refuses c08(b)'s paths.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c13:' test/contracts-closed-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T1-c13:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c14: After a verify: (a) remove contracts/closed/<id>.json and contracts/receipts/<id>.md on disk, run syncFromDisk(p,'git-pull') for each, verify again, and reopen. No delete record with agent 'external' exists for either path, and both files hold the log's content (the receipt keeps its old entries plus the new one). Once the commit queue flushes, `git show HEAD:<path>` matches both files. (b) In the vault's repository, `git rm` of either path followed by `git commit` is refused by the pre-commit hook.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c14:' test/contracts-closed-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T1-c14:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c14:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c15: Open a git clone of a vault with a fresh .memev, where contracts/receipts/<id>.md and contracts/closed/<id>.json exist with no history, and verify <id> PASS. For both paths, v.materialize(p) equals the file's bytes and its sha256 equals the log head's ch. Then edit both files on disk and reopen: both are restored to exactly those bytes.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c15:' test/contracts-closed-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T1-c15:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c16: A contract whose only criterion is file_exists of a file inside the vault is verified once with `memev verify <id>` (the CLI client token) and once through MCP with the device-shaped token. Each verify returns PASS, writes contracts/closed/<id>.json through the internal path, and appends exactly one receipt entry.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c16:' test/contracts-closed-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T1-c16:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c16:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "memory/a.md and memory/b.md, two ordinary notes, are hard links to one file. With the owner and with the device-shaped token, write, append and delete of either path through the vault, MCP and HTTP are refused as immutable, and the file's bytes and log.seq are unchanged.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c17:' test/contracts-closed-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/contracts-closed-protected.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03, T1-c08, T1-c09, T1-c10, T1-c11, T1-c12, T1-c13, T1-c14, T1-c15, T1-c16, T1-c17) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/contracts-closed-protected.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c02:|^T1-c03:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c12:|^T1-c13:|^T1-c14:|^T1-c15:|^T1-c16:|^T1-c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "State comes from the verify record, not a file",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "a signed contract is done when the log holds a contract.verified record for its id with ok true and the signed hash, or when contracts/closed/<id>.json is a close record whose envelope has the close payloadType and verifies under a key in contracts/keys/, and whose verified payload holds exactly the keys id, hash, ok and verified_at, with id equal to the contract's id, ok true and hash equal to the signed hash; the fields are read from the verified payload, never from keys stored beside the envelope; a computer that can write the backup can add a key under contracts/keys/ and is trusted for closes, while no token can write there; any other file under contracts/closed/ plays no part in contractList, contractGate or the pre-push gate",
+        "done is a fact about a past verify: a later failing verify of a done contract is recorded and reported but does not reopen it, because a scope criterion can fail later for changes made after the work landed",
+        "memev doctor lists every contract whose contracts/closed/<id>.json exists but which is not done under requirement 1, as a contract to verify again; nothing is rewritten or deleted",
+        "a vault written by the code at the base, whose contracts were closed by a real passing verify, reads them as done after the change",
+        "contractCheckSignature refuses any keyid that is not the 16-hex form keyId() produces, before the keyid touches a path, and accepts a signature only by the key whose keyid the contract.signed log record holds (or, with no such record, the keyid in <id>.sig.json, still 16-hex)",
+        "contract.verified records the canonical hash of contracts/signed/<id>.json as read and signature-checked by that verify, never a hash copied from the contract.signed record, and the keyid its signature verified under; the signed hash of a contract is the hash in this log's contract.signed record for its id or, with no such record (a clone, or a contract signed on another computer), the canonical hash of contracts/signed/<id>.json whose signature verifies under requirement 5; a verify counts toward done only when its hash equals the signed hash; a contract.verified record written before this change carries no hash and counts while the contract's signed files still verify under the keyid of its contract.signed record",
+        "verify writes contracts/closed/<id>.json as a close record: a DSSE envelope with its own payloadType, distinct from the contract signature's, over exactly {id, hash, ok: true, verified_at} with hash the signed hash, made with this computer's contract key, whose public file verify writes under contracts/keys/ when it is missing, so an honest close travels with the backup and verifies on every computer",
+        "the set of contracts with a counting pass survives a restart and an upgrade: it is rebuilt from the log on open or saved in graph.json with the snapshot's seq, never held only in memory",
+        "contractList and contractGate answer from that in-memory set, kept current by each contract.verified record, never from a log scan per call",
+        "with the daemon up, memev doctor relays the unverified-close check (the allow-list in doctor.mjs), and the check carries no fix: doctor --fix leaves the file and the log untouched",
+        "memev_contract_status with no arguments and the session-start card list a done contract whose latest verify failed as done, with the failing tasks of that verify, never as active work: the card says neither 'Active contract' nor 'Build these' for it, and such contracts do not count toward the card's limit of open contracts; memev gate verifies only contracts that are not done, so a done contract never blocks a push and gate appends no verify record for it",
+        "a supersedes link takes the superseded contract out of the open state, contractGate and the default status list only when the superseding contract was signed with local origin (decided by the transport, never by an argument), either in the superseded contract's session or by a caller with the admin scope, and has a counting pass of its own; until then the superseded contract stays open, in contractGate and in the default status list",
+        "contractSign validates a draft as contractDraft does, at least one task and no top-level key that contractDraft does not write, and refuses an id that already has a contract.signed record in this log, even when its signed files are gone from disk",
+        "docs/CONTRACTS.md says that a new version retires the old contract only when it was signed with local origin, in the old contract's session or by the owner and has passed a verify of its own, so an amend signed in a later session by a client without the admin scope leaves the old contract open until it passes",
+        "each red-green criterion of this task that runs test/contracts-done-from-log.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest"
+      ],
+      "scope": [
+        "src/engine/contracts.mjs",
+        "src/engine/vault.mjs",
+        "src/cli/doctor.mjs",
+        "test/contracts-done-from-log.test.mjs",
+        "test/helpers/**",
+        "docs/CONTRACTS.md",
+        "docs/MODULES.md",
+        "changelog.d/SR-1.27.md",
+        "src/cli/hooks.mjs",
+        "src/cli/contracts-cli.mjs",
+        "src/engine/card.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "A signed contract whose contracts/closed/<id>.json is placed on disk directly (not through the vault), with no passing contract.verified record, is open and in the Stop-hook gate, and memev doctor names it. After a passing verify it is done and leaves the gate.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c01:' test/contracts-done-from-log.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A done contract verified again with a failing result stays done; the failing result is in the receipt and in contract.verified.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c02:' test/contracts-done-from-log.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "docs/CONTRACTS.md carries the sentence 'A contract is done only after a passing verify of the contract as signed.'",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CONTRACTS.md",
+            "pattern": "A contract is done only after a passing verify of the contract as signed\\."
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/contracts-done-from-log.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/contracts-done-from-log.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/contracts-done-from-log.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Sign a contract (session S) whose only criterion is the command `false`. On disk, replace contracts/signed/<id>.json and <id>.sig.json with a copy whose criterion is `true`, signed by a fresh Ed25519 key. Store that key once as contracts/drafts/k.pub with envelope keyid '../drafts/k', and once as a new contracts/keys/<kid>.pub. Run verify, then restore the original files. The contract reads open and stays in contractGate(S); the swapped verify is either refused or recorded with a hash different from the contract.signed hash, and does not count. A verify of the unmodified contract records the signed hash, fails on its `false` criterion and leaves the contract open.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c08:' test/contracts-done-from-log.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Build the vault with the base commit's own code: git archive \"$MEMEV_CONTRACT_BASE\" src vendor templates package.json into a temp dir; when the variable is unset the subtest is skipped, so the suite passes without it, and this criterion's guard counts a skip as a failure. In it, verify contract A PASS then FAIL, hand-place a closed file for contract B, and close() so graph.json's seq covers every contract.verified record. Opened with the new code: A is done; B is open and in the Stop gate. Then verify A failing again, close() and reopen: A is still done, B is still open, and doctor names B only.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c09:' test/contracts-done-from-log.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With the vault's daemon running and answering /healthz, take a signed contract with a hand-placed contracts/closed/<id>.json. `memev doctor --json` lists a check naming <id> as a contract to verify again. `memev doctor --fix --yes` leaves that file byte-identical and the log's last seq unchanged, and the check is still listed. A contract closed by a passing verify, including one with a later failing verify, is not named.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c10:' test/contracts-done-from-log.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "On a vault with 200,000 journal append records and then one signed open contract (session S) with a hand-placed closed file, contractGate(S) lists the contract within 200 ms. The Stop hook, run through the CLI sandbox against the running daemon, prints a block decision naming it.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c11:' test/contracts-done-from-log.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Clone a vault from git and open it with a fresh .memev. In the source vault, contract A was closed by a passing verify and contract B has a hand-placed closed file. In the clone, A reads done because its close record carries a signature over the id, the signed contract's canonical hash and ok:true. That signature is checked with the same key that verifies the contract's own signature (the keyid in <id>.sig.json, rejected if it contains a path separator), never with any other file in contracts/keys/. B reads open and is named by the doctor.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c12:' test/contracts-done-from-log.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "After a PASS and then a FAIL of the same contract, memev_contract_status with no arguments and the session-start card both list the contract as done, with the failing tasks from its latest verify.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c13:' test/contracts-done-from-log.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2-c14: A is signed in session S. The device-shaped token writes contracts/drafts/x.json = {schema:'attest/1', title:'x', supersedes:A, tasks:[]} through MCP, signs it through MCP with no session, and verifies it if the sign succeeds (a contract with no tasks may be refused at signing). The same token then writes a draft x2 that supersedes A with one task whose only criterion passes, signs it through MCP claiming session S, and verifies it PASS. A is still in contractGate(S), contractStatus() with no arguments lists A as open, and `memev gate --workdir <A's workdir>` (CLI sandbox, daemon up) runs A's verify and exits 1. A leaves both gates only once A, or a superseding contract signed with local origin in session S or by the owner (a local caller with the admin scope), has a counting pass.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c14:' test/contracts-done-from-log.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T2-c14:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c14:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2-c15: (a) Sign A (session S, only criterion `false`) and B (only criterion `true`) with the same vault key. Copy B's signed and sig files over A's on disk, verify A, then restore A's files. The new contract.verified record holds canonicalHash of B's contract, not A's signed hash, and A is open and in contractGate(S). (b) Delete A's two signed files on disk, write a draft A whose criterion is `true` with the device-shaped token, and call memev_contract_sign for A. The sign is refused and no second contract.signed record for A is appended. After A's files are restored, A is open and in contractGate(S).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c15:' test/contracts-done-from-log.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T2-c15:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2-c16: Sign A (session S) and X with the same vault key, and close X with a passing verify. Hand-place contracts/closed/<A>.json as (a) a byte copy of X's close record, and (b) a record built from the envelope memev_contract_sign returned for a draft {schema:'attest/1', id:A, hash:<A's signed hash>, ok:true, verified_at} written by the device-shaped token, with those fields stored beside the envelope. In the original vault and in a fresh-.memev clone, A is open, memev doctor names it, and in the original vault A is in contractGate(S). Close records use a payloadType different from the contract signature's and hold exactly the keys id, hash, ok and verified_at.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c16:' test/contracts-done-from-log.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T2-c16:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c16:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2-c17 (scope: add src/cli/contracts-cli.mjs and src/engine/card.mjs): through the CLI sandbox with the daemon up. Contract A (workdir W) is verified PASS, then FAIL: `memev gate --workdir W` exits 0 and appends no contract.verified record. Contract C (workdir W2, session S) has a hand-placed closed file: `memev gate --workdir W2` exits 1. The card printed by the session-start hook names A as done, contains neither 'Active contract <A>' nor 'Build these' for A, and still shows C when six done-but-failing contracts exist.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c17:' test/contracts-done-from-log.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T2-c17:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2-c18: Two vaults A1 and A2 share a bare git remote, each with its own .memev and its own keyDir. Contract K (workdir null, session S) is signed on A1. A2 syncs, verifies K PASS, and syncs again. A1 syncs and reopens. K is done on A1 and out of contractGate(S), done on A2, and done in a third fresh-.memev clone, and memev doctor names it nowhere. Contract L, signed on A1, with a hand-placed closed file committed and pushed from A2, reads open in all three.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c18:' test/contracts-done-from-log.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T2-c18:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c18:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2-c19: The full suite passes with MEMEV_CONTRACT_BASE unset. c09 is skipped when the variable is unset, and its own criterion, run with the variable set, counts a skip as a failure.",
+          "verifier": {
+            "type": "command",
+            "cmd": "env -u MEMEV_CONTRACT_BASE MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "T2-c20: For keyids '..', '.', 'ab', '0123456789abcdeg', '0123456789abcdef0' and 'C:k' in <id>.sig.json, with a valid matching public key placed at each derived path under contracts/keys/, contractCheckSignature returns not ok, verify records no contract.verified, and the contract stays open.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c20:' test/contracts-done-from-log.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T2-c20:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c20:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "docs/CONTRACTS.md carries the sentence 'A new version retires the old contract only when it was signed with local origin, in the old contract's session or by the owner, and has passed a verify of its own.'",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CONTRACTS.md",
+            "pattern": "A new version retires the old contract only when it was signed with local origin, in the old contract's session or by the owner, and has passed a verify of its own\\."
+          }
+        },
+        {
+          "statement": "One full run of test/contracts-done-from-log.test.mjs passes every labelled subtest (T2-c01, T2-c02, T2-c08, T2-c09, T2-c10, T2-c11, T2-c12, T2-c13, T2-c14, T2-c15, T2-c16, T2-c17, T2-c18, T2-c20) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/contracts-done-from-log.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c02:|^T2-c08:|^T2-c09:|^T2-c10:|^T2-c11:|^T2-c12:|^T2-c13:|^T2-c14:|^T2-c15:|^T2-c16:|^T2-c17:|^T2-c18:|^T2-c20:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
