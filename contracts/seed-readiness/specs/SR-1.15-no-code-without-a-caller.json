@@ -1,0 +1,55 @@
+{
+  "title": "SR-1.15 No code without a caller",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G15: project-state.mjs (330 lines) and the oplog HLC merge helpers have no production caller; entitlements name features with nothing behind them. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Wire or remove",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "project-state drives bus task status, or is removed",
+        "every exported function in src/ is imported by another src module or a bin entry",
+        "the oplog HLC merge helpers are kept and listed by name in the dead-code test as the functions SR-3.04 wires; the list is removed when SR-3.04 lands",
+        "OpLog.recovered (the skipped unreadable records, src/engine/oplog.mjs:105-106) is read by status() and by the doctor's oplog check, or removed with the comment that promises it is reported"
+      ],
+      "description": "",
+      "scope": [
+        "src/**",
+        "test/**",
+        "scripts/docs/module-graph.mjs",
+        "docs/MODULES.md"
+      ],
+      "criteria": [
+        {
+          "statement": "An exported function with no importer fails the test",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/dead-code.test.mjs",
+            "cmd": "node --test test/dead-code.test.mjs"
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

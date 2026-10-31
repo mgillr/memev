@@ -14,17 +14,24 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { api, clientToken, resolveRoot, config } from './common.mjs';
 import { ensureDaemon } from './daemon.mjs';
-import { scanTranscript, todosToCheckpoint } from './transcript.mjs';
 import { readJson, writePrivateJson, sha256, slug, configDir, run } from '../engine/util.mjs';
-import { isVault } from '../engine/vault.mjs';
+import { isVault } from '../engine/vault-marker.mjs';
 import { PROTOCOL } from '../engine/card.mjs';
 
 function readStdin() { try { return fs.readFileSync(0, 'utf8'); } catch { return ''; } }
-export function projectOf(cwd) {
+// The project a memory belongs to: a name pinned for this repository or folder (memev project set,
+// kept in the vault config), else the git top-level folder, else the folder itself.
+export function projectInfo(cwd, root) {
   if (!cwd) return null;
-  const r = run('git', ['rev-parse', '--show-toplevel'], { cwd, timeout: 1500 });
-  return slug(path.basename(r.ok && r.stdout.trim() ? r.stdout.trim() : cwd));
+  const abs = path.resolve(cwd);
+  const r = run('git', ['rev-parse', '--show-toplevel'], { cwd: abs, timeout: 1500 });
+  let top = r.ok && r.stdout.trim() ? r.stdout.trim() : abs;
+  try { top = fs.realpathSync(top); } catch {} // the app can report a path that no longer exists
+  const pin = root ? config(root).projects?.[top] : null;
+  if (pin) return { name: slug(pin), source: 'pinned', top };
+  return { name: slug(path.basename(top)), source: r.ok && r.stdout.trim() ? 'git' : 'folder', top };
 }
+export function projectOf(cwd, root) { return projectInfo(cwd, root)?.name ?? null; }
 
 // Output shapes: Claude Code and Codex share one; Gemini CLI uses it with its own event names;
 // Cursor takes { additional_context } at session start only.
@@ -64,9 +71,10 @@ export async function runHook(event, flags, env = process.env) {
   const root = resolveRoot(flags.root, env);
   const client = String(flags.client || 'claude-code');
   const session = String(input.session_id || input.sessionId || input.conversation_id || env.MEMEV_SESSION || 'session').slice(0, 64);
-  const project = flags.project || projectOf(input.cwd || input.workspace_roots?.[0] || process.cwd());
-  const { loadRemote, remoteFetch } = await import('./remote.mjs');
-  const remote = !isVault(root) ? loadRemote(env) : null; // this computer uses a vault elsewhere (memev join)
+  const project = flags.project || projectOf(input.cwd || input.workspace_roots?.[0] || process.cwd(), root);
+  // remote.mjs (and the network stack it imports) loads only when there is no vault here
+  const { loadRemote, remoteFetch } = isVault(root) ? {} : await import('./remote.mjs');
+  const remote = loadRemote ? loadRemote(env) : null; // this computer uses a vault elsewhere (memev join)
   const stateFile = remote ? path.join(configDir(env), 'hooks', `${slug(session, 64)}.json`) : path.join(root, '.memev', 'hooks', `${slug(session, 64)}.json`);
   const st = readJson(stateFile, { offset: 0, todos: null });
   try {
@@ -77,9 +85,10 @@ export async function runHook(event, flags, env = process.env) {
       const token = clientToken(root, client);
       call = (route, body) => api(root, `/v1/${route}`, { body: { session, project, ...body }, token, timeoutMs: 4000 }).then((r) => { if (!r.ok) throw new Error(`${route}: ${r.status}`); return r.json; });
     }
-    const tr = input.transcript_path ? scanTranscript(input.transcript_path, { fromOffset: st.offset }) : null;
+    // the transcript scanner (and the oplog reader it uses) loads only when the app sent a transcript
+    const tr = input.transcript_path ? (await import('./transcript.mjs')).scanTranscript(input.transcript_path, { fromOffset: st.offset }) : null;
     const saveCheckpoint = async (source) => {
-      const cp = todosToCheckpoint(tr?.todos);
+      const cp = tr?.todos ? (await import('./transcript.mjs')).todosToCheckpoint(tr.todos) : null;
       const h = cp ? sha256(JSON.stringify(cp)) : null;
       if (cp && h !== st.todos) { await call('checkpoint', { ...cp, task: st.task || undefined, files: tr.files, source }); st.todos = h; return true; }
       if (source === 'pre-compact') { await call('checkpoint', { task: st.task || undefined, doing: tr?.lastUser ? `answering: ${tr.lastUser.slice(0, 300)}` : null, files: tr?.files || [], source }); return true; }

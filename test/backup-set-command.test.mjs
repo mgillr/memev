@@ -15,7 +15,7 @@ before(() => {
   execFileSync('git', ['init', '--bare', remote]);
   sb.env.MEMEV_BACKUP_REMOTE = remote;
 });
-after(() => { cleanup(dirs); });
+after(() => { sb.stop(); cleanup(dirs); });
 
 test('REV-004 AC02: memev backup set <file url> exits 0 and writes backup.remote', () => {
   const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect'], { timeout: 60000 });

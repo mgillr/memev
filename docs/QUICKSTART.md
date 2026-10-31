@@ -45,6 +45,8 @@ memev why "how do we deploy"       # why recall returned what it did
 memev review                       # memories waiting for a keep or drop decision
 memev audit                        # junk, duplicates and stale memories (changes nothing)
 memev card --project api           # the resume card an app would see
+memev project                      # the project name this folder's memories are filed under, and where it comes from
+memev project set api              # pin a name for this repository or folder
 memev claims --status fact         # what the graph holds as established
 memev doctor                       # check everything; --fix repairs what it can
 memev clients                      # which apps are connected
@@ -52,6 +54,12 @@ memev bus hello <seat>             # guided test: post a hello and wait for the 
 memev cloud status                 # remote access
 memev github setup                 # back the vault up to a private GitHub repo
 ```
+
+Memories are filed under a project: the git top-level folder you work in, or the folder itself
+outside a repository. `memev project` shows the name and where it came from; `memev project set
+<name>` pins a name for the repository or folder at its path, so a re-clone into the same path
+keeps the same project. A rename moves the folder to a new path, so pin the new path to keep the
+name.
 
 ## The vault
 
