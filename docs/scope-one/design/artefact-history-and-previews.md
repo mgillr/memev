@@ -11,7 +11,7 @@ This is the decision record that contract SO-1.09 asks for (task T1, phase desig
 - Docs: `docs/PROJECTS.md`, and in `docs/scope-one/`: `WBS.md`, `REQUIREMENTS.md`, `DECISIONS.md`, `SLICE-PLAN.md`.
 - The owner's baseline of 31 October 2026, cited as "baseline" and by section, as `docs/scope-one/WBS.md` line 13 does.
 - SO-05-D and SO-02-B are signed in the owner's vault and are not in this repository (spec line 5; `docs/scope-one/WBS.md` line 11, the dagger). This record cannot check them and does not restate their content.
-- Current state in one line: no artefact record, version comparison or preview exists on main. The project store has nine entity kinds and none is an artefact (`src/engine/project-store.mjs:20-29`); no code in `src/` renders a preview of a project output (the only "preview" in `src/` is the history import preview, `src/cli/import.mjs:25-26`, and the usage report preview, `src/cli/onboarding.mjs:270`); and no canvas or dashboard exists in `src/` (a search for "canvas" returns nothing). The dashboard is a planned slice (`docs/scope-one/SLICE-PLAN.md:73-79`).
+- Current state in one line: no artefact record, version comparison or preview exists on main. The project store has nine entity kinds and none is an artefact (`src/engine/project-store.mjs:20-29`); no code in `src/` renders a preview of a project output (the only "preview" in `src/` is the history import preview, `src/cli/import.mjs:25-26`, and the usage report preview, `src/cli/onboarding.mjs:270`); and no canvas or dashboard exists in `src/` (a search for "canvas" returns nothing). The dashboard is a planned slice (`docs/scope-one/SLICE-PLAN.md:71-78`).
 - Settled decisions this record follows (owner decisions of 31 October 2026, `docs/scope-one/DECISIONS.md:68-76`): local-first, with the cloud only a relay and a backup (line 72); providers are neutral (line 73). Nothing in this record depends on a single provider.
 
 Artefact record: originating requirement, deliverable or work package; creation event; revision events; relevant scope and plan version; verification status. The five elements are fixed by the spec (`contracts/scope-one/specs/SO-1.09-artefact-history-and-previews.json:13`). Their field names, types and storage are open, needs owner decision (see requirement 1).
@@ -59,7 +59,7 @@ Open, needs owner decision:
 Decided by the sources:
 
 - The five formats are named by the spec (line 15), and the baseline lists documents, diagrams, reports, code and previews as the artefact family (baseline 9.3, "Artefacts and deliverables").
-- No preview code for project outputs exists on main (see the current-state line above). The surface that would show previews, the dashboard, is a slice to be contracted (`docs/scope-one/SLICE-PLAN.md:73-79`).
+- No preview code for project outputs exists on main (see the current-state line above). The surface that would show previews, the dashboard, is a slice to be contracted (`docs/scope-one/SLICE-PLAN.md:71-78`).
 
 Open, needs owner decision:
 
