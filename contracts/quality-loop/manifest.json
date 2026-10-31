@@ -14,7 +14,7 @@
         "SR-0.03"
       ],
       "tasks": 2,
-      "criteria": 32,
+      "criteria": 44,
       "spec": "specs/QL-1.01-red-team-gate-no-signing.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },

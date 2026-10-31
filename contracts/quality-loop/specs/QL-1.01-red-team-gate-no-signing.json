@@ -16,13 +16,18 @@
         "node 23 compatible, no dependencies, first lines carry // gate-version: 1 and the SPDX header",
         "each round is a DSSE envelope signed by a reviewer key that is not a contract-signing key (not under contracts/keys/); the gate holds the reviewer public keys it accepts and refuses an unsigned round, a round signed by another key, and any edit to an earlier round, snapshot or disposition after a later round was signed. Honest limit, stated in docs/CONTRACTS.md: while the builder and reviewer run as one user on one machine the reviewer key is readable by both, so the signature makes tampering visible in history but is not separation; separation comes from a reviewer key the owner holds off the build machine or from the second human of SR-9.05",
         "a replacement is accepted only when an answer of the previous round names the replaced requirement or criterion as contradictory or impossible, the round's amendments list records task, from, to and that answer number, and the next round judges it; a scope glob added is accepted only when an added criterion of that round reads a path under it, recorded with the answer number; the never-weakens check accepts exactly these and nothing else",
-        "staleness is judged at the signing commit for a contract already signed, and at HEAD for a spec not yet signed, so a signed contract's own landed work never makes it stale"
+        "staleness is judged at the signing commit for a contract already signed, and at HEAD for a spec not yet signed, so a signed contract's own landed work never makes it stale",
+        "the check is engine code that ships with memev: src/engine/redteam-gate.mjs exports evaluate({spec, cwd, reviewerKeys}), RULES, REVIEWER_KEYS and GRANDFATHERED, and scripts/gate/redteam-gate.mjs is a thin command-line wrapper over it, so the copies other repositories receive and the engine's own draft and sign paths run the same code",
+        "the committed base fixture is signed once with the real reviewer key, whose private key is never committed; every other fixture is signed with the test key under test/fixtures/redteam/ and reaches the gate only through an injected reviewerKeys argument",
+        "a round's signature covers its answers and its spec snapshot; that round's dispositions and amendments, written after the reviewer answered, are covered by the next round's signature, and the last round of a SIGNABLE record has none",
+        "a replacement may cite a previous round's answer number or a numbered point of that round's notes (round and point), recorded in the round's amendments list"
       ],
       "description": "",
       "scope": [
         "scripts/gate/redteam-gate.mjs",
         "test/redteam-gate.test.mjs",
-        "test/fixtures/redteam/**"
+        "test/fixtures/redteam/**",
+        "src/engine/redteam-gate.mjs"
       ],
       "criteria": [
         {
@@ -114,7 +119,7 @@
           }
         },
         {
-          "statement": "The gate exports RULES, an array of reason codes. The test asserts it equals this literal list: schema, spec_id, rounds_contiguous, last_clean, last_empty, hash, dispositions_all_rounds, added_verbatim, rejected_reason, never_weakens, red_green_required, head_stale_src. The test asserts the base fixture is SIGNABLE. For every code there is a one-field mutation of that base that is refused with exactly that code and no other. The red_green_required fixture is refused when the manifest row is missing or says kind feature, and is SIGNABLE only when the manifest row says docs or evidence. A kind field inside the spec alone does not exempt it.",
+          "statement": "The gate exports RULES, an array of reason codes. The test asserts it equals this literal list: schema, spec_id, rounds_contiguous, last_clean, last_empty, hash, dispositions_all_rounds, added_verbatim, rejected_reason, never_weakens, red_green_required, head_stale_src, review_sig. The test asserts the base fixture is SIGNABLE. For every code there is a one-field mutation of that base that is refused with exactly that code and no other. The red_green_required fixture is refused when the manifest row is missing or says kind feature, and is SIGNABLE only when the manifest row says docs or evidence. A kind field inside the spec alone does not exempt it.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
@@ -147,7 +152,7 @@
           }
         },
         {
-          "statement": "Each round carries sig, a DSSE envelope from vendor/attest/signature.mjs sign() over canonical({...round without sig, snapshot_sha256, previous round in full with its dispositions and amendments}). The signing key's keyid must be in the gate's REVIEWER_KEYS and must not be a key under contracts/keys/. The RULES literal list in the existing RULES criterion gains review_sig (otherwise the two criteria cannot both pass). Refused with review_sig: (a) a single clean round with no sig; (b) a round signed by the contract-signing key; (c) r1.spec.json and rounds[0].spec_sha256 rewritten together after r2 was signed; (d) a round-1 disposition or a round-2 amendment edited after the next round was signed. A correctly signed chain, made with test keys under test/fixtures/redteam/, is SIGNABLE.",
+          "statement": "Each round carries sig, a DSSE envelope from vendor/attest/signature.mjs sign() over canonical({...round without sig, snapshot_sha256, previous round in full with its dispositions and amendments}). The signing key's keyid must be in the gate's REVIEWER_KEYS and must not be a key under contracts/keys/. Refused with review_sig: (a) a single clean round with no sig; (b) a round signed by the contract-signing key; (c) r1.spec.json and rounds[0].spec_sha256 rewritten together after r2 was signed; (d) a round-1 disposition or a round-2 amendment edited after the next round was signed. A correctly signed chain, made with test keys under test/fixtures/redteam/, is SIGNABLE when the test public key is injected through evaluate's reviewerKeys.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
@@ -187,7 +192,7 @@
           }
         },
         {
-          "statement": "The clean round names the reviewed commit. In a temporary git repository with the spec's scope ['src/**', 'scripts/x.mjs'] and inputs.files ['src/a.mjs'], a second commit makes the pre-sign gate run refuse with head_stale_src when (1) src/b.mjs, unlisted but in scope, changed; (2) src/new.mjs was added; (3) scripts/x.mjs, in scope but outside src/, changed. A change only to docs/x.md, outside the scope, stays SIGNABLE and is reported. This applies to the plain (pre-sign) run only; for an already-signed contract, --report evaluates staleness at the signing commit (see answer 10).",
+          "statement": "The clean round names the reviewed commit. In a temporary git repository with the spec's scope ['src/**', 'scripts/x.mjs'] and inputs.files ['src/a.mjs'], a second commit makes the pre-sign gate run refuse with head_stale_src when (1) src/b.mjs, unlisted but in scope, changed; (2) src/new.mjs was added; (3) scripts/x.mjs, in scope but outside src/, changed. A change only to docs/x.md, outside the scope, stays SIGNABLE and is reported. This applies to the plain (pre-sign) run only; for an already-signed contract, --report evaluates staleness at the signing commit.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/redteam-gate.test.mjs",
@@ -227,6 +232,81 @@
           }
         },
         {
+          "statement": "Independent of the test file. The gate exports evaluate({spec, cwd, reviewerKeys}), which returns {status, reasons} and is the same code the CLI runs. For every code in RULES there is a committed case tree test/fixtures/redteam/cases/<code>/, signed with the fixture test key test/fixtures/redteam/reviewer.pub (for head_stale_src, a build.sh makes the commits), plus a SIGNABLE tree cases/ok/. The case directories other than ok/ equal RULES. Each case is copied into a fresh git repository and committed, and the run asserts the working tree is clean. evaluate, given the fixture public key in-process, must then return status NOT SIGNABLE with reasons containing that code, and SIGNABLE for ok/.",
+          "verifier": {
+            "type": "command",
+            "cmd": "R=$PWD; G=$R/scripts/gate/redteam-gate.mjs; S=contracts/quality-loop/specs/QL-0.01.json; C=$R/test/fixtures/redteam/cases; K=$R/test/fixtures/redteam/reviewer.pub; codes=$(node --input-type=module -e \"const m=await import('file://$G'); console.log(m.RULES.join(' '))\") || exit 9; [ -n \"$codes\" ] || exit 9; [ \"$(ls $C | grep -v '^ok$' | sort | tr '\\n' ' ')\" = \"$(printf '%s\\n' $codes | sort | tr '\\n' ' ')\" ] || exit 6; ev(){ node --input-type=module -e \"import fs from 'node:fs'; const g=await import('file://$G'); const r=await g.evaluate({spec:'$S', cwd:process.cwd(), reviewerKeys:[fs.readFileSync('$K','utf8')]}); console.log(r.status+' '+(r.reasons||[]).join(' '));\"; }; for c in ok $codes; do T=$(mktemp -d) && cp -R $C/$c/. $T && cd $T && git init -q || exit 8; if [ -f build.sh ]; then sh build.sh || exit 8; else git add -A && git -c user.name=t -c user.email=t@t.invalid commit -qm c || exit 8; fi; [ -z \"$(git status --porcelain)\" ] || exit 7; out=$(ev) || exit 9; if [ $c = ok ]; then [ \"$out\" = 'SIGNABLE ' ] || exit 1; else case \"$out\" in 'NOT SIGNABLE '*) ;; *) exit 3;; esac; echo \"$out\" | grep -qw \"$c\" || exit 4; fi; cd $R; done; exit 0",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The gate reports every failing rule, not just the first, so the RULES criterion's one-field fixtures must be signed again after their mutation. Independent of the test file: on the committed base fixture in a fresh git repository, each of these changes is committed alone, and the plain gate must exit non-zero and name review_sig. claim: the last round's sig bytes replaced by a fresh key's signature over the same payload, keyid kept. own: the same, with keyid set to the fresh key's id. zero: the sig replaced by 64 zero bytes. content: the last round given one answer, sig left as it was. The unmodified base exits 0.",
+          "verifier": {
+            "type": "command",
+            "cmd": "R=$PWD; G=$R/scripts/gate/redteam-gate.mjs; S=contracts/quality-loop/specs/QL-0.01.json; F=contracts/quality-loop/redteam/QL-0.01.json; for m in claim own zero content; do T=$(mktemp -d) && cp -R $R/test/fixtures/redteam/base/. $T && cd $T && git init -q && git add -A && git -c user.name=t -c user.email=t@t.invalid commit -qm b || exit 8; node $G $S >/dev/null 2>&1 || exit 1; node --input-type=module -e \"import fs from 'node:fs'; import crypto from 'node:crypto'; import {pae,keyId,generateKeyPair} from 'file://$R/vendor/attest/signature.mjs'; const [f,m]=process.argv.slice(1); const o=JSON.parse(fs.readFileSync(f,'utf8')); const r=o.rounds[o.rounds.length-1]; const s=r.sig.signatures[0]; const kp=generateKeyPair(); if (m==='content') r.answers=[{n:1,disposition:'rejected',reason:'x'}]; else if (m==='zero') s.sig=Buffer.alloc(64).toString('base64'); else { s.sig=crypto.sign(null,pae(r.sig.payloadType,Buffer.from(r.sig.payload,'base64')),crypto.createPrivateKey(kp.privateKey)).toString('base64'); if (m==='own') s.keyid=keyId(kp.publicKey); } fs.writeFileSync(f,JSON.stringify(o));\" $F $m || exit 9; git -c user.name=t -c user.email=t@t.invalid commit -qam m || exit 8; node $G $S >$T.out 2>&1 && exit 2; grep -q review_sig $T.out || exit 3; cd $R; done; exit 0",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "No private key committed or present in the worktree is trusted by the production gate. For every PEM private key in any file git lists, whether stored as a file or inside a JSON string, neither its keyid nor its public key appears in the gate's exported REVIEWER_KEYS. REVIEWER_KEYS is non-empty. Test keys reach the gate only through the reviewerKeys option of its exported evaluate function, never through an env var, a flag or the record.",
+          "verifier": {
+            "type": "command",
+            "cmd": "R=$PWD; node --input-type=module -e \"import fs from 'node:fs'; import crypto from 'node:crypto'; import {execFileSync} from 'node:child_process'; import {keyId} from 'file://$R/vendor/attest/signature.mjs'; const g=await import('file://$R/scripts/gate/redteam-gate.mjs'); const trusted=JSON.stringify(g.REVIEWER_KEYS||[]); if (trusted.length<4) process.exit(2); const N=String.fromCharCode(10), B=String.fromCharCode(92); let bad=0; for (const f of execFileSync('git',['ls-files','-co','--exclude-standard'],{cwd:'$R',encoding:'utf8'}).split(N).filter(Boolean)) { let t; try { t=fs.readFileSync('$R/'+f,'utf8').split(B+'n').join(N); } catch { continue; } for (const pem of t.match(/-----BEGIN [A-Z ]*PRIVATE KEY-----[^-]+-----END [A-Z ]*PRIVATE KEY-----/g) || []) { let pub; try { pub=crypto.createPublicKey(crypto.createPrivateKey(pem)).export({type:'spki',format:'pem'}); } catch { continue; } if (trusted.includes(keyId(pub)) || trusted.includes(pub.split(N)[1])) { console.log('trusted reviewer private key in '+f); bad=1; } } } process.exit(bad);\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "In a temporary git repository, a clean round whose reviewed commit is absent from the repository, or present but not an ancestor of HEAD, is NOT SIGNABLE with head_stale_src even when every inputs.files blob matches HEAD. To keep the command criterion satisfiable, its fresh() first commits everything except the record with fixed GIT_AUTHOR_DATE and GIT_COMMITTER_DATE, giving a reproducible commit the base record names, and then commits the record.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "--report exits non-zero for a non-grandfathered contracts/signed/<id>.json whose tasks equal the drafted tasks of a SIGNABLE spec when: (a) <id>.sig.json is missing or does not verify against contracts/keys/<keyid>.pub; (b) its provenance.spec_sha256 is missing or differs from the spec's last clean round spec_sha256; or (c) the commit that added it is not a descendant of the commit that added the clean round to the record. The same contract, signed by a test key placed under contracts/keys/, with matching provenance and added after the clean round, exits 0.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "Each of the following is the only change between r1 and r2, with r2 clean and matching the disk, and is NOT SIGNABLE with never_weakens: expect_exit: 1 added to a command verifier that had none; must: 'absent' added to a grep verifier; cwd: '/tmp' added to a command verifier; a wiring verifier's symbol changed. A cmd amendment or a scope_add entry is refused when its answer names no answer of the previous round, or names an answer whose proposed criterion concerns a different criterion or reads no path under the added scope. The same entries citing the right answer are SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "red_green_required counts a mandatory test_red_green only when its cmd runs its own test_file (the cmd contains the test_file path or the {test} placeholder). A task whose only test_red_green is {test_file:'test/a.test.mjs', cmd:'test -f src/a.mjs'}, or {test_file:'test/a.test.mjs', cmd:'node --test test/other.test.mjs'}, is refused with red_green_required. With cmd 'node --test test/a.test.mjs' it is SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "In a temporary git repository, a record committed with rounds r1 (clean, spec v1) and r2 (one pending answer, spec v2), followed by a commit that removes r2 and restores spec v1, is NOT SIGNABLE with rounds_contiguous, because an earlier committed version of the record held more rounds than HEAD's. A snapshot <id>.r3.spec.json beside a two-round record is also refused.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "The gate exports GRANDFATHERED, and it deep-equals a list holding exactly one entry: the canonicalHash of contracts/signed/k-memory-quality-multiling-4468b8.json.",
+          "verifier": {
+            "type": "command",
+            "cmd": "R=$PWD; node --input-type=module -e \"import fs from 'node:fs'; import {canonicalHash} from 'file://$R/vendor/attest/signature.mjs'; const g=await import('file://$R/scripts/gate/redteam-gate.mjs'); const h=canonicalHash(JSON.parse(fs.readFileSync('$R/contracts/signed/k-memory-quality-multiling-4468b8.json','utf8'))); process.exit(JSON.stringify(g.GRANDFATHERED)===JSON.stringify([h])?0:1);\"",
+            "expect_exit": 0
+          }
+        },
+        {
           "statement": "Changes stay in scope",
           "verifier": {
             "type": "scope"
@@ -248,7 +328,8 @@
       "requirements": [
         "test/redteam-gate.test.mjs also runs the gate in --report mode over the repository's own spec directories, so npm test and CI fail on a malformed record or a signed contract without a SIGNABLE record, while NO RECORD is reported and not failed",
         "docs/CONTRACTS.md gains a section that states the rule, the record path, the hash definition and the one-line runbook: gate, then memev contract new, then memev contract sign, in one command",
-        "memev contract new refuses a spec the gate reports NOT SIGNABLE or NO RECORD when the workdir holds scripts/gate/redteam-gate.mjs, naming the reasons; memev contract sign and the MCP sign tool refuse a draft whose source spec hash has no clean signed record; a repository without the gate script is unaffected"
+        "memev contract new refuses a spec the gate reports NOT SIGNABLE or NO RECORD, naming the reasons, and memev contract sign and the MCP sign tool refuse a draft whose source spec hash has no clean signed record, wherever the repository holds red-team records or contracts.redteam_required is on; whether the gate script exists in the repository plays no part",
+        "memev_contract_draft, memev_contract_sign, memev_contract_from_request and memev_contract_amend call evaluate() before they write anything, for local callers and tunnel callers alike, wherever the repository holds red-team records or the vault setting contracts.redteam_required is on"
       ],
       "description": "",
       "scope": [
@@ -259,6 +340,8 @@
         "src/server/mcp.mjs",
         "docs/MODULES.md",
         "changelog.d/QL-1.01.md",
+        ".github/workflows/ci.yml",
+        "src/engine/redteam-gate.mjs",
         "test/contracts.test.mjs"
       ],
       "criteria": [
@@ -300,6 +383,30 @@
             "type": "test_red_green",
             "test_file": "test/contracts.test.mjs",
             "cmd": "node --test test/contracts.test.mjs"
+          }
+        },
+        {
+          "statement": "Set the vault, locally and not through the tunnel, to require red-team records for a repository root that holds scripts/gate/redteam-gate.mjs and a NOT SIGNABLE spec contracts/qa/specs/QA-1.json. None of the following then produces contracts/signed/<id>.json, and each fails with a refusal that names the gate: (a) handle() tools/call memev_contract_draft with the spec's title and tasks and no provenance, then memev_contract_sign with ctx.local true and again with ctx.local false; (b) v.contractFromRequest with the same tasks, then v.contractSign; (c) v.contractAmend of a signed contract with one criterion cmd changed, then sign; (d) `memev contract new` on a copy of the spec at a path outside the repository with cwd outside it, then `memev contract sign`. The SIGNABLE spec, drafted by `memev contract new` from its own tree, still signs.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts.test.mjs",
+            "cmd": "node --test test/contracts.test.mjs"
+          }
+        },
+        {
+          "statement": "Sign re-checks the record. (a) A draft whose provenance.spec_sha256 is the hash of a NOT SIGNABLE spec, with tasks equal to makeTask of that spec, is refused by v.contractSign and by memev_contract_sign through handle(). (b) A draft created by `memev contract new` while SIGNABLE, followed by a commit that changes an in-scope src file, is refused at sign naming head_stale_src. (c) The same draft, rewritten through memev_write before sign (workdir changed, or provenance removed), is refused. (d) The draft's provenance.spec_sha256 is computed from the same bytes the gate judged. In every case no contracts/signed/<id>.json appears.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts.test.mjs",
+            "cmd": "node --test test/contracts.test.mjs"
+          }
+        },
+        {
+          "statement": "Scope gains .github/workflows/ci.yml. The pull_request paths filter includes contracts/**, so a PR touching only contracts/ runs npm test and therefore the gate's --report run.",
+          "verifier": {
+            "type": "command",
+            "cmd": "awk '/^  pull_request:/{p=1;next} /^  push:/{p=0} p' .github/workflows/ci.yml | grep -q \"contracts/\\*\\*\"",
+            "expect_exit": 0
           }
         },
         {
