@@ -1,0 +1,49 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PG-16.1",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "f53e1f07208ddf5d4eba4b72171c1e5963d4b5b49c0c1ccf60efbddda3428113",
+      "base_commit": "79cbaae69bd9120bfc6cf5d600fe0233728825c2",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/scope-one/programme/REQUIREMENTS.md",
+            "sha256": "8b70ac41d38fe2f855bf9d74e1409358a1a89d6e68d571aea20186f15db81705"
+          },
+          {
+            "path": "docs/scope-one/WBS.md",
+            "sha256": "15f122b0a8bd47fea7591256767a5707b98578dfbfdf8dc197e57e1522e5ff91"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "findings",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "WP16-05 is file_exists only"
+        },
+        {
+          "n": 2,
+          "severity": "medium",
+          "how": "WP16-06 checks that docs/BLUEPRINT.md exists and contains \"missing capabilities\", which does not check the other six blueprint parts, and R2 (an integration audit across memev, crdt-merge and converge) has no criterion"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Second review, of pull request #325 at head 79cbaae (the first, at ea7e95d, found the agent label, the manifest kinds, wrong paths and missing citations; each of those is fixed at this head). The engine decision is owner-confirmed (t542u, 31 Oct 2026). Checks run, and the only checks made: the spec hash equals specSha256 of the file at 79cbaae; every MV citation resolves to the cited line of docs/scope-one/programme/REQUIREMENTS.md or DECOMPOSITION.md and its text matches; every quoted SO-1.x, SO-2.x, SR and QL requirement is a verbatim stretch of the signed contract it cites; each verifier (grep pattern, file_exists path, wiring entry) was run against the tree it names (this tree, or the pull request head where the spec is for another repository); the request, tasks and manifest rows were read against the leak rules of this repository (the leak scan stays clean, and I also read by hand for agent and lane labels, which the scan does not catch); no duplicate of SO-1.01, SO-1.02, SO-1.04, SO-1.10, SO-1.11, SO-2.x, SR, QL, WBS or baseline section 8 was found. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Weak criteria, so held. SO-2.14 is cited for WP16-04.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZDRjOTRlOTk0ZWFiYjI3NjgxYmRkOTYwZjgzMmJhZTRkNTUwMjNhN2UwY2MzMjY4M2NhMzA4NDkxZWZlMjgyMg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "zKfx4I+XckOklFl76ipatLkJIXo9zYO9EgPPl73JPvMA0ms51ZlwA6zIXW+7bdUffGQchxwvvMxR9wvplLeTBg=="
+          }
+        ]
+      }
+    }
+  ]
+}
