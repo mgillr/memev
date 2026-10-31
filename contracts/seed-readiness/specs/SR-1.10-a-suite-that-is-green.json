@@ -1,0 +1,88 @@
+{
+  "title": "SR-1.10 A suite that is green on any machine",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G10: 12 tests need ssh-keygen, 8 need an authenticated gh and network, 3 fail when MEMEV_NO_SERVICE is set. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Native OpenSSH keys and signatures",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "deploy keys are generated with node:crypto in OpenSSH format",
+        "SSHSIG sign and verify are implemented in Node; ssh-keygen is not spawned"
+      ],
+      "description": "",
+      "scope": [
+        "src/cli/github.mjs",
+        "src/engine/agentid-bind.mjs",
+        "src/engine/sshsig.mjs",
+        "test/sshsig.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "Signatures interoperate with ssh-keygen -Y verify fixtures",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/sshsig.test.mjs",
+            "cmd": "node --test test/sshsig.test.mjs"
+          }
+        },
+        {
+          "statement": "github.mjs no longer spawns ssh-keygen",
+          "verifier": {
+            "type": "command",
+            "cmd": "node -e \"process.exit(/ssh-keygen/.test(require('fs').readFileSync('src/cli/github.mjs','utf8'))?1:0)\""
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "No network or real gh in tests",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "tests that touch GitHub use the fake gh on PATH and a local bare remote",
+        "service tests set their own env"
+      ],
+      "description": "",
+      "scope": [
+        "test/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The suite passes with no network, no ssh-keygen and a bare environment",
+          "verifier": {
+            "type": "command",
+            "cmd": "mkdir -p /tmp/memev-hermetic && env -i PATH=/usr/bin:/bin:$(dirname $(command -v node)) HOME=/tmp/memev-hermetic MEMEV_NO_SERVICE=1 npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
