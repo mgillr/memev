@@ -182,12 +182,12 @@ test('SO-R-A AC02: the pull-request job runs the suite, leak scan, pack-install-
   assert.ok(!/^    continue-on-error:/m.test(job), 'the check job has no job-level continue-on-error');
   // The container build lives in the docker smoke, which the check job runs. A comment does not
   // count: the line must be a real docker build or docker compose build, called directly or through
-  // the script's own compose wrapper (dc() { docker compose ... }). The job names no image to pull,
-  // so the smoke takes its build branch in CI.
+  // the script's own compose wrapper (dc() { docker compose ... }). The workflow names no image to
+  // pull, at job or workflow level, so the smoke takes its build branch in CI.
   const smoke = read('scripts/docker-smoke.sh');
   const viaWrapper = /^\s*dc\(\)\s*\{\s*docker compose\b/m.test(smoke) && /^\s*dc build\b/m.test(smoke);
   assert.ok(/^\s*docker (compose )?build\b/m.test(smoke) || viaWrapper, 'scripts/docker-smoke.sh builds the container image');
-  assert.ok(!/MEMEV_IMAGE/.test(job), 'the check job names no image to pull, so the docker smoke builds it');
+  assert.ok(!/MEMEV_IMAGE/.test(read('.github/workflows/ci.yml')), 'the workflow names no image to pull, so the docker smoke builds it');
   // No step that runs a gate is skipped or allowed to fail: no if, no continue-on-error.
   for (const s of steps) {
     const gate = s.run.find((l) => GATES.includes(l));
