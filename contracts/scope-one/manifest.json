@@ -180,7 +180,7 @@
    "tasks": 1,
    "criteria": 12,
    "spec": "specs/SO-2.01-organisational-knowledge-model.json",
-   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-2.02",
@@ -195,7 +195,7 @@
    "tasks": 1,
    "criteria": 12,
    "spec": "specs/SO-2.02-permission-aware-knowledge-access.json",
-   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-2.03",
@@ -210,7 +210,7 @@
    "tasks": 1,
    "criteria": 10,
    "spec": "specs/SO-2.03-provenance-retention-invalidation.json",
-   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-2.04",
@@ -226,7 +226,7 @@
    "tasks": 1,
    "criteria": 11,
    "spec": "specs/SO-2.04-cross-project-intelligence.json",
-   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-2.05",
@@ -242,7 +242,7 @@
    "tasks": 1,
    "criteria": 10,
    "spec": "specs/SO-2.05-cross-functional-issue-discovery.json",
-   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-2.06",
@@ -260,7 +260,7 @@
    "tasks": 1,
    "criteria": 11,
    "spec": "specs/SO-2.06-organisational-intelligence-acceptance.json",
-   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-2.07",
@@ -276,7 +276,7 @@
    "tasks": 1,
    "criteria": 14,
    "spec": "specs/SO-2.07-specialist-knowledge-systems.json",
-   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-2.08",
@@ -291,7 +291,7 @@
    "tasks": 1,
    "criteria": 10,
    "spec": "specs/SO-2.08-agent-frameworks-and-runtimes.json",
-   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-2.09",
@@ -306,7 +306,7 @@
    "tasks": 1,
    "criteria": 13,
    "spec": "specs/SO-2.09-software-delivery-systems.json",
-   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-2.10",
@@ -322,7 +322,7 @@
    "tasks": 1,
    "criteria": 12,
    "spec": "specs/SO-2.10-business-communication-systems.json",
-   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-2.11",
@@ -339,7 +339,7 @@
    "tasks": 1,
    "criteria": 12,
    "spec": "specs/SO-2.11-enterprise-systems.json",
-   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-2.12",
@@ -352,7 +352,7 @@
    "tasks": 1,
    "criteria": 14,
    "spec": "specs/SO-2.12-federated-computation.json",
-   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-2.13",
@@ -365,7 +365,7 @@
    "tasks": 1,
    "criteria": 10,
    "spec": "specs/SO-2.13-commercial-integration-services.json",
-   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-2.14",
@@ -378,7 +378,7 @@
    "tasks": 1,
    "criteria": 8,
    "spec": "specs/SO-2.14-business-team-administration.json",
-   "status": "proposed: owner release of 8.3 to 8.6, 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   }
  ]
 }
