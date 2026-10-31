@@ -312,7 +312,7 @@
         "QL-1.02"
       ],
       "tasks": 1,
-      "criteria": 6,
+      "criteria": 17,
       "spec": "specs/SR-1.23-verify-sees-a-removed-tail.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -327,8 +327,8 @@
         "SR-1.01",
         "QL-1.02"
       ],
-      "tasks": 1,
-      "criteria": 7,
+      "tasks": 2,
+      "criteria": 27,
       "spec": "specs/SR-1.24-no-cli-write-beside-a-live-daemon.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -359,7 +359,7 @@
         "QL-1.02"
       ],
       "tasks": 2,
-      "criteria": 26,
+      "criteria": 39,
       "spec": "specs/SR-1.26-one-write-can-never-make-the-vault-unopenable.json",
       "status": "proposed: owner's go pending, signs after a clean red-team round"
     },
@@ -376,6 +376,23 @@
       "tasks": 2,
       "criteria": 28,
       "spec": "specs/SR-1.27-done-comes-only-from-a-passing-verify.json",
+      "status": "proposed: owner's go pending, signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.28",
+      "gap": "G93",
+      "area": "SR-1",
+      "title": "The bus writes its own routing files",
+      "repo": "memev",
+      "closes": "Closes G93 (issue #250): connector and device tokens hold write on bus/** (src/engine/devices.mjs:85, src/engine/oauth.mjs:17), and the bus's routing files are plain vault notes: bus/operator.json names the operator and bus/seats/<seat>.json carries renamed_from. So a note write makes a cloud connector the operator, its task to the 'operator' alias carries operator authority, and a runner turned on for a local seat starts its command headless with the connector's text as the prompt. Found by the SR-1.25 red-team round and reproduced on 31 October 2026 on the main source",
+      "depends_on": [
+        "SR-1.27",
+        "SR-1.24",
+        "QL-1.02"
+      ],
+      "tasks": 2,
+      "criteria": 17,
+      "spec": "specs/SR-1.28-the-bus-writes-its-own-routing-files.json",
       "status": "proposed: owner's go pending, signs after a clean red-team round"
     },
     {
