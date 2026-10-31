@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { healthy, startDaemon } from './daemon.mjs';
-import { api, clientToken, config, saveConfig, adminToken } from './common.mjs';
+import http from 'node:http';
+import { api, clientToken, config, daemonInfo, saveConfig, adminToken } from './common.mjs';
 import { FOOTER, footerEnabled } from '../engine/card.mjs';
 
 export const GATE_HOOK = (launcher, wd) => `#!/bin/sh
@@ -30,15 +31,37 @@ export function newContractSpec(spec, flags = {}) {
 
 async function reloadDaemon(root) { const t = adminToken(root); if (!t) return false; try { return (await api(root, '/v1/reload', { token: t })).ok; } catch { return false; } }
 
+// A verify runs every criterion command (red-green runs twice) and can take longer than the 600 s the other calls wait. It
+// goes over node:http, which sets no limit on the wait for the answer (fetch gives up on a silent connection after 300 s), and
+// stays open until the daemon answers.
+function waitingCall(root, token, body) {
+  const port = daemonInfo(root)?.port || config(root).port;
+  const text = JSON.stringify(body);
+  return new Promise((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port, path: '/mcp', method: 'POST', agent: false, headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(text), authorization: `Bearer ${token}` } }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => { const t = Buffer.concat(chunks).toString('utf8'); let json = null; try { json = JSON.parse(t); } catch { /* not JSON */ } resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, json, text: t }); });
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+    req.end(text);
+  });
+}
+const mcpCall = (root, name, args) => {
+  const body = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } };
+  return name === 'memev_contract_verify' ? waitingCall(root, clientToken(root, 'cli'), body) : api(root, '/mcp', { token: clientToken(root, 'cli'), body, timeoutMs: 600000 });
+};
+
 export async function command(cmd, pos, flags, { root, env }) {
   const sub = cmd === 'verify' ? 'verify-cmd' : cmd === 'gate' ? 'gate' : pos[0] || 'list';
   const data = async (name, args) => {
-    const r = await api(root, '/mcp', { token: clientToken(root, 'cli'), body: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, timeoutMs: 600000 });
+    const r = await mcpCall(root, name, args);
     const res = r.json?.result; if (!res) throw new Error(r.text); if (res.isError) throw new Error(res.content[0].text);
     return res.structuredContent;
   };
   const call = async (name, args) => {
-    const r = await api(root, '/mcp', { token: clientToken(root, 'cli'), body: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, timeoutMs: 600000 });
+    const r = await mcpCall(root, name, args);
     const res = r.json?.result; if (!res) throw new Error(r.text);
     console.log(res.content[0].text); return res.isError ? 1 : (res.structuredContent?.ok === false ? 1 : 0);
   };
@@ -80,7 +103,7 @@ export async function command(cmd, pos, flags, { root, env }) {
     let bad = 0;
     for (const c of open) {
       const r = await data('memev_contract_verify', { id: c.id });
-      console.log(`${r.verdict || (r.ok ? 'PASS' : 'FAIL')} ${c.id}: ${r.passed ?? 0}/${r.total ?? 0} tasks${r.signature && r.signature !== 'ok' && !r.ok && !r.tasks?.length ? ` (${r.signature})` : ''}`);
+      console.log(`${r.verdict || (r.ok ? 'PASS' : 'FAIL')} ${c.id}: ${r.passed ?? 0}/${r.total ?? 0} tasks${r.behaviour && r.documents ? `, behaviour ${r.behaviour.passed}/${r.behaviour.total}, documents ${r.documents.passed}/${r.documents.total}` : ''}${r.signature && r.signature !== 'ok' && !r.ok && !r.tasks?.length ? ` (${r.signature})` : ''}`);
       for (const t of r.remaining || []) console.log(`  ${t.status} ${t.id} ${t.title}${t.failing?.length ? `: ${t.failing[0]}` : ''}`);
       if (!r.ok) bad++;
     }

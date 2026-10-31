@@ -25,12 +25,12 @@ test('signing in a git workdir records the base sha, the HEAD at signing, inside
   } finally { v.close(); }
 });
 
-test('a signed contract without a recorded base gets BLOCKED on its scope criterion, never PASS', () => {
+test('a signed contract without a recorded base gets BLOCKED on its scope criterion, never PASS', async () => {
   const { v, root } = newVault({ git: false });
   try {
     const { dir } = gitRepo();
     const legacy = signByHand(root, { workdir: dir, tasks: task([SCOPE]) });
-    const r1 = v.contractVerify(OWNER, { id: legacy.id });
+    const r1 = await v.contractVerify(OWNER, { id: legacy.id });
     assert.equal(byStatement(r1)['changes stay in scope'].status, 'BLOCKED');
     assert.match(byStatement(r1)['changes stay in scope'].detail, /no base revision recorded/);
     // a workdir that is not a git checkout gives no base to record
@@ -38,7 +38,7 @@ test('a signed contract without a recorded base gets BLOCKED on its scope criter
     const d = v.contractDraft(OWNER, { title: 'No git here', workdir: plain, tasks: task([SCOPE]) });
     v.contractSign(OWNER, { id: d.id });
     assert.equal(signedBody(root, d.id).base, undefined);
-    const r2 = v.contractVerify(OWNER, { id: d.id });
+    const r2 = await v.contractVerify(OWNER, { id: d.id });
     assert.equal(byStatement(r2)['changes stay in scope'].status, 'BLOCKED');
     assert.match(byStatement(r2)['changes stay in scope'].detail, /no base revision recorded/);
     assert.equal(r2.ok, false);
@@ -55,8 +55,8 @@ test('T1-c08: In a temporary git repository at commit H, a contract whose spec n
     const plain = v.contractDraft(OWNER, { title: 'HEAD base', workdir: dir, tasks: task([FILE]) });
     v.contractSign(OWNER, { id: named.id });
     v.contractSign(OWNER, { id: plain.id });
-    assert.equal(signedBody(root, named.id).base.sha, M);
-    assert.equal(signedBody(root, plain.id).base.sha, H);
+    assert.equal(signedBody(root, named.id).base?.sha, M);
+    assert.equal(signedBody(root, plain.id).base?.sha, H);
     for (const [id, other] of [[named.id, H], [plain.id, M]]) {
       assert.equal(v.contractCheckSignature(id).ok, true);
       const f = path.join(root, 'contracts', 'signed', `${id}.json`);

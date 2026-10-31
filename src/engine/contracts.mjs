@@ -7,9 +7,10 @@
 // contract means amending: a new contract that supersedes the old one.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
-import { configDir, randomToken, slug, now, readJson, writePrivate, exists, truncate, run as spawn } from './util.mjs';
+import { configDir, randomToken, slug, now, readJson, writePrivate, exists, truncate, runAsync } from './util.mjs';
 import { git } from './git.mjs';
 import * as A from '../../vendor/attest/contract.mjs';
 import { decompose as attestDecompose } from '../../vendor/attest/decompose.mjs';
@@ -109,10 +110,68 @@ function headOf(wd) {
   const r = git(path.resolve(wd), ['rev-parse', '--verify', '-q', 'HEAD^{commit}']);
   return r.ok && SHA40.test(r.out) ? r.out : null;
 }
+// The red-green verifier runs a criterion's command twice: in a temporary worktree of the base (red, which must fail on an
+// assertion) and in the workdir (green, which must pass). Its worktrees sit under the system temp folder, named with this prefix,
+// the owning process id and a random part, so a later verify can tell its own stale ones from anyone else's.
+export const RED_GREEN_TIMEOUT_S = 900;
+export const VERIFY_WORKTREE_PREFIX = 'memev-verify-';
+const RUN_OUTPUT_MAX = 1024 * 1024;
+const OWN_WORKTREE = /^memev-verify-(\d+)-[0-9a-f]+$/;
+const pidAlive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+const tmpBase = () => fs.realpathSync(os.tmpdir());
+/** git as verify runs it on a workdir: hooks off (an empty hooks folder), no fsmonitor. */
+function vgit(cwd, args) {
+  const hooks = path.join(tmpBase(), 'memev-verify-no-hooks');
+  fs.mkdirSync(hooks, { recursive: true });
+  return git(cwd, ['-c', `core.hooksPath=${hooks}`, '-c', 'core.fsmonitor=', ...args]);
+}
+/** The worktrees git lists for the repository at `top`: { path, locked, prunable }. */
+function worktreeList(top) {
+  const r = vgit(top, ['worktree', 'list', '--porcelain']);
+  if (!r.ok) return [];
+  return r.out.split(/\n\n+/).map((b) => { const l = b.split('\n'); const p = l.find((x) => x.startsWith('worktree '))?.slice(9); return p ? { path: p, locked: l.some((x) => x === 'locked' || x.startsWith('locked ')), prunable: l.some((x) => x.startsWith('prunable')) } : null; }).filter(Boolean);
+}
+/**
+ * Remove the stale worktrees an earlier verify left (its process killed): only those under this engine's prefix in the temp
+ * folder whose owning process is gone, never a locked one, never anyone else's, and never with a bare git worktree prune.
+ */
+export function pruneStaleVerifyWorktrees(top) {
+  const base = tmpBase();
+  for (const w of worktreeList(top)) {
+    const m = OWN_WORKTREE.exec(path.basename(w.path));
+    if (!m || path.dirname(w.path) !== base || w.locked || pidAlive(Number(m[1]))) continue;
+    vgit(top, ['worktree', 'remove', '--force', w.path]);
+    fs.rmSync(w.path, { recursive: true, force: true });
+  }
+}
+/** NODE_OPTIONS without any test reporter (a second reporter makes node refuse to run a test). */
+const stripReporters = (opts) => String(opts || '').replace(/--test-reporter(-destination)?(=|\s+)\S+/g, '').trim();
+/** NODE_OPTIONS with the TAP reporter and no other. A command that names a reporter itself is left to it. */
+const tapOptions = (opts) => `${stripReporters(opts)} --test-reporter=tap`.trim();
+/** One run of a criterion command: the test path passed as one argument ($1), never spliced into the shell text. */
+async function runCriterion(cmd, cwd, env, testFile, timeoutS) {
+  const sh = String(cmd).split('{test}').join('"$1"');
+  const r = await runAsync('sh', ['-c', sh, 'sh', testFile], { cwd, env: { ...env, NODE_OPTIONS: /--test-reporter/.test(sh) ? stripReporters(env.NODE_OPTIONS) : tapOptions(env.NODE_OPTIONS) }, timeout: timeoutS * 1000, maxBuffer: RUN_OUTPUT_MAX });
+  return { status: r.status, timedOut: r.timedOut, tooLarge: r.tooLarge, failed: r.error && !r.timedOut && !r.tooLarge && r.status === null && !/^ended by /.test(r.error) ? r.error : null, out: `${r.stdout}${r.stderr}` };
+}
+/** Why a run that exited non-zero did not fail on an assertion, from its TAP output; null when it did (or it printed no TAP). */
+function notAnAssertion(out) {
+  if (!/^TAP version/m.test(out)) return null;
+  if (/code: 'ERR_ASSERTION'|name: 'AssertionError'/.test(out)) return null;
+  if (/ERR_MODULE_NOT_FOUND|SyntaxError|Cannot find module|does not provide an export named/.test(out)) return 'load error';
+  const name = /name: '([A-Za-z]*Error)'/.exec(out)?.[1];
+  return name ? `it failed with ${name} before any assertion` : 'it failed without a failing assertion';
+}
+/** Whether a TAP run printed a passing test line other than a file line. */
+const passingLine = (out) => out.split('\n').some((l) => { const m = /^\s*ok \d+ - (.*)$/.exec(l); return m && !/# (SKIP|TODO)/.test(m[1]) && !/\.test\.m?js$/.test(m[1].trim()); });
+
 /** The environment of a criterion command: this process's, with MEMEV_CONTRACT_BASE set to the base, or removed when there is none. */
 export function criterionEnv(base, env = process.env) {
   const out = { ...env };
   delete out[BASE_ENV];
+  // a criterion command is a process of its own, never a child of a test runner the caller happens to run under (a node test
+  // started with NODE_TEST_CONTEXT set reports to that runner and exits 0 whatever its tests did)
+  delete out.NODE_TEST_CONTEXT;
   if (base) out[BASE_ENV] = base;
   return out;
 }
@@ -268,7 +327,7 @@ export function attach(Vault) {
   };
 
   /** Re-run every criterion. Commands run only on this machine and only in the contract's workdir. */
-  P.contractVerify = function (identity, { id, client = null }, { local = true } = {}) {
+  P.contractVerify = async function (identity, { id, client = null }, { local = true } = {}) {
     this._need(identity, 'read', null);
     const s = this.contractCheckSignature(id);
     if (!s.ok) return { id, ok: false, signature: s.detail, tasks: [] };
@@ -301,27 +360,91 @@ export function attach(Vault) {
     };
     // the same callers supply grep patterns: past the budget their remaining grep criteria fail unchecked
     let grepLeft = inVault ? GREP_VERIFY_BUDGET_MS : Infinity;
-    const run = (crit) => {
+    // red-green (SR-0.03 task 3): red in a temporary worktree of the base holding the head's test-side files, green in the workdir
+    const redGreen = async (v) => {
+      const where = inVault ? 'the vault' : 'the workdir';
+      const inside = (p) => { const raw = String(p ?? ''); if (!raw || path.isAbsolute(raw) || raw.split(/[\\/]/).includes('..')) return null; try { return this._confinePath(wd, raw, { inVault }); } catch { return null; } };
+      const testAbs = inside(v.test_file);
+      if (!testAbs) return { status: 'BLOCKED', detail: `the test file ${v.test_file} is outside ${where}` };
+      if (!exists(testAbs)) return { status: 'FAIL', detail: `${v.test_file} is missing` };
+      const support = Array.isArray(v.support_files) ? v.support_files : [];
+      for (const f of support) if (!inside(f)) return { status: 'BLOCKED', detail: `support file ${f} is outside ${where}` };
+      const top = vgit(wd, ['rev-parse', '--show-toplevel']);
+      if (!top.ok) return { status: 'BLOCKED', detail: 'the workdir is not a git checkout' };
+      const sub = path.relative(fs.realpathSync(top.out), fs.realpathSync(wd));
+      const timeoutS = v.timeout_s || RED_GREEN_TIMEOUT_S;
+      pruneStaleVerifyWorktrees(top.out);
+      const wt = path.join(tmpBase(), `${VERIFY_WORKTREE_PREFIX}${process.pid}-${crypto.randomBytes(4).toString('hex')}`);
+      let red;
+      try {
+        const add = vgit(top.out, ['worktree', 'add', '--detach', '--quiet', wt, base]);
+        if (!add.ok) return { status: 'BLOCKED', detail: `the base worktree could not be added: ${truncate(add.err, 200)}` };
+        const redCwd = path.join(wt, sub);
+        // the head's test-side files, so the code under test is the only difference between the two runs
+        for (const rel of [v.test_file, ...support, 'test/helpers', 'test/fixtures']) {
+          const from = path.join(wd, rel);
+          if (exists(from)) fs.cpSync(from, path.join(redCwd, rel), { recursive: true });
+        }
+        red = await runCriterion(v.cmd, redCwd, env, v.test_file, timeoutS);
+      } finally {
+        vgit(top.out, ['worktree', 'remove', '--force', wt]);
+        fs.rmSync(wt, { recursive: true, force: true });
+      }
+      const green = await runCriterion(v.cmd, wd, env, v.test_file, timeoutS);
+      const exits = `red exit ${red.status}, green exit ${green.status}, base ${base}`;
+      const broken = (r, which) => r.failed ? `the ${which} run could not start: ${r.failed}` : r.timedOut ? `the ${which} run timed out after ${timeoutS} s` : r.tooLarge ? `the ${which} run's output is too large (over ${RUN_OUTPUT_MAX} bytes)` : r.status === 127 ? `the ${which} run's command was not found (exit 127)` : null;
+      const rb = broken(red, 'red');
+      if (rb) return { status: 'BLOCKED', detail: `${rb}; ${exits}` };
+      if (red.status === 0) return { status: 'FAIL', detail: `${exits}: the test passes without the change, so it proves nothing` };
+      const why = notAnAssertion(red.out);
+      if (why) return { status: 'BLOCKED', detail: `the red run did not fail on an assertion (${why}); ${exits}` };
+      const gb = broken(green, 'green');
+      if (gb) return { status: 'BLOCKED', detail: `${gb}; ${exits}` };
+      if (green.status !== 0) return { status: 'FAIL', detail: exits };
+      if (!passingLine(green.out)) return { status: 'BLOCKED', detail: `the green run printed no passing test line; ${exits}` };
+      return { status: 'PASS', detail: exits };
+    };
+    // the gates every criterion that runs a command passes first (command, metric and red-green alike), with the same details
+    const commandGate = () => {
+      if (needsApproval) return { status: 'BLOCKED', detail: 'remote-signed contract needs local operator approval (memev contract approve ' + id + ')' };
+      if (!local && this.config.contracts?.exec_local_only !== false) return { status: 'BLOCKED', detail: 'commands run only from this machine' };
+      if (this.config.contracts?.exec === false) return { status: 'BLOCKED', detail: 'running commands is switched off (contracts.exec)' };
+      return null;
+    };
+    const run = async (crit) => {
       const v = crit.verifier;
       if (v.type === 'command') {
-        if (needsApproval) return { status: 'BLOCKED', detail: 'remote-signed contract needs local operator approval (memev contract approve ' + id + ')' };
-        if (!local && this.config.contracts?.exec_local_only !== false) return { status: 'BLOCKED', detail: 'commands run only from this machine' };
-        if (this.config.contracts?.exec === false) return { status: 'BLOCKED', detail: 'running commands is switched off (contracts.exec)' };
-        const r = spawn('sh', ['-c', v.cmd], { cwd: wd, env, timeout: (v.timeout_s || 300) * 1000 });
+        const g = commandGate(); if (g) return g;
+        const r = await runAsync('sh', ['-c', v.cmd], { cwd: wd, env, timeout: (v.timeout_s || 300) * 1000 });
         const want = v.expect_exit ?? 0;
         return { status: r.status === want ? 'PASS' : 'FAIL', detail: `exit ${r.status}${r.status === want ? '' : `: ${r.error || truncate(`${r.stderr}${r.stdout}`.trim(), 300)}`}` };
       }
       if (v.type === 'file_exists') { let p; try { p = this._confinePath(wd, v.path, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.path } : { status: 'FAIL', detail: `${v.path} is missing` }; }
       if (v.type === 'test_exists') { let p; try { p = this._confinePath(wd, v.test_file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.test_file } : { status: 'FAIL', detail: `${v.test_file} is missing` }; }
       if (v.type === 'grep') { let p; try { p = this._confinePath(wd, v.file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } const pat = String(v.pattern ?? ''); if (!pat) return { status: 'FAIL', detail: 'the pattern is missing' }; if (pat.length > GREP_PATTERN_MAX) return { status: 'FAIL', detail: `a pattern over ${GREP_PATTERN_MAX} characters is not checked` }; let t = ''; try { t = fs.readFileSync(p, 'utf8'); } catch { return { status: 'FAIL', detail: `${v.file} is missing` }; } if (grepLeft <= 0) return { status: 'FAIL', detail: 'not checked: the grep time for this verify is used up' }; const limit = Math.min(GREP_TIMEOUT_MS, grepLeft); const g0 = Date.now(); const m = grepMatch(pat, String(v.flags || ''), t, limit); grepLeft -= Date.now() - g0; if (m.timeout) return { status: 'FAIL', detail: `the pattern did not finish within ${limit} ms and is not checked` }; if (m.error) return { status: 'FAIL', detail: 'the pattern is not a usable regular expression' }; return m.ok ? { status: 'PASS', detail: `${v.file} matches` } : { status: 'FAIL', detail: `${v.file} does not match ${v.pattern}` }; }
+      if (v.type === 'metric' || v.type === 'test_red_green') { const g = commandGate(); if (g) return g; }
       if (v.type === 'scope' || v.type === 'test_red_green') { const b = baseCheck(); if (b) return { status: 'BLOCKED', detail: b }; }
+      if (v.type === 'test_red_green') return redGreen(v);
       return { status: 'BLOCKED', detail: `${v.type} criteria are checked by a person or CI, not here` };
     };
-    const tasks = c.tasks.map((t) => ({ id: t.id, title: t.title, criteria: t.criteria.map((cr) => ({ id: cr.id, statement: cr.statement || `${cr.verifier?.type || "check"} check`, mandatory: cr.mandatory !== false, ...run(cr) })) }));
+    const tasks = [];
+    for (const t of c.tasks) {
+      const criteria = [];
+      for (const cr of t.criteria) criteria.push({ id: cr.id, statement: cr.statement || `${cr.verifier?.type || "check"} check`, mandatory: cr.mandatory !== false, ...(await run(cr)) });
+      tasks.push({ id: t.id, title: t.title, criteria });
+    }
+    // behaviour criteria (a command, red-green or metric run, a scope check) apart from document checks (grep, file_exists, test_exists)
+    const DOCUMENT_CHECKS = new Set(['grep', 'file_exists', 'test_exists']);
+    const kindOf = new Map(c.tasks.flatMap((t) => t.criteria.map((cr) => [cr, DOCUMENT_CHECKS.has(cr.verifier?.type) ? 'documents' : 'behaviour'])));
+    const counts = { behaviour: { passed: 0, total: 0 }, documents: { passed: 0, total: 0 } };
+    c.tasks.forEach((t, i) => {
+      tasks[i].behaviour = { passed: 0, total: 0 }; tasks[i].documents = { passed: 0, total: 0 };
+      t.criteria.forEach((cr, j) => { const k = kindOf.get(cr); const pass = tasks[i].criteria[j].status === 'PASS' ? 1 : 0; for (const o of [tasks[i][k], counts[k]]) { o.total++; o.passed += pass; } });
+    });
     for (const t of tasks) t.status = t.criteria.every((cr) => !cr.mandatory || cr.status === 'PASS') ? 'PASS' : t.criteria.some((cr) => cr.mandatory && cr.status === 'FAIL') ? 'FAIL' : 'BLOCKED';
     const ok = tasks.every((t) => t.status === 'PASS');
     const remaining = tasks.filter((t) => t.status !== 'PASS').map((t) => ({ id: t.id, title: t.title, status: t.status, failing: t.criteria.filter((cr) => cr.mandatory && cr.status !== 'PASS').map((cr) => `${cr.statement}: ${cr.detail}`) }));
-    const result = { id, ok, verdict: ok ? 'PASS' : 'FAIL', signature: s.detail, verified: now(), passed: tasks.length - remaining.length, total: tasks.length, remaining, tasks };
+    const result = { id, ok, verdict: ok ? 'PASS' : 'FAIL', signature: s.detail, verified: now(), passed: tasks.length - remaining.length, total: tasks.length, behaviour: counts.behaviour, documents: counts.documents, remaining, tasks };
     // the receipt: an append-only record in the vault of every verification and its evidence
     const receipt = [`\n### ${now()} · verify · ${ok ? 'PASS' : 'FAIL'} · ${tasks.length - remaining.length}/${tasks.length} tasks`];
     for (const t of tasks) { receipt.push(`- ${t.status} ${t.id} ${t.title}`); for (const cr of t.criteria) receipt.push(`  - ${cr.status} ${cr.id} ${cr.statement} (${truncate(String(cr.detail || '').replace(/\s+/g, ' '), 200)})`); }

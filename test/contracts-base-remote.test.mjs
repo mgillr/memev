@@ -11,7 +11,7 @@ after(cleanup);
 // a remote computer's token, as it holds it: write on contracts/**
 const REMOTE = { id: 'dev-remote', agent: 'laptop', scopes: ['read', 'write'], paths: ['contracts/**', 'memory/**', 'work/**'], remote: true };
 
-test('a remote signature runs no git and records no base; approval records HEAD then; an edited approval base stops verify before any criterion runs', () => {
+test('a remote signature runs no git and records no base; approval records HEAD then; an edited approval base stops verify before any criterion runs', async () => {
   const { v, root } = newVault({ git: false });
   const savedPath = process.env.PATH;
   try {
@@ -34,7 +34,7 @@ test('a remote signature runs no git and records no base; approval records HEAD 
     const a = v.contractApprove(OWNER, { id: d.id });
     assert.equal(a.base, atApproval);
     commit(dir, { 'src/a.js': 'export const a = 3;\n' });
-    const r = v.contractVerify(OWNER, { id: d.id });
+    const r = await v.contractVerify(OWNER, { id: d.id });
     assert.equal(r.ok, true, JSON.stringify(r.remaining));
     assert.equal(fs.readFileSync(out, 'utf8').trim().split('\n').pop(), atApproval);
 
@@ -44,7 +44,7 @@ test('a remote signature runs no git and records no base; approval records HEAD 
     rec.base.sha = 'e'.repeat(40);
     fs.writeFileSync(f, `${JSON.stringify(rec, null, 2)}\n`);
     const runs = fs.readFileSync(out, 'utf8');
-    const r2 = v.contractVerify(OWNER, { id: d.id });
+    const r2 = await v.contractVerify(OWNER, { id: d.id });
     assert.equal(r2.ok, false);
     assert.ok(r2.detail === 'approval record changed' || !v.contractCheckSignature(d.id).ok, `verify went on: ${JSON.stringify(r2).slice(0, 300)}`);
     assert.deepEqual(r2.tasks, []);

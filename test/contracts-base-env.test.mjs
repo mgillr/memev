@@ -10,7 +10,7 @@ after(cleanup);
 
 const note = (out) => `printf '%s\\n' "\${MEMEV_CONTRACT_BASE-unset}" >> '${out}'`;
 
-test('command, metric and both red-green runs each see the signed base', () => {
+test('command, metric and both red-green runs each see the signed base', async () => {
   const { v, root } = newVault({ git: false });
   try {
     const out = path.join(tmpdir('base-env-'), 'seen');
@@ -24,13 +24,13 @@ test('command, metric and both red-green runs each see the signed base', () => {
     v.contractSign(OWNER, { id: d.id });
     const base = signedBody(root, d.id).base.sha;
     assert.match(base, /^[0-9a-f]{40}$/);
-    v.contractVerify(OWNER, { id: d.id });
+    await v.contractVerify(OWNER, { id: d.id });
     const lines = fs.existsSync(out) ? fs.readFileSync(out, 'utf8').trim().split('\n') : [];
     assert.deepEqual(lines.slice(-4), [base, base, base, base], `command, metric, red and green each saw the base (file: ${JSON.stringify(lines)})`);
   } finally { v.close(); }
 });
 
-test('a legacy contract without a base sees MEMEV_CONTRACT_BASE unset, even when the daemon\'s environment has it', () => {
+test('a legacy contract without a base sees MEMEV_CONTRACT_BASE unset, even when the daemon\'s environment has it', async () => {
   const { v, root } = newVault({ git: false });
   const saved = process.env.MEMEV_CONTRACT_BASE;
   try {
@@ -38,7 +38,7 @@ test('a legacy contract without a base sees MEMEV_CONTRACT_BASE unset, even when
     const { dir } = gitRepo();
     process.env.MEMEV_CONTRACT_BASE = 'f'.repeat(40);
     const legacy = signByHand(root, { workdir: dir, tasks: task([{ statement: 'the command sees no base', verifier: { type: 'command', cmd: note(out) } }]) });
-    v.contractVerify(OWNER, { id: legacy.id });
+    await v.contractVerify(OWNER, { id: legacy.id });
     assert.equal(fs.readFileSync(out, 'utf8').trim().split('\n').pop(), 'unset');
   } finally {
     if (saved === undefined) delete process.env.MEMEV_CONTRACT_BASE; else process.env.MEMEV_CONTRACT_BASE = saved;

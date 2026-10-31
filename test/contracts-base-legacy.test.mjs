@@ -9,7 +9,7 @@ import { gitRepo, commit, gitIn, task, signByHand, signedBody, byStatement } fro
 import { canonicalHash } from '../vendor/attest/signature.mjs';
 after(cleanup);
 
-test('a legacy contract without a base is BLOCKED on scope and red-green with nothing run; a contract signed now records HEAD under its signature', () => {
+test('a legacy contract without a base is BLOCKED on scope and red-green with nothing run; a contract signed now records HEAD under its signature', async () => {
   const { v, root } = newVault({ git: false });
   try {
     // a git workdir whose last commit changes a file outside the task's scope
@@ -20,7 +20,7 @@ test('a legacy contract without a base is BLOCKED on scope and red-green with no
       { statement: 'changes stay in scope', verifier: { type: 'scope' } },
       { statement: 'the test fails before and passes after', verifier: { type: 'test_red_green', test_file: 'src/a.js', cmd: `touch '${marker}'; exit 1` } },
     ]) });
-    const r = v.contractVerify(OWNER, { id: legacy.id });
+    const r = await v.contractVerify(OWNER, { id: legacy.id });
     assert.equal(v.contractCheckSignature(legacy.id).ok, true, 'the hand-signed contract verifies as signed');
     for (const name of ['changes stay in scope', 'the test fails before and passes after']) {
       const cr = byStatement(r)[name];
@@ -41,6 +41,6 @@ test('a legacy contract without a base is BLOCKED on scope and red-green with no
     const f = path.join(root, 'contracts', 'signed', `${d.id}.json`);
     fs.writeFileSync(f, `${JSON.stringify({ ...body, base: { ...body.base, sha: 'f'.repeat(40) } }, null, 2)}\n`);
     assert.equal(v.contractCheckSignature(d.id).ok, false, 'an edited base.sha still passed the signature check');
-    assert.equal(v.contractVerify(OWNER, { id: d.id }).ok, false);
+    assert.equal((await v.contractVerify(OWNER, { id: d.id })).ok, false);
   } finally { v.close(); }
 });

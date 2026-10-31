@@ -43,7 +43,7 @@ test('a hand-signed base that reads as an option is BLOCKED on scope and red-gre
     for (const base of [{ sha: `--output=${pwned}`, recorded_at: new Date().toISOString() }, `--output=${pwned}`]) {
       const k = signByHand(s.root, { workdir: dir, tasks: task(criteria), fields: { base } });
       process.env.PATH = `${gitSpy(marker)}${path.delimiter}${savedPath}`;
-      let r; try { r = s.v.contractVerify(OWNER, { id: k.id }); } finally { process.env.PATH = savedPath; }
+      let r; try { r = await s.v.contractVerify(OWNER, { id: k.id }); } finally { process.env.PATH = savedPath; }
       assert.ok(!(fs.existsSync(marker) && fs.readFileSync(marker, 'utf8').includes('--output')), 'the base reached git');
       assert.equal(s.v.contractCheckSignature(k.id).ok, true);
       for (const name of ['changes stay in scope', 'red then green']) assert.equal(byStatement(r)[name].status, 'BLOCKED', `${name} with base ${JSON.stringify(base)}`);
@@ -66,7 +66,7 @@ test('an explicit base that exists but is not an ancestor of HEAD is BLOCKED nam
       { statement: 'red then green', verifier: { type: 'test_red_green', test_file: 'README.md', cmd: 'exit 0' } },
     ]) });
     s.v.contractSign(OWNER, { id: d.id });
-    const r = s.v.contractVerify(OWNER, { id: d.id });
+    const r = await s.v.contractVerify(OWNER, { id: d.id });
     for (const name of ['changes stay in scope', 'red then green']) {
       assert.equal(byStatement(r)[name].status, 'BLOCKED');
       assert.equal(byStatement(r)[name].detail, `base ${side} is not an ancestor of HEAD`);
