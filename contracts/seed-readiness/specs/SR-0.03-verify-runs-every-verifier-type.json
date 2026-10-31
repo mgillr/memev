@@ -10,7 +10,7 @@
       "phase": "implement",
       "depends_on": [],
       "requirements": [
-        "contractSign records base = { sha, recorded_at } from git rev-parse HEAD of the contract's workdir when the workdir is a git checkout, before the DSSE signature is made, so the signature covers it",
+        "contractSign records base = { sha, recorded_at }: the spec's explicit base when it names one (requirement 2), else git rev-parse HEAD of the contract's workdir when the workdir is a git checkout, before the DSSE signature is made, so the signature covers it",
         "memev contract new accepts an explicit base sha in the spec and refuses a value that is not 40 hex characters",
         "a scope or test_red_green criterion of a contract without a recorded base returns BLOCKED with the detail no base revision recorded, never PASS",
         "docs/CONTRACTS.md documents the base and where verify reads it",

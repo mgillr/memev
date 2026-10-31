@@ -26,6 +26,8 @@
         "after the last mutant the run executes the test command once more on the unmutated tree; a failure there stops the run with exit 2 and status noise before any kill is accepted",
         "each mutant's copy is a self-contained repository (a clone with no hard links and no alternates, or a copied .git), never a git worktree or a link to the caller's .git, so a test's git commands never change the caller's repository",
         "the per-mutant time limit is at least five times the slower unmutated control run plus 10 s, and --json reports the limit it used",
+        "the runner is engine code, src/engine/mutation-gate.mjs, which ships in the npm package; scripts/gate/mutate.mjs is a thin wrapper that imports it and adds nothing",
+        "mutate.mjs takes --scope <glob>, repeatable, and then judges only changed lines in files that match one of the globs; its JSON output carries mutants, killed and survived for each file as well as in total",
         "each red-green criterion of this task that runs test/gate-mutate.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
@@ -33,7 +35,8 @@
         "scripts/gate/mutate.mjs",
         "test/gate-mutate.test.mjs",
         "test/fixtures/mutate/**",
-        "test/helpers/**"
+        "test/helpers/**",
+        "src/engine/mutation-gate.mjs"
       ],
       "criteria": [
         {
@@ -258,13 +261,16 @@
         "the mutation lint warns at memev contract new, from-request, amend and decompose when an implement task whose scope includes src/** lacks the canonical mutation criteria: three mandatory metrics on one canonical scripts/gate/mutate.mjs command, survived == 0, mutants > 0 and ignored == 0",
         "docs/CONTRACTS.md shows the three criteria to copy and states that a test that survives a mutation is a weak test",
         "the lint is engine code in src/engine/mutation-lint.mjs, called by contractDraft, contractFromRequest, contractAmend, contractDecompose (with the scope's workdir when it names one) and contractSign; the vendored attest code is unchanged, because the checks need the workdir's project test command and vendored code cannot import the engine",
-        "with the vault setting contracts.mutation_required on, memev contract sign and the MCP sign tool refuse, with a ContractError naming the mutation criterion, a draft whose src-touching implement task has any mutation lint finding, and write no signed contract; whether the workdir holds scripts/gate/mutate.mjs plays no part; the setting is off by default because the gate does not ship in the package, and the warning text names the setting",
-        "the canonical command is node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"<T>\" --json, with <T> either projectTestCommand(workdir) or node --test followed only by paths matching test/**/*.test.mjs (a listed subset can only leave more survivors than the full suite); the lint compares shell tokens, so an appended command, a redirection, a pipe, a repeated flag or a literal base is a finding",
+        "with the vault setting contracts.mutation_required on, memev contract sign and the MCP sign tool refuse, with a ContractError naming the mutation criterion, a draft whose src-touching implement task has any mutation lint finding, and write no signed contract; whether the workdir holds scripts/gate/mutate.mjs plays no part; the setting is off by default, and the warning text names the setting",
+        "the canonical command is node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"<T>\" --json, optionally with --scope and each of the task's scope globs before --json, with <T> either projectTestCommand(workdir) or node --test followed only by paths matching test/**/*.test.mjs (a listed subset can only leave more survivors than the full suite); the lint compares shell tokens, so an appended command, a redirection, a pipe, a repeated flag or a literal base is a finding",
         "a src-touching implement task whose scope is omitted, or matches scripts/gate/mutate.mjs or package.json, is a finding even when it carries the canonical criteria",
         "the canonical criteria include ignored == 0, so a mutate-ignore line fails the contract; the mutate-ignore marker stays a feature of the command-line tool for runs outside a contract",
         "metric criteria run through the metric verifier of SR-0.03, which keeps the command criterion's three gates; this contract adds no verifier branch to contractVerify",
         "docs/CONTRACTS.md gives the canonical criteria with a timeout_s and states that a gate run costs up to 4 + 2N runs of the test command for N mutants (two controls, the no-op control, two runs per mutant and a closing control) and that the three canonical metrics run the gate three times per verify, each within its own timeout_s",
         "contractSign lints the exact bytes it signs and ignores any lint result stored in the draft, because drafts are writable by any caller with write scope",
+        "contractVerify runs the canonical mutation command with the running memev's own runner in place of the workdir's scripts/gate/mutate.mjs; when the workdir's copy is not byte-identical to memev's own, the mutation metrics FAIL with a detail saying the gate is not the pinned one, except in a task whose scope names the runner itself, where memev's own copy judges the change and the difference is reported",
+        "with contracts.mutation_required on, a contract whose implement task touches src must name an explicit base sha in its spec (SR-0.03 requirement 2) and contractSign refuses one without it; the recorded base is the spec's, so signing after the change cannot move it, and an amendment that names no new base keeps the superseded contract's base; an amendment that names a later base is an open item of this contract's stop decision",
+        "contractVerify sets MEMEV_CONTRACT_BASE to the recorded base for every command, metric and red-green run, overriding any value in its own environment",
         "each red-green criterion of this task that runs test/gate-mutate-lint.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
@@ -394,11 +400,27 @@
           }
         },
         {
-          "statement": "Through newVault with contracts.mutation_required on: contractDraft with the canonical criteria (no warning), then v.write replaces contracts/drafts/<id>.json with the same draft minus the three metrics; separately, with a findings or lint field claiming there are none. In each case contractSign throws a ContractError naming the mutation criterion, and no file appears under contracts/signed/.",
+          "statement": "Through newVault: a temp git repo with a weak test, package.json scripts.test, and a committed scripts/gate/mutate.mjs that prints {\"status\":\"ok\",\"mutants\":3,\"killed\":3,\"survived\":0,\"ignored\":0} and exits 0. A contract carrying exactly the docs/CONTRACTS.md criteria is signed from that workdir, then a weakly tested src change is committed. contractVerify returns FAIL with a detail saying the gate is not the pinned one: the mutation metrics run only when the workdir gate's sha256 equals the hash memev pins (its own copy, or a hash recorded in the vault).",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-mutate-lint.test.mjs",
             "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c15:' test/gate-mutate-lint.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Through newVault with contracts.mutation_required on, four contracts in a temp git repo, none carrying mutation criteria: (a) phase 'verify', scope ['src/**']; (b) phase implement, scope ['docs/**']; (c) scope ['./src/**']; (d) scope ['s?c/**']. Each is either refused at sign or signed; after a committed change to src/f.mjs with only a weak test, contractVerify of each signed one returns FAIL with a detail naming the mutation criterion. Verify compares the files changed since the recorded base with the mutation requirement and does not trust the declared phase or scope.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c16:' test/gate-mutate-lint.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c16:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Through newVault with contracts.mutation_required on: contractDraft with the canonical criteria (no warning), then v.write replaces contracts/drafts/<id>.json with the same draft minus the three metrics; separately, with a findings or lint field claiming there are none. In each case contractSign throws a ContractError naming the mutation criterion, and no file appears under contracts/signed/.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c17:' test/gate-mutate-lint.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -424,10 +446,26 @@
           }
         },
         {
-          "statement": "One full run of test/gate-mutate-lint.test.mjs passes every labelled subtest (T2-c01, T2-c04, T2-c05, T2-c06, T2-c07, T2-c08, T2-c09, T2-c10, T2-c11, T2-c12, T2-c13, T2-c15) with nothing skipped and nothing todo.",
+          "statement": "T2-c20: Through newVault with contracts.mutation_required on: a temporary git repository with main at commit M and a commit C that changes src/f.mjs, covered only by a weak test. A contract whose spec names the explicit base M is signed after C, and an amendment of it, naming the same base, is signed after a further strongly tested one-line commit D. Verifying either returns FAIL with C's line among the gate's survivors, because the recorded base is the spec's M, not HEAD at signing. A draft whose src-touching implement task has no explicit base is refused at sign and no signed contract is written.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c20:' test/gate-mutate-lint.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c20:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2-c21: contractVerify, started with MEMEV_CONTRACT_BASE set to HEAD~1 in its own environment, runs a command criterion that prints MEMEV_CONTRACT_BASE, a metric criterion and a red-green criterion of a contract whose recorded base is an earlier commit, and each sees the recorded base, never the inherited value.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c21:' test/gate-mutate-lint.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c21:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/gate-mutate-lint.test.mjs passes every labelled subtest (T2-c01, T2-c04, T2-c05, T2-c06, T2-c07, T2-c08, T2-c09, T2-c10, T2-c11, T2-c12, T2-c13, T2-c15, T2-c16, T2-c17, T2-c20, T2-c21) with nothing skipped and nothing todo.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-mutate-lint.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c04:|^T2-c05:|^T2-c06:|^T2-c07:|^T2-c08:|^T2-c09:|^T2-c10:|^T2-c11:|^T2-c12:|^T2-c13:|^T2-c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-mutate-lint.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c04:|^T2-c05:|^T2-c06:|^T2-c07:|^T2-c08:|^T2-c09:|^T2-c10:|^T2-c11:|^T2-c12:|^T2-c13:|^T2-c15:|^T2-c16:|^T2-c17:|^T2-c20:|^T2-c21:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
             "timeout_s": 600
           }
         },
