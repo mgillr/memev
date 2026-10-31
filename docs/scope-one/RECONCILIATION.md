@@ -2,7 +2,7 @@
 
 Part of the [documentation index](../README.md). Related: [DECISIONS.md](DECISIONS.md), [INVENTORY.md](INVENTORY.md), [programme decomposition](programme/README.md).
 
-Dated 31 October 2026, against main at `4823064`, which includes the Scope One work breakdown (`WBS.md` in `docs/scope-one`, with `SO-1.01` to `SO-1.11` and its test `wbs.test.mjs`) from pull request #324. This page refers to that work breakdown and to `SO-1.02` (the reconciliation contract) instead of restating them; leaf numbers below are the numbers in `WBS.md`. It does not edit `WBS.md`, any `SO-1.x` contract, any signature or any red-team record: those are owned by the ASTL workstream.
+Dated 31 October 2026, against main at `4823064`, which includes the Scope One work breakdown (`WBS.md` in `docs/scope-one`, with `SO-1.01` to `SO-1.11` and its test `wbs.test.mjs`) from pull request #324. This page refers to that work breakdown and to `SO-1.02` (the reconciliation contract) instead of restating them; leaf numbers below are the numbers in `WBS.md`. It does not edit `WBS.md`, any `SO-1.x` contract, any signature or any red-team record: those are owned by the lead workstream.
 
 ## Headline
 
@@ -34,24 +34,79 @@ A task takes the strongest class of the requirements it serves: conflicting, the
 - Sections 6 to 8 (pull requests, branches, merged foundations) are mirrored here by [INVENTORY.md](INVENTORY.md), refreshed to the live `gh pr list` state.
 - 45 leaves are blocked on owner decisions. None is decided here.
 
+## Boundaries with the Scope One contracts
+
+[WBS.md](WBS.md) section 9.1 records where the programme tasks touch `SO-1.01` to `SO-2.14`; this page applies that table and does not restate it. In short: where a Scope One contract is the design record, the programme spec keeps only the build and test criteria the record does not hold.
+
+- `WP07-01` to `WP07-04` stay with the wiring pull request, which cites `SO-1.01` and does not replace it. `WP08-01`, `WP17-01` and `WP17-02` are `SO-1.02` and `WBS.md`; `WP08-02` follows `SO-1.04`; `WP08-03` follows `SO-1.10` and `SO-1.11`. None of those has a programme spec.
+- `SO-2.03` keeps retention, deletion and invalidation; `WP10-01` and `WP10-02` keep the status lattice. `SO-2.02` keeps retrieval-time access; `WP13-01` keeps the publish boundary. `SO-2.04` and `SO-2.05` feed `WP08-04` and `WP14-04`; `SO-2.06` holds the acceptance tests of the organisational-intelligence demonstrator. `SO-2.08` treats `WP18-02` as its first instance. `SO-2.13` leaves the licence boundary to `WP15` and the pricing dimensions to the tier decision.
+- `SO-2.07` to `SO-2.11` require canonical operation contracts at their adapter layers; the `WP04` envelope is that contract and no programme spec defines an adapter for those systems.
+- No clash was found that needs a change to a Scope One file.
+
 ## Claim register
 
 Who writes which task, so that two workstreams do not write the same one. Owners are workstreams. A status is as of the date above.
 
 | Task id | Owner workstream | Branch or pull request | Status |
 | --- | --- | --- | --- |
-| Scope One `WBS.md`, `wbs.test.mjs` | ASTL workstream | memev #324, branch `wbs` | merged |
-| `SO-1.01` to `SO-1.11` contracts | ASTL workstream | memev #324 | merged, signed |
-| Contract signing and re-signing (all repositories) | ASTL workstream | `scripts/gate/redteam-gate.mjs` in memev; #319 to #323 merged | in progress |
-| Red-team records | ASTL workstream | `contracts/**/redteam/` | in progress |
-| `WP01-01` to `WP01-05` (crdt-merge correctness) | Programme workstream | crdt-merge, branch `fix/crdt-correctness-four-bugs` #180 | in progress |
-| `WP07-01` to `WP07-03`, `WP15-01` (memev wiring and licence guard) | Programme workstream | memev, branch `feat/wire-project-engine` #326 | in progress |
-| `WP17-05`, `WP16-03` and `WP15-02` for memev (this reconciliation, tiers, README, decisions) | Programme workstream | memev, branch `docs/engine-decision-tiers-reconcile` #325 | open |
-| `WP16-02` (converge README) | Programme workstream | converge, branch `docs/fair-mem0-comparison` #1 | open |
-| `WP16-03` (site plans) | Programme workstream | memev-site, branch `fix/plans-match-tier-decision` #1 | open |
-| `WP05-02`, `WP15-02` for memev-ops (SR-3.01 and SR-3.03 superseded, SR-3.05) | Programme workstream | memev-ops, branch `docs/engine-decision-sr3` #13 | open |
-| Programme contract specs (`contracts/programme`, one per work package and one per work pull request) | Programme workstream | memev, same branch as the row above #325 | open, unsigned; signing by the ASTL workstream |
+| Scope One `WBS.md`, `wbs.test.mjs` | Lead | memev #324, branch `wbs` | merged |
+| `SO-1.01` to `SO-1.11` contracts | Lead | memev #324 | merged, signed |
+| Contract signing and re-signing (all repositories) | Lead | `scripts/gate/redteam-gate.mjs` in memev; #319 to #323 merged | in progress |
+| Red-team records | Lead | `contracts/**/redteam/` | in progress |
+| `WP01-01` to `WP01-05` (crdt-merge correctness) | Programme | crdt-merge, branch `fix/crdt-correctness-four-bugs` #180 | in progress |
+| `WP07-01` to `WP07-04`, `WP15-01` (memev wiring, single-authority guard and licence guard; implements `SO-1.01`) | Programme | memev, branch `feat/wire-project-engine` #326 | in progress |
+| `WP17-05`, `WP16-03` and `WP15-02` for memev (this reconciliation, tiers, README, decisions) | Programme | memev, branch `docs/engine-decision-tiers-reconcile` #325 | open |
+| `WP16-02` (converge README) | Programme | converge, branch `docs/fair-mem0-comparison` #1 | open |
+| `WP16-03` (site plans) | Programme | memev-site, branch `fix/plans-match-tier-decision` #1 | open |
+| `WP05-02`, `WP15-02` for memev-ops (SR-3.01 and SR-3.03 superseded, SR-3.05) | Programme | memev-ops, branch `docs/engine-decision-sr3` #13 | open |
+| Programme contract specs (`contracts/programme`, one per work package and one per work pull request) | Programme | memev, same branch as the row above #325 | open, unsigned; signing by the Lead |
+| Baseline 8.1 (dashboard and command centre, lead-agent single authority, release and installation readiness, failure-path suite, ADR 4 and ADR 5 drafts) | Lead | `SO-1.x` contracts and `WBS.md` | agreed split |
+| Baseline 8.2 (intake to end-to-end demo, extending `SO-1.x`), with `WP08-01` to `WP08-03` | Lead | `SO-1.02` (`WP08-01`, `WP17-01`, `WP17-02`), `SO-1.04` (`WP08-02`), `SO-1.10` and `SO-1.11` (`WP08-03`) | agreed split; no programme spec |
+| Baseline 8.3 (organisational intelligence, WBS 5.3.x and 4.3.2), with `WP08-04` | Lead (baseline scope); Dev 2 workstream (decision records `SO-2.01` to `SO-2.06`, branches `feat/so-2-0X-<slug>`, active) | `SO-2.01` to `SO-2.06` | agreed split; no programme spec |
+| Baseline 8.4 except A2A, SDK and payments (WBS 5.4.4 to 5.4.8 and the non-GitHub parts of 5.4.6), 5.5.11 federated computation, 5.6.5 commercial integration services | Lead | `SO-2.07` to `SO-2.13` | agreed split |
+| Baseline 8.6 personal multi-device, business deployment, enterprise deployment, public distribution and external security assurance, with `WP16-04` | Lead | `SO-2.14` and `WBS.md` | agreed split; no programme spec |
+| `WP11-01` to `WP11-06`, `WP17-03`, `WP17-04`, `WP17-06` | Lead | `SO-1.02` and `WBS.md` | no programme spec |
+| Baseline 8.4 A2A (`WP18-01`), SDK and framework adapter (`WP18-02`), payments (`WP18-04`); 8.5 (`WP01` to `WP06`, `WP09`, `WP10`, `WP12` to `WP14`); 8.6 licensing (`WP15`), tiers and claims (`WP16`), conformance tests (`WP18-03`) | Programme | `contracts/programme` | specs proposed, work unclaimed; except the rows below for `PG-02.1`, `PG-03.1` to `PG-03.3` and `PG-12.1` |
+| `PG-02.1` (CRDT conformance gate; `WP02-01` to `WP02-04`) | Dev 2 workstream | crdt-merge, branch `feat/pg-02-1-crdt-conformance-gate` | queued after `SO-2.01` to `SO-2.06` |
+| `PG-03.1` (vectors, crdt-merge), `PG-03.2` (crdt-merge-ts), `PG-03.3` (crdt-merge-rs); one pull request per package | Dev 2 workstream | branches `feat/pg-03-1-*`, `feat/pg-03-2-*`, `feat/pg-03-3-*` | queued after `SO-2.01` to `SO-2.06` |
+| `PG-12.1` (multi-node gossip transport; `WP12-01` to `WP12-03`) | unclaimed | none | open, unclaimed |
+| Which layer to build against: the unsigned fold `SO-F-01` to `SO-F-13`, or the programme specs `PG-04.1`, `PG-05.1`, `PG-09.1`, `PG-09.2`, `PG-13.1`, `PG-14.1` | owner | none | PENDING OWNER DECISION |
+| Upgrade, rollback, backup and restore, and uninstall (work breakdown 5.1.3, requirements 70 and 96) | signed vault contract `SO-R-C` | cited by id, no programme task | covered by the vault contract |
+| `SR-6.03` installers and public release | signed vault contracts `WO-02-A` and `MEM-015` | cited by id, no programme task | covered by the vault contracts |
+| `SR-0.03` tasks 1, 3 and 4 (one pull request) | Dev 3 workstream | branch `feat/sr-0-03-tasks-1-3-4` | active |
+| `QL-1.01` task 2 (the red-team gate, linked to #314) | Dev 3 workstream | branch `feat/ql-1-01-task-2` | queued after `SR-0.03` |
 | Every other `WP*` task (the work itself) | unclaimed | none | not started |
+
+## Signed vault contracts, cited by id
+
+The owner vault holds signed contracts that already cover some programme work. They are cited by id only: no vault contract file or text is copied into this repository, because a copy would carry a second, unverifiable signature. Where a signed contract covers a task, the programme spec cites it and does not repeat the criterion.
+
+| Vault contract | What it covers | Used by |
+| --- | --- | --- |
+| `SO-05-A` | typed project and task tools on the existing MCP handler, identical over stdio and HTTP, scoped by token and seat | PGP-1.02 (WP07-01 to WP07-04) and SO-1.01 |
+| `SO-06-A` | architecture guards: project modules persist only through the store, nothing else constructs the store or coordinator, no project module imports the merge engine | PGP-1.02 T1 and T3 |
+| `WO-05-A` | the external-engine call boundary | foundation of PG-05.1 and of every spec that names the call-out boundary |
+| `WO-05-B` | the paid-engine client behind a flag, off by default (build in draft PR #201, still open) | WP05-05, dropped from PG-05.1; PG-05.1 and WP05-06 cite it |
+| `WO-05-C` | the external convergence service specification | foundation of PG-05.1 |
+| `WO-05-D` | the external trust service specification | PG-09.1 and PG-09.2 place their adapters on its boundary |
+| `WO-05-E` | the licence boundary text guard: the two licence pages agree and name the engine licence | PG-15.1, PGP-1.03 and PGP-1.06 (SR-3.05 states the licences once) |
+| `MEM-145, MEM-146, MEM-147` | human binding of agent roles (bind, verify, setup, roles listing) | foundation of WP09-01 (PG-09.1) |
+| `SO-05-B` | per-client capability records and an honest connection state | WP18-02 (PG-18.1) and SO-1.04 |
+| `SO-09-A` | authorisation matrix at every entry point | boundary of PG-13.1 with SO-2.02 |
+| `SO-11-A` | end-to-end acceptance of the delivery loop | WP08-03, with SO-1.10 and SO-1.11 |
+| `SO-R-C` | upgrade, rollback, backup and restore, and uninstall paths, tested and documented | owner of WBS 5.1.3 and requirements 70 and 96 (SO-REQ-070, SO-REQ-096), which the work breakdown marks as having no owner; no programme task covers it |
+| `WO-02-A, MEM-015` | the published one-line install and the public release | SR-6.03; no programme task touches it, and any spec that does cites these |
+| `SO-14-A` | evidence class and checked date on public claims pages | PG-16.1 |
+| `MEM-064, MEM-065, MEM-066, MEM-137, REV-032` | price, tier-name and plan wording; the price and tier values they carry are superseded by the owner decision of 31 Oct 2026 | PGP-1.03, PGP-1.05 and PG-16.1 |
+
+`WP05-05` (the paid-engine client, draft pull request #201) is owned by `WO-05-B` and is dropped from `PG-05.1`. Upgrade, rollback, backup and restore, and uninstall (requirements 70 and 96 of the work breakdown, which marks them as having no owner) are owned by `SO-R-C`; no programme task covers them.
+
+## Pending owner decisions
+
+| Decision | Question | Overlaps | Status |
+| --- | --- | --- | --- |
+| Layer to build against | The unsigned Scope One fold `SO-F-01` to `SO-F-13` overlaps the programme specs: which layer is built against? | `PG-04.1`: `SO-F-03`; `PG-05.1`: `SO-F-02`, `SO-F-06`; `PG-09.1`: `SO-F-01`, `SO-F-08`; `PG-09.2`: `SO-F-01`, `SO-F-08`; `PG-13.1`: `SO-F-04`, `SO-F-05`, `SO-F-07`, `SO-F-12`, `SO-F-13`; `PG-14.1`: `SO-F-13` | PENDING OWNER DECISION: nothing is dropped and none of these specs is signed on the strength of either layer until it is decided |
+| Memory and project-state authority | Is the vault the only authority (local-first, no second database)? | all `SO-1.x`, `SO-2.x` and programme specs | proposed, pending owner confirmation: recorded as ADR 7 in [DECISIONS.md](DECISIONS.md); the owner decision of 31 Oct 2026 (local-first, the cloud only a relay and a backup) is the only part decided |
 
 ## Requirement register
 
@@ -139,7 +194,7 @@ One row per requirement of [programme/REQUIREMENTS.md](programme/REQUIREMENTS.md
 | `MV-PGM-04` | One canonical contract format and id namespace for new work (memev attest/1 specs versus proofline/1) | missing | none |
 | `MV-PGM-05` | Requirements owned by an existing contract stay covered by it; no duplicate contracts are written for them | same | 9 (owner index and overlap check) |
 | `MV-PGM-07` | The three engine plans are reconciled into one: the notes (crdt-merge via call-out, never vendored), PI-04/PI-05 on branch dev-integration-specs (vend... | conflicting | 7.1 PI-04 and PI-05 and 1.2.4 SR-3.01, SR-3.03 are open or covered; superseded by owner decision 31 Oct 2026 |
-| `MV-PGM-06` | Parallel bot work is deconflicted: one claim register for who is writing which WBS or contract | missing | this register |
+| `MV-PGM-06` | Parallel work is deconflicted: one claim register for who is writing which WBS or contract | missing | this register |
 
 ## Programme tasks by work package
 

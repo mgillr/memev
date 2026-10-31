@@ -86,6 +86,22 @@ current code already uses, so no contract is blocked on a guess.
   distribution against the BSL use restriction. The change date is not changed by this record.
 - Safe default: keep the call-out boundary as it is; do not build or re-sign the superseded contracts.
 
+### ADR 7: memory and project-state authority
+
+- Status: proposed (pending owner confirmation)
+- Decision owner: owner
+- Proposal: the vault and its store are the one canonical authority for memory and project state, local-first,
+  with no second database. External components (the engine, the admission service, the trust service, compute
+  runtimes) are reached only across adapter boundaries, and there is no migration to another implementation.
+- Sources: what is decided is the owner decision of 31 Oct 2026 (below): topology is local-first and the cloud is
+  only a relay and a backup. The wider statement that the vault is the only authority is recorded in the owner
+  vault as decision D-SO-MEMORY-AUTHORITY, which that record shows as taken by the lead workstream under the owner's
+  delegation of 30 Oct 2026, not as the owner's own word. It is cited by id and is not copied here.
+- Rationale for leaving it proposed: no owner-signed contract or owner statement in this repository carries the
+  second part, so it is not stated here as decided.
+- Safe default: keep the code as it is: one store under the vault, no second database, and the engine behind the
+  call-out boundary (ADR 6, SO-1.01).
+
 ### Tiers (decided, owner decision 31 Oct 2026)
 
 The free core, Personal at $12/month or $120/year for up to 3 computers, and contact us for

@@ -2,7 +2,7 @@
   "title": "PG-01.1 crdt-merge correctness fixes for the agent/memory subsystems (crdt-merge)",
   "project": "memev",
   "workdir": null,
-  "request": "Programme contract for work package WP01 in crdt-merge: crdt-merge correctness fixes for the agent/memory subsystems. Proposed and unsigned; the signer (ASTL workstream) signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP01.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP01-01. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "request": "Programme contract for work package WP01 in crdt-merge: crdt-merge correctness fixes for the agent/memory subsystems. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP01.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP01-01. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json.  Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
   "tasks": [
     {
       "id": "WP01-03",
@@ -60,17 +60,19 @@
       "requirements": [
         "MV-CRDT-07: E4 KeyPair verification is strict Ed25519 with no HMAC fallback keyed by the public key. (Added from live review; not in the notes.) (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:30; evidence docs/scope-one/programme/DECOMPOSITION.md:82; baseline 8.5)"
       ],
-      "description": "Repo: crdt-merge. PR #179 open since 2026-09-28 and mergeable. Review against the E4 tests; merge is the owner's call.",
+      "description": "Repo: crdt-merge. PR #179 open since 2026-09-28 and mergeable; it adds tests/e4/resilience/test_key_ownership.py (tampered message at :43, wrong key at :49, forged revocation proof at :89). Review against those tests; merge is the owner's call.",
       "scope": [
-        "crdt_merge/e4/**",
-        "tests/**"
+        "crdt_merge/e4/resilience/**",
+        "tests/e4/resilience/test_key_ownership.py",
+        "docs/security/**"
       ],
       "criteria": [
         {
-          "statement": "a forged-signature test is present",
+          "statement": "The key-ownership tests that PR #179 adds (tampered message, wrong key, forged revocation proof) are red on the base and green after",
           "verifier": {
-            "type": "test_exists",
-            "test_file": "tests/test_e4_ed25519_strict.py"
+            "type": "test_red_green",
+            "test_file": "tests/e4/resilience/test_key_ownership.py",
+            "cmd": "python -m pytest -x -q tests/e4/resilience/test_key_ownership.py"
           }
         },
         {
@@ -105,19 +107,12 @@
       ],
       "criteria": [
         {
-          "statement": "doc exists",
-          "verifier": {
-            "type": "file_exists",
-            "path": "docs/gossip-boundary.md"
-          }
-        },
-        {
-          "statement": "doc names the caller duties",
+          "statement": "The note names all three caller duties: transport, scheduling and the sync lifecycle",
           "verifier": {
             "type": "grep",
             "file": "docs/gossip-boundary.md",
-            "pattern": "transport",
-            "flags": "i"
+            "pattern": "transport.*scheduling.*lifecycle",
+            "flags": "is"
           }
         },
         {

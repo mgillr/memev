@@ -2,7 +2,7 @@
   "title": "PGP-1.01 crdt-merge: four correctness bugs fixed (ORSet resurrection, LWWMap get/value, TrustAgentState delete, tag collisions)",
   "project": "memev",
   "workdir": null,
-  "request": "Per-pull-request contract for crdt-merge, branch fix/crdt-correctness-four-bugs (pull request #180, head 83cc699, checks green). crdt-merge is an external engine under its own licence; Memev reaches it only across the provider boundary and none of its code is part of Memev. Proposed and unsigned; the signer (ASTL workstream) signs after the red-team gate. Repository: crdt-merge (paths below are relative to that repository). Covers programme tasks WP01-01, WP01-02, WP01-04 and WP01-05; WP01-03, WP01-06 and WP01-07 stay in PG-01.1. The fixes are additive on the wire and change no licence term, LICENSE or PATENTS file. Depends on contracts: none.",
+  "request": "Per-pull-request contract for crdt-merge, branch fix/crdt-correctness-four-bugs (pull request #180, head 83cc699, checks green). crdt-merge is an external engine under its own licence; Memev reaches it only across the provider boundary and none of its code is part of Memev. Proposed and unsigned; the signer signs after the red-team gate. Repository: crdt-merge (paths below are relative to that repository). Covers programme tasks WP01-01, WP01-02, WP01-04 and WP01-05; WP01-03, WP01-06 and WP01-07 stay in PG-01.1. The fixes are additive on the wire and change no licence term, LICENSE or PATENTS file. Depends on contracts: none. ",
   "tasks": [
     {
       "id": "T1",
@@ -17,7 +17,8 @@
       "description": "Regression file: tests/test_orset_lwwmap_correctness.py. Fixed in crdt_merge/core.py.",
       "scope": [
         "crdt_merge/core.py",
-        "tests/test_orset_lwwmap_correctness.py"
+        "tests/test_orset_lwwmap_correctness.py",
+        ".github/workflows/crdt-laws.yml"
       ],
       "criteria": [
         {
@@ -33,6 +34,15 @@
             "type": "test_red_green",
             "test_file": "tests/test_orset_lwwmap_correctness.py",
             "cmd": "python -m pytest -x -q tests/test_orset_lwwmap_correctness.py"
+          }
+        },
+        {
+          "statement": "The CRDT law workflow (.github/workflows/crdt-laws.yml, added by pull request #180) is triggered by all three regression files",
+          "verifier": {
+            "type": "grep",
+            "file": ".github/workflows/crdt-laws.yml",
+            "pattern": "test_orset_lwwmap_correctness.*test_trust_agent_state_delete.*test_crdt_state_tag_uniqueness",
+            "flags": "s"
           }
         },
         {

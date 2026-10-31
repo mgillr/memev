@@ -2,7 +2,7 @@
   "title": "PG-02.1 CRDT conformance gate (history-based, CI) (crdt-merge)",
   "project": "memev",
   "workdir": null,
-  "request": "Programme contract for work package WP02 in crdt-merge: CRDT conformance gate (history-based, CI). Proposed and unsigned; the signer (ASTL workstream) signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP02.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP01-01, WP01-02. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "request": "Programme contract for work package WP02 in crdt-merge: CRDT conformance gate (history-based, CI). Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP02.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP01-01, WP01-02. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json.  Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
   "tasks": [
     {
       "id": "WP02-01",
@@ -69,6 +69,14 @@
           }
         },
         {
+          "statement": "The law tests name all five subsystems: ORSet, LWWMap, AgentState, TrustAgentState and gossip",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in ORSet LWWMap AgentState TrustAgentState gossip; do grep -qi \"$n\" tests/conformance/test_laws.py || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
           "statement": "Changes stay in scope",
           "verifier": {
             "type": "scope"
@@ -96,7 +104,7 @@
       "requirements": [
         "MV-CONF-03: The gate covers: commutativity, associativity, idempotency, deletion propagation, concurrent additions, stale replica recovery, duplicate delivery, out-of-order delivery, process restart, cross-language serialisation, clock skew, replica identity collision, partition and heal. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:36; evidence docs/scope-one/programme/DECOMPOSITION.md:85; baseline 8.5)"
       ],
-      "description": "Repo: crdt-merge. One test per scenario named in the notes list.",
+      "description": "Repo: crdt-merge. One test per scenario named in the notes list: test_deletion_propagation, test_stale_replica, test_duplicate_delivery, test_out_of_order_delivery, test_process_restart, test_clock_skew, test_replica_id_collision, test_partition_and_heal.",
       "scope": [
         "tests/conformance/test_scenarios.py"
       ],
@@ -110,11 +118,11 @@
           }
         },
         {
-          "statement": "all 7 scenario names present",
+          "statement": "All eight scenario tests named in the title are present, one function each",
           "verifier": {
-            "type": "grep",
-            "file": "tests/conformance/test_scenarios.py",
-            "pattern": "def test_partition_and_heal"
+            "type": "command",
+            "cmd": "for n in test_deletion_propagation test_stale_replica test_duplicate_delivery test_out_of_order_delivery test_process_restart test_clock_skew test_replica_id_collision test_partition_and_heal; do grep -q \"def $n\" tests/conformance/test_scenarios.py || exit 1; done",
+            "expect_exit": 0
           }
         },
         {

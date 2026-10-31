@@ -2,7 +2,7 @@
   "title": "PG-05.1 Engine integration: merge semantics, mapping, boundary (memev)",
   "project": "memev",
   "workdir": null,
-  "request": "Programme contract for work package WP05 in memev: Engine integration: merge semantics, mapping, boundary. Proposed and unsigned; the signer (ASTL workstream) signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP05.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP01-03, WP04-01, WP04-03, WP05-02. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "request": "Programme contract for work package WP05 in memev: Engine integration: merge semantics, mapping, boundary. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP05.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP01-03, WP04-01, WP04-03, WP05-02, WP05-05. Depends on contracts: SO-2.12, SO-2.13, WO-05-B. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.12 and SO-2.13: WP05-06 degrades as SO-2.12 requirement 8 says when the paid engine is absent and keeps the paid interface behind SO-2.13 requirements 3 and 4; neither is restated here. Signed vault contract WO-05-A and WO-05-C (cited by id only): foundation: the call-out boundary and the external convergence service specification; this spec cites them and does not specify them again. Signed vault contract WO-05-B (cited by id only): the paid-engine client behind a flag, off by default (draft PR #201, still open); WP05-05 is dropped from this spec because that signed contract owns it, and WP05-06 depends on it. Pending owner decision (which layer to build against): the unsigned Scope One fold SO-F-01 to SO-F-13 (cited by id only) overlaps this spec at SO-F-02, SO-F-06. Which layer is built against is open and is the owner's call. This spec is not signed until it is decided, and nothing is dropped on the strength of the unsigned fold. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
   "tasks": [
     {
       "id": "WP05-01",
@@ -25,12 +25,11 @@
           }
         },
         {
-          "statement": "all nine classes named",
+          "statement": "All nine object classes are named in the table",
           "verifier": {
-            "type": "grep",
-            "file": "docs/MERGE-SEMANTICS.md",
-            "pattern": "external action.*",
-            "flags": "is"
+            "type": "command",
+            "cmd": "for n in observations metadata membership counters \"task ownership\" \"task state\" contracts approvals \"external action\"; do grep -qi \"$n\" docs/MERGE-SEMANTICS.md || exit 1; done",
+            "expect_exit": 0
           }
         },
         {
@@ -62,7 +61,7 @@
         "MV-INT-04: A Memev integration design maps vault operations, agent state, bus events, project state and contracts into one replicated event model (deliverable 2). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:43; evidence docs/scope-one/programme/DECOMPOSITION.md:89; baseline 8.5)",
         "MV-ARCH-04: Responsibility split is explicit: Memev owns project semantics, identity, authority, contracts, coordination, approvals, policy; the engine owns CRDT state, causal sync, trust/identity primitives and receipts. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:13; evidence docs/scope-one/programme/DECOMPOSITION.md:68; baseline 8.5)"
       ],
-      "description": "Repo: memev. Deliverable 2 of the notes.",
+      "description": "Repo: memev. Deliverable 2 of the notes. Foundation, cited by id: WO-05-A (the call-out boundary) and WO-05-C (the external convergence service specification); this design does not specify them again.",
       "scope": [
         "docs/INTEGRATION-DESIGN.md"
       ],
@@ -162,71 +161,21 @@
       ]
     },
     {
-      "id": "WP05-05",
-      "title": "Paid-engine client behind a flag, off by default (finish and land PR #201 WO-05-B)",
-      "phase": "implement",
-      "depends_on": [
-        "WP05-03"
-      ],
-      "requirements": [
-        "MV-INT-05: The engine is integrated as a separately licensed dependency across the existing external call-out boundary, never vendored. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:44; evidence docs/scope-one/programme/DECOMPOSITION.md:90; baseline 8.5)"
-      ],
-      "description": "Repo: memev, draft PR #201. Core calls out; holds no convergence logic; never vendors the engine.",
-      "scope": [
-        "src/engine/merge.mjs",
-        "src/engine/**",
-        "test/**"
-      ],
-      "criteria": [
-        {
-          "statement": "licence boundary test green",
-          "verifier": {
-            "type": "command",
-            "cmd": "node --test test/licence-boundary.test.mjs",
-            "expect_exit": 0,
-            "timeout_s": 1800
-          }
-        },
-        {
-          "statement": "suite green",
-          "verifier": {
-            "type": "command",
-            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
-            "expect_exit": 0,
-            "timeout_s": 1800
-          }
-        },
-        {
-          "statement": "Changes stay in scope",
-          "verifier": {
-            "type": "scope"
-          }
-        },
-        {
-          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
-          "verifier": {
-            "type": "pushed"
-          }
-        }
-      ],
-      "stop_rules": [
-        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
-        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
-      ]
-    },
-    {
       "id": "WP05-06",
       "title": "Engine round trip: a memev state change replicates through crdt-merge and back on two local vaults",
       "phase": "implement",
       "depends_on": [
-        "WP05-04",
-        "WP05-05"
+        "WP05-04"
       ],
       "requirements": [
         "MV-INT-01: Memev vault data is represented in CRDT-compatible state (P0 agent memory integration). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:40; evidence docs/scope-one/programme/DECOMPOSITION.md:86; baseline 8.5)",
-        "MV-INT-05: The engine is integrated as a separately licensed dependency across the existing external call-out boundary, never vendored. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:44; evidence docs/scope-one/programme/DECOMPOSITION.md:90; baseline 8.5)"
+        "MV-INT-05: The engine is integrated as a separately licensed dependency across the existing external call-out boundary, never vendored. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:44; evidence docs/scope-one/programme/DECOMPOSITION.md:90; baseline 8.5)",
+        "SO-2.12 requirement 8: \"The system must remain useful locally and degrade safely if a paid or remote service is unavailable. It must not falsely claim distributed convergence, trust verification or evidence admission while those services are unavailable.\" (source: contract SO-2.12 T1)",
+        "SO-2.13 requirement 3: \"Keep paid multi-device convergence behind a stable, tested interface.\" (source: contract SO-2.13 T1)",
+        "SO-2.13 requirement 4: \"Do not let cloud availability become a hidden dependency for local project integrity.\" (source: contract SO-2.13 T1)",
+        "The round trip runs through the paid-engine client of signed vault contract WO-05-B (off by default; draft PR #201) and does not rebuild it (source: signed vault contract WO-05-B, cited by id only)"
       ],
-      "description": "Repo: memev. Skipped with a stated reason when the paid engine is not installed (reported as not run, not as pass).",
+      "description": "Repo: memev. Skipped with a stated reason when the paid engine is not installed (reported as not run, not as pass). The client that this test exercises is WO-05-B, not a task of this spec.",
       "scope": [
         "test/engine-roundtrip.test.mjs",
         "scripts/**"

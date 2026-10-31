@@ -2,7 +2,7 @@
   "title": "PG-18.1 Interop SDKs, A2A and payments (memev)",
   "project": "memev",
   "workdir": null,
-  "request": "Programme contract for work package WP18 in memev: Interop SDKs, A2A and payments. Proposed and unsigned; the signer (ASTL workstream) signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP18.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP02-04, WP04-02, WP10-03. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "request": "Programme contract for work package WP18 in memev: Interop SDKs, A2A and payments. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP18.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP02-04, WP04-02, WP10-03. Depends on contracts: SO-2.08, SO-1.04. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.08 and SO-1.04: WP18-02 is the first framework adapter (LangGraph first); SO-2.08 covers every other framework and runtime. Boundary with SO-2.07 and SO-2.09 to SO-2.11: specialist, delivery, communication and enterprise systems are not taken here; WP18 covers the agent protocol, the SDK, conformance and payments. Signed vault contract SO-05-B (cited by id only): per-client capability records; WP18-02 reads them and defines no second record.  Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
   "tasks": [
     {
       "id": "WP18-01",
@@ -61,18 +61,21 @@
         "WP18-01"
       ],
       "requirements": [
-        "MV-PRD-10: SDKs, framework adapters and public conformance tests let existing agents (for example LangGraph) join a Memev project, claim work, submit evidence and sync state. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:103; evidence docs/scope-one/programme/DECOMPOSITION.md:131; baseline 8.4)"
+        "MV-PRD-10: SDKs, framework adapters and public conformance tests let existing agents (for example LangGraph) join a Memev project, claim work, submit evidence and sync state. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:103; evidence docs/scope-one/programme/DECOMPOSITION.md:131; baseline 8.4)",
+        "SO-2.08 requirement 1: \"Provider-neutral task adapter and capability mapping\" (source: contract SO-2.08 T1)",
+        "SO-1.04 requirement 2: \"Keep provider-specific behaviour inside adapters; the planner and coordinator must consume capability declarations rather than provider-specific conditionals.\" (source: contract SO-1.04 T1)"
       ],
-      "description": "Repo: memev (or a new SDK repo; decide in WP17-03).",
+      "description": "Repo: memev (or a new SDK repo; decide in WP17-03). Client capability is read from the per-client records of signed vault contract SO-05-B (cited by id); no second record is defined here.",
       "scope": [
         "sdk/**"
       ],
       "criteria": [
         {
-          "statement": "sdk example test present",
+          "statement": "The SDK example joins a project, claims work and submits evidence (red on the base, green after)",
           "verifier": {
-            "type": "test_exists",
-            "test_file": "sdk/test/join-project.test.mjs"
+            "type": "test_red_green",
+            "test_file": "sdk/test/join-project.test.mjs",
+            "cmd": "node --test sdk/test/join-project.test.mjs"
           }
         },
         {
@@ -139,7 +142,8 @@
       "phase": "implement",
       "depends_on": [],
       "requirements": [
-        "MV-PRD-11: Payments follow verified acceptance (agentic payment protocols for machine payments, Stripe for fiat) with idempotency and reconciliation; a payment receipt is not proof of delivery. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:104; evidence docs/scope-one/programme/DECOMPOSITION.md:132; baseline 8.4)"
+        "MV-PRD-11: Payments follow verified acceptance (agentic payment protocols for machine payments, Stripe for fiat) with idempotency and reconciliation; a payment receipt is not proof of delivery. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:104; evidence docs/scope-one/programme/DECOMPOSITION.md:132; baseline 8.4)",
+        "No payment is made without the owner approving it first; the adapter only requests approval (source: programme task WP18-04, docs/scope-one/programme/fragments/WP18.json:164)"
       ],
       "description": "Repo: memev. Adapter only; no money moves without owner approval.",
       "scope": [
@@ -153,6 +157,15 @@
             "type": "test_red_green",
             "test_file": "test/payments.test.mjs",
             "cmd": "node --test test/payments.test.mjs"
+          }
+        },
+        {
+          "statement": "The payment tests exercise the owner-approval gate",
+          "verifier": {
+            "type": "grep",
+            "file": "test/payments.test.mjs",
+            "pattern": "approv",
+            "flags": "i"
           }
         },
         {

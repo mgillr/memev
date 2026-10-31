@@ -2,12 +2,12 @@
   "title": "PGP-1.06 memev-ops: SR-3.01 and SR-3.03 superseded by the call-out engine decision, SR-3.05 states the licences once",
   "project": "memev",
   "workdir": null,
-  "request": "Per-pull-request contract for memev-ops, branch docs/engine-decision-sr3. Proposed and unsigned; the signer (ASTL workstream) signs after the red-team gate. Repository: memev-ops (paths relative to that repository; the contract lives in the memev contracts tree). Programme tasks WP05-02 and WP15-02 (ops side). The canonical seed-readiness manifest is the one in memev-ops (103 contracts); the memev copy holds a subset and is kept identical for SR-3.01 and SR-3.05. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository (BSL 1.1 with its PATENTS file) and is reached only across the call-out boundary, never vendored, so inclusion cannot relicense it; tiers are the free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that, with no Federated tier and no separate Personal trial; federation is planned, not available. Depends on contracts: none.",
+  "request": "Per-pull-request contract for memev-ops, branch docs/engine-decision-sr3. Proposed and unsigned; the signer signs after the red-team gate. Repository: memev-ops (paths relative to that repository; the contract lives in the memev contracts tree). Programme tasks WP05-02 and WP15-02 (ops side). Boundary with SO-2.13: this contract states licences and the call-out decision; the commercial service boundary stays in SO-2.13. The canonical seed-readiness manifest is the one in memev-ops (103 contracts); the memev copy holds a subset and is kept identical for SR-3.01 and SR-3.05. Owner decisions of 31 Oct 2026 apply (the engine decision confirmed by the owner, t542u): crdt-merge stays in its own repository (BSL 1.1 with its PATENTS file) and is reached only across the call-out boundary, never vendored, so inclusion cannot relicense it; tiers are the free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that, with no Federated tier and no separate Personal trial; federation is planned, not available. Depends on contracts: none. Signed vault contract WO-05-E (cited by id only): SR-3.05 states the licences once; the signed text guard of the two licence pages stays as it is. ",
   "tasks": [
     {
       "id": "T1",
       "title": "SR-3.01 and SR-3.03 are superseded, and their specs state the call-out approach",
-      "phase": "implement",
+      "phase": "design",
       "depends_on": [],
       "requirements": [
         "SR-3.01 and SR-3.03 are marked superseded with a reason, and are not built or re-signed in their earlier form (source: owner decision 31 Oct 2026)",
@@ -68,7 +68,7 @@
     {
       "id": "T2",
       "title": "SR-3.05 states the licences once",
-      "phase": "implement",
+      "phase": "design",
       "depends_on": [
         "T1"
       ],

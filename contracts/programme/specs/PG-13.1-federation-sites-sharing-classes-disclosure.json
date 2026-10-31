@@ -2,7 +2,7 @@
   "title": "PG-13.1 Federation sites, sharing classes, disclosure (memev)",
   "project": "memev",
   "workdir": null,
-  "request": "Programme contract for work package WP13 in memev: Federation sites, sharing classes, disclosure. Proposed and unsigned; the signer (ASTL workstream) signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP13.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP04-02, WP06-03, WP09-01, WP09-02, WP10-01, WP12-02. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "request": "Programme contract for work package WP13 in memev: Federation sites, sharing classes, disclosure. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP13.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP04-02, WP06-03, WP09-01, WP09-02, WP10-01, WP12-02. Depends on contracts: SO-2.02, PG-09.1. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.02: WP13-01 enforces sharing classes at the publish boundary of a site; SO-2.02 governs retrieval and action time and takes none of it. Boundary with SO-2.12: WP13-03 (sites) is a prerequisite of federated computation. Boundary with SO-2.11 and SO-2.14: WP13 concerns sites of Memev; enterprise systems and multi-person project permissions stay with those contracts. Signed vault contract SO-09-A (cited by id only): the authorisation matrix at every entry point; WP13 enforces the publish boundary of a site and does not restate it. Pending owner decision (which layer to build against): the unsigned Scope One fold SO-F-01 to SO-F-13 (cited by id only) overlaps this spec at SO-F-04, SO-F-05, SO-F-07, SO-F-12, SO-F-13. Which layer is built against is open and is the owner's call. This spec is not signed until it is decided, and nothing is dropped on the strength of the unsigned fold. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
   "tasks": [
     {
       "id": "WP13-01",
@@ -13,7 +13,7 @@
         "MV-FED-02: Sharing classes are enforced: approved project state, decisions, task handoffs, signed contributions with receipts and authorised knowledge are shared; raw data, private memory, credentials and restricted documents stay local. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:61; evidence docs/scope-one/programme/DECOMPOSITION.md:101; baseline 8.5)",
         "MV-FED-01: Independent site nodes: each runs its own Memev server, keeps local authoritative records, controls local identity, keeps working during partitions, publishes only authorised state and reconciles on reconnect. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:60; evidence docs/scope-one/programme/DECOMPOSITION.md:100; baseline 8.5)"
       ],
-      "description": "Repo: memev. Prior art: the sibling programme docs/federation.md export-deny filter.",
+      "description": "Repo: memev. Enforces sharing classes at the publish boundary of a site only. Access control at retrieval and action time, and its default-deny rule, are SO-2.02 requirements 2 and 3; this task does not restate or implement them.",
       "scope": [
         "src/engine/publish-policy.mjs",
         "test/publish-policy.test.mjs"
@@ -105,14 +105,14 @@
     },
     {
       "id": "WP13-03",
-      "title": "Site node identity, organisation membership and sovereignty policy per site",
+      "title": "Organisation membership, permission boundaries and sovereignty policy per site (node identity is WP09-01)",
       "phase": "implement",
       "depends_on": [],
       "requirements": [
-        "MV-FED-05: Node identity, organisation membership, permission boundaries and sovereignty policies exist per site. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:64; evidence docs/scope-one/programme/DECOMPOSITION.md:104; baseline 8.5)",
+        "MV-FED-05: Node identity, organisation membership, permission boundaries and sovereignty policies exist per site. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:64; evidence docs/scope-one/programme/DECOMPOSITION.md:104; baseline 8.5) Scope here: membership, permission boundaries and sovereignty policy. Node identity is WP09-01 (PG-09.1), reused and not rebuilt.",
         "MV-FED-01: Independent site nodes: each runs its own Memev server, keeps local authoritative records, controls local identity, keeps working during partitions, publishes only authorised state and reconciles on reconnect. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:60; evidence docs/scope-one/programme/DECOMPOSITION.md:100; baseline 8.5)"
       ],
-      "description": "Repo: memev.",
+      "description": "Repo: memev. Reuses the node identity of WP09-01 (PG-09.1) and builds none of its own; owns membership, permission boundaries and sovereignty policy per site.",
       "scope": [
         "src/engine/site.mjs",
         "test/site.test.mjs"
@@ -124,6 +124,14 @@
             "type": "test_red_green",
             "test_file": "test/site.test.mjs",
             "cmd": "node --test test/site.test.mjs"
+          }
+        },
+        {
+          "statement": "The site module imports the identity modules of WP09-01 rather than defining its own",
+          "verifier": {
+            "type": "grep",
+            "file": "src/engine/site.mjs",
+            "pattern": "from '[^']*(agentid-bind|admission|devices)\\.mjs'"
           }
         },
         {
@@ -156,7 +164,8 @@
       ],
       "description": "Repo: memev.",
       "scope": [
-        "test/partition-reconcile.test.mjs"
+        "test/partition-reconcile.test.mjs",
+        "src/engine/site.mjs"
       ],
       "criteria": [
         {

@@ -2,7 +2,7 @@
 
 Part of the [Scope One records](../../README.md) (see also [DECISIONS.md](../DECISIONS.md)). This folder holds the programme decomposition of 31 October 2026: the programme requirements (`MV-*`), how they were derived, the work packages (WP01 to WP18) as proposed contracts, and the checks run over them.
 
-Status: **proposed and unsigned.** Every contract here is a planning draft in the `proofline/1` format. None is signed, none has a red-team record, none is accepted. Signing, re-signing and red-team records belong to the ASTL workstream; nothing here replaces the Scope One `WBS.md` or the `SO-1.x` contracts (ASTL's work, PR #324). The reconciliation of these files against that work breakdown is in [../RECONCILIATION.md](../RECONCILIATION.md).
+Status: **proposed and unsigned.** Every contract here is a planning draft in the `proofline/1` format. None is signed, none has a red-team record, none is accepted. Signing, re-signing and red-team records belong to the lead workstream; nothing here replaces the Scope One `WBS.md` or the `SO-1.x` contracts (the lead workstream's work, PR #324). The reconciliation of these files against that work breakdown is in [../RECONCILIATION.md](../RECONCILIATION.md).
 
 | File | What it holds |
 | --- | --- |

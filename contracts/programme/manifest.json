@@ -36,10 +36,123 @@
       "reason": "tier decision 31 Oct 2026: there is no Federated tier"
     }
   ],
+  "vault_contracts": [
+    {
+      "ids": "SO-05-A",
+      "covers": "typed project and task tools on the existing MCP handler, identical over stdio and HTTP, scoped by token and seat",
+      "used_by": "PGP-1.02 (WP07-01 to WP07-04) and SO-1.01"
+    },
+    {
+      "ids": "SO-06-A",
+      "covers": "architecture guards: project modules persist only through the store, nothing else constructs the store or coordinator, no project module imports the merge engine",
+      "used_by": "PGP-1.02 T1 and T3"
+    },
+    {
+      "ids": "WO-05-A",
+      "covers": "the external-engine call boundary",
+      "used_by": "foundation of PG-05.1 and of every spec that names the call-out boundary"
+    },
+    {
+      "ids": "WO-05-B",
+      "covers": "the paid-engine client behind a flag, off by default (build in draft PR #201, still open)",
+      "used_by": "WP05-05, dropped from PG-05.1; PG-05.1 and WP05-06 cite it"
+    },
+    {
+      "ids": "WO-05-C",
+      "covers": "the external convergence service specification",
+      "used_by": "foundation of PG-05.1"
+    },
+    {
+      "ids": "WO-05-D",
+      "covers": "the external trust service specification",
+      "used_by": "PG-09.1 and PG-09.2 place their adapters on its boundary"
+    },
+    {
+      "ids": "WO-05-E",
+      "covers": "the licence boundary text guard: the two licence pages agree and name the engine licence",
+      "used_by": "PG-15.1, PGP-1.03 and PGP-1.06 (SR-3.05 states the licences once)"
+    },
+    {
+      "ids": "MEM-145, MEM-146, MEM-147",
+      "covers": "human binding of agent roles (bind, verify, setup, roles listing)",
+      "used_by": "foundation of WP09-01 (PG-09.1)"
+    },
+    {
+      "ids": "SO-05-B",
+      "covers": "per-client capability records and an honest connection state",
+      "used_by": "WP18-02 (PG-18.1) and SO-1.04"
+    },
+    {
+      "ids": "SO-09-A",
+      "covers": "authorisation matrix at every entry point",
+      "used_by": "boundary of PG-13.1 with SO-2.02"
+    },
+    {
+      "ids": "SO-11-A",
+      "covers": "end-to-end acceptance of the delivery loop",
+      "used_by": "WP08-03, with SO-1.10 and SO-1.11"
+    },
+    {
+      "ids": "SO-R-C",
+      "covers": "upgrade, rollback, backup and restore, and uninstall paths, tested and documented",
+      "used_by": "owner of WBS 5.1.3 and requirements 70 and 96 (SO-REQ-070, SO-REQ-096), which the work breakdown marks as having no owner; no programme task covers it"
+    },
+    {
+      "ids": "WO-02-A, MEM-015",
+      "covers": "the published one-line install and the public release",
+      "used_by": "SR-6.03; no programme task touches it, and any spec that does cites these"
+    },
+    {
+      "ids": "SO-14-A",
+      "covers": "evidence class and checked date on public claims pages",
+      "used_by": "PG-16.1"
+    },
+    {
+      "ids": "MEM-064, MEM-065, MEM-066, MEM-137, REV-032",
+      "covers": "price, tier-name and plan wording; the price and tier values they carry are superseded by the owner decision of 31 Oct 2026",
+      "used_by": "PGP-1.03, PGP-1.05 and PG-16.1"
+    }
+  ],
+  "vault_contracts_note": "Signed contracts of the owner vault are cited by id only. No vault contract file or text is copied into this repository.",
+  "pending_owner_decisions": [
+    {
+      "id": "LAYER",
+      "question": "Which layer is built against: the unsigned Scope One fold SO-F-01 to SO-F-13, or the programme specs PG-04, PG-05, PG-09, PG-13 and PG-14, which overlap it",
+      "overlaps": {
+        "PG-04.1": [
+          "SO-F-03"
+        ],
+        "PG-05.1": [
+          "SO-F-02",
+          "SO-F-06"
+        ],
+        "PG-09.1": [
+          "SO-F-01",
+          "SO-F-08"
+        ],
+        "PG-09.2": [
+          "SO-F-01",
+          "SO-F-08"
+        ],
+        "PG-13.1": [
+          "SO-F-04",
+          "SO-F-05",
+          "SO-F-07",
+          "SO-F-12",
+          "SO-F-13"
+        ],
+        "PG-14.1": [
+          "SO-F-13"
+        ]
+      },
+      "status": "pending owner decision; no spec is dropped and none is signed on the strength of either layer until it is decided"
+    }
+  ],
   "contracts": [
     {
       "id": "PGP-1.01",
-      "kind": "work pull request",
+      "kind": "evidence",
+      "type": "work pull request",
       "area": "PGP",
       "title": "crdt-merge: four correctness bugs fixed (ORSet resurrection, LWWMap get/value, TrustAgentState delete, tag collisions)",
       "repo": "crdt-merge",
@@ -47,14 +160,15 @@
       "pull_request": "crdt-merge #180",
       "programme_tasks": "WP01-01, WP01-02, WP01-04, WP01-05",
       "depends_on": [],
+      "vault_contracts": [],
       "tasks": 4,
-      "criteria": 20,
+      "criteria": 21,
       "spec": "specs/PGP-1.01-crdt-merge-four-correctness-bugs.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
     {
       "id": "PGP-1.02",
-      "kind": "work pull request",
+      "type": "work pull request",
       "area": "PGP",
       "title": "memev: the project store, state machine and coordinator wired into the daemon, with a licence-boundary guard",
       "repo": "memev",
@@ -62,7 +176,13 @@
       "pull_request": "memev #326",
       "programme_tasks": "WP07-01, WP07-02, WP07-03, WP15-01",
       "depends_on": [
-        "SO-1.01"
+        "SO-1.01",
+        "SO-05",
+        "SO-06"
+      ],
+      "vault_contracts": [
+        "SO-05-A",
+        "SO-06-A"
       ],
       "tasks": 4,
       "criteria": 16,
@@ -71,7 +191,8 @@
     },
     {
       "id": "PGP-1.03",
-      "kind": "work pull request",
+      "kind": "docs",
+      "type": "work pull request",
       "area": "PGP",
       "title": "memev: engine decision recorded, tier docs aligned, README rewritten, reconciliation against the work breakdown",
       "repo": "memev",
@@ -81,6 +202,10 @@
       "depends_on": [
         "SO-1.02"
       ],
+      "vault_contracts": [
+        "WO-05-E",
+        "MEM-064, MEM-065, MEM-066, MEM-137 and REV-032"
+      ],
       "tasks": 4,
       "criteria": 21,
       "spec": "specs/PGP-1.03-memev-docs-tiers-reconciliation.json",
@@ -88,7 +213,8 @@
     },
     {
       "id": "PGP-1.04",
-      "kind": "work pull request",
+      "kind": "docs",
+      "type": "work pull request",
       "area": "PGP",
       "title": "converge: the Mem0 comparison states Mem0's published design and what converge does differently",
       "repo": "converge",
@@ -96,6 +222,7 @@
       "pull_request": "converge #1",
       "programme_tasks": "WP16-02",
       "depends_on": [],
+      "vault_contracts": [],
       "tasks": 1,
       "criteria": 6,
       "spec": "specs/PGP-1.04-converge-fair-mem0-comparison.json",
@@ -103,7 +230,8 @@
     },
     {
       "id": "PGP-1.05",
-      "kind": "work pull request",
+      "kind": "evidence",
+      "type": "work pull request",
       "area": "PGP",
       "title": "memev-site: plans, home and trial copy follow the tier decision, and federation is stated as planned",
       "repo": "memev-site",
@@ -111,6 +239,9 @@
       "pull_request": "memev-site #1",
       "programme_tasks": "WP16-03 (site side)",
       "depends_on": [],
+      "vault_contracts": [
+        "MEM-064, MEM-065 and MEM-066"
+      ],
       "tasks": 1,
       "criteria": 6,
       "spec": "specs/PGP-1.05-memev-site-plans-match-tier-decision.json",
@@ -118,7 +249,8 @@
     },
     {
       "id": "PGP-1.06",
-      "kind": "work pull request",
+      "kind": "docs",
+      "type": "work pull request",
       "area": "PGP",
       "title": "memev-ops: SR-3.01 and SR-3.03 superseded by the call-out engine decision, SR-3.05 states the licences once",
       "repo": "memev-ops",
@@ -126,6 +258,9 @@
       "pull_request": "memev-ops #13",
       "programme_tasks": "WP05-02, WP15-02 (ops side)",
       "depends_on": [],
+      "vault_contracts": [
+        "WO-05-E"
+      ],
       "tasks": 2,
       "criteria": 9,
       "spec": "specs/PGP-1.06-memev-ops-sr3-engine-decision.json",
@@ -133,7 +268,8 @@
     },
     {
       "id": "PG-01.1",
-      "kind": "programme work package",
+      "kind": "evidence",
+      "type": "programme work package",
       "area": "PG-01",
       "title": "crdt-merge correctness fixes for the agent/memory subsystems (crdt-merge)",
       "repo": "crdt-merge",
@@ -143,17 +279,20 @@
         "MV-CRDT-05",
         "MV-CRDT-07"
       ],
+      "cross_references": [],
+      "vault_contracts": [],
       "depends_on": [
         "PGP-1.01"
       ],
       "tasks": 3,
-      "criteria": 11,
+      "criteria": 10,
       "spec": "specs/PG-01.1-crdt-merge-correctness-fixes-for-the-agent-memor.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
     {
       "id": "PG-02.1",
-      "kind": "programme work package",
+      "kind": "evidence",
+      "type": "programme work package",
       "area": "PG-02",
       "title": "CRDT conformance gate (history-based, CI) (crdt-merge)",
       "repo": "crdt-merge",
@@ -163,17 +302,20 @@
         "MV-CONF-02",
         "MV-CONF-03"
       ],
+      "cross_references": [],
+      "vault_contracts": [],
       "depends_on": [
         "PGP-1.01"
       ],
       "tasks": 4,
-      "criteria": 14,
+      "criteria": 15,
       "spec": "specs/PG-02.1-crdt-conformance-gate-history-based-ci.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
     {
       "id": "PG-03.1",
-      "kind": "programme work package",
+      "kind": "evidence",
+      "type": "programme work package",
       "area": "PG-03",
       "title": "Cross-language protocol vectors (crdt-merge)",
       "repo": "crdt-merge",
@@ -181,17 +323,20 @@
       "requirements": [
         "MV-DEM-06"
       ],
+      "cross_references": [],
+      "vault_contracts": [],
       "depends_on": [
         "PG-02.1"
       ],
       "tasks": 1,
-      "criteria": 4,
+      "criteria": 7,
       "spec": "specs/PG-03.1-cross-language-protocol-vectors.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
     {
       "id": "PG-03.2",
-      "kind": "programme work package",
+      "kind": "evidence",
+      "type": "programme work package",
       "area": "PG-03",
       "title": "Cross-language protocol vectors (crdt-merge-ts)",
       "repo": "crdt-merge-ts",
@@ -199,6 +344,8 @@
       "requirements": [
         "MV-DEM-06"
       ],
+      "cross_references": [],
+      "vault_contracts": [],
       "depends_on": [
         "PG-03.1"
       ],
@@ -209,7 +356,8 @@
     },
     {
       "id": "PG-03.3",
-      "kind": "programme work package",
+      "kind": "evidence",
+      "type": "programme work package",
       "area": "PG-03",
       "title": "Cross-language protocol vectors (crdt-merge-rs)",
       "repo": "crdt-merge-rs",
@@ -217,6 +365,8 @@
       "requirements": [
         "MV-DEM-06"
       ],
+      "cross_references": [],
+      "vault_contracts": [],
       "depends_on": [
         "PG-03.1"
       ],
@@ -227,7 +377,7 @@
     },
     {
       "id": "PG-04.1",
-      "kind": "programme work package",
+      "type": "programme work package",
       "area": "PG-04",
       "title": "Canonical operation envelope (memev)",
       "repo": "memev",
@@ -236,8 +386,21 @@
         "MV-INT-02",
         "MV-INT-03"
       ],
+      "cross_references": [
+        {
+          "contract": "SO-1.04 and SO-1.01",
+          "boundary": "WP04 depends on both: the envelope carries the four-way event distinction of SO-1.04 requirement 3 and does not define the adapter contract (SO-1.04 requirement 1) or own the store or coordinator (SO-1.01)"
+        },
+        {
+          "contract": "SO-2.07 to SO-2.11",
+          "boundary": "their adapter layers must use canonical operation contracts: the WP04 envelope is that contract, and these specs do not define any adapter for those systems"
+        }
+      ],
+      "vault_contracts": [],
+      "pending_owner_decision": "which layer to build against: the unsigned fold SO-F-03 or this spec",
       "depends_on": [
-        "SO-1.02"
+        "SO-1.01",
+        "SO-1.04"
       ],
       "tasks": 4,
       "criteria": 16,
@@ -246,11 +409,11 @@
     },
     {
       "id": "PG-05.1",
-      "kind": "programme work package",
+      "type": "programme work package",
       "area": "PG-05",
       "title": "Engine integration: merge semantics, mapping, boundary (memev)",
       "repo": "memev",
-      "programme_tasks": "WP05-01, WP05-03, WP05-04, WP05-05, WP05-06",
+      "programme_tasks": "WP05-01, WP05-03, WP05-04, WP05-06",
       "requirements": [
         "MV-ARCH-04",
         "MV-ARCH-05",
@@ -258,19 +421,33 @@
         "MV-INT-04",
         "MV-INT-05"
       ],
+      "cross_references": [
+        {
+          "contract": "SO-2.12 and SO-2.13",
+          "boundary": "WP05-06 degrades as SO-2.12 requirement 8 says when the paid engine is absent and keeps the paid interface behind SO-2.13 requirements 3 and 4; neither is restated here"
+        }
+      ],
+      "vault_contracts": [
+        "WO-05-A and WO-05-C",
+        "WO-05-B"
+      ],
+      "pending_owner_decision": "which layer to build against: the unsigned fold SO-F-02, SO-F-06 or this spec",
       "depends_on": [
         "PG-01.1",
         "PG-04.1",
-        "PGP-1.06"
+        "PGP-1.06",
+        "SO-2.12",
+        "SO-2.13",
+        "WO-05-B"
       ],
-      "tasks": 5,
-      "criteria": 20,
+      "tasks": 4,
+      "criteria": 16,
       "spec": "specs/PG-05.1-engine-integration-merge-semantics-mapping-bound.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
     {
       "id": "PG-06.1",
-      "kind": "programme work package",
+      "type": "programme work package",
       "area": "PG-06",
       "title": "Replication separate from acceptance (memev)",
       "repo": "memev",
@@ -279,6 +456,8 @@
         "MV-ARCH-06",
         "MV-ARCH-07"
       ],
+      "cross_references": [],
+      "vault_contracts": [],
       "depends_on": [
         "PG-04.1",
         "PGP-1.02"
@@ -290,7 +469,7 @@
     },
     {
       "id": "PG-09.1",
-      "kind": "programme work package",
+      "type": "programme work package",
       "area": "PG-09",
       "title": "Identity, admission and ACFA boundary (memev)",
       "repo": "memev",
@@ -302,6 +481,17 @@
         "MV-TRU-05",
         "MV-TRU-07"
       ],
+      "cross_references": [
+        {
+          "contract": "SO-2.12",
+          "boundary": "WP09-02 (the contribution-admission boundary) is a prerequisite of federated computation and is not repeated there"
+        }
+      ],
+      "vault_contracts": [
+        "MEM-145, MEM-146 and MEM-147",
+        "WO-05-D"
+      ],
+      "pending_owner_decision": "which layer to build against: the unsigned fold SO-F-01, SO-F-08 or this spec",
       "depends_on": [
         "PG-04.1",
         "PG-06.1"
@@ -313,7 +503,7 @@
     },
     {
       "id": "PG-09.2",
-      "kind": "programme work package",
+      "type": "programme work package",
       "area": "PG-09",
       "title": "Identity, admission and ACFA boundary (memev-ops)",
       "repo": "memev-ops",
@@ -321,6 +511,11 @@
       "requirements": [
         "MV-LIC-02"
       ],
+      "cross_references": [],
+      "vault_contracts": [
+        "WO-05-D"
+      ],
+      "pending_owner_decision": "which layer to build against: the unsigned fold SO-F-01, SO-F-08 or this spec",
       "depends_on": [],
       "tasks": 1,
       "criteria": 3,
@@ -329,7 +524,7 @@
     },
     {
       "id": "PG-10.1",
-      "kind": "programme work package",
+      "type": "programme work package",
       "area": "PG-10",
       "title": "Evidence, knowledge status and receipts (memev)",
       "repo": "memev",
@@ -340,9 +535,22 @@
         "MV-TRU-03",
         "MV-TRU-06"
       ],
+      "cross_references": [
+        {
+          "contract": "SO-2.03",
+          "boundary": "WP10-01 and WP10-02 hold the knowledge status lattice and the origin fields; SO-2.03 holds retention, deletion, invalidation and derived-record provenance, and this spec takes none of them"
+        },
+        {
+          "contract": "SO-2.01",
+          "boundary": "WP10 defines the status of a fact, not the organisational model"
+        }
+      ],
+      "vault_contracts": [],
       "depends_on": [
         "PG-04.1",
-        "PGP-1.02"
+        "PG-06.1",
+        "PGP-1.02",
+        "SO-2.03"
       ],
       "tasks": 4,
       "criteria": 15,
@@ -351,15 +559,21 @@
     },
     {
       "id": "PG-12.1",
-      "kind": "programme work package",
+      "type": "programme work package",
       "area": "PG-12",
       "title": "Multi-node gossip transport (memev)",
       "repo": "memev",
       "programme_tasks": "WP12-01, WP12-02, WP12-03",
       "requirements": [
-        "MV-DEM-01",
         "MV-INT-06"
       ],
+      "cross_references": [
+        {
+          "contract": "SO-2.12",
+          "boundary": "WP12-01 to WP12-03 (transport) are prerequisites of federated computation and are not repeated there"
+        }
+      ],
+      "vault_contracts": [],
       "depends_on": [
         "PG-04.1",
         "PG-05.1",
@@ -372,7 +586,7 @@
     },
     {
       "id": "PG-13.1",
-      "kind": "programme work package",
+      "type": "programme work package",
       "area": "PG-13",
       "title": "Federation sites, sharing classes, disclosure (memev)",
       "repo": "memev",
@@ -384,21 +598,40 @@
         "MV-FED-04",
         "MV-FED-05"
       ],
+      "cross_references": [
+        {
+          "contract": "SO-2.02",
+          "boundary": "WP13-01 enforces sharing classes at the publish boundary of a site; SO-2.02 governs retrieval and action time and takes none of it"
+        },
+        {
+          "contract": "SO-2.12",
+          "boundary": "WP13-03 (sites) is a prerequisite of federated computation"
+        },
+        {
+          "contract": "SO-2.11 and SO-2.14",
+          "boundary": "WP13 concerns sites of Memev; enterprise systems and multi-person project permissions stay with those contracts"
+        }
+      ],
+      "vault_contracts": [
+        "SO-09-A"
+      ],
+      "pending_owner_decision": "which layer to build against: the unsigned fold SO-F-04, SO-F-05, SO-F-07, SO-F-12, SO-F-13 or this spec",
       "depends_on": [
         "PG-04.1",
         "PG-06.1",
         "PG-09.1",
         "PG-10.1",
-        "PG-12.1"
+        "PG-12.1",
+        "SO-2.02"
       ],
       "tasks": 5,
-      "criteria": 17,
+      "criteria": 18,
       "spec": "specs/PG-13.1-federation-sites-sharing-classes-disclosure.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
     {
       "id": "PG-14.1",
-      "kind": "programme work package",
+      "type": "programme work package",
       "area": "PG-14",
       "title": "Federation demonstrators and benchmark (memev)",
       "repo": "memev",
@@ -410,27 +643,51 @@
         "MV-DEM-04",
         "MV-DEM-05"
       ],
+      "cross_references": [
+        {
+          "contract": "SO-2.04 and SO-2.05",
+          "boundary": "WP14-04 names the demonstrators and depends on these design records for the organisational-intelligence demonstrator; it defines no organisational-knowledge model and builds no discovery logic"
+        },
+        {
+          "contract": "SO-2.06",
+          "boundary": "the acceptance tests of the organisational-intelligence demonstrator are defined there, not in WP14-04"
+        }
+      ],
+      "vault_contracts": [],
+      "pending_owner_decision": "which layer to build against: the unsigned fold SO-F-13 or this spec",
       "depends_on": [
         "PG-03.2",
         "PG-09.1",
         "PG-10.1",
         "PG-12.1",
-        "PG-13.1"
+        "PG-13.1",
+        "SO-2.04",
+        "SO-2.05",
+        "SO-2.06"
       ],
       "tasks": 5,
-      "criteria": 16,
+      "criteria": 19,
       "spec": "specs/PG-14.1-federation-demonstrators-and-benchmark.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
     {
       "id": "PG-15.1",
-      "kind": "programme work package",
+      "type": "programme work package",
       "area": "PG-15",
       "title": "Licensing boundary (memev-ops)",
       "repo": "memev-ops",
       "programme_tasks": "WP15-03",
       "requirements": [
         "MV-LIC-03"
+      ],
+      "cross_references": [
+        {
+          "contract": "SO-2.13",
+          "boundary": "WP15 holds the licence boundary; SO-2.13 is the service boundary only and takes no licence term"
+        }
+      ],
+      "vault_contracts": [
+        "WO-05-E"
       ],
       "depends_on": [
         "PGP-1.06"
@@ -442,31 +699,43 @@
     },
     {
       "id": "PG-16.1",
-      "kind": "programme work package",
+      "type": "programme work package",
       "area": "PG-16",
       "title": "Positioning, tiers, public claims, blueprint (memev)",
       "repo": "memev",
-      "programme_tasks": "WP16-04, WP16-05, WP16-06",
+      "programme_tasks": "WP16-05, WP16-06",
       "requirements": [
-        "MV-ARCH-10",
-        "MV-FED-06",
         "MV-PRD-03",
         "MV-PRD-06",
         "MV-PRD-07",
         "MV-PRD-08"
       ],
+      "cross_references": [
+        {
+          "contract": "SO-2.13",
+          "boundary": "WP16 holds the claims and the blueprint; pricing dimensions (WP16-07) were resolved by the tier decision; SO-2.13 takes the service boundary only"
+        },
+        {
+          "contract": "SO-2.14",
+          "boundary": "WP16 takes no multi-person permissions or team administration"
+        }
+      ],
+      "vault_contracts": [
+        "SO-14-A",
+        "MEM-064, MEM-065, MEM-066, MEM-137 and REV-032"
+      ],
       "depends_on": [
         "PG-05.1",
         "SO-1.02"
       ],
-      "tasks": 3,
-      "criteria": 10,
+      "tasks": 2,
+      "criteria": 7,
       "spec": "specs/PG-16.1-positioning-tiers-public-claims-blueprint.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
     {
       "id": "PG-18.1",
-      "kind": "programme work package",
+      "type": "programme work package",
       "area": "PG-18",
       "title": "Interop SDKs, A2A and payments (memev)",
       "repo": "memev",
@@ -476,13 +745,28 @@
         "MV-PRD-10",
         "MV-PRD-11"
       ],
+      "cross_references": [
+        {
+          "contract": "SO-2.08 and SO-1.04",
+          "boundary": "WP18-02 is the first framework adapter (LangGraph first); SO-2.08 covers every other framework and runtime"
+        },
+        {
+          "contract": "SO-2.07 and SO-2.09 to SO-2.11",
+          "boundary": "specialist, delivery, communication and enterprise systems are not taken here; WP18 covers the agent protocol, the SDK, conformance and payments"
+        }
+      ],
+      "vault_contracts": [
+        "SO-05-B"
+      ],
       "depends_on": [
         "PG-02.1",
         "PG-04.1",
-        "PG-10.1"
+        "PG-10.1",
+        "SO-1.04",
+        "SO-2.08"
       ],
       "tasks": 4,
-      "criteria": 13,
+      "criteria": 14,
       "spec": "specs/PG-18.1-interop-sdks-a2a-and-payments.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     }
@@ -604,7 +888,7 @@
     },
     {
       "task": "WP05-02",
-      "title": "Resolve the engine question: structured replicated state on crdt-merge, Markdown text merge on its own layer; reconcile SR-3.01 and SR-3.03 accordingly",
+      "title": "Engine decision: structured replicated state stays in crdt-merge across the call-out boundary; no memev-merge text engine; SR-3.01 and SR-3.03 superseded",
       "contract": "PGP-1.06",
       "note": "per-PR contract for memev-ops branch docs/engine-decision-sr3 (memev side in PGP-1.03)"
     },
@@ -623,8 +907,8 @@
     {
       "task": "WP05-05",
       "title": "Paid-engine client behind a flag, off by default (finish and land PR #201 WO-05-B)",
-      "contract": "PG-05.1",
-      "note": "specified in this set"
+      "contract": "WO-05-B",
+      "note": "signed vault contract WO-05-B (the paid-engine client behind a flag, off by default; build in draft PR #201, still open) owns this task; PG-05.1 cites it and WP05-06 depends on it"
     },
     {
       "task": "WP05-06",
@@ -671,32 +955,40 @@
     {
       "task": "WP07-04",
       "title": "Single-authority guard: a test fails if a second state store or coordinator is introduced",
-      "contract": "SO-1.01",
-      "note": "single authority for store, state machine and coordinator: SO-1.01 and the wiring pull request (PGP-1.02); ASTL workstream, baseline 8.2"
+      "contract": "PGP-1.02",
+      "note": "single-authority guard (SO-1.01 requirement 3): test/project-wiring.test.mjs in the wiring pull request, which cites SO-1.01; SO-1.01 is the design record and holds none of the build criteria"
     },
     {
       "task": "WP08-01",
       "title": "Refresh the Scope One requirement register (98 SO-REQ) against current main and publish the fresh counts",
       "contract": "SO-1.02",
-      "note": "reconciliation and the work breakdown are owned by SO-1.02 and docs/scope-one/WBS.md; the interim register is docs/scope-one/RECONCILIATION.md"
+      "note": "SO-1.02 and docs/scope-one/WBS.md (sections 6 and 7) are the register refresh and the disposition ledger; nothing is left to specify here (WBS 9.1: the tasks consume them, not repeat them)"
     },
     {
       "task": "WP08-02",
       "title": "Provider-neutral execution adapter contract: discovery, session lifecycle, dispatch, checkpoint, progress, cancellation, recovery",
       "contract": "SO-1.04",
-      "note": "dispatch and event distinction (adapter contract)"
+      "note": "SO-1.04 holds the four-way event distinction and the adapter contract decision; the adapter build (docs/ADAPTERS.md, src/engine/adapter-contract.mjs, test/adapter-contract.test.mjs) is not specified in this set: it extends SO-1.x and is carried by the lead workstream under the agreed split, sequenced with SO-1.04 and not merged (WBS 9.1)"
     },
     {
       "task": "WP08-03",
       "title": "Lifecycle test: intake, spec with approvals, contract and work packages, execution, verification, delivery with evidence",
-      "contract": "SO-1.05",
-      "note": "workspace views and lifecycle"
+      "contract": "SO-1.11",
+      "also": [
+        "SO-1.10",
+        "SO-11-A (signed vault contract, by id)"
+      ],
+      "note": "SO-1.11 is the reference-project gate and SO-1.10 the fault classes; the end-to-end lifecycle test (test/lifecycle.test.mjs) is not specified in this set: it extends SO-1.x and is carried by the lead workstream, and SO-1.11 owns the gate (WBS 9.1)"
     },
     {
       "task": "WP08-04",
       "title": "Organisational intelligence prototype: evidence-linked cross-project dependency and conflict detection; both original plans preserved until an authorised change",
-      "contract": "ASTL workstream",
-      "note": "organisational intelligence, baseline 8.3 (WBS 5.3.x, 4.3.2); SO-1.07 covers the relationship model; not specified here"
+      "contract": "SO-2.04",
+      "also": [
+        "SO-2.05",
+        "SO-2.06"
+      ],
+      "note": "organisational intelligence, baseline 8.3 (WBS 5.3.x, 4.3.2); the prototype consumes SO-2.01 (model), SO-2.04 and SO-2.05 (design records); not specified here"
     },
     {
       "task": "WP09-01",
@@ -749,38 +1041,38 @@
     {
       "task": "WP11-01",
       "title": "Stage 1 recall: phrase matching, alias expansion, exact id lookup, temporal filters",
-      "contract": "ASTL workstream",
-      "note": "recall stages are not in the programme share of the agreed split; the ASTL workstream carries them through docs/scope-one/WBS.md; not specified here"
+      "contract": "Lead",
+      "note": "recall stages are not in the programme share of the agreed split; the lead workstream carries them through docs/scope-one/WBS.md; not specified here"
     },
     {
       "task": "WP11-02",
       "title": "Stage 1 recall: reciprocal rank fusion, decision and accepted-fact boost, superseded and contested handling",
-      "contract": "ASTL workstream",
-      "note": "recall stages are not in the programme share of the agreed split; the ASTL workstream carries them through docs/scope-one/WBS.md; not specified here"
+      "contract": "Lead",
+      "note": "recall stages are not in the programme share of the agreed split; the lead workstream carries them through docs/scope-one/WBS.md; not specified here"
     },
     {
       "task": "WP11-03",
       "title": "Stage 2 recall: graph-aware retrieval (decisions, amendments, dependent tasks, evidence, contracts, supersessions)",
-      "contract": "ASTL workstream",
-      "note": "recall stages are not in the programme share of the agreed split; the ASTL workstream carries them through docs/scope-one/WBS.md; not specified here"
+      "contract": "Lead",
+      "note": "recall stages are not in the programme share of the agreed split; the lead workstream carries them through docs/scope-one/WBS.md; not specified here"
     },
     {
       "task": "WP11-04",
       "title": "Stage 4 recall: trust-aware ranking by knowledge status",
-      "contract": "ASTL workstream",
-      "note": "recall stages are not in the programme share of the agreed split; the ASTL workstream carries them through docs/scope-one/WBS.md; not specified here"
+      "contract": "Lead",
+      "note": "recall stages are not in the programme share of the agreed split; the lead workstream carries them through docs/scope-one/WBS.md; not specified here"
     },
     {
       "task": "WP11-05",
       "title": "Stage 3 (local semantic retrieval) is delivered by the existing contract SR-2.01; this task only checks the interface",
-      "contract": "ASTL workstream",
-      "note": "recall stages are not in the programme share of the agreed split; the ASTL workstream carries them through docs/scope-one/WBS.md; not specified here"
+      "contract": "Lead",
+      "note": "recall stages are not in the programme share of the agreed split; the lead workstream carries them through docs/scope-one/WBS.md; not specified here"
     },
     {
       "task": "WP11-06",
       "title": "get and recall stay separate operations (regression guard)",
-      "contract": "ASTL workstream",
-      "note": "recall stages are not in the programme share of the agreed split; the ASTL workstream carries them through docs/scope-one/WBS.md; not specified here"
+      "contract": "Lead",
+      "note": "recall stages are not in the programme share of the agreed split; the lead workstream carries them through docs/scope-one/WBS.md; not specified here"
     },
     {
       "task": "WP12-01",
@@ -899,8 +1191,8 @@
     {
       "task": "WP16-04",
       "title": "Deployment model scales by topology and trust boundary, not by computer count, documented",
-      "contract": "PG-16.1",
-      "note": "specified in this set"
+      "contract": "Lead",
+      "note": "deployment model: the business and enterprise deployment rows of baseline 8.6 belong to the lead workstream (SO-2.14 is the business deployment design record); not specified here"
     },
     {
       "task": "WP16-05",
@@ -924,29 +1216,29 @@
       "task": "WP17-01",
       "title": "Reconcile register: replace the stale '27 open draft PRs' inventory with live PR, branch and contract state",
       "contract": "SO-1.02",
-      "note": "reconciliation and the work breakdown are owned by SO-1.02 and docs/scope-one/WBS.md; the interim register is docs/scope-one/RECONCILIATION.md"
+      "note": "SO-1.02 and WBS.md hold the refresh; the one remaining step, the live inventory in docs/scope-one/INVENTORY.md, is criterion T4 of PGP-1.03"
     },
     {
       "task": "WP17-02",
       "title": "Disposition for every open PR and every branch without a PR (merge, rework, close or supersede) recorded in one table",
       "contract": "SO-1.02",
-      "note": "reconciliation and the work breakdown are owned by SO-1.02 and docs/scope-one/WBS.md; the interim register is docs/scope-one/RECONCILIATION.md"
+      "note": "SO-1.02 and docs/scope-one/WBS.md (sections 6 and 7) are the register refresh and the disposition ledger; nothing is left to specify here (WBS 9.1: the tasks consume them, not repeat them)"
     },
     {
       "task": "WP17-03",
       "title": "One canonical contract format and id namespace: decide attest/1 specs versus proofline/1 and write the mapping",
       "contract": "SO-1.02",
-      "note": "reconciliation and the claim register: SO-1.02, docs/scope-one/WBS.md and docs/scope-one/RECONCILIATION.md; ASTL workstream"
+      "note": "reconciliation and the claim register: SO-1.02, docs/scope-one/WBS.md and docs/scope-one/RECONCILIATION.md; lead workstream"
     },
     {
       "task": "WP17-04",
       "title": "Requirement ownership map: each MV-* id is either covered by an existing SR/QL/SO/WO contract or by a new task here",
       "contract": "SO-1.02",
-      "note": "reconciliation and the claim register: SO-1.02, docs/scope-one/WBS.md and docs/scope-one/RECONCILIATION.md; ASTL workstream"
+      "note": "reconciliation and the claim register: SO-1.02, docs/scope-one/WBS.md and docs/scope-one/RECONCILIATION.md; lead workstream"
     },
     {
       "task": "WP17-05",
-      "title": "Claim register so that two bots do not write the same WBS or contract at once",
+      "title": "Claim register so that two workstreams do not write the same WBS or contract at once",
       "contract": "PGP-1.03",
       "note": "claim register is in docs/scope-one/RECONCILIATION.md (this docs pull request)"
     },
@@ -954,7 +1246,7 @@
       "task": "WP17-06",
       "title": "Judgement rule recorded: a feature is accepted only with an answer to 'does this make Memev more essential to a distributed agent ecosystem'",
       "contract": "SO-1.02",
-      "note": "reconciliation and the claim register: SO-1.02, docs/scope-one/WBS.md and docs/scope-one/RECONCILIATION.md; ASTL workstream"
+      "note": "reconciliation and the claim register: SO-1.02, docs/scope-one/WBS.md and docs/scope-one/RECONCILIATION.md; lead workstream"
     },
     {
       "task": "WP18-01",

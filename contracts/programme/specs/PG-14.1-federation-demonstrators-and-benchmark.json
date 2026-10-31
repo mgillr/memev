@@ -2,7 +2,7 @@
   "title": "PG-14.1 Federation demonstrators and benchmark (memev)",
   "project": "memev",
   "workdir": null,
-  "request": "Programme contract for work package WP14 in memev: Federation demonstrators and benchmark. Proposed and unsigned; the signer (ASTL workstream) signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP14.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP03-02, WP08-04, WP09-03, WP10-03, WP12-03, WP13-04. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "request": "Programme contract for work package WP14 in memev: Federation demonstrators and benchmark. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP14.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP03-02, WP08-04, WP09-03, WP10-03, WP12-03, WP13-04. Depends on contracts: SO-2.04, SO-2.05, SO-2.06, PG-12.1. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.04 and SO-2.05: WP14-04 names the demonstrators and depends on these design records for the organisational-intelligence demonstrator; it defines no organisational-knowledge model and builds no discovery logic. Boundary with SO-2.06: the acceptance tests of the organisational-intelligence demonstrator are defined there, not in WP14-04. Pending owner decision (which layer to build against): the unsigned Scope One fold SO-F-01 to SO-F-13 (cited by id only) overlaps this spec at SO-F-13. Which layer is built against is open and is the owner's call. This spec is not signed until it is decided, and nothing is dropped on the strength of the unsigned fold. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
   "tasks": [
     {
       "id": "WP14-01",
@@ -12,7 +12,7 @@
       "requirements": [
         "MV-DEM-01: Federated prototype: three independent nodes with separate identities, concurrent agents, a network partition, recovery and a verifiable shared project outcome (deliverable 3). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:69; evidence docs/scope-one/programme/DECOMPOSITION.md:106; baseline 8.5)"
       ],
-      "description": "Repo: memev. Deliverable 3 of the notes.",
+      "description": "Repo: memev. Deliverable 3 of the notes. Runs the three-node harness of WP12-03 (scripts/federation-harness.mjs, PG-12.1) and builds no second harness; owns the prototype scenario: concurrent agents, a partition, recovery and a verifiable outcome.",
       "scope": [
         "scripts/demo-federation.mjs",
         "test/demo-federation.test.mjs"
@@ -24,6 +24,14 @@
             "type": "test_red_green",
             "test_file": "test/demo-federation.test.mjs",
             "cmd": "node --test test/demo-federation.test.mjs"
+          }
+        },
+        {
+          "statement": "The demo runs the WP12-03 harness rather than building its own",
+          "verifier": {
+            "type": "grep",
+            "file": "scripts/demo-federation.mjs",
+            "pattern": "federation-harness"
           }
         },
         {
@@ -134,18 +142,40 @@
         "WP14-02"
       ],
       "requirements": [
-        "MV-DEM-03: Three architectural acceptance demonstrators: autonomous project delivery, organisational intelligence, independent-site federation. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:71; evidence docs/scope-one/programme/DECOMPOSITION.md:108; baseline 8.5)"
+        "MV-DEM-03: Three architectural acceptance demonstrators: autonomous project delivery, organisational intelligence, independent-site federation. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:71; evidence docs/scope-one/programme/DECOMPOSITION.md:108; baseline 8.5)",
+        "SO-2.04 requirement 1: \"Evidence-backed discovery of recurring risks, dependencies, conflicts, assumptions and reusable knowledge\" (source: contract SO-2.04 T1)",
+        "SO-2.05 requirement 1: \"Surface relevant information between departments without granting unrestricted access to their private records\" (source: contract SO-2.05 T1)"
       ],
-      "description": "Repo: memev.",
+      "description": "Repo: memev. Names the three demonstrators. The organisational-intelligence demonstrator is a scenario over the design records SO-2.04 (cross-project discovery) and SO-2.05 (cross-functional discovery) and is accepted by SO-2.06; this task defines no organisational-knowledge model, discovery logic or acceptance tests of its own.",
       "scope": [
         "docs/DEMONSTRATORS.md"
       ],
       "criteria": [
         {
-          "statement": "doc exists",
+          "statement": "The page names the autonomous project delivery demonstrator",
           "verifier": {
-            "type": "file_exists",
-            "path": "docs/DEMONSTRATORS.md"
+            "type": "grep",
+            "file": "docs/DEMONSTRATORS.md",
+            "pattern": "autonomous project delivery",
+            "flags": "i"
+          }
+        },
+        {
+          "statement": "The page names the organisational intelligence demonstrator and cites SO-2.04 and SO-2.05",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/DEMONSTRATORS.md",
+            "pattern": "organisational intelligence.{0,400}SO-2\\.04.{0,200}SO-2\\.05",
+            "flags": "is"
+          }
+        },
+        {
+          "statement": "The page names the independent-site federation demonstrator",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/DEMONSTRATORS.md",
+            "pattern": "independent-site federation",
+            "flags": "i"
           }
         },
         {
@@ -190,10 +220,12 @@
           }
         },
         {
-          "statement": "doc exists",
+          "statement": "The benchmark page states its method",
           "verifier": {
-            "type": "file_exists",
-            "path": "docs/BENCH-FEDERATION.md"
+            "type": "grep",
+            "file": "docs/BENCH-FEDERATION.md",
+            "pattern": "method",
+            "flags": "i"
           }
         },
         {

@@ -2,15 +2,15 @@
   "title": "PGP-1.04 converge: the Mem0 comparison states Mem0's published design and what converge does differently",
   "project": "memev",
   "workdir": null,
-  "request": "Per-pull-request contract for converge, branch docs/fair-mem0-comparison. Proposed and unsigned; the signer (ASTL workstream) signs after the red-team gate. Repository: converge (paths relative to that repository; the contract lives in the memev contracts tree). Programme task WP16-02. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository (BSL 1.1 with its PATENTS file) and is reached only across the call-out boundary, never vendored, so inclusion cannot relicense it; tiers are the free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that, with no Federated tier and no separate Personal trial; federation is planned, not available. Depends on contracts: none.",
+  "request": "Per-pull-request contract for converge, branch docs/fair-mem0-comparison. Proposed and unsigned; the signer signs after the red-team gate. Repository: converge (paths relative to that repository; the contract lives in the memev contracts tree). Programme task WP16-02. Owner decisions of 31 Oct 2026 apply (the engine decision confirmed by the owner, t542u): crdt-merge stays in its own repository (BSL 1.1 with its PATENTS file) and is reached only across the call-out boundary, never vendored, so inclusion cannot relicense it; tiers are the free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that, with no Federated tier and no separate Personal trial; federation is planned, not available. Depends on contracts: none. ",
   "tasks": [
     {
       "id": "T1",
       "title": "README comparison with Mem0 is factual and fair",
-      "phase": "implement",
+      "phase": "design",
       "depends_on": [],
       "requirements": [
-        "Mem0's April 2026 memory algorithm uses single-pass ADD-only extraction as a deliberate, published design choice; the README states it as that and does not say Mem0 gave up or abandoned anything (source: Mem0 blog post of 16 April 2026 and Mem0 documentation, read 31 Oct 2026)",
+        "Mem0's April 2026 memory algorithm uses single-pass ADD-only extraction as a deliberate, published design choice; the README states it as that and does not say Mem0 gave up or abandoned anything (source, external and not re-read in this repository, confirm before signing: Mem0 blog post of 16 April 2026 and Mem0 documentation, read 31 Oct 2026)",
         "The contrast stated is converge's own: deterministic CRDT merge of concurrent writers, offline merge without an LLM, explicit deletes, Strong Eventual Consistency under stated assumptions (source: converge README.md sections Foundation Layer and Architecture)",
         "The README states the in-progress stale-replica delete fix as in progress, not as released (source: contract PGP-1.01)",
         "No benchmark of another vendor is quoted as converge's own, and no disparagement (source: owner request of 31 Oct 2026)"

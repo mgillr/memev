@@ -2,7 +2,7 @@
   "title": "PG-03.1 Cross-language protocol vectors (crdt-merge)",
   "project": "memev",
   "workdir": null,
-  "request": "Programme contract for work package WP03 in crdt-merge: Cross-language protocol vectors. Proposed and unsigned; the signer (ASTL workstream) signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP03.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP02-02. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "request": "Programme contract for work package WP03 in crdt-merge: Cross-language protocol vectors. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP03.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP02-02. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json.  Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
   "tasks": [
     {
       "id": "WP03-01",
@@ -12,7 +12,7 @@
       "requirements": [
         "MV-DEM-06: Python, Rust and TypeScript nodes exchange identical protocol representations (P2). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:74; evidence docs/scope-one/programme/DECOMPOSITION.md:111; baseline 8.5)"
       ],
-      "description": "Repo: crdt-merge.",
+      "description": "Repo: crdt-merge. The generator writes one vector file per type: tests/vectors/orset.json, tests/vectors/lwwmap.json and tests/vectors/agentstate.json.",
       "scope": [
         "tests/vectors/**",
         "tests/test_vectors_generate.py"
@@ -27,10 +27,32 @@
           }
         },
         {
-          "statement": "vector file exists",
+          "statement": "The ORSet vector file exists",
           "verifier": {
             "type": "file_exists",
             "path": "tests/vectors/orset.json"
+          }
+        },
+        {
+          "statement": "The LWWMap vector file exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "tests/vectors/lwwmap.json"
+          }
+        },
+        {
+          "statement": "The AgentState vector file exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "tests/vectors/agentstate.json"
+          }
+        },
+        {
+          "statement": "Regenerating the vectors leaves the committed files byte-identical",
+          "verifier": {
+            "type": "command",
+            "cmd": "python -m pytest -q tests/test_vectors_generate.py && git diff --exit-code -- tests/vectors",
+            "expect_exit": 0
           }
         },
         {

@@ -248,7 +248,7 @@
         "MV-PGM-06",
         "MV-PGM-03"
       ],
-      "description": "Repo: memev-ops. A file listing, per work package, which workstream holds it. Starts with the known overlap: the ASTL workstream's WBS and SO-* contract work in the same repo on 31 Oct.",
+      "description": "Repo: memev-ops. A file listing, per work package, which workstream holds it. Starts with the known overlap: the lead workstream's WBS and SO-* contract work in the same repo on 31 Oct.",
       "scope": {
         "allow": [
           "contracts/CLAIMS.md"

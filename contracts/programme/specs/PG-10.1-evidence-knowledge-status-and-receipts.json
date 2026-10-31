@@ -2,7 +2,7 @@
   "title": "PG-10.1 Evidence, knowledge status and receipts (memev)",
   "project": "memev",
   "workdir": null,
-  "request": "Programme contract for work package WP10 in memev: Evidence, knowledge status and receipts. Proposed and unsigned; the signer (ASTL workstream) signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP10.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP04-01, WP07-02. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "request": "Programme contract for work package WP10 in memev: Evidence, knowledge status and receipts. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP10.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP04-01, WP07-02. Depends on contracts: SO-2.03, PG-06.1. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.03: WP10-01 and WP10-02 hold the knowledge status lattice and the origin fields; SO-2.03 holds retention, deletion, invalidation and derived-record provenance, and this spec takes none of them. Boundary with SO-2.01: WP10 defines the status of a fact, not the organisational model.  Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
   "tasks": [
     {
       "id": "WP10-01",
@@ -13,7 +13,7 @@
         "MV-ARCH-08: Schemas and docs preserve the distinctions: replicated is not verified, signed is not true, converged is not completed, admitted is not correct, trust is not access control, a payment receipt is not proof of delivery. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:17; evidence docs/scope-one/programme/DECOMPOSITION.md:72; baseline 8.5)",
         "MV-TRU-03: Shared knowledge records distinguish own observation, single-source claim, corroborated claim, verified result, approved decision, disputed contribution and superseded fact; repetition by many agents does not raise a disputed claim. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:52; evidence docs/scope-one/programme/DECOMPOSITION.md:95; baseline 8.5)"
       ],
-      "description": "Repo: memev. Records the distinctions (replicated is not verified; signed is not true; converged is not completed; trust is not access control; payment receipt is not delivery).",
+      "description": "Repo: memev. Records the distinctions (replicated is not verified; signed is not true; converged is not completed; trust is not access control; payment receipt is not delivery). Boundary: provenance, retention, deletion and invalidation are SO-2.03 requirements 2 to 4; this task defines the status of a fact only and does not restate them.",
       "scope": [
         "docs/KNOWLEDGE-STATUS.md"
       ],
@@ -115,7 +115,7 @@
       "requirements": [
         "MV-TRU-02: Accepted work carries independently verifiable evidence (P1 verification receipts). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:51; evidence docs/scope-one/programme/DECOMPOSITION.md:94; baseline 8.5)"
       ],
-      "description": "Repo: memev. Uses the existing contracts/receipts shape; no new signing scheme.",
+      "description": "Repo: memev. Owns the receipt format: how accepted work links to an independently verifiable receipt, using the existing contracts/receipts shape (no new signing scheme). Feeding memev_task_verify from a passing memev_contract_verify receipt is wiring owned by PGP-1.02 T4 (requirement 2 there); this task does not wire it. Shares src/engine/project-store.mjs with PG-06.1, which lands first.",
       "scope": [
         "src/engine/contracts.mjs",
         "src/engine/project-store.mjs",
