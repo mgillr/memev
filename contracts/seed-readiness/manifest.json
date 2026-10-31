@@ -420,10 +420,11 @@
       "closes": "Closes G95: a contract's done state must mean the same on every computer and clone of a vault, and come only from a passing verify of the contract as signed. Split from SR-1.27 at its three-round stop (lead decision under the owner's delegation, 31 October 2026): SR-1.27 keeps task 1, which protects contracts/closed/ and contracts/receipts/ in every path form; this contract takes SR-1.27's task 2, the done state that comes from the verify record, with round 3's answers about pre-upgrade closes, close keys, swapped bodies, supersession and pulls. The stopgap #273 already refuses a key id that is not 16 hex, a signed body whose id is not the contract asked for, and a supersede that was not signed on this computer and passed",
       "depends_on": [
         "SR-1.27",
+        "SR-1.24",
         "QL-1.02"
       ],
       "tasks": 1,
-      "criteria": 32,
+      "criteria": 41,
       "spec": "specs/SR-1.30-done-holds-across-computers-and-clones.json",
       "status": "proposed: lead's decision under the owner's delegation, 31 Oct; signs after a clean red-team round"
     },
