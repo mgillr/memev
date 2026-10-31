@@ -43,6 +43,9 @@ export function checkPath(p) {
   return s;
 }
 
+/** The largest recall offset served: past it a page is empty and next is null, so one argument cannot ask the index to rank every match. */
+export const RECALL_OFFSET_MAX = 1000;
+
 export class Vault extends EventEmitter {
   constructor(root, opts = {}) { super(); this.root = path.resolve(root); this.opts = opts; this.state = path.join(this.root, STATE); }
 
@@ -441,9 +444,15 @@ export class Vault extends EventEmitter {
     return fn;
   }
   /** Recall: the index, filtered to what the token may read and the project, annotated with graph context; the use is logged. */
-  recall(identity, { query, project = null, all_projects = false, limit = 6, client = null, session = null, log = true }) {
+  recall(identity, { query, project = null, all_projects = false, limit = 6, offset = 0, client = null, session = null, log = true }) {
     this._need(identity, 'read', null);
-    const hits = this.index.query(query, { limit, project, boosts: this.tuning?.boosts, filter: this._recallFilter(identity, { project, all_projects }) });
+    const lim = limit == null ? 6 : Math.min(10, Math.max(1, Math.trunc(Number(limit)) || 1));
+    const off = Math.max(0, Math.trunc(Number(offset)) || 0);
+    // A far offset must not cost a full ranking: the index is asked for one page past the bound at most, and an offset
+    // past the bound is an empty page. A client that follows next never gets there; next stops at the bound.
+    const top = this.index.query(query, { limit: Math.min(off, RECALL_OFFSET_MAX) + lim, project, boosts: this.tuning?.boosts, filter: this._recallFilter(identity, { project, all_projects }) });
+    const total = top.total;
+    const hits = off > RECALL_OFFSET_MAX ? [] : top.slice(off, off + lim);
     for (const h of hits) {
       const key = `${h.path}#${h.heading || ''}`;
       const ents = this.graph.sectionEnts.get(key) || [];
@@ -453,6 +462,7 @@ export class Vault extends EventEmitter {
       const u = this.graph.usage.get(key); if (u) h.used = u.count;
     }
     if (log && hits.length) this._logUsage(identity, { client, session, query, items: hits.map((h) => `${h.path}#${h.heading || ''}`) });
+    hits.total = total;
     return hits;
   }
 
