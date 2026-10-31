@@ -116,14 +116,18 @@ whether or not the relay is on: a sync pushes to the git remote, and switching t
 changes nothing about that. With the relay off on a vault that was using it, the next sync still runs
 through the git backup, and the vault's tree is byte for byte what it was.
 
-The doctor says so on the backup check it already reports: one line that names the relay as off, the git
-backup as the path in use, and the command that switches the relay back on. That line is not added to the
-resume card or the protocol; a session sees it only if it calls memev_doctor.
+The doctor says so on the backup check it already reports: one line that names the relay as off, on but
+unreachable, or on but not running (the daemon is stopped, or MEMEV_NO_TUNNEL holds it off), says the relay
+address does not reach the vault while the git backup still carries its notes to your other computers, and
+names the command that switches the relay back on or shows its state. A first connect still under way is not
+reported. That line is not added to the resume card or the protocol; a session sees it only if it calls
+memev_doctor.
 
 When the relay is configured but unreachable, the client reports the failure and reconnects on a growing
-pause (half a second, doubling up to a minute). A connect that has not finished in ten seconds is dropped,
-so a non-routable address fails the same way a refused port does. The retries are non-blocking timers on
-the event loop, so the daemon's other background jobs keep running.
+pause (half a second, doubling up to a minute). An attempt the relay has not accepted in ten seconds is
+dropped and the drop is logged, so a non-routable address, or a relay that takes the connection and never
+answers, fails the same way a refused port does. The retries are non-blocking timers on the event loop, so
+the daemon's other background jobs keep running.
 
 ## The relay for development and tests
 
