@@ -1,0 +1,58 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SR-1.06",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "b2368e3d947800e80a86004faf48dd433ab9dc289ffb53ffdf6a5e6e6f0edab0",
+      "base_commit": "4282ba7d1f0e0db2c4f0335bfd949bfcbbbe7f1b",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/PRICING.md",
+            "sha256": "6f7eb6bab13ab4f1352aad64e1e9a00cc2d513ffefd89f875a7d18af05f0782e"
+          },
+          {
+            "path": "src/cli/licensing.mjs",
+            "sha256": "435db30683806c65f8b96f715d4cb44806ee1ff1696c36f0fe7515bf0a38e38d"
+          },
+          {
+            "path": "src/cli/relay.mjs",
+            "sha256": "ac392b19f82fa05c9480d26e5f693e84699e28d1a5a7f095fbcac6fd5f41047e"
+          },
+          {
+            "path": "src/engine/license.mjs",
+            "sha256": "d0f82c9adad838d6577d292d04e2288fdb025038eac63a7c551e08787d7c9507"
+          },
+          {
+            "path": "src/engine/merge.mjs",
+            "sha256": "50539d4c05a584105ab2e53372743550f45c9da549f85ac994c1114afbd55bca"
+          },
+          {
+            "path": "test/licensing-activate.test.mjs",
+            "sha256": "5f654764f294f00d88e3c080aef7e1c0796e5cdf8391348274ba0af710618098"
+          },
+          {
+            "path": "test/merge-entitlement.test.mjs",
+            "sha256": "eac05cea08c2a573084059e15e6e72d458486597fd5a3954066fe5454b36d236"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Re-sign review of the spec as it stands on main at 4282ba7d1f0e, for a contract signed before the red-team gate. It has 1 task(s) and 43 criteria. Mechanical checks run on every criterion, and these are the only checks made: each task drafts through makeTask; each command, metric and red-green cmd parses with sh -n; each red-green cmd names its test_file and that file is in the task's scope; no criterion statement is repeated within a task except as answer 1 records; every contract this spec depends on, in its manifest row, is a manifest row. They found nothing. I did not re-run the three rounds that were made off this repository before the first signing, and I did not run the checks the criteria name, because their code is not built yet. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NjI5M2ZmYTc5MzIyMDA0NTAwMzY4YTEwZDAwODVlOWMwM2VhYzg1Y2VhOTZmOTViNmQ1N2YzZWIzMjE5NmE3YQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "I1ljgfTkpSTSA5Y5/Scyi7SQPB33s5I16XTTEZUo7k5l3Inf68GnlcdH+4qjFCoYDCoWq+ffrnJJRYg2/Au0DA=="
+          }
+        ]
+      }
+    }
+  ]
+}
