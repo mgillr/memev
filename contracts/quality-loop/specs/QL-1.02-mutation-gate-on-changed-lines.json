@@ -14,7 +14,8 @@
         "before any mutant it runs the test command twice on the unmutated tree; a failure or a differing pass count there is NOISE and the run stops with exit 2, never judging a mutant (the twin's ME-MT oracle was confounded without this control)",
         "each mutant runs in a temporary copy of the workdir that is removed in a finally block; the original tree is byte-identical after the run (checked by hashing the scope files before and after)",
         "--json prints {mutants, killed, survived, noise, survivors:[{file,line,operator}]}; exit 1 when any mutant survives; a line carrying the comment mutate-ignore with a reason is skipped and counted as ignored",
-        "the script has no dependencies and its first line carries a version: comment"
+        "the script has no dependencies and its first line carries a version: comment",
+        "a NOISE run and a run with zero mutants never report survived 0 as a result: --json carries status (ok, noise or no-mutants) and the survived value counts only when status is ok"
       ],
       "description": "",
       "scope": [
@@ -40,6 +41,80 @@
           }
         },
         {
+          "statement": "On the flaky fixture, and on a fixture whose test fails on the unmutated tree, the run exits 2 and the --json output has no numeric survived (null or absent), so a metric survived == 0 evaluated on that output fails",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
+          }
+        },
+        {
+          "statement": "The fixture's changed lines are `export const gt = (a, b) => a > b;`, `export const tag = (s) => s + '===';` and a sum loop `for (let i = 0; i < n; i = i + 1)`, with a weak test that only checks each function returns. The run must exit 1 with killed 0, and every mutant it judged must pass node --check. A mutant that does not parse is reported as invalid and the looping mutant as timeout, never as killed. The run finishes within a bounded time and leaves no child process running",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
+          }
+        },
+        {
+          "statement": "On a fixture whose weak test also reads a git-ignored file (listed in .gitignore and present in the workdir) and runs git rev-parse HEAD, the run either exits 1 with the weak mutant in survivors (the copy is complete) or exits 2 NOISE (the null control ran in the same kind of copy). It never exits 0, and killed is 0",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
+          }
+        },
+        {
+          "statement": "The fixture's --test command records $PWD and the sha256 of the changed src file to a log outside the fixture. The test asserts that no run sees a mutated src file at the original workdir path. It then starts a second run whose --test blocks on a marker, SIGKILLs it while a mutant's test is running, and asserts that every file in the fixture workdir hashes exactly as before, git status --porcelain is unchanged, and no gate temp directory is left inside the workdir",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
+          }
+        },
+        {
+          "statement": "Fixture repo: a base commit; a later commit that changes src/a/one.mjs; an uncommitted edit to src/two.mjs that inserts three lines above the changed comparison; an untracked new src/new.mjs; and git mv src/old.mjs src/b/renamed.mjs with one edited line. All have weak tests. With --base <base sha> the run exits 1, its survivors' {file,line} pairs are exactly the expected new-side coordinates in all four files, and no mutant sits on an unchanged line",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
+          }
+        },
+        {
+          "statement": "A fixture has one changed line per operator kind in requirement 1, in both directions: === and !==, < and >=, > and <=, && and ||, true and false, numeric + and -, return x, and a bare call statement. It also has one line `return a > b && c;`. With a weak test that only checks each function returns, the survivors' operator set covers every kind and the two-site line yields two survivors. With a strong test on the same lines, every mutant is killed and the run exits 0",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
+          }
+        },
+        {
+          "statement": "Two gate processes started together on the same weak-fixture checkout both exit 1 with identical survivors and killed 0, and the checkout hashes exactly as before",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
+          }
+        },
+        {
+          "statement": "On a weak-test fixture, a changed line with a bare `// mutate-ignore` (no reason) and a changed line containing 'mutate-ignore' inside a string literal are still mutated and survive. A line with `// mutate-ignore: <reason>` is skipped. --json reports ignored as a count plus entries of {file,line,reason}",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
+          }
+        },
+        {
+          "statement": "The run judged at least one mutant on the changed lines",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/fixtures/mutate/kill.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">=",
+            "value": 1
+          }
+        },
+        {
           "statement": "Changes stay in scope",
           "verifier": {
             "type": "scope"
@@ -60,14 +135,18 @@
       ],
       "requirements": [
         "the attest lint used by memev contract new warns when an implement task whose scope includes src/** has no metric criterion on scripts/gate/mutate.mjs with key survived, op ==, value 0",
-        "docs/CONTRACTS.md shows the criterion to copy and states that a test that survives a mutation is a weak test"
+        "docs/CONTRACTS.md shows the criterion to copy and states that a test that survives a mutation is a weak test",
+        "the warning lives in the vendored attest lint (vendor/attest/contract.mjs), so memev contract new and contract decompose share it"
       ],
       "description": "",
       "scope": [
         "src/engine/contracts.mjs",
         "docs/CONTRACTS.md",
         "test/gate-mutate-lint.test.mjs",
-        "test/helpers/**"
+        "test/helpers/**",
+        "vendor/attest/contract.mjs",
+        "docs/MODULES.md",
+        "changelog.d/QL-1.02.md"
       ],
       "criteria": [
         {
@@ -92,6 +171,38 @@
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "A draft whose src-touching implement task carries only the metric survived == 0 still gets the warning. The warning clears only when the task also carries a metric on the same mutate.mjs command with key mutants, op >, value 0, and docs/CONTRACTS.md shows both criteria",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "node --test test/gate-mutate-lint.test.mjs"
+          }
+        },
+        {
+          "statement": "Using newVault (test/helpers/tmp.mjs): a signed contract whose task carries a mandatory metric (a node -e cmd printing the JSON object survived:1, key survived, op ==, value 0) verifies FAIL. The same contract with survived:0 verifies PASS. A cmd that prints no JSON, or exits non-zero, verifies FAIL. A draft whose mutation metric is mandatory:false still gets the lint warning. This is red at base because contracts.mjs:235 returns BLOCKED",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "node --test test/gate-mutate-lint.test.mjs"
+          }
+        },
+        {
+          "statement": "Through newVault: v.contractDraft with an implement task scoped ['src/**'] and no mutation metric returns a warnings entry naming the mutation criterion. So do v.contractFromRequest and v.contractAmend for the same task. The same draft carrying the canonical criterion returns no such warning",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "node --test test/gate-mutate-lint.test.mjs"
+          }
+        },
+        {
+          "statement": "Each of these drafts gets the warning: a cmd that does not start with `node scripts/gate/mutate.mjs`; a --test that is not the workdir's project test command (projectTestCommand, contracts.mjs:80); --base HEAD; op, value or key other than survived == 0; mandatory:false; scope ['src/engine/x.mjs'], ['**'] or omitted; phase omitted. No warning appears for scope ['docs/**'], for a non-implement phase, or for the criterion parsed out of the fenced block in docs/CONTRACTS.md",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "node --test test/gate-mutate-lint.test.mjs"
           }
         },
         {
