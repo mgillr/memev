@@ -15,13 +15,20 @@
         "the header comment matches what a licence may carry",
         "installLicense refuses a licence carrying name, email or machine exactly as activateLicense does, and writes no file; the test installs such a licence from file and asserts the refusal (the twin measured install writing a licence that activate refuses: src/cli/licensing.mjs:148-151 never calls extraFields, :90 does)",
         "a trial licence and an org licence install from file and activate by key under the same rule; the schema header states which non-identity fields (trial, org, trial_ext) a licence may carry",
-        "the schema check lives in verifyLicense, so install, activate, loadLicense and every reader apply one rule; the trial rules (one trial per organisation, a trial never replaces a live paid licence) live in one function that install and activate both call"
+        "the schema check lives in verifyLicense, so install, activate, loadLicense and every reader apply one rule; the trial rules (one trial per organisation, a trial never replaces a live paid licence) live in one function that install and activate both call",
+        "the relay default that the activation server sends beside the licence (the wrapper's relay object) is the one unsigned exception: the schema lists it as a wrapper field, it is typed and validated (an https URL and a domain name, nothing else), it is applied only when no relay is configured, and docs state that it is unsigned; every field read from the licence itself is a signed schema field",
+        "a trial licence must carry org, so the one-trial-per-organisation rule cannot be sidestepped by leaving org out; existing fixtures that build a trial without org gain one",
+        "keys that name Object.prototype members (__proto__, constructor, toString) are unknown fields, and an org of that name never reaches a prototype through the trial record"
       ],
       "description": "",
       "scope": [
         "src/engine/license.mjs",
         "src/cli/licensing.mjs",
-        "test/license-schema.test.mjs"
+        "test/license-schema.test.mjs",
+        "test/licensing-activate.test.mjs",
+        "test/merge-entitlement.test.mjs",
+        "docs/PRICING.md",
+        "changelog.d/SR-1.06.md"
       ],
       "criteria": [
         {
@@ -139,6 +146,103 @@
         },
         {
           "statement": "activateLicense refuses an answer {license: <valid signed>, email: 'x@example.invalid'} and writes no file. A file containing exactly the wrapper activate accepts gets the same ok from installLicense, or the spec states that install takes only the bare licence.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "activateLicense with root set to an initialised vault and fetchImpl answering {license: <valid signed personal_more licence>, relay:{default_url:'relay://127.0.0.1:9', default_domain:'relay.test'}} leaves relaySetting(root).default_url and default_domain null. A relay default is stored only when the vendor signature covers it as a typed field. The owner must first add test/licensing-activate.test.mjs (MEM-030-FU) to scope and remove 'relay' from the criterion-9 key list, or else record relay as an explicit unsigned exception.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "For a correctly signed licence with services ['merge'] plus each key in ['email','name','customer_id','relay']: verifyLicense(lic,{keys,now}).state === 'invalid' with a reason naming the key; engineAllowed(lic,{keys,now}) imported from src/engine/merge.mjs === false; and resolveMerge({a:'A\\n',b:'B\\n',base:'x\\n',license:lic,config:{merge:{provider:stub}},keys,now}) makes no stub call and returns keepBoth:true. The same licence without the extra key gives engineAllowed true and exactly one provider call.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "A signed licence with trial:true and no org makes verifyLicense return 'invalid' with a reason naming org. installLicense and activateLicense both refuse it and write neither license.json nor trials.json. This needs test/merge-entitlement.test.mjs in scope so its trial fixture can gain an org.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "In a fresh config dir, using activateLicense only: trial lid A for org_ext0002 returns ok. Then trial lid B with trial_ext:true returns ok, and readTrialRecord(env).org_ext0002 has lid B and extended true. Then trial lid C without trial_ext returns ok:false matching /already had a trial/, and the licence bytes are unchanged. The same sequence with installLicense only gives the same three results.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "With a signed paid licence installed whose exp is past but inside grace_days at now (verifyLicense state 'grace'), installLicense(trial file) and activateLicense(same trial) both return ok:false matching /paid licence is already active/. The licence bytes are unchanged and trials.json is not written.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "Each criterion-10 fixture, plus trial_ext:1, is produced by signing the changed fields. verifyLicense, installLicense and activateLicense refuse each one with a reason that names the field and does not match /signature/. The same fields with the value corrected and signed the same way verify 'valid', and install and activate return ok:true.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "For the wrapper {license:<valid signed>, relay:{...}}, and for wrappers that add each of ['email','customer_id','hostname','note']: activateLicense (fetchImpl) and installLicense (a file holding the same bytes, root set) return the same ok, write the same licence bytes or none, and leave the same relaySetting(root). Every wrapper key other than license (and relay, if the owner keeps it) is refused with a reason naming the key.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "Use three variants of licenseFile(env): (i) a signed paid licence with trial:true and org:'org_fake0001' added after signing; (ii) the same trial correctly signed by a foreign key; (iii) variant (i) with org:'__proto__'. For each, installing a signed paid licence returns ok:true and converted:false, and in a fresh copy activating it returns ok:true. In both cases readTrialRecord(env) has no org_fake0001 or __proto__ key, and ({}).ended === undefined afterwards.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "licensing.mjs no longer calls extraFields, and each trial-rule refusal text exists exactly once across the two source files. The reason texts are already fixed by (a) and (b), so a second copy of a rule would have to repeat them.",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -n 'extraFields(' src/cli/licensing.mjs && [ \"$(cat src/engine/license.mjs src/cli/licensing.mjs | grep -c 'already had a trial')\" = 1 ] && [ \"$(cat src/engine/license.mjs src/cli/licensing.mjs | grep -c 'paid licence is already active')\" = 1 ]",
+            "expect_exit": 0,
+            "timeout_s": 30
+          }
+        },
+        {
+          "statement": "Licences built by JSON.parse of signed text carrying '__proto__', 'constructor' or 'toString' are refused by verifyLicense, installLicense and activateLicense with a reason naming the key. [...LICENSE_FIELDS].sort() deep-equals the sorted list v, lid, tier, services, seats, connectors, iat, exp, grace_days, kid, sig, trial, org, trial_ext.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "A valid signed licence written as U+FEFF followed by its JSON, and one padded with whitespace to 70 KiB, each get the same ok from installLicense(file) as from activateLicense with fetchImpl returning new Response(sameBytes).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "With a live paid licence installed, and separately a live trial, a signed licence whose iat is 30 days after now is refused by both installLicense and activateLicense. The installed licence bytes are unchanged and the trial record is not ended.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/license-schema.test.mjs",
