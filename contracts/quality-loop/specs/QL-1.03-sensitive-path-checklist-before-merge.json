@@ -12,7 +12,11 @@
       "requirements": [
         "scripts/gate/sensitive-paths.json lists the sensitive globs by area: command execution (src/engine/contracts.mjs, src/cli/runner.mjs, src/cli/setup-remote.mjs, src/engine/setup-channel.mjs, src/cli/contracts-cli.mjs), auth and tokens (src/server/oauth.mjs, src/engine/tokens.mjs, src/engine/devices.mjs, src/engine/sshsig.mjs when it exists), the tunnel and relay (src/cli/tunnel.mjs, src/engine/relay*.mjs, src/server/http.mjs), the oplog (src/engine/oplog.mjs, src/engine/vault.mjs)",
         "scripts/gate/sensitive-paths.mjs --base <sha> lists the changed files that match; when any does, it requires security/checklists/<head-sha-12>.md (or the file named by --checklist) with the four headings Who can call this, What runs, What survives a restart, What happens with two processes, each followed by at least one non-empty line that names a file:line, and a line Head: <40-hex> equal to the head being checked",
-        "exit 1 with the missing answers named; exit 0 when no sensitive file changed or the checklist is complete; the script has no dependencies and carries a version: comment"
+        "exit 1 with the missing answers named; exit 0 when no sensitive file changed or the checklist is complete; the script has no dependencies and carries a version: comment",
+        "the head being checked is the newest non-merge commit in base..HEAD whose diff touches a sensitive path (renames followed, deletions counted); the checklist file is named after that commit (security/checklists/<its sha, 12 characters>.md) and its Head line names that commit; commits after it may touch only security/checklists/ and non-sensitive files, otherwise the binding is stale; the gate therefore works on a pull request merge ref and after a squash, where no author knows the final sha",
+        "the gate fails closed: when the changed files cannot be computed (unknown base, the all-zero sha, no merge base, a shallow history) it exits non-zero naming why, or treats every file as changed",
+        "the sensitive globs are read from the base commit and from the head and merged, so a change that removes a glob cannot excuse itself; a change to the gate script, its glob file, ci.yml or the hook template is itself sensitive",
+        "an answer counts only when it is not TODO, n/a or a repeat of another answer, and cites a file:line that exists at the head being checked"
       ],
       "description": "",
       "scope": [
@@ -21,7 +25,9 @@
         "security/checklists/README.md",
         "test/gate-sensitive.test.mjs",
         "test/fixtures/sensitive/**",
-        "test/helpers/**"
+        "test/helpers/**",
+        "security/checklists/**",
+        "changelog.d/QL-1.03.md"
       ],
       "criteria": [
         {
@@ -37,6 +43,62 @@
           "verifier": {
             "type": "file_exists",
             "path": "security/checklists/README.md"
+          }
+        },
+        {
+          "statement": "In a fixture repo: (a) commit A edits src/engine/oplog.mjs; commit B adds only the checklist made by the procedure in security/checklists/README.md; then `git merge --no-ff` onto the base to mimic refs/pull/N/merge. Run the gate the way ci.yml runs it: exit 0. (b) Commit C edits oplog.mjs again with no new checklist: exit 1, naming the stale binding. (c) A checklist saved under the current head's file name but with Head: naming commit A: exit 1. (d) --checklist pointing at a complete checklist whose Head is another commit: exit 1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "node --test test/gate-sensitive.test.mjs"
+          }
+        },
+        {
+          "statement": "Cases on a fixture with an oplog.mjs change and the correct Head: (i) four headings with empty bodies and one 'src/engine/oplog.mjs:1' after the last heading: exit 1, naming the first three questions. (ii) Each answer 'TODO' or 'n/a': exit 1, naming all four. (iii) An answer citing src/engine/nope.mjs:1, or a line past the end of an existing file at head: exit 1. (iv) The same 'localhost:7777' line under every heading: exit 1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "node --test test/gate-sensitive.test.mjs"
+          }
+        },
+        {
+          "statement": "Each case has an oplog.mjs change and no checklist, and each must exit non-zero, never 0. The cases: --base set to an unknown 40-hex sha; --base 0000000000000000000000000000000000000000; no --base; a `git clone --depth 1 file://` of the fixture with --base set to its parent; a detached HEAD; a single root commit. Each failure names why the changed files could not be computed. For the root-commit and zero-sha cases, the gate may instead treat every file as changed and exit 1 naming oplog.mjs.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "node --test test/gate-sensitive.test.mjs"
+          }
+        },
+        {
+          "statement": "(a) Every tracked src/**/*.mjs that imports node:child_process, imports engine/tokens.mjs or engine/oplog.mjs, or contains timingSafeEqual, 'authorization', 'Bearer', localOnly or ssh-keygen is matched by a glob in sensitive-paths.json, so a new such file fails the suite until it is listed. (b) Every glob not marked optional matches at least one tracked file. (c) For each path in the requirement, plus util.mjs, mcp.mjs, common.mjs, agentid-bind.mjs, cli/relay.mjs and server/relay-dev.mjs, a fixture diff touching only that path exits 1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "node --test test/gate-sensitive.test.mjs"
+          }
+        },
+        {
+          "statement": "In a fixture: `git mv src/server/http.mjs src/server/gateway.mjs` plus an edit to src/server/main.mjs: exit 1, naming src/server/http.mjs. A rename that also rewrites about 40% of the file: exit 1. Deleting src/engine/oplog.mjs: exit 1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "node --test test/gate-sensitive.test.mjs"
+          }
+        },
+        {
+          "statement": "A fixture diff that removes the oplog entry from scripts/gate/sensitive-paths.json and edits src/engine/oplog.mjs exits 1; the globs are read from `git show <base>:scripts/gate/sensitive-paths.json` merged with head's. A diff that touches only scripts/gate/sensitive-paths.mjs, or only .github/workflows/ci.yml, exits 1 when there is no checklist.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "node --test test/gate-sensitive.test.mjs"
+          }
+        },
+        {
+          "statement": "Extract the checklist template from security/checklists/README.md, fill each answer with a real file:line and the Head line, and run the gate on a fixture oplog.mjs change: exit 0. Remove any one heading from the filled template: exit 1, naming it. Also assert that docs/DEVELOPING.md names every area key in sensitive-paths.json and all four headings.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive.test.mjs",
+            "cmd": "node --test test/gate-sensitive.test.mjs"
           }
         },
         {
@@ -61,7 +123,9 @@
       "requirements": [
         "the CI workflow runs the gate against the pull request's base on every pull request and on push to main",
         "memev contract hook installs a pre-push hook that runs the gate beside memev gate",
-        "docs/DEVELOPING.md names the sensitive areas and the four questions"
+        "docs/DEVELOPING.md names the sensitive areas and the four questions",
+        "the hook is written where git reads it (git rev-parse --git-path hooks/pre-push), so linked worktrees and core.hooksPath work; it reads the refs from pre-push stdin; it runs the sensitive-path gate only in a repository that has scripts/gate/sensitive-paths.mjs and exits 0 in a plain user project",
+        "the CI steps that run the gate check out full history (fetch-depth 0), take the base from the event through env, carry no continue-on-error and no || , and run on pull requests and on push to main; docs/DEVELOPING.md states that the check must be a required status on main, a repository setting the owner turns on"
       ],
       "description": "",
       "scope": [
@@ -69,7 +133,10 @@
         "src/cli/contracts-cli.mjs",
         "docs/DEVELOPING.md",
         "test/gate-sensitive-wiring.test.mjs",
-        "test/helpers/**"
+        "test/helpers/**",
+        "security/checklists/**",
+        "changelog.d/QL-1.03.md",
+        "docs/CONTRACTS.md"
       ],
       "criteria": [
         {
@@ -94,6 +161,46 @@
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Parse ci.yml and find each step whose run invokes node scripts/gate/sensitive-paths.mjs. Assert that one such step runs on pull_request and one on push to main (the job's if: allows the event). Each such job checks out with fetch-depth: 0. No such step has continue-on-error, and its run has no '||'. --base comes from github.event.pull_request.base.sha or github.event.before, passed through env. Then run that line in a fixture repo that has an oplog.mjs change and no checklist, with the ${{ }} expressions replaced by fixture shas, and assert exit 1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-wiring.test.mjs",
+            "cmd": "node --test test/gate-sensitive-wiring.test.mjs"
+          }
+        },
+        {
+          "statement": "Set up a sandbox repo with scripts/gate copied in and a bare remote, then install the hook with `memev contract hook` (or GATE_HOOK with a stub launcher that exits 0). With HEAD on a clean main, commit an oplog.mjs change with no checklist on branch feat. `git push origin feat` exits non-zero and `git --git-dir=<bare> rev-parse refs/heads/feat` fails. After a valid checklist is added, the push succeeds. With a stub launcher that exits 1, the push is refused even with a checklist.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-wiring.test.mjs",
+            "cmd": "node --test test/gate-sensitive-wiring.test.mjs"
+          }
+        },
+        {
+          "statement": "Install the hook (stub launcher that exits 0) in a repository without scripts/gate, a plain user project, and assert an ordinary `git push` succeeds. Install it in a memev-layout fixture with an oplog.mjs change and no checklist, and assert the push is refused, with the hook output naming the sensitive-path gate.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-wiring.test.mjs",
+            "cmd": "node --test test/gate-sensitive-wiring.test.mjs"
+          }
+        },
+        {
+          "statement": "Install with `memev contract hook` in a `git worktree add` worktree and in a repo with core.hooksPath set. Assert the hook lands at `git rev-parse --git-path hooks/pre-push`, and that a push carrying an oplog.mjs change without a checklist is refused.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-sensitive-wiring.test.mjs",
+            "cmd": "node --test test/gate-sensitive-wiring.test.mjs"
+          }
+        },
+        {
+          "statement": "The gate passes on the contract's own change against the base commit. This makes the owner add security/checklists/*.md (and the changelog note) to T2's scope rather than leave them as hidden breaches.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/gate/sensitive-paths.mjs --base be457dbd829c89e48fbd3f19b72d43864cd97fd8",
+            "expect_exit": 0
           }
         },
         {
