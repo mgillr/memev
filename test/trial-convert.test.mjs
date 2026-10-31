@@ -12,6 +12,7 @@ import { signLicense, verifyLicense, loadLicense } from '../src/engine/license.m
 import { seatPolicy } from '../src/engine/entitlements.mjs';
 import { deviceKeygen } from '../src/engine/devices.mjs';
 import { installLicense, readTrialRecord, mergeAllowed, pendingMergeCopies, command } from '../src/cli/licensing.mjs';
+import { recordConflicts } from '../src/cli/sync.mjs';
 import { stringLiterals } from './helpers/string-literals.mjs';
 
 const vendor = (() => {
@@ -124,6 +125,29 @@ test('MEM-133 AC02: a paid licence installed over a trial resumes the merge engi
   const conflicts = JSON.parse(fs.readFileSync(jobsPath, 'utf8')).sync.conflicts;
   assert.equal(conflicts.length, 1, 'the conflict record is intact, not merged');
   assert.equal(conflicts[0].copy, copyRel);
+  v.close();
+});
+
+test('MEM-133 AC02: a licence installed after a direct sync recorded a same-note conflict lists the kept copy from that record', () => {
+  const { root, v } = newVault();
+  const env = { MEMEV_CONFIG_DIR: tmpdir('convert2r-conf-') };
+  const now = Date.parse('2026-01-25T00:00:00Z');
+  const paid = signLicense({ v: 1, lid: 'lic_paid0003', tier: 'business', services: ['merge'], seats: 3, iat: '2026-01-01', exp: '2027-01-01', grace_days: 7 }, vendor.pem, 'test-vendor');
+  const paidFile = path.join(tmpdir('convert2r-p-'), 'licence.json');
+  fs.writeFileSync(paidFile, JSON.stringify(paid));
+  const copyRel = 'notes/plan.conflict-20260102.md';
+  fs.mkdirSync(path.join(root, 'notes'), { recursive: true });
+  fs.writeFileSync(path.join(root, copyRel), 'the other computer kept this version\n');
+  // the record a sync run in this process writes: { at, files, conflicts }, not a plain list
+  const conflict = { path: 'notes/plan.md', kind: 'note', how: 'kept both versions as separate files', copy: copyRel };
+  recordConflicts(root, { at: '2026-01-24T12:00:00Z', files: ['notes/plan.md'], conflicts: [conflict] });
+  const r = installLicense({ file: paidFile, env, keys: vendor.keys, now, root });
+  assert.equal(r.ok, true, r.reason);
+  assert.deepEqual(r.merge.pending, [{ path: 'notes/plan.md', copy: copyRel, how: conflict.how }], 'the copy is listed from the record');
+  assert.deepEqual(pendingMergeCopies(root), r.merge.pending);
+  // a copy a person already removed is not listed
+  fs.rmSync(path.join(root, copyRel));
+  assert.deepEqual(pendingMergeCopies(root), []);
   v.close();
 });
 
