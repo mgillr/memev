@@ -21,6 +21,7 @@ import { loadTuning } from './tuning.mjs';
 import { attach as attachContracts, installVaultHooks } from './contracts.mjs';
 import { assess, DEFAULT_GATE } from './quality.mjs';
 import { STATE, isVault } from './vault-marker.mjs';
+import { ProjectStore } from './project-store.mjs';
 
 export const VERSION = readJson(new URL('../../package.json', import.meta.url), {}).version;
 export { STATE, isVault };
@@ -106,6 +107,32 @@ export class Vault extends EventEmitter {
     return false;
   }
   _noLink(p) { if (this._linked(p)) throw new VaultError('bad_path', `${p} goes through a symbolic link; memev does not follow links in the vault`); }
+  /**
+   * A note is refused when its path, or any folder on the way to it, differs from a live note's only in letter case or Unicode
+   * form, naming the existing spelling: a case-insensitive disk (macOS, Windows) keeps the two as one file or one folder, so the
+   * log would hold two histories over one body, and the vault syncs to such disks (issue 243). The fold (NFC, upper case, then
+   * lower case, NFC again) makes final sigma, long s, the sharp s against SS and the Kelvin sign equal to their plain forms, as
+   * APFS does; it is close to the disk's own table but not the table itself. Only a path with no live head is checked, so writing
+   * an existing note costs nothing extra; the check reads every live head once.
+   */
+  _noCaseTwin(p) {
+    const h = this.log.heads.get(p); if (h && !h.deleted) return;
+    const fold = (x) => x.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC');
+    const segs = p.split('/'); const want = []; let acc = '';
+    for (const sg of segs) { acc = acc ? `${acc}/${sg}` : sg; want.push([acc, fold(acc)]); }
+    for (const [q, hq] of this.log.heads) {
+      if (hq.deleted || q === p) continue;
+      const qs = q.split('/'); let qa = '';
+      for (let i = 0; i < Math.min(qs.length, want.length); i++) {
+        qa = qa ? `${qa}/${qs[i]}` : qs[i];
+        const [mine, key] = want[i];
+        if (qa === mine) continue;
+        // a folder of the path, or the note itself, matches the existing spelling only under the fold
+        if (fold(qa) === key && (i < segs.length - 1 ? i < qs.length - 1 : i === qs.length - 1)) throw new VaultError('bad_path', `${mine} differs from the existing ${i < qs.length - 1 ? 'folder' : 'note'} ${qa} only in letter case or Unicode form; a case-insensitive disk keeps them as one, so use the spelling ${qa}`);
+        break;
+      }
+    }
+  }
   /**
    * A write is refused before the log advances when the file system cannot take it: a note already sits where a folder of the
    * path must be, or a folder with something in it sits at the path. An empty folder there, which a delete leaves behind, is
@@ -270,6 +297,7 @@ export class Vault extends EventEmitter {
   write(identity, { path: p, body, client = null, allow_secrets = false, internal = false }) {
     p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); this._placeable(p); body = String(body ?? '');
     this._guard(p, body, allow_secrets, internal);
+    this._noCaseTwin(p); // before syncFromDisk, which on a case-insensitive disk would read the other note's file under this spelling
     this.syncFromDisk(p);
     const old = this._read(p);
     let rec;
@@ -290,7 +318,7 @@ export class Vault extends EventEmitter {
   }
 
   append(identity, { path: p, text, client = null, allow_secrets = false, internal = false }) {
-    p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); this._placeable(p);
+    p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); this._noCaseTwin(p); this._placeable(p);
     this.syncFromDisk(p);
     let ns = this._ncGet(p);
     if (!ns) { const cur = this._read(p); if (cur !== null) { this._ncSet(p, cur); ns = this._ncGet(p); } }
@@ -371,6 +399,11 @@ export class Vault extends EventEmitter {
     const pick = (re) => (re.exec(last) || [])[1]?.trim() || null;
     const next = [...last.matchAll(/^- \[ \] (.+)$/gm)].map((m) => m[1].trim()).filter((n) => !done.has(n.toLowerCase()));
     return { path: p, checkpoints: cps.length, at: last.split('\n')[0].replace(/^### /, ''), task: pick(/^Task: (.+)$/m), doing: pick(/^Doing: (.+)$/m), next, done: [...done.values()], files: pick(/^Files: (.+)$/m) };
+  }
+
+  /** The canonical project store for one project, under this vault's .memev directory. One writer at a time. */
+  projectStore(projectId, opts = {}) {
+    return new ProjectStore(this.root, { id: projectId, deviceId: this.host?.id ?? null, fsync: this.opts.fsync ?? true, ...opts }).open();
   }
 
   /** Record one turn of a session (continuous recording). */

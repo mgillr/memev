@@ -26,6 +26,21 @@ export const LEAD_NEEDED = 'No lead AI is set for this vault. Ask the user which
 const SEAT_RE = /^[a-z0-9][a-z0-9._-]{0,40}@[a-z0-9][a-z0-9._-]{0,40}(\/[a-z0-9._-]{1,24})?$/;
 const REF_RE = /^[A-Za-z0-9._:-]{1,64}$/;
 const PULSE_COMMIT_MS = 5 * 60e3;
+// What a seat has read, per device counter: pulse.read[device] is the contiguous prefix, kept a plain number so older
+// code still reads it, and pulse.read_extra[device] lists the counters read beyond a gap, which older code ignores (it
+// shows those once more, which is harmless). hasRead is the one rule; the bus and memev bus hello both use it.
+const readPrefix = (read, device) => { const v = (read || {})[device]; return typeof v === 'number' ? v : 0; };
+const readState = (p) => ({ read: { ...(p?.read || {}) }, extra: { ...(p?.read_extra || {}) } });
+export function hasRead(pulse, m) {
+  return m.dseq <= readPrefix(pulse?.read, m.device) || (pulse?.read_extra?.[m.device] || []).includes(m.dseq);
+}
+
+export const UNREAD_VIEW = 8;   // default messages a capped bus_unread shows
+export const UNREAD_MAX = 50;   // stated maximum for the bus_unread limit
+export const BODY_CUT = 300;    // characters per message in the capped view
+export const CUT_MARK = '…';    // appended when a body is cut to fit the view
+export const TAIL_MAX = 50;     // stated maximum for bus_tail n
+export const SINCE_MAX = 50;    // stated maximum for bus_since limit
 
 export class BusError extends Error { constructor(code, message) { super(message); this.code = code; this.name = 'BusError'; } }
 
@@ -70,7 +85,7 @@ export class Bus {
     const host = this.devices.get(this.devices.hostId);
     return label(host?.label || 'this computer');
   }
-  /** The seat name for an app on a device: my-app@my-laptop, cursor@laptop, chatgpt@cloud. */
+  /** The seat name for an app on a device: my-app@my-laptop, cursor@laptop, chatgpt@cloud. A teammate's computer is enrolled as <name>-<machine>, so its seats read <app>@<name>-<machine>. */
   seatName(client, device) {
     if (!device || device.kind === 'host' || device.kind === 'local-client') return `${label(client)}@${this.machineName()}`;
     if (device.kind === 'cloud-connector') return `${label(device.label)}@cloud`;
@@ -345,38 +360,116 @@ export class Bus {
 
   since(ctx, { seq = 0, limit = 50, seat = null } = {}) {
     const who = this.resolve(ctx, { seat }); this.pulse(ctx, { who });
-    return this.all().filter((m) => m.seq > Number(seq || 0) && this._visible(who, m)).slice(0, Math.min(200, limit));
+    const lim = Math.min(Math.max(1, Math.floor(Number(limit)) || SINCE_MAX), SINCE_MAX);
+    const matched = this.all().filter((m) => m.seq > Number(seq || 0) && this._visible(who, m));
+    return { messages: matched.slice(0, lim), more: Math.max(0, matched.length - lim) };
   }
   tail(ctx, { n = 20, seat = null, type = null } = {}) {
     const who = this.resolve(ctx, { seat });
-    return this.all().filter((m) => this._visible(who, m) && (!type || m.type === type)).slice(-Math.min(200, n));
+    const lim = Math.min(Math.max(1, Math.floor(Number(n)) || 20), TAIL_MAX);
+    const matched = this.all().filter((m) => this._visible(who, m) && (!type || m.type === type));
+    return { messages: matched.slice(-lim), more: Math.max(0, matched.length - lim) };
   }
-  /** New messages for this seat; marks them read, counts as a heartbeat and answers comms checks. */
-  unread(ctx, { seat = null, peek = false } = {}) {
+  /** The read state for a device: the contiguous prefix from read and the counters read beyond a gap from read_extra. */
+  _readUpTo(st, device) {
+    return { upTo: readPrefix(st.read, device), extra: new Set(st.extra[device] || []) };
+  }
+  _storeRead(st, device, upTo, extra) {
+    const arr = [...extra].filter((d) => d > upTo).sort((a, b) => a - b);
+    if (upTo > 0) st.read[device] = upTo; else delete st.read[device];
+    if (arr.length) st.extra[device] = arr; else delete st.extra[device];
+  }
+  /** Has this seat seen this message yet (its read prefix or extras cover it)? */
+  _isRead(st, m) {
+    const { upTo, extra } = this._readUpTo(st, m.device);
+    return m.dseq <= upTo || extra.has(m.dseq);
+  }
+  /** Mark one message read, keeping the contiguous prefix and the extras. */
+  _markRead(st, m) {
+    const { upTo, extra } = this._readUpTo(st, m.device);
+    if (m.dseq <= upTo) return;
+    if (m.dseq === upTo + 1) {
+      let n = m.dseq;
+      while (extra.has(n + 1)) { extra.delete(n + 1); n += 1; }
+      this._storeRead(st, m.device, n, extra);
+    } else {
+      extra.add(m.dseq);
+      this._storeRead(st, m.device, upTo, extra);
+    }
+  }
+  /** Mark every message up to and including m read (the old all-at-once behaviour). */
+  _markAllRead(st, m) {
+    const { upTo, extra } = this._readUpTo(st, m.device);
+    const newUp = Math.max(upTo, m.dseq);
+    const rest = new Set([...extra].filter((d) => d > newUp));
+    this._storeRead(st, m.device, newUp, rest);
+  }
+  /** One message in the capped view: body cut to BODY_CUT unless it is a priority type. */
+  _view(m, { cut = true } = {}) {
+    const doCut = cut && m.body.length > BODY_CUT;
+    return { seq: m.seq, id: m.id, from: m.from, to: m.to, type: m.type, ref: m.ref, operator: m.operator, ts: m.ts, body: doCut ? m.body.slice(0, BODY_CUT) + CUT_MARK : m.body, cut: doCut };
+  }
+  /** New messages for this seat; counts as a heartbeat and answers comms checks.
+   * Capped (a limit, or the capped flag) it shows the priority messages (hold, task) in full, then
+   * any message that arrived later with an older time (never lost under the cap), then the last
+   * `limit` of the in-order rest cut to BODY_CUT; it marks only what it showed read and says how
+   * many it left. Uncapped it returns every fresh message and marks them all read, as the hook
+   * path does. */
+  unread(ctx, { seat = null, peek = false, limit = null, capped = false } = {}) {
     const who = this.resolve(ctx, { seat });
-    const p = this._pulse(who.seat); const read = p.read || {};
+    const p = this._pulse(who.seat); const st = readState(p);
     const all = this.all();
     const names = this._names(who.seat);
-    const fresh = all.filter((m) => m.dseq > (read[m.device] || 0) && this._toMe(who, m, names) && this._visible(who, m));
-    if (!peek) for (const m of all) if (this._toMe(who, m, names) || names.includes(m.from)) read[m.device] = Math.max(read[m.device] || 0, m.dseq);
-    this.pulse(ctx, { who, read: peek ? null : read });
+    const fresh = all.filter((m) => !this._isRead(st, m) && this._toMe(who, m, names) && this._visible(who, m));
+    const cap = capped || limit != null;
+    const isPriority = (m) => m.type === 'task' || (m.type === 'hold' && m.operator);
+    let shownMsgs = fresh; let notShown = 0;
+    if (cap) {
+      const lim = Math.min(Math.max(1, Math.floor(Number(limit)) || UNREAD_VIEW), UNREAD_MAX);
+      // priority messages come first, in full, oldest first, at most UNREAD_MAX of them; the rest stay unread and are counted
+      const allPriority = fresh.filter(isPriority);
+      const priority = allPriority.slice(0, UNREAD_MAX);
+      // I always show a message that arrived after this seat's last call but landed at or before
+      // what that call saw (written offline, for example), so it is not buried under newer ones. It
+      // is new if its device counter is above the highest that call saw from its device; what was
+      // already there and left unshown is not late, so the cap still applies to it on the next call.
+      const seen = p.seen_seq || 0; const seenDseq = p.seen_dseq || null;
+      const isLate = (m) => !!seenDseq && m.seq <= seen && m.dseq > (seenDseq[m.device] || 0);
+      const late = fresh.filter((m) => !isPriority(m) && isLate(m));
+      const rest = fresh.filter((m) => !isPriority(m) && !isLate(m));
+      shownMsgs = [...priority, ...[...late, ...rest.slice(-lim)].sort((a, b) => a.seq - b.seq)];
+      notShown = rest.length - rest.slice(-lim).length + (allPriority.length - priority.length);
+    }
+    if (!peek) {
+      if (cap) {
+        for (const m of shownMsgs) this._markRead(st, m);
+        for (const m of all) if (names.includes(m.from)) this._markRead(st, m);
+      } else {
+        for (const m of all) if (this._toMe(who, m, names) || names.includes(m.from)) this._markAllRead(st, m);
+      }
+    }
+    // what this call saw: the bus position and, per device, the highest counter
+    const frontier = all.length ? all[all.length - 1].seq : (p.seen_seq || 0);
+    const seenDseq = {}; for (const m of all) seenDseq[m.device] = Math.max(seenDseq[m.device] || 0, m.dseq);
+    this.pulse(ctx, { who, read: peek ? null : st.read, readExtra: peek ? null : st.extra, seen: peek ? null : frontier, seenDseq: peek ? null : seenDseq });
     const acked = [];
     if (!(who.operator && who.seat === OPERATOR)) {
       for (const m of fresh.filter((x) => x.check)) if (!all.some((a) => a.type === 'ack' && a.ref === m.id && names.includes(a.from))) {
         try { if (!ctx.identity?.read_only) { this._append(who, { to: m.from, type: 'ack', body: 'comms check: here', ref: m.id, project: null }); acked.push(m.id); } } catch {}
       }
     }
-    return { seat: who.seat, operator: who.operator, hold: this.holdOn(who.seat, all), messages: fresh, acked, ...(this.operator() ? {} : { lead_needed: LEAD_NEEDED }) };
+    const messages = cap ? shownMsgs.map((m) => this._view(m, { cut: !isPriority(m) })) : fresh;
+    return { seat: who.seat, operator: who.operator, hold: this.holdOn(who.seat, all), messages, ...(cap ? { not_shown: notShown } : {}), acked, ...(this.operator() ? {} : { lead_needed: LEAD_NEEDED }) };
   }
 
   // ---- pulse
   _pulse(seat) { return readJson(this._p('pulse', `${fileOf(seat)}.json`), { seat, read: {} }); }
   /** A heartbeat: the seat is here. The first one also joins the seat and says hello. */
-  pulse(ctx, { who = null, read = null, session = null, at = Date.now() } = {}) {
+  pulse(ctx, { who = null, read = null, readExtra = null, seen = null, seenDseq = null, session = null, at = Date.now() } = {}) {
     who ||= this.resolve(ctx);
     if (who.seat === OPERATOR) return null;
     const p = this._pulse(who.seat);
-    const rec = { seat: who.seat, device: who.device.id, last_seen: new Date(at).toISOString(), session: session || ctx.session || p.session || null, beats: (p.beats || 0) + 1, read: read || p.read || {} };
+    const rec = { seat: who.seat, device: who.device.id, last_seen: new Date(at).toISOString(), session: session || ctx.session || p.session || null, beats: (p.beats || 0) + 1, read: read || p.read || {}, read_extra: readExtra || p.read_extra || {}, seen_seq: seen == null ? (p.seen_seq || 0) : seen, seen_dseq: seenDseq || p.seen_dseq || null };
     const f = `${fileOf(who.seat)}.json`;
     this._w(this._p('pulse', f));
     fs.mkdirSync(this._p('pulse'), { recursive: true });
@@ -408,11 +501,11 @@ export class Bus {
       else if (s.joined && p.last_seen) state = ago(p.last_seen, at) <= this.liveMin ? 'live' : 'stale';
       const claims = all.filter((m) => m.type === 'claim' && names.includes(m.from) && !all.some((v) => v.type === 'verdict' && v.ref === m.ref)).map((m) => m.ref);
       const status = all.filter((m) => m.type === 'status' && names.includes(m.from) && !m.check).at(-1);
-      return { seat: s.seat, client: s.client, device: s.device, device_label: dev?.label || s.device_label, device_kind: dev?.kind || s.device_kind, state, operator: op === s.seat, last_seen: p.last_seen || null, minutes_since: p.last_seen ? ago(p.last_seen, at) : null, last_message: last ? { seq: last.seq, type: last.type, ts: last.ts, body: last.body.slice(0, 120) } : null, hold: this.holdOn(s.seat, all), claims, status: status ? status.body.slice(0, 160) : null, project: s.project };
+      return { seat: s.seat, client: s.client, device: s.device, device_label: dev?.label || s.device_label, device_kind: dev?.kind || s.device_kind, teammate: dev?.teammate || null, state, operator: op === s.seat, last_seen: p.last_seen || null, minutes_since: p.last_seen ? ago(p.last_seen, at) : null, last_message: last ? { seq: last.seq, type: last.type, ts: last.ts, body: last.body.slice(0, 120) } : null, hold: this.holdOn(s.seat, all), claims, status: status ? status.body.slice(0, 160) : null, project: s.project };
     });
     // licensed computers with no app on the bus yet
     const seated = new Set(rows.map((r) => r.device));
-    for (const d of this.devices.list().filter((x) => x.kind === 'remote-computer' && !seated.has(x.id))) rows.push({ seat: null, client: null, device: d.id, device_label: d.label, device_kind: d.kind, state: d.status === 'active' ? 'never joined' : 'removed', operator: false, last_seen: null, minutes_since: null, last_message: null, hold: null, claims: [], status: null, project: null });
+    for (const d of this.devices.list().filter((x) => x.kind === 'remote-computer' && !seated.has(x.id))) rows.push({ seat: null, client: null, device: d.id, device_label: d.label, device_kind: d.kind, teammate: d.teammate || null, state: d.status === 'active' ? 'never joined' : 'removed', operator: false, last_seen: null, minutes_since: null, last_message: null, hold: null, claims: [], status: null, project: null });
     return { live_minutes: this.liveMin, operator: op, seats: rows, ...(op ? {} : { lead_needed: LEAD_NEEDED }) };
   }
   reasonFor(row) {
@@ -440,10 +533,10 @@ export class Bus {
     return { check: msg.id, seq: msg.seq, waited_ms: Date.now() - start, answered, missing };
   }
 
-  /** Has this seat not seen this message yet (its read pointer is still behind it)? */
+  /** Has this seat not seen this message yet (its read prefix or extras do not cover it)? */
   unreadFor(seat, m) {
     const p = this._pulse(seat);
-    return m.dseq > (p.read?.[m.device] || 0);
+    return !hasRead(p, m);
   }
   /** Tasks with who claimed them, the restatement, the latest status and the verdict. An unclaimed
    * task to a live seat that has not read it yet waits for that seat's next turn. */
