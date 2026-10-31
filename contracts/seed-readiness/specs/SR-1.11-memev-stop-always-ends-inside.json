@@ -26,7 +26,7 @@
           "statement": "The stop test passes 20 runs in a row on a 2 vCPU machine",
           "verifier": {
             "type": "command",
-            "cmd": "for i in $(seq 1 20); do out=$(node --test --test-reporter=tap --test-name-pattern='REV-022' test/sync-schedule.test.mjs 2>&1) || exit 1; printf '%s\\n' \"$out\" | awk -v pat='REV-022' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }' || exit 1; done"
+            "cmd": "for i in $(seq 1 20); do out=$(node --test --test-reporter=tap --test-name-pattern='REV-022' test/sync-schedule.test.mjs 2>&1) || exit 1; printf '%s\\n' \"$out\" | awk -v pat='REV-022' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' || exit 1; done"
           }
         },
         {

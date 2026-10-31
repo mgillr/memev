@@ -277,7 +277,7 @@
         "QL-1.02"
       ],
       "tasks": 1,
-      "criteria": 17,
+      "criteria": 19,
       "spec": "specs/SR-1.21-a-missing-note-is-never-silent.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -294,7 +294,7 @@
         "SR-1.26"
       ],
       "tasks": 1,
-      "criteria": 16,
+      "criteria": 29,
       "spec": "specs/SR-1.22-an-interrupted-write-recovers-from-the-log.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -310,7 +310,7 @@
         "QL-1.02"
       ],
       "tasks": 1,
-      "criteria": 4,
+      "criteria": 6,
       "spec": "specs/SR-1.23-verify-sees-a-removed-tail.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -326,7 +326,7 @@
         "QL-1.02"
       ],
       "tasks": 1,
-      "criteria": 5,
+      "criteria": 7,
       "spec": "specs/SR-1.24-no-cli-write-beside-a-live-daemon.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -341,7 +341,7 @@
         "QL-1.02"
       ],
       "tasks": 1,
-      "criteria": 4,
+      "criteria": 6,
       "spec": "specs/SR-1.25-a-cloud-seat-addresses-one-local-seat.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -357,7 +357,7 @@
         "QL-1.02"
       ],
       "tasks": 2,
-      "criteria": 20,
+      "criteria": 24,
       "spec": "specs/SR-1.26-one-write-can-never-make-the-vault-unopenable.json",
       "status": "proposed: owner's go pending, signs after a clean red-team round"
     },

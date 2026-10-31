@@ -57,7 +57,30 @@
             "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/recover-unrebuildable.test.mjs\" --json",
             "key": "survived",
             "op": "==",
-            "value": 0
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/recover-unrebuildable.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/recover-unrebuildable.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
           }
         },
         {
@@ -73,7 +96,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/recover-unrebuildable.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='write to an unrebuildable note' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='write to an unrebuildable note' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='write to an unrebuildable note' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='write to an unrebuildable note' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -81,7 +104,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/recover-unrebuildable.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='doctor fix keeps the report' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='doctor fix keeps the report' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='doctor fix keeps the report' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='doctor fix keeps the report' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -89,7 +112,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/recover-unrebuildable.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='memev doctor CLI' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='memev doctor CLI' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='memev doctor CLI' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='memev doctor CLI' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -97,7 +120,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/recover-unrebuildable.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='status text names it' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='status text names it' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='status text names it' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='status text names it' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -105,7 +128,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/recover-unrebuildable.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='record unreadable' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='record unreadable' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='record unreadable' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='record unreadable' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -113,7 +136,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/recover-unrebuildable.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='present file' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='present file' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='present file' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='present file' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -121,7 +144,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/recover-unrebuildable.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='never overwrites' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='never overwrites' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='never overwrites' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='never overwrites' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -129,7 +152,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/recover-unrebuildable.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='verify stays ok' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='verify stays ok' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='verify stays ok' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='verify stays ok' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -137,7 +160,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/recover-unrebuildable.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='survives restarts' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='survives restarts' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='survives restarts' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='survives restarts' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -145,7 +168,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/recover-unrebuildable.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='path-limited token' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='path-limited token' -v k=1 'function flush() { if (cand) n++; cand = 0 } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); cand = ($0 ~ /^[[:space:]]*ok / && $0 ~ pat && $0 !~ /# (SKIP|TODO)/ && $0 !~ /\\.test\\.m?js$/); next } /^[[:space:]]*type: .suite./ { cand = 0 } END { flush(); exit !(n >= k) }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='path-limited token' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='path-limited token' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
