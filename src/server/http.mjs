@@ -266,7 +266,10 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       if (!local && dev?.kind === 'cloud-connector' && computerSide({ userAgent: req.headers['user-agent'], memevClient: req.headers['x-memev-client'] })) {
         return send(403, { error: 'connector_on_computer', error_description: 'This connector URL is for a cloud AI app. To use this vault from another computer, enroll that computer with its own device key: memev devices keygen there, then memev devices enroll --kind remote-computer --pubkey <key> on the vault.' });
       }
-      const client = String(req.headers['x-memev-client'] || identity.agent).slice(0, 40);
+      // On this computer every app has its own token, so the token names the app; a header cannot make one app's token
+      // speak as another app or as the CLI (issues 248 and 263). A remote computer's one device token serves all of
+      // that computer's apps, so there the header picks which of them is calling.
+      const client = String(local ? identity.agent : req.headers['x-memev-client'] || identity.agent).slice(0, 40);
       const session = req.headers['x-memev-session'] ? String(req.headers['x-memev-session']).slice(0, 64) : null;
       const ctx = { identity, client, session, local, device: dev, cli: local && client === 'cli' };
 
