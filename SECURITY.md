@@ -12,7 +12,10 @@ not open a public issue.
   rotated or removed alone. An added computer must also sign every request with its own Ed25519
   key, made on that computer and never sent anywhere; the signature covers the method, path, time,
   a one-time nonce and the body, so a copied config or a replayed request is refused. Remote
-  requests are rate limited and logged. Admin and contract-signing routes are local only.
+   requests are rate limited and logged. Admin routes are local only. Contract signing is available
+   remotely, but a contract signed from a remote origin records that origin, and its command
+   criteria do not run on this machine until a local operator approves it with
+   `memev contract approve <id>`.
 - Writes are scanned for secrets (keys, tokens, private keys) and refused unless explicitly allowed.
   Comms bus messages are scanned the same way and always refused.
 - The comms bus is files in the vault (`bus/`). It travels only with the vault: to your own git
@@ -20,7 +23,12 @@ not open a public issue.
 - Files under `.memev/` and in the config directory are created readable by your user only.
 - GitHub backup uses a deploy key limited to one private repository, and a pre-push check.
 - No telemetry. Memev makes no network requests except the tunnel you enable, the `cloudflared`
-  download (pinned version, SHA-256 checked), and git pushes to the remote you set up.
+  download (pinned version, SHA-256 checked), git pushes to the remote you set up, the one call
+  `memev license activate <key>` makes to the licence endpoint you configure (the key goes out, a signed
+  licence comes back, and no vault data ever does), and the anonymous milestone report if you turn it
+  on (off by default; `memev report show` prints exactly what it would send). The installer scripts
+  fetch the release tarball and, when no Node 22 is on PATH, the pinned Node runtime, each checked by
+  SHA-256.
 - No runtime dependencies.
 - Licences are verified offline against the vendor public key in `src/engine/license.mjs`; nothing
   is sent anywhere to check one. The vault refuses to add computers past the licensed number. With

@@ -1,5 +1,7 @@
 # GitHub backup
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 ```sh
 memev github setup                 # or: memev github setup --repo you/my-memory
 memev github setup --host ghe.example.com   # GitHub Enterprise
@@ -15,7 +17,7 @@ memev backup set <git-url>         # any private git remote (self-hosted, file, 
 4. Points the vault's git remote at it, adds a pre-push check that refuses to push to any other
    remote, and pushes.
 
-After that the daemon pushes every 30 minutes when there are new commits. `memev github status`
+After that the daemon pushes every few minutes when there are new commits. `memev github status`
 shows the target; `memev doctor` reports failed pushes.
 
 ## When port 22 is blocked
@@ -38,3 +40,21 @@ The token lives in the vault's git config on this machine only; it is never comm
 
 To stop: delete the deploy key in the repository settings and run `git remote remove origin` in the
 vault.
+
+## Adding a second computer (Free)
+
+On Free the vault lives on one computer at a time, through your own GitHub. To move it to a second
+computer, or to start using it on a second computer, back the vault up on the first computer with
+`memev github setup`, then on the second computer clone that backup instead of creating a new vault:
+
+```sh
+memev init --from <git-url>     # clone the existing backup into the vault folder
+```
+
+`--from` uses plain git, so it works with no GitHub CLI installed. It clones the repository into the
+vault folder and keeps its history; it does not create a new, empty vault. If the URL is not a Memev
+vault backup, init stops and creates nothing.
+
+If you already have a fresh vault on the second computer and run `memev github setup` against a
+repository that holds a different vault, Memev will not push over it: it tells you the histories are
+unrelated and offers the clone above instead.
