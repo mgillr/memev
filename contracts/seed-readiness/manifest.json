@@ -50,7 +50,7 @@
       "closes": "The nonce cache is in-memory, so a daemon restart reopens the five-minute replay window",
       "depends_on": [],
       "tasks": 1,
-      "criteria": 26,
+      "criteria": 35,
       "spec": "specs/SR-1.03-replay-protection-that-survives-a.json"
     },
     {
