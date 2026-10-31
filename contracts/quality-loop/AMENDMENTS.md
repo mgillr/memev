@@ -27,3 +27,21 @@ A requirement is replaced, never silently removed, only when a round's answer na
 - QL-1.02 T2: criterion replaced after red-team round 2 answer 3 (the canonical set is three metrics after round 2 answer 3). From: "The contracts page carries the criterion and the weak-test rule". To: "The contracts page carries the canonical criteria and the weak-test rule".
 - QL-1.02 T2: criterion replaced after red-team round 2 answer 3 (the canonical set is three metrics after round 2 answer 3). From: "Through newVault: v.contractDraft with an implement task scoped ['src/**'] and no mutation metric returns a warnings entry naming the mutation criterion. So do v.contractFromRequest and v.contractAmend for the same task. The same draft carrying the canonical criterion returns no such warning". To: "Through newVault: v.contractDraft with an implement task scoped ['src/**'] and no mutation metric returns a warnings entry naming the mutation criterion. So do v.contractFromRequest and v.contractAmend for the same task. The same draft carrying the canonical criteria returns no such warning".
 - QL-1.02 T2: criterion replaced after red-team round 2 answer 3 (the canonical set is three metrics after round 2 answer 3). From: "Each of these drafts gets the warning: a cmd that does not start with `node scripts/gate/mutate.mjs`; a --test that is neither the workdir's project test command (projectTestCommand, contracts.mjs:80) nor `node --test` followed only by paths matching test/**/*.test.mjs; --base HEAD; op, value or key other than survived == 0; mandatory:false; scope ['src/engine/x.mjs'], ['**'] or omitted; phase omitted. No warning appears for scope ['docs/**'], for a non-implement phase, or for the criterion parsed out of the fenced block in docs/CONTRACTS.md". To: "Each of these drafts gets the warning: a cmd that does not start with `node scripts/gate/mutate.mjs`; a --test that is neither the workdir's project test command (projectTestCommand, contracts.mjs:80) nor `node --test` followed only by paths matching test/**/*.test.mjs; --base HEAD; op, value or key other than survived == 0; mandatory:false; scope ['src/engine/x.mjs'], ['**'] or omitted; phase omitted. No warning appears for scope ['docs/**'], for a non-implement phase, or for the criteria parsed out of the fenced block in docs/CONTRACTS.md".
+
+## Test-name guards added by the build
+
+node's TAP output counts each test file as a passing test, so a name filter that matches nothing exits 0 and prints '# pass 1' (measured on node 23.7, 31 October 2026). Each command below that filters tests by name now requires, for each alternative of its filter, a passing test line whose test name matches it; a skipped or todo test, a file line and a describe() suite line never count, and anchors in the filter apply to the test name. Statements are unchanged.
+
+History of the guard's form, 31 October 2026: (1) a count of matching passing lines against the number of alternatives (grep); (2) the same count, with describe() suite lines dropped (awk); (3) one match required for each alternative, matched against the test name, because a count let two tests matching one alternative stand in for another that never ran.
+
+- QL-1.01: name guard on 34 criterion command(s).
+- QL-1.02: name guard on 27 criterion command(s).
+- QL-1.03: name guard on 25 criterion command(s).
+
+## Subtest labels added by the build
+
+When two or more red-green criteria of one task shared one whole-file command, one failing subtest at base and a green file passed them all (reviewer's finding, 31 October 2026). Each such criterion now runs its own subtest, named <task>-cNN: after its position in the task; the task gains a requirement naming the rule and a command criterion that one full run passes every labelled subtest with nothing skipped. Statements are unchanged.
+
+- QL-1.01: 34 criterion command(s) narrowed to labelled subtests.
+- QL-1.02: 27 criterion command(s) narrowed to labelled subtests.
+- QL-1.03: 25 criterion command(s) narrowed to labelled subtests.

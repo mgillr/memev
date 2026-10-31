@@ -14,7 +14,7 @@
         "SR-0.03"
       ],
       "tasks": 2,
-      "criteria": 44,
+      "criteria": 47,
       "spec": "specs/QL-1.01-red-team-gate-no-signing.json",
       "status": "proposed: owner's quality-loop order of 30 Oct, signs after a clean red-team round"
     },
@@ -29,7 +29,7 @@
         "SR-0.03"
       ],
       "tasks": 2,
-      "criteria": 35,
+      "criteria": 37,
       "spec": "specs/QL-1.02-mutation-gate-on-changed-lines.json",
       "status": "proposed: owner's quality-loop order of 30 Oct, signs after a clean red-team round"
     },
@@ -42,7 +42,7 @@
       "closes": "Closes quality-loop principle 7",
       "depends_on": [],
       "tasks": 2,
-      "criteria": 31,
+      "criteria": 33,
       "spec": "specs/QL-1.03-sensitive-path-checklist-before-merge.json",
       "status": "proposed: owner's quality-loop order of 30 Oct, signs after a clean red-team round"
     },
