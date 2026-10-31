@@ -1,0 +1,108 @@
+{
+  "title": "SO-1.03 Lead assignment: a default suitability analysis and an in-language user preference",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G-SO-03 (addendum 2, review row 2). Source: the Scope One addendum (PR #222, docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md at head a1757a0) and its review table (issuecomment-6534383323); owner request of 31 Oct 2026 that every aspect be decomposed in the WBS and built into contracts (t531u). The addendum names recommendations that become contracts on acceptance; this contract is the design-record stage, so it asks for the decision record and builds nothing. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository. Depends on contracts: SO-L-A, SO-08-A.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "Default agent suitability analysis: During scope analysis and planning, Memev should assess each work package and task against the capabilities required to complete it, then evaluate the connected agents and execution resources against those requirements. Consider demonstrated capability and relevant context, supported tools, permissions, reliability, availability, workload and applicable cost/latency constraints.",
+        "Optional user-directed assignment and control: The user must nevertheless be able to influence or override the default through the persistent lead-agent prompt, in ordinary language. For example: \"Use the review model for the architecture review\", \"Keep all code changes on my local machine\", \"Give this task to the agent I connected for testing\", or \"I want to handle this task myself.\" The lead agent should interpret the instruction, identify the affected work, assess feasibility and policy implications, and update the proposed plan or assignment preference. It should confirm material consequences where appropriate and explain when a request cannot be honoured; it must not silently ignore the instruction or imply that an unavailable or unsuitable resource can perform the work.",
+        "State-machine enforcement: User preferences and overrides are inputs to the canonical project policy/plan, not direct mutations of execution state. The state machine and coordinator remain authoritative for validating permissions, dependencies, resource eligibility, claims, dispatch, reassignment and recovery. A user preference cannot override access controls, safety policy, required approvals or valid task transitions.",
+        "Progressive control: The default experience should require no agent-management knowledge. Users who want more control can specify preferred agents, tools, machines, constraints or human ownership at project, workstream or individual-task level through the same lead-agent interaction area. Memev should make the effective preference visible and editable without turning routine orchestration into a mandatory configuration workflow."
+      ],
+      "description": "",
+      "scope": [
+        "docs/scope-one/design/lead-assignment-preference.md",
+        "docs/README.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The decision record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/design/lead-assignment-preference.md"
+          }
+        },
+        {
+          "statement": "The record decides requirement 1: Default agent suitability analysis: During scope analysis and planning, Memev should assess each work package and task against the capabilities required to...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/lead-assignment-preference.md",
+            "pattern": "^## Requirement 1:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 2: Optional user-directed assignment and control: The user must nevertheless be able to influence or override the default through the persistent lead-agent...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/lead-assignment-preference.md",
+            "pattern": "^## Requirement 2:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 3: State-machine enforcement: User preferences and overrides are inputs to the canonical project policy/plan, not direct mutations of execution state. The...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/lead-assignment-preference.md",
+            "pattern": "^## Requirement 3:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 4: Progressive control: The default experience should require no agent-management knowledge. Users who want more control can specify preferred agents, tools,...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/lead-assignment-preference.md",
+            "pattern": "^## Requirement 4:"
+          }
+        },
+        {
+          "statement": "The record names the suitability analysis",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/lead-assignment-preference.md",
+            "pattern": "^Suitability analysis:"
+          }
+        },
+        {
+          "statement": "The record names the preference record",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/lead-assignment-preference.md",
+            "pattern": "^Preference record:"
+          }
+        },
+        {
+          "statement": "The decision record passes the leak scan",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The documentation links and up-links stay valid",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-links.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

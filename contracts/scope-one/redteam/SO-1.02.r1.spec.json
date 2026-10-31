@@ -1,0 +1,109 @@
+{
+  "title": "SO-1.02 Reconciliation: one work breakdown that accounts for every requirement, contract, pull request and branch",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G-SO-02 (addendum 1, review row 1: reconciliation cadence not pinned). Source: the Scope One addendum (PR #222, docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md at head a1757a0) and its review table (issuecomment-6534383323); owner request of 31 Oct 2026 that every aspect be decomposed in the WBS and built into contracts (t531u). The addendum names recommendations that become contracts on acceptance; this contract is the design-record stage, so it asks for the decision record and builds nothing. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository. Depends on contracts: SO-T-A.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "Reconcile every Scope One branch and open PR against current `main` before commissioning overlapping work.",
+        "Give each canonical requirement one owner, one implementation path, explicit dependencies and acceptance tests.",
+        "Mark work as implemented, merged, integrated and verified separately; do not use these terms interchangeably.",
+        "Close or supersede duplicate/twin contracts explicitly, preserving links and rationale.",
+        "Reconcile the takeover register whenever the baseline changes. Treat counts in old snapshots as historical, not live status."
+      ],
+      "description": "",
+      "scope": [
+        "docs/scope-one/design/reconciliation-wbs.md",
+        "docs/README.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The decision record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/design/reconciliation-wbs.md"
+          }
+        },
+        {
+          "statement": "The record decides requirement 1: Reconcile every Scope One branch and open PR against current `main` before commissioning overlapping work.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reconciliation-wbs.md",
+            "pattern": "^## Requirement 1:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 2: Give each canonical requirement one owner, one implementation path, explicit dependencies and acceptance tests.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reconciliation-wbs.md",
+            "pattern": "^## Requirement 2:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 3: Mark work as implemented, merged, integrated and verified separately; do not use these terms interchangeably.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reconciliation-wbs.md",
+            "pattern": "^## Requirement 3:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 4: Close or supersede duplicate/twin contracts explicitly, preserving links and rationale.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reconciliation-wbs.md",
+            "pattern": "^## Requirement 4:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 5: Reconcile the takeover register whenever the baseline changes. Treat counts in old snapshots as historical, not live status.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reconciliation-wbs.md",
+            "pattern": "^## Requirement 5:"
+          }
+        },
+        {
+          "statement": "The record names the reconciliation cadence",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reconciliation-wbs.md",
+            "pattern": "^Reconciliation cadence:"
+          }
+        },
+        {
+          "statement": "The decision record passes the leak scan",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The documentation links and up-links stay valid",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-links.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

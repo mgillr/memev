@@ -1,0 +1,216 @@
+{
+  "title": "SO-1.11 Reference project: the whole user journey as one integration gate",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G-SO-11 (addendum 12, review row 12). Source: the Scope One addendum (PR #222, docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md at head a1757a0) and its review table (issuecomment-6534383323); owner request of 31 Oct 2026 that every aspect be decomposed in the WBS and built into contracts (t531u). The addendum names recommendations that become contracts on acceptance; this contract is the design-record stage, so it asks for the decision record and builds nothing. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository. Depends on contracts: SO-11-A.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "A user connects the local directory/directories and GitHub repository scope required for the project.",
+        "The user connects the supported services and grants the access they want Memev to have. They are not asked to allocate agents or select execution resources.",
+        "The user describes the desired outcome and scope in the lead-agent prompt.",
+        "Memev clarifies material ambiguity, assumptions, constraints and acceptance criteria, then presents the proposed scope for approval.",
+        "Memev decomposes the approved scope into contracts, deliverables, a project brief, roadmap, integrated project plan, development plan, system architecture, subsystem architecture as needed, work breakdown structure and dependency graph.",
+        "The user reviews the project definition and approves it. The state machine takes over execution.",
+        "Memev internally selects eligible resources, dispatches work, manages dependencies, handles provider/session failures, retries or reallocates work where policy permits, and records actual execution events.",
+        "The workspace reflects factual project progress and makes generated documents, diagrams and previews available with verification state.",
+        "A genuine blocker requiring human judgement is raised; the lead agent explains options, records the user's choice and updates affected work.",
+        "Interrupt an execution resource and confirm Memev recovers or reallocates work without asking the user to manage the agent.",
+        "Revoke a required permission and confirm Memev safely pauses or reroutes affected work, then asks the user only if a new grant is necessary.",
+        "Introduce a failed verification and require repair.",
+        "Change scope and confirm affected roadmap items, plans, architecture, tasks, approvals and evidence are updated or marked stale.",
+        "Reconcile a conflicting edit without silently losing work.",
+        "Produce a final report linking delivered artefacts, checks, evidence, decisions and outstanding limitations.",
+        "Repeat with different provider and machine configurations. Record which steps are automatic, policy-gated or genuinely require human intervention."
+      ],
+      "description": "",
+      "scope": [
+        "docs/scope-one/design/reference-project-acceptance.md",
+        "docs/README.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The decision record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/design/reference-project-acceptance.md"
+          }
+        },
+        {
+          "statement": "The record decides requirement 1: A user connects the local directory/directories and GitHub repository scope required for the project.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 1:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 2: The user connects the supported services and grants the access they want Memev to have. They are not asked to allocate agents or select execution resources.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 2:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 3: The user describes the desired outcome and scope in the lead-agent prompt.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 3:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 4: Memev clarifies material ambiguity, assumptions, constraints and acceptance criteria, then presents the proposed scope for approval.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 4:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 5: Memev decomposes the approved scope into contracts, deliverables, a project brief, roadmap, integrated project plan, development plan, system architecture,...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 5:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 6: The user reviews the project definition and approves it. The state machine takes over execution.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 6:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 7: Memev internally selects eligible resources, dispatches work, manages dependencies, handles provider/session failures, retries or reallocates work where...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 7:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 8: The workspace reflects factual project progress and makes generated documents, diagrams and previews available with verification state.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 8:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 9: A genuine blocker requiring human judgement is raised; the lead agent explains options, records the user's choice and updates affected work.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 9:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 10: Interrupt an execution resource and confirm Memev recovers or reallocates work without asking the user to manage the agent.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 10:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 11: Revoke a required permission and confirm Memev safely pauses or reroutes affected work, then asks the user only if a new grant is necessary.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 11:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 12: Introduce a failed verification and require repair.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 12:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 13: Change scope and confirm affected roadmap items, plans, architecture, tasks, approvals and evidence are updated or marked stale.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 13:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 14: Reconcile a conflicting edit without silently losing work.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 14:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 15: Produce a final report linking delivered artefacts, checks, evidence, decisions and outstanding limitations.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 15:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 16: Repeat with different provider and machine configurations. Record which steps are automatic, policy-gated or genuinely require human intervention.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^## Requirement 16:"
+          }
+        },
+        {
+          "statement": "The record names the step table",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^Step table:"
+          }
+        },
+        {
+          "statement": "The record names the automatic or gated or human",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/reference-project-acceptance.md",
+            "pattern": "^Automatic or gated or human:"
+          }
+        },
+        {
+          "statement": "The decision record passes the leak scan",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The documentation links and up-links stay valid",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-links.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
