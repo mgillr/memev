@@ -14,7 +14,7 @@
         "SR-0.03"
       ],
       "tasks": 2,
-      "criteria": 51,
+      "criteria": 59,
       "spec": "specs/QL-1.01-red-team-gate-no-signing.json",
       "status": "proposed: owner's quality-loop order of 30 Oct, signs after a clean red-team round"
     },
@@ -29,7 +29,7 @@
         "SR-0.03"
       ],
       "tasks": 2,
-      "criteria": 50,
+      "criteria": 55,
       "spec": "specs/QL-1.02-mutation-gate-on-changed-lines.json",
       "status": "proposed: owner's quality-loop order of 30 Oct, signs after a clean red-team round"
     },
