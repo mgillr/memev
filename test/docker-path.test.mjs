@@ -1,6 +1,6 @@
 // SO-R-B: the Docker path. I read the image and compose file statically, I test the graceful stop
-// against a daemon started in the sandbox, I run the smoke script against a recording stub docker,
-// and I run the container entry point outside Docker through the same code path.
+// against a daemon started in the sandbox, I run the smoke script against a recording stub docker
+// and curl, and I run the container entry point outside Docker through the same code path.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -10,6 +10,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import { cleanup, PKG, tmpdir } from './helpers/tmp.mjs';
 import { sandbox, BIN } from './helpers/cli.mjs';
 import { initVault, Vault, isVault } from '../src/engine/vault.mjs';
+import { configDir } from '../src/engine/util.mjs';
+import { whyNotRunning } from '../src/cli/daemon.mjs';
 
 after(() => cleanup());
 
@@ -42,11 +44,14 @@ test('SO-R-B AC01: the Dockerfile and compose.yaml carry the named volume, the l
   const pkg = JSON.parse(read('package.json'));
   assert.match(compose, /^\s+memev-vault:\s*$/m, 'the vault is a named volume');
   assert.match(compose, /memev-vault:\/vault/, 'the volume is mounted at /vault');
-  assert.match(compose, /127\.0\.0\.1:7787:7787/, 'the port is published on the loopback address by default');
+  assert.match(compose, /"127\.0\.0\.1:\$\{MEMEV_PORT:-7787\}:\$\{MEMEV_PORT:-7787\}"/, 'the port is published on the loopback address, 7787 unless MEMEV_PORT says otherwise');
+  assert.match(compose, /^\s+MEMEV_PORT:\s*\$\{MEMEV_PORT:-7787\}\s*$/m, 'the daemon in the container listens on the port compose publishes');
   const hc = dockerfile.split('\n').find((l) => l.startsWith('HEALTHCHECK'));
   assert.ok(hc, 'the Dockerfile has a HEALTHCHECK');
   for (const f of ['--interval', '--timeout', '--retries', '--start-period']) assert.ok(hc.includes(f), `the HEALTHCHECK has ${f}`);
   assert.match(hc, /\/healthz/, 'the HEALTHCHECK probes /healthz');
+  assert.match(hc, /http:\/\/127\.0\.0\.1:\$\{MEMEV_PORT:-7787\}\/healthz/, 'the HEALTHCHECK probes the port the daemon listens on');
+  assert.match(dockerfile, /^ENV\s.*\bMEMEV_CONFIG_DIR=\/vault\/\.memev\/\S+/m, 'the config folder (signing key, licence, trial record) is in the volume, under .memev/');
   assert.match(dockerfile, /^USER memev$/m, 'the process runs as an unprivileged user');
   assert.doesNotMatch(dockerfile, /^USER\s+root/m, 'the process does not run as root');
   assert.ok(dockerfile.includes(`ARG MEMEV_VERSION=${pkg.version}`), 'ARG MEMEV_VERSION matches the package version');
@@ -82,6 +87,24 @@ test('SO-R-B AC01: a daemon that receives SIGTERM flushes the op-log, closes its
   }
 });
 
+test('SO-R-B AC02: the image keeps the config folder in the vault volume, where the vault\'s git never commits it', () => {
+  const value = /^ENV\s.*\bMEMEV_CONFIG_DIR=(\S+)/m.exec(read('Dockerfile'))?.[1];
+  assert.ok(value, 'the Dockerfile sets MEMEV_CONFIG_DIR');
+  assert.ok(value.startsWith('/vault/'), `the config folder is in the volume, not in the container's home: ${value}`);
+  // the volume's first run, outside Docker: /vault is a fresh vault
+  const root = path.join(tmpdir('vol-'), 'vault');
+  initVault(root, { template: path.join(PKG, 'templates', 'vault') });
+  const dir = configDir({ HOME: '/home/memev', MEMEV_CONFIG_DIR: path.join(root, value.slice('/vault/'.length)) });
+  assert.ok(dir.startsWith(root + path.sep), 'the config folder resolves inside the volume');
+  fs.mkdirSync(path.join(dir, 'keys'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'keys', 'signing.pem'), 'not a real key');
+  fs.writeFileSync(path.join(dir, 'license.json'), '{}');
+  for (const rel of ['keys/signing.pem', 'license.json']) {
+    const file = path.relative(root, path.join(dir, rel));
+    assert.equal(spawnSync('git', ['-C', root, 'check-ignore', '-q', file]).status, 0, `the vault's git ignores ${file}, so a key or a licence is never committed or pushed to a backup`);
+  }
+});
+
 test('SO-R-B AC02: docs/DOCKER.md documents the path and every variable the image reads', () => {
   const docs = read('docs/DOCKER.md');
   const names = new Set();
@@ -97,71 +120,112 @@ test('SO-R-B AC02: docs/DOCKER.md documents the path and every variable the imag
   assert.match(shutdown, /keeps the volume/i, 'the shutdown section says down keeps the volume');
   assert.match(docs, /docker pull /, 'the pull-and-run example pulls the image');
   assert.match(docs, /placeholder/i, 'the page marks the image name as a placeholder until a registry is decided');
+  const persistent = docs.split(/##\s*Persistent data/)[1]?.split(/\n##\s/)[0] || '';
+  assert.match(persistent, /MEMEV_CONFIG_DIR/, 'the persistent data section names the config folder in the volume');
+  assert.match(persistent, /signing key/i, 'and says the signing key is kept there');
+  assert.match(persistent, /licen[cs]e/i, 'and the licence');
+  assert.match(docs, /memev-smoke/, 'the page says the smoke runs in a compose project of its own');
 });
 
-const STUB = `#!/bin/sh
-echo "docker $*" >> "$DOCKER_STUB_LOG"
-if [ "$1" = "volume" ]; then
-  echo "local  memev-vault"
-  exit 0
-fi
-if [ "$1" != "compose" ]; then
-  exit 0
-fi
-case "$2" in
-  ps)
-    if [ -n "\${DOCKER_STUB_UNHEALTHY:-}" ]; then
-      echo '{"Service":"memev","State":"running","Health":"starting"}'
-    elif [ -f "$DOCKER_STUB_STATE/need-healthy" ]; then
-      rm -f "$DOCKER_STUB_STATE/need-healthy"
-      echo '{"Service":"memev","State":"running","Health":"starting"}'
-    else
-      echo '{"Service":"memev","State":"running","Health":"healthy"}'
-    fi
-    ;;
-  up|restart)
-    touch "$DOCKER_STUB_STATE/need-healthy"
-    ;;
-  exec)
-    case "$*" in
-      *recall*) echo "docker smoke note" ;;
-    esac
-    ;;
-esac
-exit 0
+// The stub stands in for docker and curl as shell functions, sourced before the smoke script, so the run needs no new
+// executable file and never reaches a real docker. It logs every call and keeps the volumes and the remembered notes in
+// DOCKER_STUB_STATE. Without -p, compose uses the folder name as the project, as docker does: that is the project of a
+// memev deployed from this checkout.
+const STUB = `
+stub_log() { echo "$*" >> "$DOCKER_STUB_LOG"; }
+curl() {
+  stub_log "curl $*"
+  printf '%s' "\${DOCKER_STUB_CURL_CODE:-401}"
+}
+docker() {
+  stub_log "docker $*"
+  case "$1" in
+    compose) shift ;;
+    volume)
+      case "$2" in
+        ls) sed 's/^/local  /' "$DOCKER_STUB_STATE/volumes" ;;
+        inspect) grep -qx "$3" "$DOCKER_STUB_STATE/volumes" || return 1 ;;
+      esac
+      return 0 ;;
+    *) return 0 ;;
+  esac
+  project=$(basename "$PWD")
+  if [ "$1" = "-p" ]; then project="$2"; shift 2; fi
+  case "$1" in
+    ps)
+      if [ -n "\${DOCKER_STUB_UNHEALTHY:-}" ] || [ -f "$DOCKER_STUB_STATE/need-healthy" ]; then
+        rm -f "$DOCKER_STUB_STATE/need-healthy"
+        echo '{"Service":"memev","State":"running","Health":"starting"}'
+      else
+        echo '{"Service":"memev","State":"running","Health":"healthy"}'
+      fi ;;
+    up)
+      grep -qx "\${project}_memev-vault" "$DOCKER_STUB_STATE/volumes" || echo "\${project}_memev-vault" >> "$DOCKER_STUB_STATE/volumes"
+      touch "$DOCKER_STUB_STATE/need-healthy" ;;
+    restart) touch "$DOCKER_STUB_STATE/need-healthy" ;;
+    down)
+      if [ "\${2:-}" = "-v" ] || [ -n "\${DOCKER_STUB_DOWN_DROPS_VOLUME:-}" ]; then
+        grep -vx "\${project}_memev-vault" "$DOCKER_STUB_STATE/volumes" > "$DOCKER_STUB_STATE/volumes.new" || true
+        mv "$DOCKER_STUB_STATE/volumes.new" "$DOCKER_STUB_STATE/volumes"
+      fi ;;
+    exec)
+      case "$5" in
+        remember) [ -n "\${DOCKER_STUB_LOSE_WRITES:-}" ] || echo "$6" >> "$DOCKER_STUB_STATE/notes" ;;
+        recall) cat "$DOCKER_STUB_STATE/notes" 2>/dev/null || true ;;
+      esac ;;
+  esac
+  return 0
+}
 `;
 
 const step = (line) => {
+  if (line.startsWith('curl ')) return 'curl';
   if (line.startsWith('docker pull ')) return 'pull';
   if (line.startsWith('docker volume')) return 'volume';
   const parts = line.split(' ');
   if (parts[1] === 'compose') {
-    if (parts[2] === 'exec') return parts.includes('remember') ? 'exec-remember' : 'exec-recall';
-    return parts[2];
+    const sub = parts[2] === '-p' ? parts.slice(4) : parts.slice(2);
+    if (sub[0] === 'exec') return sub.includes('remember') ? 'exec-remember' : 'exec-recall';
+    if (sub[0] === 'down') return sub.includes('-v') ? 'down -v' : 'down';
+    return sub[0];
   }
   return parts[1];
 };
 
-test('SO-R-B AC03: the smoke script runs the persistence check in the right order against a recording stub docker', () => {
-  assert.equal(spawnSync('bash', ['-n', path.join(PKG, 'scripts', 'docker-smoke.sh')]).status, 0, 'the smoke script parses');
-  const bin = tmpdir('stubbin-');
-  fs.writeFileSync(path.join(bin, 'docker'), STUB, { mode: 0o755 });
-  const runSmoke = (extraEnv = {}) => {
-    const logDir = tmpdir('stublog-');
-    const log = path.join(logDir, 'log');
-    const r = spawnSync('sh', [path.join(PKG, 'scripts', 'docker-smoke.sh')], {
-      cwd: PKG,
-      encoding: 'utf8',
-      timeout: 60000,
-      env: { PATH: bin + path.delimiter + process.env.PATH, DOCKER_STUB_LOG: log, DOCKER_STUB_STATE: tmpdir('stubstate-'), MEMEV_SMOKE_HEALTH_TIMEOUT: '10', ...extraEnv },
-    });
-    const steps = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n').map(step) : [];
-    return { ...r, steps };
-  };
+const SMOKE = path.join(PKG, 'scripts', 'docker-smoke.sh');
+// the volume of a memev deployed from this checkout: docker names it after the folder
+const DEPLOYED = `${path.basename(PKG)}_memev-vault`;
+
+const runSmoke = (extraEnv = {}, { notes = [] } = {}) => {
+  const state = tmpdir('stubstate-');
+  const log = path.join(state, 'log');
+  fs.writeFileSync(path.join(state, 'volumes'), `${DEPLOYED}\n`);
+  if (notes.length) fs.writeFileSync(path.join(state, 'notes'), notes.map((n) => `${n}\n`).join(''));
+  const stub = path.join(state, 'stub.sh');
+  fs.writeFileSync(stub, STUB);
+  // T-INS-04 runs the script with sh; sourcing it after the stub is the same run with docker and curl stood in for
+  const r = spawnSync('sh', ['-c', '. "$1"; . "$2"', 'sh', stub, SMOKE], {
+    cwd: PKG,
+    encoding: 'utf8',
+    timeout: 60000,
+    env: { PATH: process.env.PATH, DOCKER_STUB_LOG: log, DOCKER_STUB_STATE: state, MEMEV_SMOKE_HEALTH_TIMEOUT: '10', ...extraEnv },
+  });
+  const lines = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n') : [];
+  const volumes = fs.readFileSync(path.join(state, 'volumes'), 'utf8').split('\n').filter(Boolean);
+  const remembered = lines.filter((l) => step(l) === 'exec-remember').map((l) => l.replace(/^.* remember /, '').replace(/ --kind fact$/, ''));
+  return { ...r, lines, steps: lines.map(step), volumes, remembered };
+};
+
+test('SO-R-B AC03: the smoke script runs the persistence check in the right order, in a compose project of its own, against a recording stub docker', () => {
+  assert.equal(spawnSync('bash', ['-n', SMOKE]).status, 0, 'the smoke script parses');
   const ok = runSmoke();
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);
   assert.match(ok.stdout, /docker smoke: ok/);
-  assert.deepEqual(ok.steps, ['build', 'up', 'ps', 'ps', 'exec-remember', 'restart', 'ps', 'ps', 'exec-recall', 'down', 'volume', 'down'], 'the steps run in order');
+  assert.deepEqual(ok.steps, ['build', 'up', 'ps', 'ps', 'curl', 'exec-remember', 'restart', 'ps', 'ps', 'exec-recall', 'down', 'volume', 'down -v'], 'the steps run in order');
+  const compose = ok.lines.filter((l) => l.startsWith('docker compose'));
+  assert.ok(compose.length > 0 && compose.every((l) => l.startsWith('docker compose -p memev-smoke ')), `every compose call names the memev-smoke project, so a deployed memev is never recreated or stopped: ${compose.join(' | ')}`);
+  assert.ok(ok.lines.includes('docker volume inspect memev-smoke_memev-vault'), 'the volume is checked by its exact name');
+  assert.deepEqual(ok.volumes, [DEPLOYED], 'the smoke project\'s volume is removed at the end and the deployed volume is untouched');
   const pulled = runSmoke({ MEMEV_IMAGE: 'example/memev:0.1.0' });
   assert.equal(pulled.status, 0, pulled.stdout + pulled.stderr);
   assert.equal(pulled.steps[0], 'pull', 'a published image is pulled');
@@ -169,6 +233,34 @@ test('SO-R-B AC03: the smoke script runs the persistence check in the right orde
   const bad = runSmoke({ DOCKER_STUB_UNHEALTHY: '1', MEMEV_SMOKE_HEALTH_TIMEOUT: '1' });
   assert.notEqual(bad.status, 0, 'an unhealthy container fails the smoke');
   assert.match(bad.stderr, /failed at wait for healthy/, 'the failure names the step');
+  assert.deepEqual(bad.volumes, [DEPLOYED], 'a failed run removes its volume too');
+});
+
+test('SO-R-B AC03: the smoke fails when the published port answers an MCP call without a token (LAB-TEST-PLAN T-INS-04)', () => {
+  const ok = runSmoke();
+  const curl = ok.lines.find((l) => l.startsWith('curl '));
+  assert.ok(curl && curl.includes('http://127.0.0.1:7787/mcp') && !/authorization/i.test(curl), `the check posts to /mcp on the published port with no token: ${curl}`);
+  const open = runSmoke({ DOCKER_STUB_CURL_CODE: '200' });
+  assert.notEqual(open.status, 0, 'a 200 without a token fails the smoke');
+  assert.match(open.stderr, /failed at 401 without a token \(got 200\)/);
+  const port = runSmoke({ MEMEV_PORT: '17787' });
+  assert.equal(port.status, 0, port.stdout + port.stderr);
+  assert.ok(port.lines.find((l) => l.startsWith('curl ')).includes('http://127.0.0.1:17787/mcp'), 'the check follows MEMEV_PORT, the port compose publishes');
+});
+
+test('SO-R-B AC03: the persistence checks can fail: a note from an earlier run or a volume of another project does not pass them', () => {
+  const one = runSmoke();
+  const two = runSmoke();
+  assert.equal(one.remembered.length, 1);
+  assert.notEqual(one.remembered[0], two.remembered[0], 'every run writes a note of its own');
+  // the vault still holds the note an earlier run wrote, and this run's write is lost
+  const lost = runSmoke({ DOCKER_STUB_LOSE_WRITES: '1' }, { notes: ['docker smoke note', ...one.remembered] });
+  assert.notEqual(lost.status, 0, 'an earlier run\'s note does not stand in for this run\'s');
+  assert.match(lost.stderr, /failed at read the note back/);
+  // down takes the smoke volume with it while the deployed memev's volume, which also ends in memev-vault, is there
+  const gone = runSmoke({ DOCKER_STUB_DOWN_DROPS_VOLUME: '1' });
+  assert.notEqual(gone.status, 0, 'another project\'s memev-vault volume does not pass the check');
+  assert.match(gone.stderr, /failed at volume memev-smoke_memev-vault kept after down/);
 });
 
 test('SO-R-B AC04: first run on an empty volume creates the vault and serves it', async () => {
@@ -202,6 +294,17 @@ test('SO-R-B AC04: a syntax error in the mounted config logs one line naming the
   assert.equal(lines.length, 1, `exactly one line names the config file; output: ${all}`);
   assert.doesNotMatch(all, /^\s*at /m, 'no stack trace');
   assert.doesNotMatch(all, /SyntaxError/, 'no raw SyntaxError');
+});
+
+test('SO-R-B AC04: with a syntax error in the config the doctor\'s daemon check names the file instead of only saying the daemon is not running', async () => {
+  const root = path.join(tmpdir('vault-'), 'vault');
+  initVault(root, { template: path.join(PKG, 'templates', 'vault') });
+  assert.equal(await whyNotRunning(root), null, 'a stopped vault with a good config has no reason to report');
+  const cfg = path.join(root, '.memev', 'config.json');
+  fs.writeFileSync(cfg, '{ not valid json');
+  const why = await whyNotRunning(root);
+  assert.ok(why && why.includes(cfg), `the reason names the config file: ${why}`);
+  assert.match(why, /not valid json/);
 });
 
 test('SO-R-B AC05: docs/DOCKER.md says publishing a versioned image needs the registry decision and the owner\'s go', () => {

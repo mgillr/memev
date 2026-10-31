@@ -7,21 +7,27 @@ docker compose up -d
 docker compose exec memev memev token issue my-app
 ```
 
-`compose.yaml` publishes port 7787 on the host's loopback only (`127.0.0.1:7787`) and keeps the
-vault in the `memev-vault` volume. The image runs as the unprivileged `memev` user and has a health
-check on `/healthz`.
+`compose.yaml` publishes port 7787 (or `MEMEV_PORT`) on the host's loopback only (`127.0.0.1:7787`)
+and keeps the vault and the config folder in the `memev-vault` volume. The image runs as the
+unprivileged `memev` user and has a health check on `/healthz`.
 
 ## Persistent data
 
 The vault lives in the named volume `memev-vault`, mounted at `/vault` inside the container
-(`MEMEV_ROOT=/vault`). Everything the daemon writes, the notes, the op-log, the tokens and the git
-history, is in that volume. `docker compose down` stops the container and keeps the volume; the
+(`MEMEV_ROOT=/vault`). The config folder lives there too: the image sets
+`MEMEV_CONFIG_DIR=/vault/.memev/user-config`, and that folder holds the signing key for contracts,
+the licence, the trial record and the device key. It is inside `.memev/`, which the vault's git
+ignores, so none of it is committed or pushed to a backup. Everything the daemon writes, the notes,
+the op-log, the tokens, the git history and the config folder, is in that volume. `docker compose down` stops the container and keeps the volume; the
 next `docker compose up -d` starts on the same data. Only `docker compose down -v` removes the
 volume and the data in it.
 
 ## Ports
 
-Publish the port as `127.0.0.1:7787:7787`, as `compose.yaml` does. Inside the container the server
+Publish the port as `127.0.0.1:7787:7787`, as `compose.yaml` does. `MEMEV_PORT` (7787 in the image)
+is the port the daemon listens on inside the container; `compose.yaml` publishes the same port on
+loopback and the health check probes it, so to move it, set `MEMEV_PORT` when you run
+`docker compose`. Inside the container the server
 binds `0.0.0.0` (`MEMEV_BIND`) so the compose port mapping reaches it, and it treats exactly one
 peer as local: the bridge gateway, which is the host. It finds that address from the default route
 (`MEMEV_TRUST_GATEWAY=1`; set `MEMEV_GATEWAY` to override it). A request from any other address is
@@ -48,7 +54,8 @@ volume.
 
 ## Health check
 
-The image carries a `HEALTHCHECK` that probes `http://127.0.0.1:7787/healthz` every 30 seconds
+The image carries a `HEALTHCHECK` that probes `/healthz` on the daemon's port
+(`http://127.0.0.1:7787/healthz` unless `MEMEV_PORT` says otherwise) every 30 seconds
 (`--interval=30s`), gives each probe 3 seconds (`--timeout=3s`), counts the container unhealthy
 after 3 failed probes (`--retries=3`) and does not start counting failures for the first 10
 seconds (`--start-period=10s`). `docker compose ps` shows the state; wait for `healthy` before
@@ -61,7 +68,8 @@ The image reads these variables:
 | variable | default | meaning |
 | --- | --- | --- |
 | `MEMEV_ROOT` | `/vault` | where the vault lives; the mounted volume |
-| `MEMEV_PORT` | the vault config, then `7787` | the port the daemon listens on inside the container |
+| `MEMEV_PORT` | `7787` in the image | the port the daemon listens on inside the container; `compose.yaml` publishes the same port on loopback and the health check probes it |
+| `MEMEV_CONFIG_DIR` | `/vault/.memev/user-config` in the image | the config folder: the signing key, the licence, the trial record and the device key; in the volume, inside `.memev/`, which the vault's git ignores |
 | `MEMEV_BIND` | `0.0.0.0` in the image | the address the daemon binds; keep the compose publish on loopback |
 | `MEMEV_TRUST_GATEWAY` | `1` in the image | trust the bridge gateway (the host) as the one local peer |
 | `MEMEV_GATEWAY` | the default route | the gateway address, when `MEMEV_TRUST_GATEWAY` is set |
@@ -107,7 +115,10 @@ SIGKILL and the volume still keeps everything that was flushed.
 
 `memev selftest` inside the image checks a throwaway vault end to end; `scripts/docker-smoke.sh`
 runs the full container check against whatever image `MEMEV_IMAGE` names, or a local build when it
-is not set.
+is not set. It runs in a compose project of its own, `memev-smoke`, so a memev deployed from the
+same checkout keeps its container and its volume, and it removes the `memev-smoke` volume at the
+end. If a memev on the machine already publishes port 7787, run the smoke with `MEMEV_PORT` set to a
+free port.
 
 ## Trial setup
 

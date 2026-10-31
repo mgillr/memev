@@ -1,7 +1,9 @@
-# Memev in a container. The vault lives in the /vault volume; the port is published on the host's
-# loopback only (see compose.yaml). With MEMEV_TRUST_GATEWAY=1 the server trusts only the bridge
-# gateway (the host, found from the default route) as local. Remote access from inside the container
-# is off: run a tunnel on the host, or add a cloudflared sidecar (docs/DOCKER.md).
+# Memev in a container. The vault lives in the /vault volume, and so does the config folder (the
+# signing key, the licence and the trial record) under /vault/.memev, which the vault's git ignores.
+# The port (MEMEV_PORT, 7787) is published on the host's loopback only (see compose.yaml). With
+# MEMEV_TRUST_GATEWAY=1 the server trusts only the bridge gateway (the host, found from the default
+# route) as local. Remote access from inside the container is off: run a tunnel on the host, or add
+# a cloudflared sidecar (docs/DOCKER.md).
 FROM node:22-alpine
 RUN apk add --no-cache git openssh-client tini \
  && addgroup -S memev && adduser -S -G memev -h /home/memev memev
@@ -20,9 +22,10 @@ LABEL org.opencontainers.image.title="memev" \
   org.opencontainers.image.licenses="Apache-2.0" \
   org.opencontainers.image.version="${MEMEV_VERSION}"
 ENV HOME=/home/memev MEMEV_ROOT=/vault MEMEV_BIND=0.0.0.0 MEMEV_TRUST_GATEWAY=1 MEMEV_NO_TUNNEL=1 MEMEV_NO_SERVICE=1
+ENV MEMEV_CONFIG_DIR=/vault/.memev/user-config MEMEV_PORT=7787
 ENV MEMEV_CONTAINER=1
 VOLUME ["/vault"]
 EXPOSE 7787
-HEALTHCHECK --interval=30s --timeout=3s --retries=3 --start-period=10s CMD wget -qO- http://127.0.0.1:7787/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 --start-period=10s CMD wget -qO- "http://127.0.0.1:${MEMEV_PORT:-7787}/healthz" || exit 1
 ENTRYPOINT ["/sbin/tini", "--", "memev"]
 CMD ["container"]

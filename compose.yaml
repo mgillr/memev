@@ -3,8 +3,10 @@ services:
     build: .
     image: ${MEMEV_IMAGE:-memev:local}
     restart: unless-stopped
+    environment:
+      MEMEV_PORT: ${MEMEV_PORT:-7787}
     ports:
-      - "127.0.0.1:7787:7787"   # loopback only: nothing on your network can reach it
+      - "127.0.0.1:${MEMEV_PORT:-7787}:${MEMEV_PORT:-7787}"   # loopback only: nothing on your network can reach it
     volumes:
       - memev-vault:/vault
 volumes:
