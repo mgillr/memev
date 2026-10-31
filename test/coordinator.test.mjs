@@ -1,7 +1,7 @@
 // SO-08-A: the coordinator's duplicate-work controls, over a store with the ProjectStore API.
 // The store is a self-contained double in this file (same public API, O_EXCL single-writer lock,
-// append-only log, replay, per-record generation, idempotency keys) so the tests need no store on
-// main. Concurrency claims use two real processes; no fixed port.
+// append-only log, replay, per-record generation, idempotency keys), written before the store was on main; one AC01
+// subtest runs over the real ProjectStore. Concurrency claims use two real processes; no fixed port.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -10,6 +10,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { Coordinator } from '../src/engine/coordinator.mjs';
+import { ProjectStore } from '../src/engine/project-store.mjs';
 
 // ---- the store double: same public API as the SO-07-A ProjectStore (withWrite, append, put,
 // snapshot, stats, close), a single-writer O_EXCL lock, an append-only log, replay on every write,
@@ -235,6 +236,23 @@ test('SO-08-A AC01: two claimants in two processes, exactly one wins a lease; re
   assert.equal(rel.ok, true);
   assert.equal(store.snapshot('lease')[lease.id].release_reason, 'done by test');
   store.close();
+});
+
+// The same claim over the real ProjectStore, which refuses a stale append with code stale_generation and a message that
+// does not contain it. Two stores on one folder are both opened before either claims, so the second claim is stale.
+test('SO-08-A AC01: over the real ProjectStore, the claimant that loses on a stale generation gets a conflict naming the holder', () => {
+  const dir = tmpdir();
+  const open = () => new ProjectStore(dir, { id: 'p1', fsync: false }).open();
+  { const s = open(); new Coordinator(s).plan('p1', [{ id: 'T1', title: 'task one' }]); s.close(); }
+  const s1 = open(); const s2 = open();
+  try {
+    const won = new Coordinator(s1).claim('T1', 'agent-A', 60000);
+    assert.equal(won.ok, true, 'the first claimant receives a lease');
+    const lost = new Coordinator(s2).claim('T1', 'agent-B', 60000);
+    assert.equal(lost.ok, false, 'the second claimant does not win');
+    assert.equal(lost.conflict.holder, 'agent-A', 'the conflict names the holder');
+    assert.equal(lost.conflict.expires, won.lease.expires, 'the conflict names the expiry');
+  } finally { s1.close(); s2.close(); }
 });
 
 // ---- AC02: a stale owner cannot commit

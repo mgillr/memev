@@ -183,7 +183,8 @@ export class Coordinator {
           },
         });
       } catch (e) {
-        if (String(e?.message).includes('stale_generation')) {
+        // the ProjectStore refuses a stale append with code stale_generation (its message says 'refused: generation ...')
+        if (e?.code === 'stale_generation' || String(e?.message).includes('stale_generation')) {
           const fresh = s.snapshot('task')[taskId];
           const fl = fresh?.lease_id ? s.snapshot('lease')[fresh.lease_id] : null;
           return {
