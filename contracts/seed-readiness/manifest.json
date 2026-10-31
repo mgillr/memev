@@ -683,7 +683,7 @@
       "area": "SR-5",
       "title": "The Business trial can actually start",
       "repo": "memev",
-      "closes": "invite.trialAvailable() returns false (MEM-067); the site offers a trial no one can start",
+      "closes": "invite.trialAvailable() returns false and its comment waits for MEM-067, which will not ship because there is no Personal trial (the free core is the trial); the Business trial lands through MEM-129, MEM-130 and MEM-134; the site offers a trial no one can start",
       "depends_on": [
         "SR-4.02",
         "SR-7.02"
