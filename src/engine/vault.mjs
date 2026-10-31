@@ -213,6 +213,9 @@ export class Vault extends EventEmitter {
     if (!allowed(identity, scope, p)) throw new VaultError('forbidden', `this token may not ${scope}${p ? ` ${p}` : ''}`);
   }
   _guard(p, text, allowSecrets, internal) {
+    // the bus writes its own files (messages, seats, the lead record) without the note API, so no token writes under bus/
+    // in any letter case: a cloud connector's note writes there made it the lead and gave a local seat its alias (issue 250)
+    if (!internal && /^bus\//i.test(p)) throw new VaultError('immutable', `${p} is written only by the bus itself; post with the bus tools`);
     if (!internal && PROTECTED.some((re) => re.test(p))) {
       if (/^contracts\/(closed|receipts)\//i.test(p)) throw new VaultError('immutable', `${p} is written only by memev contract verify; a contract is done when its verify passes`);
       throw new VaultError('immutable', `${p} is signed and immutable; amend it with a new contract (memev contract amend)`);
