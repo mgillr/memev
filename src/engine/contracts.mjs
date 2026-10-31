@@ -91,6 +91,32 @@ export function projectTestCommand(wd) {
 export class ContractError extends Error { constructor(code, m) { super(m); this.code = code; } }
 const SIGNED = 'contracts/signed', KEYS = 'contracts/keys';
 
+// The base revision: the commit a contract's work starts from. Scope and red-green criteria compare against it, and every
+// criterion command sees it as MEMEV_CONTRACT_BASE. A local signature records it ({ sha, recorded_at }) inside the signed body,
+// so the signature covers it; a remote-signed contract gets it at local approval, in a signed approval record.
+export const BASE_ENV = 'MEMEV_CONTRACT_BASE';
+const SHA40 = /^[0-9a-f]{40}$/;
+/** An explicit base as a spec or draft names it: a 40-hex sha (any case) gives it lowercased; null when none is named; else throws. */
+export function explicitBase(b) {
+  if (b === undefined || b === null) return null;
+  const sha = typeof b === 'string' ? b : b && typeof b === 'object' ? b.sha : undefined;
+  if (typeof sha !== 'string' || !/^[0-9a-fA-F]{40}$/.test(sha)) throw new ContractError('bad_request', 'the base must be a commit sha of 40 hex characters');
+  return sha.toLowerCase();
+}
+/** The commit HEAD names in a git workdir, or null when the workdir is not a git checkout. Only for a local caller. */
+function headOf(wd) {
+  if (!wd) return null;
+  const r = git(path.resolve(wd), ['rev-parse', '--verify', '-q', 'HEAD^{commit}']);
+  return r.ok && SHA40.test(r.out) ? r.out : null;
+}
+/** The environment of a criterion command: this process's, with MEMEV_CONTRACT_BASE set to the base, or removed when there is none. */
+export function criterionEnv(base, env = process.env) {
+  const out = { ...env };
+  delete out[BASE_ENV];
+  if (base) out[BASE_ENV] = base;
+  return out;
+}
+
 export const PRE_COMMIT = `#!/bin/sh
 # Memev: signed contracts and their keys are immutable once committed.
 bad=$(git diff --cached --name-only --diff-filter=MDR -- '${SIGNED}/' '${KEYS}/')
@@ -120,11 +146,13 @@ function signingKey(dir) {
 export function attach(Vault) {
   const P = Vault.prototype;
 
-  P.contractDraft = function (identity, { title, project = null, workdir = null, tasks = [], supersedes = null, client = null, request = null, provenance = null, version = null }) {
+  P.contractDraft = function (identity, { title, project = null, workdir = null, tasks = [], supersedes = null, client = null, request = null, provenance = null, version = null, base = null }) {
     if (!title) throw new ContractError('bad_request', 'a contract needs a title');
     if (!Array.isArray(tasks) || !tasks.length) throw new ContractError('bad_request', 'a contract needs at least one task');
+    // an explicit base is checked before anything is written: only a 40-hex sha, never a ref or anything git could read as an option
+    const baseSha = explicitBase(base);
     const id = `k-${slug(title, 24)}-${randomToken(3)}`;
-    const c = { ...A.skeleton(project || 'memev'), id, title, workdir, created: now(), version: version || 1, ...(supersedes ? { supersedes } : {}), ...(request ? { request: truncate(String(request), 4000) } : {}), ...(provenance ? { provenance } : {}), tasks: tasks.map((t, i) => A.makeTask({ id: t.id || `T${i + 1}`, title: t.title, phase: t.phase || 'implement', depends_on: t.depends_on || [], requirements: t.requirements || [], description: t.description || '', scope: t.scope || ['**'], criteria: t.criteria || [], stop_rules: t.stop_rules || [] })) };
+    const c = { ...A.skeleton(project || 'memev'), id, title, workdir, created: now(), version: version || 1, ...(baseSha ? { base: baseSha } : {}), ...(supersedes ? { supersedes } : {}), ...(request ? { request: truncate(String(request), 4000) } : {}), ...(provenance ? { provenance } : {}), tasks: tasks.map((t, i) => A.makeTask({ id: t.id || `T${i + 1}`, title: t.title, phase: t.phase || 'implement', depends_on: t.depends_on || [], requirements: t.requirements || [], description: t.description || '', scope: t.scope || ['**'], criteria: t.criteria || [], stop_rules: t.stop_rules || [] })) };
     const errs = A.validate(c);
     if (errs.length) throw new ContractError('invalid', `the contract is not valid: ${errs.slice(0, 5).join('; ')}`);
     this.write(identity, { path: `contracts/drafts/${id}.json`, body: `${JSON.stringify(c, null, 2)}\n`, client });
@@ -143,12 +171,18 @@ export function attach(Vault) {
     const key = signingKey(this.opts.keyDir || path.join(configDir(), 'keys'));
     const origin = local ? 'local' : 'remote';
     c.origin = origin;
+    // the base revision, recorded before the signature is made so the signature covers it: the draft's explicit base, else the
+    // workdir's HEAD when the workdir is a git checkout. A draft is a note other tokens can write, so its base is checked again.
+    // A remote caller's contract records none and runs no git here: its base is recorded at local approval.
+    const explicit = explicitBase(c.base);
+    delete c.base;
+    if (local) { const sha = explicit || headOf(c.workdir); if (sha) c.base = { sha, recorded_at: now() }; }
     const env_ = dsseSign(c, key.priv);
     const body = `${JSON.stringify(c, null, 2)}\n`;
     if (this._read(`${KEYS}/${key.id}.pub`) === null) this.write(identity, { path: `${KEYS}/${key.id}.pub`, body: key.pub, client, internal: true });
     this.write(identity, { path: `${SIGNED}/${id}.json`, body, client, internal: true });
     this.write(identity, { path: `${SIGNED}/${id}.sig.json`, body: `${JSON.stringify(env_, null, 2)}\n`, client, internal: true });
-    this._applyMisc(this.log.append({ type: 'contract.signed', path: null, agent: identity.agent, client, data: { id, hash: canonicalHash(c), keyid: key.id, session, supersedes: c.supersedes || null, origin } }));
+    this._applyMisc(this.log.append({ type: 'contract.signed', path: null, agent: identity.agent, client, data: { id, hash: canonicalHash(c), keyid: key.id, session, supersedes: c.supersedes || null, origin, base: c.base?.sha || null } }));
     // the signed contract is a memory: a decision anyone can recall, linked to its project, the
     // session that signed it, the decisions it rests on and the version it replaces (provenance)
     const project = c.project && c.project !== 'memev' ? c.project : null;
@@ -158,7 +192,7 @@ export function attach(Vault) {
     if (session || c.provenance?.session) this.link(identity, { from: node, to: `session ${String(session || c.provenance.session).slice(0, 16)}`, type: 'derived_from', why: 'signed in this conversation', client });
     for (const d of c.provenance?.decisions || []) this.link(identity, { from: node, to: String(d), type: 'derived_from', why: 'a decision the contract rests on', client });
     if (c.supersedes) this.link(identity, { from: node, to: `contract ${c.supersedes}`, type: 'supersedes', why: 'new version', client });
-    return { id, signed: true, version: c.version || 1, supersedes: c.supersedes || null, hash: canonicalHash(c), keyid: key.id, path: `${SIGNED}/${id}.json`, origin, memory: mem.path || null, next: 'build the tasks in order; run memev_contract_verify after each one' };
+    return { id, signed: true, version: c.version || 1, supersedes: c.supersedes || null, hash: canonicalHash(c), keyid: key.id, path: `${SIGNED}/${id}.json`, origin, base: c.base?.sha || null, memory: mem.path || null, next: 'build the tasks in order; run memev_contract_verify after each one' };
   };
 
   P.contractApprove = function (identity, { id, local = true }) {
@@ -168,9 +202,30 @@ export function attach(Vault) {
     // the approval sits beside the signed contract, under the protected path: no plain write can create it
     // (a remote caller included), and it is written once, since the vault hook refuses a change under signed/
     if (this._contractApproved(id)) return { approved: true, id };
-    this.write(identity, { path: `${SIGNED}/${id}.approval.txt`, body: `${JSON.stringify({ id, at: now(), by: identity.agent }, null, 2)}\n`, client: null, internal: true });
-    this._applyMisc(this.log.append({ type: 'contract.approved', path: null, agent: identity.agent, data: { id } }));
-    return { approved: true, id };
+    // the base of a remote-signed contract is the workdir's HEAD now, at local approval. The record is signed with this machine's
+    // contract key, so an edit of the recorded base on disk is caught before any criterion runs.
+    let wd = null; try { wd = JSON.parse(this._read(`${SIGNED}/${id}.json`)).workdir || null; } catch { wd = null; }
+    const sha = headOf(wd);
+    const key = signingKey(this.opts.keyDir || path.join(configDir(), 'keys'));
+    const body = { id, at: now(), by: identity.agent, base: sha ? { sha, recorded_at: now() } : null };
+    if (this._read(`${KEYS}/${key.id}.pub`) === null) this.write(identity, { path: `${KEYS}/${key.id}.pub`, body: key.pub, client: null, internal: true });
+    this.write(identity, { path: `${SIGNED}/${id}.approval.txt`, body: `${JSON.stringify({ ...body, sig: dsseSign(body, key.priv) }, null, 2)}\n`, client: null, internal: true });
+    this._applyMisc(this.log.append({ type: 'contract.approved', path: null, agent: identity.agent, data: { id, base: sha } }));
+    return { approved: true, id, base: sha };
+  };
+
+  /** The base an approval recorded: { sha } (null for an approval made before bases were recorded), or { problem } when the record was changed. */
+  P._approvalBase = function (id) {
+    let a; try { a = JSON.parse(this._read(`${SIGNED}/${id}.approval.txt`)); } catch { return { problem: 'approval record changed' }; }
+    if (!a || typeof a !== 'object') return { problem: 'approval record changed' };
+    if (a.sig === undefined && (a.base === undefined || a.base === null)) return { sha: null };
+    const kid = a.sig?.signatures?.[0]?.keyid;
+    const pub = /^[0-9a-f]{16}$/.test(String(kid)) ? this._read(`${KEYS}/${kid}.pub`) : null;
+    const { sig, ...body } = a;
+    if (!pub || !dsseVerify(body, sig, pub).ok || body.id !== id) return { problem: 'approval record changed' };
+    const sha = body.base?.sha ?? null;
+    if (sha !== null && !SHA40.test(String(sha))) return { problem: 'approval record changed' };
+    return { sha };
   };
 
   P._contractOrigin = function (id) {
@@ -224,6 +279,26 @@ export function attach(Vault) {
     // file-based criteria stay inside the vault root when the caller is remote or the contract was signed
     // remotely (its receipt is readable remotely, so a local verify must not prove anything outside it either)
     const inVault = !local || origin === 'remote';
+    // the base: a locally signed contract's own (under its signature), a remote-signed one's from its signed approval record;
+    // a changed approval record stops the verify before any criterion runs
+    let base = null; let baseNote = null;
+    if (origin === 'remote') {
+      if (approved) { const ap = this._approvalBase(id); if (ap.problem) return { id, ok: false, verdict: 'BLOCKED', signature: s.detail, detail: ap.problem, tasks: [] }; base = ap.sha; }
+    } else if (c.base !== undefined && c.base !== null) {
+      const sha = typeof c.base === 'object' ? c.base.sha : c.base;
+      if (typeof sha === 'string' && SHA40.test(sha)) base = sha; else baseNote = 'the recorded base is not a 40-hex commit sha';
+    }
+    const env = criterionEnv(base);
+    // scope and red-green criteria compare with the base: without one, or with one this workdir's HEAD does not descend from,
+    // they are BLOCKED and nothing runs. The base passed to git is always a checked 40-hex sha, never an option or a ref.
+    let baseProblem;
+    const baseCheck = () => {
+      if (baseProblem !== undefined) return baseProblem;
+      if (!base) return (baseProblem = `no base revision recorded${baseNote ? ` (${baseNote})` : ''}`);
+      if (!git(wd, ['cat-file', '-e', `${base}^{commit}`]).ok) return (baseProblem = headOf(wd) ? `base ${base} is not a commit in the workdir` : 'the workdir is not a git checkout');
+      const a = git(wd, ['merge-base', '--is-ancestor', base, 'HEAD']);
+      return (baseProblem = a.status === 0 ? null : a.status === 1 ? `base ${base} is not an ancestor of HEAD` : `base ${base} could not be compared with HEAD`);
+    };
     // the same callers supply grep patterns: past the budget their remaining grep criteria fail unchecked
     let grepLeft = inVault ? GREP_VERIFY_BUDGET_MS : Infinity;
     const run = (crit) => {
@@ -232,13 +307,14 @@ export function attach(Vault) {
         if (needsApproval) return { status: 'BLOCKED', detail: 'remote-signed contract needs local operator approval (memev contract approve ' + id + ')' };
         if (!local && this.config.contracts?.exec_local_only !== false) return { status: 'BLOCKED', detail: 'commands run only from this machine' };
         if (this.config.contracts?.exec === false) return { status: 'BLOCKED', detail: 'running commands is switched off (contracts.exec)' };
-        const r = spawn('sh', ['-c', v.cmd], { cwd: wd, timeout: (v.timeout_s || 300) * 1000 });
+        const r = spawn('sh', ['-c', v.cmd], { cwd: wd, env, timeout: (v.timeout_s || 300) * 1000 });
         const want = v.expect_exit ?? 0;
         return { status: r.status === want ? 'PASS' : 'FAIL', detail: `exit ${r.status}${r.status === want ? '' : `: ${r.error || truncate(`${r.stderr}${r.stdout}`.trim(), 300)}`}` };
       }
       if (v.type === 'file_exists') { let p; try { p = this._confinePath(wd, v.path, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.path } : { status: 'FAIL', detail: `${v.path} is missing` }; }
       if (v.type === 'test_exists') { let p; try { p = this._confinePath(wd, v.test_file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.test_file } : { status: 'FAIL', detail: `${v.test_file} is missing` }; }
       if (v.type === 'grep') { let p; try { p = this._confinePath(wd, v.file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } const pat = String(v.pattern ?? ''); if (!pat) return { status: 'FAIL', detail: 'the pattern is missing' }; if (pat.length > GREP_PATTERN_MAX) return { status: 'FAIL', detail: `a pattern over ${GREP_PATTERN_MAX} characters is not checked` }; let t = ''; try { t = fs.readFileSync(p, 'utf8'); } catch { return { status: 'FAIL', detail: `${v.file} is missing` }; } if (grepLeft <= 0) return { status: 'FAIL', detail: 'not checked: the grep time for this verify is used up' }; const limit = Math.min(GREP_TIMEOUT_MS, grepLeft); const g0 = Date.now(); const m = grepMatch(pat, String(v.flags || ''), t, limit); grepLeft -= Date.now() - g0; if (m.timeout) return { status: 'FAIL', detail: `the pattern did not finish within ${limit} ms and is not checked` }; if (m.error) return { status: 'FAIL', detail: 'the pattern is not a usable regular expression' }; return m.ok ? { status: 'PASS', detail: `${v.file} matches` } : { status: 'FAIL', detail: `${v.file} does not match ${v.pattern}` }; }
+      if (v.type === 'scope' || v.type === 'test_red_green') { const b = baseCheck(); if (b) return { status: 'BLOCKED', detail: b }; }
       return { status: 'BLOCKED', detail: `${v.type} criteria are checked by a person or CI, not here` };
     };
     const tasks = c.tasks.map((t) => ({ id: t.id, title: t.title, criteria: t.criteria.map((cr) => ({ id: cr.id, statement: cr.statement || `${cr.verifier?.type || "check"} check`, mandatory: cr.mandatory !== false, ...run(cr) })) }));

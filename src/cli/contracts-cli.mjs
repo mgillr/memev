@@ -13,6 +13,21 @@ export const GATE_HOOK = (launcher, wd) => `#!/bin/sh
 exec "${launcher}" gate --workdir "${wd}"
 `;
 
+/**
+ * The spec `memev contract new` drafts. Its workdir is --workdir when given, else the spec's own; a spec with neither is refused,
+ * so commands, the base and scope never fall back to the vault root by accident, and the workdir is recorded as its absolute real
+ * path. --base, or the spec's base, is an explicit base revision: a commit sha of 40 hex characters and nothing else.
+ */
+export function newContractSpec(spec, flags = {}) {
+  const s = { ...spec };
+  if (flags.workdir !== undefined && flags.workdir !== true) s.workdir = String(flags.workdir);
+  if (!s.workdir) throw new Error('the spec names no workdir: pass --workdir <dir>, the checkout the criteria run in');
+  try { s.workdir = fs.realpathSync(path.resolve(String(s.workdir))); } catch { throw new Error(`the workdir ${s.workdir} does not exist`); }
+  if (flags.base !== undefined) s.base = flags.base === true ? '' : String(flags.base);
+  if (s.base !== undefined && s.base !== null && !(typeof s.base === 'string' && /^[0-9a-fA-F]{40}$/.test(s.base))) throw new Error('the base must be a commit sha of 40 hex characters');
+  return s;
+}
+
 async function reloadDaemon(root) { const t = adminToken(root); if (!t) return false; try { return (await api(root, '/v1/reload', { token: t })).ok; } catch { return false; } }
 
 export async function command(cmd, pos, flags, { root, env }) {
@@ -82,12 +97,12 @@ export async function command(cmd, pos, flags, { root, env }) {
     console.log(`Installed ${f}: pushes from ${wd} wait for its open contracts to verify. Remove the file to undo.`);
     return 0;
   }
-  if (sub === 'new') { const spec = JSON.parse(fs.readFileSync(pos[1], 'utf8')); return call('memev_contract_draft', spec); }
+  if (sub === 'new') return call('memev_contract_draft', newContractSpec(JSON.parse(fs.readFileSync(pos[1], 'utf8')), flags));
   if (sub === 'sign') return call('memev_contract_sign', { id: pos[1] });
   if (sub === 'approve') return callAdmin('memev_contract_approve', { id: pos[1] });
   if (sub === 'verify') return call('memev_contract_verify', { id: pos[1] });
   if (sub === 'amend') return call('memev_contract_amend', { id: pos[1], title: flags.title });
   if (sub === 'decompose') return call('memev_contract_decompose', { scope: JSON.parse(fs.readFileSync(pos[1], 'utf8')) });
-  throw new Error('memev contract list | status [id] | from-request <text> | new <spec.json> | sign <id> | approve <id> | verify <id> | amend <id> | decompose <scope.json> | hook [dir]');
+  throw new Error('memev contract list | status [id] | from-request <text> | new <spec.json> [--workdir <dir>] [--base <sha>] | sign <id> | approve <id> | verify <id> | amend <id> | decompose <scope.json> | hook [dir]');
 }
 
