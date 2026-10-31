@@ -13,7 +13,7 @@ const READ_ONLY = [
   'memev_session_start', 'memev_recall', 'memev_why', 'memev_audit', 'memev_get', 'memev_list',
   'memev_claims', 'memev_graph', 'memev_explain', 'memev_provenance', 'memev_tournament_standings',
   'memev_doctor', 'memev_contract_status', 'memev_contract_list', 'bus_since', 'bus_tail',
-  'bus_roster', 'bus_tasks', 'memev_status',
+  'bus_roster', 'bus_tasks', 'memev_status', 'memev_project_status',
 ];
 // Write tools: they change the vault or the bus, so a read-only connector must not be told they are safe.
 const WRITE = [
@@ -21,6 +21,7 @@ const WRITE = [
   'memev_claim', 'memev_feedback', 'memev_tournament_match', 'memev_contract_draft', 'memev_contract_sign',
   'memev_contract_verify', 'memev_contract_from_request', 'memev_contract_amend', 'memev_contract_decompose',
   'memev_contract_approve',
+  'memev_task_plan', 'memev_task_claim', 'memev_task_heartbeat', 'memev_task_report', 'memev_task_release', 'memev_task_verify',
   'bus_unread', 'bus_send', 'bus_check', 'bus_set_operator',
 ];
 

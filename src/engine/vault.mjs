@@ -22,6 +22,7 @@ import { attach as attachContracts, installVaultHooks } from './contracts.mjs';
 import { assess, DEFAULT_GATE } from './quality.mjs';
 import { STATE, isVault } from './vault-marker.mjs';
 import { ProjectStore } from './project-store.mjs';
+import { Coordinator } from './coordinator.mjs';
 
 export const VERSION = readJson(new URL('../../package.json', import.meta.url), {}).version;
 export { STATE, isVault };
@@ -92,7 +93,7 @@ export class Vault extends EventEmitter {
     } catch {}
   }
 
-  close() { this.commits.flush(); this.index.save(); this._saveGraph(); this.devices?.saveSoon(); this.log.close(); }
+  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.index.save(); this._saveGraph(); this.devices?.saveSoon(); this.log.close(); }
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }
@@ -404,9 +405,74 @@ export class Vault extends EventEmitter {
     return { path: p, checkpoints: cps.length, at: last.split('\n')[0].replace(/^### /, ''), task: pick(/^Task: (.+)$/m), doing: pick(/^Doing: (.+)$/m), next, done: [...done.values()], files: pick(/^Files: (.+)$/m) };
   }
 
-  /** The canonical project store for one project, under this vault's .memev directory. One writer at a time. */
+  /**
+   * The canonical project store for one project, under this vault's .memev directory. One store object per project
+   * for the life of the vault (the options apply to the first open), so there is never a second writer in a process;
+   * across processes the store's own lock serialises them.
+   */
   projectStore(projectId, opts = {}) {
-    return new ProjectStore(this.root, { id: projectId, deviceId: this.host?.id ?? null, fsync: this.opts.fsync ?? true, ...opts }).open();
+    const id = String(projectId);
+    this._projectStores ??= new Map();
+    let st = this._projectStores.get(id);
+    if (!st) {
+      st = new ProjectStore(this.root, { id, deviceId: this.host?.id ?? null, fsync: this.opts.fsync ?? true, ...opts }).open();
+      this._projectStores.set(id, st);
+    }
+    return st;
+  }
+
+  /** The one coordinator for a project, over that project's store, moving tasks only through project-state's table. */
+  coordinator(projectId) {
+    const id = String(projectId);
+    this._coordinators ??= new Map();
+    let c = this._coordinators.get(id);
+    if (!c) { c = new Coordinator(this.projectStore(id), { lifecycle: true }); this._coordinators.set(id, c); }
+    return c;
+  }
+
+  _projectId(project) {
+    if (!project) throw new VaultError('bad_request', 'a project name is needed');
+    return slug(project);
+  }
+
+  /** Plan tasks for a project: each is accepted, and ready when it has no unmet dependency. Idempotent per task id. */
+  tasksPlan(identity, { project, tasks, client = null }) {
+    this._need(identity, 'write', null);
+    if (!Array.isArray(tasks) || !tasks.length) throw new VaultError('bad_request', 'tasks must be a non-empty list');
+    const id = this._projectId(project);
+    const specs = tasks.map((t) => ({ id: String(t.id), title: t.title, deps: t.deps || [], resources: t.resources || [], artifacts: t.artifacts || [], criteria: t.criteria || [], artifact_hash: t.artifact_hash ?? null }));
+    if (specs.some((t) => !t.id || t.id === 'undefined')) throw new VaultError('bad_request', 'every task needs an id');
+    return { ...this.coordinator(id).plan(id, specs, { actor: client || identity.agent }), project: id };
+  }
+
+  tasksClaim(identity, { project, task, ttl_s = 900, client = null }) {
+    this._need(identity, 'write', null);
+    this.coordinator(this._projectId(project)).sweep();   // a lease past its expiry blocks its task (owner lost) before anyone claims
+    return this.coordinator(this._projectId(project)).claim(String(task), client ? `${identity.agent}/${client}` : identity.agent, (Number(ttl_s) > 0 ? Number(ttl_s) : 900) * 1000);
+  }
+  tasksHeartbeat(identity, { project, lease, checkpoint = null }) {
+    this._need(identity, 'write', null);
+    return this.coordinator(this._projectId(project)).heartbeat({ id: String(lease) }, { checkpoint });
+  }
+  tasksReport(identity, { project, lease, output = null, artifacts = [], artifact_hash = null }) {
+    this._need(identity, 'write', null);
+    return this.coordinator(this._projectId(project)).report({ id: String(lease) }, { output, artifacts, ...(artifact_hash ? { artifact_hash } : {}) });
+  }
+  tasksRelease(identity, { project, lease, reason = null }) {
+    this._need(identity, 'write', null);
+    return this.coordinator(this._projectId(project)).release({ id: String(lease) }, reason);
+  }
+  /** The operator step that makes a task VERIFIED: evidence bound to its scope version and artifact hash, or a refusal. */
+  tasksVerify(identity, { project, task, evidence = [] }) {
+    this._need(identity, 'admin', null);
+    return this.coordinator(this._projectId(project)).verify(String(task), { actor: identity.agent, evidence });
+  }
+  /** The tasks of a project, the derived project status and what may be claimed now. Read-only; null for a project with no store. */
+  tasksStatus(identity, project) {
+    this._need(identity, 'read', null);
+    const id = this._projectId(project);
+    if (!fs.existsSync(path.join(this.root, STATE, 'projects', id, 'events.jsonl'))) return null;
+    return this.coordinator(id).status(id);
   }
 
   /** Record one turn of a session (continuous recording). */
@@ -586,7 +652,7 @@ export class Vault extends EventEmitter {
     const relevant = task ? this.recall(identity, { query: `${task} ${proj || ''}`, project: proj, limit: 6, client, session }) : [];
     const contracts = this._openContracts();
     const active = this.allNotes('work/active').map((p) => ({ path: p, state: this.projectState(path.posix.basename(p, '.md')) })).filter((x) => x.state?.checkpoints).sort((a, b) => String(b.state.at).localeCompare(String(a.state.at))).slice(0, 5).map((x) => ({ project: path.posix.basename(x.path, '.md'), at: x.state.at, task: x.state.task, doing: x.state.doing }));
-    return { vault: path.basename(this.root), project: proj, north_star: ns && !ns.includes('Write a few lines about yourself') ? truncate(ns.replace(/^---[\s\S]*?\n---\n/, ''), 1500) : null, project_state: state, active_projects: active, recent_decisions: decisions, last_session: lastSession, relevant, open_contracts: contracts };
+    return { vault: path.basename(this.root), project: proj, north_star: ns && !ns.includes('Write a few lines about yourself') ? truncate(ns.replace(/^---[\s\S]*?\n---\n/, ''), 1500) : null, project_state: state, project_tasks: proj ? this.tasksStatus(identity, proj) : null, active_projects: active, recent_decisions: decisions, last_session: lastSession, relevant, open_contracts: contracts };
   }
   _recentEntries(dir, n) {
     const files = this.allNotes(dir.replace(/\/$/, '')).slice(-2); const out = [];
