@@ -374,7 +374,7 @@
         "QL-1.02"
       ],
       "tasks": 2,
-      "criteria": 28,
+      "criteria": 40,
       "spec": "specs/SR-1.27-done-comes-only-from-a-passing-verify.json",
       "status": "proposed: owner's go pending, signs after a clean red-team round"
     },
