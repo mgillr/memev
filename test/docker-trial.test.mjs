@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { PKG } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
 
@@ -137,4 +139,32 @@ test('MEM-141 AC08: user-facing copy passes the house writing check', () => {
     assert.doesNotMatch(text, /!/, `${f} has exclamation mark`);
     assert.doesNotMatch(text, /\u2014/, `${f} has em-dash`);
   }
+});
+
+// Issue 283: run the smoke script itself against a stand-in docker that records the compose project of each call. Every
+// compose call, the exit trap's down -v included, runs in the smoke's own project, never the folder's default one that
+// compose.yaml shares.
+test('issue 283: every docker compose call in the trial smoke runs in its own project, so down -v removes only its own volume', { skip: process.platform === 'win32' && 'needs sh' }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'trial-smoke-'));
+  try {
+    const log = path.join(dir, 'calls.log');
+    const bin = path.join(dir, 'bin'); fs.mkdirSync(bin);
+    fs.writeFileSync(path.join(bin, 'docker'), [
+      '#!/bin/sh',
+      'echo "project=${COMPOSE_PROJECT_NAME:-} args=$*" >> "$STUB_LOG"',
+      'case "$*" in',
+      `  *" ps "*) echo '{"Health":"healthy"}' ;;`,
+      '  *"license install"*) echo "not installed: unsigned"; exit 1 ;;',
+      'esac',
+      'exit 0',
+    ].join('\n') + '\n', { mode: 0o755 });
+    const env = { ...process.env, PATH: bin + path.delimiter + process.env.PATH, STUB_LOG: log };
+    delete env.COMPOSE_PROJECT_NAME;
+    const r = spawnSync('sh', [script], { cwd: PKG, env, encoding: 'utf8', timeout: 30000 });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const calls = fs.readFileSync(log, 'utf8').trim().split('\n').filter((l) => /args=compose /.test(l));
+    assert.ok(calls.length >= 6, `expected the build, up, ps, doctor, licence and down calls, got ${calls.length}`);
+    for (const c of calls) assert.match(c, /^project=memev-trial-smoke /, `a compose call ran outside the smoke's own project: ${c}`);
+    assert.ok(calls.filter((c) => /down -v/.test(c)).length >= 1, 'the smoke removes its own volumes');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
