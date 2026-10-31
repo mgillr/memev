@@ -169,3 +169,9 @@ When two or more red-green criteria of one task shared one whole-file command, o
 - SR-1.26: 21 criterion command(s) narrowed to labelled subtests.
 - SR-1.27: 15 criterion command(s) narrowed to labelled subtests.
 - SR-1.28: 5 criterion command(s) narrowed to labelled subtests.
+
+## Subtest labels renumbered by the build
+
+A criterion that arrives already filtered to a subtest label, as a red-team answer's own criterion does, is renumbered so that NN in <task>-cNN: is its position in the task, and its label joins that task's full-run criterion for the file, so the full run also checks it for skips and todos (reviewer's finding, 31 October 2026). A build lint fails on any label whose number differs from its position or which no full-run list names. Statements are unchanged apart from the full-run criterion's list of labels.
+
+- SR-1.28: 12 labelled criterion command(s) renumbered to their position and added to the full-run list.
