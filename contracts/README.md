@@ -127,3 +127,18 @@ shows where each sits is [docs/scope-one/WBS.md](../docs/scope-one/WBS.md).
 | [SO-2.12](scope-one/specs/SO-2.12-federated-computation.json) | [`k-so-2-12-federated-comput-0d4271`](signed/k-so-2-12-federated-comput-0d4271.json) | G-SO-23 | Federated computation behind the provider boundary | none |
 | [SO-2.13](scope-one/specs/SO-2.13-commercial-integration-services.json) | [`k-so-2-13-commercial-integ-d4d6ec`](signed/k-so-2-13-commercial-integ-d4d6ec.json) | G-SO-24 | Commercial integration services that keep the open-core boundary neutral | none |
 | [SO-2.14](scope-one/specs/SO-2.14-business-team-administration.json) | [`k-so-2-14-business-deploym-5aa59d`](signed/k-so-2-14-business-deploym-5aa59d.json) | G-SO-25 | Business deployment: multi-person project permissions and team administration | none |
+
+## Programme contracts, 1 November 2026
+
+`programme/` holds what the Scope One contracts do not already cover, plus one contract per pull request that closes programme work: 24 specs in all. Each has an interim red-team record under `programme/redteam/` (an interim solo review, pending independent re-review; the record cites the owner confirmation of the engine decision, t542u, 31 Oct 2026). Eight passed and are signed by signer-2. The other sixteen have a record and stay unsigned; each record gives the reason (a label that names another agent, a criterion that is only a file check or a weak pattern, or an unmet precondition the spec states for itself).
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [PGP-1.05](programme/specs/PGP-1.05-memev-site-plans-match-tier-decision.json) | [`k-pgp-1-05-memev-site-plan-a03d0c`](signed/k-pgp-1-05-memev-site-plan-a03d0c.json) | memev-site: plans, home and trial copy follow the tier decision, and federation is stated as planned | none |
+| [PG-02.1](programme/specs/PG-02.1-crdt-conformance-gate-history-based-ci.json) | [`k-pg-02-1-crdt-conformance-f7cb3e`](signed/k-pg-02-1-crdt-conformance-f7cb3e.json) | CRDT conformance gate (history-based, CI) (crdt-merge) | PGP-1.01 |
+| [PG-03.1](programme/specs/PG-03.1-cross-language-protocol-vectors.json) | [`k-pg-03-1-cross-language-p-a519ac`](signed/k-pg-03-1-cross-language-p-a519ac.json) | Cross-language protocol vectors (crdt-merge) | PG-02.1 |
+| [PG-03.2](programme/specs/PG-03.2-cross-language-protocol-vectors.json) | [`k-pg-03-2-cross-language-p-d32de4`](signed/k-pg-03-2-cross-language-p-d32de4.json) | Cross-language protocol vectors (crdt-merge-ts) | PG-03.1 |
+| [PG-03.3](programme/specs/PG-03.3-cross-language-protocol-vectors.json) | [`k-pg-03-3-cross-language-p-fde764`](signed/k-pg-03-3-cross-language-p-fde764.json) | Cross-language protocol vectors (crdt-merge-rs) | PG-03.1 |
+| [PG-06.1](programme/specs/PG-06.1-replication-separate-from-acceptance.json) | [`k-pg-06-1-replication-sepa-c68fcd`](signed/k-pg-06-1-replication-sepa-c68fcd.json) | Replication separate from acceptance (memev) | PG-04.1, PGP-1.02 |
+| [PG-12.1](programme/specs/PG-12.1-multi-node-gossip-transport.json) | [`k-pg-12-1-multi-node-gossi-63c027`](signed/k-pg-12-1-multi-node-gossi-63c027.json) | Multi-node gossip transport (memev) | PG-04.1, PG-05.1, PG-09.1 |
+| [PG-18.1](programme/specs/PG-18.1-interop-sdks-a2a-and-payments.json) | [`k-pg-18-1-interop-sdks-a2a-645104`](signed/k-pg-18-1-interop-sdks-a2a-645104.json) | Interop SDKs, A2A and payments (memev) | PG-02.1, PG-04.1, PG-10.1, SO-1.04, SO-2.08 |

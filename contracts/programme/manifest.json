@@ -263,7 +263,7 @@
       "tasks": 1,
       "criteria": 6,
       "spec": "specs/PGP-1.05-memev-site-plans-match-tier-decision.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PGP-1.06",
@@ -328,7 +328,7 @@
       "tasks": 4,
       "criteria": 16,
       "spec": "specs/PG-02.1-crdt-conformance-gate-history-based-ci.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-03.1",
@@ -349,7 +349,7 @@
       "tasks": 1,
       "criteria": 7,
       "spec": "specs/PG-03.1-cross-language-protocol-vectors.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-03.2",
@@ -370,7 +370,7 @@
       "tasks": 1,
       "criteria": 3,
       "spec": "specs/PG-03.2-cross-language-protocol-vectors.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-03.3",
@@ -391,7 +391,7 @@
       "tasks": 1,
       "criteria": 3,
       "spec": "specs/PG-03.3-cross-language-protocol-vectors.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-04.1",
@@ -483,7 +483,7 @@
       "tasks": 3,
       "criteria": 17,
       "spec": "specs/PG-06.1-replication-separate-from-acceptance.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-08.1",
@@ -641,7 +641,7 @@
       "tasks": 3,
       "criteria": 12,
       "spec": "specs/PG-12.1-multi-node-gossip-transport.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-13.1",
@@ -827,7 +827,7 @@
       "tasks": 4,
       "criteria": 15,
       "spec": "specs/PG-18.1-interop-sdks-a2a-and-payments.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     }
   ],
   "mapping": [
