@@ -86,7 +86,7 @@
       "closes": "LICENSE_FIELDS omits trial, org and trial_ext that other modules read; installLicense skips the check activate applies",
       "depends_on": [],
       "tasks": 1,
-      "criteria": 29,
+      "criteria": 40,
       "spec": "specs/SR-1.06-one-licence-schema-validated-everywhere.json"
     },
     {
@@ -360,7 +360,7 @@
         "QL-1.02"
       ],
       "tasks": 2,
-      "criteria": 39,
+      "criteria": 51,
       "spec": "specs/SR-1.26-one-write-can-never-make-the-vault-unopenable.json",
       "status": "proposed: owner's go pending, signs after a clean red-team round"
     },

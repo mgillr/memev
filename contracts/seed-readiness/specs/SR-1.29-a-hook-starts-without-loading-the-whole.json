@@ -36,7 +36,7 @@
           }
         },
         {
-          "statement": "Each hook event's stdout and exit code, for the inputs and stub of test/hooks-latency.test.mjs, equal the base code's: the test builds the base itself (git archive of $MEMEV_CONTRACT_BASE into a temp dir), needs MEMEV_CONTRACT_BASE and fails without it, and replaces timestamps, durations and random ids with fixed markers in both outputs before comparing.",
+          "statement": "Each hook event's stdout and exit code, for the inputs and stub of test/hooks-latency.test.mjs, equal the base code's: the test builds the base itself (git archive of $MEMEV_CONTRACT_BASE into a temp dir), is skipped when MEMEV_CONTRACT_BASE is unset, so the suite passes without it (this criterion's guard counts a skip as a failure), and replaces timestamps, durations and random ids with fixed markers in both outputs before comparing.",
           "verifier": {
             "type": "command",
             "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.29 output unchanged' test/hooks-startup.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.29 output unchanged$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
@@ -44,7 +44,7 @@
           }
         },
         {
-          "statement": "With a stub whose backend calls answer at once, the base code (git archive of $MEMEV_CONTRACT_BASE into a temp dir, in the same run) and the new code each run node bin/memev.mjs hook prompt --client claude-code five times, interleaved; the new code's median process time is at most 70% of the base's. The test needs MEMEV_CONTRACT_BASE and fails without it.",
+          "statement": "With a stub whose backend calls answer at once, the base code (git archive of $MEMEV_CONTRACT_BASE into a temp dir, in the same run) and the new code each run node bin/memev.mjs hook prompt --client claude-code five times, interleaved; the new code's median process time is at most 70% of the base's. The test is skipped when MEMEV_CONTRACT_BASE is unset, so the suite passes without it, and this criterion's guard counts a skip as a failure.",
           "verifier": {
             "type": "command",
             "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.29 prompt hook start-up' test/hooks-startup.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.29 prompt hook start-up$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
