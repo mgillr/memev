@@ -1,0 +1,65 @@
+{
+  "title": "SR-1.22 A whole-note write interrupted after the log append recovers from the log, not from the old file",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G87: write() appends the put to the log and then renames the file; when the rename fails, the next open() imports the old file as an external edit and the note reads the old body while the new body sits in the log (src/engine/vault.mjs:119-121, the prefix rule covers appends only), against README's log-first promise. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence). Repository: memev. Depends on contracts: SR-1.01, QL-1.02. Sensitive path (the oplog): the QL-1.03 checklist applies before merge.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Log-first holds for writes",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "on open, a path whose last logged put is newer than the file on disk and whose file content equals the put's previous head is completed from the log, not imported as external",
+        "a file that differs from both the logged head and the previous head is still imported as an external edit, so a real outside edit is never lost",
+        "README and DESIGN.md state log-first for writes and appends"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/vault.mjs",
+        "README.md",
+        "docs/DESIGN.md",
+        "test/write-interrupted.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "A write whose rename failed (read-only directory) reads the new body after the directory is writable and the vault reopens; an outside edit made in the same window is imported as external",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "node --test test/write-interrupted.test.mjs"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/write-interrupted.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

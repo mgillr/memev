@@ -1,0 +1,76 @@
+{
+  "title": "SR-1.24 No CLI command writes vault state beside a live daemon",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G89: with the daemon stopped five CLI commands wrote vault files (token issue to .memev/tokens.json, project set and backup set to .memev/config.json, devices rename to .memev/devices.json and .memev/jobs.json, bus rename edits bus/ from the CLI process after starting a daemon), measured by hashing every vault file before and after; DESIGN.md says the daemon is the only writer. SR-1.01 closes the log-writing case (claims); this contract closes the state files. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence). Repository: memev. Depends on contracts: SR-1.01, QL-1.02. Sensitive path (the oplog): the QL-1.03 checklist applies before merge.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "State writes go through the daemon or the lock",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "token issue, project set, backup set, devices rename and bus rename call the daemon over HTTP when it is running and take the SR-1.01 vault lock when it is not; with a live daemon none of them writes a vault file from the CLI process",
+        "DESIGN.md's one-writer sentence names the state files it covers"
+      ],
+      "description": "",
+      "scope": [
+        "src/cli/main.mjs",
+        "src/cli/licensing.mjs",
+        "src/cli/bus-cli.mjs",
+        "src/engine/tokens.mjs",
+        "src/engine/devices.mjs",
+        "src/server/http.mjs",
+        "docs/DESIGN.md",
+        "test/cli-one-writer.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "With a live daemon each of the five commands leaves every vault file byte-identical in the CLI process and makes its change through the daemon",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "node --test test/cli-one-writer.test.mjs"
+          }
+        },
+        {
+          "statement": "The design page names the state files under the one-writer rule",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/DESIGN.md",
+            "pattern": "tokens.json"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/cli-one-writer.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

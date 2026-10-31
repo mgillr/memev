@@ -1,0 +1,211 @@
+{
+  "title": "QL-1.01 Red-team gate: no contract is signed without a clean record that matches its spec",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes quality-loop principle 1 (red-team each contract before signing) and the signing-time part of principle 2 (red-green primary, document-only checks never count toward done). A zero-dependency node script reads a contract spec and its red-team record and reports SIGNABLE, NOT SIGNABLE with reasons, or NO RECORD; a test proves every refusal rule; the seed-gate and the sign runbook call it. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "The gate script and its refusal rules",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "scripts/gate/redteam-gate.mjs takes spec paths (default: every file under contracts/seed-readiness/specs/ and contracts/quality-loop/specs/) and prints one line per spec: SIGNABLE, NOT SIGNABLE: <reasons>, or NO RECORD; exit 0 only when every named spec is SIGNABLE; --report mode exits 0 unless a record is malformed, a hash mismatch is claimed clean, or a signed contract under contracts/signed/ has a spec without a SIGNABLE record",
+        "the record is contracts/<area>/redteam/<id>.json with schema memev-redteam/1 and snapshots <id>.r<n>.spec.json beside it; spec_sha256 is sha256 of the spec as canonical JSON (sorted keys, no whitespace, workdir null)",
+        "SIGNABLE requires all of: record parses with the schema and the spec id; rounds numbered 1..n without gaps; the last round has verdict clean and an empty answers list; its spec_sha256 equals the spec on disk; every answer in every round has disposition added or rejected; every added criterion is present verbatim (task, statement, verifier type) in the spec on disk; every rejected answer has a non-empty reason; the sequence of snapshots never weakens (no task or criterion removed, no verifier type changed, no metric loosened, no command changed except as recorded in an amendments list the round names, no scope glob added or broadened); every implement task has at least one test_red_green criterion unless the spec's manifest row declares kind docs or evidence; every input file of the clean round whose blob at HEAD differs is reported, and under src/ it is NOT SIGNABLE",
+        "node 23 compatible, no dependencies, first lines carry // gate-version: 1 and the SPDX header"
+      ],
+      "description": "",
+      "scope": [
+        "scripts/gate/redteam-gate.mjs",
+        "test/redteam-gate.test.mjs",
+        "test/fixtures/redteam/**"
+      ],
+      "criteria": [
+        {
+          "statement": "Each refusal rule is exercised by a fixture that is SIGNABLE until exactly one field is broken, and the broken fixture is refused with that rule's reason",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "A spec edited after its clean round is NOT SIGNABLE until a new clean round",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "A clean verdict with a non-empty answers list, and a round with answers left pending, are both refused",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "The gate script carries its version line",
+          "verifier": {
+            "type": "grep",
+            "file": "scripts/gate/redteam-gate.mjs",
+            "pattern": "^// gate-version: 1$"
+          }
+        },
+        {
+          "statement": "For every refused fixture and for a spec with no record, spawning `node scripts/gate/redteam-gate.mjs <spec>` (no --report) exits non-zero. Running `sh -c 'node scripts/gate/redteam-gate.mjs <spec> && echo PROCEED'` prints no PROCEED. For the SIGNABLE base fixture the exit is 0 and PROCEED is printed. Naming two specs where only one is SIGNABLE also exits non-zero.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "The test pins one fixture spec's spec_sha256 to a literal hex constant. It also asserts the gate's hash equals canonicalHash({...spec, workdir: null}) from vendor/attest/signature.mjs, imported independently of the script. Changing only tasks[0].criteria[0].verifier.cmd, only a scope glob, or only interior whitespace in a statement makes the fixture NOT SIGNABLE with a hash-mismatch reason. Reordering keys or reformatting whitespace between tokens keeps it SIGNABLE. If record.spec_file names a different file whose hash matches the round, but the spec path passed on the command line differs, the result is NOT SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "Each of the following is applied as the only change between snapshot r1 and r2, with r2 a clean round whose hash matches the spec on disk: a grep pattern changed, a grep file changed, a test_red_green test_file changed, expect_exit changed or removed, mandatory:false added, a statement rewritten, a stop_rule removed, a requirement removed, a depends_on entry removed, or workdir set to a non-null path. Each is NOT SIGNABLE with a weakening reason naming the task and criterion statement. Swapping two criteria within a task is not reported as a removal.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "Refused: a record where any round's snapshot is missing. Refused: a record where a snapshot's canonical hash differs from its round's spec_sha256. Each gets a reason naming the round. The case where r1.spec.json is overwritten with the current spec, so that a real weakening would disappear, is refused.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "Each of these two-round records is NOT SIGNABLE with a reason naming round 1 and the answer number: round 2 clean with empty answers and a matching hash, while round 1 has one answer that is (a) pending, (b) missing its disposition, (c) rejected with reason '   ', or (d) added with no criterion object. The same record with round 1 fully dispositioned is SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "A command change between r1 and r2 is SIGNABLE only when round 2's amendments list has an entry with the same task, the same criterion statement, from equal to the r1 cmd and to equal to the r2 cmd. Refused cases: an amendment naming a different criterion, an amendment whose to differs from the r2 cmd, one amendment covering two changed commands, and an amendments list in a round other than the one whose snapshot holds the change.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "In a temporary git repository: a clean round lists src/a.mjs with the sha256 of its first committed version, and a second commit changes it. The result is NOT SIGNABLE naming src/a.mjs, even after the working-tree copy is restored to the first version. The same holds when the path is written ./src/a.mjs, and when src/a.mjs is deleted at HEAD. A changed docs/x.md input is reported but stays SIGNABLE. A record whose clean round has inputs.files: [] while the spec's scope names a src/ path is refused.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "The gate exports RULES, an array of reason codes. The test asserts it equals this literal list: schema, spec_id, rounds_contiguous, last_clean, last_empty, hash, dispositions_all_rounds, added_verbatim, rejected_reason, never_weakens, red_green_required, head_stale_src. The test asserts the base fixture is SIGNABLE. For every code there is a one-field mutation of that base that is refused with exactly that code and no other. The red_green_required fixture is refused when the manifest row is missing or says kind feature, and is SIGNABLE only when the manifest row says docs or evidence. A kind field inside the spec alone does not exempt it.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "An answer with disposition added is refused when the spec on disk has a criterion with the same task, statement and verifier type but whose verifier is not deep-equal, under canonical JSON, to the answer's proposed verifier. The cases are: a different cmd, a different test_file, and a different grep pattern. An exact deep-equal match is SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "With no arguments, cwd set to a temporary tree that has one NOT SIGNABLE spec only under contracts/quality-loop/specs/, the gate prints that spec's line and exits non-zero. It does the same with the spec only under contracts/seed-readiness/specs/. Given a nonexistent spec path, or no specs found by default, it exits non-zero with a message saying so.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Wired into the suite and documented",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "test/redteam-gate.test.mjs also runs the gate in --report mode over the repository's own spec directories, so npm test and CI fail on a malformed record or a signed contract without a SIGNABLE record, while NO RECORD is reported and not failed",
+        "docs/CONTRACTS.md gains a section that states the rule, the record path, the hash definition and the one-line runbook: gate, then memev contract new, then memev contract sign, in one command"
+      ],
+      "description": "",
+      "scope": [
+        "test/redteam-gate.test.mjs",
+        "docs/CONTRACTS.md"
+      ],
+      "criteria": [
+        {
+          "statement": "A signed contract whose spec has no SIGNABLE record fails the suite's report run; a spec with no record does not",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "The contracts page states the rule",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CONTRACTS.md",
+            "pattern": "No contract is signed without a clean red-team record"
+          }
+        },
+        {
+          "statement": "In a temporary repository tree, --report exits non-zero when contracts/signed/k-xyz-abc123.json (a real engine-shaped id) is linked to a spec by title, or by the tasks makeTask would draft from it, and that spec has no SIGNABLE record. It also exits non-zero when the signed contract's tasks differ from the spec's drafted tasks (one criterion cmd changed), and exits 0 when the record is SIGNABLE and the tasks match. The run over the real repository asserts the number of specs it examined, printed by the gate, equals the number of files in the two default directories. When those directories are missing it prints that fact instead of a bare exit 0.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "The test pulls the single runbook line out of the fenced block in docs/CONTRACTS.md's red-team section and runs it with sh. PATH holds a stub memev that logs its arguments and prints a draft JSON with an id. On a NOT SIGNABLE fixture spec the stub is never called. On a SIGNABLE fixture it is called with 'contract new <spec>' and then 'contract sign <the id the stub printed>', with no hand-typed id. The same section must contain contracts/<area>/redteam/<id>.json and the hash definition (sorted keys, no whitespace, workdir null).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "node --test test/redteam-gate.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+# Amendments to the seed-readiness specs before signing (30 October 2026)
+
+Applied by the lead seat on the reviewer seat's read of the specs against the code at main be457db, under the rule that every finding becomes a stronger criterion before a contract is signed. Each line names the contract, what changed and why. The owner's original archive is kept unchanged beside the working copy; the hygiene changes (repository names without the account, the coming-soon provider named by role, company sites) are listed in README.md.
+
+- SR-1.08: T2 scope gains scripts/coverage-of.mjs (the task's own criterion names the script, which was outside its scope and absent on main)
+- SR-1.09: T3 scope gains scripts/count-silent-catch.mjs (the task's own criterion names the script, which was outside its scope and absent on main)
+- SR-1.20: T2 scope gains scripts/security-findings.mjs (the task's own criterion names the script, which was outside its scope and absent on main)
+- SR-2.01: T2 scope gains scripts/bench/paraphrase.mjs, bench/paraphrase/** (the task's own criterion names the script, which was outside its scope and absent on main)
+- SR-2.04: T2 scope gains scripts/bench/continuity.mjs, bench/continuity/** (the task's own criterion names the script, which was outside its scope and absent on main)
+- SR-6.04: T1 scope gains scripts/count-entries.mjs (the task's own criterion names the script, which was outside its scope and absent on main)
+- SR-9.05: T2 scope gains scripts/review-stats.mjs (the task's own criterion names the script, which was outside its scope and absent on main)
+- SR-1.12: depends on SR-1.10 and SR-1.18: T1 requires the Windows job to run the full suite, which needs the hermetic suite and the Windows code paths first
+- manifest: SR-1.12 depends_on gains SR-1.10 and SR-1.18
+- SR-1.15: T1 requirement added: "the oplog HLC merge helpers are kept and listed by name in the dead-code test as the functions SR-3.04 wires; the list is removed when SR-3.04 lands" (SR-3.04 depends on those helpers having a caller; removing them here would reopen G33)
+- SR-1.06: T1 grep pattern now matches the array even when SR-1.09's line limit wraps it
+- SR-1.10: T2 command creates /tmp/memev-hermetic first, sets MEMEV_NO_SERVICE=1 and carries timeout_s 1800
+- 11 bare "npm test" criteria now run as MEMEV_NO_SERVICE=1 with a fresh HOME and timeout_s 1800 (the Mac suite registers launchd services and exceeds the 300 s default otherwise); no seat runs them on this Mac, CI or the box does
+- SR-1.11: T1 requirement added: "the 20-run check prints the CPU count, the CPU model and the 1-minute load with its result, so a timing read on other hardware is labelled" (the bound is hardware-bound and verify runs wherever it is invoked)
+- SR-1.17: T1 requirement added: "the bench prints the CPU count, the CPU model and the 1-minute load beside roster_ms_p95" (the p95 is hardware-bound and verify runs wherever it is invoked)
+- SR-1.18: T1 requirement added: "the test mocks process.platform and the Windows process table, so it goes red on the base and green after on macOS and Linux verifiers too" (a Windows-only test cannot prove red-green where verify runs)
+- SR-1.20: T1 requirement added: "the reviewer is named in the public file only with their written consent, otherwise by firm" (the file is public once SR-6.01 lands)
+- SR-0.01: T2 requirement added: "the gate reports BLOCKED (a criterion awaiting local approval or a verifier the engine does not run) apart from FAIL, with both counts" (SR-1.02 puts command criteria behind memev contract approve; the engine returns BLOCKED for verifier types it does not run) (spec not in this copy; applied in the programme copy)
+- SR-1.06: T1 requirement added: "installLicense refuses a licence carrying name, email or machine exactly as activateLicense does, and writes no file; the test installs such a licence from file and asserts the refusal (the twin measured install writing a licence that activate refuses: src/cli/licensing.mjs:148-151 never calls extraFields, :90 does)" (memev twin finding ME-LI-05, CONFIRMED_DEFECT)
+- SR-1.06: T1 requirement added: "a trial licence and an org licence install from file and activate by key under the same rule; the schema header states which non-identity fields (trial, org, trial_ext) a licence may carry" (memev twin finding ME-LI-05: trial and org licences were installable from file and never activatable by key)
+- SR-1.01: T1 requirement added: "the test opens a second writable Vault the way memev claims does (src/cli/main.mjs:327, which opens the vault in process and rewrites .memev/oplog/snapshot.json) beside an open one and asserts VaultLocked and an unchanged snapshot" (memev twin finding ME-MC-05: with the daemon stopped five CLI commands wrote vault files; the log-writing one is G01 itself)
+- SR-1.15: T1 requirement added: "OpLog.recovered (the skipped unreadable records, src/engine/oplog.mjs:105-106) is read by status() and by the doctor's oplog check, or removed with the comment that promises it is reported" (memev twin finding F-9: nothing in src or bin reads it)
+- SR-1.16: T3 added: generator main guard on real paths and the docs index rule matched to its test (memev twin findings F-10 and F-8)
+
+Not applied here, recorded for the repositories that do not exist yet: SR-3.03 (memev-merge) prints the hardware beside its p95 at 100 kB; SR-0.02, SR-5.05, SR-6.07, SR-6.08, SR-7.06, SR-7.13 and SR-8.06 name scripts outside their task scopes and gain them when their repositories are created.

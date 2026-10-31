@@ -1,0 +1,62 @@
+{
+  "title": "SR-1.25 A cloud seat allowed to assign tasks addresses one local seat, never all",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G90: with bus.cloud_tasks on, a cloud seat's task to all is accepted (src/engine/bus.mjs:307 checks the type, not the address), while docs/BUS.md:100-101 grants a task to a local seat and nothing else. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence). Repository: memev. Depends on contracts: QL-1.02. Sensitive path (the oplog): the QL-1.03 checklist applies before merge.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Address checked with the type",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a cloud seat's task is accepted only when it is addressed to one named local seat; all, a cloud seat and an unknown seat are refused with the reason"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/bus.mjs",
+        "docs/BUS.md",
+        "test/bus-cloud-address.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "With cloud_tasks on, a task to a named local seat posts and tasks to all and to another cloud seat are refused",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-cloud-address.test.mjs",
+            "cmd": "node --test test/bus-cloud-address.test.mjs"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/bus-cloud-address.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

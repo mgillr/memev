@@ -1,0 +1,161 @@
+{
+  "title": "SR-1.05 A bounded rate limiter",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G05: The rate limiter bucket map is never evicted (http.mjs:69-77), an unbounded memory growth on a public tunnel. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Evicting buckets",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "idle buckets older than two minutes are dropped",
+        "the map is capped (10,000 keys) with oldest-first eviction",
+        "createServer exposes the limiter it builds as server.rateLimiter (read only, for tests), and exports MAX_BUCKETS = 10000; the limiter at http.mjs:108 is built with the cap",
+        "the cap bounds every key family the limiter holds (ip: and t: keys alike, and any map it splits into), checked after every take(), not only after a sweep",
+        "at the cap, eviction removes a bucket holding at least one token (least recently used first) before any exhausted bucket (fewer than one token); eviction is amortized O(1), never a scan of the map per insert, and a new key is always admitted",
+        "a bucket is idle when no take() touched it for 120,000 ms (time since its last take, b.at), and only idle buckets are dropped by the idle rule; any sweep timer is unref'd and cleared when the server closes",
+        "the remote rate-limit key reads cf-connecting-ip only when the Cloudflare tunnel is configured (remote.cloudflare, the edge sets that header), reads x-forwarded-for only when remote.trusted_proxy names it, and otherwise keys on the socket address; tests that simulate distinct remote callers by cf-connecting-ip configure remote.cloudflare (memev twin finding F-2: with headers rotated, 0 of 200 requests were limited against 140 with a fixed header)"
+      ],
+      "description": "",
+      "scope": [
+        "src/server/http.mjs",
+        "test/rate-limit.test.mjs",
+        "docs/MODULES.md"
+      ],
+      "criteria": [
+        {
+          "statement": "After 50,000 distinct keys the map holds at most 10,000 entries",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "node --test test/rate-limit.test.mjs"
+          }
+        },
+        {
+          "statement": "The cap is a named constant",
+          "verifier": {
+            "type": "grep",
+            "file": "src/server/http.mjs",
+            "pattern": "MAX_BUCKETS"
+          }
+        },
+        {
+          "statement": "Mutation check: in a clean copy of the committed tree with MAX_BUCKETS replaced by Infinity (and a check that the replacement actually applied), test/rate-limit.test.mjs FAILS. This proves the test depends on the cap being enforced. A red at base on a brand-new file cannot prove that.",
+          "verifier": {
+            "type": "command",
+            "cmd": "d=$(mktemp -d) && git archive HEAD | tar -x -C \"$d\" && perl -pi -e 's/(MAX_BUCKETS\\s*=\\s*)[0-9_.e]+/${1}Infinity/' \"$d/src/server/http.mjs\" && grep -q 'MAX_BUCKETS *= *Infinity' \"$d/src/server/http.mjs\" && cd \"$d\" && ! node --test test/rate-limit.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Guard test 'exhausted key stays limited' in test/rate-limit.test.mjs. Freeze the clock with mock.timers.enable({ apis: ['Date'] }) and set remote.rate_per_min = 5 before createServer. Remote address A (cf-connecting-ip) sends GET /healthz/x and gets 5 non-429 responses, then 429. Then MAX_BUCKETS + 1 requests come from distinct cf-connecting-ip values. A's next request must still be 429. This guard is green at base, so it runs as a named command and the pass count must be at least 1. It fails under LRU, FIFO, most-depleted-first or clear().",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='exhausted key stays limited' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^# pass [1-9]'",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "test/rate-limit.test.mjs takes the limiter instance that createServer(v) itself builds, through a handle the change exposes (the contract should name it, e.g. server.rateLimiter), not a separately constructed Buckets. It calls take() on that instance with MAX_BUCKETS + 1,000 distinct 'ip:' keys and asserts the entry count <= MAX_BUCKETS. At base it is red with an AssertionError, because assert.ok(server.rateLimiter) fails, not with a module-load error.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "node --test test/rate-limit.test.mjs"
+          }
+        },
+        {
+          "statement": "Use mock.timers on Date, setTimeout and setInterval, rate_per_min = 6, and the limiter that createServer built. (a) Exhaust key A, advance 1,000 ms, call take() once on a fresh key (to trigger any on-insert sweep) and tick any interval sweep: take(A) is still refused. (b) Take key B once, advance 120,001 ms, call one more take() or tick the sweep: B is no longer among the limiter's entries. Red at base on (b).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "node --test test/rate-limit.test.mjs"
+          }
+        },
+        {
+          "statement": "Guard test 'new caller served during flood'. With the clock frozen (mock.timers Date) and remote.rate_per_min = 5, send MAX_BUCKETS + 1 remote requests from distinct cf-connecting-ip values. A never-seen address must then get a status other than 429 on GET /healthz/x (401 is expected). Green at base, so it runs as a named command with a pass-count check.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='new caller served during flood' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^# pass [1-9]'",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Through HTTP with Date frozen, send 6,000 remote GET /healthz/x requests. Each has a distinct cf-connecting-ip and a distinct 'Authorization: Bearer mv_<8 hex>_<32 hex>'. These tokens are unverified, so 12,000 keys reach the limiter at :131. All responses must be 401, not 429. Afterwards the total entry count across every map the createServer-built limiter keeps must be <= MAX_BUCKETS.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "node --test test/rate-limit.test.mjs"
+          }
+        },
+        {
+          "statement": "The existing server and limiter tests, the module-map check and the new test all pass, and every test process exits before the timeout. This covers pre-auth throttling (http.test.mjs:66-71, oauth.test.mjs:136-141), docs/MODULES.md agreement and clean exit.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-reporter=tap test/http.test.mjs test/oauth.test.mjs test/remote-proof-order.test.mjs test/connectors-unlimited.test.mjs test/docs-module-map.test.mjs test/rate-limit.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Enable mock.timers for Date, setTimeout and setInterval before createServer, so no sweep can fire on its own. Call take() on the createServer-built limiter for 50,000 distinct keys and assert the entry count <= MAX_BUCKETS after every call, not only after the loop.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "node --test test/rate-limit.test.mjs"
+          }
+        },
+        {
+          "statement": "For the createServer-built limiter, the average cost of a fresh-key take() at the cap (20,000 inserts, each evicting) is at most 5 times the cost below the cap. Amortized O(1) eviction, such as a batch trim, passes; a full scan per insert does not.",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node --input-type=module -e \"import { newVault, cleanup } from './test/helpers/tmp.mjs'; import { createServer, MAX_BUCKETS } from './src/server/http.mjs'; const { v } = newVault(); const L = createServer(v).rateLimiter; const run = (n, p) => { const s = process.hrtime.bigint(); for (let i = 0; i < n; i++) L.take(p + i); return Number(process.hrtime.bigint() - s) / n; }; run(2000, 'ip:w'); const below = run(MAX_BUCKETS / 4, 'ip:a'); run(MAX_BUCKETS, 'ip:b'); const at = run(20000, 'ip:c'); console.log(JSON.stringify({ ratio: at / below })); v.close(); cleanup();\"",
+            "key": "ratio",
+            "op": "<=",
+            "value": 5
+          }
+        },
+        {
+          "statement": "Guard test 'busy key not reset at two minutes'. With rate_per_min = 6 and Date mocked, call take('ip:A') on the createServer-built limiter once per simulated second for 180 seconds. At most 24 calls are allowed: a correct bucket allows 6 + 179 x 0.1 = 23, and an age-based reset at 120 s adds about 5. The idle-unit bug in answer 4 also fails this guard.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='busy key not reset at two minutes' test/rate-limit.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^# pass [1-9]'",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "http.mjs exports MAX_BUCKETS equal to 10000. The tests above need this export anyway. Together with answer 1's mutation check, this proves the constant has the right value and is load-bearing.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --input-type=module -e \"const m = await import('./src/server/http.mjs'); process.exit(m.MAX_BUCKETS === 10000 ? 0 : 1)\"",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "Without a trusted proxy configured, one connection rotating cf-connecting-ip and x-forwarded-for values is limited as one caller: at rate_per_min 5 the sixth request in a frozen minute gets 429 (memev twin finding F-2)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/rate-limit.test.mjs",
+            "cmd": "node --test test/rate-limit.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

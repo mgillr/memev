@@ -1,0 +1,110 @@
+{
+  "title": "QL-1.02 Mutation gate: the changed lines are broken on purpose and the tests must catch every mutant",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes quality-loop principle 2 (a test that survives a mutation is a weak test). Repository: memev. Depends on contracts: SR-0.03. Quality-loop principle set of 30 October 2026 (owner's order: implement as a gate for all dev).",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Mutation runner over the diff",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "scripts/gate/mutate.mjs takes --base <sha> and --test <cmd>, lists the lines added or changed between base and the working tree in src/**/*.mjs, and applies one mutation at a time from a fixed operator set: === and !==, < and >=, > and <=, && and ||, true and false, + and - on numeric operands, a return value replaced by undefined, a call statement removed",
+        "before any mutant it runs the test command twice on the unmutated tree; a failure or a differing pass count there is NOISE and the run stops with exit 2, never judging a mutant (the twin's ME-MT oracle was confounded without this control)",
+        "each mutant runs in a temporary copy of the workdir that is removed in a finally block; the original tree is byte-identical after the run (checked by hashing the scope files before and after)",
+        "--json prints {mutants, killed, survived, noise, survivors:[{file,line,operator}]}; exit 1 when any mutant survives; a line carrying the comment mutate-ignore with a reason is skipped and counted as ignored",
+        "the script has no dependencies and its first line carries a version: comment"
+      ],
+      "description": "",
+      "scope": [
+        "scripts/gate/mutate.mjs",
+        "test/gate-mutate.test.mjs",
+        "test/fixtures/mutate/**",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "On a fixture whose test checks the changed comparison the mutant is killed; on a fixture whose test only checks that a function returns, the mutant survives and the run exits 1; a flaky fixture stops with NOISE before any mutant",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "node --test test/gate-mutate.test.mjs"
+          }
+        },
+        {
+          "statement": "The runner exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "scripts/gate/mutate.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Every code contract carries the mutation criterion",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "the attest lint used by memev contract new warns when an implement task whose scope includes src/** has no metric criterion on scripts/gate/mutate.mjs with key survived, op ==, value 0",
+        "docs/CONTRACTS.md shows the criterion to copy and states that a test that survives a mutation is a weak test"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/contracts.mjs",
+        "docs/CONTRACTS.md",
+        "test/gate-mutate-lint.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "A draft with an implement task touching src and no mutation criterion gets the warning; one with it gets none",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "node --test test/gate-mutate-lint.test.mjs"
+          }
+        },
+        {
+          "statement": "The contracts page carries the criterion and the weak-test rule",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CONTRACTS.md",
+            "pattern": "survives a mutation"
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

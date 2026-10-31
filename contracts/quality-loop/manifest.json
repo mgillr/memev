@@ -1,0 +1,63 @@
+{
+  "schema": "memev-quality-loop/1",
+  "created": "2026-10-31",
+  "note": "Quality-loop gate contracts (owner's order of 30 October 2026: implement the eight principles as a gate for all dev). The red-team gate QL-1.01 refuses signing of any contract, these included, without a clean record.",
+  "contracts": [
+    {
+      "id": "QL-1.01",
+      "gap": null,
+      "area": "QL-1",
+      "title": "Red-team gate: no contract is signed without a clean record that matches its spec",
+      "repo": "memev",
+      "closes": "Closes quality-loop principle 1 (red-team each contract before signing) and the signing-time part of principle 2 (red-green primary, document-only checks never count toward done). A zero-dependency node script reads a contract spec and its red-team record and reports SIGNABLE, NOT SIGNABLE with reasons, or NO RECORD; a test proves every refusal rule; the seed-gate and the sign runbook call it",
+      "depends_on": [],
+      "tasks": 2,
+      "criteria": 8,
+      "spec": "specs/QL-1.01-red-team-gate-no-signing.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+    },
+    {
+      "id": "QL-1.02",
+      "gap": null,
+      "area": "QL-1",
+      "title": "Mutation gate: the changed lines are broken on purpose and the tests must catch every mutant",
+      "repo": "memev",
+      "closes": "Closes quality-loop principle 2 (a test that survives a mutation is a weak test)",
+      "depends_on": [
+        "SR-0.03"
+      ],
+      "tasks": 2,
+      "criteria": 7,
+      "spec": "specs/QL-1.02-mutation-gate-on-changed-lines.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+    },
+    {
+      "id": "QL-1.03",
+      "gap": null,
+      "area": "QL-1",
+      "title": "Security checklist before merge on every change that touches command execution, auth, tokens, the tunnel or the oplog",
+      "repo": "memev",
+      "closes": "Closes quality-loop principle 7",
+      "depends_on": [],
+      "tasks": 2,
+      "criteria": 7,
+      "spec": "specs/QL-1.03-sensitive-path-checklist-before-merge.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+    },
+    {
+      "id": "QL-1.04",
+      "gap": null,
+      "area": "QL-1",
+      "title": "The claims check runs in every repository from one script: a claim ahead of its status row fails CI",
+      "repo": "memev",
+      "closes": "Closes quality-loop principle 4 (CI fails in any repo, site included, if a claim runs ahead of its row)",
+      "depends_on": [
+        "SR-5.04"
+      ],
+      "tasks": 2,
+      "criteria": 6,
+      "spec": "specs/QL-1.04-claims-ledger-check-in-every-repository.json",
+      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+    }
+  ]
+}
