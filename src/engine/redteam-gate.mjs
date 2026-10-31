@@ -332,7 +332,13 @@ export function weakenings(A, B, { amendments = [], prev = null, ...ctx } = {}) 
     const t2 = tb.get(id);
     if (!t2) {
       const i = entry((a) => a.kind === 'move' && a.task === id);
-      const own = [...arr(cx.rounds).flatMap((r) => arr(r?.amendments)), ...arr(cx.stopAmendments)].filter((x) => isObj(x) && x.task === id && x.kind === undefined);
+      // the replacements made at the split: entries for the moved task in the list that records the move, each counted in the
+      // chain only when it passes as a change with its own citation (requirement 11); any other entry is ignored
+      const own = [];
+      if (i >= 0) ams.forEach((x, k) => {
+        if (used.has(k) || !isObj(x) || x.task !== id || x.kind !== undefined || x.scope_add !== undefined) return;
+        if (typeof x.field === 'string' ? !take(k, 'text', id, null) : typeof x.statement === 'string' && !take(k, 'cmd', id, [x.statement])) own.push(x);
+      });
       let why = i < 0 ? null : cx.root ? movedTaskProblem(cx.root, ams[i], ta, own) : 'there is no tree to resolve the receiving spec in';
       if (i >= 0 && !why) why = take(i, 'text', id, null);
       if (i < 0 || why) out.push(`task ${id} removed${why ? ` and its move is refused: ${why}` : ''}`);
@@ -463,8 +469,9 @@ function holdsText(list, ams, field, q) {
 
 /**
  * A removed task is accepted as moved only when the move entry's spec id resolves through a manifest and its to_task holds every
- * requirement, criterion and stop rule of the task, itself or the end of its From/To chain: the replacements this record lists for
- * the moved task (`own`, as at the split), then the receiving spec's own for to_task. null, else why not.
+ * requirement, criterion and stop rule of the task, itself or the end of its From/To chain: the cited replacements the list that
+ * records the move holds for the moved task (`own`, as made at the split), then the receiving spec's own for to_task. null, else
+ * why not.
  */
 function movedTaskProblem(root, mv, ta, own = []) {
   const r = resolveSpecId(root, mv.to_spec);
@@ -740,7 +747,7 @@ export function evaluate({ spec, cwd = process.cwd(), reviewerKeys, at } = {}) {
 
   // never_weakens: snapshot to snapshot (and on to the disk after a stop), workdir null, no criterion optional
   const chain = specRounds.map((r) => ({ r, s: snapOf.get(r) })).filter((x) => x.s);
-  const ctx = { rounds, stopAmendments: arr(stop?.amendments), notes: arr(rec.reviewer_notes), specId: id, trusted, refused, root };
+  const ctx = { rounds, notes: arr(rec.reviewer_notes), specId: id, trusted, refused, root };
   for (let k = 1; k < chain.length; k++) for (const w of weakenings(chain[k - 1].s, chain[k].s, { amendments: chain[k].r.amendments, prev: chain[k - 1].r, cur: chain[k].r.round, ...ctx })) fail('never_weakens', `round ${chain[k].r.round}: ${w}`);
   // at a stop, the change from the last spec round's snapshot to the disk is judged with the stop's own amendments (requirement 12)
   if (stop && chain.length) for (const w of weakenings(chain[chain.length - 1].s, disk, { amendments: stop.amendments, prev: chain[chain.length - 1].r, cur: Infinity, ...ctx })) fail('never_weakens', `the spec on disk: ${w}`);

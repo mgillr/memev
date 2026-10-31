@@ -135,8 +135,8 @@ list records it with a citation, and the next round judges whether it weakens:
   the one it became;
 - a task moved to another spec at a split: `{kind: "move", task, to_spec, to_task, <citation>}`, accepted
   only when the receiving task holds every requirement, criterion and stop rule of the moved task, itself or
-  the end of its From/To chain: the replacements this record lists for the moved task (as made at the split),
-  then the receiving spec's own.
+  the end of its From/To chain: the replacements for the moved task in the amendments list that records the
+  move (as made at the split), each counted only with its own citation, then the receiving spec's own.
 
 A citation is `answer: "<round>.<n>"`, an answer of the previous spec round or of an implementation round
 recorded after it; `note: "<round>.<point>"`, a numbered point of the previous round's notes; or

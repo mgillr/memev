@@ -875,6 +875,30 @@ test('T1-c42: an added answer folded into the spec its task moved to is judged t
   const reworded = 'src/b.mjs re-exports a from QL-0.01';
   signable(taskMove({ requirements: [reworded] }, undefined, [{ task: 'T2', field: 'requirement', from: 'src/b.mjs re-exports a', to: reworded, answer: '1.1' }]), 'a moved requirement present through the replacement recorded at the split');
   weakened(taskMove({ requirements: [reworded] }), 'T2', null, 'the reworded requirement with no replacement recorded');
+  // the replacements at the split count only with their own citations: uncited, they cannot rename a task into a stub
+  const small = { id: 'T2', title: 'The module b', phase: 'implement', depends_on: ['T1'], requirements: ['b refuses a cycle'], description: '', scope: ['src/b.mjs', 'test/b.test.mjs'], criteria: [{ statement: 'b refuses a cycle', verifier: { type: 'test_red_green', test_file: 'test/b.test.mjs', cmd: 'node --test test/b.test.mjs' } }], stop_rules: [] };
+  const stub = { ...specV2(), title: 'QL-0.02 The receiving contract', tasks: [{ ...clone(small), id: 'T1', depends_on: [], requirements: ['c prints a banner'], criteria: [{ statement: 'c prints a banner', verifier: { type: 'test_red_green', test_file: 'test/c.test.mjs', cmd: 'node --test test/c.test.mjs' } }] }] };
+  const renames = [
+    { task: 'T2', field: 'requirement', from: 'b refuses a cycle', to: 'c prints a banner' },
+    { task: 'T2', field: 'statement', from: 'b refuses a cycle', to: 'c prints a banner' },
+    { task: 'T2', field: 'verifier.test_file', statement: 'c prints a banner', from: 'test/b.test.mjs', to: 'test/c.test.mjs' },
+    { task: 'T2', field: 'verifier.cmd', statement: 'c prints a banner', from: 'node --test test/b.test.mjs', to: 'node --test test/c.test.mjs' },
+  ];
+  const intoStub = (cite, record) => {
+    const v1 = specV1(); v1.tasks[1] = clone(small);
+    const v2 = specV2(); v2.tasks = [v2.tasks[0]];
+    const rounds = baseRounds(); rounds[1].amendments = [{ kind: 'move', task: 'T2', to_spec: 'QL-0.02', to_task: 'T1', answer: '1.1' }, ...renames.map((x, k) => ({ ...x, ...cite(k) }))];
+    const extra = { 'contracts/quality-loop/manifest.json': manifest(['QL-0.01', 'QL-0.02']), 'contracts/quality-loop/specs/QL-0.02.json': `${JSON.stringify(stub, null, 2)}\n` };
+    return ev(sc({ snapshots: [v1, v2], disk: v2, rounds, extra, ...(record ? { record } : {}) }));
+  };
+  const noteText = 'the split renames the moved task for its new contract';
+  const stubNotes = { reviewer_notes: [{ n: 1, text: noteText, sig: sign({ spec_id: 'QL-0.01', n: 1, text: noteText }, TEST_PRIV) }] };
+  const uncited = intoStub(() => ({}));
+  weakened(uncited, 'T2', null, 'uncited replacements renaming the moved task into a stub');
+  assert.match(reason(uncited, 'never_weakens'), /task T2 removed and its move is refused: QL-0\.02 T1 lacks the requirement "b refuses a cycle"/);
+  weakened(intoStub((k) => (k === 3 ? {} : { answer: '1.1' })), 'T2', null, 'one of the four replacements uncited');
+  signable(intoStub(() => ({ answer: '1.1' })), 'each replacement citing an added answer of the previous round');
+  signable(intoStub(() => ({ reviewer_note: 1 }), stubNotes), 'each replacement citing a reviewer note');
   weakened(taskMove({ requirements: ['c prints a banner'], criteria: [{ statement: 'c prints a banner', verifier: { type: 'grep', file: 'src/c.mjs', pattern: 'banner' } }] }), 'T2', null, 'the receiving task is an unrelated stub');
 });
 
