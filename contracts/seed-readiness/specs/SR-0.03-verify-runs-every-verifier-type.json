@@ -112,12 +112,12 @@
         "src/engine/contracts.mjs",
         "test/contracts-scope.test.mjs",
         "test/helpers/**",
+        "test/contracts-scope-trailers.test.mjs",
         "test/contracts-base-unknown.test.mjs",
         "test/contracts-scope-cases.test.mjs",
         "test/contracts-scope-tasks.test.mjs",
         "test/contracts-scope-remote.test.mjs",
         "test/contracts-scope-vault.test.mjs",
-        "test/contracts-scope-trailers.test.mjs",
         "test/contracts-scope-history.test.mjs",
         "test/contracts-scope-gates.test.mjs",
         "test/contracts-scope-nogit.test.mjs"
@@ -172,14 +172,6 @@
           }
         },
         {
-          "statement": "One fixture repository, two tasks (T1 scope ['a.js'], T2 scope ['b.js']). Commit c1 changes a.js with trailer T1 and c2 changes b.js with trailer T2: T1 PASS and T2 PASS (a plain working-tree diff fails both). c3 changes b.js with trailer T1: T1 FAIL naming b.js and c3. c4 has no trailer: both FAIL naming c4. An uncommitted edit to a.js: both BLOCKED with 'commit the work'. With the vault root as workdir, sign + verify + an in-scope memory/ write leaves scope PASS, because the vault's own 'memev:' commits are not counted. The spec must first choose one semantics, and either drop the untracked=FAIL cases from scope-cases or drop req 4's BLOCKED rule. Add the file to T2 scope.",
-          "verifier": {
-            "type": "test_red_green",
-            "test_file": "test/contracts-scope-trailers.test.mjs",
-            "cmd": "node --test test/contracts-scope-trailers.test.mjs"
-          }
-        },
-        {
           "statement": "Fixture with scope ['src/a/**'] and base B. (i) A merge commit (two parents) whose tree adds src/b/evil.js, which neither parent has: FAIL naming src/b/evil.js and the merge sha. (ii) One commit whose body has 'Contract-Task: <id> T1' and 'Contract-Task: <id> T2' in separate paragraphs (the squash shape) and changes src/b/x.js: FAIL with 'more than one task' or naming src/b/x.js, never PASS. (iii) A commit with no trailer that changes src/a/ok.js: FAIL naming the commit.",
           "verifier": {
             "type": "test_red_green",
@@ -201,6 +193,14 @@
             "type": "test_red_green",
             "test_file": "test/contracts-scope-nogit.test.mjs",
             "cmd": "node --test test/contracts-scope-nogit.test.mjs"
+          }
+        },
+        {
+          "statement": "One fixture repository, two tasks (T1 scope ['a.js'], T2 scope ['b.js']), union semantics: commit c1 changes a.js with trailer T1 and c2 changes b.js with trailer T2: T1 PASS and T2 PASS. c3 changes b.js with trailer T1: T1 FAIL naming b.js and c3. An untrailered commit changing a.js: PASS; an untrailered commit changing z.js (outside every task): FAIL naming z.js and the commit. An uncommitted edit to a.js: PASS; an uncommitted z.js: FAIL naming z.js and 'uncommitted'. A commit carrying two Contract-Task trailers: FAIL naming the commit. With the vault root as workdir, sign, verify and an in-scope memory/ write: scope PASS.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-trailers.test.mjs",
+            "cmd": "node --test test/contracts-scope-trailers.test.mjs"
           }
         },
         {
