@@ -116,9 +116,14 @@ export function effectiveClient(claimed, env = process.env, ppid = process.ppid)
   return want;
 }
 
-// The daemon is always on this computer's loopback address, never behind a proxy (fetchOut sends loopback direct too),
-// so api() talks to it with node:http. Loading fetch's implementation costs more start-up time than a hook can spare on
-// a slow runner (MEM-098); the answer is the same: status, ok for 2xx, the body text and its JSON when it parses.
+// A hook process talks to the daemon with node:http: bin/memev.mjs turns this on before it runs a hook, because loading
+// fetch's implementation costs more start-up time than a hook can spare on a slow runner (MEM-098). Every other
+// command, and in-process callers such as the bench harness (which hands fetch calls to the server in-process), keep
+// fetchOut, imported on first use so that a hook process never loads it. The daemon is always on this computer's
+// loopback address, never behind a proxy, so both give the same answer: status, ok for 2xx, the body text and its JSON.
+let directLoopback = false;
+export function useDirectLoopback() { directLoopback = true; }
+
 // node:http is required, not imported: an ESM import of it reads every export, and one of them loads fetch's
 // implementation, which is the cost this avoids.
 const http = createRequire(import.meta.url)('node:http');
@@ -135,12 +140,18 @@ function loopback(port, route, { method, headers, body, signal }) {
     req.end(body ?? undefined);
   });
 }
+async function viaFetch(port, route, opts) {
+  const { fetchOut } = await import('../engine/net.mjs');
+  const r = await fetchOut(`http://127.0.0.1:${port}${route}`, { ...opts, body: opts.body ?? undefined });
+  return { status: r.status, text: await r.text() };
+}
 
 export async function api(root, route, { method = 'POST', body = null, token = null, timeoutMs = 3000, port = null } = {}) {
   const p = port || daemonInfo(root)?.port || config(root).port;
   const ac = new AbortController(); const t = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const r = await loopback(p, route, { method, signal: ac.signal, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : null });
+    const opts = { method, signal: ac.signal, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : null };
+    const r = directLoopback ? await loopback(p, route, opts) : await viaFetch(p, route, opts);
     let json = null; try { json = JSON.parse(r.text); } catch {}
     return { ok: r.status >= 200 && r.status < 300, status: r.status, json, text: r.text };
   } finally { clearTimeout(t); }

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-// Every request Memev makes to another computer goes through fetchOut, which honours the usual proxy settings:
-// HTTPS_PROXY for https, HTTP_PROXY for http (either case), NO_PROXY for the hosts that go direct. Node's own fetch
-// ignores them all, and its built-in support needs a start-up flag. The daemon on this computer is always reached
-// directly (the CLI's api() in cli/common.mjs talks to it with node:http). With no proxy for a URL this is plain fetch,
+// Every request Memev makes goes through fetchOut, except a hook process's calls to the daemon on this computer, which
+// use node:http (cli/common.mjs). fetchOut honours the usual proxy settings: HTTPS_PROXY for https, HTTP_PROXY for http
+// (either case), NO_PROXY for the hosts that go direct. Node's own fetch ignores them all, and its built-in support needs
+// a start-up flag. The daemon on this computer is always reached directly. With no proxy for a URL this is plain fetch,
 // so nothing changes for anyone who does not set one.
 import http from 'node:http';
 import https from 'node:https';
