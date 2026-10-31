@@ -36,7 +36,9 @@
         "test/gate-mutate.test.mjs",
         "test/fixtures/mutate/**",
         "test/helpers/**",
-        "src/engine/mutation-gate.mjs"
+        "src/engine/mutation-gate.mjs",
+        "docs/MODULES.md",
+        "changelog.d/QL-1.02.md"
       ],
       "criteria": [
         {
