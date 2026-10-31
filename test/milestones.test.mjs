@@ -115,7 +115,7 @@ test('MEM-073 AC03: no milestone code makes a network call', async () => {
 test('MEM-073: the checklist keeps the milestones, memev onboarding --milestones lists them, a fresh vault has only installed', () => {
   const sb = sandbox();
   try {
-    assert.equal(sb.run(['init', '--no-connect', '--local-only']).code, 0);
+    assert.equal(sb.run(['init', '--port', String(sb.port), '--no-connect', '--local-only']).code, 0);
     const r = sb.run(['onboarding', '--milestones', '--json']);
     assert.equal(r.code, 0, r.err);
     const m = JSON.parse(r.out);

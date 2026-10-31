@@ -10,7 +10,7 @@ import { inferRequirements } from '../src/engine/contracts.mjs';
 import { isBuildRequest } from '../src/cli/hooks.mjs';
 
 let sb;
-before(() => { sb = sandbox(); const r = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']); assert.equal(r.code, 0, r.err + r.out); });
+before(() => { sb = sandbox(); const r = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']); assert.equal(r.code, 0, r.err + r.out); const on = sb.run(['contracts', 'on']); assert.equal(on.code, 0, on.err); });
 after(() => { sb.stop(); cleanup(); });
 const ctx = (r) => { assert.equal(r.code, 0, r.err); return r.out ? JSON.parse(r.out).hookSpecificOutput?.additionalContext || '' : ''; };
 const data = (r) => { assert.ok(!r.isError, r.content?.[0]?.text); return r.structuredContent; };

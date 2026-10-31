@@ -108,12 +108,24 @@ export class DeviceRegistry {
     return { device: d, token: t.token };
   }
 
+  /**
+   * A record that a User-Agent switched to cloud-connector before issue 266 was fixed goes back to remote-computer, so
+   * upgrading closes the hole for a credential that was already switched. The caller decides that the token was not
+   * made for a cloud app.
+   */
+  restoreSwitched(id) {
+    const d = this.get(id); if (!d) return d;
+    d.kind = 'remote-computer';
+    this._flag(d, 'kind-restored', 'this computer credential had been counted as a cloud connector because of a User-Agent; it is a computer again and needs its device key. For a cloud AI app, make a connector link with memev cloud url');
+    this.save(); return d;
+  }
+
   rename(id, label) { const d = this.get(id); if (!d) throw new Error(`no device ${id}`); d.label = String(label).slice(0, 60); this.save(); return d; }
 
   /**
    * Existing installs: every active token that is not yet a device becomes one. Local tokens are
    * local clients; remote tokens made for a cloud app are connectors; other remote tokens are
-   * remote computers until their traffic says otherwise.
+   * remote computers. Their traffic never changes that (issue 266): only the person makes a connector.
    */
   migrate(tokens) {
     const added = [];
@@ -152,8 +164,10 @@ export class DeviceRegistry {
     d.first_seen ||= t; d.last_seen = t;
     const cls = this.classify({ local, connectorUrl, userAgent, device: d });
     d.last_class = cls;
-    // a token issued by hand that a cloud AI app uses is a connector; the other way round only flags
-    if (d.inferred && !local && d.kind === 'remote-computer' && cls === 'cloud-connector') d.kind = cls;
+    // A User-Agent is the caller's choice, so it never changes what a device is (issue 266): a computer credential that
+    // a cloud AI app uses is only flagged, and it still needs its device proof. For a cloud AI app the person makes a
+    // connector link (memev cloud url). A connector used by something else is flagged too.
+    if (!local && d.kind === 'remote-computer' && cls === 'cloud-connector') this._flag(d, 'cloud-app-on-computer-credential', 'a cloud AI app used a computer credential; it is refused until it signs with a device key. For a cloud AI app, make a connector link with memev cloud url');
     if (d.kind === 'cloud-connector' && cls === 'remote-computer') this._flag(d, 'connector-used-by-computer', 'a connector credential was used by something that is not a cloud AI app; it is counted as a computer');
     if (proof) { if (proof.ok) d.proof = 'ok'; else this._flag(d, 'proof', proof.reason); }
     else if (d.pubkey && !local) this._flag(d, 'unsigned', 'this device has a key but sent an unsigned request');
@@ -234,6 +248,33 @@ export function deviceKeygen() {
 const invitePath = (root) => path.join(root, '.memev', 'invites.json');
 export const inviteHash = (secret) => sha256(String(secret));
 
+/**
+ * The backup value in an invite is handed to git fetch as the remote, so it must be a remote git
+ * can name: a URL (https, http, ssh, git, file), a [user@]host:path remote, or an absolute local
+ * path. Anything else is refused, including anything that starts with a dash (which git would read
+ * as an option) and a <transport>::<address> value (which runs a git remote helper).
+ */
+export function assertBackupRemote(value) {
+  const v = String(value ?? '');
+  const bad = () => { throw new Error('the invite backup is not a valid git remote (a URL, a user@host:path remote, or an absolute local path)'); };
+  if (!v || /[\x00-\x1f\x7f]/.test(v) || v.startsWith('-')) bad();
+  if (/^[A-Za-z0-9+.-]+::/.test(v)) bad();
+  if (v.startsWith('/') || /^[A-Za-z]:[\\/]/.test(v)) return v;
+  let m;
+  if ((m = /^(https?|ssh|git|git\+ssh|ssh\+git|file):\/\/(?:([^@/\s]*)@)?([^/:?#\s]*)(?::(\d+))?(?:[/?]|$)/.exec(v))) {
+    if (!m[3] && m[1] !== 'file') bad();
+    if (m[3].startsWith('-') || (m[2] || '').startsWith('-')) bad();
+    return v;
+  }
+  if ((m = /^(?:([^@/:\s]+)@)?([^/:\s]+):(.+)$/.exec(v))) {
+    if (m[2].startsWith('-') || (m[1] || '').startsWith('-')) bad();
+    // "scheme:value" without a slash (e.g. "http:bad") is not a remote git can name
+    if (!m[1] && /^(?:https?|ssh|git|git\+ssh|ssh\+git|file|ftps?)$/i.test(m[2])) bad();
+    return v;
+  }
+  bad();
+}
+
 export function encodeInvite({ address, secret, pubkey = undefined, backup = undefined }) {
   const o = { a: address, s: secret };
   if (pubkey) o.k = pubkey;
@@ -244,7 +285,8 @@ export function decodeInvite(code) {
   let o;
   try { o = JSON.parse(Buffer.from(String(code), 'base64url').toString('utf8')); } catch { throw new Error('bad invite code'); }
   if (!o || typeof o.a !== 'string' || typeof o.s !== 'string' || !o.a || !o.s) throw new Error('bad invite code');
-  return { address: o.a, secret: o.s, pubkey: typeof o.k === 'string' && o.k ? o.k : null, backup: typeof o.b === 'string' && o.b ? o.b : null };
+  const backup = typeof o.b === 'string' && o.b ? assertBackupRemote(o.b) : null;
+  return { address: o.a, secret: o.s, pubkey: typeof o.k === 'string' && o.k ? o.k : null, backup };
 }
 
 function loadInvites(root) { return readJson(invitePath(root), null) || { version: 1, invites: {} }; }

@@ -9,6 +9,7 @@ import tls from 'node:tls';
 import { tmpdir, cleanup, PKG } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
 import { initVault, Vault } from '../src/engine/vault.mjs';
+import { readJson, writeJson } from '../src/engine/util.mjs';
 import { signLicense, loadLicense } from '../src/engine/license.mjs';
 import { seatPolicy } from '../src/engine/entitlements.mjs';
 import { deviceKeygen, signRequest } from '../src/engine/devices.mjs';
@@ -28,6 +29,11 @@ const rpc = (name, args) => ({ jsonrpc: '2.0', id: 1, method: 'tools/call', para
 async function rig() {
   const root = path.join(tmpdir(), 'vault'); const keyDir = path.join(root, '..', 'keys');
   initVault(root, { template: path.join(PKG, 'templates', 'vault') });
+  // remote access is off by default; the relay tests exercise the on path, so switch it on as `memev cloud on` would
+  const cfgFile = path.join(root, '.memev', 'config.json');
+  const cfg = readJson(cfgFile, {});
+  cfg.remote = { ...cfg.remote, enabled: true };
+  writeJson(cfgFile, cfg, 0o600);
   const conf = tmpdir('relay-conf-');
   fs.writeFileSync(path.join(conf, 'license.json'), JSON.stringify(signLicense({ v: 1, lid: 'lic_relay029', tier: 'team', services: ['relay'], seats: 3, iat: day(-10), exp: day(300), grace_days: 14 }, vendor.pem, 'test-vendor')));
   const env = { MEMEV_CONFIG_DIR: conf };
@@ -192,7 +198,7 @@ test('MEM-029: the relay is off until the setting says otherwise, and nothing co
   let conns = 0; const dummy = net.createServer((s) => { conns++; s.destroy(); }); await new Promise((r) => dummy.listen(0, '127.0.0.1', r));
   const sb = sandbox();
   try {
-    assert.equal(sb.run(['init', '--no-connect', '--local-only']).code, 0);
+    assert.equal(sb.run(['init', '--port', String(sb.port), '--no-connect', '--local-only']).code, 0);
     const st = sb.run(['cloud', 'relay', 'status']); assert.equal(st.code, 0); assert.match(st.out, /Relay: off/);
     assert.equal(client.relaySetting(sb.root).enabled, false);
     // the daemon's supervisor with the setting off never dials
@@ -219,7 +225,7 @@ test('MEM-030-FU: a Personal licence in grace still uses the configured relay ad
   const sb = sandbox();
   const url = 'relay://127.0.0.1:9';
   try {
-    assert.equal(sb.run(['init', '--no-connect', '--local-only']).code, 0);
+    assert.equal(sb.run(['init', '--port', String(sb.port), '--no-connect', '--local-only']).code, 0);
     client.setRelay(sb.root, { default_url: url, default_domain: DOMAIN });
     assert.equal(await client.command(['on'], {}, { root: sb.root, env: sb.env, license: { state: 'grace', tier: 'personal' } }), 0);
     assert.equal(client.relaySetting(sb.root).url, url);
@@ -231,7 +237,7 @@ test('MEM-030 AC02: The default relay URL is read from config and the client use
   const sb = sandbox();
   const url = 'relay://127.0.0.1:9';
   try {
-    assert.equal(sb.run(['init', '--no-connect', '--local-only']).code, 0);
+    assert.equal(sb.run(['init', '--port', String(sb.port), '--no-connect', '--local-only']).code, 0);
     client.setRelay(sb.root, { default_url: url, default_domain: DOMAIN });
     await assert.rejects(() => client.command(['on'], {}, { root: sb.root, env: sb.env, license: { state: 'none', tier: null } }), /no relay is built in/);
     await assert.rejects(() => client.command(['on'], {}, { root: sb.root, env: sb.env, license: { state: 'valid', tier: 'team' } }), /no relay is built in/);

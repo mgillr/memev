@@ -1,5 +1,7 @@
 # Readiness review
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 A readiness review of the earlier private prototype was done before this repository was created.
 It found the prototype not ready to share (identity and business details throughout its history,
 compaction continuity gaps, unbounded log growth, manual client setup) and proposed a clean build

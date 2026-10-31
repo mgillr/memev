@@ -1,0 +1,51 @@
+{
+  "title": "SR-5.02 The Business trial can actually start",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G43: invite.trialAvailable() returns false (MEM-067); the site offers a trial no one can start. Repository: memev. Depends on contracts: SR-4.02, SR-7.02.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Trial issuance and conversion",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "14 days, one 14-day extension, 5 members and 10 computers, one per organisation, ends in grace with nothing deleted"
+      ],
+      "description": "",
+      "scope": [
+        "src/cli/invite.mjs",
+        "src/cli/licensing.mjs",
+        "test/trial.test.mjs",
+        "docs/BUSINESS-TRIAL.md"
+      ],
+      "criteria": [
+        {
+          "statement": "A trial starts, extends once, refuses a second extension and converts in place",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trial.test.mjs",
+            "cmd": "node --test test/trial.test.mjs"
+          }
+        },
+        {
+          "statement": "trialAvailable is no longer a stub",
+          "verifier": {
+            "type": "command",
+            "cmd": "node -e \"process.exit(/return false;\\s*\\n\\}/.test(require('fs').readFileSync('src/cli/invite.mjs','utf8'))?1:0)\""
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

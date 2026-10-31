@@ -1,8 +1,21 @@
 # Contracts
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 A contract is a signed statement of what a piece of work must deliver: tasks, acceptance criteria
 with checks a machine can run, and stop rules. Memev includes a modified copy of Proofline
 (`vendor/attest`, Apache-2.0) for drafting, decomposing and verifying them.
+
+## Opt-in
+
+Contracts are off by default for new installs. When they are off, the Stop hook never blocks on a
+contract. Existing vaults (created before the opt-in) keep contracts on.
+
+```sh
+memev contracts on      # turn contracts on
+memev contracts off     # turn contracts off
+memev contracts status  # show whether contracts are on or off
+```
 
 ## "I have a project, build me X"
 
@@ -36,6 +49,20 @@ memev verify [id]            # verify one contract, or every open one
 memev gate [--workdir DIR]   # exit 1 while an open contract for DIR does not verify
 memev contract hook [DIR]    # optional: a local git pre-push hook in DIR that runs memev gate
 ```
+
+## Remote signing and local approval
+
+A contract can be signed from a remote origin (through the tunnel). The signed contract records
+its origin. While a remote-signed contract is not yet approved, its command criteria are blocked
+on this machine: `memev_contract_verify` reports them as BLOCKED, and the resume card does not
+solicit a verify. A local operator approves it with:
+
+```sh
+memev contract approve <id>  # allow a remote-signed contract's commands to run here
+```
+
+After approval, the contract verifies normally. File-existence and grep criteria are always
+confined to the vault root; paths that escape it are refused.
 
 ## Immutability and versions
 
