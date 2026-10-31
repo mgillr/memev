@@ -76,7 +76,7 @@ export async function command(cmd, pos, flags, { root, env }) {
   }
 
   const paths = flags.path ? String(flags.path).split(',').map((s) => s.trim()).filter(Boolean) : [];
-  const aiHistory = !!flags['ai-history'];
+  let aiHistory = !!flags['ai-history'];
   const exportFiles = flags.export ? String(flags.export).split(',').map((s) => s.trim()).filter(Boolean) : [];
   const preview = !!flags.preview;
   const yes = !!flags.yes;

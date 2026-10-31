@@ -167,3 +167,28 @@ test('MEM-105 AC13: importing the same folder twice does not duplicate notes', (
   assert.equal(list.length, 1, 'still only one import');
   v.close();
 });
+
+test('MEM-105: the import with no arguments previews the current folder and the history without stopping', async () => {
+  const { root, v } = newVault();
+  v.close();
+  const proj = tmpdir('proj-');
+  fs.writeFileSync(path.join(proj, 'README.md'), '# Bare import\nA note found by the bare import.\n');
+  const home = tmpdir('home-');
+  const { command } = await import('../src/cli/import.mjs');
+  const cwd = process.cwd();
+  const lines = [];
+  const log = console.log;
+  console.log = (...a) => { lines.push(a.join(' ')); };
+  let code;
+  try {
+    process.chdir(proj);
+    code = await command('import', [], { preview: true }, { root, env: { HOME: home } });
+  } finally {
+    console.log = log;
+    process.chdir(cwd);
+  }
+  assert.equal(code, 0, 'the bare import previews and exits 0');
+  assert.ok(lines.join('\n').includes('Import preview'), 'a preview is printed');
+  assert.ok(lines.join('\n').includes('README.md'), 'the current folder is scanned');
+});
+
