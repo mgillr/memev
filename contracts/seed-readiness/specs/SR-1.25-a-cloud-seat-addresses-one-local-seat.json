@@ -10,14 +10,26 @@
       "phase": "implement",
       "depends_on": [],
       "requirements": [
-        "a cloud seat's task is accepted only when it is addressed to one named local seat; all, a cloud seat and an unknown seat are refused with the reason"
+        "a cloud seat's task is accepted only when it is addressed to one named local seat; all, a cloud seat and an unknown seat are refused with the reason",
+        "the address is checked before anything is written: a refused cloud send leaves the bus log, its size and every seat's unread unchanged",
+        "a seat is a cloud seat when its device's current kind in the registry is cloud-connector, whatever its name, number suffix, sub-seat or rename; a seat on an enrolled remote computer (the owner's own device) is a local seat; a removed seat or a seat whose computer was revoked is refused",
+        "a cloud seat's task 'to' must be a string naming one registered local seat exactly; an array, any other type, 'all' in any case or with padding, and a name with a control character are refused",
+        "with cloud_tasks on, the refusal for 'all' or a cloud seat says a cloud task goes to one local seat and does not mention turning cloud_tasks on; an unknown seat is refused with code not_found and 'no seat <name>'",
+        "a caller that is not local and has no device record is treated as a cloud seat",
+        "when the lead is a cloud seat, a cloud seat's task to the operator alias is refused like a task to that seat by name",
+        "memev doctor flags cloud tasks to 'all' or to a cloud seat that are already in the bus logs from before this change",
+        "docs/BUS.md says a cloud task goes to one named local seat, that a seat on an enrolled remote computer counts as local, and that 'all', a cloud seat and an unknown seat are refused",
+        "each red-green criterion of this task that runs test/bus-cloud-address.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
       "scope": [
         "src/engine/bus.mjs",
         "docs/BUS.md",
         "test/bus-cloud-address.test.mjs",
-        "test/helpers/**"
+        "test/helpers/**",
+        "src/server/mcp.mjs",
+        "src/engine/devices.mjs",
+        "src/cli/doctor.mjs"
       ],
       "criteria": [
         {
@@ -25,7 +37,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/bus-cloud-address.test.mjs",
-            "cmd": "node --test test/bus-cloud-address.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/bus-cloud-address.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -67,6 +79,94 @@
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "After every refused cloud send (to all, to a registered cloud seat, to an unknown seat), v.bus.all().length and the byte size of bus/log/<cloud device id>.jsonl are unchanged, and bus_unread with peek for each local seat holds no message from the cloud seat. The accepted single-seat task adds exactly one line.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-cloud-address.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/bus-cloud-address.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The fixture enrolls a second cloud-connector device and has it post once to the operator, so its seat file exists. Before sending, the test asserts that v.bus.seat(target) is not null and that devices.get(rec.device).kind is cloud-connector. It then asserts that the cloud task to that seat throws with code forbidden and a message naming the one-local-seat rule, and that the message does not match 'no seat'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-cloud-address.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c07:' test/bus-cloud-address.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With cloud_tasks on, tasks to these targets are refused: a second same-label connector's seat (...@cloud-2), a cloud sub-seat (...@cloud/x), a renamed cloud seat by its new name and by its old one, and a seat whose stored device_kind is remote-computer but whose device is now cloud-connector. A task to a local seat registered after the host's label is set to 'cloud' is accepted.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-cloud-address.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/bus-cloud-address.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With cloud_tasks on, v.bus.send from the cloud ctx throws and adds no log line for each of: to ['all'], to ['cursor@host','codex@host'], 'All', ' all', 'all ', and 'all' followed by a NUL character. Through /mcp, bus_send with to:['all'] returns isError.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-cloud-address.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c09:' test/bus-cloud-address.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With cloud_tasks on, the refusal for 'all' and for a registered cloud seat says the task must go to one local seat and does not mention turning on cloud_tasks. An unknown seat is refused with code not_found and 'no seat <name>'. Each case asserts err.code and a message pattern.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-cloud-address.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c10:' test/bus-cloud-address.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With cloud_tasks on, a cloud task to a seat on an enrolled remote computer is accepted; BUS.md states that such a seat counts as local. Tasks to a removed seat and to a seat whose computer was revoked are refused.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-cloud-address.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c11:' test/bus-cloud-address.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The contract base is set, at least one mutant of the changed lines is made and killed, and none survive. This assumes the mutator's JSON has a 'killed' count; use whichever field counts killed mutants.",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -n \"$MEMEV_CONTRACT_BASE\" && node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/bus-cloud-address.test.mjs\" --json | node -e \"const r=JSON.parse(require('fs').readFileSync(0,'utf8'));process.exit(r.survived===0&&r.killed>0?0:1)\"",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "v.bus.send with ctx {local:false, device:null} and a remote identity throws forbidden, with cloud_tasks on and with it off.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-cloud-address.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c13:' test/bus-cloud-address.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With the lead set to a second cloud seat, a cloud seat's task to 'operator' and to that seat by name are both refused.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-cloud-address.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c14:' test/bus-cloud-address.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c14:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "BUS.md says a cloud task goes to one named local seat, and that 'all', a cloud seat and an unknown seat are refused (a secondary check alongside the behavioural tests).",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/BUS.md",
+            "pattern": "one (named )?local seat"
+          }
+        },
+        {
+          "statement": "One full run of test/bus-cloud-address.test.mjs passes every labelled subtest (T1-c01, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c11, T1-c13, T1-c14) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/bus-cloud-address.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c13:|^T1-c14:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
           }
         },
         {

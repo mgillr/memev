@@ -2,7 +2,7 @@
   "title": "SR-1.28 The bus writes its own routing files",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G93 (issue #250): connector and device tokens hold write on bus/** (src/engine/devices.mjs:85, src/engine/oauth.mjs:17), and the bus's routing files are plain vault notes: bus/operator.json names the operator and bus/seats/<seat>.json carries renamed_from. So a note write makes a cloud connector the operator, its task to the 'operator' alias carries operator authority, and a runner turned on for a local seat starts its command headless with the connector's text as the prompt. Found by the SR-1.25 red-team round and reproduced on 31 October 2026 on the main source. Repository: memev. Depends on contracts: SR-1.27, SR-1.24, QL-1.02. SR-1.27 brings the folded and resolved protected-path check this contract extends to bus/; SR-1.24 brings the admin-gated operator route of issue #248. It is urgent: until it lands, a stopgap fix ahead of it needs the owner's approval. Sensitive path (tokens, the bus and command execution): the QL-1.03 checklist applies before merge.",
+  "request": "Closes G93 (issue #250): connector and device tokens hold write on bus/** (src/engine/devices.mjs:85, src/server/oauth.mjs:17), and the bus's routing files are plain vault notes: bus/operator.json names the operator and bus/seats/<seat>.json carries renamed_from. So a note write makes a cloud connector the operator, its task to the 'operator' alias carries operator authority, and a runner turned on for a local seat starts its command headless with the connector's text as the prompt. Found by the SR-1.25 red-team round and reproduced on 31 October 2026 on the main source. Repository: memev. Depends on contracts: SR-1.27, SR-1.24, QL-1.02. SR-1.27 brings the folded and resolved protected-path check this contract extends to bus/; SR-1.24 brings the admin-gated operator route of issue #248. It is urgent: until it lands, a stopgap fix ahead of it needs the owner's approval. Sensitive path (tokens, the bus and command execution): the QL-1.03 checklist applies before merge.",
   "tasks": [
     {
       "id": "T1",
@@ -130,7 +130,7 @@
       ],
       "scope": [
         "src/engine/devices.mjs",
-        "src/engine/oauth.mjs",
+        "src/server/oauth.mjs",
         "src/engine/tokens.mjs",
         "src/engine/bus.mjs",
         "src/server/http.mjs",
