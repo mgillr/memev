@@ -84,7 +84,7 @@
       "closes": "LICENSE_FIELDS omits trial, org and trial_ext that other modules read; installLicense skips the check activate applies",
       "depends_on": [],
       "tasks": 1,
-      "criteria": 16,
+      "criteria": 28,
       "spec": "specs/SR-1.06-one-licence-schema-validated-everywhere.json"
     },
     {
