@@ -278,18 +278,27 @@ export class ProjectStore {
     if (exists(this.lockPath)) {
       const pid = parseInt(fs.readFileSync(this.lockPath, 'utf8').trim(), 10);
       if (pid !== process.pid && pidAlive(pid)) return true;
+      // a lock file with no pid in it is a writer caught between creating and filling it: busy, not stale
+      if (!Number.isInteger(pid) && Date.now() - fs.statSync(this.lockPath).mtimeMs < 5000) return true;
       try { fs.unlinkSync(this.lockPath); } catch {}
     }
+    // The lock appears whole or not at all: the pid is written to a private file, which is then linked to the lock
+    // name (atomic, and refused when the name exists). Creating the lock and then writing the pid left a moment in
+    // which a second process read an empty file, took it for stale and removed a live lock.
+    const tmp = `${this.lockPath}.${process.pid}.${randomToken(3)}`;
     try {
-      const fd = fs.openSync(this.lockPath, 'wx', 0o600);
-      fs.writeSync(fd, String(process.pid));
-      fs.closeSync(fd);
+      fs.writeFileSync(tmp, String(process.pid), { mode: 0o600 });
+      try { fs.linkSync(tmp, this.lockPath); }
+      catch (e) {
+        if (e.code === 'EEXIST') return true;
+        if (!['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'EXDEV'].includes(e.code)) throw e;
+        // a file system with no hard links: the exclusive create, with the pid written in the same call
+        try { fs.writeFileSync(this.lockPath, String(process.pid), { flag: 'wx', mode: 0o600 }); }
+        catch (e2) { if (e2.code === 'EEXIST') return true; throw e2; }
+      }
       this._lockDepth = 1;
       return false;
-    } catch (e) {
-      if (e.code === 'EEXIST') return true;
-      throw e;
-    }
+    } finally { try { fs.unlinkSync(tmp); } catch {} }
   }
   _releaseLock() {
     if (this._lockDepth <= 0) return;
