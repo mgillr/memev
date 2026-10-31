@@ -4,8 +4,10 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { cleanup } from './helpers/tmp.mjs';
-import { sandbox, mcpClient } from './helpers/cli.mjs';
+import { spawn } from 'node:child_process';
+import { cleanup, newVault, OWNER } from './helpers/tmp.mjs';
+import { sandbox, mcpClient, BIN } from './helpers/cli.mjs';
+import { hasRead, UNREAD_MAX } from '../src/engine/bus.mjs';
 after(cleanup);
 
 const SENT = 'The export suite is green after the index change, and the flaky retry is now stable under load. ';
@@ -128,4 +130,117 @@ test('MEM-109 AC06: operator hold and task messages are always shown first and n
     assert.ok(first.some((m) => m.type === 'hold'), 'the hold comes first');
     assert.equal(u.messages.length, 10, 'two priority plus the page of the rest');
   } finally { await cursor.close(); await codex.close(); sb.stop(); }
+});
+
+// In process with git off: codex and gemini are apps on this computer, each posting as its own seat.
+function inProcess() {
+  const { root, v } = newVault({ git: false });
+  const host = v.devices.get(v.devices.hostId);
+  for (const c of ['codex', 'gemini']) v.bus.register({ client: c, device: host });
+  const ctx = (client) => ({ identity: OWNER, client, device: host, local: true });
+  const pulse = () => JSON.parse(fs.readFileSync(path.join(root, 'bus', 'pulse', 'gemini~host.json'), 'utf8'));
+  const statuses = () => v.bus.all().filter((m) => m.from === 'codex@host' && m.type === 'status');
+  return { root, v, ctx, pulse, statuses };
+}
+
+test('MEM-109 AC03: after a capped bus_unread leaves a gap, each read value in the pulse file stays a number, the rest is in read_extra, and hasRead covers both', () => {
+  const { v, ctx, pulse, statuses } = inProcess();
+  try {
+    for (let i = 0; i < 30; i++) v.bus.send(ctx('codex'), { to: 'all', type: 'status', body: `status ${i + 1}` });
+    const u = v.bus.unread(ctx('gemini'), { capped: true });
+    assert.equal(u.messages.length, 8);
+    const p = pulse();
+    for (const [d, n] of Object.entries(p.read || {})) assert.equal(typeof n, 'number', `read[${d}] is ${JSON.stringify(n)}; code that reads it as a number breaks`);
+    const shown = new Set(u.messages.map((m) => m.id));
+    const all = statuses();
+    assert.equal(all.filter((m) => !shown.has(m.id)).length, 22);
+    assert.ok((p.read_extra?.[all[0].device] || []).length > 0, 'the shown messages beyond the gap are kept in read_extra');
+    for (const m of all) {
+      assert.equal(hasRead(p, m), shown.has(m.id), `hasRead is wrong for ${m.id}`);
+      assert.equal(v.bus.unreadFor('gemini@host', m), !shown.has(m.id), `unreadFor is wrong for ${m.id}`);
+      // code that knows only the prefix never takes an unshown message for read
+      if (!shown.has(m.id)) assert.ok(!((p.read || {})[m.device] >= m.dseq), `${m.id} looks read to a prefix-only reader`);
+    }
+    // a hello from the terminal, read on the seat's next turn while older messages are still unread
+    const h = v.bus.send({ identity: OWNER, cli: true, local: true }, { to: 'gemini@host', type: 'hello', body: 'hello from the terminal' });
+    assert.equal(hasRead(pulse(), h), false);
+    const u2 = v.bus.unread(ctx('gemini'), { capped: true });
+    assert.ok(u2.messages.some((m) => m.id === h.id), 'the seat sees the hello');
+    assert.ok(u2.not_shown > 0, 'older messages are still unread');
+    const p2 = pulse();
+    assert.equal(hasRead(p2, h), true, 'the hello counts as read');
+    assert.ok(!((p2.read || {})[h.device] >= h.dseq), 'the gap is still open, so the prefix alone would call the hello unread');
+  } finally { v.close(); }
+});
+
+test('MEM-109 AC03: memev bus hello reports the hello read while a capped bus_unread has left older messages unread', async () => {
+  const sb = setUp();
+  const codex = mcpClient(sb, 'codex');
+  const cursor = mcpClient(sb, 'cursor');
+  try {
+    for (let i = 0; i < 30; i++) await codex.tool('bus_send', { to: 'all', type: 'status', body: `status ${i + 1}` });
+    assert.equal((await cursor.tool('bus_unread', {})).structuredContent.messages.length, 8);
+    const hello = new Promise((resolve) => {
+      const p = spawn(process.execPath, [BIN, 'bus', 'hello', 'cursor@host', '--timeout', '20'], { env: sb.env, stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = ''; let err = '';
+      p.stdout.on('data', (d) => out += d); p.stderr.on('data', (d) => err += d);
+      p.on('close', (code) => resolve({ code, out, err }));
+    });
+    const sent = () => JSON.parse(sb.run(['bus', 'tail', '--json', '--type', 'hello']).out).some((m) => m.to === 'cursor@host');
+    for (let i = 0; i < 100 && !sent(); i++) await new Promise((r) => setTimeout(r, 200));
+    const u = (await cursor.tool('bus_unread', {})).structuredContent;
+    assert.ok(u.messages.some((m) => m.type === 'hello' && m.to === 'cursor@host'), 'the app sees the hello on its next turn');
+    assert.ok(u.not_shown > 0, 'older messages are still unread, so what the seat has read has a gap');
+    const r = await hello;
+    assert.equal(r.code, 0, r.out + r.err);
+    assert.match(r.out, /cursor@host read it \d+ s after you sent it/);
+  } finally { await cursor.close(); await codex.close(); sb.stop(); }
+});
+
+test('MEM-109 AC02: every capped bus_unread call shows at most the cap, so the call after one that left 22 of 30 shows 8 again, and each message is shown once', () => {
+  const { v, ctx, statuses } = inProcess();
+  try {
+    for (let i = 0; i < 30; i++) v.bus.send(ctx('codex'), { to: 'all', type: 'status', body: `status ${i + 1}` });
+    const seen = new Set(); const counts = [];
+    for (let k = 0; k < 10; k++) {
+      const u = v.bus.unread(ctx('gemini'), { capped: true });
+      if (!u.messages.length) break;
+      counts.push(u.messages.length);
+      assert.ok(u.messages.length <= 8, `call ${k + 1} showed ${u.messages.length}`);
+      for (const m of u.messages) { assert.ok(!seen.has(m.id), `${m.id} was shown twice`); seen.add(m.id); }
+    }
+    for (const m of statuses()) assert.ok(seen.has(m.id), `${m.id} was never shown`);
+    assert.deepEqual(counts.slice(0, 3), [8, 8, 8], `shown per call: ${counts}`);
+  } finally { v.close(); }
+});
+
+test('MEM-109 AC03: a message written offline that lands before what the last call saw is shown on the next call, whatever the cap', () => {
+  const { root, v, ctx } = inProcess();
+  try {
+    for (let i = 0; i < 30; i++) v.bus.send(ctx('codex'), { to: 'all', type: 'status', body: `status ${i + 1}` });
+    assert.equal(v.bus.unread(ctx('gemini'), { capped: true }).messages.length, 8);
+    // another computer's log arrives with a message older than everything on the bus
+    const late = { id: 'offline1-1', dseq: 1, ts: '2020-01-01T00:00:00.000Z', device: 'dev_offline1', from: 'codex@laptop', operator: false, to: 'all', type: 'status', body: 'written offline', ref: null, project: null };
+    fs.writeFileSync(path.join(root, 'bus', 'log', 'dev_offline1.jsonl'), `${JSON.stringify(late)}\n`);
+    const u = v.bus.unread(ctx('gemini'), { capped: true });
+    assert.ok(u.messages.some((m) => m.id === late.id), 'the late message is shown');
+    assert.equal(u.messages.length, 9, 'the late message plus the 8 the cap allows');
+  } finally { v.close(); }
+});
+
+test('MEM-109 AC06: more tasks than the stated maximum show the oldest ' + UNREAD_MAX + ' in full, count the rest in not_shown, and the next call shows the rest', () => {
+  const { v, ctx } = inProcess();
+  try {
+    const n = UNREAD_MAX + 5;
+    for (let i = 0; i < n; i++) v.bus.send(ctx('codex'), { to: 'gemini@host', type: 'task', body: `task ${i + 1}. ${'x'.repeat(400)}` });
+    const label = (m) => m.body.split('.')[0];
+    const u1 = v.bus.unread(ctx('gemini'), { capped: true });
+    const t1 = u1.messages.filter((m) => m.type === 'task');
+    assert.deepEqual(t1.map(label), Array.from({ length: UNREAD_MAX }, (_, i) => `task ${i + 1}`), 'the oldest, oldest first');
+    for (const m of t1) assert.ok(!m.cut && m.body.length > 300, 'a task is shown in full');
+    assert.equal(u1.not_shown, 5);
+    const u2 = v.bus.unread(ctx('gemini'), { capped: true });
+    assert.deepEqual(u2.messages.filter((m) => m.type === 'task').map(label), Array.from({ length: 5 }, (_, i) => `task ${UNREAD_MAX + i + 1}`));
+    assert.equal(u2.not_shown, 0);
+  } finally { v.close(); }
 });
