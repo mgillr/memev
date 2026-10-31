@@ -273,7 +273,7 @@ async function run(argv, env) {
         const checks = fileChecks({ root, env }).filter((x) => x.id.startsWith('container-'));
         for (const c of checks.filter((x) => x.status === 'fail' || x.status === 'warn')) console.log(`doctor: ${c.status} ${c.title}: ${c.detail}`);
       }
-      console.log(`Connect an app: http://127.0.0.1:${config(root).port || 7787}/mcp with the header Authorization: Bearer <token>; get a token with: docker compose exec memev memev token issue <app-name>`);
+      console.log(`Connect an app: http://127.0.0.1:${Number(env.MEMEV_PORT) || config(root).port || 7787}/mcp with the header Authorization: Bearer <token>; get a token with: docker compose exec memev memev token issue <app-name>`);
       await import('../server/main.mjs'); return new Promise(() => {});
     }
     case 'selftest': {

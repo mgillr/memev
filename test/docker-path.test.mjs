@@ -129,14 +129,19 @@ test('SO-R-B AC02: docs/DOCKER.md documents the path and every variable the imag
 
 // The stub stands in for docker and curl as shell functions, sourced before the smoke script, so the run needs no new
 // executable file and never reaches a real docker. It logs every call and keeps the volumes and the remembered notes in
-// DOCKER_STUB_STATE. Without -p, compose uses the folder name as the project, as docker does: that is the project of a
+// DOCKER_STUB_STATE (the notes in DOCKER_STUB_STATE/notes stand for the volume; with DOCKER_STUB_VAULT_OFF_VOLUME they
+// sit in the container's own files instead, which a restart keeps and down removes). Without -p, compose uses the folder name as the project, as docker does: that is the project of a
 // memev deployed from this checkout.
 const STUB = `
 stub_log() { echo "$*" >> "$DOCKER_STUB_LOG"; }
 curl() {
   stub_log "curl $*"
-  printf '%s' "\${DOCKER_STUB_CURL_CODE:-401}"
+  case "$*" in
+    *"authorization: Bearer"*) printf '%s' "\${DOCKER_STUB_CURL_AUTH_CODE:-200}" ;;
+    *) printf '%s' "\${DOCKER_STUB_CURL_CODE:-401}" ;;
+  esac
 }
+notes_file() { if [ -n "\${DOCKER_STUB_VAULT_OFF_VOLUME:-}" ]; then echo "$DOCKER_STUB_STATE/container-notes"; else echo "$DOCKER_STUB_STATE/notes"; fi; }
 docker() {
   stub_log "docker $*"
   case "$1" in
@@ -164,14 +169,16 @@ docker() {
       touch "$DOCKER_STUB_STATE/need-healthy" ;;
     restart) touch "$DOCKER_STUB_STATE/need-healthy" ;;
     down)
+      rm -f "$DOCKER_STUB_STATE/container-notes"
       if [ "\${2:-}" = "-v" ] || [ -n "\${DOCKER_STUB_DOWN_DROPS_VOLUME:-}" ]; then
         grep -vx "\${project}_memev-vault" "$DOCKER_STUB_STATE/volumes" > "$DOCKER_STUB_STATE/volumes.new" || true
         mv "$DOCKER_STUB_STATE/volumes.new" "$DOCKER_STUB_STATE/volumes"
       fi ;;
     exec)
       case "$5" in
-        remember) [ -n "\${DOCKER_STUB_LOSE_WRITES:-}" ] || echo "$6" >> "$DOCKER_STUB_STATE/notes" ;;
-        recall) cat "$DOCKER_STUB_STATE/notes" 2>/dev/null || true ;;
+        token) printf 'Token for docker-smoke (shown once):\\nmv_stub_token\\n' ;;
+        remember) [ -n "\${DOCKER_STUB_LOSE_WRITES:-}" ] || echo "$6" >> "$(notes_file)" ;;
+        recall) cat "$(notes_file)" 2>/dev/null || true ;;
       esac ;;
   esac
   return 0
@@ -185,7 +192,7 @@ const step = (line) => {
   const parts = line.split(' ');
   if (parts[1] === 'compose') {
     const sub = parts[2] === '-p' ? parts.slice(4) : parts.slice(2);
-    if (sub[0] === 'exec') return sub.includes('remember') ? 'exec-remember' : 'exec-recall';
+    if (sub[0] === 'exec') return sub.includes('remember') ? 'exec-remember' : sub.includes('token') ? 'exec-token' : 'exec-recall';
     if (sub[0] === 'down') return sub.includes('-v') ? 'down -v' : 'down';
     return sub[0];
   }
@@ -221,7 +228,7 @@ test('SO-R-B AC03: the smoke script runs the persistence check in the right orde
   const ok = runSmoke();
   assert.equal(ok.status, 0, ok.stdout + ok.stderr);
   assert.match(ok.stdout, /docker smoke: ok/);
-  assert.deepEqual(ok.steps, ['build', 'up', 'ps', 'ps', 'curl', 'exec-remember', 'restart', 'ps', 'ps', 'exec-recall', 'down', 'volume', 'down -v'], 'the steps run in order');
+  assert.deepEqual(ok.steps, ['build', 'up', 'ps', 'ps', 'curl', 'exec-token', 'curl', 'exec-remember', 'down', 'up', 'ps', 'ps', 'exec-recall', 'down', 'volume', 'down -v'], 'the steps run in order');
   const compose = ok.lines.filter((l) => l.startsWith('docker compose'));
   assert.ok(compose.length > 0 && compose.every((l) => l.startsWith('docker compose -p memev-smoke ')), `every compose call names the memev-smoke project, so a deployed memev is never recreated or stopped: ${compose.join(' | ')}`);
   assert.ok(ok.lines.includes('docker volume inspect memev-smoke_memev-vault'), 'the volume is checked by its exact name');
@@ -245,7 +252,16 @@ test('SO-R-B AC03: the smoke fails when the published port answers an MCP call w
   assert.match(open.stderr, /failed at 401 without a token \(got 200\)/);
   const port = runSmoke({ MEMEV_PORT: '17787' });
   assert.equal(port.status, 0, port.stdout + port.stderr);
-  assert.ok(port.lines.find((l) => l.startsWith('curl ')).includes('http://127.0.0.1:17787/mcp'), 'the check follows MEMEV_PORT, the port compose publishes');
+  assert.ok(port.lines.filter((l) => l.startsWith('curl ')).every((l) => l.includes('http://127.0.0.1:17787/mcp')), 'both checks follow MEMEV_PORT, the port compose publishes');
+});
+
+test('SO-R-B AC03: the smoke fails when a token issued in the container is refused through the published port', () => {
+  const ok = runSmoke();
+  const authed = ok.lines.find((l) => l.startsWith('curl ') && /authorization: Bearer mv_stub_token/.test(l));
+  assert.ok(authed && authed.includes('http://127.0.0.1:7787/mcp'), `the check posts to /mcp on the published port with the token issued in the container: ${authed}`);
+  const refused = runSmoke({ DOCKER_STUB_CURL_AUTH_CODE: '403' });
+  assert.notEqual(refused.status, 0, 'a token refused through the published port fails the smoke');
+  assert.match(refused.stderr, /failed at an MCP call with an issued token through the published port \(got 403\)/);
 });
 
 test('SO-R-B AC03: the persistence checks can fail: a note from an earlier run or a volume of another project does not pass them', () => {
@@ -261,6 +277,10 @@ test('SO-R-B AC03: the persistence checks can fail: a note from an earlier run o
   const gone = runSmoke({ DOCKER_STUB_DOWN_DROPS_VOLUME: '1' });
   assert.notEqual(gone.status, 0, 'another project\'s memev-vault volume does not pass the check');
   assert.match(gone.stderr, /failed at volume memev-smoke_memev-vault kept after down/);
+  // the vault sits in the container's own files, not the volume: a restart would keep the note, removing the container does not
+  const offVolume = runSmoke({ DOCKER_STUB_VAULT_OFF_VOLUME: '1' });
+  assert.notEqual(offVolume.status, 0, 'a vault off the volume does not pass the read-back');
+  assert.match(offVolume.stderr, /failed at read the note back/);
 });
 
 test('SO-R-B AC04: first run on an empty volume creates the vault and serves it', async () => {

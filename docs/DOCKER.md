@@ -39,7 +39,7 @@ remote access switched on and a remote token to do anything. But the health chec
 route answer without a token, and a remote token would be reachable from the network. Keep the
 publish on `127.0.0.1` and reach the vault from the host only.
 
-Point an app at `http://127.0.0.1:7787/mcp` with `Authorization: Bearer <token>`.
+Point an app at `http://127.0.0.1:7787/mcp` (the port in `MEMEV_PORT` if you set one) with `Authorization: Bearer <token>`.
 
 Inside the container the tunnel, the login service and app registration are off: the container
 cannot see your apps or your login session. For cloud access, run the tunnel on the host
