@@ -296,7 +296,7 @@
         "SR-1.26"
       ],
       "tasks": 1,
-      "criteria": 29,
+      "criteria": 41,
       "spec": "specs/SR-1.22-an-interrupted-write-recovers-from-the-log.json",
       "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
     },
@@ -391,7 +391,7 @@
         "QL-1.02"
       ],
       "tasks": 2,
-      "criteria": 17,
+      "criteria": 30,
       "spec": "specs/SR-1.28-the-bus-writes-its-own-routing-files.json",
       "status": "proposed: owner's go pending, signs after a clean red-team round"
     },
