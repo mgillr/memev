@@ -62,10 +62,14 @@ function aggregate(rows, valueOf, dateOf) {
 }
 
 const num = (row) => (Number.isFinite(row.downloads) ? row.downloads : 0);
-// A trial licence is marked on its activation row with "trial": true, as on the licence itself. A
-// trial is counted on its own and never as paid.
-const paid = (row) => (row.result === 'issued' && row.trial !== true ? 1 : 0);
-const trial = (row) => (row.result === 'issued' && row.trial === true ? 1 : 0);
+// A trial licence is marked on its activation row with "trial": true, as on the licence itself, or
+// with 1, as a SQL export of the activations table gives it. A trial is counted on its own and never
+// as paid. false or 0 is paid, and so is a row with no trial field (or any other value), as the
+// product reads a licence with none; those issued rows are counted on a line of their own.
+const isTrial = (row) => row.trial === true || row.trial === 1;
+const unmarked = (row) => (row.result === 'issued' && ![true, 1, false, 0].includes(row.trial) ? 1 : 0);
+const paid = (row) => (row.result === 'issued' && !isTrial(row) ? 1 : 0);
+const trial = (row) => (row.result === 'issued' && isTrial(row) ? 1 : 0);
 const refused = (row) => (row.result === 'refused' ? 1 : 0);
 
 function section(title, agg, { hasRows, noInput, extra = [] } = {}) {
@@ -109,9 +113,11 @@ function gateLines(gates, totals, label) {
       verdict = measured >= g.threshold ? 'pass' : 'miss';
     }
     const unit = g.metric === 'free_to_paid_percent' ? ' percent' : '';
-    lines.push(`  ${g.name}: measured ${measured}, threshold ${g.threshold}${unit}, ${verdict}`);
+    // every installs choice is a download count, and a download is not an install, so it prints as downloads
+    const shown = g.metric === 'installs' && installs !== null ? `${measured} downloads` : measured;
+    lines.push(`  ${g.name}: measured ${shown}, threshold ${g.threshold}${unit}, ${verdict}`);
   }
-  if (installs !== null) lines.push(`  installs proxy: ${proxy}`);
+  if (installs !== null) lines.push(`  installs proxy: ${proxy} (a download is not an install)`);
   else if (proxy) lines.push(`  installs proxy: open (${JSON.stringify(proxy)} is not a choice; pick one of ${Object.keys(PROXIES).join(', ')})`);
   else lines.push(`  installs proxy: open (${gates.installs_proxy_note || "which counted number stands for installs is the owner's choice"})`);
   return lines;
@@ -124,6 +130,7 @@ export function renderReport({ packageRows = [], releaseRows = [], activationRow
   const act = aggregate(activationRows, paid, (r) => dayOf(r.day));
   const tri = aggregate(activationRows, trial, (r) => dayOf(r.day));
   const ref = aggregate(activationRows, refused, (r) => dayOf(r.day));
+  const unm = aggregate(activationRows, unmarked, (r) => dayOf(r.day));
   const mst = aggregate(milestoneRows, () => 1, (r) => dayOf(r.date));
   const names = new Map();
   for (const row of milestoneRows) if (row && row.name) names.set(row.name, (names.get(row.name) || 0) + 1);
@@ -141,7 +148,11 @@ export function renderReport({ packageRows = [], releaseRows = [], activationRow
   lines.push('');
   lines.push(...section('Licence activations (paid)', act, {
     hasRows: activationRows.length > 0,
-    extra: [`  trials, not counted as paid: ${tri.total}`, ...(ref.total > 0 ? [`  refused: ${ref.total}`] : [])],
+    extra: [
+      `  trials, not counted as paid: ${tri.total}`,
+      ...(unm.total > 0 ? [`  issued with no trial field, counted as paid: ${unm.total}`] : []),
+      ...(ref.total > 0 ? [`  refused: ${ref.total}`] : []),
+    ],
   }));
   lines.push('');
   lines.push(...section('Milestones', mst, {

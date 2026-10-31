@@ -81,7 +81,9 @@ lands, at the licence endpoint, because that is the only place that sees it.
 - What is counted: one row per activation, holding the licence id, the day, the result
   (`issued` or `refused`) and whether the licence is a trial. Counts are per licence id and per day.
 - Paid and trial are counted apart. A trial licence carries `trial: true`, and its activation row
-  says so in the same way; a paid count never includes a trial.
+  says so with `true`, or with `1` as the table below holds it; a paid count never includes a trial.
+  `false` or `0` is paid, and so is a row with no trial field: the product reads a licence with no
+  trial field as paid (`src/cli/licensing.mjs`), and the count does the same.
 - What is not counted: licence checks. A licence is verified on the computer against the vendor
   public key, offline, so day-to-day use never reaches the endpoint and cannot be counted there.
 - Where the counts are kept: beside the licence endpoint, and run by the owner with it. The
@@ -169,14 +171,17 @@ person's computer.
   per day: `{ "day": "<date>", "downloads": N }`), `--release` the release-host download rows (the
   same shape, one row per day and file), and `--activations` the licence-activation rows
   (`{ "day": "<date>", "licence_id": "...", "result": "issued" or "refused" }`, one row per
-  activation, with `"trial": true` added on the row of a trial licence). `--milestones`
+  activation, with `"trial": true` or `"trial": 1` on the row of a trial licence; an export of the
+  table above, such as `sqlite3 -json`, gives 1). `--milestones`
   optionally holds the opt-in milestone rows (the report payload above, one row per milestone:
   `{ "name": "...", "date": "<date>" }`). A row without a date, or with one that is not a real
   calendar date such as 2026-13-45, counts in the total only. With no milestone input the page says
   so in one line and still renders.
 - **The page.** For each count set: the count per day, per week (ISO week) and the total. The
-  licence activations are the paid ones: an issued row marked as a trial is never counted as paid.
-  The trials print on a line of their own, and so do any refused activations. Nothing is estimated
+  licence activations are the paid ones: an issued row marked as a trial (`true` or `1`) is never
+  counted as paid. The trials print on a line of their own, and so do any refused activations. An
+  issued row with no trial field (or one that is not `true`, `1`, `false` or `0`) counts as paid,
+  and the page prints how many there were on a line of their own. Nothing is estimated
   and nothing is typed into the program: every number on the page comes from the files.
 - **The gates.** The page header renders the gates from `scripts/metrics/gates.json`: the month-6
   gates, installs at or above 5,000 by month 6, and free-to-paid at or above 1 percent once sync
@@ -185,11 +190,13 @@ person's computer.
   them. Each gate prints its measured value, its threshold and pass or miss.
 - **The installs choice.** A download is not an install, so the file also says which counted
   number stands for installs (`installs_proxy`: `package_downloads`, `release_downloads` or
-  `downloads`). Activations are not a choice: free-to-paid divides paid activations by installs,
-  so it would read 100 percent. That choice is the owner's; until it is made the file says open,
-  the page prints that line, and both gates stay open. A value that is not one of the choices
-  leaves both gates open too, and the page says it is not a choice. Editing the file changes the
-  header with no change to the program.
+  `downloads`). The file names `downloads` (D-WO-INSTALL-PROXY): the package downloads and the
+  release-host downloads together. Every choice is a download count, so the installs gate prints
+  its measured value as downloads, and the page says a download is not an install. Activations are
+  not a choice: free-to-paid divides paid activations by installs, so it would read 100 percent.
+  With no choice in the file (`null`) the page says open and both gates stay open. A value that is
+  not one of the choices leaves both gates open too, and the page says it is not a choice. Editing
+  the file changes the header with no change to the program.
 - **Hosts nothing.** The counts are kept beside the licence endpoint on the owner's server; this
   tool reads counts handed to it and hosts nothing.
 

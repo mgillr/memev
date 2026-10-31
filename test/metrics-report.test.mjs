@@ -29,8 +29,9 @@ const FIXTURE = {
   ],
   activations: [
     { day: '2026-10-21', licence_id: 'L1', result: 'issued' },
-    { day: '2026-10-21', licence_id: 'L2', result: 'issued' },
+    { day: '2026-10-21', licence_id: 'L2', result: 'issued', trial: 0 },
     { day: '2026-10-21', licence_id: 'T1', result: 'issued', trial: true },
+    { day: '2026-10-21', licence_id: 'T2', result: 'issued', trial: 1 },
     { day: '2026-10-22', licence_id: 'L3', result: 'refused' },
   ],
   milestones: [
@@ -94,14 +95,16 @@ test('WO-04-A AC01: the page holds the count per day, per week and the total for
     '    2026-W43: 7',
     '  total: 10',
   ]);
-  // licence activations: paid issued rows counted, the trial and the refused rows shown apart, never as paid
+  // licence activations: paid issued rows counted, the trials (true and 1) and the refused row shown apart,
+  // never as paid, and the paid row with no trial field counted on its own line too
   assert.deepEqual(block(page, 'Licence activations (paid)'), [
     '  per day:',
     '    2026-10-21: 2',
     '  per week:',
     '    2026-W43: 2',
     '  total: 2',
-    '  trials, not counted as paid: 1',
+    '  trials, not counted as paid: 2',
+    '  issued with no trial field, counted as paid: 1',
     '  refused: 1',
   ]);
   // milestones: the opt-in rows, per day, per week, total and per name
@@ -135,20 +138,58 @@ test('WO-04-A AC01: a day that is not a real calendar date counts in the total o
   assert.ok(page.includes('days 2026-10-19 to 2026-10-19'), 'only the real day dates the page');
 });
 
+test('WO-04-A AC01: an activation row is a trial when it says true or 1, as a SQL export gives it, and paid when it says false or 0 or has no trial field; free-to-paid counts the paid ones only', () => {
+  const gates = { installs_proxy: 'package_downloads', gates: [{ name: 'free-to-paid', metric: 'free_to_paid_percent', threshold: 1 }] };
+  const installs = [{ day: '2026-10-20', downloads: 100 }];
+  // one trial-only activation written as 1 over 100 installs: nothing is paid, so free-to-paid is 0 and a miss
+  const one = renderReport({ packageRows: installs, activationRows: [{ day: '2026-10-21', licence_id: 'T1', result: 'issued', trial: 1 }], gates }).split('\n');
+  assert.ok(one.includes('  free-to-paid: measured 0, threshold 1 percent, miss'), one.join('\n'));
+  assert.deepEqual(block(one, 'Licence activations (paid)'), ['  total: 0', '  trials, not counted as paid: 1']);
+  // every way a row can say trial or paid: true and 1 are trials; false, 0 and no field are paid
+  const all = renderReport({ packageRows: installs, activationRows: [
+    { day: '2026-10-21', licence_id: 'T1', result: 'issued', trial: true },
+    { day: '2026-10-21', licence_id: 'T2', result: 'issued', trial: 1 },
+    { day: '2026-10-21', licence_id: 'L1', result: 'issued', trial: false },
+    { day: '2026-10-21', licence_id: 'L2', result: 'issued', trial: 0 },
+    { day: '2026-10-21', licence_id: 'L3', result: 'issued' },
+  ], gates }).split('\n');
+  assert.ok(all.includes('  free-to-paid: measured 3, threshold 1 percent, pass'), all.join('\n'));
+  assert.deepEqual(block(all, 'Licence activations (paid)'), [
+    '  per day:',
+    '    2026-10-21: 3',
+    '  per week:',
+    '    2026-W43: 3',
+    '  total: 3',
+    '  trials, not counted as paid: 2',
+    '  issued with no trial field, counted as paid: 1',
+  ]);
+});
+
 test('WO-04-A AC02: the header renders the two gates from the gates file with measured value, threshold and pass or miss, and editing the file changes the header with no change to the program', async () => {
   const dir = tmpdir('wo04a-');
   const f = writeFixtures(dir);
   const args = ['--package', f.package, '--release', f.release, '--activations', f.activations];
-  // the shipped file: the thresholds live in it, the installs choice is open, so both gates stay open
+  // the shipped file: the thresholds live in it, and installs are the downloads, package and release
+  // together (47 + 10), printed as downloads because a download is not an install
   const gates = JSON.parse(fs.readFileSync(GATES, 'utf8'));
-  assert.equal(gates.installs_proxy, null, 'the file says the installs choice is open');
+  assert.equal(gates.installs_proxy, 'downloads', 'the file reads installs as the package and release downloads together');
   const first = await run(args);
   assert.equal(first.code, 0, first.err);
   const page = first.out.split('\n');
   assert.ok(page.some((l) => l.startsWith('Gates (')), 'the header carries the gates');
-  assert.ok(page.includes('  installs at or above 5,000 by month 6: measured open, threshold 5000, open'));
-  assert.ok(page.includes('  free-to-paid at or above 1 percent once sync has shipped: measured open, threshold 1 percent, open'));
-  assert.ok(page.some((l) => l.startsWith('  installs proxy: open')), 'the page prints which counted number stands for installs');
+  assert.ok(page.includes('  installs at or above 5,000 by month 6: measured 57 downloads, threshold 5000, miss'), first.out);
+  // free-to-paid is the paid activations over installs: 2 of 57
+  assert.ok(page.includes('  free-to-paid at or above 1 percent once sync has shipped: measured 3.51, threshold 1 percent, pass'), first.out);
+  assert.ok(page.includes('  installs proxy: downloads (a download is not an install)'), 'the page prints which counted number stands for installs');
+  // with no choice in the file both gates stay open and the page says so
+  const g0f = path.join(dir, 'gates0.json');
+  fs.writeFileSync(g0f, JSON.stringify({ ...gates, installs_proxy: null }));
+  const r0 = await run([...args, '--gates', g0f]);
+  assert.equal(r0.code, 0, r0.err);
+  const p0 = r0.out.split('\n');
+  assert.ok(p0.includes('  installs at or above 5,000 by month 6: measured open, threshold 5000, open'), r0.out);
+  assert.ok(p0.includes('  free-to-paid at or above 1 percent once sync has shipped: measured open, threshold 1 percent, open'), r0.out);
+  assert.ok(p0.some((l) => l.startsWith('  installs proxy: open (')), r0.out);
   // editing the file changes the header with no change to the program: a proxy and a low threshold pass
   const g1 = { ...gates, installs_proxy: 'package_downloads', gates: [
     { name: 'installs at or above 5,000 by month 6', metric: 'installs', threshold: 10 },
@@ -159,8 +200,8 @@ test('WO-04-A AC02: the header renders the two gates from the gates file with me
   const r1 = await run([...args, '--gates', g1f]);
   assert.equal(r1.code, 0, r1.err);
   const p1 = r1.out.split('\n');
-  assert.ok(p1.includes('  installs proxy: package_downloads'));
-  assert.ok(p1.includes('  installs at or above 5,000 by month 6: measured 47, threshold 10, pass'));
+  assert.ok(p1.includes('  installs proxy: package_downloads (a download is not an install)'));
+  assert.ok(p1.includes('  installs at or above 5,000 by month 6: measured 47 downloads, threshold 10, pass'));
   // free-to-paid is the paid activations over installs: 2 of 47; the trial is not counted as paid
   assert.ok(p1.includes('  free-to-paid at or above 1 percent once sync has shipped: measured 4.26, threshold 1 percent, pass'));
   // and a high threshold flips the verdict to miss, still from the file alone
@@ -173,7 +214,7 @@ test('WO-04-A AC02: the header renders the two gates from the gates file with me
   const r2 = await run([...args, '--gates', g2f]);
   assert.equal(r2.code, 0, r2.err);
   const p2 = r2.out.split('\n');
-  assert.ok(p2.includes('  installs at or above 5,000 by month 6: measured 47, threshold 5000, miss'));
+  assert.ok(p2.includes('  installs at or above 5,000 by month 6: measured 47 downloads, threshold 5000, miss'));
   assert.ok(p2.includes('  free-to-paid at or above 1 percent once sync has shipped: measured 4.26, threshold 100 percent, miss'));
   // activations are not a choice for installs: free-to-paid would divide activations by themselves and
   // read 100 percent, so the file naming them leaves both gates open and the page says it is not a choice
@@ -189,9 +230,10 @@ test('WO-04-A AC02: the header renders the two gates from the gates file with me
 });
 
 test('WO-04-A AC03: the report is a development tool that reports nothing anywhere: no vault import, no call of its own, not in the package file list, and no milestone input says so in one line', async () => {
-  // the code: only the file and path built-ins, no vault module, nothing that can reach a network or start a program
+  // the code: only the file and path built-ins, no vault module, nothing that can reach a network or start a
+  // program; every module it names counts, static or dynamic, in single, double or back quotes
   const src = fs.readFileSync(REPORT, 'utf8');
-  const imports = [...src.matchAll(/from '([^']+)'/g)].map((x) => x[1]);
+  const imports = [...src.matchAll(/\b(?:from|import|require|getBuiltinModule)\s*\(?\s*(['"`])([^'"`]+)\1/g)].map((x) => x[2]);
   assert.deepEqual(imports.sort(), ['node:fs', 'node:path', 'node:process', 'node:url']);
   assert.equal(src.includes('src/'), false, 'no vault module');
   // the behaviour: with every way out of the process stubbed, rendering makes no call
@@ -227,9 +269,21 @@ test('WO-04-A AC03: the report is a development tool that reports nothing anywhe
   assert.ok(page.includes('Package downloads:'), 'the rest of the page still renders');
   assert.ok(page.includes('  total: 47'));
   // and the program itself, main() and all, run with fetch, http, https and raw sockets refused and every
-  // attempt logged, still renders and makes no attempt
+  // attempt logged, still renders and makes no attempt. The shared preload leaves a socket made with
+  // new net.Socket() and the name lookups open, so a second preload, written here, refuses and logs those.
   const netLog = path.join(dir, 'net.log');
-  const stubbed = await run([...args, '--milestones', f.milestones], { NO_NET_LOG: netLog }, ['--import', NO_NET]);
+  const more = path.join(dir, 'no-net-more.mjs');
+  fs.writeFileSync(more, [
+    "import fs from 'node:fs';",
+    "import net from 'node:net';",
+    "import dns from 'node:dns';",
+    "import { syncBuiltinESMExports } from 'node:module';",
+    'const refuse = (what) => () => { fs.appendFileSync(process.env.NO_NET_LOG, `${what}\\n`); throw new Error(`network call refused: ${what}`); };',
+    "net.Socket.prototype.connect = refuse('net.Socket.connect');",
+    "for (const k of ['lookup', 'lookupService', 'resolve', 'resolve4', 'resolve6', 'resolveAny']) { dns[k] = refuse(`dns.${k}`); dns.promises[k] = refuse(`dns.promises.${k}`); }",
+    'syncBuiltinESMExports();',
+  ].join('\n'));
+  const stubbed = await run([...args, '--milestones', f.milestones], { NO_NET_LOG: netLog }, ['--import', NO_NET, '--import', pathToFileURL(more).href]);
   assert.equal(stubbed.code, 0, stubbed.err);
   assert.ok(stubbed.out.startsWith('Memev weekly funnel report'));
   assert.equal(fs.existsSync(netLog) ? fs.readFileSync(netLog, 'utf8') : '', '', 'the program made no network call');
