@@ -15,7 +15,8 @@ import { deviceKeygen } from '../src/engine/devices.mjs';
 import { fileChecks } from '../src/cli/doctor.mjs';
 import { setRelay, relayStateFile } from '../src/cli/relay.mjs';
 import { selectProvider } from '../src/services/providers.mjs';
-import { installLicense } from '../src/cli/licensing.mjs';
+import { installLicense, registry } from '../src/cli/licensing.mjs';
+import { initVault } from '../src/engine/vault.mjs';
 import { sha256 } from '../src/engine/util.mjs';
 
 after(cleanup);
@@ -112,17 +113,24 @@ test('WO-11-A AC01: with the relay down, the vault keeps working through the git
   v.close();
 });
 
+// A merge provider that counts its calls.
+const counting = (resolve) => { const p = { calls: 0, resolve: (args) => { p.calls++; return resolve(args); } }; return p; };
+
 test('WO-11-A AC02: a same-note conflict keeps both versions with the engine off and with a refusing or timing out engine', () => {
+  // each case has a provider that counts its calls: the engine cases reach it once, and with the flag off it is never
+  // called (it would merge if it were, so a wrong call fails twice)
   const cases = [
-    ['the engine flag off', null, null],
-    ['a refusing engine', paidLicence(day(30)), { resolve: () => ({}) }],
-    ['a timing out engine', paidLicence(day(30)), { resolve: () => { throw new Error('timed out'); } }],
+    ['the engine flag off', null, counting(() => ({ text: '# N\n\nMerged\n' })), 0],
+    ['a refusing engine', paidLicence(day(30)), counting(() => ({})), 1],
+    ['a timing out engine', paidLicence(day(30)), counting(() => { throw new Error('timed out'); }), 1],
   ];
-  for (const [label, lic, provider] of cases) {
+  for (const [label, lic, provider, calls] of cases) {
     const { v, root, note } = noteConflict();
-    if (provider) v.config.merge = { provider };
+    v.config.merge = { provider };
+    // at is the clock syncOnce hands on to the merge (syncSteps passes it as now), so the licence is checked at NOW
     const res = syncOnce(v, { root, license: lic, keys, at: NOW });
     assert.equal(res.error, null, `${label}: sync completes: ${res.error}`);
+    assert.equal(provider.calls, calls, `${label}: the merge engine was called ${provider.calls} time(s), not ${calls}`);
     const rec = res.conflicts?.find((c) => c.path === note);
     assert.ok(rec, `${label}: the note is recorded`);
     assert.ok(rec.copy, `${label}: the conflict copy is named`);
@@ -200,7 +208,7 @@ test('WO-11-A AC04: installing a licence over a lapsed one restores writing and 
 
 test('WO-11-A AC05: the doctor reports one check for each paid path, and each check id has its troubleshooting row', () => {
   const { v, root } = newVault();
-  const ids = ['relay', 'merge', 'licence-expired', 'licence-change'];
+  const ids = ['relay', 'merge', 'license-expired', 'license-change'];
   const checks = fileChecks({ root, env: { MEMEV_CONFIG_DIR: tmpdir('conf-') }, vault: v });
   for (const id of ids) {
     const found = checks.filter((c) => c.id === id);
@@ -210,9 +218,45 @@ test('WO-11-A AC05: the doctor reports one check for each paid path, and each ch
   // each check id has its row and fix in the troubleshooting table
   const doc = fs.readFileSync(path.join(PKG, 'docs', 'TROUBLESHOOTING.md'), 'utf8');
   for (const id of ids) {
-    const row = doc.split('\n').find((l) => l.startsWith('|') && l.includes(id));
+    const row = doc.split('\n').find((l) => l.startsWith('|') && l.split('|')[1].trim() === `\`${id}\``);
     assert.ok(row, `TROUBLESHOOTING.md has a row for the ${id} check`);
     assert.ok(row.split('|').length >= 4, `the ${id} row has a symptom and a fix`);
   }
   v.close();
+});
+
+test('WO-11-A AC05: after a same-note conflict the merge check warns and names the note and its copy', () => {
+  const { v, root, note } = noteConflict();
+  v.config.merge = { provider: { resolve: () => ({}) } };
+  const res = syncOnce(v, { root, license: paidLicence(day(30)), keys, at: NOW });
+  const rec = res.conflicts?.find((c) => c.path === note);
+  assert.ok(rec?.copy, `the conflict copy is named: ${JSON.stringify(res)}`);
+  const merge = fileChecks({ root, env: { MEMEV_CONFIG_DIR: tmpdir('conf-') }, vault: v }).find((c) => c.id === 'merge');
+  assert.equal(merge.status, 'warn', `the merge check warns: ${merge.detail}`);
+  assert.ok(merge.detail.includes(note), `the merge check names the note: ${merge.detail}`);
+  assert.ok(merge.detail.includes(rec.copy), `the merge check names the copy: ${merge.detail}`);
+  v.close();
+});
+
+test('WO-11-A AC05: the license-expired check warns on an expired licence, and license-change names the tier with an added computer writing', () => {
+  // the doctor as the CLI runs it with no vault open: the vault and its device registry on disk
+  const root = path.join(tmpdir(), 'vault');
+  initVault(root, { template: path.join(PKG, 'templates', 'vault') });
+  const env = { MEMEV_CONFIG_DIR: tmpdir('conf-') };
+  const current = verified(paidLicence(day(30)));
+  const { reg, tokens } = registry(root);
+  reg.enroll(tokens, { kind: 'remote-computer', label: 'laptop', pubkey: deviceKeygen().publicKey, policy: seatPolicy({ license: current, devices: reg.list() }) });
+  const check = (license, id) => fileChecks({ root, env, license }).find((c) => c.id === id);
+  // an expired licence past its grace: a warning; the added computer only reads, which is not a regression, and the tier is Personal
+  const expired = check(verified(paidLicence(day(-30))), 'license-expired');
+  assert.equal(expired.status, 'warn', `an expired licence is a warning: ${expired.detail}`);
+  assert.match(expired.detail, /past its grace period/);
+  const lapsed = check(verified(paidLicence(day(-30))), 'license-change');
+  assert.equal(lapsed.status, 'ok', lapsed.detail);
+  assert.match(lapsed.detail, /^Personal tier/, 'the license-change check names the tier in force');
+  // a valid licence: no expiry warning, and the added computer within the seat count writes
+  assert.equal(check(current, 'license-expired').status, 'ok');
+  const valid = check(current, 'license-change');
+  assert.equal(valid.status, 'ok', valid.detail);
+  assert.match(valid.detail, /^Business tier/, 'the license-change check names the tier in force');
 });

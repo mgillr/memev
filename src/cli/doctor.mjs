@@ -12,9 +12,10 @@ import { redactSecrets, findSecrets } from '../engine/secrets.mjs';
 import { VERSION, isVault } from '../engine/vault.mjs';
 import { PKG, daemonInfo, pidAlive, config, out, clientsFile, tokenExpiryWarnings } from './common.mjs';
 import { EXPIRY_WARNING_DAYS } from '../engine/tokens.mjs';
-import { licensingStatus, licencePhrase, pendingMergeCopies } from './licensing.mjs';
+import { licensingStatus, licencePhrase, pendingMergeCopies, registry } from './licensing.mjs';
 import { relaySetting, relayState } from './relay.mjs';
 import { loadLicense } from '../engine/license.mjs';
+import { seatPolicy } from '../engine/entitlements.mjs';
 import { alt443, githubReachable } from './github.mjs';
 import { label } from '../engine/bus.mjs';
 import { fetchOut } from '../engine/net.mjs';
@@ -160,29 +161,45 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
     const renewal = ls.renewal;
     r.push(C('license', 'licence and seats (report only)', flagged.length || renewal ? 'warn' : 'ok', `${licencePhrase(ls.license)}; ${ls.usage.computers} computer(s), ${ls.usage.connectors} connector(s), ${ls.usage.local_clients} local client(s)${ls.notes.length ? `; ${ls.notes.join(' ')}` : ''}${renewal ? `; ${renewal}` : ''}${flagged.length ? `; credential flagged on ${flagged.map((f) => f.label).join(', ')}: memev devices` : ''}`));
   } catch (e) { r.push(C('license', 'licence and seats (report only)', 'ok', `not checked: ${e.message}`)); }
-  // the four paid paths, each named on every run so a regression is reported, not silent. Report only: none fails the run.
-  const relay = relaySetting(root);
-  const rstate = relayState(root);
-  const rUp = rstate && rstate.state === 'up';
-  r.push(C('relay', 'relay reachable (falls back to the git backup)',
-    !relay.enabled ? 'ok' : rUp ? 'ok' : 'warn',
-    !relay.enabled ? 'off; the vault is reached through the git backup'
-      : rUp ? `up at ${rstate.address || relay.url}`
-      : `down or not started (${rstate?.state || 'not started'}); the vault is reached through the git backup`));
-  const pending = pendingMergeCopies(root);
-  r.push(C('merge', 'same-note conflicts keep both versions', pending.length ? 'warn' : 'ok',
-    pending.length
-      ? `${pending.length} note(s) edited on two computers at once, kept as two whole files: ${pending.map((p) => `${p.path} and ${p.copy}`).join('; ')}; a person decides what to keep`
-      : 'no unresolved same-note conflicts'));
-  let licState = 'none';
-  try { licState = (license ?? loadLicense({ env })).state || 'none'; } catch { licState = 'none'; }
-  r.push(C('licence-expired', 'an expired licence keeps this computer working',
+  // the four paid paths, each named on every run so a regression is reported, not silent. Report only: none fails the
+  // run, and one file that cannot be read is reported on its own check instead of ending the run.
+  try {
+    const relay = relaySetting(root);
+    const rstate = relayState(root);
+    const rUp = rstate && rstate.state === 'up';
+    r.push(C('relay', 'relay reachable (falls back to the git backup)',
+      !relay.enabled ? 'ok' : rUp ? 'ok' : 'warn',
+      !relay.enabled ? 'off; the vault is reached through the git backup'
+        : rUp ? `up at ${rstate.address || relay.url}`
+        : `down or not started (${rstate?.state || 'not started'}); the vault is reached through the git backup`));
+  } catch (e) { r.push(C('relay', 'relay reachable (falls back to the git backup)', 'ok', `not checked: ${e.message}`)); }
+  try {
+    const pending = pendingMergeCopies(root);
+    r.push(C('merge', 'same-note conflicts keep both versions', pending.length ? 'warn' : 'ok',
+      pending.length
+        ? `${pending.length} note(s) edited on two computers at once, kept as two whole files: ${pending.map((p) => `${p.path} and ${p.copy}`).join('; ')}; a person decides what to keep`
+        : 'no unresolved same-note conflicts'));
+  } catch (e) { r.push(C('merge', 'same-note conflicts keep both versions', 'ok', `not checked: ${e.message}`)); }
+  let lic = { state: 'none' };
+  try { lic = license ?? loadLicense({ env }); } catch { lic = { state: 'none' }; }
+  const licState = lic?.state || 'none';
+  r.push(C('license-expired', 'an expired licence keeps this computer working',
     licState === 'expired' ? 'warn' : 'ok',
     licState === 'expired'
       ? 'the licence is past its grace period: this computer keeps full read and write access, added computers can read but not write, and nothing is deleted'
       : `licence ${licState}; this computer is never limited`));
-  r.push(C('licence-change', 'changing the licence needs no re-enrolment', 'ok',
-    'installing a licence restores writing and removing it returns to Personal; the vault, its computers and its notes are unchanged by either'));
+  // with a valid licence every active added computer within the seat count writes; one that still only reads means
+  // installing the licence did not restore writing
+  try {
+    const devices = vault?.devices ? vault.devices.list() : registry(root).reg.list();
+    const policy = seatPolicy({ license: lic, devices });
+    const added = devices.filter((d) => d.kind === 'remote-computer' && d.status === 'active').sort((a, b) => String(a.created).localeCompare(String(b.created)));
+    const within = licState === 'valid' ? added.slice(0, Math.max(0, (lic.seats || 1) - 1)) : [];
+    const stuck = within.filter((d) => policy.read_only.includes(d.id));
+    r.push(C('license-change', 'changing the licence needs no re-enrolment', stuck.length ? 'warn' : 'ok', stuck.length
+      ? `the licence is valid for ${lic.seats} computer(s), but ${stuck.map((d) => d.label).join(', ')} within that count can still only read; memev license status shows the seats`
+      : `${policy.tier_label} tier; installing a licence restores writing and removing it returns to Personal; the vault, its computers and its notes are unchanged by either`));
+  } catch (e) { r.push(C('license-change', 'changing the licence needs no re-enrolment', 'ok', `not checked: ${e.message}`)); }
   try { const s = fs.statfsSync(root); const freePct = (s.bavail / s.blocks) * 100; const inodePct = s.files ? (s.ffree / s.files) * 100 : 100; r.push(C('disk', 'disk space', freePct < 3 || inodePct < 3 ? 'warn' : 'ok', `${freePct.toFixed(0)}% space, ${inodePct.toFixed(0)}% inodes free`)); } catch {}
   const upd = updateLine(root, env);
   if (upd) r.push(C('update', 'update available', 'warn', upd));
