@@ -1,5 +1,7 @@
 # Set up your office
 
+Part of the [Memev documentation](README.md). Up: the [README](../README.md).
+
 One vault, a few computers, and the AI apps on them, all sharing one memory and one comms bus.
 This is the short path from an empty machine to a working office.
 
