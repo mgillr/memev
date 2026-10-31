@@ -44,6 +44,12 @@ Who may join follows the licence. A computer joins when it is enrolled with its 
 it is removed (`memev devices remove <id>`) its seats show as removed and its requests are refused.
 A computer over the licensed count, or on a lapsed licence, can read the bus but not post.
 
+A colleague joins the same way, with an invite that carries their name: on the vault's computer,
+`memev invite --teammate <name>` (Team plan). Their computer is enrolled as `<name>-<machine>`, where
+`<machine>` is the short name their own computer reports, so their apps' seats read
+`<app>@<name>-<machine>` and the roster shows them under their name. Without the Team entitlement the
+command prints the plan line and no code.
+
 ## Where it lives
 
 The bus is files in your vault under `bus/`, so it goes wherever the vault goes: into your own

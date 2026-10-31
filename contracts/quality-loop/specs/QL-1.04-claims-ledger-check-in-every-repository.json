@@ -2,7 +2,7 @@
   "title": "QL-1.04 The claims check runs in every repository from one script: a claim ahead of its status row fails CI",
   "project": "memev",
   "workdir": null,
-  "request": "Closes quality-loop principle 4 (CI fails in any repo, site included, if a claim runs ahead of its row). Repository: memev. Depends on contracts: SR-5.04. Quality-loop principle set of 30 October 2026 (owner's order: implement as a gate for all dev). Sequenced with QL-1.03, which also changes .github/workflows/ci.yml. The fixtures follow SR-5.04's status table as merged.",
+  "request": "Closes quality-loop principle 4 (CI fails in any repo, site included, if a claim runs ahead of its row). Repository: memev. Depends on contracts: SR-5.04. Quality-loop principle set of 30 October 2026 (owner's order: implement as a gate for all dev). The fixtures follow SR-5.04's status table as merged. Task 2, which copied the gate into the other repositories and ran the checker in memev's own CI, moved to QL-1.06 at the three-round stop (lead decision under the owner's delegation, 31 October 2026).",
   "tasks": [
     {
       "id": "T1",
@@ -14,14 +14,16 @@
         "a planned row without a date older than four weeks is a warning and older than eight weeks is a finding that says give it a date, drop it, or move it to the roadmap (principle 5)",
         "--json prints {features, claims, findings, warnings}; exit 1 on any finding; no dependencies; a version: comment on the first line",
         "claims.mjs exits 2, distinct from 1 for a finding, and prints the cause when the status file is missing, is not valid JSON, has no feature rows, holds a status outside the documented set, or has no claim phrases, and when a --surfaces glob matches no file; --json reports the number of files scanned under the key files",
-        "claims.mjs and every file it imports only read files: they spawn no process, open no network connection, resolve no name, write nothing, and import only node:fs, node:path, node:url, node:process and ./ files under scripts/gate/ that obey the same rule; none uses createRequire, require(, process.binding, process.dlopen, WebSocket, EventSource, globalThis[ or import(",
-        "a planned feature counts as labelled only when the label sits in the same sentence or HTML element as its claim phrase; each Markdown list item, table row and HTML li, tr and td is its own unit whatever its punctuation, and a label in one does not cover another; the one exception is an element of class tag whose whole text is the label, which labels the next sibling element only (the site's section tag); 'not planned', 'was planned', 'as planned' and 'no longer planned' are not the label; phrases match without regard to case, across line wraps, with HTML tags stripped, entities decoded, Markdown emphasis and link syntax removed (the link text kept), Unicode hyphens folded to '-' and typographic apostrophes and quotes folded to ASCII",
-        "a performance figure is a number, with thousands separators or a k suffix allowed, followed by a unit of time, throughput or size (ms, s, seconds, MB, GB, ops/s, req/s, x or × faster) in a sentence; it needs a results file that exists, named in the row of the feature the sentence names, and a figure sentence that names no feature is a finding; version numbers, durations such as a 14-day trial, prices and counts are not figures; a sentence carrying the marker <!-- claims: not a figure --> is exempt from this rule only",
+        "claims.mjs and every file it imports only read files: they spawn no process, open no network connection, resolve no name, write nothing, and import only node:fs, node:path, node:url, node:process and ./ files under scripts/gate/ that obey the same rule; none uses createRequire, require(, process.binding, process.dlopen, process.getBuiltinModule, fetch, Reflect.get on globalThis, eval, Function, WebSocket, EventSource, globalThis[ or import(, nor any node:fs call that writes (writeFile, appendFile, createWriteStream, mkdir, rm, rename, copyFile, in their sync, callback and promise forms)",
+        "a planned feature counts as labelled only when the label sits in the same sentence as its claim phrase, inside the same block element (a paragraph, a list item, a table cell, a heading, a definition or a blockquote line), and in the same clause: within a sentence, clauses are split at ';' and at a comma or a dash followed by but, while, whereas or with, and a label covers only the phrases of its own clause; a common ancestor such as div, section, main or body is not the same element; each Markdown list item, table row and HTML li, tr and td is its own unit whatever its punctuation, and a label in one does not cover another; the label is the whole word planned ('unplanned' is not the label), and 'not planned', 'was planned', 'as planned' and 'no longer planned' are not the label; there are two exceptions to the same-element rule: an element of class tag whose whole text is the label labels the next sibling element only (the site's section tag), and a heading whose text ends with the label, as '(planned)' or ': planned', labels every unit of its section up to the next heading of the same or higher level; a heading that only uses the word ('What is built and what is planned'), a banner or any other page-wide line labels nothing; phrases match without regard to case, across line wraps, with HTML tags stripped, entities decoded, Markdown emphasis and link syntax removed (the link text kept), Unicode hyphens folded to '-' and typographic apostrophes and quotes folded to ASCII",
+        "a performance figure is a number, with thousands separators or a k suffix allowed, followed by a unit of time, throughput or size (ms, µs, s, seconds, minutes, MB, GB, TB, MB/s, ops/s, req/s, x or × faster, times faster, x or × less), with or without a space before the unit, or a percentage stated as a gain or a saving (40% fewer, 40% faster, 40% less), in a sentence; it needs a results file named in the row of the feature the sentence names, which must be a relative path to a .json file under a directory named results inside the checkout (this repository keeps its bench results under bench/results/) that parses to a non-empty object; a row whose results field names a directory, an absolute path, a path holding '..', a file that is not JSON, a file outside a results directory (docs/status.json itself included) or an empty JSON file makes claims.mjs exit 2 naming the row, and a figure sentence that names no feature is a finding; version numbers, durations such as a 14-day trial, prices and counts are not figures; a sentence carrying the marker <!-- claims: not a figure --> is exempt from this rule only",
         "the age of a planned row comes from a field in the row (the date it was marked planned), never from a file time or git history; claims.mjs takes --now so tests fix the clock",
         "the fixtures follow SR-5.04's status table as merged, and the CLI is tested end to end on fixtures at fixed paths",
         "a planned row whose 'marked planned' field is missing, not an ISO date (YYYY-MM-DD) or after --now makes claims.mjs exit 2 naming the row; a planned row whose target date is before --now is a finding naming the row, whatever its age",
         "a --surfaces file of any other type (.mdx, .astro, .txt and so on) is scanned as plain text with HTML tags stripped, never skipped; with no --surfaces, claims.mjs scans README.md, **/*.md and **/*.html under the working directory, leaving out node_modules/ and .git/, and --json says which globs it used",
         "when one row's phrase lies inside another row's phrase at the same place, only the longer phrase counts there",
+        "phrases from the status table are folded the same way as page text (case, Unicode hyphens, typographic apostrophes and quotes) and matched as literal text, never as a regular expression; a planned row with no non-empty phrase makes claims.mjs exit 2 naming the row",
+        "the text of the content attribute of a meta description, og:description or twitter:description tag, and of every alt, title and aria-label attribute, is scanned as a unit of its own",
         "each red-green criterion of this task that runs test/gate-claims.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
@@ -90,7 +92,7 @@
           }
         },
         {
-          "statement": "The full suite passes after T1, not only after T2.",
+          "statement": "The full suite passes with this task alone, before QL-1.06's sync to the other repositories.",
           "verifier": {
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
@@ -106,7 +108,7 @@
           }
         },
         {
-          "statement": "T1-c10: on T1-c04's three-row fixture, each of these sentences naming row B gives exactly one finding naming B, and naming row A gives none: '0.8 s', '2 seconds', '450 MB', '1.5 GB', '1,200 req/s', '10k ops/s', '3x faster', '3× faster'; each of 'version 1.10', 'v0.1.0', 'needs Node 22', 'a 14-day trial', '$12/month' and 'up to 3 computers' gives none. The spec must also state how a real hardware sentence such as '2 CPUs, 4 GB RAM, 10 GB disk' is exempted (a per-sentence marker with its own subtest), so T2's run of claims.mjs over this repository's own surfaces cannot be met by narrowing this list.",
+          "statement": "T1-c10: on T1-c04's three-row fixture, each of these sentences naming row B gives exactly one finding naming B, and naming row A gives none: '0.8 s', '2 seconds', '450 MB', '1.5 GB', '1,200 req/s', '10k ops/s', '3x faster', '3× faster'; each of 'version 1.10', 'v0.1.0', 'needs Node 22', 'a 14-day trial', '$12/month' and 'up to 3 computers' gives none. The spec must also state how a real hardware sentence such as '2 CPUs, 4 GB RAM, 10 GB disk' is exempted (a per-sentence marker with its own subtest), so QL-1.06's run of claims.mjs over this repository's own surfaces cannot be met by narrowing this list.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-claims.test.mjs",
@@ -146,6 +148,15 @@
           }
         },
         {
+          "statement": "Against the real docs/status.json, every planned row has at least one non-empty phrase. For each such phrase, a temp page holding only '<phrase> is available today.' makes claims.mjs exit 1, with exactly one finding for that page, naming the row. The command assumes SR-5.04's field names are features[].id, .status and .phrases; adjust it to the table as merged.",
+          "verifier": {
+            "type": "command",
+            "cmd": "d=$(mktemp -d) && node -e 'const fs=require(\"fs\"),cp=require(\"child_process\"),path=require(\"path\");const t=JSON.parse(fs.readFileSync(\"docs/status.json\",\"utf8\"));let bad=0,n=0;for(const r of t.features){if(r.status!==\"planned\")continue;const ph=r.phrases||[];if(!ph.length||ph.some(p=>!String(p).trim())){console.log(\"no usable phrase: \"+r.id);bad++;continue}for(const p of ph){n++;const f=path.join(process.argv[1],\"p\"+n+\".md\");fs.writeFileSync(f,p+\" is available today.\\n\");const o=cp.spawnSync(\"node\",[\"scripts/gate/claims.mjs\",\"--json\",\"--status\",\"docs/status.json\",\"--surfaces\",f],{encoding:\"utf8\"});let j={};try{j=JSON.parse(o.stdout)}catch{}const mine=(j.findings||[]).filter(x=>JSON.stringify(x).includes(\"p\"+n+\".md\"));if(o.status!==1||mine.length!==1||!JSON.stringify(mine[0]).includes(r.id)){console.log(\"undetected: \"+r.id+\" / \"+p);bad++}}}process.exit(bad||!n?1:0)' \"$d\"",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
           "statement": "The full suite passes",
           "verifier": {
             "type": "command",
@@ -158,7 +169,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-claims.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c16:' test/gate-claims.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c16:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c17:' test/gate-claims.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -166,177 +177,78 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-claims.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c17:' test/gate-claims.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c18:' test/gate-claims.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c18:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
-          "statement": "One full run of test/gate-claims.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03, T1-c04, T1-c05, T1-c07, T1-c09, T1-c10, T1-c11, T1-c12, T1-c13, T1-c14, T1-c16, T1-c17) with nothing skipped and nothing todo.",
+          "statement": "T1-c19: the test first runs its own read-only scanner on snippets it plants in a temp directory, and the scanner must reject each one: process.getBuiltinModule(...), process['getBuiltinModule'], 'fetch (u)', 'const f = fetch', globalThis.fetch.call(...), Reflect.get(globalThis, 'fetch'), eval('1'), new Function('x'), Function('x'), and fs.writeFileSync, appendFileSync, createWriteStream, mkdirSync, rmSync, renameSync, copyFileSync and promises.writeFile. Each is also planted inside try/catch and inside an imported ./helper.mjs. The scanner must then accept claims.mjs and every ./ file reachable from it. T1-c09's two runs also set GITHUB_ACTIONS=true and CI=true, point TMPDIR at a fresh empty directory, and assert it is still empty afterwards.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-claims.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c19:' test/gate-claims.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c19:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c20: with planned rows A and B, each of these gives exactly one finding, naming A: '<p>A is included. B is planned.</p>'; '<div><p>A is here.</p><p>B (planned)</p></div>'; '<main><p>A is here.</p><p>The rest is planned.</p></main>'; and the Markdown paragraph 'A is included. B is planned.'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-claims.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c20:' test/gate-claims.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c20:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c21: '## What is built and what is planned' followed by '- A is here.' gives one finding naming A; '> Everything on this page is **planned**.' followed by the paragraph 'A gives you an export.' gives one finding naming A; '## What's included (planned)' followed by '- A' and the paragraph 'B is here.' gives no finding, and a '### Detail' heading inside that section does not end it; the same items after a following '## Other' heading give one finding each.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-claims.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c21:' test/gate-claims.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c21:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c22: each of these makes claims.mjs exit 2 naming the row: a row whose results field names a directory ('bench'), an absolute path ('/etc/hosts'), a path containing '..', a file that is not JSON (README.md), docs/status.json itself, or an empty JSON file. A results file must be a .json file under a documented results directory and parse to a non-empty object.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-claims.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c22:' test/gate-claims.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c22:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c23: an .html fixture puts an unlabelled planned claim only in an attribute: <meta name=\"description\" content>, <meta property=\"og:description\" content>, an img alt= and a title= attribute. Each attribute gives one finding naming the row, and the same text with '(planned)' inside the attribute value gives none.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-claims.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c23:' test/gate-claims.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c23:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c24: on T1-c04's three-row fixture, each of '12ms', '800 µs', '2 minutes', '120 MB/s', '1.2 TB', '10 times faster', '3x less memory' and '40% fewer tokens' gives one finding naming row B in a sentence naming B, and none in a sentence naming row A. Alternatively, the amended requirement lists the forms it exempts and the test asserts that list.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-claims.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c24:' test/gate-claims.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c24:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c25: 'A ships today; B is planned.', 'A is live now, but B is planned.' and 'A is live, with no downtime planned.' each give one finding naming A. 'A, B and C are all planned.' and 'Planned: A, B and C.' give none.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-claims.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c25:' test/gate-claims.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c25:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c26: .astro, .mdx and .txt pages holding an unlabelled planned claim each give exit 1 with one finding, never exit 2. With no --surfaces, in a temp tree holding README.md and site/index.html, --json lists the globs used under a named key as exactly README.md, **/*.md and **/*.html, with files = 2. claims.mjs run on the real docs/status.json with --surfaces naming a one-line clean page exits 0.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-claims.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c26:' test/gate-claims.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c26:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/gate-claims.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03, T1-c04, T1-c05, T1-c07, T1-c09, T1-c10, T1-c11, T1-c12, T1-c13, T1-c14, T1-c17, T1-c18, T1-c19, T1-c20, T1-c21, T1-c22, T1-c23, T1-c24, T1-c25, T1-c26) with nothing skipped and nothing todo.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-claims.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c02:|^T1-c03:|^T1-c04:|^T1-c05:|^T1-c07:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c12:|^T1-c13:|^T1-c14:|^T1-c16:|^T1-c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
-            "timeout_s": 600
-          }
-        },
-        {
-          "statement": "Changes stay in scope",
-          "verifier": {
-            "type": "scope"
-          }
-        }
-      ],
-      "stop_rules": [
-        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
-        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
-      ]
-    },
-    {
-      "id": "T2",
-      "title": "Shipped to the other repositories",
-      "phase": "implement",
-      "depends_on": [
-        "T1"
-      ],
-      "requirements": [
-        "scripts/gate/sync-gates.mjs copies scripts/gate/** into a target checkout given by --to and prints the version of each file copied; a target whose copy is older than this repository's is reported",
-        "docs/DEVELOPING.md says the gate scripts are owned here and copied into memev-site, memev-cloud, memev-org and memev-ops, and that each of them runs claims.mjs in its CI",
-        "sync-gates.mjs copies docs/status.json with the gate scripts, and claims.mjs reads the status table only from the copy in its own checkout",
-        "sync-gates.mjs --check writes nothing and exits non-zero naming the file when a target gate file differs in content from this repository's (even at the same version line), is missing, or has no version line; versions compare numerically (1.10 is newer than 1.9), and a newer target copy is reported, never overwritten; docs/status.json, which cannot carry a version line, is exempt from the version-line rule only and is compared by content like every gate file, and so is each results file sync copies",
-        "memev's own CI runs claims.mjs over README.md, docs/**/*.md and site/**/*.html, the globs quoted so claims.mjs expands them itself, on every pull request that touches them and on a schedule, so the age rule runs even when nothing changes: the claims step sits in a job whose if: admits both schedule and pull_request, after no step that reads github.base_ref, passes no --now, and the scheduled run has a concurrency group of its own",
-        "sync-gates.mjs --check also exits non-zero, naming the repository, when no workflow under the target's .github/workflows/ runs node scripts/gate/claims.mjs; memev's CI has a scheduled job that checks out memev-site, memev-cloud, memev-org and memev-ops read-only, with a read-only token held as a repository secret (an owner step), and runs sync-gates.mjs --to <checkout> --check on each; the job fails, never skips, when the secret is missing",
-        "sync-gates copies every results file named in a row of docs/status.json to the same path in the target, so a figure backed in memev is backed in the target",
-        "each sentence of README.md, docs/**/*.md and site/**/*.html that gives hardware or limits rather than performance (for example docs/testing/LAB-TEST-PLAN.md's '2 CPUs, 4 GB RAM, 10 GB disk') carries the marker <!-- claims: not a figure --> at the end of its line; apart from docs/DEVELOPING.md, T2 changes those files only by inserting the marker",
-        "each red-green criterion of this task that runs test/gate-sync.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest"
-      ],
-      "description": "",
-      "scope": [
-        "scripts/gate/sync-gates.mjs",
-        "docs/DEVELOPING.md",
-        "test/gate-sync.test.mjs",
-        "test/helpers/**",
-        ".github/workflows/ci.yml",
-        "README.md",
-        "docs/**/*.md",
-        "site/**/*.html"
-      ],
-      "criteria": [
-        {
-          "statement": "Syncing into a temporary git checkout writes every gate script with its version and reports an older copy",
-          "verifier": {
-            "type": "test_red_green",
-            "test_file": "test/gate-sync.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c01:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
-          }
-        },
-        {
-          "statement": "The developing page names the four receiving repositories",
-          "verifier": {
-            "type": "grep",
-            "file": "docs/DEVELOPING.md",
-            "pattern": "memev-site, memev-cloud, memev-org and memev-ops"
-          }
-        },
-        {
-          "statement": "The full suite passes",
-          "verifier": {
-            "type": "command",
-            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
-            "timeout_s": 1800
-          }
-        },
-        {
-          "statement": "sync-gates.mjs --to <dir> --check writes nothing (the target's file hashes are unchanged afterwards) and exits non-zero, naming the file, when: a target gate file has the same version line but different sha256 content; a gate file is missing in the target; or the target copy has no version line. It exits 0 only when every file is byte-identical to this repository's. Residual risk that no criterion here can cover: a PR that edits its own copy is caught only if this check runs from outside that PR (a scheduled memev job over the four repositories, or CODEOWNERS on scripts/gate/** in each target).",
-          "verifier": {
-            "type": "test_red_green",
-            "test_file": "test/gate-sync.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c04:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
-          }
-        },
-        {
-          "statement": "After sync-gates writes into a temporary git checkout that holds only a README.md, the test runs node scripts/gate/claims.mjs --json with cwd = the target, once through its realpath and once through a symlink to it. The README claims a planned feature without the label: exit 1, one finding naming README.md, features > 0. With the label added: exit 0. The status table is read only from what sync-gates put into the target, so the requirement must be amended to ship or reference the table.",
-          "verifier": {
-            "type": "test_red_green",
-            "test_file": "test/gate-sync.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c05:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
-          }
-        },
-        {
-          "statement": "(Scope amended to add .github/workflows/ci.yml.) The test parses ci.yml and asserts: a step runs node scripts/gate/claims.mjs with --surfaces covering README.md, docs/**/*.md and site/**/*.html; the pull_request paths include README.md and site/** (or that job has no paths filter); and an on.schedule trigger runs the same step.",
-          "verifier": {
-            "type": "test_red_green",
-            "test_file": "test/gate-sync.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c06:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
-          }
-        },
-        {
-          "statement": "Target copies at version 1.9 against source 1.10, and a target copy with its version line removed, are both reported, with a non-zero exit or a 'stale' entry in --json. A target copy at a newer version is reported, not silently overwritten. The test parses versions with its own inline regex, not with code imported from scripts/gate or test/helpers. Line 1 of every scripts/gate/*.mjs matches /^\\/\\/ version: \\d+\\.\\d+/.",
-          "verifier": {
-            "type": "test_red_green",
-            "test_file": "test/gate-sync.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c07:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
-          }
-        },
-        {
-          "statement": "T2-c08: (a) sync-gates.mjs --check also exits non-zero, naming the repository, when no file under the target's .github/workflows/ runs node scripts/gate/claims.mjs; (b) ci.yml has a job that runs on on.schedule (its if: admits event_name 'schedule') which checks out each of memev-site, memev-cloud, memev-org and memev-ops read-only and runs node scripts/gate/sync-gates.mjs --to <checkout> --check. The test parses ci.yml for (b) with exactly those four names, and runs --check on three temp targets: a clean synced copy with a workflow calling claims.mjs (exit 0); the same with claims.mjs edited and its version line bumped to 99.0 (non-zero, names scripts/gate/claims.mjs); a current copy with no workflow step calling claims.mjs (non-zero).",
-          "verifier": {
-            "type": "test_red_green",
-            "test_file": "test/gate-sync.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c08:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T2-c08:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
-          }
-        },
-        {
-          "statement": "T2-c09: the test parses ci.yml, finds every job containing the claims.mjs step, and evaluates that job's and that step's if: for github.event_name = 'schedule' and = 'pull_request'; both must admit the step. No earlier step in that job reads github.base_ref, the claims step passes no --now, and the scheduled run's concurrency group differs from a push to main's (not ci-refs/heads/main with cancel-in-progress). Red for a claims step added to the existing check job under ci.yml:44.",
-          "verifier": {
-            "type": "test_red_green",
-            "test_file": "test/gate-sync.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c09:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T2-c09:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
-          }
-        },
-        {
-          "statement": "T2-c10: the test extracts the run: text of the claims step from ci.yml verbatim, adds --json, executes it with bash -e -c (globstar off, as on the runner) in the repository root, and asserts exit 0 and that the files-scanned count equals the number of lines of git ls-files ':(glob)README.md' ':(glob)docs/**/*.md' ':(glob)site/**/*.html' (76 at be457dbd). Red for an unquoted docs/**/*.md.",
-          "verifier": {
-            "type": "test_red_green",
-            "test_file": "test/gate-sync.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c10:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T2-c10:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
-          }
-        },
-        {
-          "statement": "Run claims.mjs in the CI's form (README.md, 'docs/**/*.md', 'site/**/*.html'), capture its own exit code (must be 0), and require features > 0, claims > 0, zero findings, and the files-scanned count (key 'files'; the requirement should name the key) equal to the number of files find lists for README.md, docs/**/*.md and site/**/*.html.",
-          "verifier": {
-            "type": "command",
-            "cmd": "want=$({ ls README.md; find docs -type f -name '*.md'; find site -type f -name '*.html'; } | wc -l); out=$(node scripts/gate/claims.mjs --json --surfaces README.md 'docs/**/*.md' 'site/**/*.html'); rc=$?; [ \"$rc\" = 0 ] || exit 1; printf '%s' \"$out\" | W=$want node -e \"const r=JSON.parse(require('fs').readFileSync(0,'utf8'));const n=x=>Array.isArray(x)?x.length:Number(x);process.exit(n(r.features)>0&&n(r.claims)>0&&n(r.findings)===0&&n(r.files)===Number(process.env.W)?0:1)\"",
-            "expect_exit": 0,
-            "timeout_s": 120
-          }
-        },
-        {
-          "statement": "T2-c12: after sync into a temp checkout, --check exits 0; flipping one row of the target's docs/status.json from planned to built (scripts untouched) makes --check exit non-zero naming docs/status.json with the target's file hashes unchanged; with that flip, claims.mjs run in the target on a README claiming that feature unlabelled exits 0 (it read the target's table, not the source's); after deleting the target's docs/status.json it exits 2 naming the missing file.",
-          "verifier": {
-            "type": "test_red_green",
-            "test_file": "test/gate-sync.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c12:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T2-c12:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
-          }
-        },
-        {
-          "statement": "T2-c13: source row A names results/a.json, which exists in the source. After sync into a temp checkout whose README says '<A phrase> answers in 12 ms.', claims.mjs run in the target exits 0 (sync carried the named results file, or a sha256 manifest of it that claims.mjs checks); a target README giving '12 ms' for a row whose results file is missing in the source exits 1 naming the row.",
-          "verifier": {
-            "type": "test_red_green",
-            "test_file": "test/gate-sync.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c13:' test/gate-sync.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T2-c13:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
-          }
-        },
-        {
-          "statement": "Apart from docs/DEVELOPING.md, every file under README.md, docs/ and site/ that differs from the recorded base, untracked files included, is an existing file whose head copy, with each ' <!-- claims: not a figure -->' (and the spaces before it) removed, equals its base copy byte for byte.",
-          "verifier": {
-            "type": "command",
-            "cmd": "[ -n \"$MEMEV_CONTRACT_BASE\" ] && b=$(mktemp) && h=$(mktemp) && ok=1 && for f in $({ git diff --name-only \"$MEMEV_CONTRACT_BASE\" -- README.md docs site; git ls-files --others --exclude-standard -- README.md docs site; } | sort -u | grep -vxF docs/DEVELOPING.md); do git cat-file -e \"$MEMEV_CONTRACT_BASE:$f\" 2>/dev/null || { echo \"new file: $f\"; ok=0; continue; }; git show \"$MEMEV_CONTRACT_BASE:$f\" > \"$b\"; [ -f \"$f\" ] || { echo \"deleted: $f\"; ok=0; continue; }; sed \"s/ *<!-- claims: not a figure -->//g\" \"$f\" > \"$h\"; cmp -s \"$b\" \"$h\" || { echo \"changed beyond markers: $f\"; ok=0; }; done; [ \"$ok\" = 1 ]",
-            "timeout_s": 60
-          }
-        },
-        {
-          "statement": "One full run of test/gate-sync.test.mjs passes every labelled subtest (T2-c01, T2-c04, T2-c05, T2-c06, T2-c07, T2-c08, T2-c09, T2-c10, T2-c12, T2-c13) with nothing skipped and nothing todo.",
-          "verifier": {
-            "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-sync.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c04:|^T2-c05:|^T2-c06:|^T2-c07:|^T2-c08:|^T2-c09:|^T2-c10:|^T2-c12:|^T2-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-claims.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c02:|^T1-c03:|^T1-c04:|^T1-c05:|^T1-c07:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c12:|^T1-c13:|^T1-c14:|^T1-c17:|^T1-c18:|^T1-c19:|^T1-c20:|^T1-c21:|^T1-c22:|^T1-c23:|^T1-c24:|^T1-c25:|^T1-c26:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
             "timeout_s": 600
           }
         },

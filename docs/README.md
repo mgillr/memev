@@ -25,6 +25,7 @@ this folder links back here, and this page links down to every page.
 | [PROJECTS.md](PROJECTS.md) | the project layer: task states, the transition table, derived project status |
 | [CLIENTS.md](CLIENTS.md) | what is added to each AI app; per-app pages below |
 | [CLOUD.md](CLOUD.md) | the secure link, devices, invites, joining another computer |
+| [AGENT-IDENTITY.md](AGENT-IDENTITY.md) | a person vouches for an agent role, and a third party checks it offline |
 | [RELAY.md](RELAY.md) | the relay protocol and the `memev cloud relay` client |
 | [GITHUB.md](GITHUB.md) | backup to your own private repository |
 | [DOCKER.md](DOCKER.md) | running Memev in a container |

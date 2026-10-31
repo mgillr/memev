@@ -1,0 +1,233 @@
+{
+  "title": "SR-1.31 Every other CLI state writer goes through the daemon or the lock",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G96: SR-1.24 routes five CLI commands' state writes through the daemon, or the SR-1.01 vault lock when no daemon runs, and gates the daemon's state routes on a local request with the admin scope. Every other CLI process that writes vault state still writes it beside a live daemon: token revoke and rotate, devices enroll, remove and rotate, the cloud and relay commands, contracts on and off, deployment set, github setup, invite, memev init on an existing vault, license activate with a relay, the per-session hook and mcp processes when they mint a missing client token, the cli and doctor tokens that memev recall, card, claims, doctor and every bus subcommand reissue, the session-start hook's lead mark, onboarding and report, and the relay address command, which rewrites the relay's key file. Split from SR-1.24 at its three-round stop (lead decision under the owner's delegation, 31 October 2026): SR-1.24 keeps task 1; this contract takes SR-1.24's task 2 with round 3's answers about these writers, the token-mint route (a local request with the admin scope only) and the admin token's own rotation. Repository: memev. Depends on contracts: SR-1.24, SR-1.28, SR-1.01, QL-1.02. Sensitive path (tokens and the bus's routing files): the QL-1.03 checklist applies before merge.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Every other CLI state writer goes through the daemon or the lock",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "token revoke and rotate, devices enroll, remove and rotate, cloud on, off, use, funnel, url, connect, rotate-key and status --show-secrets, cloud relay on and off, contracts on and off, the contracts CLI's client token, deployment set, github setup, invite, memev init on an existing vault, and license activate when a relay is returned, make their change through SR-1.24's helper: in the daemon when it is present, under the SR-1.01 lock when it is not",
+        "an invite is minted and redeemed in the same process, the daemon when it is present, so a redemption never races a mint on invites.json and one code enrols one computer",
+        "the One writer paragraph of docs/DESIGN.md names every state file these commands and SR-1.24's five commands write: tokens.json, clients.json, config.json, devices.json, invites.json, tunnel-key.txt, relay.json and bus/",
+        "these commands decide presence and treat refusals exactly as SR-1.24's helper does (its presence and no-fallback requirements): no healthy() probe decides presence, and a 404 from an older daemon ends the command non-zero",
+        "the per-session processes, memev hook and memev mcp, get a missing client token from the daemon when it is present and never write tokens.json or clients.json themselves; with no daemon they mint it under the SR-1.01 lock; the hook still exits 0",
+        "every remaining CLI state writer, in src/cli/onboarding.mjs, src/cli/hooks.mjs, src/cli/mcp-stdio.mjs, src/cli/memory-cli.mjs, src/cli/doctor.mjs and src/cli/upgrade.mjs, goes through SR-1.24's helper, so the One writer paragraph is true of every CLI process",
+        "memev token rotate on the admin token's id rewrites .memev/admin.json with the new token, with no expiry, in the same daemon operation; memev token revoke refuses the only admin token with a message",
+        "license activate installs the licence and applies the relay default in one daemon operation, so a refusal or a timeout leaves neither half-applied",
+        "each red-green criterion of this task that runs test/cli-one-writer-all.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c17: for the first), and the criterion runs only that subtest"
+      ],
+      "scope": [
+        "src/cli/main.mjs",
+        "src/cli/licensing.mjs",
+        "src/cli/tunnel.mjs",
+        "src/cli/contracts-cli.mjs",
+        "src/cli/deployment.mjs",
+        "src/cli/invite.mjs",
+        "src/cli/github.mjs",
+        "src/cli/relay.mjs",
+        "src/engine/devices.mjs",
+        "src/server/http.mjs",
+        "test/cli-one-writer-all.test.mjs",
+        "test/helpers/**",
+        "docs/DESIGN.md",
+        "docs/MODULES.md",
+        "changelog.d/SR-1.24.md",
+        "src/cli/common.mjs",
+        "src/cli/onboarding.mjs",
+        "src/cli/hooks.mjs",
+        "src/cli/mcp-stdio.mjs",
+        "src/cli/memory-cli.mjs",
+        "src/cli/doctor.mjs",
+        "src/cli/upgrade.mjs",
+        "src/cli/bus-cli.mjs",
+        "src/cli/clients.mjs",
+        "src/engine/milestones.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "With a live stub daemon that records every request and writes nothing, each of token revoke, token rotate, devices enroll, remove and rotate, cloud on, off, use and funnel, contracts on and off, deployment set, invite, and license activate with a relay answer sends exactly one request naming its change, and every file under the vault root, including .memev/** and bus/**, keeps the same sha256, inode, mtimeMs and size.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer-all.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 every writer' test/cli-one-writer-all.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 every writer$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Two concurrent redemptions of one invite code against the real daemon: exactly one enrols a computer, the other is refused, and invites.json marks the code used.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer-all.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 invite once' test/cli-one-writer-all.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 invite once$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With no daemon, each command of the first criterion exits 0, makes its change, and takes the SR-1.01 lock while it writes.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer-all.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 every writer offline' test/cli-one-writer-all.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 every writer offline$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/cli-one-writer-all.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/cli-one-writer-all.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/cli-one-writer-all.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Every operation this task adds (token revoke, token rotate, devices enroll/remove/rotate, cloud on/off/use/funnel, contracts on/off, deployment set, github setup, invite, licence relay, cloud url, connect, rotate-key and status --show-secrets, cloud relay on and off, the contracts CLI's client token and memev init on an existing vault) gets the four refusal cases (a)-(d) of SR-1.24's admin-route criterion (a non-admin read+write token with x-memev-client: cli, a read-only token, a remote request, and the same request through /c/<token>/) plus a request with no Authorization. Each answers 403 with the route's own error code and returns no token, secret or invite code. Every vault file, .git/config and .git/hooks/** stays identical (sha256, inode, mtimeMs, size, file list). Token rotate of the admin token's id in case (a) leaves admin.json's token valid. The admin token from loopback succeeds for each operation.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer-all.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 every writer route auth' test/cli-one-writer-all.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 every writer route auth$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "For each command of this task's first criterion: (i) daemon.lock and daemon.json name a live pid whose port answers /healthz after 5 s; (ii) a stub answers the state request with 404, 403, 500, or after the CLI timeout. In every case the command writes no vault file (sha256, inode, mtimeMs, size, file list) and the stub sees at most one state request. The command exits non-zero with a message, or in (i) routes once through the daemon.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer-all.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 every writer busy and refusing' test/cli-one-writer-all.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 every writer busy and refusing$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Against the stub daemon, with remote access on and .memev/tunnel.json holding a url, run: memev cloud url; memev cloud connect claude --timeout 1; memev cloud rotate-key; memev cloud status --show-secrets; memev cloud relay on; memev cloud relay off; memev init --local-only on the existing vault; memev contract list with the 'cli' entry removed from clients.json. Each leaves every vault file identical (sha256, inode, mtimeMs, size, file list) or exits non-zero with a message. For memev hook prompt --client claude-code and memev mcp, with that client's entry removed, every vault file stays identical in their own processes, because the daemon mints the missing client token; the hook exits 0 and memev mcp answers initialize.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer-all.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 unlisted writers' test/cli-one-writer-all.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([6-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 unlisted writers$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Take the route or op that memev hook and memev mcp use to get a missing client token, as identified from the stub's recorded request. Over loopback it answers 401 or 403, returns no mv_ token, and leaves tokens.json and clients.json with the same sha256, inode, mtimeMs and size in each of these cases: no Authorization; a read+write '**' non-admin token with x-memev-client: cli; the 'cli' token; a read-only token; and the remote cases (c) and (d) of SR-1.24's admin-route criterion (a remote request, and the same request through /c/<token>/). Asking for a client that already has a token never returns that token. Only the admin.json bearer over loopback succeeds, and the stub records that bearer on the hook's and mcp's own mint request.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer-all.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 session token mint auth' test/cli-one-writer-all.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([6-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 session token mint auth$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Against a live stub daemon, run these commands twice: once with the 'cli' and 'doctor' entries removed from clients.json, and once with both tokens' records expired (both set up while no daemon runs). The commands are memev recall x, remember x, checkpoint --project p, card, claims, why x, review, audit, doctor, bus roster, bus tail, bus unread, bus send all status x, and memev connect for a fake app. Every file under the vault root keeps its sha256, inode, mtimeMs and size, and the file list is unchanged. Each command answers through the stub or exits non-zero with a message, and tokens.json gains no record.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer-all.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 credential-using commands' test/cli-one-writer-all.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 credential-using commands$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Use a stub daemon that answers session-start, bus-pulse and journal, on a vault whose bus/operator.json has no 'asked' field. Run memev hook session-start --client claude-code (source startup), then hook prompt, hook pre-compact and hook stop, each with the client's entry removed. bus/** and every file the One writer paragraph names keep sha256, inode, mtimeMs, size and the file list. If .memev/hooks/** changes, the One writer paragraph names it as the hook's own exception. Every hook exits 0, and the stub records the lead-asked mark as a request. Against the real daemon, 20 concurrent session-start hooks run while memev bus operator <seat> runs, and operator.json still names that seat afterwards.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer-all.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 hook writers' test/cli-one-writer-all.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([5-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 hook writers$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Run memev github setup (fake gh and ssh-keygen on PATH), memev onboarding, memev report show, memev cloud relay address (with a relay configured), memev doctor and memev doctor --fix. Run them against a stub daemon, and again with daemon.lock and daemon.json naming a live pid whose /healthz answers after 5 s. Each command either exits non-zero with a message, or leaves every file under the vault root, .git/config and .git/hooks/** included, with the same sha256, inode, mtimeMs, size and file list. The files are sampled every 20 ms during the run as well as after it, so a file created and then deleted counts. github setup sends exactly one state request.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer-all.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 remaining writers' test/cli-one-writer-all.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([6-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 remaining writers$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Against the real daemon, mint code A. Run memev invite --local eight times concurrently while A is redeemed once in the middle. Repeat with a seam that pauses the mint between reading and writing invites.json while A is redeemed. Afterwards invites.json holds A and all eight new rows, A is used:true with its device id, a second redemption of A answers 409, and devices.json holds exactly one device enrolled from A.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer-all.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 mint against redeem' test/cli-one-writer-all.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([2-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 mint against redeem$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Against a stub daemon, each of these exits 0 and the stub records exactly one state request naming its operation: memev cloud url, cloud connect claude --timeout 1, cloud rotate-key, cloud status --show-secrets, cloud relay on --url relay://127.0.0.1:9 --domain t.example, cloud relay off, memev init --local-only on the existing vault, and memev contract list with the cli entry removed. Against the real daemon, each change is on disk afterwards (tunnel-key.txt rotated, relay.enabled toggled, remote.enabled false), and the CLI process wrote no vault file.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer-all.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 routed not refused' test/cli-one-writer-all.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([8-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 routed not refused$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c17: Against the real daemon, with a device's last_seen held in memory and not yet flushed and a 'reuse' flag raised on it, devices enroll, devices remove and devices rotate run on other devices through the daemon and an invite is redeemed, each within 1 s. After the next 5 s flush, devices.json holds that device's last_seen from the request and the flag, and each of the changes.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer-all.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c17:' test/cli-one-writer-all.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c18: Against the real daemon, memev token rotate <id from admin.json> exits 0, admin.json then holds the new token with no expiry, memev project set through the daemon exits 0, and the old secret gets 401. memev token revoke <admin id> is refused with a message while it is the only admin token, and tokens.json and admin.json keep their sha256.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer-all.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c18:' test/cli-one-writer-all.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c18:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c19: Against the real daemon with MEMEV_STATE_TIMEOUT_MS=1000 and a test seam that answers each state operation 2 s after applying it, memev token rotate, devices enroll, invite and license activate with a relay each exit non-zero with a message that says the change may have been applied and names the command that shows it. Once the daemon finishes, exactly one change is on disk for each: one rotated token, one device, one invite row, one licence with its relay default.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer-all.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c19:' test/cli-one-writer-all.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c19:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/cli-one-writer-all.test.mjs passes every labelled subtest (T1-c17, T1-c18, T1-c19) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/cli-one-writer-all.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c17:|^T1-c18:|^T1-c19:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

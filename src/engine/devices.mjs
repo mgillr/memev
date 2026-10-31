@@ -60,10 +60,10 @@ export class DeviceRegistry {
     return this.data.devices[host.id];
   }
 
-  _add({ kind, label, tokenId = null, pubkey = null, inferred = false }) {
+  _add({ kind, label, tokenId = null, pubkey = null, inferred = false, teammate = null }) {
     if (!KINDS.includes(kind) || kind === 'host') throw new Error(`kind must be one of ${KINDS.filter((k) => k !== 'host').join(', ')}`);
     const id = `dev_${randomToken(8)}`;
-    this.data.devices[id] = { id, kind, label: String(label || kind).slice(0, 60), status: 'active', created: now(), first_seen: null, last_seen: null, token_id: tokenId, pubkey, flags: [], ...(inferred ? { inferred: true } : {}), origins: [] };
+    this.data.devices[id] = { id, kind, label: String(label || kind).slice(0, 60), status: 'active', created: now(), first_seen: null, last_seen: null, token_id: tokenId, pubkey, flags: [], ...(inferred ? { inferred: true } : {}), ...(teammate ? { teammate } : {}), origins: [] };
     if (tokenId) this.byToken.set(tokenId, id);
     this.dirty = true;
     return this.data.devices[id];
@@ -74,7 +74,7 @@ export class DeviceRegistry {
    * computer needs its device public key and a free seat under `policy` (the free tier when none is
    * given: no other computer).
    */
-  enroll(tokens, { kind, label, pubkey = null, ttlDays = 365, policy = null }) {
+  enroll(tokens, { kind, label, pubkey = null, ttlDays = 365, policy = null, teammate = null }) {
     if (pubkey) publicKeyFrom(pubkey); // throws if it is not an Ed25519 public key
     if (kind === 'remote-computer') {
       if (!pubkey) throw new SeatError('A computer joins with its own device key. Run `memev devices keygen` on that computer, then `memev devices enroll --kind remote-computer --pubkey <key>` here.');
@@ -83,7 +83,7 @@ export class DeviceRegistry {
     }
     const remote = kind !== 'local-client';
     const t = tokens.issue({ agent: String(label || kind).slice(0, 40), scopes: ['read', 'write'], paths: remote ? ['memory/**', 'work/**', 'contracts/**', 'bus/**'] : ['**'], ttlDays, remote, note: `device ${kind}` });
-    const d = this._add({ kind, label, tokenId: t.id, pubkey });
+    const d = this._add({ kind, label, tokenId: t.id, pubkey, teammate });
     this.save();
     return { device: d, token: t.token };
   }
@@ -291,14 +291,17 @@ export function decodeInvite(code) {
 
 function loadInvites(root) { return readJson(invitePath(root), null) || { version: 1, invites: {} }; }
 
-/** Mint a one-time secret. The file keeps the hash, the expiry and the address, never the secret. */
-export function mintInvite(root, { address, ttlSec = 15 * 60, at = Date.now() } = {}) {
+/**
+ * Mint a one-time secret. The file keeps the hash, the expiry and the address, never the secret.
+ * With `teammate`, the invite is for a colleague: their computer is enrolled under their name.
+ */
+export function mintInvite(root, { address, ttlSec = 15 * 60, at = Date.now(), teammate = null } = {}) {
   if (!address) throw new Error('an invite needs the vault address');
   const secret = crypto.randomBytes(16).toString('base64url');
   const expires = new Date(at + ttlSec * 1000).toISOString();
   const id = `inv_${randomToken(4)}`;
   const data = loadInvites(root);
-  data.invites[id] = { id, hash: inviteHash(secret), expires, address, used: false };
+  data.invites[id] = { id, hash: inviteHash(secret), expires, address, used: false, ...(teammate ? { teammate } : {}) };
   writePrivateJson(invitePath(root), data);
   const origin = git(root, ['remote', 'get-url', 'origin']);
   const code = encodeInvite({ address, secret, pubkey: addressKeypair(root).publicKey, backup: origin.ok ? origin.out : null });
@@ -307,7 +310,9 @@ export function mintInvite(root, { address, ttlSec = 15 * 60, at = Date.now() } 
 
 /**
  * Redeem a code once. A second try is refused. An invite past its expiry is refused with a message
- * that says it expired. On success one remote computer is enrolled.
+ * that says it expired. On success one remote computer is enrolled. A teammate invite enrolls the
+ * computer under the teammate's name: its label is <name>-<machine>, where <machine> is the label
+ * the joining computer reports.
  */
 export function redeemInvite(root, { code, pubkey, label, tokens, policy, at = Date.now() }) {
   const { address, secret } = decodeInvite(code);
@@ -317,7 +322,8 @@ export function redeemInvite(root, { code, pubkey, label, tokens, policy, at = D
   if (Date.parse(row.expires) <= at) throw new Error('this invite expired');
   if (row.used) throw new Error('this invite was already used');
   const reg = new DeviceRegistry(path.join(root, '.memev', 'devices.json'));
-  const enrolled = reg.enroll(tokens, { kind: 'remote-computer', label: label || 'invited computer', pubkey, policy });
+  const name = row.teammate ? `${row.teammate}-${label || 'computer'}` : (label || 'invited computer');
+  const enrolled = reg.enroll(tokens, { kind: 'remote-computer', label: name, pubkey, policy, teammate: row.teammate || null });
   row.used = true;
   row.device = enrolled.device.id;
   writePrivateJson(invitePath(root), data);
