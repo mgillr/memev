@@ -13,7 +13,8 @@
         "OpLog.open takes an exclusive lock file (O_EXCL with stale-pid recovery) before truncating or rewriting the manifest",
         "a second opener gets a VaultLocked error naming the holder pid",
         "a read-only open mode exists that never mutates the log",
-        "the test opens a second writable Vault the way memev claims does (src/cli/main.mjs:327, which opens the vault in process and rewrites .memev/oplog/snapshot.json) beside an open one and asserts VaultLocked and an unchanged snapshot"
+        "the test opens a second writable Vault the way memev claims does (src/cli/main.mjs:327, which opens the vault in process and rewrites .memev/oplog/snapshot.json) beside an open one and asserts VaultLocked and an unchanged snapshot",
+        "stale-lock recovery never takes a lock whose holder is alive on another host or in another container: the lock records the host and the boot id beside the pid, and a holder whose host or boot id differs from the reader's is treated as alive unless an OS-level advisory lock on the same file is free"
       ],
       "description": "",
       "scope": [
