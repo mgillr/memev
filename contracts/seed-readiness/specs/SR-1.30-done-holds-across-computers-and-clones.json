@@ -38,7 +38,7 @@
         "test/helpers/**",
         "docs/CONTRACTS.md",
         "docs/MODULES.md",
-        "changelog.d/SR-1.27.md",
+        "changelog.d/SR-1.30.md",
         "src/cli/hooks.mjs",
         "src/cli/contracts-cli.mjs",
         "src/engine/card.mjs",

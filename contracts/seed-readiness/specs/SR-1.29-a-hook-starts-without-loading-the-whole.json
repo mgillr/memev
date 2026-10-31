@@ -2,7 +2,8 @@
   "title": "SR-1.29 A hook starts without loading the whole CLI",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G94: the MEM-098 latency test (test/hooks-latency.test.mjs:64: the prompt hook returns in under 1.5 s while each backend call takes 1 s) fails on the CI runner at 1589 to 1729 ms on 32 of 37 open pull requests, after passing on 28 to 30 October. The hook runs through bin/memev.mjs, which loads the whole CLI (src/cli/main.mjs) for every hook, and src/cli/hooks.mjs loads the engine at start through isVault (src/engine/vault.mjs) and the transcript scanner. Measured on 31 October 2026 on a development machine: node starts in 40 ms, importing main.mjs takes 110 ms and hooks.mjs 140 ms, and the test passes there at 1322 ms. Every hook event calls isVault, which lives in the engine module (src/engine/vault.mjs:39). The fix is to the hook's own start-up, never to the budget. Repository: memev. Depends on contracts: QL-1.02.",
+  "base": "8b377f107e4c0c601420c7f3182be3d9e366a2bf",
+  "request": "Closes G94: the MEM-098 latency test (test/hooks-latency.test.mjs:64: the prompt hook returns in under 1.5 s while each backend call takes 1 s) fails on the CI runner at 1589 to 1729 ms on 32 of 37 open pull requests, after passing on 28 to 30 October. The hook runs through bin/memev.mjs, which loads the whole CLI (src/cli/main.mjs) for every hook, and src/cli/hooks.mjs loads the engine at start through isVault (src/engine/vault.mjs) and the transcript scanner. Measured on 31 October 2026 on a development machine: node starts in 40 ms, importing main.mjs takes 110 ms and hooks.mjs 140 ms, and the test passes there at 1322 ms. Every hook event calls isVault, which lives in the engine module (src/engine/vault.mjs:39). The fix is to the hook's own start-up, never to the budget. Repository: memev. Depends on contracts: QL-1.02. Its design landed on main first as a stopgap (pull request 267, squash 2bfaa7d936c192cc24bebf1adf6575253f32ba44). The contract's explicit base is 8b377f107e4c0c601420c7f3182be3d9e366a2bf, the commit before that squash, and the work is verified on a branch that starts at the squash with no merge of main before verify, so the red runs and every base comparison see the code before the stopgap and the range holds only this contract's commits.",
   "tasks": [
     {
       "id": "T1",
@@ -14,7 +15,12 @@
         "src/cli/hooks.mjs imports at module load only what every hook event needs; the engine (src/engine/vault.mjs and what it imports), the transcript scanner and any code one event alone uses are imported inside that event's path",
         "isVault and STATE move to a new module, src/engine/vault-marker.mjs, that imports only node built-ins, and src/engine/vault.mjs re-exports both, so there is one definition of 'is a vault' and a hook checks it without loading the engine",
         "the hooks' behaviour, output and exit codes are unchanged, and the 1.5 s budget of MEM-098, MEMEV_HOOK_BUDGET_MS and test/hooks-latency.test.mjs stay as they are",
-        "the start-up cost is measured, not assumed: the test records which modules a hook process loads and how long a prompt hook takes with a stub that answers at once"
+        "the start-up cost is measured, not assumed: the test records which modules a hook process loads and how long a prompt hook takes with a stub that answers at once",
+        "a hook process reaches the daemon on this computer with node:http directly (useDirectLoopback in src/cli/common.mjs, called only by bin/memev.mjs on the hook path); every other caller keeps fetchOut, which src/cli/common.mjs imports only when first used",
+        "bin/memev.mjs takes the hook path only when the first argument is exactly hook; every other command, memev contract hook included, goes through main() with its error output (memev: <message> on stderr, the stack under MEMEV_DEBUG) and exit codes unchanged",
+        "every dynamic import on the hook path is a string-literal relative specifier, so it resolves on Windows and never from the app's working directory",
+        "the production entry points never enable a code cache or register module hooks; the load log is a test helper only",
+        "the MEM-098 tests pass on a loaded machine: ten runs in a row with one busy process per CPU"
       ],
       "scope": [
         "bin/memev.mjs",
@@ -24,7 +30,10 @@
         "test/hooks-startup.test.mjs",
         "test/helpers/load-log.mjs",
         "docs/MODULES.md",
-        "changelog.d/SR-1.29.md"
+        "changelog.d/SR-1.29.md",
+        "src/cli/common.mjs",
+        "src/cli/main.mjs",
+        "src/engine/net.mjs"
       ],
       "criteria": [
         {
@@ -44,7 +53,7 @@
           }
         },
         {
-          "statement": "With a stub whose backend calls answer at once, the base code (git archive of $MEMEV_CONTRACT_BASE into a temp dir, in the same run) and the new code each run node bin/memev.mjs hook prompt --client claude-code five times, interleaved; the new code's median process time is at most 70% of the base's. The test is skipped when MEMEV_CONTRACT_BASE is unset, so the suite passes without it, and this criterion's guard counts a skip as a failure.",
+          "statement": "With a stub whose backend calls answer at once, the base code (git archive of $MEMEV_CONTRACT_BASE into a temp dir, in the same run) and the new code each run node bin/memev.mjs hook prompt --client claude-code five times, interleaved; the new code's median process time is at most 50% of the base's, and both sides are spawned with NODE_DISABLE_COMPILE_CACHE=1, without --import and without NODE_OPTIONS. The test is skipped when MEMEV_CONTRACT_BASE is unset, so the suite passes without it, and this criterion's guard counts a skip as a failure.",
           "verifier": {
             "type": "command",
             "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.29 prompt hook start-up' test/hooks-startup.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.29 prompt hook start-up$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
@@ -52,10 +61,10 @@
           }
         },
         {
-          "statement": "The MEM-098 tests pass ten runs in a row, unchanged.",
+          "statement": "The MEM-098 tests pass ten runs in a row, unchanged, under CPU load like the CI runner's npm test (one self-terminating busy process per CPU).",
           "verifier": {
             "type": "command",
-            "cmd": "for i in $(seq 1 10); do out=$(node --test --test-reporter=tap --test-name-pattern='MEM-098' test/hooks-latency.test.mjs 2>&1) || exit 1; printf '%s\\n' \"$out\" | awk -v pat='^MEM-098' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' || exit 1; done",
+            "cmd": "n=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4); pids=''; i=0; while [ $i -lt $n ]; do node -e 'const e=Date.now()+400000;while(Date.now()<e){}' & pids=\"$pids $!\"; i=$((i+1)); done; trap 'kill $pids 2>/dev/null' EXIT; for k in $(seq 1 10); do out=$(node --test --test-reporter=tap --test-name-pattern='MEM-098' test/hooks-latency.test.mjs 2>&1) || exit 1; printf '%s\\n' \"$out\" | awk -v pat='^MEM-098' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' || exit 1; done",
             "timeout_s": 600
           }
         },
@@ -106,6 +115,78 @@
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "'SR-1.29 other commands unchanged' (needs MEMEV_CONTRACT_BASE; a skip counts as a failure) runs both the base build and the new bin/memev.mjs, in fresh mktemp dirs, for: `contract hook <fresh git repo>` (prints 'Installed', and .git/hooks/pre-push is written), `version`, `help`, an unknown command (exit 2), and `recall x --root <empty dir>` with and without MEMEV_DEBUG=1 (`memev: no vault at`, exit 1). For each, it asserts that stdout, the first stderr line and the exit code equal the base's, and that the load log of `version` includes src/cli/main.mjs.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.29 other commands unchanged$' test/hooks-startup.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ok [0-9]+ - SR-1.29 other commands unchanged$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.29 other commands unchanged$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "'SR-1.29 one vault marker' imports src/engine/vault.mjs and src/engine/vault-marker.mjs and asserts strict identity: vault.isVault === marker.isVault and vault.STATE === marker.STATE === '.memev'. It asserts that every import specifier in vault-marker.mjs starts with 'node:'. It asserts that isVault gives the base's answers for a root with .memev/config.json, with only .memev/, with config.json as a directory, for a missing root and for a relative root. And it asserts that src/cli/hooks.mjs imports isVault from '../engine/vault-marker.mjs' and contains no 'config.json' check of its own. Red at base because vault-marker.mjs is missing.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/hooks-startup.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.29 one vault marker$' test/hooks-startup.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ok [0-9]+ - SR-1.29 one vault marker$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.29 one vault marker$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "'SR-1.29 requests and state unchanged' (needs MEMEV_CONTRACT_BASE; a skip or a failed base build counts as a failure) covers each of the four events with formats claude, cursor, gemini and plain. The payload is {session_id, cwd, transcript_path to a fixture JSONL with a TodoWrite and an Edit, prompt}, and the cases are a local vault, a root that is not a vault, and a stub variant that returns card text, an open contract on contract-gate and a waiting operator task on bus-pulse. For each case, the base and new runs give byte-equal stdout, the same exit code, the same sorted list of the stub's (route, JSON body) pairs, and an identical .memev/hooks/<session>.json. No normalisation is applied.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.29 requests and state unchanged$' test/hooks-startup.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ok [0-9]+ - SR-1.29 requests and state unchanged$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.29 requests and state unchanged$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "'SR-1.29 prompt hook start-up, app payload' (needs MEMEV_CONTRACT_BASE; a skip counts as a failure) uses the C3 method: an instant stub and 5 interleaved runs of base and new. The payload is what Claude Code sends: session_id, cwd set to a git repository, transcript_path to a 200-line fixture, hook_event_name and prompt. It asserts that the new median is at most 70% of the base's and that the saved offset after each new run equals the base's.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.29 prompt hook start-up, app payload$' test/hooks-startup.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ok [0-9]+ - SR-1.29 prompt hook start-up, app payload$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.29 prompt hook start-up, app payload$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The production entry points never enable a code cache or register module hooks: bin/ and src/ contain no enableCompileCache, NODE_COMPILE_CACHE, module.register, registerHooks or load-log reference. The C3 test also spawns both sides with NODE_DISABLE_COMPILE_CACHE=1, without --import and without NODE_OPTIONS.",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -rnE 'enableCompileCache|NODE_COMPILE_CACHE|module\\.register|registerHooks|load-log' bin src",
+            "timeout_s": 30
+          }
+        },
+        {
+          "statement": "'SR-1.29 timed runs did the work' (needs MEMEV_CONTRACT_BASE; a skip counts as a failure) checks every one of C3's ten timed runs. Each must exit 0 and print RECALL-TEXT and BUS-TEXT, with stdout equal to the base's, and the stub must record /healthz, /v1/recall, /v1/bus-pulse and /v1/journal for that run. Both sides are spawned with the same env and cwd, without --import or NODE_OPTIONS.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.29 timed runs did the work$' test/hooks-startup.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^ok [0-9]+ - SR-1.29 timed runs did the work$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.29 timed runs did the work$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The lines of src/cli/hooks.mjs that define and read the hook budget are textually identical to the base's.",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ -n \"$MEMEV_CONTRACT_BASE\" ] && a=$(git show \"$MEMEV_CONTRACT_BASE\":src/cli/hooks.mjs | grep -E 'HOOK_BUDGET_MS') && b=$(grep -E 'HOOK_BUDGET_MS' src/cli/hooks.mjs) && [ \"$a\" = \"$b\" ]",
+            "timeout_s": 30
+          }
+        },
+        {
+          "statement": "Every dynamic import in the hook path (bin/memev.mjs, src/cli/hooks.mjs, src/cli/common.mjs, src/cli/daemon.mjs and src/engine/vault-marker.mjs) is a string-literal relative specifier, resolved against the module's own URL (no path.join, template, variable or process.cwd()), so it resolves on Windows and never from the app's working directory. A secondary check; the behavioural complement is the Windows job of the CI workflow.",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -nE 'import\\([[:space:]]*[a-zA-Z_$`(]' bin/memev.mjs src/cli/hooks.mjs src/cli/common.mjs src/cli/daemon.mjs src/engine/vault-marker.mjs",
+            "timeout_s": 30
+          }
+        },
+        {
+          "statement": "'SR-1.29 hook load allow-list' runs session-start, prompt, stop and pre-compact on a local vault with the latency stub. For each, the load log (resolved file: URLs, written with appendFileSync before resolving returns): (a) includes bin/memev.mjs, src/cli/hooks.mjs and src/engine/vault-marker.mjs; (b) lists no src/ or vendor/ module outside {src/cli/hooks.mjs, src/cli/common.mjs, src/cli/daemon.mjs, src/engine/util.mjs, src/engine/tokens.mjs, src/engine/net.mjs, src/engine/vault-marker.mjs}, plus only these per-case extras: src/cli/transcript.mjs and src/engine/oplog.mjs when transcript_path is given; src/engine/card.mjs, src/engine/bus.mjs and src/engine/secrets.mjs for session-start; and src/cli/remote.mjs with src/engine/devices.mjs, src/engine/git.mjs and src/engine/entitlements.mjs only when the root is not a vault; (c) when the same helper is run on the base build ($MEMEV_CONTRACT_BASE), its log lists src/cli/main.mjs and src/engine/vault.mjs, which proves the log sees them.",
+          "verifier": {
+            "type": "test_red_green",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.29 hook load allow-list$' test/hooks-startup.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SR-1.29 hook load allow-list$' && ! printf '%s\\n' \"$out\" | grep -Eq 'SR-1.29 hook load allow-list.*# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.29 hook load allow-list$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "test_file": "test/hooks-startup.test.mjs"
           }
         },
         {
