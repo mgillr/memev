@@ -62,7 +62,7 @@
       "closes": "Connector URLs embed the bearer token in the path (logged by tunnel providers); cloud tokens are plain replayable bearers",
       "depends_on": [],
       "tasks": 3,
-      "criteria": 11,
+      "criteria": 24,
       "spec": "specs/SR-1.04-cloud-connectors-no-bearer-in.json"
     },
     {
@@ -122,7 +122,7 @@
       "closes": "300 to 600 character lines, server imports CLI, helpers duplicated three times, empty catch blocks hide faults",
       "depends_on": [],
       "tasks": 3,
-      "criteria": 9,
+      "criteria": 21,
       "spec": "specs/SR-1.09-code-a-second-engineer-can.json"
     },
     {
@@ -134,7 +134,7 @@
       "closes": "12 tests need ssh-keygen, 8 need an authenticated gh and network, 3 fail when MEMEV_NO_SERVICE is set",
       "depends_on": [],
       "tasks": 2,
-      "criteria": 6,
+      "criteria": 19,
       "spec": "specs/SR-1.10-a-suite-that-is-green.json"
     },
     {
@@ -173,7 +173,7 @@
       "closes": "Docs and site claim 1.1 ms recall and 160 MB heap with no hardware; measured 4.55 ms and 183 MB",
       "depends_on": [],
       "tasks": 2,
-      "criteria": 5,
+      "criteria": 14,
       "spec": "specs/SR-1.13-performance-numbers-anyone-can-reproduce.json"
     },
     {
@@ -694,7 +694,7 @@
       "closes": "The $12 tier advertises automatic merge, which does not exist; the pricing test covers docs but not the site",
       "depends_on": [],
       "tasks": 1,
-      "criteria": 14,
+      "criteria": 25,
       "spec": "specs/SR-5.04-paid-tiers-sell-only-what.json"
     },
     {

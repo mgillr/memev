@@ -10,7 +10,10 @@
       "phase": "implement",
       "depends_on": [],
       "requirements": [
-        "the growth bench writes bench/results/<date>-<cpu>.json with CPU model, cores, RAM, Node version and every figure"
+        "the growth bench writes bench/results/<date>-<cpu>.json with CPU model, cores, RAM, Node version and every figure",
+        "the bench takes a results-directory override (a flag or an environment variable, default bench/results) and writes exactly one file there per run, named <YYYY-MM-DD>-<slug of the CPU model>.json, holding every key it prints with the same value; a run whose own checks fail writes none",
+        "each results file records its token target, and every committed results file reproduces: a rerun at that target gives the same tokens_simulated, sessions and turns",
+        "each results file records the bench's exec_argv and the real heap limit from v8.getHeapStatistics(); heap_bound_mb is that limit or absent"
       ],
       "description": "",
       "scope": [
@@ -25,6 +28,31 @@
             "type": "test_red_green",
             "test_file": "test/bench-results.test.mjs",
             "cmd": "node --test test/bench-results.test.mjs"
+          }
+        },
+        {
+          "statement": "The test 'SR-1.13 bench writes results' runs node --max-old-space-size=256 scripts/growth-bench.mjs --tokens 2000000 with a results-directory override (a flag or environment variable, defaulting to bench/results) pointed at a temporary folder. It asserts four things. Exactly one file appears, named YYYY-MM-DD-<slug of os.cpus()[0].model>.json. Its cpu, cores, ram and node fields equal os.cpus()[0].model, os.cpus().length, os.totalmem() and process.version. Every key printed in the stdout JSON is in the file with the same value. Nothing is written under the repository's bench/results. The test is red at base because the base bench writes no such file.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bench-results.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.13 bench writes results$' test/bench-results.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - SR-1\\.13 bench writes results$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.13 bench writes results$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Every results file records its token target (for example tokens_target). The test 'SR-1.13 committed results match the bench' reruns scripts/growth-bench.mjs with that target into a temporary folder for each committed bench/results/*.json. It asserts that tokens_simulated, sessions and turns equal the committed values. It also fails when bench/results holds no file.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-timeout=280000 --test-name-pattern='^SR-1.13 committed results match the bench$' test/bench-results.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - SR-1\\.13 committed results match the bench$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.13 committed results match the bench$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The test 'SR-1.13 heap limit recorded' runs the bench twice with --tokens 1000000: once with --max-old-space-size=256 and once with no flag. Each results file must hold exec_argv (equal to the child's process.execArgv) and heap_size_limit_mb, taken from v8.getHeapStatistics().heap_size_limit inside the bench. The limit must be at most 320 for the flagged run and above 320 for the run without the flag, and heap_bound_mb must equal heap_size_limit_mb or be absent.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bench-results.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.13 heap limit recorded$' test/bench-results.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - SR-1\\.13 heap limit recorded$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.13 heap limit recorded$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -48,14 +76,20 @@
       ],
       "requirements": [
         "every latency and heap figure in docs cites a results file and names its hardware",
-        "every quantitative figure in docs and the README (a time, a size, a rate, a count of tokens or notes) cites a results file and names its hardware, not only latency and heap; a figure from simulated traffic (the growth bench's 170 million tokens) says it is simulated and gives the stored size beside it"
+        "every quantitative figure in docs and the README (a time, a size, a rate, a count of tokens or notes) cites a results file and names its hardware, not only latency and heap; a figure from simulated traffic (the growth bench's 170 million tokens) says it is simulated and gives the stored size beside it",
+        "the template site's pages under site/web/ follow the same rule while they exist (SR-6.11 retires them)",
+        "the checker reads the real docs/ and README.md (from MEMEV_DOCS_ROOT when set), and its real-docs test is never skipped",
+        "a figure counts as cited only when its paragraph links the results file, names that file's CPU model and matches the key that carries the figure's unit",
+        "the simulated-token rule covers every written form of the count (170 million, 170-million-token, 170M, 170000000) and needs the stored size (notes_mb or log_mb) beside it, not the heap",
+        "every kind of figure counts (times, sizes, rates, and counts of sessions, turns, operations and notes); a figure that no committed results file supports is removed or restated without the number, a configured limit or setting needs no results file only where its sentence states it as one, and the checker exempts no measured figure"
       ],
       "description": "",
       "scope": [
         "docs/**",
         "README.md",
         "scripts/docs/**",
-        "test/docs-figures.test.mjs"
+        "test/docs-figures.test.mjs",
+        "site/web/**"
       ],
       "criteria": [
         {
@@ -67,11 +101,60 @@
           }
         },
         {
+          "statement": "The test 'SR-1.13 cites and names' covers four fixture cases. (a) The figure is in results file R, but the paragraph has no link to bench/results/R: fails. (b) The paragraph links R but does not contain R's CPU model string: fails. (c) The paragraph links R, while the figure's value exists only in another file S, or only under a key in R whose unit differs from the figure's unit (for example 1.1 ms against log_mb 1.1): fails. (d) The paragraph links R, names R's CPU, and the figure matches the key in R with the right unit: passes.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/docs-figures.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.13 cites and names$' test/docs-figures.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - SR-1\\.13 cites and names$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.13 cites and names$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The test 'SR-1.13 simulated forms' covers five fixture cases, each citing results file R. (a) 'simulated 170 million tokens' with no size: fails. (b) The same with only R's max_heap_mb beside it: fails. (c) '170-million-token growth test' without 'simulated': fails. (d) '170M tokens' or '170000000 tokens' without 'simulated': fails. (e) 'simulated' and R's notes_mb or log_mb value in the same sentence: passes.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/docs-figures.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.13 simulated forms$' test/docs-figures.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - SR-1\\.13 simulated forms$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.13 simulated forms$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The test 'SR-1.13 figure kinds' checks fixture pages that each hold one uncited figure: '29 seconds', 'about 17 million characters a second', '8,096 turns', '111 notes', '25,862 logged operations' and '4.2 ms'. Each page must fail. The test also asserts that any exemption list in the checker matches none of the lines in docs/DESIGN.md:41-44, docs/SOLUTIONS.md:108-109 and :259-260, or docs/testing/LAB-TEST-PLAN.md:299-302.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/docs-figures.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.13 figure kinds$' test/docs-figures.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - SR-1\\.13 figure kinds$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.13 figure kinds$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
           "statement": "SR-1.13 every figure: a fixture page saying 170 million tokens with no results file fails; with a results file but without the word simulated and the stored size beside it, it fails; with both, it passes",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/docs-figures.test.mjs",
             "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.13 every figure' test/docs-figures.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.13 every figure$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The test 'SR-1.13 site figures' strips the tags from every site/web/*.html page and applies the docs rule to each quantitative figure: it must be in the cited results file, with that file's CPU named. It fails at base on site/web/solutions.html:99 and :215.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/docs-figures.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.13 site figures$' test/docs-figures.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - SR-1\\.13 site figures$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.13 site figures$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The test 'SR-1.13 real docs' walks every .md under docs/ plus README.md, from the root in MEMEV_DOCS_ROOT (default: the repository), and fails on any figure that is uncited or has no hardware named. Pointed at the docs of the contract's base it must report not ok. On the changed tree it must report ok, and must not be skipped.",
+          "verifier": {
+            "type": "command",
+            "expect_exit": 0,
+            "timeout_s": 300,
+            "cmd": "b=\"$MEMEV_CONTRACT_BASE\"; [ -n \"$b\" ] || exit 2; d=$(mktemp -d); git archive \"$b\" docs README.md | tar -x -C \"$d\" || exit 2; out=$(MEMEV_DOCS_ROOT=\"$d\" node --test --test-reporter=tap test/docs-figures.test.mjs 2>&1); printf '%s\\n' \"$out\" | grep -Eq '^ *not ok [0-9]+ - SR-1\\.13 real docs$' || exit 1; out=$(node --test --test-reporter=tap test/docs-figures.test.mjs 2>&1) && printf '%s\\n' \"$out\" | grep -Eq '^ *ok [0-9]+ - SR-1\\.13 real docs$'"
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
           }
         },
         {
