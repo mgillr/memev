@@ -1,6 +1,6 @@
 {
   "installs_proxy": null,
-  "installs_proxy_note": "open: which counted number stands for installs is the owner's choice (D-WO-INSTALL-PROXY); pick one of package_downloads, release_downloads, downloads or activations",
+  "installs_proxy_note": "open: which counted number stands for installs is the owner's choice (D-WO-INSTALL-PROXY); pick one of package_downloads, release_downloads or downloads (activations are not a choice: free-to-paid divides paid activations by installs)",
   "gates": [
     { "name": "installs at or above 5,000 by month 6", "metric": "installs", "threshold": 5000 },
     { "name": "free-to-paid at or above 1 percent once sync has shipped", "metric": "free_to_paid_percent", "threshold": 1 }
@@ -23,7 +23,7 @@
       },
       {
         "name": "paying users at or above 600",
-        "metric": "distinct_issued_licences",
+        "metric": "distinct_paid_licences",
         "threshold": 600,
         "due_month": 12,
         "branch": "hold costs at a bootstrapped level and treat the project as an independent business"
@@ -32,6 +32,7 @@
         "name": "at least one organisation through a completed Business pilot",
         "metric": "milestone",
         "milestone": "business_pilot_completed",
+        "planned": "no code records a completed Business pilot yet, so this gate is not measured until one does",
         "threshold": 1,
         "due_month": 12,
         "branch": "hold costs at a bootstrapped level and treat the project as an independent business"

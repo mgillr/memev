@@ -78,8 +78,10 @@ lands, at the licence endpoint, because that is the only place that sees it.
 
 - What the endpoint sees: the licence key and the time of the request. The client sends nothing
   else (no name, e-mail, machine, vault or version).
-- What is counted: one row per activation, holding the licence id, the day and the result
-  (`issued` or `refused`). Counts are per licence id and per day.
+- What is counted: one row per activation, holding the licence id, the day, the result
+  (`issued` or `refused`) and whether the licence is a trial. Counts are per licence id and per day.
+- Paid and trial are counted apart. A trial licence carries `trial: true`, and its activation row
+  says so in the same way; a paid count never includes a trial.
 - What is not counted: licence checks. A licence is verified on the computer against the vendor
   public key, offline, so day-to-day use never reaches the endpoint and cannot be counted there.
 - Where the counts are kept: beside the licence endpoint, and run by the owner with it. The
@@ -88,15 +90,20 @@ lands, at the licence endpoint, because that is the only place that sees it.
   configuration (`MEMEV_REPORT_URL`) and there is no built-in address, so until one is set nothing
   is sent.
 
-The queries, written for a table `activations(licence_id, day, result)`:
+The queries, written for a table `activations(licence_id, day, result, trial)`, where `trial` is 1
+for a trial licence and 0 for a paid one:
 
 ```sql
--- activations per day, last 30 days
+-- paid activations per day, last 30 days
 SELECT day, count(*) FROM activations
-WHERE result = 'issued' AND day >= date('now', '-30 day') GROUP BY day ORDER BY day;
+WHERE result = 'issued' AND trial = 0 AND day >= date('now', '-30 day') GROUP BY day ORDER BY day;
 
--- distinct licences activated, all time
-SELECT count(DISTINCT licence_id) FROM activations WHERE result = 'issued';
+-- trial activations per day, last 30 days
+SELECT day, count(*) FROM activations
+WHERE result = 'issued' AND trial = 1 AND day >= date('now', '-30 day') GROUP BY day ORDER BY day;
+
+-- distinct paid licences activated, all time
+SELECT count(DISTINCT licence_id) FROM activations WHERE result = 'issued' AND trial = 0;
 
 -- activations per licence (a key used on more computers than it should be shows here)
 SELECT licence_id, count(*) AS n FROM activations
@@ -148,7 +155,7 @@ host's access log, counted by distinct day and file, with no address kept.
 | Number | Source | What it tells you |
 |---|---|---|
 | downloads | npm, releases | interest |
-| activations | licence endpoint | paid or trial licences taken up |
+| activations | licence endpoint | paid licences taken up, with trials counted apart |
 | milestones | your own `onboarding.json`; shared only if you turn on the opt-in report, which is off by default | what you reach after installing |
 
 ## The weekly funnel report (a development tool)
@@ -162,31 +169,41 @@ person's computer.
   per day: `{ "day": "<date>", "downloads": N }`), `--release` the release-host download rows (the
   same shape, one row per day and file), and `--activations` the licence-activation rows
   (`{ "day": "<date>", "licence_id": "...", "result": "issued" or "refused" }`, one row per
-  activation). `--milestones` optionally holds the opt-in milestone rows (the report payload above,
-  one row per milestone: name and day). A row without a day counts in the total only. With no
-  milestone input the page says so in one line and still renders.
-- **The page.** For each count set: the count per day, per week (ISO week) and the total. Nothing
-  is estimated and nothing is typed into the program: every number on the page comes from the
-  files.
+  activation, with `"trial": true` added on the row of a trial licence). `--milestones`
+  optionally holds the opt-in milestone rows (the report payload above, one row per milestone:
+  `{ "name": "...", "date": "<date>" }`). A row without a date, or with one that is not a real
+  calendar date such as 2026-13-45, counts in the total only. With no milestone input the page says
+  so in one line and still renders.
+- **The page.** For each count set: the count per day, per week (ISO week) and the total. The
+  licence activations are the paid ones: an issued row marked as a trial is never counted as paid.
+  The trials print on a line of their own, and so do any refused activations. Nothing is estimated
+  and nothing is typed into the program: every number on the page comes from the files.
 - **The gates.** The page header renders the gates from `scripts/metrics/gates.json`: the month-6
   gates, installs at or above 5,000 by month 6, and free-to-paid at or above 1 percent once sync
-  has shipped. The thresholds live in the file, never in the program, because the owner moves
+  has shipped. Free-to-paid is the paid activations over installs, as a percent; trials are not
+  counted in it. The thresholds live in the file, never in the program, because the owner moves
   them. Each gate prints its measured value, its threshold and pass or miss.
 - **The installs choice.** A download is not an install, so the file also says which counted
-  number stands for installs (`installs_proxy`: `package_downloads`, `release_downloads`,
-  `downloads` or `activations`). That choice is the owner's; until it is made the file says open,
-  the page prints that line, and both gates stay open. Editing the file changes the header with no
-  change to the program.
+  number stands for installs (`installs_proxy`: `package_downloads`, `release_downloads` or
+  `downloads`). Activations are not a choice: free-to-paid divides paid activations by installs,
+  so it would read 100 percent. That choice is the owner's; until it is made the file says open,
+  the page prints that line, and both gates stay open. A value that is not one of the choices
+  leaves both gates open too, and the page says it is not a choice. Editing the file changes the
+  header with no change to the program.
 - **The monthly verdict.** With `--month N`, the page adds a monthly verdict below the gates: each
   of the file's monthly gates as a row with the gate, its threshold, the measured value, the month
-  it falls due and pass or miss. A gate whose due month has not arrived is not yet due, never a
-  miss; a gate with no measured value is not measured, never a pass. A missed gate prints the
-  branch text held for that gate in the file, word for word, and a met gate prints none. The
-  branch text lives in the file, not in the program, so the owner moves it with the thresholds.
-  The measured values come from the counted rows: installs through the installs choice,
-  free-to-paid from the activation rows over the install rows, paying users as the distinct issued
-  licences, and the Business pilot from the milestone rows named in the file. The file also holds
-  the conservative-case 2029 values as reference, not as month-12 milestones.
+  it falls due and pass or miss. N is a whole number of months, 1 or more; anything else is refused
+  with an error and no page. A gate whose due month has not arrived is not yet due, never a miss; a
+  gate with no measured value is not measured, never a pass or a miss. A gate whose count file was
+  not handed in (no `--activations`, say) has no measured value. A missed gate prints the branch
+  text held for that gate in the file, word for word, and a met gate prints none. The branch text
+  lives in the file, not in the program, so the owner moves it with the thresholds. The measured
+  values come from the counted rows: installs through the installs choice, free-to-paid as the paid
+  activations over installs, and paying users as the distinct paid licences issued; trials are not
+  counted as paying users. The Business pilot gate is planned, not measured: no code records a
+  completed Business pilot yet, so the file marks that gate `planned` and its row says planned, not
+  measured, whatever the milestone rows hold. The file also holds the conservative-case 2029 values
+  as reference, not as month-12 milestones.
 - **Hosts nothing.** The counts are kept beside the licence endpoint on the owner's server; this
   tool reads counts handed to it and hosts nothing.
 

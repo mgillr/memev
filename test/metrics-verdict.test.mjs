@@ -11,8 +11,9 @@ after(cleanup);
 
 const REPORT = path.join(PKG, 'scripts', 'metrics', 'report.mjs');
 
-// The counted rows: 47 package downloads, 10 release downloads, 3 issued activations across 2
-// distinct licences and 1 refused, and 1 completed Business pilot among the milestone rows.
+// The counted rows: 47 package downloads, 10 release downloads, 3 paid activations across 2
+// distinct licences, 1 trial activation and 1 refused, and 1 completed Business pilot among the
+// milestone rows.
 const FIXTURE = {
   package: [
     { day: '2026-10-19', downloads: 12 },
@@ -27,6 +28,7 @@ const FIXTURE = {
     { day: '2026-10-21', licence_id: 'L1', result: 'issued' },
     { day: '2026-10-21', licence_id: 'L2', result: 'issued' },
     { day: '2026-10-22', licence_id: 'L1', result: 'issued' },
+    { day: '2026-10-22', licence_id: 'T1', result: 'issued', trial: true },
     { day: '2026-10-22', licence_id: 'L3', result: 'refused' },
   ],
   milestones: [
@@ -47,7 +49,7 @@ const MONTHLY_GATES = {
     gates: [
       { name: 'installs at or above 5,000 with the package and the directory listings live', metric: 'installs', threshold: 40, due_month: 6, branch: 'the branch the file holds for the installs gate' },
       { name: 'free-to-paid conversion at or above 1 percent once sync has shipped', metric: 'free_to_paid_percent', threshold: 100, due_month: 6, branch: 'the branch the file holds for the conversion gate' },
-      { name: 'paying users at or above 600', metric: 'distinct_issued_licences', threshold: 600, due_month: 12, branch: 'the branch the file holds for the paying users gate' },
+      { name: 'paying users at or above 600', metric: 'distinct_paid_licences', threshold: 600, due_month: 12, branch: 'the branch the file holds for the paying users gate' },
       { name: 'at least one organisation through a completed Business pilot', metric: 'milestone', milestone: 'business_pilot_completed', threshold: 1, due_month: 12, branch: 'the branch the file holds for the pilot gate' },
     ],
   },
@@ -110,9 +112,16 @@ test('WO-12-A AC01: the report has a monthly verdict section that renders each g
   const shipped = await run([...baseArgs(f), '--month', '12']);
   assert.equal(shipped.code, 0, shipped.err);
   const srows = verdict(shipped.out.split('\n'));
-  assert.ok(srows.includes('  paying users at or above 600: measured 2, threshold 600, due month 12, miss'));
-  assert.ok(srows.includes('  at least one organisation through a completed Business pilot: measured 1, threshold 1, due month 12, pass'));
+  // paying users are the distinct paid licences: L1 and L2, never the trial T1
+  assert.ok(srows.includes('  paying users at or above 600: measured 2, threshold 600, due month 12, miss'), shipped.out);
   assert.ok(srows.includes('  installs at or above 5,000 with the package and the directory listings live: measured not measured, threshold 5000, due month 6, not measured'));
+  // no code records a completed Business pilot, so the shipped file marks that gate planned: it is
+  // planned, not measured, even with such a row in the milestone input, and prints no branch
+  const iPilot = srows.findIndex((l) => l.startsWith('  at least one organisation'));
+  assert.equal(srows[iPilot], '  at least one organisation through a completed Business pilot: measured not measured, threshold 1, due month 12, planned, not measured', shipped.out);
+  assert.equal(iPilot + 1, srows.length, 'the planned gate prints no branch line');
+  const shippedFile = JSON.parse(fs.readFileSync(path.join(PKG, 'scripts', 'metrics', 'gates.json'), 'utf8'));
+  assert.ok(shippedFile.monthly.gates.find((g) => g.milestone === 'business_pilot_completed').planned, 'the shipped file marks the pilot gate planned');
 });
 
 test('WO-12-A AC02: a missed gate prints the branch text held for that gate in the gate file word for word, a met gate prints none, and no branch text is written in the program', async () => {
@@ -222,4 +231,44 @@ test('WO-12-A AC04: the verdict needs no judgement: the same inputs give the sam
   assert.ok(installsRow.includes('measured not measured'), 'the gate with no measured value says so');
   assert.ok(installsRow.endsWith(', not measured'), 'it is not a pass');
   assert.ok(!installsRow.includes('pass'), 'it is not a pass');
+  // a count file that was not handed in measures nothing: with no --activations and no --milestones
+  // the gates that read them are not measured, never 0 and a miss with the branch text
+  const e = await run(['--package', f.package, '--gates', gf, '--month', '12']);
+  assert.equal(e.code, 0, e.err);
+  assert.deepEqual(verdict(e.out.split('\n')).slice(1), [
+    '  installs at or above 5,000 with the package and the directory listings live: measured 47, threshold 40, due month 6, pass',
+    '  free-to-paid conversion at or above 1 percent once sync has shipped: measured not measured, threshold 100 percent, due month 6, not measured',
+    '  paying users at or above 600: measured not measured, threshold 600, due month 12, not measured',
+    '  at least one organisation through a completed Business pilot: measured not measured, threshold 1, due month 12, not measured',
+  ], e.out);
+  // and installs through the downloads choice need both download files: with only one it is not measured
+  const both = path.join(dir, 'gates-downloads.json');
+  fs.writeFileSync(both, JSON.stringify({ ...MONTHLY_GATES, installs_proxy: 'downloads' }));
+  const g = await run(['--package', f.package, '--activations', f.activations, '--gates', both, '--month', '12']);
+  assert.equal(g.code, 0, g.err);
+  const grows = verdict(g.out.split('\n'));
+  assert.ok(grows.includes('  installs at or above 5,000 with the package and the directory listings live: measured not measured, threshold 40, due month 6, not measured'), g.out);
+  assert.ok(grows.includes('  free-to-paid conversion at or above 1 percent once sync has shipped: measured not measured, threshold 100 percent, due month 6, not measured'), g.out);
+  assert.ok(!g.out.includes('branch: the branch the file holds for the conversion gate'), 'no branch for a gate that was not measured');
+});
+
+test('WO-12-A AC04: a month that is not a whole number of months, 1 or more, is refused with an error and no page, never dropped in silence', async () => {
+  const dir = tmpdir('wo12a-');
+  const f = writeFixtures(dir);
+  const gf = path.join(dir, 'gates.json');
+  fs.writeFileSync(gf, JSON.stringify(MONTHLY_GATES));
+  for (const bad of [['--month', 'abc'], ['--month', '6.5'], ['--month', '0'], ['--month', '-3'], ['--month', ''], ['--month']]) {
+    const r = await run([...baseArgs(f), '--gates', gf, ...bad]);
+    assert.equal(r.code, 2, `${bad.join(' ')} exits 2`);
+    assert.match(r.err, /--month is a whole number of months, 1 or more/, `${bad.join(' ')} says why`);
+    assert.equal(r.out, '', `${bad.join(' ')} prints no page`);
+  }
+  // a flag in the place of the month is refused too, not read as a month
+  const r = await run([...baseArgs(f), '--month', '--gates', gf]);
+  assert.equal(r.code, 2);
+  assert.equal(r.out, '');
+  // a whole month still renders the verdict
+  const ok = await run([...baseArgs(f), '--gates', gf, '--month', '6']);
+  assert.equal(ok.code, 0, ok.err);
+  assert.equal(verdict(ok.out.split('\n'))[0], 'Monthly verdict (month 6):');
 });

@@ -19,6 +19,13 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
+// A day is YYYY-MM-DD and a real calendar date; anything else (2026-13-45, 2026-02-30) is no day.
+function dayOf(value) {
+  if (typeof value !== 'string' || !DAY.test(value)) return null;
+  const d = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value ? value : null;
+}
+
 // ISO week (the week that holds the Thursday), as YYYY-Www.
 function isoWeek(day) {
   const d = new Date(`${day}T00:00:00Z`);
@@ -32,8 +39,9 @@ function isoWeek(day) {
   return `${year}-W${String(week).padStart(2, '0')}`;
 }
 
+// A count file that was not handed in reads as null, so the monthly verdict can tell it from an empty one.
 function readRows(file) {
-  if (!file) return [];
+  if (!file) return null;
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
   if (!Array.isArray(data)) throw new Error(`count file must hold a JSON array of rows: ${file}`);
   return data;
@@ -58,7 +66,10 @@ function aggregate(rows, valueOf, dateOf) {
 }
 
 const num = (row) => (Number.isFinite(row.downloads) ? row.downloads : 0);
-const issued = (row) => (row.result === 'issued' ? 1 : 0);
+// A trial licence is marked on its activation row with "trial": true, as on the licence itself. A
+// trial is counted on its own and never as paid.
+const paid = (row) => (row.result === 'issued' && row.trial !== true ? 1 : 0);
+const trial = (row) => (row.result === 'issued' && row.trial === true ? 1 : 0);
 const refused = (row) => (row.result === 'refused' ? 1 : 0);
 
 function section(title, agg, { hasRows, noInput, extra = [] } = {}) {
@@ -77,11 +88,12 @@ function section(title, agg, { hasRows, noInput, extra = [] } = {}) {
   return lines;
 }
 
+// The counted numbers that may stand for installs. Activations are not one of them: free-to-paid
+// divides paid activations by installs, so with activations as installs it would always read 100.
 const PROXIES = {
   package_downloads: (t) => t.package,
   release_downloads: (t) => t.release,
-  downloads: (t) => t.package + t.release,
-  activations: (t) => t.activations,
+  downloads: (t) => (t.package === null || t.release === null ? null : t.package + t.release),
 };
 
 function pct(n) {
@@ -91,7 +103,7 @@ function pct(n) {
 function gateLines(gates, totals, label) {
   const lines = [`Gates (${label}):`];
   const proxy = gates.installs_proxy;
-  const installs = proxy && PROXIES[proxy] ? PROXIES[proxy](totals) : null;
+  const installs = proxy && Object.hasOwn(PROXIES, proxy) ? PROXIES[proxy](totals) : null;
   for (const g of gates.gates || []) {
     let measured = 'open';
     let verdict = 'open';
@@ -103,34 +115,37 @@ function gateLines(gates, totals, label) {
     const unit = g.metric === 'free_to_paid_percent' ? ' percent' : '';
     lines.push(`  ${g.name}: measured ${measured}, threshold ${g.threshold}${unit}, ${verdict}`);
   }
-  if (proxy && PROXIES[proxy]) lines.push(`  installs proxy: ${proxy}`);
+  if (installs !== null) lines.push(`  installs proxy: ${proxy}`);
+  else if (proxy) lines.push(`  installs proxy: open (${JSON.stringify(proxy)} is not a choice; pick one of ${Object.keys(PROXIES).join(', ')})`);
   else lines.push(`  installs proxy: open (${gates.installs_proxy_note || "which counted number stands for installs is the owner's choice"})`);
   return lines;
 }
 
-// The measured value of one monthly gate, from the counted rows alone.
-function monthlyValue(g, totals, installs, issuedLicences, milestoneNames) {
-  if (g.metric === 'installs') return installs;
-  if (g.metric === 'free_to_paid_percent') return installs === null ? null : installs > 0 ? pct((totals.activations / installs) * 100) : 0;
-  if (g.metric === 'distinct_issued_licences') return issuedLicences;
-  if (g.metric === 'milestone') return milestoneNames.get(g.milestone) || 0;
+// The measured value of one monthly gate, from the counted rows alone. A gate whose count file was
+// not handed in has no measured value (null), and neither has a gate the file marks as planned.
+function monthlyValue(g, counted) {
+  if (g.planned) return null;
+  if (g.metric === 'installs') return counted.installs;
+  if (g.metric === 'free_to_paid_percent') {
+    if (counted.installs === null || counted.activations === null) return null;
+    return counted.installs > 0 ? pct((counted.activations / counted.installs) * 100) : 0;
+  }
+  if (g.metric === 'distinct_paid_licences') return counted.paidLicences;
+  if (g.metric === 'milestone') return counted.milestones === null ? null : counted.milestones.get(g.milestone) || 0;
   return null;
 }
 
 // The monthly verdict: each of the file's monthly gates as a row. A gate whose due month has not
 // arrived is not yet due, never a miss; a gate with no measured value is not measured, never a
-// pass; a missed gate prints the branch text held for it in the file, word for word.
-function verdictLines(gates, month, totals, activationRows, milestoneRows) {
+// pass; a gate the file marks as planned is planned, not measured; a missed gate prints the branch
+// text held for it in the file, word for word.
+function verdictLines(gates, month, counted) {
   const lines = [`Monthly verdict (month ${month}):`];
-  const proxy = gates.installs_proxy;
-  const installs = proxy && PROXIES[proxy] ? PROXIES[proxy](totals) : null;
-  const issuedLicences = new Set(activationRows.filter((r) => r && r.result === 'issued' && r.licence_id).map((r) => r.licence_id)).size;
-  const milestoneNames = new Map();
-  for (const row of milestoneRows) if (row && row.name) milestoneNames.set(row.name, (milestoneNames.get(row.name) || 0) + 1);
   for (const g of (gates.monthly && gates.monthly.gates) || []) {
-    const measured = monthlyValue(g, totals, installs, issuedLicences, milestoneNames);
+    const measured = monthlyValue(g, counted);
     let status;
-    if (g.due_month > month) status = 'not yet due';
+    if (g.planned) status = 'planned, not measured';
+    else if (g.due_month > month) status = 'not yet due';
     else if (measured === null) status = 'not measured';
     else if (measured >= g.threshold) status = 'pass';
     else status = 'miss';
@@ -143,11 +158,18 @@ function verdictLines(gates, month, totals, activationRows, milestoneRows) {
 
 export function renderReport({ packageRows = [], releaseRows = [], activationRows = [], milestoneRows = [], gates, gatesLabel = 'gates.json', month = null }) {
   if (!gates || !Array.isArray(gates.gates)) throw new Error('gates file must hold a "gates" array');
-  const pkg = aggregate(packageRows, num, (r) => (DAY.test(r.day) ? r.day : null));
-  const rel = aggregate(releaseRows, num, (r) => (DAY.test(r.day) ? r.day : null));
-  const act = aggregate(activationRows, issued, (r) => (DAY.test(r.day) ? r.day : null));
-  const ref = aggregate(activationRows, refused, (r) => (DAY.test(r.day) ? r.day : null));
-  const mst = aggregate(milestoneRows, () => 1, (r) => (DAY.test(r.date) ? r.date : null));
+  // null is a count file that was not handed in: no rows here, and not measured in the monthly verdict
+  const given = { package: packageRows !== null, release: releaseRows !== null, activations: activationRows !== null, milestones: milestoneRows !== null };
+  packageRows = packageRows || [];
+  releaseRows = releaseRows || [];
+  activationRows = activationRows || [];
+  milestoneRows = milestoneRows || [];
+  const pkg = aggregate(packageRows, num, (r) => dayOf(r.day));
+  const rel = aggregate(releaseRows, num, (r) => dayOf(r.day));
+  const act = aggregate(activationRows, paid, (r) => dayOf(r.day));
+  const tri = aggregate(activationRows, trial, (r) => dayOf(r.day));
+  const ref = aggregate(activationRows, refused, (r) => dayOf(r.day));
+  const mst = aggregate(milestoneRows, () => 1, (r) => dayOf(r.date));
   const names = new Map();
   for (const row of milestoneRows) if (row && row.name) names.set(row.name, (names.get(row.name) || 0) + 1);
   const totals = { package: pkg.total, release: rel.total, activations: act.total };
@@ -159,16 +181,24 @@ export function renderReport({ packageRows = [], releaseRows = [], activationRow
   lines.push(...gateLines(gates, totals, gatesLabel));
   lines.push('');
   if (Number.isInteger(month) && month > 0 && gates.monthly && Array.isArray(gates.monthly.gates)) {
-    lines.push(...verdictLines(gates, month, totals, activationRows, milestoneRows));
+    const proxy = gates.installs_proxy;
+    const counts = { package: given.package ? pkg.total : null, release: given.release ? rel.total : null };
+    const counted = {
+      installs: proxy && Object.hasOwn(PROXIES, proxy) ? PROXIES[proxy](counts) : null,
+      activations: given.activations ? act.total : null,
+      paidLicences: given.activations ? new Set(activationRows.filter((r) => r && paid(r) && r.licence_id).map((r) => r.licence_id)).size : null,
+      milestones: given.milestones ? names : null,
+    };
+    lines.push(...verdictLines(gates, month, counted));
     lines.push('');
   }
   lines.push(...section('Package downloads', pkg, { hasRows: packageRows.length > 0 }));
   lines.push('');
   lines.push(...section('Release downloads', rel, { hasRows: releaseRows.length > 0 }));
   lines.push('');
-  lines.push(...section('Licence activations', act, {
+  lines.push(...section('Licence activations (paid)', act, {
     hasRows: activationRows.length > 0,
-    extra: ref.total > 0 ? [`  refused: ${ref.total}`] : [],
+    extra: [`  trials, not counted as paid: ${tri.total}`, ...(ref.total > 0 ? [`  refused: ${ref.total}`] : [])],
   }));
   lines.push('');
   lines.push(...section('Milestones', mst, {
@@ -184,6 +214,11 @@ function main(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--package' || a === '--release' || a === '--activations' || a === '--milestones' || a === '--gates' || a === '--month') args[a.slice(2)] = argv[++i];
+  }
+  // a month that is not a whole number of months, 1 or more, is refused, never dropped in silence
+  if ('month' in args && !(/^\d+$/.test(args.month || '') && Number(args.month) >= 1)) {
+    console.error(`report.mjs: --month is a whole number of months, 1 or more (got ${args.month === undefined ? 'nothing' : JSON.stringify(args.month)})`);
+    process.exit(2);
   }
   const gatesFile = args.gates || path.join(here, 'gates.json');
   const gates = JSON.parse(fs.readFileSync(gatesFile, 'utf8'));
