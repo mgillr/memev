@@ -42,7 +42,7 @@
       "closes": "Closes quality-loop principle 7",
       "depends_on": [],
       "tasks": 2,
-      "criteria": 36,
+      "criteria": 37,
       "spec": "specs/QL-1.03-sensitive-path-checklist-before-merge.json",
       "status": "proposed: owner's quality-loop order of 30 Oct, signs after a clean red-team round"
     },

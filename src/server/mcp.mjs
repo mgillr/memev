@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // MCP (JSON-RPC 2.0): one handler shared by HTTP (/mcp) and the stdio proxy.
-import { VERSION, VaultError } from '../engine/vault.mjs';
+import { VERSION, VaultError, RECALL_OFFSET_MAX } from '../engine/vault.mjs';
 import { PROTOCOL, PROTOCOL_POINTER, renderCard } from '../engine/card.mjs';
 import { HOOK_CLIENTS } from '../cli/clients.mjs';
 
@@ -109,10 +109,23 @@ export function listCapped(paths, { offset = 0 } = {}) {
   return { text: JSON.stringify(data), data };
 }
 
+/**
+ * The memev_recall text: the hits as the JSON array they always were, then, when more hits match than the page shows,
+ * one continuation line in the shape memev_get and memev_list use, so a model that reads only the text learns the total
+ * and the offset of the next page. The line holds no bracket, so the array still ends at the last one.
+ */
+export function recallText(hits, { offset = 0, total = hits.length, next = null } = {}) {
+  const json = JSON.stringify(hits, null, 1);
+  const shown = hits.length ? `Showing hits ${offset + 1}-${offset + hits.length} of ${total}.` : `No hits at offset ${offset}; ${total} match.`;
+  if (next !== null) { const left = total - next; return `${json}\n${shown} Call memev_recall again with offset ${next}. ${left} hit${left === 1 ? '' : 's'} remain${left === 1 ? 's' : ''}.`; }
+  if (total > offset + hits.length) return `${json}\n${shown} Recall does not page past offset ${RECALL_OFFSET_MAX}; narrow the query to reach the rest.`;
+  return json;
+}
+
 tool('memev_session_start', 'Call first in every session (and after a compaction): returns the resume card with the project state, what is already done, the last session, recent decisions and memory relevant to the task.', S({ task: str('One sentence: what the user wants now'), project: str('The project or repository name'), session: str('Your session id, if you know it') }),
   (v, a, c) => { const card = v.sessionStart(c.identity, { task: a.task, project: a.project, client: c.client, session: a.session || c.session }); return { text: HOOK_CLIENTS.has(c.client) ? `${PROTOCOL}\n\n${renderCard(card)}` : renderCard(card), data: card }; }, { readOnly: true });
-tool('memev_recall', 'Search memory before answering anything the user may have recorded. Returns exact snippets with their note, related entities and claim status. With a project, only that project\'s memories and memories with no project are searched.', S({ query: str('What you need to know'), project: str('The project: recall stays inside it'), all_projects: { type: 'boolean', description: 'Search every project (the given project is only ranked higher)' }, limit: { type: 'number' } }, ['query']),
-  (v, a, c) => ({ data: v.recall(c.identity, { query: a.query, project: a.project, all_projects: !!a.all_projects, limit: a.limit || 6, client: c.client, session: c.session }) }), { readOnly: true });
+tool('memev_recall', 'Search memory before answering anything the user may have recorded. Returns exact snippets with their note, related entities and claim status. With a project, only that project\'s memories and memories with no project are searched. limit is clamped to 1-10; use offset to page through more.', S({ query: str('What you need to know'), project: str('The project: recall stays inside it'), all_projects: { type: 'boolean', description: 'Search every project (the given project is only ranked higher)' }, limit: { type: 'number', description: 'How many to return (1-10, default 6)' }, offset: { type: 'number', description: 'Skip this many results (for paging)' } }, ['query']),
+  (v, a, c) => { const lim = a.limit == null ? 6 : Math.min(10, Math.max(1, Math.trunc(Number(a.limit)) || 1)); const off = Math.max(0, Math.trunc(Number(a.offset)) || 0); const hits = v.recall(c.identity, { query: a.query, project: a.project, all_projects: !!a.all_projects, limit: lim, offset: off, client: c.client, session: c.session }); const total = hits.total; const next = off + lim < total && off + lim <= RECALL_OFFSET_MAX ? off + lim : null; return { text: recallText(hits, { offset: off, total, next }), data: { result: hits, total, next } }; }, { readOnly: true });
 tool('memev_remember', 'Save something that will still matter in a later session: a decision, gotcha, fact, pattern, win, person or preference, in the user\'s words, with the reason when there is one. Skip greetings, status updates and anything true only for this session. Memev refuses acknowledgements, noise and duplicates and says why; short-lived notes get a review date.', S({ text: str('The memory'), kind: str('decision | gotcha | fact | pattern | win | person | preference | note'), project: str('Project name'), why: str('The reason, if given'), review_by: str('Optional: YYYY-MM-DD or a number of days after which it leaves recall unless kept'), force: { type: 'boolean', description: 'Save even if the quality check refuses it (it is flagged)' } }, ['text']),
   (v, a, c) => ({ data: v.remember(c.identity, { text: a.text, kind: a.kind, project: a.project, why: a.why, review_by: a.review_by, force: !!a.force, client: c.client }) }));
 tool('memev_why', 'Explain why recall returned what it did for a query (or why one item was not returned): matched words and their share of the score, project and feedback multipliers, review state, past use and, for one item, where it came from. Read-only.', S({ query: str('The query that was recalled'), project: str('The project used for the recall'), all_projects: { type: 'boolean' }, item: str('Optional: one item as path#heading from recall') }, ['query']),

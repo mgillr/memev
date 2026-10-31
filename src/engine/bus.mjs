@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { findSecrets } from './secrets.mjs';
-import { readJson, writeJson, now } from './util.mjs';
+import { readJson, writeJson, now, linkedUnder } from './util.mjs';
 import { allowed } from './tokens.mjs';
 
 export const TYPES = ['hello', 'status', 'task', 'claim', 'restate', 'review', 'verdict', 'question', 'answer', 'finding', 'push', 'ack', 'hold'];
@@ -61,6 +61,9 @@ export class Bus {
 
   _p(...a) { return path.join(this.dir, ...a); }
   _rel(...a) { return [BUS_DIR, ...a].join('/'); }
+  /** The bus writes its own files with its own file calls, so it checks each one first: a symbolic link on the way from the
+   * vault root refuses the write, wherever the link came from (issue 256). */
+  _w(...abs) { for (const a of abs) if (linkedUnder(this.root, a)) throw new BusError('bad_path', `${path.relative(this.root, a).split(path.sep).join('/')} goes through a symbolic link; the bus does not follow links in the vault`); }
 
   /** Seed bus/ (the caller commits it) so the bus is part of the vault from the first commit: the layout, no operator yet, and this computer's own (empty) message file. */
   ensure(deviceId) {
@@ -69,6 +72,7 @@ export class Bus {
       ['operator.json', () => writeJson(this._p('operator.json'), { seat: null, set: null })],
       ...(deviceId ? [[`log/${deviceId}.jsonl`, () => fs.writeFileSync(this._p('log', `${deviceId}.jsonl`), '')]] : []),
     ];
+    this._w(this._p('config.json'), this._p('operator.json'), this._p('log'), ...(deviceId ? [this._p('log', `${deviceId}.jsonl`)] : []));
     fs.mkdirSync(this._p('log'), { recursive: true });
     const created = [];
     for (const [rel, make] of files) if (!fs.existsSync(this._p(...rel.split('/')))) { make(); created.push(this._rel(...rel.split('/'))); }
@@ -132,6 +136,7 @@ export class Bus {
     if (cur && !cur.removed && device && cur.device !== device.id) throw new BusError('conflict', `seat ${name} belongs to another computer`);
     if (cur && !cur.removed) return cur;
     const rec = { seat: name, client: label(client), device: device.id, device_kind: device.kind, device_label: device.label, project: project || null, created: now(), joined: cur?.joined || null, removed: null };
+    this._w(this._p('seats', `${fileOf(name)}.json`));
     fs.mkdirSync(this._p('seats'), { recursive: true });
     writeJson(this._p('seats', `${fileOf(name)}.json`), rec); this.commit(this._rel('seats', `${fileOf(name)}.json`));
     return rec;
@@ -148,6 +153,7 @@ export class Bus {
     const from = rec.seat;
     rec.seat = newName;
     rec.renamed_from = [...new Set([...(rec.renamed_from || []), from])];
+    this._w(this._p('seats', `${fileOf(from)}.json`), this._p('seats', `${fileOf(newName)}.json`), this._p('pulse', `${fileOf(from)}.json`), this._p('pulse', `${fileOf(newName)}.json`), this._p('operator.json'));
     fs.mkdirSync(this._p('seats'), { recursive: true });
     const oldF = this._p('seats', `${fileOf(from)}.json`);
     const newF = this._p('seats', `${fileOf(newName)}.json`);
@@ -221,6 +227,7 @@ export class Bus {
   setOperator(seat, { by = 'terminal', answer = null } = {}) {
     const rec = seat ? this.seat(seat) : null;
     if (seat && (!rec || rec.removed)) throw new BusError('not_found', `no seat ${seat}; memev bus roster lists them`);
+    this._w(this._p('operator.json'));
     fs.mkdirSync(this.dir, { recursive: true });
     writeJson(this._p('operator.json'), { seat: seat || null, set: now(), by, ...(answer ? { user_answer: answer } : {}) }); this.commit(this._rel('operator.json'));
     return seat || null;
@@ -343,6 +350,7 @@ export class Bus {
     let ts = now(); if (last && ts <= last.ts) ts = new Date(Date.parse(last.ts) + 1).toISOString();
     const dseq = (last?.dseq || 0) + 1;
     const msg = { id: `${who.device.id.slice(4, 12)}-${dseq}`, dseq, ts, device: who.device.id, from: who.seat, operator: !!who.operator, ...fields };
+    this._w(this._p('log', file));
     fs.mkdirSync(this._p('log'), { recursive: true });
     fs.appendFileSync(this._p('log', file), `${JSON.stringify(msg)}\n`);
     this._last.set(file, msg);
@@ -462,13 +470,14 @@ export class Bus {
     if (who.seat === OPERATOR) return null;
     const p = this._pulse(who.seat);
     const rec = { seat: who.seat, device: who.device.id, last_seen: new Date(at).toISOString(), session: session || ctx.session || p.session || null, beats: (p.beats || 0) + 1, read: read || p.read || {}, read_extra: readExtra || p.read_extra || {}, seen_seq: seen == null ? (p.seen_seq || 0) : seen, seen_dseq: seenDseq || p.seen_dseq || null };
-    fs.mkdirSync(this._p('pulse'), { recursive: true });
     const f = `${fileOf(who.seat)}.json`;
+    this._w(this._p('pulse', f));
+    fs.mkdirSync(this._p('pulse'), { recursive: true });
     writeJson(this._p('pulse', f), rec);
     if (at - (this._pulseCommitted.get(f) || 0) > PULSE_COMMIT_MS) { this._pulseCommitted.set(f, at); this.commit(this._rel('pulse', f)); }
     const seatRec = this.seat(who.seat);
     if (seatRec && !seatRec.joined) {
-      seatRec.joined = rec.last_seen; writeJson(this._p('seats', f), seatRec); this.commit(this._rel('seats', f));
+      seatRec.joined = rec.last_seen; this._w(this._p('seats', f)); writeJson(this._p('seats', f), seatRec); this.commit(this._rel('seats', f));
       if (!ctx.identity?.read_only) this._append(who, { to: 'all', type: 'hello', body: `${who.seat} joined${who.operator ? ' (operator)' : ''}`, ref: null, project: null });
     }
     return rec;
@@ -560,6 +569,7 @@ export function markLeadAsked(root) {
   const f = path.join(root, BUS_DIR, 'operator.json');
   const op = readJson(f, null) || {};
   if (op.asked) return;
+  if (linkedUnder(root, f)) return; // never written through a link (issue 256); the mark only quiets the lead question
   fs.mkdirSync(path.dirname(f), { recursive: true });
   writeJson(f, { ...op, asked: now() });
 }
