@@ -11,7 +11,7 @@
         "MV-REC-06",
         "MV-LIC-01"
       ],
-      "description": "Repo: mgillr/memev. Existing test/licence-boundary.test.mjs checks wording; this checks imports and vendored paths.",
+      "description": "Repo: memev. Existing test/licence-boundary.test.mjs checks wording; this checks imports and vendored paths.",
       "scope": {
         "allow": [
           "test/no-engine-import.test.mjs"
@@ -58,7 +58,7 @@
       "requirements": [
         "MV-LIC-04"
       ],
-      "description": "Repo: mgillr/memev. Overlaps SR-3.05 in memev-ops (engine licence stated three ways); keep SR-3.05 as the owner and make this task consume its result.",
+      "description": "Repo: memev. Overlaps SR-3.05 in memev-ops (engine licence stated three ways); keep SR-3.05 as the owner and make this task consume its result.",
       "scope": {
         "allow": [
           "docs/LICENSING-NOTICE.md"
@@ -108,7 +108,7 @@
       "requirements": [
         "MV-LIC-03"
       ],
-      "description": "Repo: mgillr/memev-ops. Owner action; the task holds the written result only. Related SR-3.05 and SR-3.06.",
+      "description": "Repo: memev-ops. Owner action; the task holds the written result only. Related SR-3.05 and SR-3.06.",
       "scope": {
         "allow": [
           "contracts/COUNSEL-REVIEW.md"

@@ -1,0 +1,188 @@
+{
+  "title": "PG-02.1 CRDT conformance gate (history-based, CI) (crdt-merge)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract for work package WP02 in crdt-merge: CRDT conformance gate (history-based, CI). Proposed and unsigned; the signer (ASTL workstream) signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP02.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP01-01, WP01-02. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "WP02-01",
+      "title": "History generator: random interleavings of operations on N replicas with drop, duplicate, reorder and restart",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "MV-CONF-02: The gate generates operation histories (random interleavings of operations on several replicas), not a few hand-built states. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:35; evidence docs/scope-one/programme/DECOMPOSITION.md:84; baseline 8.5)"
+      ],
+      "description": "Repo: crdt-merge. Hypothesis-based; seeds recorded so a failure replays.",
+      "scope": [
+        "tests/conformance/history.py",
+        "tests/conformance/test_history_generator.py"
+      ],
+      "criteria": [
+        {
+          "statement": "generator test passes (red on base: module absent)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/conformance/test_history_generator.py",
+            "cmd": "python -m pytest -x -q tests/conformance/test_history_generator.py"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP02-02",
+      "title": "Conformance suite for ORSet, LWWMap, AgentState, TrustAgentState and gossip: commutativity, associativity, idempotency",
+      "phase": "implement",
+      "depends_on": [
+        "WP02-01"
+      ],
+      "requirements": [
+        "MV-CONF-01: A formal CRDT conformance gate for the memory, agent-state and gossip subsystems runs in CI, not only model-merge tests. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:34; evidence docs/scope-one/programme/DECOMPOSITION.md:83; baseline 8.5)",
+        "MV-CONF-03: The gate covers: commutativity, associativity, idempotency, deletion propagation, concurrent additions, stale replica recovery, duplicate delivery, out-of-order delivery, process restart, cross-language serialisation, clock skew, replica identity collision, partition and heal. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:36; evidence docs/scope-one/programme/DECOMPOSITION.md:85; baseline 8.5)"
+      ],
+      "description": "Repo: crdt-merge.",
+      "scope": [
+        "tests/conformance/test_laws.py"
+      ],
+      "criteria": [
+        {
+          "statement": "law tests pass",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/conformance/test_laws.py",
+            "cmd": "python -m pytest -x -q tests/conformance/test_laws.py"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP02-03",
+      "title": "Scenario suite: deletion propagation, stale replica, duplicate and out-of-order delivery, process restart, clock skew, replica id collision, partition and heal",
+      "phase": "implement",
+      "depends_on": [
+        "WP02-01"
+      ],
+      "requirements": [
+        "MV-CONF-03: The gate covers: commutativity, associativity, idempotency, deletion propagation, concurrent additions, stale replica recovery, duplicate delivery, out-of-order delivery, process restart, cross-language serialisation, clock skew, replica identity collision, partition and heal. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:36; evidence docs/scope-one/programme/DECOMPOSITION.md:85; baseline 8.5)"
+      ],
+      "description": "Repo: crdt-merge. One test per scenario named in the notes list.",
+      "scope": [
+        "tests/conformance/test_scenarios.py"
+      ],
+      "criteria": [
+        {
+          "statement": "scenario tests pass",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/conformance/test_scenarios.py",
+            "cmd": "python -m pytest -x -q tests/conformance/test_scenarios.py"
+          }
+        },
+        {
+          "statement": "all 7 scenario names present",
+          "verifier": {
+            "type": "grep",
+            "file": "tests/conformance/test_scenarios.py",
+            "pattern": "def test_partition_and_heal"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP02-04",
+      "title": "Run the conformance gate in CI on every PR to crdt-merge",
+      "phase": "release",
+      "depends_on": [
+        "WP02-02",
+        "WP02-03"
+      ],
+      "requirements": [
+        "MV-CONF-01: A formal CRDT conformance gate for the memory, agent-state and gossip subsystems runs in CI, not only model-merge tests. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:34; evidence docs/scope-one/programme/DECOMPOSITION.md:83; baseline 8.5)"
+      ],
+      "description": "Repo: crdt-merge.",
+      "scope": [
+        ".github/workflows/conformance.yml"
+      ],
+      "criteria": [
+        {
+          "statement": "workflow exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": ".github/workflows/conformance.yml"
+          }
+        },
+        {
+          "statement": "workflow runs the conformance dir",
+          "verifier": {
+            "type": "grep",
+            "file": ".github/workflows/conformance.yml",
+            "pattern": "tests/conformance"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}

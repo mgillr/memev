@@ -1,0 +1,207 @@
+{
+  "title": "PG-04.1 Canonical operation envelope (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract for work package WP04 in memev: Canonical operation envelope. Proposed and unsigned; the signer (ASTL workstream) signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP04.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP17-03. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "WP04-01",
+      "title": "Envelope specification: fields, versioning, deterministic serialisation, hash rules",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "MV-INT-02: One canonical operation envelope with versioned schema and deterministic serialisation: origin identity and node, operation id, causal dependencies, project and object id, type and payload, authorisation evidence, contract or policy reference, content hash, verification status (P0). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:41; evidence docs/scope-one/programme/DECOMPOSITION.md:87; baseline 8.5)"
+      ],
+      "description": "Repo: memev. Fields from the notes: origin identity and node, operation id, causal dependencies, project and object id, type and payload, authorisation evidence, contract or policy reference, content hash, verification status. Resolve ADR 2 (id and event ordering) in the same change.",
+      "scope": [
+        "docs/OPERATION-ENVELOPE.md"
+      ],
+      "criteria": [
+        {
+          "statement": "spec exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/OPERATION-ENVELOPE.md"
+          }
+        },
+        {
+          "statement": "spec names the verification status field",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/OPERATION-ENVELOPE.md",
+            "pattern": "verification_status"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP04-02",
+      "title": "Envelope module: build, canonical-serialise, hash and validate an envelope",
+      "phase": "implement",
+      "depends_on": [
+        "WP04-01"
+      ],
+      "requirements": [
+        "MV-INT-02: One canonical operation envelope with versioned schema and deterministic serialisation: origin identity and node, operation id, causal dependencies, project and object id, type and payload, authorisation evidence, contract or policy reference, content hash, verification status (P0). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:41; evidence docs/scope-one/programme/DECOMPOSITION.md:87; baseline 8.5)"
+      ],
+      "description": "Repo: memev.",
+      "scope": [
+        "src/engine/envelope.mjs",
+        "test/envelope.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "envelope tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/envelope.test.mjs",
+            "cmd": "node --test test/envelope.test.mjs"
+          }
+        },
+        {
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP04-03",
+      "title": "Adapters: the oplog record, the bus message and project-store events convert to and from the envelope without loss",
+      "phase": "implement",
+      "depends_on": [
+        "WP04-02"
+      ],
+      "requirements": [
+        "MV-INT-03: The oplog, the bus, project coordination and the engine use that one event model rather than four. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:42; evidence docs/scope-one/programme/DECOMPOSITION.md:88; baseline 8.5)"
+      ],
+      "description": "Repo: memev. Round-trip test for each of the three record shapes.",
+      "scope": [
+        "src/engine/envelope-adapters.mjs",
+        "test/envelope-adapters.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "round-trip tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/envelope-adapters.test.mjs",
+            "cmd": "node --test test/envelope-adapters.test.mjs"
+          }
+        },
+        {
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP04-04",
+      "title": "Envelope is reachable from the real write path (oplog append), not only from tests",
+      "phase": "implement",
+      "depends_on": [
+        "WP04-03"
+      ],
+      "requirements": [
+        "MV-INT-03: The oplog, the bus, project coordination and the engine use that one event model rather than four. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:42; evidence docs/scope-one/programme/DECOMPOSITION.md:88; baseline 8.5)"
+      ],
+      "description": "Repo: memev. Rule SR-1.15: no code without a caller.",
+      "scope": [
+        "src/engine/oplog.mjs",
+        "src/engine/index.mjs",
+        "test/envelope-wired.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "oplog default path references the envelope",
+          "verifier": {
+            "type": "wiring",
+            "entry": "src/engine/index.mjs",
+            "symbol": "buildEnvelope"
+          }
+        },
+        {
+          "statement": "wired test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/envelope-wired.test.mjs",
+            "cmd": "node --test test/envelope-wired.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}

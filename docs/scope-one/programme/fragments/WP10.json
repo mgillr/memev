@@ -13,7 +13,7 @@
         "MV-ARCH-08",
         "MV-TRU-03"
       ],
-      "description": "Repo: mgillr/memev. Records the distinctions (replicated is not verified; signed is not true; converged is not completed; trust is not access control; payment receipt is not delivery).",
+      "description": "Repo: memev. Records the distinctions (replicated is not verified; signed is not true; converged is not completed; trust is not access control; payment receipt is not delivery).",
       "scope": {
         "allow": [
           "docs/KNOWLEDGE-STATUS.md"
@@ -72,7 +72,7 @@
       "requirements": [
         "MV-TRU-03"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "src/engine/vault.mjs",
@@ -136,7 +136,7 @@
       "requirements": [
         "MV-TRU-02"
       ],
-      "description": "Repo: mgillr/memev. Uses the existing contracts/receipts shape; no new signing scheme.",
+      "description": "Repo: memev. Uses the existing contracts/receipts shape; no new signing scheme.",
       "scope": {
         "allow": [
           "src/engine/contracts.mjs",
@@ -199,7 +199,7 @@
       "requirements": [
         "MV-TRU-06"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "src/engine/project-store.mjs",

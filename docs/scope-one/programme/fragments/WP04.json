@@ -12,7 +12,7 @@
       "requirements": [
         "MV-INT-02"
       ],
-      "description": "Repo: mgillr/memev. Fields from the notes: origin identity and node, operation id, causal dependencies, project and object id, type and payload, authorisation evidence, contract or policy reference, content hash, verification status. Resolve ADR 2 (id and event ordering) in the same change.",
+      "description": "Repo: memev. Fields from the notes: origin identity and node, operation id, causal dependencies, project and object id, type and payload, authorisation evidence, contract or policy reference, content hash, verification status. Resolve ADR 2 (id and event ordering) in the same change.",
       "scope": {
         "allow": [
           "docs/OPERATION-ENVELOPE.md"
@@ -71,7 +71,7 @@
       "requirements": [
         "MV-INT-02"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "src/engine/envelope.mjs",
@@ -132,7 +132,7 @@
       "requirements": [
         "MV-INT-03"
       ],
-      "description": "Repo: mgillr/memev. Round-trip test for each of the three record shapes.",
+      "description": "Repo: memev. Round-trip test for each of the three record shapes.",
       "scope": {
         "allow": [
           "src/engine/envelope-adapters.mjs",
@@ -193,7 +193,7 @@
       "requirements": [
         "MV-INT-03"
       ],
-      "description": "Repo: mgillr/memev. Rule SR-1.15: no code without a caller.",
+      "description": "Repo: memev. Rule SR-1.15: no code without a caller.",
       "scope": {
         "allow": [
           "src/engine/oplog.mjs",

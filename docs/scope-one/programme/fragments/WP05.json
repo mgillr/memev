@@ -13,7 +13,7 @@
       "requirements": [
         "MV-ARCH-05"
       ],
-      "description": "Repo: mgillr/memev. Task ownership is a lease/claim, not a counter. Contracts and approvals are never silently merged.",
+      "description": "Repo: memev. Task ownership is a lease/claim, not a counter. Contracts and approvals are never silently merged.",
       "scope": {
         "allow": [
           "docs/MERGE-SEMANTICS.md"
@@ -74,7 +74,7 @@
         "MV-ARCH-03",
         "MV-PGM-07"
       ],
-      "description": "Repo: mgillr/memev-ops. Owner decision record answering OQ-02: choose between call-out to crdt-merge (WO-05-A), vendoring the Apache-2.0 crdt-merge-ts core with a Node oplog engine (PI-04/PI-05 on branch dev-integration-specs) and a new memev-merge text engine (SR-3.01/SR-3.03); state what each kept layer shares with crdt-merge.",
+      "description": "Repo: memev-ops. Owner decision record answering OQ-02: choose between call-out to crdt-merge (WO-05-A), vendoring the Apache-2.0 crdt-merge-ts core with a Node oplog engine (PI-04/PI-05 on branch dev-integration-specs) and a new memev-merge text engine (SR-3.01/SR-3.03); state what each kept layer shares with crdt-merge.",
       "scope": {
         "allow": [
           "contracts/ENGINE-DECISION.md"
@@ -136,7 +136,7 @@
         "MV-INT-04",
         "MV-ARCH-04"
       ],
-      "description": "Repo: mgillr/memev. Deliverable 2 of the notes.",
+      "description": "Repo: memev. Deliverable 2 of the notes.",
       "scope": {
         "allow": [
           "docs/INTEGRATION-DESIGN.md"
@@ -207,7 +207,7 @@
       "requirements": [
         "MV-INT-01"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "src/engine/state-map.mjs",
@@ -268,7 +268,7 @@
       "requirements": [
         "MV-INT-05"
       ],
-      "description": "Repo: mgillr/memev, draft PR #201. Core calls out; holds no convergence logic; never vendors the engine.",
+      "description": "Repo: memev, draft PR #201. Core calls out; holds no convergence logic; never vendors the engine.",
       "scope": {
         "allow": [
           "src/engine/merge.mjs",
@@ -333,7 +333,7 @@
         "MV-INT-01",
         "MV-INT-05"
       ],
-      "description": "Repo: mgillr/memev. Skipped with a stated reason when the paid engine is not installed (reported as not run, not as pass).",
+      "description": "Repo: memev. Skipped with a stated reason when the paid engine is not installed (reported as not run, not as pass).",
       "scope": {
         "allow": [
           "test/engine-roundtrip.test.mjs",

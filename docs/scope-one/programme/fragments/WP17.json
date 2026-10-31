@@ -11,7 +11,7 @@
         "MV-PGM-01",
         "MV-S1-06"
       ],
-      "description": "Repo: mgillr/memev. Refresh docs/scope-one/INVENTORY.md from live `gh pr list` and `git branch -r`; record the date and main SHA. Live state on 2026-10-31: 8 open PRs, 8 branches without a PR.",
+      "description": "Repo: memev. Refresh docs/scope-one/INVENTORY.md from live `gh pr list` and `git branch -r`; record the date and main SHA. Live state on 2026-10-31: 8 open PRs, 8 branches without a PR.",
       "scope": {
         "allow": [
           "docs/scope-one/INVENTORY.md",
@@ -72,7 +72,7 @@
       "requirements": [
         "MV-PGM-02"
       ],
-      "description": "Repo: mgillr/memev. One row per item in the live 8 PRs + 8 branches: id, disposition, owner lane, reason. Owner approves; no PR is closed by this task.",
+      "description": "Repo: memev. One row per item in the live 8 PRs + 8 branches: id, disposition, owner lane, reason. Owner approves; no PR is closed by this task.",
       "scope": {
         "allow": [
           "docs/scope-one/DISPOSITIONS.md"
@@ -131,7 +131,7 @@
       "requirements": [
         "MV-PGM-04"
       ],
-      "description": "Repo: mgillr/memev-ops. Decision record: which format new work uses, how an id maps (SR-*, QL-*, SO-*, WO-*, MV-*), and whether memev's vendor/attest signing applies to proofline fragments. Owner decision, so the task asks and records.",
+      "description": "Repo: memev-ops. Decision record: which format new work uses, how an id maps (SR-*, QL-*, SO-*, WO-*, MV-*), and whether memev's vendor/attest signing applies to proofline fragments. Owner decision, so the task asks and records.",
       "scope": {
         "allow": [
           "contracts/FORMAT.md"
@@ -190,7 +190,7 @@
       "requirements": [
         "MV-PGM-05"
       ],
-      "description": "Repo: mgillr/memev-ops. Map MV-REC-04, MV-LIC-03, MV-LIC-04, MV-ARCH-02 and the SR-3.x family to their existing contracts; mark duplicates for the later writer.",
+      "description": "Repo: memev-ops. Map MV-REC-04, MV-LIC-03, MV-LIC-04, MV-ARCH-02 and the SR-3.x family to their existing contracts; mark duplicates for the later writer.",
       "scope": {
         "allow": [
           "contracts/OWNERSHIP.md"
@@ -248,7 +248,7 @@
         "MV-PGM-06",
         "MV-PGM-03"
       ],
-      "description": "Repo: mgillr/memev-ops. A file listing, per work package, which workstream holds it. Starts with the known overlap: the ASTL workstream's WBS and SO-* contract work in the same repo on 31 Oct.",
+      "description": "Repo: memev-ops. A file listing, per work package, which workstream holds it. Starts with the known overlap: the ASTL workstream's WBS and SO-* contract work in the same repo on 31 Oct.",
       "scope": {
         "allow": [
           "contracts/CLAIMS.md"
@@ -307,7 +307,7 @@
       "requirements": [
         "MV-PRD-09"
       ],
-      "description": "Repo: mgillr/memev. Add the acceptance question to DECISIONS.md or the contract template.",
+      "description": "Repo: memev. Add the acceptance question to DECISIONS.md or the contract template.",
       "scope": {
         "allow": [
           "docs/scope-one/DECISIONS.md"

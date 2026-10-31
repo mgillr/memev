@@ -1,0 +1,119 @@
+{
+  "title": "PGP-1.06 memev-ops: SR-3.01 and SR-3.03 superseded by the call-out engine decision, SR-3.05 states the licences once",
+  "project": "memev",
+  "workdir": null,
+  "request": "Per-pull-request contract for memev-ops, branch docs/engine-decision-sr3. Proposed and unsigned; the signer (ASTL workstream) signs after the red-team gate. Repository: memev-ops (paths relative to that repository; the contract lives in the memev contracts tree). Programme tasks WP05-02 and WP15-02 (ops side). The canonical seed-readiness manifest is the one in memev-ops (103 contracts); the memev copy holds a subset and is kept identical for SR-3.01 and SR-3.05. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository (BSL 1.1 with its PATENTS file) and is reached only across the call-out boundary, never vendored, so inclusion cannot relicense it; tiers are the free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that, with no Federated tier and no separate Personal trial; federation is planned, not available. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "SR-3.01 and SR-3.03 are superseded, and their specs state the call-out approach",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "SR-3.01 and SR-3.03 are marked superseded with a reason, and are not built or re-signed in their earlier form (source: owner decision 31 Oct 2026)",
+        "The merge engine is reached only across the call-out boundary; no memev-merge repository is created (source: owner decision 31 Oct 2026)"
+      ],
+      "description": "",
+      "scope": [
+        "contracts/seed-readiness/manifest.json",
+        "contracts/seed-readiness/specs/SR-3.01-engine-decision-what-merges-a.json",
+        "contracts/seed-readiness/specs/SR-3.03-the-text-merge-engine-built.json",
+        "contracts/seed-readiness/README.md",
+        "contracts/DEPENDENCIES.md",
+        "contracts/seed-readiness/AMENDMENTS.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The manifest marks the superseded entries",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/seed-readiness/manifest.json",
+            "pattern": "\"status\": \"superseded 31 Oct 2026\""
+          }
+        },
+        {
+          "statement": "The manifest gives the reason",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/seed-readiness/manifest.json",
+            "pattern": "\"superseded_reason\""
+          }
+        },
+        {
+          "statement": "SR-3.03 no longer names a memev-merge repository",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eqi '\"repo(sitory)?\": \"memev-merge\"' contracts/seed-readiness/specs/SR-3.03-the-text-merge-engine-built.json",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "SR-3.05 states the licences once",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "Apache-2.0 core, BSL-1.1 crdt-merge, ACFA-RS under its own licence, commercial federated services; the BSL change date 2028-03-29 is not changed and awaits lawyer review (source: owner decision 31 Oct 2026)"
+      ],
+      "description": "",
+      "scope": [
+        "contracts/seed-readiness/specs/SR-3.05-one-licence-for-the-engine.json",
+        "contracts/seed-readiness/manifest.json"
+      ],
+      "criteria": [
+        {
+          "statement": "The spec names ACFA-RS",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/seed-readiness/specs/SR-3.05-one-licence-for-the-engine.json",
+            "pattern": "ACFA-RS"
+          }
+        },
+        {
+          "statement": "The spec keeps the change date unchanged",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/seed-readiness/specs/SR-3.05-one-licence-for-the-engine.json",
+            "pattern": "2028-03-29"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}

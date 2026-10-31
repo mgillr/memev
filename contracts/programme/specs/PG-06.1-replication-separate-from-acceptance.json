@@ -1,0 +1,157 @@
+{
+  "title": "PG-06.1 Replication separate from acceptance (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract for work package WP06 in memev: Replication separate from acceptance. Proposed and unsigned; the signer (ASTL workstream) signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP06.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP04-01, WP07-02. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "WP06-01",
+      "title": "Acceptance state model: received, replicated, evaluated, accepted, rejected, superseded; transitions and who may make them",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "MV-ARCH-06: Replication and acceptance are separate: a node may receive and replicate an operation without accepting its consequences into authoritative project state. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:15; evidence docs/scope-one/programme/DECOMPOSITION.md:70; baseline 8.5)"
+      ],
+      "description": "Repo: memev. Resolves ADR 4 (policy defaults) for acceptance.",
+      "scope": [
+        "docs/ACCEPTANCE.md"
+      ],
+      "criteria": [
+        {
+          "statement": "doc exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/ACCEPTANCE.md"
+          }
+        },
+        {
+          "statement": "doc names replicated is not accepted",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/ACCEPTANCE.md",
+            "pattern": "replicat.*not.*accept",
+            "flags": "i"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP06-02",
+      "title": "Acceptance evaluator implementing the seven questions (authorised, invariant, superseded dependency, auto-accept, verification, offline, global authority)",
+      "phase": "implement",
+      "depends_on": [
+        "WP06-01"
+      ],
+      "requirements": [
+        "MV-ARCH-07: Memev decides, per change: is the agent authorised, does it break an invariant, does it depend on a superseded decision, is it safe to auto-accept, does it need verification, may it proceed offline, does it need global authorisation. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:16; evidence docs/scope-one/programme/DECOMPOSITION.md:71; baseline 8.5)"
+      ],
+      "description": "Repo: memev. One test per question.",
+      "scope": [
+        "src/engine/acceptance.mjs",
+        "test/acceptance.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "evaluator tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/acceptance.test.mjs",
+            "cmd": "node --test test/acceptance.test.mjs"
+          }
+        },
+        {
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP06-03",
+      "title": "Acceptance is on the default path: a replicated operation does not change authoritative state until accepted",
+      "phase": "implement",
+      "depends_on": [
+        "WP06-02"
+      ],
+      "requirements": [
+        "MV-ARCH-06: Replication and acceptance are separate: a node may receive and replicate an operation without accepting its consequences into authoritative project state. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:15; evidence docs/scope-one/programme/DECOMPOSITION.md:70; baseline 8.5)"
+      ],
+      "description": "Repo: memev.",
+      "scope": [
+        "src/engine/project-store.mjs",
+        "src/engine/acceptance.mjs",
+        "test/acceptance-wired.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "project-store references acceptance",
+          "verifier": {
+            "type": "wiring",
+            "entry": "src/engine/project-store.mjs",
+            "symbol": "evaluateAcceptance"
+          }
+        },
+        {
+          "statement": "wired test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/acceptance-wired.test.mjs",
+            "cmd": "node --test test/acceptance-wired.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 {
-  "title": "SR-3.05 One licence for the engine, stated once",
+  "title": "SR-3.05 The licences, stated once: Apache-2.0 core, BSL-1.1 crdt-merge, ACFA-RS under its own licence, commercial federated services",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G34: The engine licence is stated three ways (BSL 1.1, FSL-1.1-ALv2, draft BUSL-1.1 with licensor to be confirmed). Repository: memev. Depends on contracts: none.",
+  "request": "Closes G34, as amended by the owner decision of 31 Oct 2026: the engine licence was stated three ways (BSL 1.1, FSL-1.1-ALv2, draft BUSL-1.1 with licensor to be confirmed). The licences are now stated once, in docs/LICENSING-NOTICE.md, and every other mention agrees: the Memev core is Apache-2.0; crdt-merge is BSL 1.1 (its change date 2028-03-29 is unchanged and awaits lawyer review) with its PATENTS file; ACFA-RS is under its own licence; federated services are commercial and available by contact us. No licence file or term is changed by this contract. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -10,8 +10,9 @@
       "phase": "implement",
       "depends_on": [],
       "requirements": [
-        "one licence, licensor (the company from SR-9.01) and change date, reviewed by counsel",
-        "every mention in memev and memev-cloud agrees"
+        "the licences are stated once, as Apache-2.0 core, BSL-1.1 crdt-merge, ACFA-RS under its own licence and commercial federated services (source: owner decision 31 Oct 2026)",
+        "the licensor and the change date 2028-03-29 are stated as they are today and are reviewed by counsel before they are described as settled (source: owner decision 31 Oct 2026)",
+        "every mention in memev and memev-cloud agrees, and no document states an engine licence other than BSL 1.1 (source: contract SR-3.05 T1, original requirement)"
       ],
       "description": "",
       "scope": [
@@ -30,6 +31,47 @@
             "type": "test_red_green",
             "test_file": "test/licence-boundary.test.mjs",
             "cmd": "node --test test/licence-boundary.test.mjs"
+          }
+        },
+        {
+          "statement": "The notice has one section that states the licences",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/LICENSING-NOTICE.md",
+            "pattern": "^## Licences, stated once"
+          }
+        },
+        {
+          "statement": "That section names the Apache-2.0 core",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/LICENSING-NOTICE.md",
+            "pattern": "## Licences, stated once[\\s\\S]*Apache-2\\.0"
+          }
+        },
+        {
+          "statement": "That section names crdt-merge under BSL 1.1",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/LICENSING-NOTICE.md",
+            "pattern": "## Licences, stated once[\\s\\S]*BSL[ -]1\\.1"
+          }
+        },
+        {
+          "statement": "That section names ACFA-RS under its own licence",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/LICENSING-NOTICE.md",
+            "pattern": "## Licences, stated once[\\s\\S]*ACFA-RS"
+          }
+        },
+        {
+          "statement": "That section states federated services are commercial",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/LICENSING-NOTICE.md",
+            "pattern": "## Licences, stated once[\\s\\S]*federated services[\\s\\S]*commercial",
+            "flags": "i"
           }
         },
         {

@@ -22,4 +22,4 @@ All contracts in fragments/ are unsigned proofline/1 planning drafts. Nothing wa
 | Owner decision 31 Oct 2026 (DECISIONS.md, a8e5332) | MV-PRD-04, MV-PRD-05, OQ-01 | Closes topology, providers, tier set; no Federated tier named | WP16-01 records whether a federation offer exists above it. |
 | memev attest/1 signed contracts (contracts/signed, QL gates) | all fragments here | Different format (proofline/1 here) | Keep fragments as planning contracts in memev-ops; convert to attest specs only after the owner accepts a work package and its red-team record exists (QL-1.01). Do not sign. |
 | ASTL's SO-* contract effort (report of 31 Oct) | WP07, WP08 | ASTL's 31 Oct report says it wrote none of the SO-C/O/L-* contracts and waits for owner decisions | No duplicate: WP07/WP08 reference only the already-landed SO-04-A, SO-07-A, SO-08-A. |
-| hivevault-programme (PG-*), atsl-proofline (AT-*) | none | Separate programmes | Reuse hivevault-programme's layout (precedent). |
+| the sibling programme (PG-*), the sibling proofline programme (AT-*) | none | Separate programmes | Reuse the sibling programme's layout (precedent). |

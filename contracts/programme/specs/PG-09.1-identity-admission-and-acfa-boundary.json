@@ -1,0 +1,155 @@
+{
+  "title": "PG-09.1 Identity, admission and ACFA boundary (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract for work package WP09 in memev: Identity, admission and ACFA boundary. Proposed and unsigned; the signer (ASTL workstream) signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP09.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP04-02, WP06-02. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "WP09-01",
+      "title": "Signed node and agent identity with scoped delegation, revocation and admission, on top of the sibling identity project and agentid-bind",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "MV-TRU-01: Signed identity, scoped delegation, revocation and admission for contributing nodes and agents (P1). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:50; evidence docs/scope-one/programme/DECOMPOSITION.md:93; baseline 8.5)",
+        "MV-FED-05: Node identity, organisation membership, permission boundaries and sovereignty policies exist per site. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:64; evidence docs/scope-one/programme/DECOMPOSITION.md:104; baseline 8.5)"
+      ],
+      "description": "Repo: memev. Reuse the sibling identity project (the sibling identity project) and devices.mjs; no second key scheme.",
+      "scope": [
+        "src/engine/agentid-bind.mjs",
+        "src/engine/devices.mjs",
+        "src/engine/admission.mjs",
+        "test/admission.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "admission tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/admission.test.mjs",
+            "cmd": "node --test test/admission.test.mjs"
+          }
+        },
+        {
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP09-02",
+      "title": "ACFA-RS adapter boundary: numeric contributions only, agreed contributor set, Krum n>=2f+3 and Bulyan n>=4f+3 enforced, trusted-identity pinned verification",
+      "phase": "implement",
+      "depends_on": [
+        "WP09-01"
+      ],
+      "requirements": [
+        "MV-TRU-04: ACFA-RS is used only for compatible numeric contributions with an agreed contributor set; the Krum n>=2f+3 and Bulyan n>=4f+3 assumptions are enforced; verification is pinned to trusted identities and policy; never for text memories or averaged confidences. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:53; evidence docs/scope-one/programme/DECOMPOSITION.md:96; baseline 8.5)",
+        "MV-TRU-05: Service contracts exist for ACFA-RS and E4 as adapter boundaries beside the merge boundary, with no product names in the open core. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:54; evidence docs/scope-one/programme/DECOMPOSITION.md:97; baseline 8.5)"
+      ],
+      "description": "Repo: memev. Boundary only; no ACFA code in the core; refuses text memories and confidence averages.",
+      "scope": [
+        "docs/EXTENSION-POINTS.md",
+        "src/engine/acfa-boundary.mjs",
+        "test/acfa-boundary.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "boundary tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/acfa-boundary.test.mjs",
+            "cmd": "node --test test/acfa-boundary.test.mjs"
+          }
+        },
+        {
+          "statement": "licence boundary test green",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/licence-boundary.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP09-03",
+      "title": "Equivocation and suspicious-contribution handler: evidence goes to Memev authority and exclusion policy",
+      "phase": "implement",
+      "depends_on": [
+        "WP09-01"
+      ],
+      "requirements": [
+        "MV-TRU-07: Equivocation and suspicious contributions are detected and handed to Memev authority and exclusion policy. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:56; evidence docs/scope-one/programme/DECOMPOSITION.md:99; baseline 8.5)"
+      ],
+      "description": "Repo: memev.",
+      "scope": [
+        "src/engine/exclusion.mjs",
+        "test/exclusion.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "exclusion tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/exclusion.test.mjs",
+            "cmd": "node --test test/exclusion.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}

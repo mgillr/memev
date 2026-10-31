@@ -3,7 +3,7 @@
   "tasks": [
     {
       "id": "WP09-01",
-      "title": "Signed node and agent identity with scoped delegation, revocation and admission, on top of agentkey and agentid-bind",
+      "title": "Signed node and agent identity with scoped delegation, revocation and admission, on top of the sibling identity project and agentid-bind",
       "phase": "implement",
       "owner": "lane-trust",
       "depends_on": [
@@ -13,7 +13,7 @@
         "MV-TRU-01",
         "MV-FED-05"
       ],
-      "description": "Repo: mgillr/memev. Reuse agentkey (github.com/mgillr/agentkey) and devices.mjs; no second key scheme.",
+      "description": "Repo: memev. Reuse the sibling identity project (the sibling identity project) and devices.mjs; no second key scheme.",
       "scope": {
         "allow": [
           "src/engine/agentid-bind.mjs",
@@ -77,7 +77,7 @@
         "MV-TRU-04",
         "MV-TRU-05"
       ],
-      "description": "Repo: mgillr/memev. Boundary only; no ACFA code in the core; refuses text memories and confidence averages.",
+      "description": "Repo: memev. Boundary only; no ACFA code in the core; refuses text memories and confidence averages.",
       "scope": {
         "allow": [
           "docs/EXTENSION-POINTS.md",
@@ -140,7 +140,7 @@
       "requirements": [
         "MV-TRU-07"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "src/engine/exclusion.mjs",
@@ -188,7 +188,7 @@
       "requirements": [
         "MV-LIC-02"
       ],
-      "description": "Repo: mgillr/memev-ops. Owner or counsel task: LICENSE is Apache-2.0; patent position unverified.",
+      "description": "Repo: memev-ops. Owner or counsel task: LICENSE is Apache-2.0; patent position unverified.",
       "scope": {
         "allow": [
           "contracts/ACFA-LICENCE-CHECK.md"

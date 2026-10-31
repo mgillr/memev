@@ -10,7 +10,7 @@
       "requirements": [
         "MV-CRDT-01"
       ],
-      "description": "Repo: mgillr/crdt-merge, crdt_merge/core.py L351-L453. Today remove() drops the tags, merge() unions, so the stale copy brings the element back (reproduced 31 Oct on e2047c4). Fix without changing ORSet's public API; keep wire format readable.",
+      "description": "Repo: crdt-merge, crdt_merge/core.py L351-L453. Today remove() drops the tags, merge() unions, so the stale copy brings the element back (reproduced 31 Oct on e2047c4). Fix without changing ORSet's public API; keep wire format readable.",
       "scope": {
         "allow": [
           "crdt_merge/core.py",
@@ -69,7 +69,7 @@
       "requirements": [
         "MV-CRDT-02"
       ],
-      "description": "Repo: mgillr/crdt-merge, core.py L557-L606. get() checks the tombstone map first, value() compares timestamps.",
+      "description": "Repo: crdt-merge, core.py L557-L606. get() checks the tombstone map first, value() compares timestamps.",
       "scope": {
         "allow": [
           "crdt_merge/core.py",
@@ -130,7 +130,7 @@
       "requirements": [
         "MV-CRDT-03"
       ],
-      "description": "Repo: mgillr/crdt-merge, agentic.py L215-L240. Either unify the two policies or state the difference in the docs and test both.",
+      "description": "Repo: crdt-merge, agentic.py L215-L240. Either unify the two policies or state the difference in the docs and test both.",
       "scope": {
         "allow": [
           "crdt_merge/agentic.py",
@@ -190,7 +190,7 @@
       "requirements": [
         "MV-CRDT-04"
       ],
-      "description": "Repo: mgillr/crdt-merge, e4/integration/agent_bridge.py L119-L120 (`delete()` pops the entry).",
+      "description": "Repo: crdt-merge, e4/integration/agent_bridge.py L119-L120 (`delete()` pops the entry).",
       "scope": {
         "allow": [
           "crdt_merge/e4/integration/agent_bridge.py",
@@ -251,7 +251,7 @@
       "requirements": [
         "MV-CRDT-06"
       ],
-      "description": "Repo: mgillr/crdt-merge, model/crdt_state.py L141-L142 and L202 use itertools.count(), unique per process only. Use (node id, counter) or UUID; define the tie-break.",
+      "description": "Repo: crdt-merge, model/crdt_state.py L141-L142 and L202 use itertools.count(), unique per process only. Use (node id, counter) or UUID; define the tie-break.",
       "scope": {
         "allow": [
           "crdt_merge/model/crdt_state.py",
@@ -310,7 +310,7 @@
       "requirements": [
         "MV-CRDT-07"
       ],
-      "description": "Repo: mgillr/crdt-merge. PR #179 open since 2026-09-28 and mergeable. Review against the E4 tests; merge is the owner's call.",
+      "description": "Repo: crdt-merge. PR #179 open since 2026-09-28 and mergeable. Review against the E4 tests; merge is the owner's call.",
       "scope": {
         "allow": [
           "crdt_merge/e4/**",
@@ -359,7 +359,7 @@
       "requirements": [
         "MV-CRDT-05"
       ],
-      "description": "Repo: mgillr/crdt-merge. State the boundary in docs, matching gossip.py's own wording.",
+      "description": "Repo: crdt-merge. State the boundary in docs, matching gossip.py's own wording.",
       "scope": {
         "allow": [
           "docs/gossip-boundary.md"

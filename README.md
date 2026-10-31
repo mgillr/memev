@@ -180,8 +180,8 @@ Every line below says whether it exists. Nothing in the second and third lists i
 
 ### In progress
 
-- The project engine: the project store, the project state machine and the coordinator are merged and tested, and are being wired into one execution path. Tracked in the Scope One work breakdown (pull request [#324](https://github.com/mgillr/memev/pull/324)) and in [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md).
-- The paid-engine client behind a flag, off by default (pull request [#201](https://github.com/mgillr/memev/pull/201)), with the trial licence and entitlement work ([#154](https://github.com/mgillr/memev/pull/154), [#163](https://github.com/mgillr/memev/pull/163), [#177](https://github.com/mgillr/memev/pull/177)).
+- The project engine: the project store, the project state machine and the coordinator are merged and tested, and are being wired into one execution path. Tracked in the Scope One work breakdown (pull request #324) and in [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md).
+- The paid-engine client behind a flag, off by default (pull request #201), with the trial licence and entitlement work (#154, #163, #177).
 - Correctness fixes in the crdt-merge engine itself, in its own repository.
 - The programme decomposition of the wider plan, as proposed and unsigned contracts: [docs/scope-one/programme/README.md](docs/scope-one/programme/README.md).
 - Documentation and tier alignment to the owner decisions of 31 October 2026.
@@ -192,7 +192,7 @@ Every line below says whether it exists. Nothing in the second and third lists i
 - Hosted end-to-end encrypted sync, hosted encrypted backup and a stable relay address.
 - A company vault with an admin console, one AI provider per organisation, sign-in with Google Workspace or Microsoft Entra ID, roles, an egress log, and a Business trial.
 - A single replicated event model across the log, the bus and project state, and evidence receipts for accepted work.
-- Federation across independent sites, an architecture under review in pull request [#224](https://github.com/mgillr/memev/pull/224), and decided only in part. It is not available, and Memev makes no claim about it beyond this line.
+- Federation across independent sites, an architecture under review in pull request #224, and decided only in part. It is not available, and Memev makes no claim about it beyond this line.
 
 ## What you get
 
@@ -254,7 +254,7 @@ nothing else. See [docs/DESIGN.md](docs/DESIGN.md), the [module map](docs/MODULE
 ## Licensing
 
 - **Memev core: Apache-2.0.** The code in this repository is Apache-2.0 and stays that way. It includes a modified copy of Proofline (Apache-2.0); see [NOTICE](NOTICE).
-- **crdt-merge: BSL 1.1, separately licensed.** The convergence engine is a separate project in its own repository, licensed under the Business Source License 1.1 by its Licensor, Ryan Gillespie / Optitransfer, and it carries patents (see its PATENTS file). It is never copied or vendored into Memev. Memev reaches it only across the provider boundary, so including it can never relicense it. Its change date to Apache-2.0 is 2028-03-29; a lawyer review of that date is an open item.
+- **crdt-merge: BSL 1.1, separately licensed.** The convergence engine is a separate project in its own repository, licensed under the Business Source License 1.1 by its licensor, and it carries patents (see its PATENTS file). It is never copied or vendored into Memev. Memev reaches it only across the provider boundary, so including it can never relicense it. Its change date to Apache-2.0 is 2028-03-29; a lawyer review of that date is an open item.
 - **Commercial terms:** anything beyond the free core and Personal, including federated services, is agreed through contact us.
 
 See [docs/LICENSING-NOTICE.md](docs/LICENSING-NOTICE.md), [docs/CONVERGENCE.md](docs/CONVERGENCE.md) and [docs/PRICING.md](docs/PRICING.md).

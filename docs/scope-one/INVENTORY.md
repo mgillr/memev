@@ -135,4 +135,4 @@ Dated 2026-10-30, at the baseline commit recorded in BASELINE.md; the open pull 
 | owner-held (unlisted) | author statement | none | unknown | unowned | not in any branch or pull request of this set | none | NEW |
 
 ## Sources not read
-- The open pull requests above are the live `gh pr list` state of mgillr/memev on 31 October 2026. The earlier line that named 27 open draft pull requests, taken from the market analysis (section 7), is replaced by it: seven pull requests are open, one of them not a draft. Pull requests #319 to #323 were merged on 31 October and #132 was closed; MEM-067 is cancelled (see its row above).
+- The open pull requests above are the live `gh pr list` state of memev on 31 October 2026. The earlier line that named 27 open draft pull requests, taken from the market analysis (section 7), is replaced by it: seven pull requests are open, one of them not a draft. Pull requests #319 to #323 were merged on 31 October and #132 was closed; MEM-067 is cancelled (see its row above).

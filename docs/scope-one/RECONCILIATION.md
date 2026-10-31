@@ -2,11 +2,11 @@
 
 Part of the [documentation index](../README.md). Related: [DECISIONS.md](DECISIONS.md), [INVENTORY.md](INVENTORY.md), [programme decomposition](programme/README.md).
 
-Dated 31 October 2026, against main at `67bec9d`. The Scope One work breakdown (`WBS.md` in `docs/scope-one`, with `SO-1.01` to `SO-1.11` and its test `wbs.test.mjs`) is in pull request [#324](https://github.com/mgillr/memev/pull/324), which had not merged when this page was written, so this page is based on main and reads that file from the pull request branch `wbs`. If #324 lands after this page, the references below stay valid and the page is rebased onto it. It does not edit `WBS.md`, any `SO-1.x` contract, any signature or any red-team record: those are owned by the ASTL workstream.
+Dated 31 October 2026, against main at `4823064`, which includes the Scope One work breakdown (`WBS.md` in `docs/scope-one`, with `SO-1.01` to `SO-1.11` and its test `wbs.test.mjs`) from pull request #324. This page refers to that work breakdown and to `SO-1.02` (the reconciliation contract) instead of restating them; leaf numbers below are the numbers in `WBS.md`. It does not edit `WBS.md`, any `SO-1.x` contract, any signature or any red-team record: those are owned by the ASTL workstream.
 
 ## Headline
 
-The programme decomposition has 81 requirements (`MV-*`) and 82 tasks in 18 work packages ([programme/REQUIREMENTS.md](programme/REQUIREMENTS.md), [programme/WBS.md](programme/WBS.md)). Each requirement is compared with the 276 leaves of the Scope One work breakdown.
+The programme decomposition has 81 requirements (`MV-*`) and 82 tasks in 18 work packages ([programme/REQUIREMENTS.md](programme/REQUIREMENTS.md), [programme/WBS.md](programme/WBS.md)). Each requirement is compared with the 276 leaves of the Scope One work breakdown. Programme work that `SO-1.01` to `SO-1.11` already covers is not re-specified: the mapping is in the [programme contract manifest](../../contracts/programme/manifest.json).
 
 | | Same | Missing | Conflicting | Total |
 | --- | --- | --- | --- | --- |
@@ -40,17 +40,18 @@ Who writes which task, so that two workstreams do not write the same one. Owners
 
 | Task id | Owner workstream | Branch or pull request | Status |
 | --- | --- | --- | --- |
-| Scope One `WBS.md`, `wbs.test.mjs` | ASTL workstream | mgillr/memev [#324](https://github.com/mgillr/memev/pull/324), branch `wbs` | open |
-| `SO-1.01` to `SO-1.11` contracts | ASTL workstream | mgillr/memev [#324](https://github.com/mgillr/memev/pull/324) | open, unsigned |
-| Contract signing and re-signing (all repositories) | ASTL workstream | `scripts/gate/redteam-gate.mjs` in mgillr/memev; #319 to #323 merged | in progress |
+| Scope One `WBS.md`, `wbs.test.mjs` | ASTL workstream | memev #324, branch `wbs` | merged |
+| `SO-1.01` to `SO-1.11` contracts | ASTL workstream | memev #324 | merged, signed |
+| Contract signing and re-signing (all repositories) | ASTL workstream | `scripts/gate/redteam-gate.mjs` in memev; #319 to #323 merged | in progress |
 | Red-team records | ASTL workstream | `contracts/**/redteam/` | in progress |
-| `WP01-01` to `WP01-05` (crdt-merge correctness) | Programme workstream | mgillr/crdt-merge, branch `fix/crdt-correctness-four-bugs` | in progress |
-| `WP07-01` to `WP07-03`, `WP15-01` (memev wiring and licence guard) | Programme workstream | mgillr/memev, branch `feat/wire-project-engine` | in progress |
-| `WP17-01`, `WP17-05`, `WP16-03` and `WP15-02` for memev (this reconciliation, tiers, README, decisions) | Programme workstream | mgillr/memev, branch `docs/engine-decision-tiers-reconcile` | open |
-| `WP16-02` (converge README) | Programme workstream | mgillr/converge, branch `docs/fair-mem0-comparison` | open |
-| `WP16-03` (site plans) | Programme workstream | mgillr/memev-site, branch `fix/plans-match-tier-decision` | open |
-| `WP05-02`, `WP15-02` for memev-ops (SR-3.01 and SR-3.03 superseded, SR-3.05) | Programme workstream | mgillr/memev-ops, branch `docs/engine-decision-sr3` | open |
-| Every other `WP*` task | unclaimed | none | not started |
+| `WP01-01` to `WP01-05` (crdt-merge correctness) | Programme workstream | crdt-merge, branch `fix/crdt-correctness-four-bugs` #180 | in progress |
+| `WP07-01` to `WP07-03`, `WP15-01` (memev wiring and licence guard) | Programme workstream | memev, branch `feat/wire-project-engine` #326 | in progress |
+| `WP17-05`, `WP16-03` and `WP15-02` for memev (this reconciliation, tiers, README, decisions) | Programme workstream | memev, branch `docs/engine-decision-tiers-reconcile` #325 | open |
+| `WP16-02` (converge README) | Programme workstream | converge, branch `docs/fair-mem0-comparison` #1 | open |
+| `WP16-03` (site plans) | Programme workstream | memev-site, branch `fix/plans-match-tier-decision` #1 | open |
+| `WP05-02`, `WP15-02` for memev-ops (SR-3.01 and SR-3.03 superseded, SR-3.05) | Programme workstream | memev-ops, branch `docs/engine-decision-sr3` #13 | open |
+| Programme contract specs (`contracts/programme`, one per work package and one per work pull request) | Programme workstream | memev, same branch as the row above #325 | open, unsigned; signing by the ASTL workstream |
+| Every other `WP*` task (the work itself) | unclaimed | none | not started |
 
 ## Requirement register
 
@@ -125,7 +126,7 @@ One row per requirement of [programme/REQUIREMENTS.md](programme/REQUIREMENTS.md
 | `MV-PRD-08` | Entry sequence: stage 1 interoperable and accountable (SDKs, MCP/A2A, conformance, reference deployment), stage 2 multi-organisation federation demons... | missing | none |
 | `MV-PRD-09` | Every feature is judged by: does it make Memev more essential to a distributed agent ecosystem, or is it only a better application | missing | none |
 | `MV-PRD-10` | SDKs, framework adapters and public conformance tests let existing agents (for example LangGraph) join a Memev project, claim work, submit evidence an... | same | 5.4.5 (blocked) |
-| `MV-PRD-11` | Payments follow verified acceptance (x402 for machine payments, Stripe for fiat) with idempotency and reconciliation; a payment receipt is not proof o... | same | 5.4.3 (blocked) |
+| `MV-PRD-11` | Payments follow verified acceptance (agentic payment protocols for machine payments, Stripe for fiat) with idempotency and reconciliation; a payment receipt is not proof o... | same | 5.4.3 (blocked) |
 | `MV-S1-01` | Outcome-to-delivery lifecycle: intake and scope, formal spec with approvals, contracts and work packages, resource choice, coordinated execution with ... | same | 3.1.2 to 3.1.4, 3.8.5 |
 | `MV-S1-02` | PMO-grade project workspace and a persistent lead-agent interface over canonical state | same | 3.8.1 (SO-REQ-086), 5.2.10 (SO-1.05) |
 | `MV-S1-03` | Organisational intelligence: evidence-linked discovery of cross-project dependencies and conflicts; both original plans are preserved until an authori... | same | 5.3.1 to 5.3.6 (blocked) |

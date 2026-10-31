@@ -13,7 +13,7 @@
       "requirements": [
         "MV-CONF-02"
       ],
-      "description": "Repo: mgillr/crdt-merge. Hypothesis-based; seeds recorded so a failure replays.",
+      "description": "Repo: crdt-merge. Hypothesis-based; seeds recorded so a failure replays.",
       "scope": {
         "allow": [
           "tests/conformance/history.py",
@@ -64,7 +64,7 @@
         "MV-CONF-01",
         "MV-CONF-03"
       ],
-      "description": "Repo: mgillr/crdt-merge.",
+      "description": "Repo: crdt-merge.",
       "scope": {
         "allow": [
           "tests/conformance/test_laws.py"
@@ -113,7 +113,7 @@
       "requirements": [
         "MV-CONF-03"
       ],
-      "description": "Repo: mgillr/crdt-merge. One test per scenario named in the notes list.",
+      "description": "Repo: crdt-merge. One test per scenario named in the notes list.",
       "scope": {
         "allow": [
           "tests/conformance/test_scenarios.py"
@@ -174,7 +174,7 @@
       "requirements": [
         "MV-CONF-01"
       ],
-      "description": "Repo: mgillr/crdt-merge.",
+      "description": "Repo: crdt-merge.",
       "scope": {
         "allow": [
           ".github/workflows/conformance.yml"

@@ -70,7 +70,7 @@ current code already uses, so no contract is blocked on a guess.
 
 - Status: decided (owner decision 31 Oct 2026)
 - Decision owner: owner
-- Decision: crdt-merge (BSL 1.1, Licensor Ryan Gillespie / Optitransfer, with its PATENTS file) stays in its
+- Decision: crdt-merge (BSL 1.1, licensed by its licensor, with its PATENTS file) stays in its
   own repository. Memev (Apache-2.0) consumes it only across the existing external call-out and provider
   boundary (WO-05-A, [docs/CONVERGENCE.md](../CONVERGENCE.md)). Nothing from crdt-merge is vendored, copied
   or ported into Memev, including any TypeScript port. There is no new Memev merge engine and no new

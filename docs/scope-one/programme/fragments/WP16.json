@@ -13,7 +13,7 @@
         "MV-PRD-04",
         "MV-PRD-05"
       ],
-      "description": "Repo: mgillr/memev. OQ-01. The owner decision of 31 Oct 2026 (a8e5332) fixed the tier set without a Federated tier; this task records whether a distinct federation offer exists above it, in DECISIONS.md before any page changes.",
+      "description": "Repo: memev. OQ-01. The owner decision of 31 Oct 2026 (a8e5332) fixed the tier set without a Federated tier; this task records whether a distinct federation offer exists above it, in DECISIONS.md before any page changes.",
       "scope": {
         "allow": [
           "docs/PRICING.md",
@@ -62,7 +62,7 @@
       "requirements": [
         "MV-PRD-01"
       ],
-      "description": "Repo: mgillr/converge. README L126, L165 and L465.",
+      "description": "Repo: converge. README L126, L165 and L465.",
       "scope": {
         "allow": [
           "README.md"
@@ -124,7 +124,7 @@
         "MV-PRD-02",
         "MV-ARCH-01"
       ],
-      "description": "Repo: mgillr/memev. Coordinates with SR-6.07 and SR-6.10 in memev-ops which own the site claims; planned and delivered capability are listed separately.",
+      "description": "Repo: memev. Coordinates with SR-6.07 and SR-6.10 in memev-ops which own the site claims; planned and delivered capability are listed separately.",
       "scope": {
         "allow": [
           "README.md",
@@ -188,7 +188,7 @@
         "MV-FED-06",
         "MV-ARCH-10"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "docs/DEPLOYMENT-MODEL.md"
@@ -237,7 +237,7 @@
         "MV-PRD-03",
         "MV-PRD-08"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "docs/PORTFOLIO.md"
@@ -287,7 +287,7 @@
         "MV-PRD-06",
         "MV-PRD-07"
       ],
-      "description": "Repo: mgillr/memev. Folds in the integration audit across memev, crdt-merge and converge.",
+      "description": "Repo: memev. Folds in the integration audit across memev, crdt-merge and converge.",
       "scope": {
         "allow": [
           "docs/BLUEPRINT.md"
@@ -346,7 +346,7 @@
       "requirements": [
         "MV-PRD-05"
       ],
-      "description": "Repo: mgillr/memev. Subject to the WP16-01 decision.",
+      "description": "Repo: memev. Subject to the WP16-01 decision.",
       "scope": {
         "allow": [
           "docs/PRICING.md"

@@ -12,7 +12,7 @@
       "requirements": [
         "MV-S1-04"
       ],
-      "description": "Repo: mgillr/memev. docs/MODULES.md L446 and L464: project-state.mjs and coordinator.mjs are imported by no other module.",
+      "description": "Repo: memev. docs/MODULES.md L446 and L464: project-state.mjs and coordinator.mjs are imported by no other module.",
       "scope": {
         "allow": [
           "src/cli/**",
@@ -75,7 +75,7 @@
         "MV-S1-04",
         "MV-INT-07"
       ],
-      "description": "Repo: mgillr/memev. SO-04-A (6ad655f) landed the module.",
+      "description": "Repo: memev. SO-04-A (6ad655f) landed the module.",
       "scope": {
         "allow": [
           "src/cli/**",
@@ -137,7 +137,7 @@
       "requirements": [
         "MV-S1-04"
       ],
-      "description": "Repo: mgillr/memev. SO-08-A (7de636b) landed the module. Settle ADR 3 (lease semantics) first.",
+      "description": "Repo: memev. SO-08-A (7de636b) landed the module. Settle ADR 3 (lease semantics) first.",
       "scope": {
         "allow": [
           "src/server/**",
@@ -199,7 +199,7 @@
       "requirements": [
         "MV-ARCH-09"
       ],
-      "description": "Repo: mgillr/memev. Static check over src/ for a second implementation of claim or project state.",
+      "description": "Repo: memev. Static check over src/ for a second implementation of claim or project state.",
       "scope": {
         "allow": [
           "test/single-authority.test.mjs"

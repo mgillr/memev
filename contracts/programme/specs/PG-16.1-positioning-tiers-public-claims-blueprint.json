@@ -1,0 +1,134 @@
+{
+  "title": "PG-16.1 Positioning, tiers, public claims, blueprint (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract for work package WP16 in memev: Positioning, tiers, public claims, blueprint. Proposed and unsigned; the signer (ASTL workstream) signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP16.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP05-03, WP16-01, WP17-02. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "WP16-04",
+      "title": "Deployment model scales by topology and trust boundary, not by computer count, documented",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "MV-FED-06: The deployment model scales by topology and trust boundary, not by computer count. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:65; evidence docs/scope-one/programme/DECOMPOSITION.md:105; baseline 8.6)",
+        "MV-ARCH-10: Memev works both as a complete platform and as independently deployable services (for example verification only). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:19; evidence docs/scope-one/programme/DECOMPOSITION.md:74; baseline 8.6)"
+      ],
+      "description": "Repo: memev.",
+      "scope": [
+        "docs/DEPLOYMENT-MODEL.md"
+      ],
+      "criteria": [
+        {
+          "statement": "doc exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/DEPLOYMENT-MODEL.md"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP16-05",
+      "title": "Portfolio sequence: Operating Environment, Federation, Network",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "MV-PRD-03: Portfolio is Memev Operating Environment, Memev Federation, Memev Network, in that adoption sequence. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:96; evidence docs/scope-one/programme/DECOMPOSITION.md:124; baseline 8.6)",
+        "MV-PRD-08: Entry sequence: stage 1 interoperable and accountable (SDKs, MCP/A2A, conformance, reference deployment), stage 2 multi-organisation federation demonstrator, stage 3 commercial network; first wedge engineering and industrial programmes, healthcare as demonstration. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:101; evidence docs/scope-one/programme/DECOMPOSITION.md:129; baseline 8.6)"
+      ],
+      "description": "Repo: memev.",
+      "scope": [
+        "docs/PORTFOLIO.md"
+      ],
+      "criteria": [
+        {
+          "statement": "doc exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/PORTFOLIO.md"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP16-06",
+      "title": "Infrastructure Strategy and Architecture Blueprint: target architecture, repository mapping, missing capabilities, interfaces, licensing boundaries, build sequence, first wedge",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "MV-PRD-06: An Infrastructure Strategy and Architecture Blueprint: target architecture, repository mapping, missing capabilities, interfaces, licensing boundaries, build sequence, positioning, first wedge, ecosystem route. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:99; evidence docs/scope-one/programme/DECOMPOSITION.md:127; baseline 8.6)",
+        "MV-PRD-07: An integration audit across memev, crdt-merge and converge as one system: components, reuse, correct, missing, exact implementation contracts. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:100; evidence docs/scope-one/programme/DECOMPOSITION.md:128; baseline 8.6)"
+      ],
+      "description": "Repo: memev. Folds in the integration audit across memev, crdt-merge and converge.",
+      "scope": [
+        "docs/BLUEPRINT.md"
+      ],
+      "criteria": [
+        {
+          "statement": "blueprint exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/BLUEPRINT.md"
+          }
+        },
+        {
+          "statement": "blueprint lists missing capabilities",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/BLUEPRINT.md",
+            "pattern": "missing capabilities",
+            "flags": "i"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}

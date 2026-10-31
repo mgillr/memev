@@ -15,7 +15,7 @@
         "MV-FED-02",
         "MV-FED-01"
       ],
-      "description": "Repo: mgillr/memev. Prior art: hivevault docs/federation.md export-deny filter.",
+      "description": "Repo: memev. Prior art: the sibling programme docs/federation.md export-deny filter.",
       "scope": {
         "allow": [
           "src/engine/publish-policy.mjs",
@@ -76,7 +76,7 @@
       "requirements": [
         "MV-FED-03"
       ],
-      "description": "Repo: mgillr/memev. Answers OQ-06; counsel review recorded.",
+      "description": "Repo: memev. Answers OQ-06; counsel review recorded.",
       "scope": {
         "allow": [
           "docs/DISCLOSURE.md"
@@ -136,7 +136,7 @@
         "MV-FED-05",
         "MV-FED-01"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "src/engine/site.mjs",
@@ -188,7 +188,7 @@
       "requirements": [
         "MV-FED-01"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "test/partition-reconcile.test.mjs"
@@ -238,7 +238,7 @@
       "requirements": [
         "MV-FED-04"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "docs/TRUST-DOMAINS.md"

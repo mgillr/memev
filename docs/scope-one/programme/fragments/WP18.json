@@ -12,7 +12,7 @@
       "requirements": [
         "MV-ARCH-11"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "src/server/a2a.mjs",
@@ -74,7 +74,7 @@
       "requirements": [
         "MV-PRD-10"
       ],
-      "description": "Repo: mgillr/memev (or a new SDK repo; decide in WP17-03).",
+      "description": "Repo: memev (or a new SDK repo; decide in WP17-03).",
       "scope": {
         "allow": [
           "sdk/**"
@@ -123,7 +123,7 @@
       "requirements": [
         "MV-PRD-10"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "conformance/**"
@@ -162,7 +162,7 @@
     },
     {
       "id": "WP18-04",
-      "title": "Payment after verified acceptance: x402 and Stripe adapters, idempotency, reconciliation; a payment receipt is never taken as proof of delivery",
+      "title": "Payment after verified acceptance: agentic payment protocol adapters and a Stripe adapter, idempotency, reconciliation; a payment receipt is never taken as proof of delivery",
       "phase": "implement",
       "owner": "lane-product",
       "depends_on": [
@@ -171,7 +171,7 @@
       "requirements": [
         "MV-PRD-11"
       ],
-      "description": "Repo: mgillr/memev. Adapter only; no money moves without owner approval.",
+      "description": "Repo: memev. Adapter only; no money moves without owner approval.",
       "scope": {
         "allow": [
           "src/engine/payments.mjs",

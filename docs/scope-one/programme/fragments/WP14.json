@@ -13,7 +13,7 @@
       "requirements": [
         "MV-DEM-01"
       ],
-      "description": "Repo: mgillr/memev. Deliverable 3 of the notes.",
+      "description": "Repo: memev. Deliverable 3 of the notes.",
       "scope": {
         "allow": [
           "scripts/demo-federation.mjs",
@@ -64,7 +64,7 @@
       "requirements": [
         "MV-DEM-02"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "test/demo-workflow.test.mjs"
@@ -114,7 +114,7 @@
       "requirements": [
         "MV-DEM-04"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "test/demo-adversary.test.mjs"
@@ -164,7 +164,7 @@
       "requirements": [
         "MV-DEM-03"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "docs/DEMONSTRATORS.md"
@@ -213,7 +213,7 @@
       "requirements": [
         "MV-DEM-05"
       ],
-      "description": "Repo: mgillr/memev. Numbers published with method; no claim without a measured value.",
+      "description": "Repo: memev. Numbers published with method; no claim without a measured value.",
       "scope": {
         "allow": [
           "scripts/bench/federation.mjs",

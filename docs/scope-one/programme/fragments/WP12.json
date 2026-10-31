@@ -13,7 +13,7 @@
       "requirements": [
         "MV-INT-06"
       ],
-      "description": "Repo: mgillr/memev. Keeps the gossip boundary: engine supplies state and digests, Memev supplies transport and lifecycle. Must not become a standalone merge service (BSL restriction; OQ-10).",
+      "description": "Repo: memev. Keeps the gossip boundary: engine supplies state and digests, Memev supplies transport and lifecycle. Must not become a standalone merge service (BSL restriction; OQ-10).",
       "scope": {
         "allow": [
           "src/engine/transport.mjs",
@@ -74,7 +74,7 @@
       "requirements": [
         "MV-INT-06"
       ],
-      "description": "Repo: mgillr/memev. Reuses the existing relay.",
+      "description": "Repo: memev. Reuses the existing relay.",
       "scope": {
         "allow": [
           "src/cli/relay.mjs",
@@ -127,7 +127,7 @@
         "MV-INT-06",
         "MV-DEM-01"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "scripts/federation-harness.mjs",

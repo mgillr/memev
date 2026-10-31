@@ -1,0 +1,46 @@
+{
+  "title": "PG-09.2 Identity, admission and ACFA boundary (memev-ops)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract for work package WP09 in memev-ops: Identity, admission and ACFA boundary. Proposed and unsigned; the signer (ASTL workstream) signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP09.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: none. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "WP09-04",
+      "title": "ACFA-RS patent and licence check recorded before any release package is designed",
+      "phase": "verify",
+      "depends_on": [],
+      "requirements": [
+        "MV-LIC-02: ACFA-RS licence and patent terms are checked separately before the release package is designed. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:88; evidence docs/scope-one/programme/DECOMPOSITION.md:119; baseline 8.5)"
+      ],
+      "description": "Repo: memev-ops. Owner or counsel task: LICENSE is Apache-2.0; patent position unverified.",
+      "scope": [
+        "contracts/ACFA-LICENCE-CHECK.md"
+      ],
+      "criteria": [
+        {
+          "statement": "record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "contracts/ACFA-LICENCE-CHECK.md"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}

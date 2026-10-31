@@ -1,0 +1,220 @@
+{
+  "title": "PGP-1.02 memev: the project store, state machine and coordinator wired into the daemon, with a licence-boundary guard",
+  "project": "memev",
+  "workdir": null,
+  "request": "Per-pull-request contract for memev, branch feat/wire-project-engine (pull request #326, checks green; it implements SO-1.01 and closes this contract's T1 to T3). Proposed and unsigned; the signer (ASTL workstream) signs after the red-team gate. Repository: memev. It implements the decisions of contract SO-1.01 (canonical execution integration, signed 31 Oct 2026, design-record stage) and does not restate them: SO-1.01 asks for the decision record, this contract asks for the code that follows it. Programme tasks covered: WP07-01, WP07-02, WP07-03 and WP15-01; WP07-04 stays in PG-07.1. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository (BSL 1.1 with its PATENTS file) and is reached only across the call-out boundary, never vendored, so inclusion cannot relicense it; tiers are the free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that, with no Federated tier and no separate Personal trial; federation is planned, not available. The SO-1.01 design record (docs/scope-one/design/canonical-execution-integration.md) is that contract's deliverable, owned by the ASTL workstream, and is referenced here, not written or edited. T4 lists the wiring that pull request #326 leaves open. Depends on contracts: SO-1.01, SO-04-A, SO-07-A, SO-08-A, SR-1.27, SR-1.30.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "One store, one state machine, one coordinator, reached from the daemon",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "SO-1.01 requirement 1: the project store is the durable authority for project entities and append-only events (source: contract SO-1.01 T1)",
+        "SO-1.01 requirement 2: the state machine and the coordinator own task lifecycle, claims, leases, generations and dispatch (source: contract SO-1.01 T1)",
+        "SO-1.01 requirement 3: state changes go through the existing transition rules, and nothing mutates authoritative state directly (source: contract SO-1.01 T1; test/project-wiring.test.mjs:27, :35, :56, :115 and :137)",
+        "MV-ARCH-09: No competing state stores, duplicate coordinators or separate policy engines are created while the architecture grows. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:18; baseline 8.5)"
+      ],
+      "description": "The vault holds one store and one coordinator per project; the MCP task tools move a task through the transition table; an agent report moves a task to VERIFYING and never to a finished state.",
+      "scope": [
+        "src/engine/card.mjs",
+        "src/engine/coordinator.mjs",
+        "src/engine/vault.mjs",
+        "src/server/mcp.mjs",
+        "test/project-wiring.test.mjs",
+        "test/mcp-hints.test.mjs",
+        "docs/MODULES.md",
+        "changelog.d/PGM-WIRING.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The wiring tests are red on the base and green after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-wiring.test.mjs",
+            "cmd": "node --test test/project-wiring.test.mjs"
+          }
+        },
+        {
+          "statement": "The full suite passes with the service switched off and a fresh HOME",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "SO-1.01 requirement 5: stale generations, expired leases, duplicate delivery and concurrent claims are refused",
+      "phase": "verify",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "SO-1.01 requirement 5: stale generations, expired leases, duplicate delivery and concurrent claims are normal adversarial test cases (source: contract SO-1.01 T1; test/project-wiring.test.mjs:170 and :197; SO-1.01 requirement 3 at :161)"
+      ],
+      "description": "The tests are in test/project-wiring.test.mjs and are named for the requirement they cover.",
+      "scope": [
+        "test/project-wiring.test.mjs",
+        "src/engine/coordinator.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "The two requirement 5 tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='SO-1.01 req 5' test/project-wiring.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Licence-boundary guard: nothing of crdt-merge enters the Apache-2.0 core",
+      "phase": "verify",
+      "depends_on": [],
+      "requirements": [
+        "MV-PGM-07: The three engine plans are reconciled into one: the notes (crdt-merge via call-out, never vendored), PI-04/PI-05 on branch dev-integration-specs (vendor the Apache-2.0 TS core, Node oplog engine) and SR-3.01/SR-3.03 (new memev-merge text engine). RESOLVED by the owner decision of 31 Oct 2026: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary; PI-04/PI-05 and SR-3.01/SR-3.03 are superseded (docs/scope-one/DECISIONS.md, ADR 6). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:122; baseline 8.6)",
+        "Memev (Apache-2.0) reaches crdt-merge only as an external process across src/engine/merge.mjs; no crdt-merge implementation code, vendor/converge directory or crdt-merge package import appears in the core (source: owner decision 31 Oct 2026; src/engine/merge.mjs:2-7; test/licence-core-guard.test.mjs:60, :64 and :72)"
+      ],
+      "description": "The guard checks the repository and, on a scratch tree, each way the engine could be copied in.",
+      "scope": [
+        "test/licence-core-guard.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "The guard test is red on the base and green after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/licence-core-guard.test.mjs",
+            "cmd": "node --test test/licence-core-guard.test.mjs"
+          }
+        },
+        {
+          "statement": "The existing licence-boundary test still passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/licence-boundary.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "Open after pull request #326: the rest of the project state machine is wired, and a contract verify feeds a task verify",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "SO-1.01 requirements 2 and 3: the state machine owns lifecycle changes, so amendScope (src/engine/project-state.mjs:184), applyUpdate (:236), reassign (:262), eligibleForDispatch (:287), pause (:293), requestCancellation (:304), resume (:320) and EventLog (:160) are reached from the coordinator, the vault or the MCP routes and not only defined (source: contract SO-1.01 T1; src/engine/project-state.mjs exports; state of pull request #326 on 31 Oct 2026, where none of them is called outside project-state.mjs)",
+        "memev_task_verify (src/server/mcp.mjs:177) takes its evidence from a passing memev_contract_verify receipt (src/server/mcp.mjs:157) bound to the task scope version and artifact hash, instead of evidence supplied by the caller (source: contracts SR-1.27 and SR-1.30; pull request #326 leaves the two unconnected)"
+      ],
+      "description": "Not done by pull request #326: these are the remaining criteria of the wiring contract. The two tests named below do not exist yet; they are written by the work that closes this task.",
+      "scope": [
+        "src/engine/project-state.mjs",
+        "src/engine/coordinator.mjs",
+        "src/engine/vault.mjs",
+        "src/server/mcp.mjs",
+        "test/project-wiring-remaining.test.mjs",
+        "test/task-verify-from-contract.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "Each of amendScope, applyUpdate, reassign, eligibleForDispatch, pause, requestCancellation, resume and EventLog is reached from the coordinator, the vault or an MCP route, and the test is red on the base and green after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-wiring-remaining.test.mjs",
+            "cmd": "node --test test/project-wiring-remaining.test.mjs"
+          }
+        },
+        {
+          "statement": "memev_task_verify accepts only evidence from a passing contract verify receipt bound to the scope version and artifact hash, and the test is red on the base and green after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/task-verify-from-contract.test.mjs",
+            "cmd": "node --test test/task-verify-from-contract.test.mjs"
+          }
+        },
+        {
+          "statement": "The full suite passes with the service switched off and a fresh HOME",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}

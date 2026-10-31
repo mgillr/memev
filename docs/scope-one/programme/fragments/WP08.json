@@ -12,7 +12,7 @@
       "requirements": [
         "MV-S1-06"
       ],
-      "description": "Repo: mgillr/memev. The recorded 4 implemented / 17 partial / 58 documented-only / 19 not-implemented split is the 30 Oct baseline.",
+      "description": "Repo: memev. The recorded 4 implemented / 17 partial / 58 documented-only / 19 not-implemented split is the 30 Oct baseline.",
       "scope": {
         "allow": [
           "docs/scope-one/REQUIREMENTS.md",
@@ -63,7 +63,7 @@
       "requirements": [
         "MV-S1-05"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "docs/ADAPTERS.md",
@@ -125,7 +125,7 @@
         "MV-S1-01",
         "MV-S1-02"
       ],
-      "description": "Repo: mgillr/memev. Dashboard acceptance criteria (SLICE-PLAN slice 7) are written by the existing Scope One contract effort; this task is the end-to-end spine only.",
+      "description": "Repo: memev. Dashboard acceptance criteria (SLICE-PLAN slice 7) are written by the existing Scope One contract effort; this task is the end-to-end spine only.",
       "scope": {
         "allow": [
           "test/lifecycle.test.mjs"
@@ -175,7 +175,7 @@
       "requirements": [
         "MV-S1-03"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "src/engine/org-intel.mjs",

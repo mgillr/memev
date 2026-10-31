@@ -12,7 +12,7 @@
       "requirements": [
         "MV-REC-02"
       ],
-      "description": "Repo: mgillr/memev. Existing BM25 stays; free recall is not weakened.",
+      "description": "Repo: memev. Existing BM25 stays; free recall is not weakened.",
       "scope": {
         "allow": [
           "src/engine/vault.mjs",
@@ -74,7 +74,7 @@
       "requirements": [
         "MV-REC-02"
       ],
-      "description": "Repo: mgillr/memev. Quality measured on the existing recall bench with before and after numbers.",
+      "description": "Repo: memev. Quality measured on the existing recall bench with before and after numbers.",
       "scope": {
         "allow": [
           "src/engine/vault.mjs",
@@ -135,7 +135,7 @@
       "requirements": [
         "MV-REC-03"
       ],
-      "description": "Repo: mgillr/memev.",
+      "description": "Repo: memev.",
       "scope": {
         "allow": [
           "src/engine/graph.mjs",
@@ -198,7 +198,7 @@
       "requirements": [
         "MV-REC-05"
       ],
-      "description": "Repo: mgillr/memev. Bridges to any Federated offering.",
+      "description": "Repo: memev. Bridges to any Federated offering.",
       "scope": {
         "allow": [
           "src/engine/vault.mjs",
@@ -259,7 +259,7 @@
       "requirements": [
         "MV-REC-04"
       ],
-      "description": "Repo: mgillr/memev. Duplicate guard: do not re-specify SR-2.01 (memev-ops contracts/seed-readiness/specs/SR-2.01-recall-that-finds-paraphrases.json).",
+      "description": "Repo: memev. Duplicate guard: do not re-specify SR-2.01 (memev-ops contracts/seed-readiness/specs/SR-2.01-recall-that-finds-paraphrases.json).",
       "scope": {
         "allow": [
           "test/recall-semantic-interface.test.mjs"
@@ -307,7 +307,7 @@
       "requirements": [
         "MV-REC-01"
       ],
-      "description": "Repo: mgillr/memev. memev_get and memev_recall in src/server/mcp.mjs L127 and L138.",
+      "description": "Repo: memev. memev_get and memev_recall in src/server/mcp.mjs L127 and L138.",
       "scope": {
         "allow": [
           "test/get-recall-separate.test.mjs"

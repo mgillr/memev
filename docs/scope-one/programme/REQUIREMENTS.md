@@ -101,7 +101,7 @@ Existing contract families keep their own ids (SR-*, QL-*, SO-*, WO-*); where on
 - MV-PRD-08: Entry sequence: stage 1 interoperable and accountable (SDKs, MCP/A2A, conformance, reference deployment), stage 2 multi-organisation federation demonstrator, stage 3 commercial network; first wedge engineering and industrial programmes, healthcare as demonstration.
 - MV-PRD-09: Every feature is judged by: does it make Memev more essential to a distributed agent ecosystem, or is it only a better application.
 - MV-PRD-10: SDKs, framework adapters and public conformance tests let existing agents (for example LangGraph) join a Memev project, claim work, submit evidence and sync state.
-- MV-PRD-11: Payments follow verified acceptance (x402 for machine payments, Stripe for fiat) with idempotency and reconciliation; a payment receipt is not proof of delivery.
+- MV-PRD-11: Payments follow verified acceptance (agentic payment protocols for machine payments, Stripe for fiat) with idempotency and reconciliation; a payment receipt is not proof of delivery.
 
 ## Scope One
 

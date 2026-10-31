@@ -1,0 +1,177 @@
+{
+  "title": "PG-18.1 Interop SDKs, A2A and payments (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract for work package WP18 in memev: Interop SDKs, A2A and payments. Proposed and unsigned; the signer (ASTL workstream) signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP18.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP02-04, WP04-02, WP10-03. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "WP18-01",
+      "title": "A2A adapter alongside the existing MCP server; no replacement protocol",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "MV-ARCH-11: Memev supports MCP and A2A and does not replace them; no proprietary agent runtime; existing agents join without migrating. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:20; evidence docs/scope-one/programme/DECOMPOSITION.md:75; baseline 8.4)"
+      ],
+      "description": "Repo: memev.",
+      "scope": [
+        "src/server/a2a.mjs",
+        "test/a2a.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "a2a tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/a2a.test.mjs",
+            "cmd": "node --test test/a2a.test.mjs"
+          }
+        },
+        {
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP18-02",
+      "title": "SDK and a framework adapter (LangGraph first) so an existing agent can join a project, claim work, submit evidence and sync state",
+      "phase": "implement",
+      "depends_on": [
+        "WP18-01"
+      ],
+      "requirements": [
+        "MV-PRD-10: SDKs, framework adapters and public conformance tests let existing agents (for example LangGraph) join a Memev project, claim work, submit evidence and sync state. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:103; evidence docs/scope-one/programme/DECOMPOSITION.md:131; baseline 8.4)"
+      ],
+      "description": "Repo: memev (or a new SDK repo; decide in WP17-03).",
+      "scope": [
+        "sdk/**"
+      ],
+      "criteria": [
+        {
+          "statement": "sdk example test present",
+          "verifier": {
+            "type": "test_exists",
+            "test_file": "sdk/test/join-project.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP18-03",
+      "title": "Public conformance tests that any implementation can run",
+      "phase": "verify",
+      "depends_on": [
+        "WP18-02"
+      ],
+      "requirements": [
+        "MV-PRD-10: SDKs, framework adapters and public conformance tests let existing agents (for example LangGraph) join a Memev project, claim work, submit evidence and sync state. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:103; evidence docs/scope-one/programme/DECOMPOSITION.md:131; baseline 8.6)"
+      ],
+      "description": "Repo: memev.",
+      "scope": [
+        "conformance/**"
+      ],
+      "criteria": [
+        {
+          "statement": "conformance runner exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "conformance/run.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP18-04",
+      "title": "Payment after verified acceptance: agentic payment protocol adapters and a Stripe adapter, idempotency, reconciliation; a payment receipt is never taken as proof of delivery",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "MV-PRD-11: Payments follow verified acceptance (agentic payment protocols for machine payments, Stripe for fiat) with idempotency and reconciliation; a payment receipt is not proof of delivery. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:104; evidence docs/scope-one/programme/DECOMPOSITION.md:132; baseline 8.4)"
+      ],
+      "description": "Repo: memev. Adapter only; no money moves without owner approval.",
+      "scope": [
+        "src/engine/payments.mjs",
+        "test/payments.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "payment tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/payments.test.mjs",
+            "cmd": "node --test test/payments.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}
