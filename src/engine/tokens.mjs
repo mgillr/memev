@@ -53,7 +53,17 @@ export class TokenStore {
   }
 
   touch(id) { const r = this.data.tokens[id]; if (r) { r.last_used = now(); } }
-  revoke(id) { this.fresh(); const r = this.data.tokens[id]; if (!r) return false; r.revoked = true; r.revoked_at = now(); this.save(); return true; }
+  /** A token that holds the admin scope, is not revoked and has not expired. */
+  _liveAdmin(r) { return !!r && !r.revoked && (r.scopes || []).includes('admin') && !(r.expires && Date.parse(r.expires) < this._clock()); }
+  /** True when this token is the vault's only live admin token, so revoking it would leave no credential for the admin routes. */
+  lastAdmin(id) { const r = this.data.tokens[id]; return this._liveAdmin(r) && !Object.values(this.data.tokens).some((x) => x.id !== id && this._liveAdmin(x)); }
+  revoke(id) {
+    this.fresh(); const r = this.data.tokens[id]; if (!r) return false;
+    // the last live admin token is never revoked: nothing on the command line mints another, so every admin route would be
+    // refused for good (issue 282)
+    if (this.lastAdmin(id)) throw new Error(`${id} is this vault's only admin token; revoking it would lock every admin route. Issue another admin token first (memev token issue <name> --scopes read,write,admin), then revoke this one`);
+    r.revoked = true; r.revoked_at = now(); this.save(); return true;
+  }
 
   /** A new secret for the same id, scopes and paths; the old secret stops working at once. */
   rotate(id, { ttlDays } = {}) {

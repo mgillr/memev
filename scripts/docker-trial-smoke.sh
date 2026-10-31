@@ -1,6 +1,12 @@
 #!/bin/sh
 set -eu
 
+# The smoke runs as a compose project of its own. compose.trial.yaml sits next to compose.yaml and
+# names the same service and volume, so in the folder's default project the down -v below would
+# remove the vault of a memev deployed from this checkout (issue 283). With its own project name the
+# smoke builds, starts and removes only its own container and volume.
+export COMPOSE_PROJECT_NAME=memev-trial-smoke
+
 # Clean up on any exit so every run removes the container and volumes
 trap 'docker compose -f compose.trial.yaml down -v' EXIT
 
