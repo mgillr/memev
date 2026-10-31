@@ -81,7 +81,8 @@ The engine enabler and the gaps the memev twin measured, approved by the owner o
 |---|---|---|---|---|
 | [SR-0.03](specs/SR-0.03-verify-runs-every-verifier-type.json) | G85 | memev | Verify runs every verifier type the specs use: red-green tests, metrics and scope, behind the same local gates as commands | none |
 | [SR-1.21](specs/SR-1.21-a-missing-note-is-never-silent.json) | G86 | memev | A missing note the log cannot rebuild is reported, never silent | SR-1.01, QL-1.02 |
-| [SR-1.22](specs/SR-1.22-an-interrupted-write-recovers-from-the-log.json) | G87 | memev | A whole-note write interrupted after the log append recovers from the log, not from the old file | SR-1.01, QL-1.02 |
+| [SR-1.22](specs/SR-1.22-an-interrupted-write-recovers-from-the-log.json) | G87 | memev | A whole-note write interrupted after the log append recovers from the log, not from the old file | SR-1.01, QL-1.02, SR-1.26 |
 | [SR-1.23](specs/SR-1.23-verify-sees-a-removed-tail.json) | G88 | memev | verify() catches a removed tail of the active segment and a removed last record of a path | SR-1.01, QL-1.02 |
 | [SR-1.24](specs/SR-1.24-no-cli-write-beside-a-live-daemon.json) | G89 | memev | No CLI command writes vault state beside a live daemon | SR-1.01, QL-1.02 |
 | [SR-1.25](specs/SR-1.25-a-cloud-seat-addresses-one-local-seat.json) | G90 | memev | A cloud seat allowed to assign tasks addresses one local seat, never all | QL-1.02 |
+| [SR-1.26](specs/SR-1.26-one-write-can-never-make-the-vault-unopenable.json) | G91 | memev | One write can never make the vault unopenable | none |
