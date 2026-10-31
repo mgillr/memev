@@ -83,3 +83,26 @@ and the earlier versions stay, listed as superseded by `node scripts/gate/redtea
 | [SR-1.26](seed-readiness/specs/SR-1.26-one-write-can-never-make-the-vault-unopenable.json) | [`k-sr-1-26-one-write-can-ne-a0683a`](signed/k-sr-1-26-one-write-can-ne-a0683a.json) | 2 | [`k-sr-1-26-one-write-can-ne-e6ae4e`](signed/k-sr-1-26-one-write-can-ne-e6ae4e.json) | 2 | 51 |
 | [SR-1.27](seed-readiness/specs/SR-1.27-done-comes-only-from-a-passing-verify.json) | [`k-sr-1-27-done-comes-only-72f8b2`](signed/k-sr-1-27-done-comes-only-72f8b2.json) | 2 | [`k-sr-1-27-done-comes-only--ce2666`](signed/k-sr-1-27-done-comes-only--ce2666.json) | 1 | 22 |
 | [SR-1.28](seed-readiness/specs/SR-1.28-the-bus-writes-its-own-routing-files.json) | [`k-sr-1-28-the-bus-writes-i-c64ab5`](signed/k-sr-1-28-the-bus-writes-i-c64ab5.json) | 2 | [`k-sr-1-28-the-bus-writes-i-02c12e`](signed/k-sr-1-28-the-bus-writes-i-02c12e.json) | 2 | 56 |
+
+## Scope One gap contracts, 31 October 2026
+
+`scope-one/` holds eleven design-record contracts, SO-1.01 to SO-1.11, one for each gap the review of PR #222 names that no
+other contract owns. Each quotes the addendum text it answers and asks for a decision record under `docs/scope-one/design/`;
+none builds anything, because the addendum turns a recommendation into development only after the owner accepts the design.
+The owner asked for them on 31 October 2026 (t531u). Each has an interim red-team record (an interim solo review by the
+author, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`). The work breakdown that
+shows where each sits is [docs/scope-one/WBS.md](../docs/scope-one/WBS.md).
+
+| Spec | Contract | Gap | Title | Depends on |
+|---|---|---|---|---|
+| [SO-1.01](scope-one/specs/SO-1.01-canonical-execution-integration.json) | [`k-so-1-01-canonical-execut-21da9f`](signed/k-so-1-01-canonical-execut-21da9f.json) | G-SO-01 | Canonical execution integration: the store, the state machine and the coordinator as one authority | none |
+| [SO-1.02](scope-one/specs/SO-1.02-reconciliation-wbs.json) | [`k-so-1-02-reconciliation-o-701f2f`](signed/k-so-1-02-reconciliation-o-701f2f.json) | G-SO-02 | Reconciliation: one work breakdown that accounts for every requirement, contract, pull request and branch | none |
+| [SO-1.03](scope-one/specs/SO-1.03-lead-assignment-preference.json) | [`k-so-1-03-lead-assignment-2ba274`](signed/k-so-1-03-lead-assignment-2ba274.json) | G-SO-03 | Lead assignment: a default suitability analysis and an in-language user preference | SO-1.01 |
+| [SO-1.04](scope-one/specs/SO-1.04-dispatch-event-distinction.json) | [`k-so-1-04-dispatch-events-82855d`](signed/k-so-1-04-dispatch-events-82855d.json) | G-SO-04 | Dispatch events: a requested action, an accepted dispatch, an observed execution and a verified outcome stay apart | SO-1.01 |
+| [SO-1.05](scope-one/specs/SO-1.05-workspace-views-and-lead-area.json) | [`k-so-1-05-workspace-the-el-5e1723`](signed/k-so-1-05-workspace-the-el-5e1723.json) | G-SO-05 | Workspace: the eleven project views and the persistent lead-agent area | SO-1.01, SO-1.07 |
+| [SO-1.06](scope-one/specs/SO-1.06-connections-and-resource-readiness.json) | [`k-so-1-06-connections-and-761bb2`](signed/k-so-1-06-connections-and-761bb2.json) | G-SO-06 | Connections and access: the provider and tool connections screen and the internal resource readiness registry | SO-1.01 |
+| [SO-1.07](scope-one/specs/SO-1.07-relationship-model-and-staleness.json) | [`k-so-1-07-relationship-mod-a24ac5`](signed/k-so-1-07-relationship-mod-a24ac5.json) | G-SO-07 | Relationship model: explicit relations between project items, and change propagation that marks affected work stale | SO-1.01 |
+| [SO-1.08](scope-one/specs/SO-1.08-decision-queue.json) | [`k-so-1-08-decision-queue-b-7e1ddc`](signed/k-so-1-08-decision-queue-b-7e1ddc.json) | G-SO-08 | Decision queue: blockers and user decisions as one workflow with named states | SO-1.01 |
+| [SO-1.09](scope-one/specs/SO-1.09-artefact-history-and-previews.json) | [`k-so-1-09-artefacts-versio-a9b74b`](signed/k-so-1-09-artefacts-versio-a9b74b.json) | G-SO-09 | Artefacts: version history, comparison and previews that show verification state | SO-1.01 |
+| [SO-1.10](scope-one/specs/SO-1.10-fault-classes-added-to-failure-suite.json) | [`k-so-1-10-fault-classes-th-112630`](signed/k-so-1-10-fault-classes-th-112630.json) | G-SO-10 | Fault classes: the addendum classes that F01 to F20 do not name, added to the failure suite | SO-1.01 |
+| [SO-1.11](scope-one/specs/SO-1.11-reference-project-acceptance.json) | [`k-so-1-11-reference-projec-1fdf73`](signed/k-so-1-11-reference-projec-1fdf73.json) | G-SO-11 | Reference project: the whole user journey as one integration gate | SO-1.01, SO-1.05, SO-1.06, SO-1.07, SO-1.08, SO-1.10 |

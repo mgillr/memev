@@ -13,7 +13,7 @@
    "tasks": 1,
    "criteria": 12,
    "spec": "specs/SO-1.01-canonical-execution-integration.json",
-   "status": "proposed: owner request t531u 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-1.02",
@@ -26,7 +26,7 @@
    "tasks": 1,
    "criteria": 10,
    "spec": "specs/SO-1.02-reconciliation-wbs.json",
-   "status": "proposed: owner request t531u 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-1.03",
@@ -41,7 +41,7 @@
    "tasks": 1,
    "criteria": 10,
    "spec": "specs/SO-1.03-lead-assignment-preference.json",
-   "status": "proposed: owner request t531u 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-1.04",
@@ -56,7 +56,7 @@
    "tasks": 1,
    "criteria": 10,
    "spec": "specs/SO-1.04-dispatch-event-distinction.json",
-   "status": "proposed: owner request t531u 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-1.05",
@@ -72,7 +72,7 @@
    "tasks": 1,
    "criteria": 20,
    "spec": "specs/SO-1.05-workspace-views-and-lead-area.json",
-   "status": "proposed: owner request t531u 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-1.06",
@@ -87,7 +87,7 @@
    "tasks": 1,
    "criteria": 13,
    "spec": "specs/SO-1.06-connections-and-resource-readiness.json",
-   "status": "proposed: owner request t531u 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-1.07",
@@ -102,7 +102,7 @@
    "tasks": 1,
    "criteria": 14,
    "spec": "specs/SO-1.07-relationship-model-and-staleness.json",
-   "status": "proposed: owner request t531u 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-1.08",
@@ -117,7 +117,7 @@
    "tasks": 1,
    "criteria": 13,
    "spec": "specs/SO-1.08-decision-queue.json",
-   "status": "proposed: owner request t531u 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-1.09",
@@ -132,7 +132,7 @@
    "tasks": 1,
    "criteria": 11,
    "spec": "specs/SO-1.09-artefact-history-and-previews.json",
-   "status": "proposed: owner request t531u 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-1.10",
@@ -147,7 +147,7 @@
    "tasks": 1,
    "criteria": 13,
    "spec": "specs/SO-1.10-fault-classes-added-to-failure-suite.json",
-   "status": "proposed: owner request t531u 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   },
   {
    "id": "SO-1.11",
@@ -167,7 +167,7 @@
    "tasks": 1,
    "criteria": 22,
    "spec": "specs/SO-1.11-reference-project-acceptance.json",
-   "status": "proposed: owner request t531u 31 Oct 2026; signs after a clean interim red-team round"
+   "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
   }
  ]
 }
