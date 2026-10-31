@@ -111,6 +111,16 @@ export class Vault extends EventEmitter {
    * path must be, or a folder with something in it sits at the path. An empty folder there, which a delete leaves behind, is
    * removed. Before, the log took the write, the file system refused it, and every later open threw (issue 230).
    */
+  /**
+   * A note whose path differs from an existing note's only in letter case or Unicode form is refused, naming the existing one: a
+   * case-insensitive disk (macOS, Windows) keeps the two as one file, so both would live in the log over one body, and the vault
+   * syncs to such disks (issue 243). Only a path with no live head is checked, so writing an existing note costs nothing extra.
+   */
+  _noCaseTwin(p) {
+    const h = this.log.heads.get(p); if (h && !h.deleted) return;
+    const fold = (x) => x.normalize('NFC').toLowerCase(); const k = fold(p);
+    for (const [q, hq] of this.log.heads) if (!hq.deleted && q !== p && fold(q) === k) throw new VaultError('bad_path', `${p} differs from the existing note ${q} only in letter case or Unicode form; a case-insensitive disk keeps them as one file, so write ${q}`);
+  }
   _placeable(p) {
     const segs = String(p).split('/'); let cur = this.root;
     for (let i = 0; i < segs.length; i++) {
@@ -270,6 +280,7 @@ export class Vault extends EventEmitter {
   write(identity, { path: p, body, client = null, allow_secrets = false, internal = false }) {
     p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); this._placeable(p); body = String(body ?? '');
     this._guard(p, body, allow_secrets, internal);
+    this._noCaseTwin(p); // before syncFromDisk, which on a case-insensitive disk would read the other note's file under this spelling
     this.syncFromDisk(p);
     const old = this._read(p);
     let rec;
@@ -290,7 +301,7 @@ export class Vault extends EventEmitter {
   }
 
   append(identity, { path: p, text, client = null, allow_secrets = false, internal = false }) {
-    p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); this._placeable(p);
+    p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); this._noCaseTwin(p); this._placeable(p);
     this.syncFromDisk(p);
     let ns = this._ncGet(p);
     if (!ns) { const cur = this._read(p); if (cur !== null) { this._ncSet(p, cur); ns = this._ncGet(p); } }
