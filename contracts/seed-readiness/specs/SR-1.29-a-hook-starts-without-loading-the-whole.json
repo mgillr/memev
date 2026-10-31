@@ -1,0 +1,121 @@
+{
+  "title": "SR-1.29 A hook starts without loading the whole CLI",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G94: the MEM-098 latency test (test/hooks-latency.test.mjs:64: the prompt hook returns in under 1.5 s while each backend call takes 1 s) fails on the CI runner at 1589 to 1729 ms on 32 of 37 open pull requests, after passing on 28 to 30 October. The hook runs through bin/memev.mjs, which loads the whole CLI (src/cli/main.mjs) for every hook, and src/cli/hooks.mjs loads the engine at start through isVault (src/engine/vault.mjs) and the transcript scanner. Measured on 31 October 2026 on a development machine: node starts in 40 ms, importing main.mjs takes 110 ms and hooks.mjs 140 ms, and the test passes there at 1322 ms. The fix is to the hook's own start-up, never to the budget. Repository: memev. Depends on contracts: QL-1.02.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "The hook path starts light",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "bin/memev.mjs hands a hook command (memev hook <event>) to src/cli/hooks.mjs before it imports src/cli/main.mjs; every other command path is unchanged",
+        "src/cli/hooks.mjs imports at module load only what every hook event needs; the engine (src/engine/vault.mjs and what it imports), the transcript scanner and any code one event alone uses are imported inside that event's path",
+        "the hooks' behaviour, output and exit codes are unchanged, and the 1.5 s budget of MEM-098, MEMEV_HOOK_BUDGET_MS and test/hooks-latency.test.mjs stay as they are",
+        "the start-up cost is measured, not assumed: the test records which modules a hook process loads and how long a prompt hook takes with a stub that answers at once"
+      ],
+      "scope": [
+        "bin/memev.mjs",
+        "src/cli/hooks.mjs",
+        "test/hooks-startup.test.mjs",
+        "test/helpers/load-log.mjs",
+        "docs/MODULES.md",
+        "changelog.d/SR-1.29.md"
+      ],
+      "criteria": [
+        {
+          "statement": "Spawned as node bin/memev.mjs hook <event> --client claude-code against a stub daemon, with a module-load log (a resolve hook registered through --import from test/helpers/load-log.mjs): the prompt event loads none of src/cli/main.mjs, src/engine/vault.mjs and src/cli/transcript.mjs, and no hook event loads src/cli/main.mjs.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/hooks-startup.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.29 hook loads' test/hooks-startup.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.29 hook loads$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Each hook event's stdout and exit code, for the inputs and stub of test/hooks-latency.test.mjs, equal the values the test records from the base code.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.29 output unchanged' test/hooks-startup.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.29 output unchanged$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "With a stub whose backend calls answer at once, the median of five prompt hook processes, spawned as node bin/memev.mjs hook prompt --client claude-code, is under 400 ms on the verifying machine.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.29 prompt hook start-up' test/hooks-startup.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.29 prompt hook start-up$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The MEM-098 tests pass ten runs in a row, unchanged.",
+          "verifier": {
+            "type": "command",
+            "cmd": "for i in $(seq 1 10); do out=$(node --test --test-reporter=tap --test-name-pattern='MEM-098' test/hooks-latency.test.mjs 2>&1) || exit 1; printf '%s\\n' \"$out\" | awk -v pat='^MEM-098' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' || exit 1; done",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "test/hooks-latency.test.mjs is byte-identical to the recorded base.",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ -n \"$MEMEV_CONTRACT_BASE\" ] && git diff --quiet \"$MEMEV_CONTRACT_BASE\" -- test/hooks-latency.test.mjs",
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/hooks-startup.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/hooks-startup.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/hooks-startup.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

@@ -397,6 +397,21 @@
       "status": "proposed: owner's go pending, signs after a clean red-team round"
     },
     {
+      "id": "SR-1.29",
+      "gap": "G94",
+      "area": "SR-1",
+      "title": "A hook starts without loading the whole CLI",
+      "repo": "memev",
+      "closes": "Closes G94: the MEM-098 latency test (test/hooks-latency.test.mjs:64: the prompt hook returns in under 1.5 s while each backend call takes 1 s) fails on the CI runner at 1589 to 1729 ms on 32 of 37 open pull requests, after passing on 28 to 30 October. The hook runs through bin/memev.mjs, which loads the whole CLI (src/cli/main.mjs) for every hook, and src/cli/hooks.mjs loads the engine at start through isVault (src/engine/vault.mjs) and the transcript scanner. Measured on 31 October 2026 on a development machine: node starts in 40 ms, importing main.mjs takes 110 ms and hooks.mjs 140 ms, and the test passes there at 1322 ms. The fix is to the hook's own start-up, never to the budget",
+      "depends_on": [
+        "QL-1.02"
+      ],
+      "tasks": 1,
+      "criteria": 10,
+      "spec": "specs/SR-1.29-a-hook-starts-without-loading-the-whole.json",
+      "status": "proposed: owner's go pending, signs after a clean red-team round"
+    },
+    {
       "id": "SR-2.01",
       "gap": "G21",
       "area": "SR-2",

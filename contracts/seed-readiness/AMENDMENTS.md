@@ -197,6 +197,7 @@ History of the guard's form, 31 October 2026: (1) a count of matching passing li
 - SR-1.26: name guard on 22 criterion command(s).
 - SR-1.27: name guard on 27 criterion command(s).
 - SR-1.28: name guard on 16 criterion command(s).
+- SR-1.29: name guard on 4 criterion command(s).
 
 ## Subtest labels added by the build
 
