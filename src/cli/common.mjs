@@ -4,12 +4,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { configDir, homeDir, readJson, writePrivateJson, exists } from '../engine/util.mjs';
 import { TokenStore, TOKEN_RE, EXPIRY_WARNING_DAYS, expiryWarningLine, expiredWarningLine } from '../engine/tokens.mjs';
-import { fetchOut } from '../engine/net.mjs';
 
 export const PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const STATE = '.memev';
+
+// The flags every memev command reads as booleans. main.mjs and the hook entry both parse with this list, so a hook
+// started through bin/memev.mjs sees exactly the flags it saw when it went through main.
+export const BOOLEAN_FLAGS = ['help', 'yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects', 'release', 'open', 'once', 'refresh', 'aider', 'local'];
 
 export function parseArgs(argv, booleans = []) {
   const flags = {}; const pos = [];
@@ -112,13 +116,33 @@ export function effectiveClient(claimed, env = process.env, ppid = process.ppid)
   return want;
 }
 
+// The daemon is always on this computer's loopback address, never behind a proxy (fetchOut sends loopback direct too),
+// so api() talks to it with node:http. Loading fetch's implementation costs more start-up time than a hook can spare on
+// a slow runner (MEM-098); the answer is the same: status, ok for 2xx, the body text and its JSON when it parses.
+// node:http is required, not imported: an ESM import of it reads every export, and one of them loads fetch's
+// implementation, which is the cost this avoids.
+const http = createRequire(import.meta.url)('node:http');
+function loopback(port, route, { method, headers, body, signal }) {
+  return new Promise((resolve, reject) => {
+    const h = body != null ? { ...headers, 'content-length': Buffer.byteLength(body) } : headers;
+    const req = http.request({ host: '127.0.0.1', port, path: route, method, headers: h, signal, agent: false }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, text: Buffer.concat(chunks).toString('utf8') }));
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+    req.end(body ?? undefined);
+  });
+}
+
 export async function api(root, route, { method = 'POST', body = null, token = null, timeoutMs = 3000, port = null } = {}) {
   const p = port || daemonInfo(root)?.port || config(root).port;
   const ac = new AbortController(); const t = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const r = await fetchOut(`http://127.0.0.1:${p}${route}`, { method, signal: ac.signal, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
-    const text = await r.text(); let json = null; try { json = JSON.parse(text); } catch {}
-    return { ok: r.ok, status: r.status, json, text };
+    const r = await loopback(p, route, { method, signal: ac.signal, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : null });
+    let json = null; try { json = JSON.parse(r.text); } catch {}
+    return { ok: r.status >= 200 && r.status < 300, status: r.status, json, text: r.text };
   } finally { clearTimeout(t); }
 }
 

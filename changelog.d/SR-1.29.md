@@ -1,0 +1,3 @@
+### Fixed
+
+- The prompt hook starts in about half the time it took. `bin/memev.mjs` hands `memev hook <event>` straight to the hook code instead of loading the whole CLI; the hooks check for a vault through the new `src/engine/vault-marker.mjs` instead of loading the vault engine; the transcript scanner and the remote-vault code load only when a hook needs them; and the CLI talks to the daemon on loopback with `node:http`, so a hook no longer loads fetch's implementation. The hooks' output, exit codes and the 1.5 s budget of MEM-098 are unchanged. `test/hooks-startup.test.mjs` records which modules each hook loads and, given a base commit, compares the output and the start-up time with it.
