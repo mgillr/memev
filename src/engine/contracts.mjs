@@ -165,6 +165,40 @@ function notAnAssertion(out) {
 /** Whether a TAP run printed a passing test line other than a file line. */
 const passingLine = (out) => out.split('\n').some((l) => { const m = /^\s*ok \d+ - (.*)$/.exec(l); return m && !/# (SKIP|TODO)/.test(m[1]) && !/\.test\.m?js$/.test(m[1].trim()); });
 
+/**
+ * The last JSON object a command printed: the last top-level { ... } in `text` that parses (a pretty-printed object counts
+ * as one, an object nested inside it does not). null when there is none.
+ */
+export function lastJsonObject(text) {
+  const src = String(text ?? '');
+  let last = null;
+  let i = 0;
+  while (i < src.length) {
+    const open = src.indexOf('{', i);
+    if (open < 0) break;
+    let depth = 0; let inStr = false; let esc = false; let end = -1;
+    for (let j = open; j < src.length; j++) {
+      const ch = src[j];
+      if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') inStr = false; continue; }
+      if (ch === '"') inStr = true; else if (ch === '{') depth++; else if (ch === '}' && --depth === 0) { end = j; break; }
+    }
+    let parsed;
+    if (end > 0) { try { parsed = JSON.parse(src.slice(open, end + 1)); } catch { parsed = undefined; } }
+    if (parsed !== undefined && parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) { last = parsed; i = end + 1; } else i = open + 1;
+  }
+  return last;
+}
+/** The value at a dotted path of own properties, or { missing: true }. */
+export function dottedValue(obj, key) {
+  let cur = obj;
+  for (const part of String(key ?? '').split('.')) {
+    if (part === '' || cur === null || typeof cur !== 'object' || !Object.hasOwn(cur, part)) return { missing: true };
+    cur = cur[part];
+  }
+  return { value: cur };
+}
+const METRIC_OPS = { '<': (a, b) => a < b, '<=': (a, b) => a <= b, '>': (a, b) => a > b, '>=': (a, b) => a >= b, '==': (a, b) => a === b };
+const metricStamp = (p) => { try { const s = fs.statSync(p, { bigint: true }); return `${s.ino}:${s.size}:${s.mtimeNs}:${s.ctimeNs}`; } catch { return null; } };
 /** The environment of a criterion command: this process's, with MEMEV_CONTRACT_BASE set to the base, or removed when there is none. */
 export function criterionEnv(base, env = process.env) {
   const out = { ...env };
@@ -411,6 +445,38 @@ export function attach(Vault) {
       if (this.config.contracts?.exec === false) return { status: 'BLOCKED', detail: 'running commands is switched off (contracts.exec)' };
       return null;
     };
+    // metric (SR-0.03 task 4): the command's last JSON object, or the file it writes, compared with a threshold
+    const metric = async (v) => {
+      const op = METRIC_OPS[v.op];
+      if (!op) return { status: 'FAIL', detail: `the operator ${JSON.stringify(v.op)} is not one of <, <=, >, >=, ==` };
+      if (typeof v.value !== 'number' || !Number.isFinite(v.value)) return { status: 'FAIL', detail: 'the threshold value is not a number' };
+      if (!v.key || typeof v.key !== 'string') return { status: 'FAIL', detail: 'the key is missing' };
+      let file = null;
+      if (v.output_file !== undefined && v.output_file !== null) { try { file = this._confinePath(wd, v.output_file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } }
+      const cpus = os.cpus().length || 1;
+      const load = os.loadavg()[0];
+      const max = c.defaults?.max_load_per_cpu;
+      const where = `${cpus} CPU${cpus === 1 ? '' : 's'}, 1-minute load ${load.toFixed(2)}`;
+      if (typeof max === 'number' && load / cpus > max) return { status: 'BLOCKED', detail: `machine busy: load per CPU ${(load / cpus).toFixed(2)} is above ${max}, so the command was not run (${where})` };
+      const before = file ? metricStamp(file) : null;
+      const r = await runAsync('sh', ['-c', v.cmd], { cwd: wd, env, timeout: (v.timeout_s || 300) * 1000 });
+      if (r.timedOut) return { status: 'FAIL', detail: `the command timed out after ${v.timeout_s || 300} s` };
+      if (r.status === 127) return { status: 'BLOCKED', detail: `the command was not found (exit 127): ${truncate(`${r.stderr}${r.stdout}`.trim(), 200)}` };
+      if (r.status !== 0) return { status: 'FAIL', detail: `the command exited ${r.status}${r.error ? ` (${r.error})` : ''}: ${truncate(`${r.stderr}${r.stdout}`.trim(), 200)}` };
+      let text = r.stdout;
+      if (file) {
+        const after = metricStamp(file);
+        if (after === null || after === before) return { status: 'FAIL', detail: 'output_file not written by this run' };
+        try { text = fs.readFileSync(file, 'utf8'); } catch { return { status: 'FAIL', detail: 'output_file not written by this run' }; }
+      }
+      const obj = lastJsonObject(text);
+      if (!obj) return { status: 'FAIL', detail: 'no JSON object in the output' };
+      const got = dottedValue(obj, v.key);
+      if (got.missing) return { status: 'FAIL', detail: `the key ${v.key} is not in the output` };
+      if (typeof got.value !== 'number' || !Number.isFinite(got.value)) return { status: 'FAIL', detail: `${v.key} is not a number (${truncate(JSON.stringify(got.value), 60)})` };
+      const ok = op(got.value, v.value);
+      return { status: ok ? 'PASS' : 'FAIL', detail: `${v.key} = ${got.value}, wanted ${v.op} ${v.value} (measured ${got.value}, threshold ${v.value}, ${where})` };
+    };
     const run = async (crit) => {
       const v = crit.verifier;
       if (v.type === 'command') {
@@ -423,6 +489,7 @@ export function attach(Vault) {
       if (v.type === 'test_exists') { let p; try { p = this._confinePath(wd, v.test_file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.test_file } : { status: 'FAIL', detail: `${v.test_file} is missing` }; }
       if (v.type === 'grep') { let p; try { p = this._confinePath(wd, v.file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } const pat = String(v.pattern ?? ''); if (!pat) return { status: 'FAIL', detail: 'the pattern is missing' }; if (pat.length > GREP_PATTERN_MAX) return { status: 'FAIL', detail: `a pattern over ${GREP_PATTERN_MAX} characters is not checked` }; let t = ''; try { t = fs.readFileSync(p, 'utf8'); } catch { return { status: 'FAIL', detail: `${v.file} is missing` }; } if (grepLeft <= 0) return { status: 'FAIL', detail: 'not checked: the grep time for this verify is used up' }; const limit = Math.min(GREP_TIMEOUT_MS, grepLeft); const g0 = Date.now(); const m = grepMatch(pat, String(v.flags || ''), t, limit); grepLeft -= Date.now() - g0; if (m.timeout) return { status: 'FAIL', detail: `the pattern did not finish within ${limit} ms and is not checked` }; if (m.error) return { status: 'FAIL', detail: 'the pattern is not a usable regular expression' }; return m.ok ? { status: 'PASS', detail: `${v.file} matches` } : { status: 'FAIL', detail: `${v.file} does not match ${v.pattern}` }; }
       if (v.type === 'metric' || v.type === 'test_red_green') { const g = commandGate(); if (g) return g; }
+      if (v.type === 'metric') return metric(v);
       if (v.type === 'scope' || v.type === 'test_red_green') { const b = baseCheck(); if (b) return { status: 'BLOCKED', detail: b }; }
       if (v.type === 'test_red_green') return redGreen(v);
       return { status: 'BLOCKED', detail: `${v.type} criteria are checked by a person or CI, not here` };
