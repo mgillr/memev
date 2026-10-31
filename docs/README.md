@@ -105,3 +105,4 @@ The record a builder takes over with: what exists, what is missing, and the orde
 | [scope-one/DECISIONS.md](scope-one/DECISIONS.md) | the open ADRs and the questions only the owner can answer |
 | [scope-one/SLICE-PLAN.md](scope-one/SLICE-PLAN.md) | the ordered slices and the deferred work |
 | [scope-one/WBS.md](scope-one/WBS.md) | the work breakdown: every requirement, contract, pull request and branch once, with its status and owner |
+| [scope-one/design/cross-functional-issue-discovery.md](scope-one/design/cross-functional-issue-discovery.md) | the SO-2.05 decision record: cross-functional issue discovery, with its open owner decisions |
