@@ -269,7 +269,7 @@
         "docs/CONTRACTS.md gives the canonical criteria with a timeout_s and states that a gate run costs up to 4 + 2N runs of the test command for N mutants (two controls, the no-op control, two runs per mutant and a closing control) and that the three canonical metrics run the gate three times per verify, each within its own timeout_s",
         "contractSign lints the exact bytes it signs and ignores any lint result stored in the draft, because drafts are writable by any caller with write scope",
         "contractVerify runs the canonical mutation command with the running memev's own runner in place of the workdir's scripts/gate/mutate.mjs; when the workdir's copy is not byte-identical to memev's own, the mutation metrics FAIL with a detail saying the gate is not the pinned one, except in a task whose scope names the runner itself, where memev's own copy judges the change and the difference is reported",
-        "with contracts.mutation_required on, a contract whose implement task touches src must name an explicit base sha in its spec (SR-0.03 requirement 2) and contractSign refuses one without it; the recorded base is the spec's, so signing after the change cannot move it, and an amendment that names no new base keeps the superseded contract's base; an amendment that names a later base is an open item of this contract's stop decision",
+        "with contracts.mutation_required on, a contract whose implement task touches src must name an explicit base sha in its spec (SR-0.03 requirement 2) and contractSign refuses one without it; the recorded base is the spec's, so signing after the change cannot move it, and an amendment that names no new base keeps the superseded contract's base; an amendment whose base differs from the superseded contract's base is BLOCKED at verify, naming the base change, until a reviewer key signs an envelope over {contract id, old base, new base}, so every base change is reviewed",
         "contractVerify sets MEMEV_CONTRACT_BASE to the recorded base for every command, metric and red-green run, overriding any value in its own environment",
         "each red-green criterion of this task that runs test/gate-mutate-lint.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest"
       ],
@@ -446,7 +446,7 @@
           }
         },
         {
-          "statement": "T2-c20: Through newVault with contracts.mutation_required on: a temporary git repository with main at commit M and a commit C that changes src/f.mjs, covered only by a weak test. A contract whose spec names the explicit base M is signed after C, and an amendment of it, naming the same base, is signed after a further strongly tested one-line commit D. Verifying either returns FAIL with C's line among the gate's survivors, because the recorded base is the spec's M, not HEAD at signing. A draft whose src-touching implement task has no explicit base is refused at sign and no signed contract is written.",
+          "statement": "T2-c20: Through newVault with contracts.mutation_required on: a temporary git repository with main at commit M and a commit C that changes src/f.mjs, covered only by a weak test. A contract whose spec names the explicit base M is signed after C, and an amendment of it, naming the same base, is signed after a further strongly tested one-line commit D. Verifying either returns FAIL with C's line among the gate's survivors, because the recorded base is the spec's M, not HEAD at signing. A draft whose src-touching implement task has no explicit base is refused at sign and no signed contract is written. An amendment naming the later base D, signed after D, is BLOCKED at verify, naming the base change, until a reviewer-signed envelope over the contract id and both bases accepts it.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/gate-mutate-lint.test.mjs",
@@ -462,10 +462,18 @@
           }
         },
         {
-          "statement": "One full run of test/gate-mutate-lint.test.mjs passes every labelled subtest (T2-c01, T2-c04, T2-c05, T2-c06, T2-c07, T2-c08, T2-c09, T2-c10, T2-c11, T2-c12, T2-c13, T2-c15, T2-c16, T2-c17, T2-c20, T2-c21) with nothing skipped and nothing todo.",
+          "statement": "T2-c22: With contracts.mutation_required on and the sha256 of a weak workdir runner (one that prints a passing summary) recorded in the vault config as a pinned hash, contractVerify still runs memev's own runner, which finds the weakly tested change, and returns FAIL; the recorded hash plays no part.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c22:' test/gate-mutate-lint.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c22:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/gate-mutate-lint.test.mjs passes every labelled subtest (T2-c01, T2-c04, T2-c05, T2-c06, T2-c07, T2-c08, T2-c09, T2-c10, T2-c11, T2-c12, T2-c13, T2-c15, T2-c16, T2-c17, T2-c20, T2-c21, T2-c22) with nothing skipped and nothing todo.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-mutate-lint.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c04:|^T2-c05:|^T2-c06:|^T2-c07:|^T2-c08:|^T2-c09:|^T2-c10:|^T2-c11:|^T2-c12:|^T2-c13:|^T2-c15:|^T2-c16:|^T2-c17:|^T2-c20:|^T2-c21:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-mutate-lint.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c04:|^T2-c05:|^T2-c06:|^T2-c07:|^T2-c08:|^T2-c09:|^T2-c10:|^T2-c11:|^T2-c12:|^T2-c13:|^T2-c15:|^T2-c16:|^T2-c17:|^T2-c20:|^T2-c21:|^T2-c22:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
             "timeout_s": 600
           }
         },
