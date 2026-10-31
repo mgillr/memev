@@ -28,10 +28,11 @@ It prints a one-time code, a link and a QR code. The code is valid for 15 minute
 
     memev join <code>
 
-on their computer. That enrols the computer under their name, with its own device key, pulls the vault
-and connects their AI apps. Each app gets its own seat, named after the app, the teammate and the
-computer, such as `claude-code@sam-laptop`. A computer over the licensed count, or on a lapsed licence,
-can read the bus but not post; who may join follows the licence.
+on their computer. That enrols the computer under their name, with its own device key, and connects
+their AI apps to your vault. The vault stays on your computer; their apps reach it through the link.
+Each app gets its own seat, named after the app, the teammate and the computer, such as
+`claude-code@sam-laptop`. A computer over the licensed count, or on a lapsed licence, can read the
+bus but not post; who may join follows the licence.
 
 ## Choose the lead
 
@@ -49,7 +50,7 @@ removed.
 
 ## What is shared
 
-- The memory: every note, decision and card in the vault, in plain Markdown under `~/memev`.
+- The memory: every note, decision and card in the vault, in plain Markdown under `~/memev` on your computer.
 - The bus: the seats, the messages, the heartbeats and the lead, under `bus/` in the same vault.
 - The backup: your private GitHub repository, with everything above in it.
 
