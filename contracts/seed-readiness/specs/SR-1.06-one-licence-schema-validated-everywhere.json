@@ -16,7 +16,7 @@
         "installLicense refuses a licence carrying name, email or machine exactly as activateLicense does, and writes no file; the test installs such a licence from file and asserts the refusal (the twin measured install writing a licence that activate refuses: src/cli/licensing.mjs:148-151 never calls extraFields, :90 does)",
         "a trial licence and an org licence install from file and activate by key under the same rule; the schema header states which non-identity fields (trial, org, trial_ext) a licence may carry",
         "the schema check lives in verifyLicense, so install, activate, loadLicense and every reader apply one rule; the trial rules (one trial per organisation, a trial never replaces a live paid licence) live in one function that install and activate both call",
-        "the relay default that the activation server sends beside the licence (the wrapper's relay object) is the one unsigned exception: the schema lists it as a wrapper field, it is typed and validated (an https URL and a domain name, nothing else), it is applied only when no relay is configured, and docs state that it is unsigned; every field read from the licence itself is a signed schema field",
+        "the relay default that the activation server sends beside the licence (the wrapper's relay object) is the one unsigned exception: the schema lists it as a wrapper field; it is typed and validated (default_url a relay://host:port address exactly as src/cli/relay.mjs accepts it, default_domain a domain name, nothing else); it is applied only when no relay is configured; a malformed value is ignored with a warning and activation still succeeds; docs state that it is unsigned; every field read from the licence itself is a signed schema field",
         "a trial licence must carry org, so the one-trial-per-organisation rule cannot be sidestepped by leaving org out; existing fixtures that build a trial without org gain one",
         "keys that name Object.prototype members (__proto__, constructor, toString) are unknown fields, and an org of that name never reaches a prototype through the trial record"
       ],
@@ -28,7 +28,8 @@
         "test/licensing-activate.test.mjs",
         "test/merge-entitlement.test.mjs",
         "docs/PRICING.md",
-        "changelog.d/SR-1.06.md"
+        "changelog.d/SR-1.06.md",
+        "src/cli/relay.mjs"
       ],
       "criteria": [
         {
@@ -153,14 +154,6 @@
           }
         },
         {
-          "statement": "activateLicense with root set to an initialised vault and fetchImpl answering {license: <valid signed personal_more licence>, relay:{default_url:'relay://127.0.0.1:9', default_domain:'relay.test'}} leaves relaySetting(root).default_url and default_domain null. A relay default is stored only when the vendor signature covers it as a typed field. The owner must first add test/licensing-activate.test.mjs (MEM-030-FU) to scope and remove 'relay' from the criterion-9 key list, or else record relay as an explicit unsigned exception.",
-          "verifier": {
-            "type": "test_red_green",
-            "test_file": "test/license-schema.test.mjs",
-            "cmd": "node --test test/license-schema.test.mjs"
-          }
-        },
-        {
           "statement": "For a correctly signed licence with services ['merge'] plus each key in ['email','name','customer_id','relay']: verifyLicense(lic,{keys,now}).state === 'invalid' with a reason naming the key; engineAllowed(lic,{keys,now}) imported from src/engine/merge.mjs === false; and resolveMerge({a:'A\\n',b:'B\\n',base:'x\\n',license:lic,config:{merge:{provider:stub}},keys,now}) makes no stub call and returns keepBoth:true. The same licence without the extra key gives engineAllowed true and exactly one provider call.",
           "verifier": {
             "type": "test_red_green",
@@ -243,6 +236,14 @@
         },
         {
           "statement": "With a live paid licence installed, and separately a live trial, a signed licence whose iat is 30 days after now is refused by both installLicense and activateLicense. The installed licence bytes are unchanged and the trial record is not ended.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/license-schema.test.mjs",
+            "cmd": "node --test test/license-schema.test.mjs"
+          }
+        },
+        {
+          "statement": "The wrapper relay exception: activation with a valid relay://host:port default and a domain stores both when no relay is configured; with a relay already configured it changes nothing; with a malformed default (an https URL, a missing port, an extra key) it stores nothing, prints a warning naming the field and still installs the licence",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/license-schema.test.mjs",
