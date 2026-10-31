@@ -1,0 +1,86 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SR-1.01",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "b491215d94a556bbcaa25ad95fa74128e00fa81b48a85f1343ceadedb00f6224",
+      "base_commit": "4282ba7d1f0e0db2c4f0335bfd949bfcbbbe7f1b",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/MODULES.md",
+            "sha256": "1bc02214fea53351ee60db81e1b94dd269a7a6fbab9240cf2f37bf4225981f6a"
+          },
+          {
+            "path": "src/cli/compact.mjs",
+            "sha256": "aea53e4da00caba977b54fd2035ceb9d15b27914ea3a39588a2811c5410c3751"
+          },
+          {
+            "path": "src/cli/daemon.mjs",
+            "sha256": "5cbefe0fbac275868d7a4c34eae278c8d09180ea613f740e29e165628c469a5b"
+          },
+          {
+            "path": "src/cli/doctor.mjs",
+            "sha256": "c71aa7f868aa2199c4fde3c71948876aeb1e03cc08aab9f9d61da4c13f48d7c2"
+          },
+          {
+            "path": "src/cli/main.mjs",
+            "sha256": "0915c5b38d2b7530cb4a07fa7715e6f73fffebd2646a959348eeddfa1b5c52ef"
+          },
+          {
+            "path": "src/cli/runner.mjs",
+            "sha256": "16b6e3f780760513dd4e42792ef7e1c3feb932727b59d97502e427bc985cdad8"
+          },
+          {
+            "path": "src/cli/service.mjs",
+            "sha256": "7baf6ed41a24f1d4ef57f652a4a0be130380a9e6a10593bcb266206c9e7bcf6b"
+          },
+          {
+            "path": "src/engine/devices.mjs",
+            "sha256": "37391e4cd0f4e5a1f52eab59d5081c0731da925d24e938f0ab990862ec09d21f"
+          },
+          {
+            "path": "src/engine/index.mjs",
+            "sha256": "4fe2798c75ab648caecee244d6307bbb31253410bd8c81bab6c9d4379971d212"
+          },
+          {
+            "path": "src/engine/oplog.mjs",
+            "sha256": "35a8cfc7b849a274e356cc96e362ce627f2ec20d83108407d87251b28a230465"
+          },
+          {
+            "path": "src/engine/util.mjs",
+            "sha256": "2d299a509de79ec4824c2b2696f374cb34976f94b416841922a6ce4e34bfdd9e"
+          },
+          {
+            "path": "src/engine/vault.mjs",
+            "sha256": "63db6108e1838433b79bdd0fc725684e3ab79e92ba5d097d2545bc758bc4ad28"
+          },
+          {
+            "path": "src/server/main.mjs",
+            "sha256": "7fa8892a63b1c3447febd7736244fc6a013a51b0a50e658f3d8be76c6040c4d0"
+          },
+          {
+            "path": "test/runner.test.mjs",
+            "sha256": "9a54513bac1a7920ecd0efee0266ef1d3014143420f38fb9d8e6747a9e0f2685"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Re-sign review of the spec as it stands on main at 4282ba7d1f0e, for a contract signed before the red-team gate. It has 3 task(s) and 62 criteria. Mechanical checks run on every criterion, and these are the only checks made: each task drafts through makeTask; each command, metric and red-green cmd parses with sh -n; each red-green cmd names its test_file and that file is in the task's scope; no criterion statement is repeated within a task except as answer 1 records; every contract this spec depends on, in its manifest row, is a manifest row. They found nothing. I did not re-run the three rounds that were made off this repository before the first signing, and I did not run the checks the criteria name, because their code is not built yet. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NzUwNDMzMDAwMDcxZjFkZWJmNmUwMzQ3ZDQzY2I4N2U4MDAyYzMwMDdjMTM0ZTExYTI4ZGUyZDVmYzg2MmYxNg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "cgCkQULq4VNn4yJ8R/gUd+40H7qhNT2Cj46rUy45vhd4PXg0+tGXLG3ruTFLwdbjhPFfCZAY5GDuY6Ej43V0Dg=="
+          }
+        ]
+      }
+    }
+  ]
+}

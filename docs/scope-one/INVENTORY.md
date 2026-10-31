@@ -47,7 +47,7 @@ Dated 2026-10-30, at the baseline commit recorded in BASELINE.md. One row per co
 | MEM-057 | git branch | none | in progress | unowned | 7 commits ahead of main | none | MERGE |
 | MEM-058 | git branch | none | verified | unowned | 18 commits ahead of main | none | KEEP |
 | MEM-065 | git branch | none | verified | unowned | 1 commits ahead of main | none | KEEP |
-| MEM-067 | git branch | none | in progress | unowned | 2 commits ahead of main | none | MERGE |
+| MEM-067 | git branch | none | cancelled | unowned | #132 closed 31 Oct 2026, branch kept; owner decision 31 Oct 2026: there is no Personal trial, the free core is the trial | #154, #163, #177 carry the Business trial | CANCEL_WITH_APPROVAL |
 | MEM-069 | git branch | none | in progress | unowned | 1 commits ahead of main | none | MERGE |
 | MEM-077 (2) | git branch | none | verified | unowned | 7 commits ahead of main | twin branch of MEM-077 | KEEP |
 | MEM-077 (1) | git branch | none | verified | unowned | 2 commits ahead of main | twin branch of MEM-077 | KEEP |
