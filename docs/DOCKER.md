@@ -50,4 +50,4 @@ Step 2: `docker compose -f compose.trial.yaml up -d` prints `Container memev-1 S
 
 Step 3: `docker compose -f compose.trial.yaml cp trial.license.json memev:/vault/trial.license.json` copies the file into the volume. `docker compose -f compose.trial.yaml exec memev memev license install /vault/trial.license.json` prints `installed licence <lid> (<state>) in <path>`.
 
-`scripts/docker-trial-smoke.sh` runs the whole path on a machine with Docker: build, up, wait for healthy, doctor, licence install of a throwaway test licence, down with volumes removed. Run it by hand, not in CI.
+`scripts/docker-trial-smoke.sh` runs the whole path on a machine with Docker: build, up, wait for healthy, doctor, licence install of a throwaway test licence, down with volumes removed. It runs as its own compose project, `memev-trial-smoke`, so the volumes it removes are its own and a memev deployed from the same folder keeps its container and its vault. Run it by hand, not in CI.
