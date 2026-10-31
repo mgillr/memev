@@ -13,7 +13,15 @@
         "on open, a path whose last logged put is newer than the file on disk and whose file content equals the put's previous head is completed from the log, not imported as external",
         "a file that differs from both the logged head and the previous head is still imported as an external edit, so a real outside edit is never lost",
         "README and DESIGN.md state log-first for writes and appends",
-        "the doctor's drift message and its fix describe log-first completion, not an import of the old file, and the fix never writes the old body over a logged newer one"
+        "the doctor's drift message and its fix describe log-first completion, not an import of the old file, and the fix never writes the old body over a logged newer one",
+        "recover() runs only in an open that holds the SR-1.01 vault lock; .memev/daemon.lock plays no part in that decision, and a read-only open never recovers",
+        "write() and append() build their record from the logged head, not from the file on disk: the diff, the splice base and the append hash start from the head's content, so a call made while a logged change is still pending logs on top of it; when the file on disk does not equal the head, the call's file step writes the full new content (the head with this change applied) through a temporary file and a rename, never an append to the stale file",
+        "a file that is a strict prefix of the logged content is completed only when it starts with the previous head and the last record for the path is an append; any other shorter file is an outside edit and is imported; recovery writes a completed file through a temporary file, an fsync and a rename, so an interrupted completion leaves the old file or the new one",
+        "a file is torn when it contains a NUL byte and differs from its head, whatever its length, and a torn file is completed from the log; invalid UTF-8 alone is not torn: such a file is imported as an outside edit and its bytes on disk are kept",
+        "a completion that fails (EACCES, EPERM, EIO, ENOSPC) leaves the path pending with its reason recorded and never makes Vault.open() throw",
+        "on open, every path that recovery completed, and every path whose index entry is older than its head, is reindexed; index.jsonl records the log seq it reflects, so a stale index is brought up to date rather than trusted; with git enabled, open queues a commit for every note whose file equals its head but differs from the committed copy",
+        "a logged delete whose file is still on disk with an mtime older than the delete record is completed (the file removed); a newer file is a real outside edit and is imported; syncFromDisk on such a path completes the delete instead of importing the file",
+        "when a write or append is logged but its file step fails, the call throws a VaultError with code logged_pending that carries the logged seq, so a caller knows the change is durable and does not repeat it"
       ],
       "description": "",
       "scope": [
@@ -24,7 +32,9 @@
         "test/helpers/**",
         "src/cli/doctor.mjs",
         "docs/MODULES.md",
-        "changelog.d/SR-1.22.md"
+        "changelog.d/SR-1.22.md",
+        "src/engine/index.mjs",
+        "src/engine/git.mjs"
       ],
       "criteria": [
         {
@@ -32,7 +42,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "node --test test/write-interrupted.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c01:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -42,7 +52,30 @@
             "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/write-interrupted.test.mjs\" --json",
             "key": "survived",
             "op": "==",
-            "value": 0
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/write-interrupted.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/write-interrupted.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
           }
         },
         {
@@ -58,16 +91,14 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "node --test test/write-interrupted.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c04:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
           "statement": "The new test fails when src/engine/vault.mjs is reverted to the contract base. The test uses only APIs that exist at base, and in its failed write the new body is neither an extension of the old body nor a first write.",
           "verifier": {
             "type": "command",
-            "cmd": "d=$(mktemp -d) && cp -R package.json src templates vendor test \"$d\"/ && git show \"$MEMEV_CONTRACT_BASE\":src/engine/vault.mjs > \"$d/src/engine/vault.mjs\" && cd \"$d\" && ! node --test test/write-interrupted.test.mjs",
-            "expect_exit": 0,
-            "timeout_s": 300
+            "cmd": "d=$(mktemp -d) && cp -R package.json src templates vendor test bin docs README.md \"$d\"/ && (cd \"$d\" && node --test test/write-interrupted.test.mjs) && git show \"$MEMEV_CONTRACT_BASE\":src/engine/vault.mjs > \"$d/src/engine/vault.mjs\" && cd \"$d\" && ! node --test test/write-interrupted.test.mjs"
           }
         },
         {
@@ -75,7 +106,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "node --test test/write-interrupted.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c06:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -83,7 +114,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "node --test test/write-interrupted.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c07:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -91,7 +122,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "node --test test/write-interrupted.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c08:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -99,7 +130,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "node --test test/write-interrupted.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c09:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -107,7 +138,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "node --test test/write-interrupted.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c10:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -115,7 +146,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "node --test test/write-interrupted.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c11:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -123,7 +154,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "node --test test/write-interrupted.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c12:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
@@ -131,23 +162,112 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "node --test test/write-interrupted.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c13:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
-          "statement": "After a failed write whose new body is in the log, the file is replaced by NUL bytes of the new body's length. The reopen reads the new body and adds no external record: a file containing NUL bytes, or invalid UTF-8, is treated as torn.",
+          "statement": "After a failed write whose new body is in the log, the file is replaced by NUL bytes of the new body's length. The reopen reads the new body and adds no external record: a file containing NUL bytes is treated as torn.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "node --test test/write-interrupted.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c14:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c14:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
-          "statement": "While a live pid holds .memev/daemon.lock, a second Vault.open() on a vault whose note lags the log changes no note file and appends no record (seq and file mtimes unchanged). Recovery happens only in the lock holder.",
+          "statement": "While a child process holds the SR-1.01 vault lock on a vault whose note lags the log, a second writable Vault.open() throws VaultLocked, and a read-only open changes no note file and appends no record (seq and file mtimes unchanged). Recovery happens only in the lock holder.",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
-            "cmd": "node --test test/write-interrupted.test.mjs"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^c15:' test/write-interrupted.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "c17 lock holder recovers. (a) After a failed write (new body logged, old body on disk), write String(process.pid) to .memev/daemon.lock, exactly as src/server/main.mjs:17 does before the open at :22, then Vault.open(): the file reads the new body, v2.recovered includes p, and no record for p has agent 'external'. (b) The same with daemon.lock holding the pid of a child process that has already exited (the stale lock a kill -9 leaves).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c17:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+          }
+        },
+        {
+          "statement": "c18 calls while a write is pending. After write(B) fails with the note file chmod 0444 and its directory 0555, call append(p,'tail') and then write(p,C), where C is a one-line edit of B so that it logs a splice; each may throw. Restore the permissions and reopen: sha256(file) === v2.log.heads.get(p).ch, v2.materialize(p) equals the file, v2.log.verify().ok is true, no record for p has agent 'external', and the file contains the effect of every call that returned without throwing (and none of a call that threw before logging).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c18:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c18:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+          }
+        },
+        {
+          "statement": "c19 doctor on a lagging note. After write(B) fails (note file 0444, directory 0555), close; open v2 while still read-only (the open cannot complete the note), then restore permissions. fileChecks({root, vault: v2}) returns a 'drift' check whose detail does not match /imported/i; running its fix.run() leaves the file equal to B, adds no record for p with agent 'external', and v2.log.heads.get(p).ch === sha256(B).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c19:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c19:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+          }
+        },
+        {
+          "statement": "c20 hand truncation is kept. Write A (three sections), then append a fourth section; close. By hand cut the file to A's first section (a strict prefix of both A and A plus the section) and set its mtime 10 s after the last record. After reopen the file still reads the cut text, v2.imported includes p, v2.recovered does not, and the last record for p is an external put of the cut text. A cut inside the last appended text (the existing case in test/vault.test.mjs:20-35) still completes.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c20:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c20:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+          }
+        },
+        {
+          "statement": "Each behavioural statement has its own subtest named cNN: after its criterion number, and a full run reports every one of them ok with 0 skipped and 0 todo. Each test_red_green criterion's cmd is narrowed to its subtest with --test-name-pattern plus a pass-count guard (# pass >= 1, # fail 0), because a pattern that matches nothing exits 0.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && for n in c01 c04 c06 c07 c08 c09 c10 c11 c12 c13 c14 c15 c17 c18 c19 c20 c21 c22 c23 c25 c26 c27; do grep -Eq \"^ *ok [0-9]+ - $n:\" \"$f\" || exit 1; done",
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "c21 a non-UTF-8 outside edit is never destroyed (command guard: base already passes). Write B successfully and close. By hand replace the file with Latin-1 bytes (for example Buffer.from('caf' + String.fromCharCode(0xe9) + ' edited by hand', 'latin1')) with its mtime 10 s after the put. After reopen the file's bytes are unchanged (Buffer equality), v2.imported includes p, and the last record for p is external. Criterion 14's 'or invalid UTF-8' clause is dropped; only NUL content counts as torn.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c21:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c21:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "c22 completion that really fails. After write(B) fails, set the note file to 0444 and keep its directory 0555. Vault.open() does not throw, the file still holds the old body afterwards (so the completion did fail), v2.recovered excludes p, and no record for p has agent 'external'. Restore permissions and reopen: the file reads B and v3.recovered includes p. The test skips nothing as root: it asserts that a write to the 0444 file throws before relying on it, and fails rather than skips if it does not.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c22:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c22:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+          }
+        },
+        {
+          "statement": "c23 derived state after other interruption points. (a) The parent writes A and closes (index.jsonl saved holding A's words; git HEAD:p = A). A child replaces fs.statSync so that its first call after the note's tmp rename sends SIGKILL to itself, and writes B; the parent asserts the child died by SIGKILL and the file holds B. After a git-enabled reopen and commits.flush(): recall finds a word only in B and not a word only in A, git status --porcelain -- p is empty, and git show HEAD:p equals B. (b) For a failed write, reopen first with {git:false}, close, then reopen with git enabled: after flush, git show HEAD:p equals the new body.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c23:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c23:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+          }
+        },
+        {
+          "statement": "c25 an interrupted delete completes. Write A and close; make the directory 0555; delete(p) throws and the last record for p is a delete. Restore permissions and reopen: the file is gone, v2.get(OWNER,p) throws not_found, recall does not return p, and no record for p has agent 'external'; a following v2.syncFromDisk(p,'git-pull') appends nothing. (May need a requirement amendment.)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c25:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c25:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+          }
+        },
+        {
+          "statement": "c26 a logged-but-unfinished change says so. With the note file chmod 0444, append(p,'tail') throws a VaultError whose code is 'logged_pending' and which carries the logged seq; a write(p,B) whose tmp write fails behaves the same. After restoring permissions and reopening, 'tail' appears exactly once and the file reads the logged body plus 'tail'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c26:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c26:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+          }
+        },
+        {
+          "statement": "c27 real torn shapes. With B at least 8 KB and its failed write in the log, replace the file with (a) the first half of B's bytes followed by NULs up to B's length, and (b) B's first 4096 bytes followed by 1000 NULs (a different length). Each reopen reads B and adds no record for p with agent 'external'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c27:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c27:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
           }
         },
         {
