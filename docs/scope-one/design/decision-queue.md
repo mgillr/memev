@@ -70,7 +70,7 @@ Queue fields: severity or urgency, concise explanation, affected milestone and t
 
 ## Requirement 7: never silently skip permissions, invent an approval, discard a blocker or continue a consequential action that requires human authorisation
 
-- Covered by: SO-03-A AC01 (risk classes; irreversible and externally visible actions ask), AC03 (the user-only gate cannot be bypassed by an agent) and AC04 (an external side effect with no policy decision reference is refused by the coordinator); SO-O-A AC05 (the lead cannot grant an access request); SO-A-05 AC04.
+- Covered by: SO-03-A AC01 (risk classes; irreversible and externally visible actions ask), AC03 (an agent cannot pass the user-only gate) and AC04 (an external side effect with no policy decision reference is refused by the coordinator); SO-O-A AC05 (the lead cannot grant an access request); SO-A-05 AC04.
 - Repo fact: until the permission matrix is decided the standing default is to keep current gates and leave anything ungated denied (ADR 5, `docs/scope-one/DECISIONS.md:58-66`).
 - Gaps, open, needs owner decision: the assignment of each action to a risk class and the limits, which are policy defaults and the permission matrix (ADR 4 and ADR 5); and whether an item may ever be discarded, since none of the seven states is a discard and the spec forbids a silent one.
 
