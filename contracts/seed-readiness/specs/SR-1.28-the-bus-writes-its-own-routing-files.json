@@ -374,11 +374,11 @@
           }
         },
         {
-          "statement": "test/seat-names.test.mjs and test/protocol-once.test.mjs change only where they set the lead: every line the diff from the recorded base adds names setOperator, bus-lead, operator or admin and carries no comment, no removed line holds an assertion, and each file declares as many tests as at the base.",
+          "statement": "test/seat-names.test.mjs and test/protocol-once.test.mjs change only where they set the lead: each runs with nothing skipped and nothing todo, every line the diff from the recorded base adds names setOperator, bus-lead, operator or admin and carries no comment and no skip, todo or only, no removed line holds an assertion, and each file declares as many tests as at the base.",
           "verifier": {
             "type": "command",
-            "cmd": "[ -n \"$MEMEV_CONTRACT_BASE\" ] && for f in test/seat-names.test.mjs test/protocol-once.test.mjs; do d=$(git diff -U0 \"$MEMEV_CONTRACT_BASE\" -- \"$f\" | grep -E '^[-+]' | grep -vE '^(\\+\\+\\+|---) ' || :); ! printf '%s\\n' \"$d\" | grep -E '^\\+' | grep -vqE 'setOperator|bus-lead|operator|admin' || exit 1; ! printf '%s\\n' \"$d\" | grep -E '^\\+' | grep -qE '//|/\\*' || exit 1; ! printf '%s\\n' \"$d\" | grep -E '^-' | grep -qE 'assert' || exit 1; b=$(git show \"$MEMEV_CONTRACT_BASE:$f\" | grep -cE '^test\\(') && h=$(grep -cE '^test\\(' \"$f\") && [ \"$b\" -gt 0 ] && [ \"$b\" -eq \"$h\" ] || exit 1; done",
-            "timeout_s": 60
+            "cmd": "[ -n \"$MEMEV_CONTRACT_BASE\" ] && for f in test/seat-names.test.mjs test/protocol-once.test.mjs; do out=$(node --test --test-reporter=tap \"$f\" 2>&1) || exit 1; printf '%s\\n' \"$out\" | grep -Eq '^# skipped 0$' || exit 1; printf '%s\\n' \"$out\" | grep -Eq '^# todo 0$' || exit 1; d=$(git diff -U0 \"$MEMEV_CONTRACT_BASE\" -- \"$f\" | grep -E '^[-+]' | grep -vE '^(\\+\\+\\+|---) ' || :); ! printf '%s\\n' \"$d\" | grep -E '^\\+' | grep -vqE 'setOperator|bus-lead|operator|admin' || exit 1; ! printf '%s\\n' \"$d\" | grep -E '^\\+' | grep -qE '//|/\\*' || exit 1; ! printf '%s\\n' \"$d\" | grep -E '^\\+' | grep -qE 'skip|todo|\\.only|only[[:space:]]*:' || exit 1; ! printf '%s\\n' \"$d\" | grep -E '^-' | grep -qE 'assert' || exit 1; b=$(git show \"$MEMEV_CONTRACT_BASE:$f\" | grep -cE '^test\\(') && h=$(grep -cE '^test\\(' \"$f\") && [ \"$b\" -gt 0 ] && [ \"$b\" -eq \"$h\" ] || exit 1; done",
+            "timeout_s": 120
           }
         },
         {
