@@ -113,7 +113,9 @@ these hold:
   dependency removed, no requirement reworded, no statement or verifier key changed, no metric loosened,
   no scope glob added, no workdir set, no criterion made optional, except as an amendment records it;
 - every implement task has a mandatory `test_red_green` criterion whose command runs its own test
-  file, unless the manifest row says `docs` or `evidence`;
+  file under the test runner, unless the manifest row says `docs` or `evidence`: one command of it is
+  `node` with `--test` and, as an argument, the test file, a glob that matches it, or `{test}`. A command
+  that only names the file (`test -f`, `cat`, `grep`, `true`) does not count;
 - since the reviewed commit, no file in the spec's scope and no listed input under `src/` changed.
   This is judged at HEAD for a spec not yet signed, and at the commit that signed the contract for one
   that is signed, so the signed contract's own work never makes it stale.
@@ -130,26 +132,48 @@ list records it with a citation, and the next round judges whether it weakens:
 - a scope path added: `{task, scope_add, answer}`, one path and no glob, citing an added answer of the previous
   round whose criterion reads that path; or `{task, field: "scope", to, <citation>}` with one path, citing as
   any other change;
-- a scope glob added: `{task, field: "scope", to, answer}`, citing an added answer of the previous round whose
-  criterion reads a path under the glob. A cited answer that carries `folded_as` is judged by that criterion,
-  the one it became;
+- a scope glob added: `{task, field: "scope", to, answer}`, accepted only when each cited answer is an added
+  answer of the previous round whose criterion reads a path under the glob, and together they read every file
+  the glob newly admits at the previous round's reviewed commit, so `**`, `src/**` or `test/**` backed by one
+  reading answer is refused (a glob that admits no file there passes); or `{task, field: "scope", to,
+  reviewer_note}` citing a signed reviewer note whose text quotes the glob verbatim. The gate checks the quote
+  only: the paths the note lists are the reviewer's judgement. Otherwise the added paths are listed one by one.
+  A cited answer that carries `folded_as` is judged by that criterion, the one it became;
+- a criterion, requirement or stop rule removed: `{task, field: "criterion" | "requirement" | "stop_rule",
+  from, to: null, <citation>}`, where `from` is the removed text (a criterion by its statement, or as the
+  criterion) and the cited text (a cited answer's `how` or the note point) quotes it verbatim and, in the same
+  sentence, names it contradictory or impossible, not negated ("not contradictory" and "is not impossible" do
+  not count); or citing a signed reviewer note whose text quotes the removed text verbatim and names where it
+  is carried (an added answer whose criterion holds it, or another spec's items). For a reviewer note the gate
+  checks the quote only: where the text is carried is the reviewer's judgement;
+- a criterion, requirement or stop rule moved alone to another spec: `{kind: "move", task, field, from,
+  to_spec, to_task, <citation>}`, accepted only when the receiving task holds it, itself or the end of its
+  From/To chain in that spec's own replacements;
 - a task moved to another spec at a split: `{kind: "move", task, to_spec, to_task, <citation>}`, accepted
   only when the receiving task holds every requirement, criterion and stop rule of the moved task, itself or
   the end of its From/To chain: the replacements for the moved task in the amendments list that records the
   move (as made at the split), each counted only with its own citation, then the receiving spec's own.
 
 A citation is `answer: "<round>.<n>"`, an answer of the previous spec round or of an implementation round
-recorded after it; `note: "<round>.<point>"`, a numbered point of the previous round's notes; or
-`reviewer_note: <n>`, an entry of the record's `reviewer_notes` list. Each reviewer note is `{n, text, sig}`,
-where `sig` is a reviewer key's DSSE envelope over `{spec_id, n, text}`, so every citation rests on a reviewer
-key's signature. A cited answer must be added. A removed criterion, requirement or stop rule has no amendment
-form.
+recorded after it and before the round that cites it; `answer: "<spec>:<round>.<n>"`, an answer of another
+spec's record, the spec id resolved through the manifests (never a path) and that record's rounds up to the
+cited one each signed by a reviewer key, with the cited answer's disposition covered by the next round's
+signature or the closing envelope; `note: "<round>.<point>"`, a numbered point of the previous round's notes;
+or `reviewer_note: <n>`, an entry of the record's `reviewer_notes` list. Each reviewer note is `{n, text,
+sig}`, where `sig` is a reviewer key's DSSE envelope over `{spec_id, n, text}`, so every citation rests on a
+reviewer key's signature. A cited answer must be added, and it must concern the
+change: an answer of the same task and, for a criterion, one whose criterion has the statement the changed
+criterion had before the change (an answer of another spec's record folded into this spec is judged by the
+criterion it was folded as). A note point or a reviewer note is judged by its own text.
 
 **Moves.** An added answer whose task moved to another spec at a split is folded as `{spec, task, statement,
 verifier}`. The gate resolves the spec id through the manifests under `contracts/` (a row with that id, and
 the one spec file of that id in that area), never through a path the record gives. It requires the move
 recorded in an amendments list of the record, and the criterion verbatim in that spec, following that spec's
-own statement and verifier replacements from what the answer was folded as.
+own statement and verifier replacements from what the answer was folded as. The receiving spec's replacements
+count only as far as its record verifies: a round's amendments when every round up to the next one is signed by
+a reviewer key (or, for the last round, every round signed and its closing envelope valid), and a stop
+decision's amendments when the stop is signed by a stop key.
 
 **Signatures.** Each round carries `sig`, a DSSE envelope (`vendor/attest/signature.mjs`) by a
 reviewer key over the round without what the builder writes after the reviewer answered (each
@@ -170,11 +194,16 @@ Separation comes from a reviewer key the owner holds off the build machine, or f
 of SR-9.05.
 
 **The stop decision.** When three rounds have passed and none is clean, the record may end with `stop`:
-a decision to sign or to split, signed by a contract-signing key under `contracts/keys/`, over the spec
-id, the spec_sha256 of the spec on disk, the decider, the date, the decision, the open items (every
-answer that is not added, as round and number) and the sha256 of every round's dispositions and
-amendments. Its key's `.pub` must be committed at the judged commit (HEAD for a spec not yet signed, the
-signing commit for one that is signed): a key only in the working tree never signs a stop. The stop decision
+a decision to sign or to split, an object holding exactly `spec_id`, `spec_sha256` (of the spec on disk),
+`decider`, `date`, `decision`, `open` (every answer that is not added, as round and number),
+`dispositions` (the sha256 of every round's dispositions and amendments) and, when present, `amendments`.
+Its `sig` is a DSSE envelope over that object under the stop's own payload type,
+`application/vnd.memev.redteam-stop-sha256`, never the contract payload type, by a key in `STOP_KEYS`: the
+stop-decision public keys the gate holds in code, as it holds the reviewer keys (key id 55fada3548cc507e,
+whose private half the owner holds), none of them a key the engine's contract signing makes. A contract body
+signed through `memev contract sign` is never a stop decision. Its key's `.pub` must also be committed under
+`contracts/keys/` at the judged commit (HEAD for a spec not yet signed, the signing commit for one that is
+signed): a key only in the working tree never signs a stop. The stop decision
 may carry an `amendments` list, which its signature covers; the change from the last spec round's snapshot to
 the spec on disk is judged with it, the last spec round being the previous round for its citations. The gate
 then prints `SIGNABLE AT STOP (<n> open items)`, and `--report` lists the open items. A stop after fewer than three rounds, signed by any other key, over another spec hash, with an

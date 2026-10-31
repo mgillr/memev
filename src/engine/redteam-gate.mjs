@@ -3,14 +3,14 @@
 // The red-team gate: whether a contract spec may be signed, judged from its red-team record. A spec
 // contracts/<area>/specs/<id>-*.json is SIGNABLE only when contracts/<area>/redteam/<id>.json holds
 // reviewer-signed rounds that end clean on the spec as it is now (or with a stop decision signed by a
-// contract-signing key), every answer is dispositioned, nothing the earlier rounds required was
+// stop key), every answer is dispositioned, nothing the earlier rounds required was
 // weakened, and the code the reviewer read has not changed since. scripts/gate/redteam-gate.mjs is the
 // command line over this module; the engine's draft and sign paths call evaluate() directly.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { canonical, canonicalHash, keyId, verify as dsseVerify, PAYLOAD_TYPE } from '../../vendor/attest/signature.mjs';
+import { canonical, canonicalHash, keyId, pae, verify as dsseVerify, PAYLOAD_TYPE } from '../../vendor/attest/signature.mjs';
 import { makeTask } from '../../vendor/attest/contract.mjs';
 import { matchAny } from '../../vendor/attest/util.mjs';
 
@@ -28,6 +28,19 @@ export const RULES = Object.freeze(['schema', 'spec_id', 'rounds_contiguous', 'l
 export const REVIEWER_KEYS = Object.freeze([
   '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAkYrfYi60t6caY9cmv/YvyKldeg4Ten4AKI7Q7Q/mwG4=\n-----END PUBLIC KEY-----\n',
 ]);
+
+/**
+ * The stop-decision public keys the gate accepts (requirement 12), held in code as REVIEWER_KEYS is. Key id 55fada3548cc507e.
+ * Its private half is the owner's and is never in this repository, and it is not a key the engine's contract signing makes. A stop
+ * signed by any other key is refused, whatever sits under contracts/keys/.
+ */
+export const STOP_KEYS = Object.freeze([
+  '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA65XdvXCDHggDZUrXPWXVHbYaTkh2RsLFWYRlebZGnXs=\n-----END PUBLIC KEY-----\n',
+]);
+
+/** The payload type of a stop decision's envelope: its own, never the contract payload type. */
+export const STOP_PAYLOAD_TYPE = 'application/vnd.memev.redteam-stop-sha256';
+const STOP_FIELDS = ['spec_id', 'spec_sha256', 'decider', 'date', 'decision', 'open', 'dispositions'];
 
 /** canonicalHash of signed contracts that predate the gate and so have no red-team record. */
 export const GRANDFATHERED = Object.freeze([
@@ -201,6 +214,48 @@ function envelopeProblem(obj, env, trusted, refused) {
   return dsseVerify(obj, env, pem).ok ? null : `does not verify against reviewer key ${kid}`;
 }
 
+/** null when `env` is a stop decision's envelope over `obj`, under the stop's own payload type, by one of `trusted`, else why not. */
+function stopEnvelopeProblem(obj, env, trusted) {
+  if (!isObj(env)) return 'it is not signed';
+  if (env.payloadType !== STOP_PAYLOAD_TYPE || typeof env.payload !== 'string') return `its envelope's payload type is ${JSON.stringify(env.payloadType)}, not the stop decision's own ${STOP_PAYLOAD_TYPE}`;
+  const sigs = env.signatures;
+  if (!Array.isArray(sigs) || sigs.length !== 1 || !isObj(sigs[0]) || typeof sigs[0].sig !== 'string') return 'its envelope must carry exactly one signature';
+  const kid = sigs[0].keyid;
+  if (typeof kid !== 'string' || !/^[0-9a-f]{16}$/.test(kid)) return 'its envelope names no valid key id';
+  const pem = trusted.get(kid);
+  if (!pem) return `it is signed by ${kid}, which is not a stop key the gate accepts (STOP_KEYS)`;
+  const hash = canonicalHash(obj);
+  if (Buffer.from(env.payload, 'base64').toString('utf8') !== hash) return 'its signature covers other content: the decision was changed after signing';
+  let ok = false;
+  try { ok = crypto.verify(null, pae(STOP_PAYLOAD_TYPE, Buffer.from(hash)), crypto.createPublicKey(pem), Buffer.from(sigs[0].sig, 'base64')); } catch { ok = false; }
+  return ok ? null : `its signature by ${kid} does not verify over the decision as it is`;
+}
+
+/** null when rounds[0..upto] of the record beside `loc` are numbered in order and each is signed by a reviewer key, else why not. */
+function chainProblem(loc, rounds, upto, trusted, refused) {
+  for (let i = 0; i <= upto; i++) {
+    const r = rounds[i];
+    if (!isObj(r) || r.round !== i + 1) return `round ${i + 1} is missing or numbered otherwise`;
+    let snap = null;
+    try { snap = sha256(fs.readFileSync(loc.snapshot(i + 1))); } catch { /* no snapshot: the round signs null */ }
+    const p = envelopeProblem(roundPayload(rounds, i, snap), r.sig, trusted, refused);
+    if (p) return `round ${i + 1}'s signature ${p}`;
+  }
+  return null;
+}
+
+/**
+ * null when round i of a record and its dispositions and amendments are covered by reviewer keys: every round up to the next one
+ * signed (whose signature covers round i in full), or for the last round every round signed and its closing envelope valid.
+ */
+function coveredProblem(loc, specId, rounds, i, trusted, refused) {
+  if (i + 1 < rounds.length) return chainProblem(loc, rounds, i + 1, trusted, refused);
+  const p = chainProblem(loc, rounds, i, trusted, refused);
+  if (p) return p;
+  const c = envelopeProblem(closingPayload(specId, rounds[i]), rounds[i].closing, trusted, refused);
+  return c ? `round ${i + 1}'s closing envelope ${c}` : null;
+}
+
 /** The text of numbered point `p` ("1. ... 2. ...") of a round's notes, or null. */
 function notePoint(notes, p) {
   if (Array.isArray(notes)) return typeof notes[p - 1] === 'string' ? notes[p - 1] : null;
@@ -231,38 +286,116 @@ function readsPath(v, g) {
   return pathsRead(v).some((p) => matchAny(p, [g]));
 }
 
+const CONTRA = /\b(?:contradict\w*|impossib\w*)/gi;
+const NEGATORS = new Set(['not', 'never', 'no', 'nor', 'neither', 'without', 'hardly', 'cannot']);
+
+/**
+ * Whether `text` quotes `quoted` verbatim and, in the sentence that quotes it and outside the quote, names it contradictory or
+ * impossible without a negation in the three words before (not, never, no, nor, neither, without, hardly, cannot, a word ending
+ * in n't, or a non- or un- prefix).
+ */
+function quotesAsContradictory(text, quoted) {
+  if (typeof text !== 'string' || typeof quoted !== 'string' || !quoted) return false;
+  for (let q = text.indexOf(quoted); q >= 0; q = text.indexOf(quoted, q + 1)) {
+    const end = q + quoted.length;
+    const bm = [...text.slice(0, q).matchAll(/[.!?;]\s|\n/g)].pop();
+    const am = /[.!?;](?:\s|$)|\n/.exec(text.slice(end));
+    const from = bm ? bm.index + bm[0].length : 0;
+    const to = am ? end + am.index : text.length;
+    for (const [lo, hi] of [[from, q], [end, to]]) {
+      for (const m of text.slice(lo, hi).matchAll(CONTRA)) {
+        const at = lo + m.index;
+        if (/(?:non|un)-?$/i.test(text.slice(Math.max(lo, at - 4), at))) continue;
+        const words = text.slice(Math.max(lo, at - 48), at).toLowerCase().split(/[^a-z']+/).filter(Boolean).slice(-3);
+        if (words.some((w) => NEGATORS.has(w) || w.endsWith("n't"))) continue;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+const SPEC_CITE = /^([A-Za-z][A-Za-z0-9]*-\d+(?:\.\d+)*):(\d+)\.(\d+)$/;
+
+/**
+ * Answer n of round rn of another spec's record (requirement 11): the spec id resolved through the manifests, never a path; that
+ * record's rounds up to rn numbered in order and each signed by a reviewer key, so the chain to the cited round is intact; and the
+ * round's dispositions covered by a reviewer key too (the next round's signature, or the closing envelope), since the answer counts
+ * only as added. { answer } or { problem }.
+ */
+function citedAnswer(ctx, sid, rn, n) {
+  if (!ctx.root) return { problem: 'there is no tree to resolve the spec in' };
+  const r = resolveSpecId(ctx.root, sid);
+  if (r.problem) return { problem: r.problem };
+  const loc = locate(r.abs, sid);
+  const rr = readStrict(loc.record);
+  if (rr.missing) return { problem: `${sid} has no red-team record` };
+  const rec = rr.value;
+  if (!rr.ok || !isObj(rec) || rec.schema !== SCHEMA || rec.spec_id !== sid || !Array.isArray(rec.rounds)) return { problem: `${sid}'s record is not a ${SCHEMA} record of ${sid}` };
+  const round = rec.rounds[rn - 1];
+  if (!isObj(round) || round.round !== rn) return { problem: `${sid}'s record has no round ${rn}` };
+  const a = arr(round.answers).find((x) => isObj(x) && x.n === n);
+  if (!a) return { problem: `${sid}'s round ${rn} has no answer ${n}` };
+  const trusted = ctx.trusted ?? new Map(); const refused = ctx.refused ?? new Set();
+  const p = coveredProblem(loc, sid, rec.rounds, rn - 1, trusted, refused);
+  if (p) return { problem: `in ${sid}'s record, ${p}` };
+  return { answer: a };
+}
+
 /**
  * null when an amendment's citation is acceptable, else why not. A citation (requirement 11) is an answer of the previous spec
- * round or of an implementation round recorded after it ('<round>.<n>'), a numbered point of the previous round's notes
- * ('<round>.<point>'), or reviewer_note <n>, an entry of the record's reviewer_notes signed by a reviewer key over {spec_id, n,
- * text}. kind cmd: a command replaced; a cited answer proposes that criterion. kind scope: a scope glob added, or a path added in
- * the scope_add form; only an added answer of the previous round whose criterion (its folded_as, when it has one) reads a path
- * under it. kind text: any other change; a cited answer is added. ctx: {prev, cur (the round number holding the amendments,
- * Infinity at a stop), rounds, notes, specId, trusted, refused}.
+ * round or of an implementation round recorded after it ('<round>.<n>'), an answer of another spec's record ('<spec>:<round>.<n>',
+ * verified as citedAnswer says), a numbered point of the previous round's notes ('<round>.<point>'), or reviewer_note <n>, an entry
+ * of the record's reviewer_notes signed by a reviewer key over {spec_id, n, text}. A cited answer is added.
+ * kind cmd: a command replaced; a cited answer proposes that criterion. kind text: a requirement, statement, verifier key or scope
+ * path changed; a cited answer concerns it (requirement 6): it is of the same task and, for a criterion, its criterion has the
+ * statement before the change (one of `subjects`). kind scope: a scope glob added, or a path added in the scope_add form; only an
+ * answer of the previous round whose criterion (its folded_as, when it has one) reads a path under it. kind move: a task or an item
+ * moved to another spec. kind removal: a criterion, requirement or stop rule removed; the cited text of an answer (its how) or a note
+ * point quotes the removed text, subjects[0], and names it contradictory or impossible, while a reviewer note's text quotes it and
+ * names where it is carried, which the gate leaves to the reviewer who signed it: it checks the quote only. A note point or a
+ * reviewer note is otherwise judged by its own text. ctx: {prev, cur (the round number holding the amendments, Infinity at a stop),
+ * rounds, notes, specId, trusted, refused, root}.
  */
 function citationProblem(am, ctx, kind, task, subjects) {
   const prev = ctx.prev;
   if (!prev) return 'there is no previous round for it to cite';
-  const subj = Array.isArray(subjects) ? subjects : [subjects];
+  const subj = Array.isArray(subjects) ? subjects : subjects === null || subjects === undefined ? [] : [subjects];
+  const quoted = (text, what) => (quotesAsContradictory(text, subj[0]) ? null : `${what} does not quote "${short(subj[0])}" and name it contradictory or impossible`);
   if (am.answer !== undefined) {
-    const m = /^(\d+)\.(\d+)$/.exec(String(am.answer));
-    if (!m) return `its answer ${am.answer} is not written <round>.<n>`;
-    const rn = Number(m[1]);
-    const r = rn === prev.round ? prev
-      : kind !== 'scope' && rn > prev.round && rn < (ctx.cur ?? Infinity) ? arr(ctx.rounds).find((x) => isObj(x) && x.round === rn && x.kind === 'implementation') : null;
-    if (!r) return `its answer ${am.answer} is not an answer of the previous round (${prev.round})${kind === 'scope' ? '' : ' or of an implementation round after it'}`;
-    const a = arr(r.answers).find((x) => isObj(x) && x.n === Number(m[2]));
-    if (!a) return `round ${rn} has no answer ${m[2]}`;
-    if (kind === 'text') return a.disposition === 'added' ? null : `answer ${am.answer} is not added`;
-    // a scope citation judges the criterion the answer became (its folded_as), a command citation the criterion it proposes
-    const crit = kind === 'scope' && isObj(a.folded_as) ? a.folded_as : a.criterion;
-    if (crit?.task !== task) return `answer ${am.answer} concerns task ${crit?.task}, not ${task}`;
-    if (kind === 'cmd') {
-      if (!subj.includes(crit?.statement)) return `answer ${am.answer} proposes a criterion for a different criterion`;
+    const s = String(am.answer);
+    const x = SPEC_CITE.exec(s);
+    const m = /^(\d+)\.(\d+)$/.exec(s);
+    let a = null;
+    let other = false;
+    if (x) {
+      if (kind === 'scope') return `a scope addition cites an added answer of the previous round, not ${s}`;
+      if (x[1] === ctx.specId) return `its answer ${s} names this spec; an answer of its own record is written <round>.<n>`;
+      const c = citedAnswer(ctx, x[1], Number(x[2]), Number(x[3]));
+      if (c.problem) return `its answer ${s}: ${c.problem}`;
+      a = c.answer; other = true;
+    } else if (!m) {
+      return /[/\\]|\.json\b/i.test(s) ? `its answer ${s} gives a path; another spec's answer is cited by its id, <spec>:<round>.<n>` : `its answer ${s} is not written <round>.<n> or <spec>:<round>.<n>`;
     } else {
-      if (a.disposition !== 'added') return `answer ${am.answer} is not added`;
-      if (!readsPath(crit?.verifier, subj[0])) return `answer ${am.answer} proposes a criterion that reads no path under ${subj[0]}`;
+      const rn = Number(m[1]);
+      const r = rn === prev.round ? prev
+        : kind !== 'scope' && rn > prev.round && rn < (ctx.cur ?? Infinity) ? arr(ctx.rounds).find((y) => isObj(y) && y.round === rn && y.kind === 'implementation') : null;
+      if (!r) return `its answer ${s} is not an answer of the previous round (${prev.round})${kind === 'scope' ? '' : ' or of an implementation round after it'}`;
+      a = arr(r.answers).find((y) => isObj(y) && y.n === Number(m[2]));
+      if (!a) return `round ${rn} has no answer ${m[2]}`;
     }
+    if (a.disposition !== 'added') return `answer ${s} is not added`;
+    if (kind === 'move') return null;
+    if (kind === 'removal') return quoted(a.how, `answer ${s}'s how`);
+    // a scope citation judges the criterion the answer became (its folded_as); any other the criterion it proposes, or for another
+    // spec's answer folded into this spec, the criterion it was folded as here
+    const crit = (kind === 'scope' || (other && a.folded_as?.spec === ctx.specId)) && isObj(a.folded_as) ? a.folded_as : a.criterion;
+    if (crit?.task !== task) return `answer ${s} concerns task ${crit?.task}, not ${task}`;
+    if (kind === 'cmd') {
+      if (!subj.includes(crit?.statement)) return `answer ${s} proposes a criterion for a different criterion`;
+    } else if (kind === 'text') {
+      if (subj.length && !subj.includes(crit?.statement)) return `answer ${s} concerns the criterion "${short(crit?.statement)}", not "${short(subj[0])}"`;
+    } else if (!readsPath(crit?.verifier, subj[0])) return `answer ${s} proposes a criterion that reads no path under ${subj[0]}`;
     return null;
   }
   if (kind === 'scope') return 'a scope addition cites an added answer of the previous round';
@@ -272,7 +405,7 @@ function citationProblem(am, ctx, kind, task, subjects) {
     if (Number(m[1]) !== prev.round) return `its note ${am.note} is not a note of the previous round (${prev.round})`;
     const pt = notePoint(prev.notes, Number(m[2]));
     if (pt === null) return `round ${prev.round}'s notes have no point ${m[2]}`;
-    return null;
+    return kind === 'removal' ? quoted(pt, `note ${am.note}`) : null;
   }
   if (am.reviewer_note !== undefined) {
     const n = Number(am.reviewer_note);
@@ -280,7 +413,7 @@ function citationProblem(am, ctx, kind, task, subjects) {
     if (!Number.isInteger(n) || !note || typeof note.text !== 'string') return `the record has no reviewer note ${am.reviewer_note}`;
     const p = envelopeProblem(reviewerNotePayload(ctx.specId, note), note.sig, ctx.trusted ?? new Map(), ctx.refused ?? new Set());
     if (p) return `reviewer note ${n}'s signature ${p}`;
-    return null;
+    return kind === 'removal' && !note.text.includes(subj[0]) ? `reviewer note ${n} does not quote "${short(subj[0])}"` : null;
   }
   return 'it cites no answer of the previous round';
 }
@@ -316,9 +449,12 @@ const tighter = (op, before, after) => (op === '>=' || op === '>' ? after >= bef
  * How spec B weakens spec A. Accepted only as an entry of `amendments` records it (requirement 6), citing as requirement 11 allows:
  * a command replaced ({task, statement, from, to, answer|note|reviewer_note}, or field 'verifier.cmd'), a requirement reworded
  * ({task, field: 'requirement', from, to, ...}), a criterion statement rewritten ({task, field: 'statement', from, to, ...}), any
- * other verifier key changed ({task, field: 'verifier.<key>', statement, from, to, ...}), a scope path added ({task, scope_add,
- * answer}, one path) or a scope path or glob added ({task, field: 'scope', to, answer}), a task moved to another spec ({kind:
- * 'move', task, to_spec, to_task, ...}); and a metric value tightened. ctx: what the citations are judged against.
+ * other verifier key changed ({task, field: 'verifier.<key>', statement, from, to, ...}), a scope path or glob added ({task,
+ * scope_add, answer} or {task, field: 'scope', to, ...}; a glob only when every file it newly admits at the reviewed commit is read
+ * by a cited answer), a criterion, requirement or stop rule removed ({task, field: 'criterion'|'requirement'|'stop_rule', from,
+ * to: null, ...}, the citation quoting it and naming it contradictory or impossible, or a reviewer note quoting it), an item or a
+ * whole task moved to another spec ({kind: 'move', task, field, from, to_spec, to_task, ...}, or without field and from for the
+ * whole task); and a metric value tightened. ctx: what the citations are judged against.
  */
 export function weakenings(A, B, { amendments = [], prev = null, ...ctx } = {}) {
   const out = [];
@@ -327,20 +463,37 @@ export function weakenings(A, B, { amendments = [], prev = null, ...ctx } = {}) 
   const cx = { ...ctx, prev };
   const entry = (pred) => ams.findIndex((a, k) => !used.has(k) && isObj(a) && pred(a));
   const take = (i, kind, task, subj) => { if (i < 0) return 'no amendment records it'; const c = citationProblem(ams[i], cx, kind, task, subj); if (!c) used.add(i); return c; };
+  // a removal entry or a move entry for one item: from names the removed text (a criterion by its statement, or as the criterion)
+  const fromIs = (field, item, from) => (field === 'criterion' ? (typeof from === 'string' ? from === item?.statement : isObj(from) && from.statement === item?.statement && canonical(from.verifier ?? null) === canonical(item?.verifier ?? null)) : from === item);
+  // a criterion, requirement or stop rule removed: null when an entry records it as requirement 6 accepts, true when none records
+  // it, else why the entry is refused
+  const removal = (id, field, item, text) => {
+    let i = entry((a) => a.kind === undefined && a.task === id && a.field === field && a.to === null && fromIs(field, item, a.from));
+    if (i >= 0) { const c = take(i, 'removal', id, [text]); return c ? `its removal is refused: ${c}` : null; }
+    i = entry((a) => a.kind === 'move' && a.task === id && a.field === field && fromIs(field, item, a.from));
+    if (i < 0) return true;
+    const why = cx.root ? movedItemProblem(cx.root, ams[i], field, item, cx) : 'there is no tree to resolve the receiving spec in';
+    if (why) return `its move is refused: ${why}`;
+    const c = take(i, 'move', id, null);
+    return c ? `its move is refused: ${c}` : null;
+  };
   const tb = taskMap(B);
   for (const [id, ta] of taskMap(A)) {
     const t2 = tb.get(id);
     if (!t2) {
-      const i = entry((a) => a.kind === 'move' && a.task === id);
+      const i = entry((a) => a.kind === 'move' && a.task === id && a.field === undefined);
       // the replacements made at the split: entries for the moved task in the list that records the move, each counted in the
       // chain only when it passes as a change with its own citation (requirement 11); any other entry is ignored
       const own = [];
       if (i >= 0) ams.forEach((x, k) => {
-        if (used.has(k) || !isObj(x) || x.task !== id || x.kind !== undefined || x.scope_add !== undefined) return;
-        if (typeof x.field === 'string' ? !take(k, 'text', id, null) : typeof x.statement === 'string' && !take(k, 'cmd', id, [x.statement])) own.push(x);
+        if (used.has(k) || !isObj(x) || x.task !== id || x.kind !== undefined || x.scope_add !== undefined || x.to === null) return;
+        // a statement replacement concerns the statement it replaces; a verifier key one, the criterion it names, by that statement
+        // or the one a statement replacement here made it from
+        const names = x.field === 'statement' ? [x.from] : /^verifier\./.test(String(x.field)) ? [x.statement, ...ams.filter((y) => isObj(y) && y.task === id && y.field === 'statement' && y.to === x.statement).map((y) => y.from)] : null;
+        if (typeof x.field === 'string' ? !take(k, 'text', id, names) : typeof x.statement === 'string' && !take(k, 'cmd', id, [x.statement])) own.push(x);
       });
-      let why = i < 0 ? null : cx.root ? movedTaskProblem(cx.root, ams[i], ta, own) : 'there is no tree to resolve the receiving spec in';
-      if (i >= 0 && !why) why = take(i, 'text', id, null);
+      let why = i < 0 ? null : cx.root ? movedTaskProblem(cx.root, ams[i], ta, own, cx) : 'there is no tree to resolve the receiving spec in';
+      if (i >= 0 && !why) why = take(i, 'move', id, null);
       if (i < 0 || why) out.push(`task ${id} removed${why ? ` and its move is refused: ${why}` : ''}`);
       continue;
     }
@@ -349,21 +502,32 @@ export function weakenings(A, B, { amendments = [], prev = null, ...ctx } = {}) 
     for (const q of arr(ta.requirements)) {
       if (arr(t2.requirements).includes(q)) continue;
       const i = entry((a) => a.task === id && a.field === 'requirement' && a.from === q && typeof a.to === 'string' && arr(t2.requirements).includes(a.to) && !arr(ta.requirements).includes(a.to));
-      const why = i < 0 ? null : take(i, 'text', id, null);
-      if (i < 0 || why) out.push(`task ${id}: requirement removed or reworded: "${short(q)}"${why ? ` and its amendment is refused: ${why}` : ''}`);
+      const why = i < 0 ? removal(id, 'requirement', q, q) : take(i, 'text', id, null);
+      if (why) out.push(`task ${id}: requirement removed or reworded: "${short(q)}"${why === true ? '' : i < 0 ? ` and ${why}` : ` and its amendment is refused: ${why}`}`);
     }
-    for (const s of arr(ta.stop_rules)) if (!arr(t2.stop_rules).includes(s)) out.push(`task ${id}: stop rule removed or reworded: "${short(s)}"`);
+    for (const s of arr(ta.stop_rules)) {
+      if (arr(t2.stop_rules).includes(s)) continue;
+      const why = removal(id, 'stop_rule', s, s);
+      if (why) out.push(`task ${id}: stop rule removed or reworded: "${short(s)}"${why === true ? '' : ` and ${why}`}`);
+    }
     const sa = scopeOf(ta);
     for (const g of scopeOf(t2)) {
       if (sa.includes(g)) continue;
-      // the landed form: one path, no glob; a glob only through the field form, citing an added answer that reads under it
-      let i = entry((a) => a.scope_add !== undefined && a.task === id && a.scope_add === g);
+      const glob = GLOB.test(g);
       let why = null;
-      if (i >= 0 && GLOB.test(g)) why = 'a scope_add must name one path, not a glob';
-      if (i < 0) i = entry((a) => a.field === 'scope' && a.task === id && a.to === g);
-      if (i < 0) why = 'with no scope_add amendment';
-      // a glob, or a path in the scope_add form, cites an added answer that reads under it; a path in the field form cites like any change
-      if (!why) { const c = take(i, GLOB.test(g) || ams[i].field !== 'scope' ? 'scope' : 'text', id, GLOB.test(g) ? g : normPath(g)); if (c) why = `its amendment is refused: ${c}`; }
+      const i = entry((a) => a.scope_add !== undefined && a.task === id && a.scope_add === g);
+      if (i >= 0) {
+        // the scope_add form: one path, no glob, citing an added answer of the previous round that reads it
+        if (glob) why = 'a scope_add must name one path, not a glob';
+        else { const c = take(i, 'scope', id, normPath(g)); if (c) why = `its amendment is refused: ${c}`; }
+      } else {
+        const ks = [];
+        ams.forEach((a, k) => { if (!used.has(k) && isObj(a) && a.scope_add === undefined && a.task === id && a.field === 'scope' && a.to === g) ks.push(k); });
+        if (!ks.length) why = 'with no scope_add amendment';
+        // the field form: one path cites like any change; a glob as globProblem says
+        else if (!glob) { const c = take(ks[0], 'text', id, null); if (c) why = `its amendment is refused: ${c}`; }
+        else { why = globProblem(ams, ks, cx, id, g, sa); if (!why) for (const k of ks) used.add(k); }
+      }
       if (why) out.push(`task ${id}: scope glob ${g} added ${why}`);
     }
     // criteria are matched by statement, so reordering is not a removal; equal pairs are matched first
@@ -379,10 +543,11 @@ export function weakenings(A, B, { amendments = [], prev = null, ...ctx } = {}) 
       const where = `task ${id} criterion "${short(ca?.statement)}"`;
       let cb = (pool.get(String(ca?.statement)) || []).shift();
       if (!cb) {
-        // a statement rewritten as an entry records it
+        // a statement rewritten as an entry records it, or the criterion removed or moved
         const i = entry((a) => a.task === id && a.field === 'statement' && a.from === ca?.statement && (pool.get(String(a.to)) || []).length > 0);
-        const why = i < 0 ? null : take(i, 'text', id, null);
-        if (i < 0 || why) { out.push(`${where}: removed, or its statement rewritten${why ? ` and its amendment is refused: ${why}` : ''}`); continue; }
+        const why = i < 0 ? removal(id, 'criterion', ca, String(ca?.statement)) : take(i, 'text', id, [ca?.statement]);
+        if (why) { out.push(`${where}: removed, or its statement rewritten${why === true ? '' : i < 0 ? ` and ${why}` : ` and its amendment is refused: ${why}`}`); continue; }
+        if (i < 0) continue;
         cb = pool.get(String(ams[i].to)).shift();
       }
       const names = [ca.statement, cb.statement];
@@ -393,7 +558,7 @@ export function weakenings(A, B, { amendments = [], prev = null, ...ctx } = {}) 
       const keyEntry = (k) => entry((a) => a.task === id && a.field === `verifier.${k}` && names.includes(a.statement) && canonical(a.from ?? null) === canonical(va[k] ?? null) && canonical(a.to ?? null) === canonical(vb[k] ?? null));
       if (va.type !== vb.type) {
         const i = keyEntry('type');
-        const why = i < 0 ? null : take(i, 'text', id, null);
+        const why = i < 0 ? null : take(i, 'text', id, [ca.statement]);
         if (i < 0 || why) { out.push(`${where}: verifier type changed from ${va.type} to ${vb.type}${why ? ` and its amendment is refused: ${why}` : ''}`); continue; }
       }
       for (const k of new Set([...Object.keys(va), ...Object.keys(vb)])) {
@@ -406,12 +571,50 @@ export function weakenings(A, B, { amendments = [], prev = null, ...ctx } = {}) 
         }
         if (va.type === 'metric' && k === 'value' && va.op === vb.op && typeof va.value === 'number' && typeof vb.value === 'number' && tighter(va.op, va.value, vb.value)) continue;
         const i = keyEntry(k);
-        const why = i < 0 ? null : take(i, 'text', id, null);
+        const why = i < 0 ? null : take(i, 'text', id, [ca.statement]);
         if (i < 0 || why) out.push(`${where}: verifier ${k} ${va[k] === undefined ? 'added' : vb[k] === undefined ? 'removed' : 'changed'}${why ? ` and its amendment is refused: ${why}` : ''}`);
       }
     }
   }
   return out;
+}
+
+/**
+ * Requirement 6: a glob g added to a task's scope (`sa` before) through the field form {task, field: 'scope', to, <citation>}, the
+ * entries `ks` (indexes into `ams`). null when the entries citing answers cite added answers of the previous round that each read a
+ * path under g and together read every file g newly admits at the reviewed commit (the previous round's base_commit; none admitted
+ * passes), or when one entry cites a reviewer note, signed by a reviewer key, whose text quotes g verbatim; else why not. The gate
+ * checks the quote only: the paths the note lists are the reviewer's judgement.
+ */
+function globProblem(ams, ks, cx, task, g, sa) {
+  const problems = [];
+  for (const k of ks.filter((x) => ams[x].reviewer_note !== undefined)) {
+    const c = citationProblem(ams[k], cx, 'text', task, null);
+    if (c) { problems.push(c); continue; }
+    if (arr(cx.notes).find((x) => isObj(x) && x.n === Number(ams[k].reviewer_note)).text.includes(g)) return null;
+    problems.push(`reviewer note ${ams[k].reviewer_note} does not quote the glob ${g}`);
+  }
+  const byAnswer = ks.filter((x) => ams[x].reviewer_note === undefined);
+  if (!byAnswer.length) return `and its amendment is refused: ${problems.join('; ')}`;
+  const rc = cx.prev?.base_commit;
+  if (!cx.root || !isSha(rc) || !commitOf(cx.root, rc)) return `but the files it admits cannot be listed: round ${cx.prev?.round} names no reviewed commit in this repository`;
+  const ls = git(cx.root, ['ls-tree', '-r', '--name-only', rc]);
+  if (!ls.ok) return 'but the files it admits at the reviewed commit cannot be listed';
+  const admits = (ls.out ? ls.out.split('\n') : []).filter((f) => matchAny(f, [g]) && !matchAny(f, sa));
+  const crits = [];
+  let cited = byAnswer.length > 0;
+  for (const k of byAnswer) {
+    const c = citationProblem(ams[k], cx, 'scope', task, g);
+    if (c) { problems.push(c); cited = false; continue; }
+    const a = arr(cx.prev?.answers).find((x) => isObj(x) && `${cx.prev.round}.${x.n}` === String(ams[k].answer));
+    crits.push(isObj(a?.folded_as) ? a.folded_as : a?.criterion);
+  }
+  if (cited) {
+    const unread = admits.filter((f) => !crits.some((c) => readsPath(c?.verifier, f)));
+    if (!unread.length) return null;
+    problems.push(`it admits ${unread.length} file(s) at the reviewed commit ${rc.slice(0, 12)} that no cited answer reads (${unread.slice(0, 5).join(', ')}${unread.length > 5 ? ', ...' : ''}); list the added paths one by one`);
+  }
+  return `and its amendment is refused: ${problems.join('; ')}`;
 }
 
 /** null when the spec on disk has the added answer's criterion verbatim, else why not. */
@@ -429,11 +632,21 @@ function addedProblem(spec, c) {
   return null;
 }
 
-/** The amendments entries for `task` in the record beside the spec file `abs` (id `sid`): every round's list and the stop's. */
-function receivingAmendments(abs, sid, task) {
+/**
+ * The amendments entries for `task` in the record beside the spec file `abs` (id `sid`), read only as far as that record verifies:
+ * a round's list when a reviewer key covers it (every round up to the next one signed, or for the last round every round signed and
+ * its closing envelope valid), and the stop's list when the stop is signed by a stop key over it. ctx: {trusted, refused, stopTrusted}.
+ */
+function receivingAmendments(abs, sid, task, ctx = {}) {
+  const loc = locate(abs, sid);
   let rec = null;
-  try { rec = JSON.parse(fs.readFileSync(locate(abs, sid).record, 'utf8')); } catch { /* no record there: no replacements to follow */ }
-  return [...arr(rec?.rounds).flatMap((x) => arr(x?.amendments)), ...arr(rec?.stop?.amendments)].filter((x) => isObj(x) && x.task === task);
+  try { rec = JSON.parse(fs.readFileSync(loc.record, 'utf8')); } catch { return []; /* no record there: no replacements to follow */ }
+  if (!isObj(rec) || rec.spec_id !== sid || !Array.isArray(rec.rounds)) return [];
+  const trusted = ctx.trusted ?? new Map(); const refused = ctx.refused ?? new Set();
+  const out = [];
+  rec.rounds.forEach((r, i) => { if (isObj(r) && arr(r.amendments).length && !coveredProblem(loc, sid, rec.rounds, i, trusted, refused)) out.push(...arr(r.amendments)); });
+  if (isObj(rec.stop) && arr(rec.stop.amendments).length && !stopEnvelopeProblem(omit(rec.stop, ['sig']), rec.stop.sig, ctx.stopTrusted ?? new Map())) out.push(...arr(rec.stop.amendments));
+  return out.filter((x) => isObj(x) && x.task === task);
 }
 
 /** Criterion c ({task, statement, verifier}) followed through the statement and verifier replacements in `ams` until `spec` has it verbatim, or as far as they go. */
@@ -473,14 +686,14 @@ function holdsText(list, ams, field, q) {
  * records the move holds for the moved task (`own`, as made at the split), then the receiving spec's own for to_task. null, else
  * why not.
  */
-function movedTaskProblem(root, mv, ta, own = []) {
+function movedTaskProblem(root, mv, ta, own = [], ctx = {}) {
   const r = resolveSpecId(root, mv.to_spec);
   if (r.problem) return r.problem;
   let spec = null;
   try { spec = JSON.parse(fs.readFileSync(r.abs, 'utf8')); } catch { return `${mv.to_spec}'s spec is not JSON`; }
   const to = taskMap(spec).get(mv.to_task);
   if (!to) return `${mv.to_spec} has no task ${mv.to_task}`;
-  const ams = [...own, ...receivingAmendments(r.abs, mv.to_spec, mv.to_task)];
+  const ams = [...own, ...receivingAmendments(r.abs, mv.to_spec, mv.to_task, ctx)];
   const where = `${mv.to_spec} ${mv.to_task}`;
   for (const q of arr(ta.requirements)) if (!holdsText(to.requirements, ams, 'requirement', q)) return `${where} lacks the requirement "${short(q)}"`;
   for (const x of arr(ta.stop_rules)) if (!holdsText(to.stop_rules, ams, 'stop_rule', x)) return `${where} lacks the stop rule "${short(x)}"`;
@@ -489,24 +702,86 @@ function movedTaskProblem(root, mv, ta, own = []) {
 }
 
 /**
+ * A criterion, requirement or stop rule moved alone ({kind: move, task, field, from, to_spec, to_task, ...}): null when the spec id
+ * resolves through a manifest and to_task there holds the item, itself or the end of its From/To chain in that spec's own verified
+ * amendments, else why not.
+ */
+function movedItemProblem(root, mv, field, item, ctx = {}) {
+  const r = resolveSpecId(root, mv.to_spec);
+  if (r.problem) return r.problem;
+  let spec = null;
+  try { spec = JSON.parse(fs.readFileSync(r.abs, 'utf8')); } catch { return `${mv.to_spec}'s spec is not JSON`; }
+  const to = taskMap(spec).get(mv.to_task);
+  if (!to) return `${mv.to_spec} has no task ${mv.to_task}`;
+  const ams = receivingAmendments(r.abs, mv.to_spec, mv.to_task, ctx);
+  const where = `${mv.to_spec} ${mv.to_task}`;
+  if (field === 'criterion') return addedProblem(spec, followCriterion(spec, ams, { task: mv.to_task, statement: item?.statement, verifier: item?.verifier })) ? `${where} lacks the criterion "${short(item?.statement)}"` : null;
+  return holdsText(field === 'requirement' ? to.requirements : to.stop_rules, ams, field, item) ? null : `${where} lacks the ${field === 'requirement' ? 'requirement' : 'stop rule'} "${short(item)}"`;
+}
+
+/**
  * Requirement 15: null when an added answer folded into another spec (folded_as {spec, task, statement, verifier}) has its move
  * recorded ({kind: move, task, to_spec, to_task} in an amendments list of this record), the spec id resolves through a manifest,
  * and the criterion is verbatim there, following that spec's own amendments (statement and verifier replacements) from what the
  * answer was folded as; else why not.
  */
-function movedProblem(root, rounds, stop, a, fa) {
+function movedProblem(root, rounds, stop, a, fa, ctx = {}) {
   const entries = [...rounds.flatMap((r) => arr(r?.amendments)), ...arr(stop?.amendments)].filter(isObj);
   const r = resolveSpecId(root, fa.spec);
   if (r.problem) return r.problem;
   if (!entries.some((x) => x.kind === 'move' && x.task === a.criterion?.task && x.to_spec === fa.spec && x.to_task === fa.task)) return `no amendments list records the move of task ${a.criterion?.task} to ${fa.spec} ${fa.task}`;
   let spec = null;
   try { spec = JSON.parse(fs.readFileSync(r.abs, 'utf8')); } catch { return `${fa.spec}'s spec is not JSON`; }
-  const c = followCriterion(spec, receivingAmendments(r.abs, fa.spec, fa.task), { task: fa.task, statement: fa.statement, verifier: fa.verifier });
+  const c = followCriterion(spec, receivingAmendments(r.abs, fa.spec, fa.task, ctx), { task: fa.task, statement: fa.statement, verifier: fa.verifier });
   const p = addedProblem(spec, c);
   return p ? `in ${fa.spec}, the answer ${p.replace(/^is added, but /, '')}` : null;
 }
 
-const runsOwnTest = (v) => typeof v?.cmd === 'string' && typeof v?.test_file === 'string' && (v.cmd.includes('{test}') || v.cmd.includes(normPath(v.test_file) ?? v.test_file));
+/**
+ * The simple commands of a shell text, each as its words with quotes removed: split at ; & | ( ) ` and newlines outside quotes (a
+ * $(...) inside double quotes stays inside its word). Enough to see which program a command runs and with what arguments.
+ */
+function shellCommands(text) {
+  const cmds = [];
+  let words = []; let w = null; let q = null; let depth = 0;
+  const endWord = () => { if (w !== null) words.push(w); w = null; };
+  const endCmd = () => { endWord(); if (words.length) cmds.push(words); words = []; };
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q === "'") { if (c === "'") q = null; else w += c; continue; }
+    if (q === '"') {
+      if (c === '\\' && i + 1 < text.length) { w += text[++i]; continue; }
+      if (c === '$' && text[i + 1] === '(') { depth++; w += '$('; i++; continue; }
+      if (c === ')' && depth > 0) { depth--; w += c; continue; }
+      if (c === '"' && depth === 0) q = null; else w += c;
+      continue;
+    }
+    if (c === "'" || c === '"') { q = c; if (w === null) w = ''; continue; }
+    if (c === '\\' && i + 1 < text.length) { w = (w ?? '') + text[++i]; continue; }
+    if (/\s/.test(c) && c !== '\n') { endWord(); continue; }
+    if (';&|()`\n'.includes(c)) { endCmd(); continue; }
+    w = (w ?? '') + c;
+  }
+  endCmd();
+  return cmds;
+}
+
+/**
+ * Requirement 21: whether a verifier's cmd runs its own test_file under a test runner: one simple command of it is node (after any
+ * VAR=value assignments) with the --test flag and, as an argument, the test file, a glob node --test expands to it, or the {test}
+ * placeholder. A command that only names the file (test -f, cat, grep, true) runs nothing.
+ */
+function runsOwnTest(v) {
+  if (typeof v?.cmd !== 'string' || typeof v?.test_file !== 'string') return false;
+  const file = normPath(v.test_file);
+  return shellCommands(v.cmd).some((words) => {
+    let i = 0;
+    while (i < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i])) i++;
+    if (i >= words.length || path.posix.basename(words[i]) !== 'node') return false;
+    const args = words.slice(i + 1);
+    return args.includes('--test') && args.some((x) => x === '{test}' || (file !== null && (normPath(x) === file || (GLOB.test(x) && normPath(x) !== null && matchAny(file, [normPath(x)])))));
+  });
+}
 
 function manifestKind(file, id) {
   try { const row = arr(JSON.parse(fs.readFileSync(file, 'utf8')).contracts).find((r) => r?.id === id); return row ? (row.kind ?? 'feature') : null; } catch { return null; }
@@ -565,11 +840,12 @@ export function inScopeChanges({ cwd, spec, from, to, exclude = [] }) {
 
 /**
  * Judge one spec. spec: its path (relative to cwd or absolute). reviewerKeys: the reviewer public keys
- * (PEM) to accept instead of REVIEWER_KEYS. at: the commit staleness is judged at (default HEAD; the
- * signing commit for a signed contract). Returns { status, reasons, codes, ... }; status is SIGNABLE,
- * SIGNABLE AT STOP, NOT SIGNABLE or NO RECORD, and reasons is empty unless NOT SIGNABLE.
+ * (PEM) to accept instead of REVIEWER_KEYS. stopKeys: the stop-decision public keys (PEM) to accept
+ * instead of STOP_KEYS. at: the commit staleness is judged at (default HEAD; the signing commit for a
+ * signed contract). Returns { status, reasons, codes, ... }; status is SIGNABLE, SIGNABLE AT STOP,
+ * NOT SIGNABLE or NO RECORD, and reasons is empty unless NOT SIGNABLE.
  */
-export function evaluate({ spec, cwd = process.cwd(), reviewerKeys, at } = {}) {
+export function evaluate({ spec, cwd = process.cwd(), reviewerKeys, stopKeys, at } = {}) {
   const root = path.resolve(cwd);
   const specAbs = path.resolve(root, String(spec));
   const rel = (p) => posix(path.relative(root, p));
@@ -672,6 +948,7 @@ export function evaluate({ spec, cwd = process.cwd(), reviewerKeys, at } = {}) {
   // review_sig: each round is signed by a reviewer key over its answers, its snapshot and the previous round; every round,
   // the implementation rounds after the last spec round included (requirement 16)
   const trusted = trustedKeys(reviewerKeys === undefined ? REVIEWER_KEYS : reviewerKeys);
+  const stopTrusted = trustedKeys(stopKeys === undefined ? STOP_KEYS : stopKeys);
   const ckeys = contractKeys(root);
   const refused = new Set(ckeys.keys());
   rounds.forEach((r, i) => {
@@ -694,7 +971,7 @@ export function evaluate({ spec, cwd = process.cwd(), reviewerKeys, at } = {}) {
       // in the spec verbatim, because the build rewrites commands (the name guard) and a builder may fold an answer in substance
       if (a.disposition === 'added') {
         const fa = a.folded_as;
-        if (isObj(fa) && fa.spec !== undefined && fa.spec !== id) { const p = movedProblem(root, rounds, rec.stop, a, fa); if (p) fail('added_verbatim', `${label} folded into ${JSON.stringify(fa.spec)}: ${p}`); continue; }
+        if (isObj(fa) && fa.spec !== undefined && fa.spec !== id) { const p = movedProblem(root, rounds, rec.stop, a, fa, { trusted, refused, stopTrusted }); if (p) fail('added_verbatim', `${label} folded into ${JSON.stringify(fa.spec)}: ${p}`); continue; }
         const folded = fa !== undefined;
         const c = isObj(fa) && fa.spec !== undefined ? omit(fa, ['spec']) : folded ? fa : a.criterion;
         const p = addedProblem(disk, c);
@@ -732,14 +1009,24 @@ export function evaluate({ spec, cwd = process.cwd(), reviewerKeys, at } = {}) {
       for (const h of have) if (!want.includes(h)) problems.push(`its open list names ${h}, which is not an open answer`);
     }
     if (stop.dispositions !== dispositionsSha256(judged)) problems.push('the dispositions or amendments of the rounds changed after it was signed');
+    // requirement 12: exactly the decision's own fields, under the stop's own payload type, signed by a stop key (STOP_KEYS, or
+    // stopKeys in tests); never a contract body or a contract signature
+    const body = omit(stop, ['sig']);
+    const extra = Object.keys(body).filter((k) => !STOP_FIELDS.includes(k) && k !== 'amendments');
+    const lacks = STOP_FIELDS.filter((k) => !(k in body));
+    if (extra.length || lacks.length) problems.push(`it holds ${extra.length ? `${extra.slice(0, 8).join(', ')}${extra.length > 8 ? ', ...' : ''}` : 'no extra field'}${lacks.length ? ` and lacks ${lacks.join(', ')}` : ''}; a stop decision holds exactly ${STOP_FIELDS.join(', ')} and, when present, amendments`);
     const env = stop.sig;
     const kid = env?.signatures?.[0]?.keyid;
+    const sp = stopEnvelopeProblem(body, env, stopTrusted);
     const ck = typeof kid === 'string' && /^[0-9a-f]{16}$/.test(kid) ? ckeys.get(kid) : null;
-    // requirement 19: the key's .pub is committed at the judged commit, and that committed key is the one that verifies
+    // requirement 19: the key's .pub is committed at the judged commit, and it is the key that verifies
     const committed = ck && target ? blobAt(root, target, `contracts/keys/${kid}.pub`) : null;
-    if (!ck || !ck.pem || ck.file !== `${kid}.pub`) problems.push(`it is not signed by a contract-signing key under contracts/keys/ (${kid ? `key ${kid}` : 'no key'})`);
+    let committedId = null;
+    try { committedId = committed ? keyId(committed.toString('utf8')) : null; } catch { /* not a usable key */ }
+    if (sp) problems.push(sp);
+    else if (!ck || !ck.pem || ck.file !== `${kid}.pub`) problems.push(`its key ${kid} is not under contracts/keys/ as ${kid}.pub`);
     else if (!committed) problems.push(`its key contracts/keys/${kid}.pub is not committed at ${at ? `the commit ${String(at).slice(0, 12)}` : 'HEAD'}; a key only in the working tree never signs a stop`);
-    else if (!(env.signatures.length === 1 && dsseVerify(omit(stop, ['sig']), env, committed.toString('utf8')).ok)) problems.push(`its signature by ${kid} does not verify over the decision as it is`);
+    else if (committedId !== kid) problems.push(`contracts/keys/${kid}.pub as committed at ${at ? `the commit ${String(at).slice(0, 12)}` : 'HEAD'} is not the key ${kid}`);
     for (const p of problems) fail('stop_decision', `the stop decision: ${p}`);
     if (!problems.length) { out.stop = { decision: stop.decision, decider: stop.decider, date: stop.date }; out.open = want.map((w) => ({ round: Number(w.split('.')[0]), n: Number(w.split('.')[1]) })); }
     out.signable_sha256 = stop.spec_sha256;
@@ -747,7 +1034,7 @@ export function evaluate({ spec, cwd = process.cwd(), reviewerKeys, at } = {}) {
 
   // never_weakens: snapshot to snapshot (and on to the disk after a stop), workdir null, no criterion optional
   const chain = specRounds.map((r) => ({ r, s: snapOf.get(r) })).filter((x) => x.s);
-  const ctx = { rounds, notes: arr(rec.reviewer_notes), specId: id, trusted, refused, root };
+  const ctx = { rounds, notes: arr(rec.reviewer_notes), specId: id, trusted, refused, stopTrusted, root };
   for (let k = 1; k < chain.length; k++) for (const w of weakenings(chain[k - 1].s, chain[k].s, { amendments: chain[k].r.amendments, prev: chain[k - 1].r, cur: chain[k].r.round, ...ctx })) fail('never_weakens', `round ${chain[k].r.round}: ${w}`);
   // at a stop, the change from the last spec round's snapshot to the disk is judged with the stop's own amendments (requirement 12)
   if (stop && chain.length) for (const w of weakenings(chain[chain.length - 1].s, disk, { amendments: stop.amendments, prev: chain[chain.length - 1].r, cur: Infinity, ...ctx })) fail('never_weakens', `the spec on disk: ${w}`);
@@ -852,7 +1139,7 @@ const statusLine = (r) => {
  * spec whose hash does not match, or a signed contract under contracts/signed/ is not backed by a
  * SIGNABLE record (grandfathered contracts aside). Returns { exit, lines, errors }.
  */
-export function gate({ cwd = process.cwd(), specs = [], report = false, reviewerKeys } = {}) {
+export function gate({ cwd = process.cwd(), specs = [], report = false, reviewerKeys, stopKeys } = {}) {
   const root = path.resolve(cwd);
   const lines = [];
   const errors = [];
@@ -866,7 +1153,7 @@ export function gate({ cwd = process.cwd(), specs = [], report = false, reviewer
   }
   if (!report) {
     let ok = !errors.length;
-    for (const s of list) { const r = evaluate({ spec: s, cwd: root, reviewerKeys }); lines.push(statusLine(r)); if (!r.status.startsWith('SIGNABLE')) ok = false; }
+    for (const s of list) { const r = evaluate({ spec: s, cwd: root, reviewerKeys, stopKeys }); lines.push(statusLine(r)); if (!r.status.startsWith('SIGNABLE')) ok = false; }
     return { exit: errors.length ? 2 : ok ? 0 : 1, lines, errors };
   }
 
@@ -901,7 +1188,7 @@ export function gate({ cwd = process.cwd(), specs = [], report = false, reviewer
 
   const counts = { SIGNABLE: 0, 'SIGNABLE AT STOP': 0, 'NOT SIGNABLE': 0, 'NO RECORD': 0 };
   for (const s of list) {
-    const r = evaluate({ spec: s, cwd: root, reviewerKeys, at: signingAt.get(s) });
+    const r = evaluate({ spec: s, cwd: root, reviewerKeys, stopKeys, at: signingAt.get(s) });
     counts[r.status]++;
     lines.push(statusLine(r));
     if (r.status === 'SIGNABLE AT STOP') for (const o of r.open) lines.push(`  open: round ${o.round} answer ${o.n}`);
@@ -915,7 +1202,7 @@ export function gate({ cwd = process.cwd(), specs = [], report = false, reviewer
     for (const p of x.linked) {
       const where = `${x.relp} (from ${p.s})`;
       if (p.tasks !== x.tasks) problems.push(`${where}: its tasks are not the tasks drafted from the spec`);
-      const r = evaluate({ spec: p.s, cwd: root, reviewerKeys, at: x.at || undefined });
+      const r = evaluate({ spec: p.s, cwd: root, reviewerKeys, stopKeys, at: x.at || undefined });
       if (!r.status.startsWith('SIGNABLE')) { problems.push(`${where}: the spec is ${r.status}${r.reasons.length ? `: ${r.reasons.join('; ')}` : ''}`); continue; }
       // the signature, the provenance hash and the order of commits
       let env = null;
