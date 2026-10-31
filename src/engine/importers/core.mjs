@@ -141,15 +141,23 @@ export async function offerImport({ root, env, flags = {}, ask = false, input, o
     if (output) output.write(preview + '\n');
     let selected = null;
     {
-      if (output) output.write('Import these items? [Y/n] ');
-      let line = '';
-      await new Promise((resolve) => {
-        input.once('data', (d) => { line += d.toString(); if (line.includes('\n')) resolve(); });
-        input.once('end', resolve);
+      // Nobody asked for this import and it reads AI history, so Enter imports nothing. memev import's own question,
+      // which the person did ask for, keeps [Y/n].
+      if (output) output.write('Import these items? [y/N] ');
+      const line = await new Promise((resolve) => {
+        let buf = '';
+        const done = () => { input.off('data', onData); input.off('end', done); resolve(buf); };
+        const onData = (d) => { buf += d.toString(); if (buf.includes('\n')) done(); };
+        if (input.readableEnded) return resolve('');
+        input.on('data', onData);
+        input.once('end', done);
+        // init's first question closes its readline, which pauses stdin, and a data listener does not resume a paused
+        // stream: without this nothing keeps node alive, and init exits here with the daemon stopped
+        input.resume?.();
       });
       input.pause?.(); // a terminal left flowing would keep init from exiting
-      const ans = line.trim().toLowerCase();
-      if (ans === '' || ans === 'y' || ans === 'yes') selected = deduped;
+      const ans = line.split('\n')[0].trim().toLowerCase();
+      if (ans === 'y' || ans === 'yes') selected = deduped;
     }
     let result = { id: null, imported: 0, skipped: deduped.length, note: null };
     if (selected && selected.some((it) => !it.skip)) {

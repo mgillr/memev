@@ -41,7 +41,7 @@ function buildPreview(items) {
   return lines.join('\n');
 }
 
-export async function command(cmd, pos, flags, { root, env }) {
+export async function command(cmd, pos, flags, { root, env, stdin = process.stdin, stdout = process.stdout }) {
   if (!isVault(root)) throw new Error(`no vault at ${root}; run memev init`);
   const sub = pos[0];
 
@@ -100,9 +100,10 @@ export async function command(cmd, pos, flags, { root, env }) {
         const nums = keep.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => n >= 1);
         const numbered = deduped.map((it, i) => ({ it, n: i + 1 }));
         selected = numbered.filter(({ n }) => nums.includes(n)).map(({ it }) => it);
-      } else if (process.stdin.isTTY) {
+      } else if (stdin.isTTY) {
+        // the person asked for this import, so Enter imports; init's unasked offer defaults to no (core.mjs)
         const { createInterface } = await import('node:readline');
-        const rl = createInterface({ input: process.stdin, output: process.stdout });
+        const rl = createInterface({ input: stdin, output: stdout });
         const ans = await new Promise((r) => rl.question('Import these items? [Y/n] ', r));
         rl.close();
         const a = ans.trim().toLowerCase();

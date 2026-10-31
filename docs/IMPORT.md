@@ -58,7 +58,8 @@ memev import undo imp-1a2b3c4d
 ## At init
 
 On a terminal, init offers the import step once, after the lead question. It is
-off unless you say yes, and it never blocks init. Non-terminal init skips it.
+off unless you answer y (Enter imports nothing), and it never blocks init.
+Non-terminal init skips it. `memev import`, which you run yourself, imports on Enter.
 
 ## No model calls
 

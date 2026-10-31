@@ -142,12 +142,13 @@ export function print(items) {
 }
 
 /** The history import is offered at init only on a terminal and never under init's --yes, so the person always sees the
- * preview before anything is imported (memev import --yes is the explicit way without a question). */
+ * preview before anything is imported (memev import --yes is the explicit way without a question). firstRun passes its
+ * own stdin and stdout when it was given them, a test's, and the process's otherwise. */
 export function initImportPrompt(flags = {}, { stdin = process.stdin, stdout = process.stdout } = {}) {
   return !flags.yes && stdin?.isTTY && stdout?.isTTY ? { ask: true, input: stdin, output: stdout } : {};
 }
 export async function firstRun(o) {
-  const items = await checklist({ ...initImportPrompt(o.flags), ...o, firstRun: true }); print(items); await (await import('./pathsetup.mjs')).offer({ env: o.env });
+  const items = await checklist({ ...initImportPrompt(o.flags, o), ...o, firstRun: true }); print(items); await (await import('./pathsetup.mjs')).offer({ env: o.env });
   await finish(o);
   return items.some((i) => i.status === 'failed') ? 1 : 0;
 }

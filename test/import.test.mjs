@@ -4,6 +4,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import readline from 'node:readline';
 import { PassThrough } from 'node:stream';
 import { tmpdir, cleanup, OWNER, newVault } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
@@ -24,6 +25,11 @@ function makeProj(prefix = 'proj-') {
   fs.writeFileSync(path.join(dir, 'deploy.key'), 'dummy-key-material\n');
   return dir;
 }
+
+// Resolves to what p resolves to, or to 'timed out' after ms. The timer keeps the test process alive, so a read that
+// never resolves fails here instead of letting the process exit as init did.
+const within = (ms, p) => { let t; return Promise.race([p.finally(() => clearTimeout(t)), new Promise((res) => { t = setTimeout(() => res('timed out'), ms); })]); };
+const readJsonFile = (f) => JSON.parse(fs.readFileSync(f, 'utf8'));
 
 test('MEM-105 AC09: preview shows counts and sizes per source; --keep picks specific items; note carries source tag and import id', () => {
   const { root, v } = newVault();
@@ -105,7 +111,7 @@ test('MEM-105 AC12: non-TTY init does not ask the import question and writes no 
   } finally { sb.stop(); }
 });
 
-test('MEM-105 AC12: offerImport with ask=true and a default answer imports', async () => {
+test('MEM-105 AC12: the init offer defaults to no: Enter imports nothing, and the answer is kept', async () => {
   const { v } = newVault();
   const proj = makeProj();
   const input = new PassThrough();
@@ -113,10 +119,76 @@ test('MEM-105 AC12: offerImport with ask=true and a default answer imports', asy
   input.end('\n');
   const { offerImport } = await import('../src/cli/import.mjs');
   const r = await offerImport({ root: v.root, env: { HOME: tmpdir('home-') }, flags: {}, ask: true, input, output, cwd: proj, home: tmpdir('home-') });
+  assert.match(String(output.read() || ''), /Import these items\? \[y\/N\]/, 'the question shows no as the default');
   assert.equal(r.asked, true, 'was asked');
-  assert.equal(r.accepted, true, 'accepted with default yes');
-  assert.ok(r.result.id, 'import id returned');
+  assert.equal(r.accepted, false, 'Enter declines');
+  assert.equal(r.result.imported, 0, 'nothing imported');
+  assert.deepEqual(readJsonFile(path.join(v.root, '.memev', 'config.json')).import, { asked: true, accepted: false }, 'the answer is kept, so it is not asked again');
   v.close();
+});
+
+test('MEM-105 AC12: the init offer reads its answer after an earlier question paused the input, and from a line split in two chunks', async () => {
+  const { v } = newVault();
+  const proj = makeProj();
+  const input = new PassThrough();
+  const output = new PassThrough();
+  readline.createInterface({ input, terminal: false }).close(); // as init's first/joining question leaves stdin: paused
+  assert.equal(input.isPaused(), true, 'the input starts paused');
+  input.write('y');
+  setTimeout(() => input.write('es\n'), 50);
+  const { offerImport } = await import('../src/cli/import.mjs');
+  const r = await within(10000, offerImport({ root: v.root, env: { HOME: tmpdir('home-') }, flags: {}, ask: true, input, output, cwd: proj, home: tmpdir('home-') }));
+  assert.notEqual(r, 'timed out', 'the answer was read');
+  assert.equal(r.accepted, true, 'yes imports');
+  assert.ok(r.result.imported >= 1, 'items imported');
+  assert.equal(input.isPaused(), true, 'the input is paused again, so init can exit');
+  v.close();
+});
+
+test('MEM-105 AC12: a terminal init reaches the offer through firstRun after the first question paused stdin, and y imports', async () => {
+  const sb = sandbox();
+  const log = console.log;
+  const cwd = process.cwd();
+  try {
+    const r = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
+    assert.equal(r.code, 0, r.out);
+    // with no daemon running the offer stops and starts nothing: a daemon started from this process would get its env
+    sb.stop();
+    const proj = makeProj();
+    process.chdir(proj); // the offer reads the current folder
+    const stdin = new PassThrough(); stdin.isTTY = true;
+    const stdout = new PassThrough(); stdout.isTTY = true;
+    readline.createInterface({ input: stdin, terminal: false }).close();
+    stdin.write('y\n');
+    console.log = () => {};
+    const { firstRun } = await import('../src/cli/onboarding.mjs');
+    const code = await within(60000, firstRun({ root: sb.root, env: sb.env, flags: { 'no-connect': true, 'no-service': true }, daemonUp: false, stdin, stdout }));
+    console.log = log;
+    assert.notEqual(code, 'timed out', 'init went on past the offer');
+    assert.match(String(stdout.read() || ''), /Import these items\? \[y\/N\]/, 'the offer was made on the terminal');
+    const items = readJsonFile(path.join(sb.root, '.memev', 'onboarding.json')).items;
+    const line = items.find((i) => /History import/.test(i.step));
+    assert.equal(line?.status, 'succeeded', JSON.stringify(line));
+    assert.match(line.detail, /item\(s\) imported/);
+    assert.deepEqual(readJsonFile(path.join(sb.root, '.memev', 'config.json')).import, { asked: true, accepted: true });
+    assert.equal(stdin.isPaused(), true, 'stdin is paused again');
+  } finally { console.log = log; process.chdir(cwd); sb.stop(); }
+});
+
+test('MEM-105 AC12: the question memev import asks defaults to yes, so Enter imports', async () => {
+  const { root, v } = newVault();
+  v.close();
+  const proj = makeProj();
+  const stdin = new PassThrough(); stdin.isTTY = true;
+  const stdout = new PassThrough();
+  stdin.end('\n');
+  const { command } = await import('../src/cli/import.mjs');
+  const log = console.log; console.log = () => {};
+  let code;
+  try { code = await within(10000, command('import', [], { path: proj }, { root, env: { HOME: tmpdir('home-') }, stdin, stdout })); } finally { console.log = log; }
+  assert.equal(code, 0);
+  assert.match(String(stdout.read() || ''), /Import these items\? \[Y\/n\]/, 'the question shows yes as the default');
+  assert.equal(fs.readdirSync(path.join(root, 'memory', 'imports')).length, 1, 'Enter imported');
 });
 
 test('MEM-105 AC12: offerImport with ask=true and a no answer does not import', async () => {
