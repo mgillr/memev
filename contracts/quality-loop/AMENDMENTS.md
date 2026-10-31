@@ -126,7 +126,7 @@ node's TAP output counts each test file as a passing test, so a name filter that
 History of the guard's form, 31 October 2026: (1) a count of matching passing lines against the number of alternatives (grep); (2) the same count, with describe() suite lines dropped (awk); (3) one match required for each alternative, matched against the test name, because a count let two tests matching one alternative stand in for another that never ran; (4) each alternative that is a test name, not a label, anchored at both ends, because a name that was a prefix of another criterion's test name in the same file let that test stand in for one never written; an alternative that existing tests start with (SR-1.11's 'REV-022') is anchored at the start only.
 
 - QL-1.01: name guard on 42 criterion command(s).
-- QL-1.02: name guard on 37 criterion command(s).
+- QL-1.02: name guard on 47 criterion command(s).
 - QL-1.03: name guard on 28 criterion command(s).
 - QL-1.04: name guard on 14 criterion command(s).
 - QL-1.05: name guard on 13 criterion command(s).
@@ -148,7 +148,7 @@ When two or more red-green criteria of one task shared one whole-file command, o
 A criterion that arrives already filtered to a subtest label, as a red-team answer's own criterion does, is renumbered so that NN in <task>-cNN: is its position in the task, and its label joins that task's full-run criterion for the file, so the full run also checks it for skips and todos (reviewer's finding, 31 October 2026). A build lint fails on any label whose number differs from its position or which no full-run list names. Statements are unchanged apart from the full-run criterion's list of labels and a label that starts a statement, which is renumbered to the criterion's position the same way.
 
 - QL-1.01: 6 labelled criterion command(s) renumbered to their position and added to the full-run list, and 6 label(s) that start a statement renumbered with them.
-- QL-1.02: 8 labelled criterion command(s) renumbered to their position and added to the full-run list, and 3 label(s) that start a statement renumbered with them.
+- QL-1.02: 18 labelled criterion command(s) renumbered to their position and added to the full-run list, and 13 label(s) that start a statement renumbered with them.
 - QL-1.03: 1 labelled criterion command(s) renumbered to their position and added to the full-run list, and 1 label(s) that start a statement renumbered with them.
 - QL-1.04: 16 labelled criterion command(s) renumbered to their position and added to the full-run list, and 14 label(s) that start a statement renumbered with them.
 - QL-1.05: 5 labelled criterion command(s) renumbered to their position and added to the full-run list, and 5 label(s) that start a statement renumbered with them.

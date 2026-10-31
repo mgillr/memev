@@ -28,6 +28,13 @@
         "the per-mutant time limit is at least five times the slower unmutated control run plus 10 s, and --json reports the limit it used",
         "the runner is engine code, src/engine/mutation-gate.mjs, which ships in the npm package; scripts/gate/mutate.mjs is a thin wrapper that imports it and adds nothing",
         "mutate.mjs takes --scope <glob>, repeatable, and then judges only changed lines in files that match one of the globs; its JSON output carries mutants, killed and survived for each file as well as in total",
+        "each mutant copy has no git remote, and every command the gate runs has SSH_AUTH_SOCK, SSH_AGENT_PID, GIT_SSH, GIT_SSH_COMMAND, GIT_ASKPASS, SSH_ASKPASS and GIT_CONFIG_GLOBAL removed and git's credential helpers off, so nothing a mutant runs can push to the caller's repository or its remotes",
+        "every test command runs with a PATH whose first directory holds the gate's own refusing stubs for launchctl, systemctl, schtasks and cloudflared, so a mutant that flips an isolation check cannot act on the person's own services",
+        "the changed lines are read so that a file under a -diff or binary attribute, or with a non-ASCII path, still yields its changed lines, named by its real UTF-8 path; a changed file that yields none is listed as unjudged and the run is not ok",
+        "the operator set is stated in full and each kind has a fixture line: besides requirement 1's kinds, !=, ||=, &&=, *, /, %, a const initialiser and a plain assignment; a line with two sites of one operator gets a mutant at each site",
+        "no ref, reflog entry or object in a mutant copy holds the post-change text of a changed file: the copy's HEAD is the base and the change is uncommitted work in it",
+        "the rewrite control's change to each changed line cannot be undone by deleting parentheses, whitespace or comments, and it is chosen per run",
+        "a changed line whose only mutants timed out is listed, and the run is not ok, even when a mutant on another line was killed",
         "each red-green criterion of this task that runs test/gate-mutate.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
@@ -273,10 +280,66 @@
           }
         },
         {
-          "statement": "One full run of test/gate-mutate.test.mjs passes every labelled subtest (T1-c01, T1-c03, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c11, T1-c12, T1-c13, T1-c14, T1-c15, T1-c16, T1-c17, T1-c18, T1-c19, T1-c20, T1-c21, T1-c22, T1-c23, T1-c24, T1-c25, T1-c26, T1-c27, T1-c28, T1-c29) with nothing skipped and nothing todo.",
+          "statement": "T1-c30: The fixture repository has a local bare repository as its origin remote and a tag t0. The weak test runs, ignoring exit status, `git push -q origin HEAD:refs/heads/gate-$$; git tag gate-$$; git push -q origin --tags` in its working directory and logs `git remote -v` outside the fixture. After a normal run and after a SIGKILLed run, `git for-each-ref` of the fixture and of the bare origin equal their values from before the run, and no logged remote URL is the fixture path or the origin path.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c30:' test/gate-mutate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c30:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c31: A fixture's changed line is `export const serviceOff = (env = process.env) => !!env.MEMEV_NO_SERVICE;` in src/svc.mjs. Its weak test runs `if (!serviceOff()) spawnSync(name, ['bootstrap'])` for name in launchctl, systemctl, schtasks and cloudflared, by name. Logging stubs with those four names are placed first in the PATH the gate is started with. After the run the stub log is empty: the gate's test environment resolves those names to the gate's own refusing stubs, or the gate refuses to mutate a line that reads MEMEV_NO_* and lists it as unjudged with a status other than ok.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c31:' test/gate-mutate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c31:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c32: A fixture has a strongly tested changed comparison in src/strong.mjs and weakly tested changed comparisons in src/weak.mjs (src/.gitattributes holds `weak.mjs -diff`), in src/other.mjs (.git/info/attributes holds `other.mjs binary`) and in src/café.mjs. The run never exits 0: each weak line is in survivors with its new-side {file,line}, the file named by its real UTF-8 path, or the file is listed under unjudged and the run exits non-zero with a status other than ok.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c32:' test/gate-mutate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c32:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c33: Under a weak test, a fixture's changed lines are `flag = a != b;`, `cache ||= new Map();`, `ok &&= ready;`, `total = count * price;`, `ratio = a / b;`, `rem = a % b;`, `const limit = computeLimit();`, `cache[key] = value;`, `let y = f(x);` and `if (p === q && r === s) hits++;`, plus a strongly tested `return a > b;`. The run never exits 0. Each weak line is in survivors, where survivors cover the operators !=, ||=, &&=, *, /, % and const initialiser and hold two === entries for the two-site line, or it is listed in unmutated while the run exits non-zero with a status other than ok.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c33:' test/gate-mutate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c33:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c34: A fixture commits a change of `export const gt = (a, b) => a >= b;` to `a > b` in src/f.mjs. Its weak test writes `git show $(git log --all -1 --format=%H -- src/f.mjs):src/f.mjs` to a temp file outside the fixture, imports it, asserts that gt from ../src/f.mjs equals the imported gt on (1,2), (2,2) and (3,2), and checks nothing else. The run never exits 0 and killed is 0: it exits 2 with status noise, or 1 with the mutants in survivors, because no ref, reflog entry or object in the copy holds the post-change text of a changed file (for example, the copy's HEAD is the base and the change is uncommitted work).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c34:' test/gate-mutate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c34:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c35: A fixture's weak test embeds the expected text of each changed file as a string literal and compares it with the file read from disk after deleting comments, whitespace and every ( and ) from both. The run never exits 0 and killed is 0. It exits 2 with status noise, because the control's change to each changed line cannot be undone by deleting parentheses, whitespace or comments (for example `x === y` to `!(x !== y)`, `true` to `!false`, chosen per run).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c35:' test/gate-mutate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c35:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T1-c36: A fixture has a strongly tested changed `export const gt = (a, b) => a > b;` and, inside an unchanged while loop, a weakly tested changed `i = i + 1;` whose one mutant times out. The run does not exit 0 with status ok: --json timeout is 1, the loop line is listed (under unmutated or a timeouts list), and the run exits non-zero with a status other than ok.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c36:' test/gate-mutate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c36:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/gate-mutate.test.mjs passes every labelled subtest (T1-c01, T1-c03, T1-c04, T1-c05, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c11, T1-c12, T1-c13, T1-c14, T1-c15, T1-c16, T1-c17, T1-c18, T1-c19, T1-c20, T1-c21, T1-c22, T1-c23, T1-c24, T1-c25, T1-c26, T1-c27, T1-c28, T1-c29, T1-c30, T1-c31, T1-c32, T1-c33, T1-c34, T1-c35, T1-c36) with nothing skipped and nothing todo.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-mutate.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c03:|^T1-c04:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c12:|^T1-c13:|^T1-c14:|^T1-c15:|^T1-c16:|^T1-c17:|^T1-c18:|^T1-c19:|^T1-c20:|^T1-c21:|^T1-c22:|^T1-c23:|^T1-c24:|^T1-c25:|^T1-c26:|^T1-c27:|^T1-c28:|^T1-c29:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-mutate.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c03:|^T1-c04:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c12:|^T1-c13:|^T1-c14:|^T1-c15:|^T1-c16:|^T1-c17:|^T1-c18:|^T1-c19:|^T1-c20:|^T1-c21:|^T1-c22:|^T1-c23:|^T1-c24:|^T1-c25:|^T1-c26:|^T1-c27:|^T1-c28:|^T1-c29:|^T1-c30:|^T1-c31:|^T1-c32:|^T1-c33:|^T1-c34:|^T1-c35:|^T1-c36:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
             "timeout_s": 600
           }
         },
@@ -313,6 +376,9 @@
         "contractVerify runs the canonical mutation command with the running memev's own runner in place of the workdir's scripts/gate/mutate.mjs; when the workdir's copy is not byte-identical to memev's own, the mutation metrics FAIL with a detail saying the gate is not the pinned one, except in a task whose scope names the runner itself, where memev's own copy judges the change and the difference is reported",
         "with contracts.mutation_required on, a contract whose implement task touches src must name an explicit base sha in its spec (SR-0.03 requirement 2) and contractSign refuses one without it; the recorded base is the spec's, so signing after the change cannot move it, and an amendment that names no new base keeps the superseded contract's base; an amendment whose base differs from the superseded contract's base is BLOCKED at verify, naming the base change, until a reviewer key signs an envelope over {contract id, old base, new base}, so every base change is reviewed",
         "contractVerify sets MEMEV_CONTRACT_BASE to the recorded base for every command, metric and red-green run, overriding any value in its own environment",
+        "the lint refuses a --scope narrower than the task's own globs, and a changed src file outside --scope never counts as judged",
+        "with mutation_required on, sign refuses a base that is not an ancestor of, or equal to, merge-base(HEAD, main) at signing, and a contract of phase verify scoped to src/** still needs the mutation criteria",
+        "a base change is unblocked only by an envelope from a reviewer key (REVIEWER_KEYS, or a key injected through Vault options), never by a key under contracts/keys/",
         "each red-green criterion of this task that runs test/gate-mutate-lint.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest"
       ],
       "description": "",
@@ -512,10 +578,34 @@
           }
         },
         {
-          "statement": "One full run of test/gate-mutate-lint.test.mjs passes every labelled subtest (T2-c01, T2-c04, T2-c05, T2-c06, T2-c07, T2-c08, T2-c09, T2-c10, T2-c11, T2-c12, T2-c13, T2-c15, T2-c16, T2-c17, T2-c20, T2-c21, T2-c22) with nothing skipped and nothing todo.",
+          "statement": "T2-c23: Through newVault with contracts.mutation_required on, in a temp repo with a strongly tested committed change in src/a/x.mjs and a weakly tested committed change in src/b/y.mjs: (1) a draft scoped ['src/**'] carrying the canonical criteria with `--scope src/a/x.mjs` gets the mutation warning and is refused at sign; (2) a contract scoped ['src/a/**'] with the canonical criteria and `--scope 'src/a/**'` verifies FAIL with a detail naming src/b/y.mjs, because the gate lists changed src files outside --scope under unjudged with a status other than ok, or verify refuses changed src files outside the task's scope.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c23:' test/gate-mutate-lint.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c23:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2-c24: Through newVault with contracts.mutation_required on, in a repo with main at M and, on a branch, a weakly tested commit C to src/f.mjs then a strongly tested one-line commit D to src/g.mjs: (1) a contract with the canonical criteria whose spec base is C, signed after D, is refused at sign naming the base (the base must be an ancestor of, or equal to, merge-base(HEAD, main) at signing), or verifies FAIL with C's line among survivors; (2) a contract with phase 'verify', scope ['src/**'], no base and no mutation criteria, signed after C, is refused at sign or verifies FAIL naming the mutation criterion.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c24:' test/gate-mutate-lint.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c24:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "T2-c25: As in T2-c20, an amendment naming base D is signed after D. An envelope over {contract id, M, D} signed with the vault's own contract-signing key (the key contractSign records under contracts/keys/) leaves verify BLOCKED, naming the base change. Only a key from the reviewer key set (REVIEWER_KEYS, or one injected through Vault options and never one under contracts/keys/) unblocks it.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/gate-mutate-lint.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c25:' test/gate-mutate-lint.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c25:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "One full run of test/gate-mutate-lint.test.mjs passes every labelled subtest (T2-c01, T2-c04, T2-c05, T2-c06, T2-c07, T2-c08, T2-c09, T2-c10, T2-c11, T2-c12, T2-c13, T2-c15, T2-c16, T2-c17, T2-c20, T2-c21, T2-c22, T2-c23, T2-c24, T2-c25) with nothing skipped and nothing todo.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-mutate-lint.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c04:|^T2-c05:|^T2-c06:|^T2-c07:|^T2-c08:|^T2-c09:|^T2-c10:|^T2-c11:|^T2-c12:|^T2-c13:|^T2-c15:|^T2-c16:|^T2-c17:|^T2-c20:|^T2-c21:|^T2-c22:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/gate-mutate-lint.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c04:|^T2-c05:|^T2-c06:|^T2-c07:|^T2-c08:|^T2-c09:|^T2-c10:|^T2-c11:|^T2-c12:|^T2-c13:|^T2-c15:|^T2-c16:|^T2-c17:|^T2-c20:|^T2-c21:|^T2-c22:|^T2-c23:|^T2-c24:|^T2-c25:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
             "timeout_s": 600
           }
         },
