@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { handle } from './mcp.mjs';
 import { OAuthStore, OAuthError, consentPage } from './oauth.mjs';
-import { VaultError, VERSION } from '../engine/vault.mjs';
+import { VaultError, VERSION, RECALL_OFFSET_MAX } from '../engine/vault.mjs';
 import { timingSafeEqualHex, sha256, now, slug } from '../engine/util.mjs';
 import { renderCard, renderRecall, PROTOCOL } from '../engine/card.mjs';
 
@@ -295,7 +295,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
           const total = recalled.total;
           const hits = recalled
             .filter((h) => h.score >= bar && !skip.has(`${h.path}#${h.heading || ''}`) && !(auto && !rc.hook_include_journals && pastWork(h.path)) && !(own && h.path.startsWith('work/sessions/') && h.path.endsWith(own)));
-          const next = offset + limit < total ? offset + limit : null;
+          const next = offset + limit < total && offset + limit <= RECALL_OFFSET_MAX ? offset + limit : null;
           const text = renderRecall(hits, { maxChars: rc.max_chars || 1500 });
           return send(200, { hits, total, offset, next, text });
         }

@@ -37,6 +37,9 @@ export function checkPath(p) {
   return s;
 }
 
+/** The largest recall offset served: past it a page is empty and next is null, so one argument cannot ask the index to rank every match. */
+export const RECALL_OFFSET_MAX = 1000;
+
 export class Vault extends EventEmitter {
   constructor(root, opts = {}) { super(); this.root = path.resolve(root); this.opts = opts; this.state = path.join(this.root, STATE); }
 
@@ -361,9 +364,11 @@ export class Vault extends EventEmitter {
     this._need(identity, 'read', null);
     const lim = limit == null ? 6 : Math.min(10, Math.max(1, Math.trunc(Number(limit)) || 1));
     const off = Math.max(0, Math.trunc(Number(offset)) || 0);
-    const top = this.index.query(query, { limit: off + lim, project, boosts: this.tuning?.boosts, filter: this._recallFilter(identity, { project, all_projects }) });
+    // A far offset must not cost a full ranking: the index is asked for one page past the bound at most, and an offset
+    // past the bound is an empty page. A client that follows next never gets there; next stops at the bound.
+    const top = this.index.query(query, { limit: Math.min(off, RECALL_OFFSET_MAX) + lim, project, boosts: this.tuning?.boosts, filter: this._recallFilter(identity, { project, all_projects }) });
     const total = top.total;
-    const hits = top.slice(off, off + lim);
+    const hits = off > RECALL_OFFSET_MAX ? [] : top.slice(off, off + lim);
     for (const h of hits) {
       const key = `${h.path}#${h.heading || ''}`;
       const ents = this.graph.sectionEnts.get(key) || [];
