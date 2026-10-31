@@ -46,6 +46,23 @@ test('issue 248: a header does not give a token the terminal power to set the le
   } finally { await s.close(); }
 });
 
+test('issue 248, the sibling route: with no lead set, bus-register picks a lead only for the CLI', async () => {
+  const s = await setup();
+  try {
+    assert.equal(s.v.bus.operator(), null);
+    const narrow = s.v.tokens.issue({ agent: 'reader', scopes: ['read'], paths: ['projects/a/**'] }).token;
+    const app = s.token('cursor');
+    for (const tok of [narrow, app]) {
+      await s.post(tok, '/v1/bus-register', { clients: ['reader'], operator: 'reader@host' });
+      await s.post(tok, '/v1/bus-register', { operator: 'gemini@host' }, { 'x-memev-client': 'cli' });
+      assert.equal(s.v.bus.operator(), null, 'a token that is not the CLI\'s picked the first lead through bus-register');
+    }
+    const cli = s.token('cli', { note: 'local client' });
+    assert.equal((await s.post(cli, '/v1/bus-register', { operator: 'gemini@host' })).status, 200);
+    assert.equal(s.v.bus.operator(), 'gemini@host');
+  } finally { await s.close(); }
+});
+
 test('issue 263: a local app cannot post as another app\'s seat, the lead\'s included', async () => {
   const s = await setup();
   try {
