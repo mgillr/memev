@@ -2,11 +2,11 @@
 // The memev command.
 import fs from 'node:fs';
 import path from 'node:path';
-import { PKG, parseArgs, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, saveConfig, out, tokenExpiryWarnings } from './common.mjs';
+import { PKG, parseArgs, BOOLEAN_FLAGS, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, saveConfig, out, tokenExpiryWarnings } from './common.mjs';
 import { ensureDaemon, startDaemon, stopDaemon, healthy, choosePort } from './daemon.mjs';
 import { initVault, isVault, VERSION } from '../engine/vault.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
-import { writeAtomic, configDir } from '../engine/util.mjs';
+import { writeAtomic, configDir, slug } from '../engine/util.mjs';
 import { renderCard } from '../engine/card.mjs';
 import { fetchOut } from '../engine/net.mjs';
 
@@ -59,12 +59,17 @@ Setup
 
 Daily
   memev recall <query> [--project P] [--all-projects]  |  memev card [--project P] [--aider]
+  memev project [set <name>]       the project name this folder's memories are filed under, and where
+                                   it comes from (a pin, the git top-level folder, or the folder);
+                                   set <name> pins a name for this repository or folder
   memev remember <text> [--kind decision] [--why W] [--review-by DATE|DAYS] [--force]
   memev why <query> [--item path#heading] [--project P]   why recall returned what it did
   memev review [list|keep|drop|reset] [items] [--days N]  the inbox of flagged and short-lived memories
   memev audit [--json]             a read-only report on junk, duplicates and stale memories
+  memev compact [--dry-run]        measure and shrink the vault: archive sealed op-log segments and move old
+                                    journal sessions out of the index; --dry-run only prints the size report
   memev checkpoint --project P [--task T] [--done a,b] [--doing x] [--next c,d]
-  memev claims [--status fact]  |  memev contract status|from-request|new|sign|verify|list|amend|decompose|hook
+  memev claims [--status fact]  |  memev contract status|from-request|new|sign|approve|verify|list|amend|decompose|hook
   memev verify [id]  |  memev gate [--workdir DIR]   check signed contracts on this machine (never CI)
   memev token issue|list|revoke|rotate
   memev start | stop | restart | serve
@@ -76,7 +81,7 @@ Integration (called by AI apps)
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
-const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', deployment: './deployment.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', runner: './runner.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', update: './update.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs', setup: './setup-remote.mjs' };
+const OPTIONAL = { connect: './clients.mjs', disconnect: './clients.mjs', uninstall: './clients.mjs', clients: './clients.mjs', doctor: './doctor.mjs', deployment: './deployment.mjs', cloud: './tunnel.mjs', tunnel: './tunnel.mjs', github: './github.mjs', service: './service.mjs', preflight: './preflight.mjs', path: './pathsetup.mjs', contract: './contracts-cli.mjs', contracts: './contracts-cli.mjs', bus: './bus-cli.mjs', runner: './runner.mjs', license: './licensing.mjs', licence: './licensing.mjs', devices: './licensing.mjs', invite: './invite.mjs', verify: './contracts-cli.mjs', gate: './contracts-cli.mjs', onboarding: './onboarding.mjs', ready: './ready.mjs', report: './onboarding.mjs', why: './memory-cli.mjs', review: './memory-cli.mjs', audit: './memory-cli.mjs', update: './update.mjs', upgrade: './upgrade.mjs', plan: './upgrade.mjs', compact: './compact.mjs', setup: './setup-remote.mjs' };
 
 /** Copy the package to a stable place so client configs never point into a temporary npx cache. */
 const sq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
@@ -154,7 +159,7 @@ export async function main(argv, env = process.env) {
 
 async function run(argv, env) {
   const [cmd = 'help', ...rest] = argv;
-  const { flags, pos } = parseArgs(rest, ['help', 'yes', 'json', 'local-only', 'no-connect', 'no-service', 'fix', 'bundle', 'purge', 'dry-run', 'force', 'show-secrets', 'all', 'org', 'all-projects', 'release', 'open', 'once', 'refresh', 'aider', 'local']);
+  const { flags, pos } = parseArgs(rest, BOOLEAN_FLAGS);
   const root = resolveRoot(flags.root, env);
   const need = () => { if (!isVault(root)) throw new Error(`no vault at ${root}; run memev init`); };
   const json = (o) => console.log(JSON.stringify(o, null, 2));
@@ -328,6 +333,23 @@ async function run(argv, env) {
       if (sub === 'revoke') { if (!pos[1]) throw new Error('memev token revoke <id>'); console.log(ts.revoke(pos[1]) ? `Revoked ${pos[1]}.` : `No token ${pos[1]}.`); return 0; }
       if (sub === 'rotate') { if (!pos[1]) throw new Error('memev token rotate <id> [--ttl DAYS]'); const t = ts.rotate(pos[1], { ttlDays: Number(flags.ttl ?? 365) }); const f = path.join(root, '.memev', 'clients.json'); try { const all = JSON.parse(fs.readFileSync(f, 'utf8')); for (const k of Object.keys(all)) if (all[k].startsWith(`mv_${pos[1]}_`)) all[k] = t.token; fs.writeFileSync(f, JSON.stringify(all, null, 2), { mode: 0o600 }); } catch {} console.log(`Rotated ${pos[1]}; the credential now expires ${t.expires ? t.expires.slice(0, 10) : 'never'}. The old secret no longer works, so the link pasted into the cloud app must be pasted again: memev cloud url prints the new one. New token (shown once):\n${t.token}`); return 0; }
       throw new Error('memev token list|issue|revoke|rotate');
+    }
+    case 'project': {
+      const { projectInfo } = await import('./hooks.mjs');
+      const info = projectInfo(process.cwd(), root);
+      if (!info) throw new Error('no folder to show');
+      if (pos[0] === 'set') {
+        need();
+        const name = pos[1];
+        if (!name) throw new Error('memev project set <name>');
+        if (!/[\p{L}\p{N}]/u.test(name)) throw new Error('the name has no letters or digits, so it would pin the shared untitled project');
+        const c = config(root); c.projects = { ...c.projects, [info.top]: name }; saveConfig(root, c);
+        console.log(`Pinned ${slug(name)} for ${info.top}; recall and the hooks use it from now on.`);
+        return 0;
+      }
+      const from = info.source === 'pinned' ? 'pinned with memev project set' : info.source === 'git' ? `the git top-level folder ${info.top}` : `the folder ${info.top}`;
+      console.log(`${info.name}  (${from})`);
+      return 0;
     }
     case 'admin-token': need(); console.log(adminToken(root) || '(none)'); return 0;
     case 'backup': {

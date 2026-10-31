@@ -47,7 +47,7 @@ test('MEM-030-FU2: a relay reply that is not a relay URL is not stored', async (
   const sb = sandbox();
   const srv = await licenceServer({ answer: () => ({ license: signLicense(fields(), pem, 'test-vendor'), relay: { default_url: 'https://x', default_domain: 'relay.test' } }) });
   try {
-    assert.equal(sb.run(['init', '--no-connect', '--local-only']).code, 0);
+    assert.equal(sb.run(['init', '--port', String(sb.port), '--no-connect', '--local-only']).code, 0);
     const r = await activateLicense({ key: 'GOOD-KEY-0001', endpoint: srv.url, env: sb.env, keys, root: sb.root });
     assert.equal(r.ok, true, r.reason);
     assert.equal(relaySetting(sb.root).default_url, null);
@@ -61,7 +61,7 @@ test('MEM-030-FU: activation stores the relay address from the licence service r
   const sb = sandbox();
   const srv = await licenceServer({ answer: () => ({ license: signLicense(fields(), pem, 'test-vendor'), relay: { default_url: 'relay://127.0.0.1:9', default_domain: 'relay.test' } }) });
   try {
-    assert.equal(sb.run(['init', '--no-connect', '--local-only']).code, 0);
+    assert.equal(sb.run(['init', '--port', String(sb.port), '--no-connect', '--local-only']).code, 0);
     const r = await activateLicense({ key: 'GOOD-KEY-0001', endpoint: srv.url, env: sb.env, keys, root: sb.root });
     assert.equal(r.ok, true, r.reason);
     const saved = relaySetting(sb.root);
