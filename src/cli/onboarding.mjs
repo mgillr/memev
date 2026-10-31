@@ -141,8 +141,13 @@ export function print(items) {
   if (later.length) { console.log('\nLater, optional'); for (const i of later) console.log(line(i)); }
 }
 
+/** The history import is offered at init only on a terminal and never under init's --yes, so the person always sees the
+ * preview before anything is imported (memev import --yes is the explicit way without a question). */
+export function initImportPrompt(flags = {}, { stdin = process.stdin, stdout = process.stdout } = {}) {
+  return !flags.yes && stdin?.isTTY && stdout?.isTTY ? { ask: true, input: stdin, output: stdout } : {};
+}
 export async function firstRun(o) {
-  const items = await checklist({ ...o, firstRun: true }); print(items); await (await import('./pathsetup.mjs')).offer({ env: o.env });
+  const items = await checklist({ ...initImportPrompt(o.flags), ...o, firstRun: true }); print(items); await (await import('./pathsetup.mjs')).offer({ env: o.env });
   await finish(o);
   return items.some((i) => i.status === 'failed') ? 1 : 0;
 }

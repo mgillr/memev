@@ -8,6 +8,8 @@ import { PassThrough } from 'node:stream';
 import { tmpdir, cleanup, OWNER, newVault } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
 import { scanAll, existingHashes, dedup, runImport, listImports, undoImport } from '../src/engine/importers/core.mjs';
+import { healthy } from '../src/cli/daemon.mjs';
+import { initImportPrompt } from '../src/cli/onboarding.mjs';
 // A fake credential for the secret checks, built from parts so that secret scanners do not flag this file.
 const FAKE_KEY = ['sk', 'live', 'abcdefghijklmnop1234567890'].join('-');
 
@@ -192,3 +194,50 @@ test('MEM-105: the import with no arguments previews the current folder and the 
   assert.ok(lines.join('\n').includes('README.md'), 'the current folder is scanned');
 });
 
+test('MEM-105: memev import --preview, list, a refused undo and a run with nothing chosen each leave the daemon running', async () => {
+  const sb = sandbox();
+  try {
+    const init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
+    assert.equal(init.code, 0, init.err + init.out);
+    assert.ok(await healthy(sb.root), 'the daemon runs after init');
+    const proj = makeProj();
+    for (const args of [['import', '--path', proj, '--preview'], ['import', 'list'], ['import', 'undo', 'imp-00000000'], ['import', '--path', proj]]) {
+      const r = sb.run(args);
+      assert.ok(await healthy(sb.root), `the daemon is down after memev ${args.join(' ')}: ${r.out}${r.err}`);
+    }
+  } finally { sb.stop(); }
+});
+
+test('MEM-105 AC12: init offers the import only on a terminal and never under its --yes', () => {
+  const tty = { isTTY: true }; const pipe = { isTTY: false };
+  assert.deepEqual(initImportPrompt({}, { stdin: tty, stdout: tty }), { ask: true, input: tty, output: tty }, 'a terminal is asked');
+  assert.deepEqual(initImportPrompt({ yes: true }, { stdin: tty, stdout: tty }), {}, 'init --yes is never asked and never imports');
+  assert.deepEqual(initImportPrompt({}, { stdin: pipe, stdout: tty }), {}, 'piped input is not a terminal');
+  assert.deepEqual(initImportPrompt({}, { stdin: tty, stdout: pipe }), {}, 'piped output is not a terminal');
+});
+
+test('MEM-105 AC12: init --yes or --keep never imports: off a terminal nothing is offered, and on a terminal only the answer imports', async () => {
+  const { offerImport } = await import('../src/cli/import.mjs');
+  for (const flags of [{ yes: true }, { keep: '1,2' }]) {
+    const { v } = newVault();
+    const proj = makeProj();
+    const off = await offerImport({ root: v.root, env: { HOME: tmpdir('home-') }, flags, cwd: proj, home: tmpdir('home-') });
+    assert.equal(off.asked, false, `${JSON.stringify(flags)} alone does not offer the import`);
+    const input = new PassThrough(); const output = new PassThrough(); input.end('n\n');
+    const no = await offerImport({ root: v.root, env: { HOME: tmpdir('home-') }, flags, ask: true, input, output, cwd: proj, home: tmpdir('home-') });
+    assert.equal(no.accepted, false, `${JSON.stringify(flags)} does not answer the question for the person`);
+    assert.equal(listImports(v).length, 0, 'nothing was imported');
+    v.close();
+  }
+});
+
+test('MEM-105 AC10: memev import list counts the imported items, not the headings inside them', () => {
+  const { v } = newVault();
+  const dir = tmpdir('headings-');
+  fs.writeFileSync(path.join(dir, 'plan.md'), '# Zephyrquokka plan\n\n### Step one\nfirst\n\n### Step two\nsecond\n\n### Step three\nthird\n');
+  const items = dedup(scanAll({ paths: [dir], aiHistory: false, exports: [], cwd: dir, home: tmpdir('home-') }), existingHashes(v));
+  const r = runImport(v, OWNER, items.filter((it) => !it.skip));
+  assert.equal(r.imported, 1);
+  assert.deepEqual(listImports(v).map((x) => x.items), [1], 'one file with three headings is one item');
+  v.close();
+});

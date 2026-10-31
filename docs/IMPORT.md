@@ -29,8 +29,9 @@ plan nothing.
 
 Nothing is written until you have seen a preview of what was found. The preview
 lists each item with its title, size, and source, plus counts and sizes per
-source. On a terminal you tick what to keep; non-terminal use picks with `--keep`
-or `--yes`.
+source. On a terminal one question imports everything the preview lists or nothing;
+to pick items, run it again with `--keep` and the numbers the preview shows, or
+use `--yes` to take them all without the question.
 
 ```
 memev import --path ~/myproject --preview

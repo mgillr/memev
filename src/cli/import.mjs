@@ -12,15 +12,14 @@ export { offerImport };
 // live daemon holding the vault open under me, with a stale in-memory index.
 const daemonUp = (root) => { const i = daemonInfo(root); return !!(i && pidAlive(i.pid)); };
 
-// When the import restarts the daemon, I keep it quiet: no tunnel, no download, no background sync.
-// The import is a local operation and must not reach out, even through a child process.
-const QUIET_DAEMON_ENV = { MEMEV_NO_TUNNEL: '1', MEMEV_NO_DOWNLOAD: '1', MEMEV_NO_BACKGROUND: '1' };
-
-async function startQuietDaemon(root) {
-  const saved = {};
-  for (const [k, v] of Object.entries(QUIET_DAEMON_ENV)) { saved[k] = process.env[k]; process.env[k] = v; }
-  try { await startDaemon(root, { quiet: true }); }
-  finally { for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } }
+// The import works on the vault with the daemon stopped, so it is the only writer, and starts the daemon again on every
+// way out, a return or a throw alike, as it was before and with its own settings, as offerImport does: --preview, list,
+// a refused undo or an answer of no must not leave every app without memory until memev start.
+async function withDaemonStopped(root, fn) {
+  const wasUp = daemonUp(root);
+  if (wasUp) await stopDaemon(root);
+  try { return await fn(); }
+  finally { if (wasUp) { try { await startDaemon(root, { quiet: true }); } catch {} } }
 }
 
 function buildPreview(items) {
@@ -47,32 +46,30 @@ export async function command(cmd, pos, flags, { root, env }) {
   const sub = pos[0];
 
   if (sub === 'list') {
-    const wasUp = daemonUp(root);
-    if (wasUp) await stopDaemon(root);
-    const v = new Vault(root).open();
-    try {
-      const list = listImports(v);
-      if (!list.length) { console.log('No imports yet.'); return 0; }
-      for (const it of list) console.log(`${it.id}  ${it.items} item(s)  ${it.path}`);
-    } finally { v.close(); }
-    if (wasUp) { try { await startQuietDaemon(root); } catch {} }
-    return 0;
+    return withDaemonStopped(root, () => {
+      const v = new Vault(root).open();
+      try {
+        const list = listImports(v);
+        if (!list.length) { console.log('No imports yet.'); return 0; }
+        for (const it of list) console.log(`${it.id}  ${it.items} item(s)  ${it.path}`);
+        return 0;
+      } finally { v.close(); }
+    });
   }
 
   if (sub === 'undo') {
     const id = pos[1];
     if (!id) { console.log('Usage: memev import undo <import-id>'); return 1; }
-    const wasUp = daemonUp(root);
-    if (wasUp) await stopDaemon(root);
-    const v = new Vault(root).open();
-    try {
-      const identity = { agent: 'cli', scopes: ['read', 'write'], paths: ['**'] };
-      const r = undoImport(v, identity, id);
-      if (!r.ok) { console.log(r.error); return 1; }
-      console.log(`Removed ${id}.`);
-    } finally { v.close(); }
-    if (wasUp) { try { await startQuietDaemon(root); } catch {} }
-    return 0;
+    return withDaemonStopped(root, () => {
+      const v = new Vault(root).open();
+      try {
+        const identity = { agent: 'cli', scopes: ['read', 'write'], paths: ['**'] };
+        const r = undoImport(v, identity, id);
+        if (!r.ok) { console.log(r.error); return 1; }
+        console.log(`Removed ${id}.`);
+        return 0;
+      } finally { v.close(); }
+    });
   }
 
   const paths = flags.path ? String(flags.path).split(',').map((s) => s.trim()).filter(Boolean) : [];
@@ -88,44 +85,43 @@ export async function command(cmd, pos, flags, { root, env }) {
   }
 
   const items = scanAll({ paths, aiHistory, exports: exportFiles, cwd: process.cwd(), home: env.HOME || '' });
-  const wasUp = daemonUp(root);
-  if (wasUp) await stopDaemon(root);
-  const v = new Vault(root).open();
-  try {
-    const hashes = existingHashes(v);
-    const deduped = dedup(items, hashes);
-    console.log(buildPreview(deduped));
+  return withDaemonStopped(root, async () => {
+    const v = new Vault(root).open();
+    try {
+      const hashes = existingHashes(v);
+      const deduped = dedup(items, hashes);
+      console.log(buildPreview(deduped));
 
-    if (preview) { console.log('Preview only. Nothing imported.'); return 0; }
+      if (preview) { console.log('Preview only. Nothing imported.'); return 0; }
 
-    let selected = null;
-    if (yes) selected = deduped;
-    else if (keep) {
-      const nums = keep.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => n >= 1);
-      const numbered = deduped.map((it, i) => ({ it, n: i + 1 }));
-      selected = numbered.filter(({ n }) => nums.includes(n)).map(({ it }) => it);
-    } else if (process.stdin.isTTY) {
-      const { createInterface } = await import('node:readline');
-      const rl = createInterface({ input: process.stdin, output: process.stdout });
-      const ans = await new Promise((r) => rl.question('Import these items? [Y/n] ', r));
-      rl.close();
-      const a = ans.trim().toLowerCase();
-      if (a === '' || a === 'y' || a === 'yes') selected = deduped;
-    } else {
-      console.log('Nothing imported. Use --yes to import all, or --keep 1,2 to pick items.');
+      let selected = null;
+      if (yes) selected = deduped;
+      else if (keep) {
+        const nums = keep.split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => n >= 1);
+        const numbered = deduped.map((it, i) => ({ it, n: i + 1 }));
+        selected = numbered.filter(({ n }) => nums.includes(n)).map(({ it }) => it);
+      } else if (process.stdin.isTTY) {
+        const { createInterface } = await import('node:readline');
+        const rl = createInterface({ input: process.stdin, output: process.stdout });
+        const ans = await new Promise((r) => rl.question('Import these items? [Y/n] ', r));
+        rl.close();
+        const a = ans.trim().toLowerCase();
+        if (a === '' || a === 'y' || a === 'yes') selected = deduped;
+      } else {
+        console.log('Nothing imported. Use --yes to import all, or --keep 1,2 to pick items.');
+        return 0;
+      }
+
+      if (!selected || !selected.some((it) => !it.skip)) {
+        console.log('Nothing to import.');
+        return 0;
+      }
+
+      const identity = { agent: 'cli', scopes: ['read', 'write'], paths: ['**'] };
+      const result = runImport(v, identity, selected);
+      console.log(`Imported ${result.imported} item(s) as ${result.id} (${result.skipped} skipped).`);
+      console.log(`Undo with: memev import undo ${result.id}`);
       return 0;
-    }
-
-    if (!selected || !selected.some((it) => !it.skip)) {
-      console.log('Nothing to import.');
-      return 0;
-    }
-
-    const identity = { agent: 'cli', scopes: ['read', 'write'], paths: ['**'] };
-    const result = runImport(v, identity, selected);
-    console.log(`Imported ${result.imported} item(s) as ${result.id} (${result.skipped} skipped).`);
-    console.log(`Undo with: memev import undo ${result.id}`);
-  } finally { v.close(); }
-  if (wasUp) { try { await startQuietDaemon(root); } catch {} }
-  return 0;
+    } finally { v.close(); }
+  });
 }

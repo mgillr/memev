@@ -90,7 +90,8 @@ export function listImports(vault) {
       const note = vault.get(IMPORT_ID, rel);
       const m = /^# Import (imp-[0-9a-f]{8})$/m.exec(note.body);
       if (!m) continue;
-      const count = (note.body.match(/^### /gm) || []).length;
+      // an item is a heading followed by its Source, Import and Hash lines; a heading inside an item's own text is not one
+      const count = (note.body.match(new RegExp(`^### .*\\nSource: .*\\nImport: ${m[1]}\\nHash: `, 'gm')) || []).length;
       out.push({ id: m[1], path: rel, items: count });
     } catch {}
   }
@@ -114,10 +115,11 @@ export async function offerImport({ root, env, flags = {}, ask = false, input, o
   const { config, saveConfig } = await import('../../cli/common.mjs');
   const cfg = config(root);
   if (cfg.import && cfg.import.asked) return { asked: false, accepted: false, reason: 'already asked' };
-  // The question goes to the user only on a terminal, or with an explicit --yes/--keep. A non-TTY init is neither, so I
-  // do nothing at all: no scan, no daemon stop or restart, no config write. init must not be disturbed, and a daemon
-  // restarted here would stamp a start time after the client edits init makes.
-  if (!(flags.yes || flags.keep || (ask && input))) return { asked: false, accepted: false, reason: 'not offered' };
+  // The question goes to the user only on a terminal. Init's own --yes or --keep never answer it: an import needs a
+  // preview the person saw, or an explicit memev import --yes. Off a terminal I do nothing at all: no scan, no daemon
+  // stop or restart, no config write. init must not be disturbed, and a daemon restarted here would stamp a start time
+  // after the client edits init makes.
+  if (!(ask && input)) return { asked: false, accepted: false, reason: 'not offered' };
   const { startDaemon, stopDaemon, healthy } = await import('../../cli/daemon.mjs');
   const paths = flags.path || [];
   let aiHistory = !!flags['ai-history'];
@@ -138,19 +140,14 @@ export async function offerImport({ root, env, flags = {}, ask = false, input, o
     const preview = buildPreview(deduped);
     if (output) output.write(preview + '\n');
     let selected = null;
-    if (flags.yes) {
-      selected = deduped;
-    } else if (flags.keep) {
-      const nums = String(flags.keep).split(',').map((s) => parseInt(s.trim(), 10)).filter((n) => n >= 1);
-      const numbered = deduped.map((it, i) => ({ it, n: i + 1 }));
-      selected = numbered.filter(({ n }) => nums.includes(n)).map(({ it }) => it);
-    } else if (ask && input) {
+    {
       if (output) output.write('Import these items? [Y/n] ');
       let line = '';
       await new Promise((resolve) => {
         input.once('data', (d) => { line += d.toString(); if (line.includes('\n')) resolve(); });
         input.once('end', resolve);
       });
+      input.pause?.(); // a terminal left flowing would keep init from exiting
       const ans = line.trim().toLowerCase();
       if (ans === '' || ans === 'y' || ans === 'yes') selected = deduped;
     }
