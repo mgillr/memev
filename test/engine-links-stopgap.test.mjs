@@ -13,7 +13,8 @@ import { git } from '../src/engine/git.mjs';
 after(cleanup);
 
 const skip = process.platform === 'win32' && 'symbolic links need privileges on Windows';
-const outsideDir = (root, name) => { const d = path.join(root, '..', `outside-${name}`); fs.mkdirSync(d, { recursive: true }); return d; };
+// a folder of its own for each case, outside the vault: a shared name beside the vault could meet another test's folder
+const outsideDir = (root, name) => tmpdir(`outside-${name}-`);
 const listing = (d) => fs.readdirSync(d).sort();
 function busVault() {
   const { root, v } = newVault({ git: false });
