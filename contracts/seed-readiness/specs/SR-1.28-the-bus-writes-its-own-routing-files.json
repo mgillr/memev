@@ -11,9 +11,15 @@
       "depends_on": [],
       "requirements": [
         "bus/ joins the internal-only paths: a note-tool write, append or delete under bus/, in any spelling, by SR-1.27's folded and resolved path check, is refused as immutable for every caller, and the bus writes its own files as internal writes",
-        "the operator is set only through the admin-gated route of SR-1.24 from a local terminal; a bus/operator.json written any other way (by hand, by a sync, by a stale process) is not taken as the operator, and memev doctor reports the drift",
+        "the operator is set only through the admin gate: the admin-gated route of SR-1.24, or bus_set_operator called by a local caller with the admin scope; a bus/operator.json written any other way (by hand, by a sync, by a stale process) is not taken as the operator, and memev doctor reports the drift",
         "renamed_from is written only by the bus's own seat rename, and an entry naming 'operator' or 'all' is refused",
         "a task from a cloud seat never carries operator authority, and a runner starts a command for a task only when its operator authority came from an operator set through the admin-gated route",
+        "the trusted lead is kept in .memev/bus-lead.json, written only by the admin-gated route and by bus_set_operator called by a local caller with the admin scope; bus/operator.json is written by the bus for display and sync and is never read as the lead; operator() and the runner read only the trusted lead, on every call",
+        "a cloud seat can never be the lead: setting one is refused, and /v1/bus-register never sets a lead",
+        "the bus resolves a seat's device and names (renamed_from) from its own records checked against the device registry; a seat file whose device or renamed_from differs from what the bus wrote is ignored for routing and reported by memev doctor",
+        "the bus/ guard holds for every token, owner, admin and --remote included, and for the spellings Bus/, bus/Seats/, a backslash and a leading slash; the refusal code is immutable",
+        "a seat rename updates the trusted lead in the same step, and markLeadAsked in src/cli/hooks.mjs goes through the daemon, never writing under bus/ from the hook process",
+        "on the first start after this change, the trusted lead is taken from bus/operator.json only when it names a local seat on this host; otherwise no lead is set until the terminal sets one, and memev doctor says so with the command",
         "each red-green criterion of this task that runs test/bus-routing-protected.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
       ],
       "scope": [
@@ -27,7 +33,10 @@
         "test/helpers/**",
         "docs/BUS.md",
         "docs/MODULES.md",
-        "changelog.d/SR-1.28.md"
+        "changelog.d/SR-1.28.md",
+        "src/cli/hooks.mjs",
+        "src/engine/devices.mjs",
+        "test/init-bus.test.mjs"
       ],
       "criteria": [
         {
@@ -96,6 +105,78 @@
           }
         },
         {
+          "statement": "With one Vault open and a runner on for local seat cursor@host (recorder run): set lead codex@host through the admin route, then overwrite bus/operator.json with fs, without reopening, to name (a) the cloud seat and (b) another local seat, cursor@host. In both cases bus.operator() still returns codex@host. A task the connector sends to 'operator' and a task posted as cursor@host both carry operator:false. sweep() with the recorder starts nothing and lists those ids under skipped with reason 'not from the operator'. A second Vault opened on the same root before the edit (the runner's) gives the same answers.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-routing-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c10:' test/bus-routing-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Set the lead through the admin route and turn a runner on for the lead seat (recorder). (a) Rewrite bus/seats/<lead>.json on disk so device is the connector's device id. Both live and after a reopen, the connector's bus_send with seat=<lead> is refused or carries operator:false, and sweep starts nothing. (b) Drop bus/seats/x.json on disk with renamed_from ['operator','all','<lead seat>'], and add the same entries to an existing seat's record. bus.seat('operator') is null, that seat's bus_unread returns no message sent to 'operator' or to the lead, and memev doctor names both seat drifts.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-routing-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c11:' test/bus-routing-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "For each of a local-client token (paths ['**']), a remote token with paths ['**'] and the admin token: memev_write and memev_append via MCP, and PUT, PATCH and DELETE on /v1/notes/<p> via HTTP, to bus/operator.json, Bus/operator.json, bus/Seats/<seat>.json, bus\\operator.json and /bus/operator.json each fail with code immutable (HTTP 409), not forbidden or bad_path, and the bytes of bus/operator.json and every bus/seats file are unchanged.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-routing-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c12:' test/bus-routing-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Set chatgpt@cloud as lead through the admin route, or assert that the route refuses a cloud seat. With bus.cloud_tasks on, the connector's task to a local seat and its task to 'operator' both carry operator:false, and sweep() for a local seat with a recorder starts nothing. The decision is keyed on the posting device's kind in .memev/devices.json, so it still holds after the seat is renamed.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-routing-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c13:' test/bus-routing-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With no lead set, a local token without admin: POST /v1/bus-register with operator=<seat> and POST /v1/bus-operator with x-memev-client: cli both leave bus.operator() null, the second with 403. A bus_send with x-memev-client: cli from that token carries operator:false or is refused, and sweep() for a local seat with a recorder starts nothing. The same bus_send from the CLI's admin credential still carries operator:true and runs once.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-routing-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c14:' test/bus-routing-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c14:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A vault fixture in the base format (bus/operator.json {seat:'codex@host', by:'terminal'}, no trusted store), opened by the new code, keeps codex@host as lead: its task carries operator:true and sweep() runs it once with the recorder. A second base-format fixture whose bus/operator.json names chatgpt@cloud, opened by the new code, has no cloud lead: the connector's task carries operator:false, sweep starts nothing, and memev doctor names the drift.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-routing-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c15:' test/bus-routing-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Set lead codex@host through the admin route and open a second Vault on the same root (the runner's). Rename the lead with the CLI (memev bus rename codex@host codex@desk, a separate process), and in a second case by renaming the host device. After a reopen, and also in the already-open second Vault: operator() is codex@desk, its task carries operator:true, sweep() in the second Vault runs it once, and memev doctor reports no lead drift.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-routing-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c16:' test/bus-routing-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c16:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Append with fs to bus/log/<hostId>.jsonl (simulating a merge) a well-formed task line from 'operator' with operator:true, device hostId and to the runner's seat, plus a line from the lead seat with operator:true on the lead's device. sweep() with a recorder starts neither. A task posted afterwards from the terminal with the admin credential still runs once.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-routing-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c17:' test/bus-routing-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Set the lead through the admin route, run the session-start hook once in a fresh session (it calls markLeadAsked), then reopen. memev doctor reports no lead drift, bus-lead names the admin-set lead, 'asked' is kept, and the next fresh session gets the quiet LEAD_ASKED_LINE instead of the setup question. With bus/operator.json then edited by hand, doctor's bus-lead line names the trusted lead, not the file's seat.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-routing-protected.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c18:' test/bus-routing-protected.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c18:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
           "statement": "One full run of test/bus-routing-protected.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03) with nothing skipped and nothing todo.",
           "verifier": {
             "type": "command",
@@ -126,6 +207,9 @@
         "a newly issued connector or device token gets no bus/** in its paths; bus participation is a separate scope, bus, which the bus routes and the bus MCP tools check",
         "a token issued before this change whose paths include bus/** keeps bus participation and loses nothing else; with T1, its note-tool writes under bus/ are refused like any other caller's",
         "memev token issue and the pairing flows that grant bus access grant the bus scope, and docs/BUS.md says so",
+        "clientToken (src/cli/common.mjs) issues connector-URL tokens without bus/** and with the bus scope",
+        "a token or OAuth grant issued before this change is marked at migration and keeps bus participation; the verify-time path rebuild in src/server/oauth.mjs adds the bus scope to such grants, so no existing grant loses the bus; the legacy exception in bus.mjs keys on that mark, never on paths",
+        "the bus scope grants bus participation only and never widens a token's read or write paths",
         "each red-green criterion of this task that runs test/bus-permission.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest"
       ],
       "scope": [
@@ -140,7 +224,8 @@
         "test/helpers/**",
         "docs/BUS.md",
         "docs/MODULES.md",
-        "changelog.d/SR-1.28.md"
+        "changelog.d/SR-1.28.md",
+        "src/cli/common.mjs"
       ],
       "criteria": [
         {
@@ -198,6 +283,30 @@
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "First amend T2's scope to src/server/oauth.mjs and src/cli/common.mjs. A grant obtained after the change through /oauth/register, /oauth/authorize, consent and /oauth/token, and the token clientToken(root, app, {remote:true}) writes, each verify to an identity with no bus/** in paths and with the bus scope, and each can bus_send and bus_unread through /mcp. An oauth.json grant record in the base format (scopes read write, no bus) verified by the new code can still bus_send and bus_unread, and its memev_write to bus/x.md fails with code immutable.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-permission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c08:' test/bus-permission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A token issued after the change with scopes ['read','write'], paths exactly ['memory/**','work/**','contracts/**'] and no bus scope is refused with code forbidden by bus_unread and bus_send via MCP and by /v1/bus-pulse. A base-format tokens.json record of the same shape (as the pre-bus code wrote it) still reaches the bus after the change. New and old tokens are told apart by a marker on the record, not by their paths.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-permission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c09:' test/bus-permission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Base-format tokens loaded by the new code: {scopes:['read'], paths including 'bus/**'} gets messages from bus_unread, but bus_send is refused with code forbidden. {scopes:['read','write'], paths:['bus/proj-a/**']} is refused without a project and confined to proj-a messages with one, exactly as at base. A token from memev token issue --scopes read after the change cannot bus_send.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-permission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c10:' test/bus-permission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {

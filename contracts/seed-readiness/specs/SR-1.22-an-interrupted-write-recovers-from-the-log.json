@@ -16,12 +16,17 @@
         "the doctor's drift message and its fix describe log-first completion, not an import of the old file, and the fix never writes the old body over a logged newer one",
         "recover() runs only in an open that holds the SR-1.01 vault lock; .memev/daemon.lock plays no part in that decision, and a read-only open never recovers",
         "write() and append() build their record from the logged head, not from the file on disk: the diff, the splice base and the append hash start from the head's content, so a call made while a logged change is still pending logs on top of it; when the file on disk does not equal the head, the call's file step writes the full new content (the head with this change applied) through a temporary file and a rename, never an append to the stale file",
-        "a file that is a strict prefix of the logged content is completed only when it starts with the previous head and the last record for the path is an append; any other shorter file is an outside edit and is imported; recovery writes a completed file through a temporary file, an fsync and a rename, so an interrupted completion leaves the old file or the new one",
-        "a file is torn when it contains a NUL byte and differs from its head, whatever its length, and a torn file is completed from the log; invalid UTF-8 alone is not torn: such a file is imported as an outside edit and its bytes on disk are kept",
+        "a file that is a strict prefix of the logged content, other than a file equal to the previous head and older than the put (requirement 1 completes that one), is completed only when it starts with the previous head and the last record for the path is an append; any other shorter file is an outside edit and is imported; recovery writes a completed file through a temporary file, an fsync and a rename, so an interrupted completion leaves the old file or the new one",
+        "a file is torn only when the bytes before its first NUL are a prefix of the logged head or the previous head and every byte from there on is NUL, whatever its length, and a torn file is completed from the log; any other file, a UTF-16 save or invalid UTF-8 included, is an outside edit and its bytes on disk are kept",
         "a completion that fails (EACCES, EPERM, EIO, ENOSPC) leaves the path pending with its reason recorded and never makes Vault.open() throw",
         "on open, every path that recovery completed, and every path whose index entry is older than its head, is reindexed; index.jsonl records the log seq it reflects, so a stale index is brought up to date rather than trusted; with git enabled, open queues a commit for every note whose file equals its head but differs from the committed copy",
         "a logged delete whose file is still on disk with an mtime older than the delete record is completed (the file removed); a newer file is a real outside edit and is imported; syncFromDisk on such a path completes the delete instead of importing the file",
-        "when a write or append is logged but its file step fails, the call throws a VaultError with code logged_pending that carries the logged seq, so a caller knows the change is durable and does not repeat it"
+        "when a write or append is logged but its file step fails, the call throws a VaultError with code logged_pending that carries the logged seq, so a caller knows the change is durable and does not repeat it",
+        "completion from the log applies only while the file still holds what the pending change was logged against (the previous head, a prefix of the logged content, or a torn file); a file edited during the pending window is an outside edit, imported before the next call logs",
+        "write(), append() and recovery fsync the temporary file before the rename when fsync is on, and never open the note path itself for writing",
+        "a completion that fails for any reason (EACCES, EPERM, ENOSPC, EIO or another) leaves the path pending with its error code recorded",
+        "the MCP and HTTP error paths carry logged_pending's seq and tell the caller not to repeat the call, and memev_remember reports a duplicate for an entry whose append threw logged_pending",
+        "the doctor's drift fix completes only paths awaiting completion; a note edited by hand is imported as an outside edit, never overwritten"
       ],
       "description": "",
       "scope": [
@@ -34,7 +39,9 @@
         "docs/MODULES.md",
         "changelog.d/SR-1.22.md",
         "src/engine/index.mjs",
-        "src/engine/git.mjs"
+        "src/engine/git.mjs",
+        "src/server/mcp.mjs",
+        "src/server/http.mjs"
       ],
       "criteria": [
         {
@@ -217,12 +224,12 @@
           "statement": "Each behavioural statement has its own subtest named cNN: after its criterion number, and a full run reports every one of them ok with 0 skipped and 0 todo. Each test_red_green criterion's cmd is narrowed to its subtest with --test-name-pattern plus a pass-count guard (# pass >= 1, # fail 0), because a pattern that matches nothing exits 0.",
           "verifier": {
             "type": "command",
-            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && for n in c01 c04 c06 c07 c08 c09 c10 c11 c12 c13 c14 c15 c17 c18 c19 c20 c21 c22 c23 c25 c26 c27; do grep -Eq \"^ *ok [0-9]+ - $n:\" \"$f\" || exit 1; done",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && for n in c01 c04 c06 c07 c08 c09 c10 c11 c12 c13 c14 c15 c17 c18 c19 c20 c21 c22 c23 c25 c26 c27 c28 c29 c30 c31 c32 c33 c34 c35 c36 c37 c38; do grep -Eq \"^ *ok [0-9]+ - $n:\" \"$f\" || exit 1; done",
             "timeout_s": 300
           }
         },
         {
-          "statement": "c21 a non-UTF-8 outside edit is never destroyed (command guard: base already passes). Write B successfully and close. By hand replace the file with Latin-1 bytes (for example Buffer.from('caf' + String.fromCharCode(0xe9) + ' edited by hand', 'latin1')) with its mtime 10 s after the put. After reopen the file's bytes are unchanged (Buffer equality), v2.imported includes p, and the last record for p is external. Criterion 14's 'or invalid UTF-8' clause is dropped; only NUL content counts as torn.",
+          "statement": "c21 a non-UTF-8 outside edit is never destroyed (command guard: base already passes). Write B successfully and close. By hand replace the file with Latin-1 bytes (for example Buffer.from('caf' + String.fromCharCode(0xe9) + ' edited by hand', 'latin1')) with its mtime 10 s after the put. After reopen the file's bytes are unchanged (Buffer equality), v2.imported includes p, and the last record for p is external. Criterion 14's 'or invalid UTF-8' clause is dropped; only a logged prefix followed by NUL bytes counts as torn.",
           "verifier": {
             "type": "command",
             "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c21:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c21:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]",
@@ -268,6 +275,106 @@
             "type": "test_red_green",
             "test_file": "test/write-interrupted.test.mjs",
             "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c27:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; awk -v pat='^c27:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && [ \"$rc\" -eq 0 ]"
+          }
+        },
+        {
+          "statement": "c28 recovery completes atomically. A child process opens a vault (fsync: true) whose note lags the log (B logged, A on disk). Before the open it wraps fs.openSync, writeFileSync, appendFileSync, writeSync, truncateSync, fsyncSync, fdatasyncSync and renameSync to record each call's path or fd. The parent asserts three things: no call opens, truncates or writes the note path itself; the only call that names the note path is renameSync(tmp, note); and an fsyncSync or fdatasyncSync on the fd that wrote the tmp file comes before that rename. In a second run, the wrapped renameSync for that tmp sends SIGKILL to the child. The parent asserts death by SIGKILL and that the note still byte-equals A. It then reopens: the file reads B, v.recovered includes p, and no record for p has agent 'external'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c28:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c28:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c28:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c28:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
+          }
+        },
+        {
+          "statement": "c29 an interrupted extension write completes (command guard: base already passes). (a) Write A (50 lines), then write B = A plus two new lines with the directory read-only so the write throws; the last record for p is a splice. (b) The same, with B = A plus a section longer than A, so the record is a put. Make the directory writable and reopen: the file reads B, v2.recovered includes p, and no record for p has agent 'external'. Add c29 to the full-run list.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c29:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c29:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c29:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c29:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "c30 a note re-created after a delete is kept. Write A, delete(p) succeeds, close. Write C (different from A) by hand with its mtime 10 s after the delete record. Reopen: the file reads C, v2.imported includes p, v2.recovered does not, and the last record for p is an external put of C. Then delete(p) through v2, write D by hand (mtime +10 s), and call v2.syncFromDisk(p,'git-pull') without reopening: the file still reads D and the last record for p is an external put of D.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c30:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c30:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c30:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c30:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
+          }
+        },
+        {
+          "statement": "c31 an outside edit made while a write is pending is kept (command guard: base already passes). After write(B) throws (read-only directory), make the directory writable and, without reopening, write A' (different from both A and B) by hand with its mtime 10 s after the put. Then call v.append(OWNER,{path:p,text:'tail'}): the file equals A' followed by the appended line, the record just before the append is an external put of A', and no line unique to B is in the file. With v.syncFromDisk(p,'git-pull') as the next call instead, the file still reads A' and the last record for p is an external put of A'.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c31:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c31:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c31:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c31:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "c32 a UTF-16 outside edit is never destroyed (command guard: base already passes). Write B and close. By hand, replace the file with the bytes FF FE followed by Buffer.from('edited in Notepad', 'utf16le'), with its mtime 10 s after the put. Reopen: the file's bytes are unchanged (Buffer equality), v2.imported includes p, v2.recovered does not, and the last record for p is external. The same bytes written while v2 is open, followed by v2.syncFromDisk(p,'git-pull'), also stay unchanged.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c32:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c32:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c32:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c32:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "c33 a second process changes no byte. While a child holds the SR-1.01 lock on a vault whose note lags the log, the parent appends a partial line (no newline) to the active segment to stand for the holder's in-flight record. It then records the bytes and mtime of every file under .memev/oplog, of .memev/index.jsonl and of the note. Then (a) a writable Vault.open() throws VaultLocked, and (b) a read-only open is followed by close(). After each, every recorded file is byte-identical with the same mtime, and the partial line is still present.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c33:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c33:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c33:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c33:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
+          }
+        },
+        {
+          "statement": "c34 write() makes the new content durable before the rename. A child opens a vault (fsync: true) and wraps fs.openSync, writeSync, writeFileSync, fsyncSync, fdatasyncSync and renameSync to record their calls. It then runs write(p,B) on an existing note, and append(p,'tail') on a note whose file lags its head, so that R6's tmp path runs. For each call, the parent asserts that an fsyncSync or fdatasyncSync on the fd that wrote the tmp file comes before renameSync(tmp, note), and that the note path itself is never opened for writing.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c34:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c34:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c34:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c34:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
+          }
+        },
+        {
+          "statement": "c35 a completion that fails with ENOSPC or EIO. For each code, a child process wraps the fs call that writes or renames the note's completion tmp so that it throws an Error with that code. Vault.open() returns, v.recovered excludes p, no record for p has agent 'external', and the recorded reason (v.status() or the doctor drift check detail) names p and the code. A later open without the wrapper reads B.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c35:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c35:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c35:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c35:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
+          }
+        },
+        {
+          "statement": "c36 calls made while a change is pending are logged. In c18's setup, record v.log.seq before the two calls. Afterwards it is exactly 2 higher, the last two records for p are an append whose text is 'tail' plus a newline followed by a splice, and each call either returned or threw a VaultError with code 'logged_pending' carrying its own record's seq. After the reopen, the file equals C applied to B plus the tail line.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c36:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c36:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c36:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c36:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
+          }
+        },
+        {
+          "statement": "c38 a logged_pending error reaches a remote caller. With the note file 0444, call memev_append through createServer's /mcp route with an owner token. The result has isError, its text contains 'logged_pending', the logged seq and a phrase telling the caller not to repeat the call, and v.log.seq rose by exactly one. After restoring permissions and reopening, a memev_remember with the text of an entry whose append threw logged_pending is reported as a duplicate.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c38:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c38:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c38:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c38:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
+          }
+        },
+        {
+          "statement": "At the reverted base the file loads and the right subtests fail. In a copy with vault.mjs reverted to the contract base, the guards c10 and c21 report ok (proof that the file loaded and ran), and each of c01 c04 c06 c07 c09 c11 c14 c18 c22 c25 c26 c27 reports not ok.",
+          "verifier": {
+            "type": "command",
+            "cmd": "d=$(mktemp -d) && cp -R package.json src templates vendor test bin docs README.md \"$d\"/ && git show \"$MEMEV_CONTRACT_BASE\":src/engine/vault.mjs > \"$d/src/engine/vault.mjs\" && cd \"$d\" && { node --test --test-reporter=tap test/write-interrupted.test.mjs > \"$d/base.tap\" 2>&1; true; } && grep -Eq '^ *ok [0-9]+ - c10:' \"$d/base.tap\" && grep -Eq '^ *ok [0-9]+ - c21:' \"$d/base.tap\" && for n in c01 c04 c06 c07 c09 c11 c14 c18 c22 c25 c26 c27; do grep -Eq \"^ *not ok [0-9]+ - $n:\" \"$d/base.tap\" || exit 1; done",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "c37 the doctor fix keeps outside edits. Extend c19's setup with a second note q, written successfully. After v2 opens, write q by hand to a body that differs from both of its heads, mtime 10 s after its put. The fileChecks({root, vault: v2}) drift detail names p as awaiting completion and q as an outside edit. fix.run() leaves p equal to B and q byte-identical to the hand edit, the last record for q is an external put of it, and no record for p is external.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/write-interrupted.test.mjs",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap --test-name-pattern='^c37:' test/write-interrupted.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^ *ok [0-9]+ - c37:' \"$f\" && ! grep -Eq '^ *ok [0-9]+ - c37:.*# (SKIP|TODO)' \"$f\" && grep -Eq '^# fail 0$' \"$f\" && awk -v pat='^c37:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\""
           }
         },
         {
