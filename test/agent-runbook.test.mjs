@@ -58,35 +58,62 @@ function pageCommands() {
 
 // --- memev help and the README install section ---
 
+// One synopsis from memev help, as its positional slots in order and the flags it takes. Brackets mark
+// what is optional: [--json] is a flag, [--timeout S] a flag with a value, [client|all] an optional
+// argument. A slot is a word (its spellings, split on |) or an argument (<x> or an upper case name).
+function parseSynopsis(text) {
+  const slots = []; const flags = new Map();
+  let depth = 0; let flag = null; let flagDepth = 0;
+  for (const raw of text.trim().split(/\s+/)) {
+    const open = /^\[*/.exec(raw)[0].length; const close = /\]*$/.exec(raw)[0].length;
+    const tok = raw.slice(open, raw.length - close);
+    const optional = depth + open > 0;
+    depth += open;
+    if (/^-/.test(tok)) { flags.set(tok, false); flag = tok; flagDepth = depth; }
+    else if (flag && ((open === 0 && depth > 0 && depth >= flagDepth) || /^[A-Z<]/.test(tok))) { flags.set(flag, true); flag = null; }
+    else { flag = null; slots.push(/^[<A-Z]/.test(tok) ? { arg: true, optional } : { words: new Set(tok.split('|')), optional }); }
+    depth = Math.max(0, depth - close);
+    if (flag && depth < flagDepth) flag = null; // the flag's brackets closed: what follows is not its value
+  }
+  return { slots, flags };
+}
+
 function helpForms() {
   const sbx = sandbox();
   const forms = [];
   for (const line of sbx.run(['help']).out.split('\n')) {
     const m = /^  memev (.+)$/.exec(line);
     if (!m) continue;
-    for (const part of m[1].split(/\s{2,}/)[0].split(' | ')) {
-      const toks = part.trim().split(/\s+/);
-      forms.push({
-        base: ['memev', ...toks.filter((t) => !/^-/.test(t) && !/^[<[]/.test(t))],
-        flags: new Set(toks.filter((t) => /^-/.test(t))),
-        hasArg: toks.some((t) => /^[<[]/.test(t)),
-      });
-    }
+    for (const part of m[1].split(/\s{2,}/)[0].split(' | ')) forms.push(parseSynopsis(part));
   }
   return forms;
 }
 
-const GLOBAL_FLAGS = new Set(['--root', '--help', '-h']);
+// --root takes a value; --help and -h do not
+const GLOBAL_FLAGS = new Map([['--root', true], ['--help', false], ['-h', false]]);
+// A placeholder on the page (<client>) fills an argument slot, or a word slot that names it ([client|all]);
+// a literal word fills an argument slot or a word slot that spells it.
+const fits = (tok, slot) => slot.arg || slot.words.has(/^<(.+)>$/.exec(tok)?.[1] ?? tok);
+function matchSlots(toks, slots, i = 0, j = 0) {
+  if (j === slots.length) return i === toks.length;
+  if (slots[j].optional && matchSlots(toks, slots, i, j + 1)) return true;
+  return i < toks.length && fits(toks[i], slots[j]) && matchSlots(toks, slots, i + 1, j + 1);
+}
 function inHelp(cmd, forms) {
   const toks = cmd.split(/\s+/);
-  const flags = toks.filter((t) => /^-/.test(t));
-  const words = toks.filter((t) => !/^-/.test(t) && !/^[<[]/.test(t));
-  const placeholders = toks.filter((t) => /^[<[]/.test(t));
-  return forms.some((f) =>
-    f.base.length === words.length &&
-    f.base.every((t, i) => t === words[i]) &&
-    flags.every((fl) => f.flags.has(fl) || GLOBAL_FLAGS.has(fl)) &&
-    (placeholders.length === 0 || f.hasArg));
+  if (toks[0] !== 'memev') return false;
+  return forms.some((f) => {
+    const positional = [];
+    for (let i = 1; i < toks.length; i++) {
+      const t = toks[i];
+      if (!/^-/.test(t)) { positional.push(t); continue; }
+      const name = t.split('=')[0];
+      const takesValue = f.flags.has(name) ? f.flags.get(name) : GLOBAL_FLAGS.get(name);
+      if (takesValue === undefined) return false;
+      if (takesValue && !t.includes('=')) i++;
+    }
+    return matchSlots(positional, f.slots);
+  });
 }
 
 function readmeCommands() {
@@ -101,7 +128,11 @@ function readmeCommands() {
   return [...cmds].filter((c) => CMD.test(c));
 }
 
-const inReadme = (cmd, readme) => readme.some((r) => r === cmd || r.includes(cmd) || cmd.includes(r));
+// The commands a README install command runs, cut at &&. A page command is covered when each command it
+// runs is one of these exactly or a form in memev help; node bin/memev.mjs is the same CLI as memev.
+const readmeParts = (readme) => new Set(readme.flatMap((r) => r.split('&&').map((p) => p.trim())));
+const asMemev = (c) => c.replace(/^node bin\/memev\.mjs(?=\s|$)/, 'memev');
+const covered = (cmd, forms, parts) => cmd.split('&&').map((p) => p.trim()).every((p) => parts.has(p) || inHelp(asMemev(p), forms));
 
 // --- the sandbox, like test/ready.test.mjs ---
 
@@ -151,14 +182,15 @@ test('SO-R-D AC01: the runbook carries the nine sections in order, and the failu
 
 test('SO-R-D AC02: every command on the page is in memev help or a README install command', () => {
   const forms = helpForms();
-  const readme = readmeCommands();
-  const experimental = /not published yet|coming soon|experimental|preview|unsupported/i;
-  const bad = [];
-  for (const cmd of pageCommands()) {
-    const line = PAGE.split('\n').find((l) => l.includes(cmd));
-    if (inHelp(cmd, forms) || inReadme(cmd, readme) || (line && experimental.test(line))) continue;
-    bad.push(cmd);
+  const parts = readmeParts(readmeCommands());
+  // the check can fail: an invented command, subcommand or flag is not covered, and the real forms are
+  for (const c of ['memev ready --json --delete-everything', 'memev frobnicate', 'memev doctor --nuke', 'memev init --no-connect --yes', 'memev connect <client> --all-apps', 'memev cloud explode', 'npm install -g evil', 'node bin/memev.mjs init --everything']) {
+    assert.equal(covered(c, forms, parts), false, `${c} must not count as covered`);
   }
+  for (const c of ['memev ready --json', 'memev ready --timeout 120 --json', 'memev doctor --json', 'memev connect <client>', 'memev disconnect <client>', 'memev cloud url', 'memev --version', 'node bin/memev.mjs init --no-connect', 'npm install -g . && memev init --no-connect', 'docker compose up -d']) {
+    assert.equal(covered(c, forms, parts), true, `${c} must count as covered`);
+  }
+  const bad = pageCommands().filter((cmd) => !covered(cmd, forms, parts));
   assert.deepEqual(bad, [], `not in memev help or the README install section: ${bad.join(', ')}`);
 });
 
@@ -292,4 +324,12 @@ test('SO-R-D AC05: the page says the agent asks permission before privileged act
   assert.match(sec, /ask/i);
   assert.match(sec, /before/i);
   assert.match(PAGE, /never weaken local security controls/i);
+  // init connects no app on its own: every init the page runs carries --no-connect, and each app is
+  // connected with its own memev connect after its own yes
+  const inits = pageCommands().filter((c) => /^(memev|node|npm)\b/.test(c) && /\binit\b/.test(c));
+  assert.ok(inits.length > 0, 'the page runs no init');
+  for (const c of inits) assert.match(c, /--no-connect/, `${c} connects every app it finds before the person approves any`);
+  const connect = section('connect only the clients the user approved').replace(/\s+/g, ' ');
+  assert.ok(connect.includes('`memev connect <client>`'), 'the approved-clients step does not run memev connect <client>');
+  assert.match(connect, /one yes connects one client/i);
 });
