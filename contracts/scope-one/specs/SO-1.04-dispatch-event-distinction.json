@@ -1,0 +1,108 @@
+{
+  "title": "SO-1.04 Dispatch events: a requested action, an accepted dispatch, an observed execution and a verified outcome stay apart",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G-SO-04 (addendum 3, review row 3). Source: the Scope One addendum (PR #222, docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md at head a1757a0) and its review table (issuecomment-6534383323); owner request of 31 Oct 2026 that every aspect be decomposed in the WBS and built into contracts (t531u). The addendum names recommendations that become contracts on acceptance; this contract is the design-record stage, so it asks for the decision record and builds nothing. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository. Depends on contracts: SO-05-B, SO-05-D, SO-08-A.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "Define one adapter contract with declared capabilities, identity, session discovery, dispatch, progress/result reporting, checkpointing, cancellation semantics and recovery.",
+        "Keep provider-specific behaviour inside adapters; the planner and coordinator must consume capability declarations rather than provider-specific conditionals.",
+        "Distinguish a requested action, an accepted dispatch, an observed execution and a verified outcome in the event history.",
+        "Never report successful completion merely because a provider returned a success-shaped response."
+      ],
+      "description": "",
+      "scope": [
+        "docs/scope-one/design/dispatch-event-distinction.md",
+        "docs/README.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The decision record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/design/dispatch-event-distinction.md"
+          }
+        },
+        {
+          "statement": "The record decides requirement 1: Define one adapter contract with declared capabilities, identity, session discovery, dispatch, progress/result reporting, checkpointing, cancellation...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/dispatch-event-distinction.md",
+            "pattern": "^## Requirement 1:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 2: Keep provider-specific behaviour inside adapters; the planner and coordinator must consume capability declarations rather than provider-specific conditionals.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/dispatch-event-distinction.md",
+            "pattern": "^## Requirement 2:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 3: Distinguish a requested action, an accepted dispatch, an observed execution and a verified outcome in the event history.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/dispatch-event-distinction.md",
+            "pattern": "^## Requirement 3:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 4: Never report successful completion merely because a provider returned a success-shaped response.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/dispatch-event-distinction.md",
+            "pattern": "^## Requirement 4:"
+          }
+        },
+        {
+          "statement": "The record names the event kinds",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/dispatch-event-distinction.md",
+            "pattern": "^Event kinds:"
+          }
+        },
+        {
+          "statement": "The record names the adapter contract",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/dispatch-event-distinction.md",
+            "pattern": "^Adapter contract:"
+          }
+        },
+        {
+          "statement": "The decision record passes the leak scan",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The documentation links and up-links stay valid",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-links.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
