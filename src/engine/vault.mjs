@@ -89,15 +89,30 @@ export class Vault extends EventEmitter {
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }
+  /**
+   * True when a note's path, or any folder on the way to it, is a symbolic link. memev never follows a link in the vault:
+   * a link reached files outside it (issue 256), and a dangling link named like a note stopped the vault opening (230).
+   */
+  _linked(p) {
+    let cur = this.root;
+    for (const seg of String(p).split('/')) {
+      cur = path.join(cur, seg);
+      let st; try { st = fs.lstatSync(cur); } catch { return false; }
+      if (st.isSymbolicLink()) return true;
+    }
+    return false;
+  }
+  _noLink(p) { if (this._linked(p)) throw new VaultError('bad_path', `${p} goes through a symbolic link; memev does not follow links in the vault`); }
   /** Read a note; a journal file that retention moved to work/archive is still readable at its old path. */
   _read(p) {
+    if (this._linked(p)) return null; // a link is never followed, for reading either
     try { return fs.readFileSync(this.abs(p), 'utf8'); } catch {}
-    if (p.startsWith('work/')) { try { return fs.readFileSync(this.abs(`work/archive/${p.slice(5)}`), 'utf8'); } catch {} }
+    if (p.startsWith('work/') && !this._linked(`work/archive/${p.slice(5)}`)) { try { return fs.readFileSync(this.abs(`work/archive/${p.slice(5)}`), 'utf8'); } catch {} }
     return null;
   }
   allNotes(dir = '') {
     const out = []; const base = dir ? this.abs(dir) : this.root;
-    const walk = (d, rel) => { let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of ents) { if (e.name.startsWith('.') || e.name === 'node_modules') continue; const r = rel ? `${rel}/${e.name}` : e.name; if (e.isDirectory()) { if (r === 'work/archive') continue; walk(path.join(d, e.name), r); } else if (e.name.endsWith('.md')) out.push(r); } };
+    const walk = (d, rel) => { let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of ents) { if (e.name.startsWith('.') || e.name === 'node_modules' || e.isSymbolicLink()) continue; const r = rel ? `${rel}/${e.name}` : e.name; if (e.isDirectory()) { if (r === 'work/archive') continue; walk(path.join(d, e.name), r); } else if (e.name.endsWith('.md')) out.push(r); } };
     walk(base, dir.replace(/\/$/, '')); return out.sort();
   }
   reindexAll() { for (const p of this.allNotes()) { const b = this._read(p); this.index.update(p, b); this.graph.indexNote(p, b); } this.index.save(); }
@@ -113,6 +128,7 @@ export class Vault extends EventEmitter {
     const fixed = [], imported = [];
     for (const [p, h] of this.log.heads) {
       if (h.deleted || !h.ch) continue;
+      if (this._linked(p)) continue; // never rebuilt through a link: the write would land wherever the link points
       const cur = this._read(p);
       if (cur !== null && sha256(cur) === h.ch) continue;
       const content = this.materialize(p);
@@ -150,6 +166,7 @@ export class Vault extends EventEmitter {
 
   /** A note changed on disk outside Memev (an editor, git pull): log it before touching it. */
   syncFromDisk(p, source = 'external') {
+    if (this._linked(p)) return null; // a link that replaced a note is neither imported nor taken as a delete
     const h = this.log.heads.get(p);
     const known = this._ncGet(p);
     if (known && h && !h.deleted && known.ch === h.ch) return null;
@@ -222,7 +239,7 @@ export class Vault extends EventEmitter {
   list(identity, prefix = '') { this._need(identity, 'read', null); return this.allNotes(prefix ? prefix.replace(/\/$/, '') : '').filter((p) => allowed(identity, 'read', p)); }
 
   write(identity, { path: p, body, client = null, allow_secrets = false, internal = false }) {
-    p = checkPath(p); this._need(identity, 'write', p); body = String(body ?? '');
+    p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); body = String(body ?? '');
     this._guard(p, body, allow_secrets, internal);
     this.syncFromDisk(p);
     const old = this._read(p);
@@ -244,7 +261,7 @@ export class Vault extends EventEmitter {
   }
 
   append(identity, { path: p, text, client = null, allow_secrets = false, internal = false }) {
-    p = checkPath(p); this._need(identity, 'write', p);
+    p = checkPath(p); this._need(identity, 'write', p); this._noLink(p);
     this.syncFromDisk(p);
     let ns = this._ncGet(p);
     if (!ns) { const cur = this._read(p); if (cur !== null) { this._ncSet(p, cur); ns = this._ncGet(p); } }
@@ -262,7 +279,7 @@ export class Vault extends EventEmitter {
   }
 
   delete(identity, { path: p, client = null }) {
-    p = checkPath(p); this._need(identity, 'write', p); this._guard(p, '', true, false);
+    p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); this._guard(p, '', true, false);
     if (this._read(p) === null) throw new VaultError('not_found', `no note ${p}`);
     const rec = this.log.append({ type: 'delete', path: p, agent: identity.agent, client, data: {} });
     fs.rmSync(this.abs(p)); this._nc?.delete(p); this.index.remove(p); this.graph.removeNote(p); this.commits.add(p, client); this._indexSaveSoon();
