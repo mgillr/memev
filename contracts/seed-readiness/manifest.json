@@ -26,7 +26,7 @@
         "QL-1.02"
       ],
       "tasks": 3,
-      "criteria": 37,
+      "criteria": 49,
       "spec": "specs/SR-1.01-one-writer-enforced-an-exclusive.json"
     },
     {
