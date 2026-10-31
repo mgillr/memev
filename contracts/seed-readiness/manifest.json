@@ -633,7 +633,7 @@
       "closes": "The $12 tier advertises automatic merge, which does not exist; the pricing test covers docs but not the site",
       "depends_on": [],
       "tasks": 1,
-      "criteria": 3,
+      "criteria": 4,
       "spec": "specs/SR-5.04-paid-tiers-sell-only-what.json"
     },
     {

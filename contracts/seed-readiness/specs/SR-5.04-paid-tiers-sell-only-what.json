@@ -11,7 +11,8 @@
       "depends_on": [],
       "requirements": [
         "a machine-readable status table (built, planned, date) is the single source; docs and the site render from it",
-        "a feature listed in a paid tier must be built or carry a delivery date"
+        "a feature listed in a paid tier must be built or carry a delivery date",
+        "the status table carries a tiers section: each tier's name, its monthly and yearly prices in each currency the docs show, and its computer and member limits, equal to the pricing table in docs/PRICING.md, so the site renders every tier fact from the copy QL-1.06's gate sync brings in; the trial's size is a separate entry, never a tier limit"
       ],
       "description": "",
       "scope": [
@@ -36,6 +37,14 @@
           "verifier": {
             "type": "file_exists",
             "path": "docs/status.json"
+          }
+        },
+        {
+          "statement": "SR-5.04 tiers: the tiers section of docs/status.json equals the pricing table in docs/PRICING.md (names, prices and limits), and the trial's size is not a tier limit; a fixture PRICING.md whose Personal price or a computer limit differs from the section fails the test",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pricing-honesty.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-5.04 tiers' test/pricing-honesty.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-5.04 tiers$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
