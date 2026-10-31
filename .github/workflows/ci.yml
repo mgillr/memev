@@ -1,6 +1,6 @@
-# Memev's own development checks. Kept to one short job on pull requests: Actions minutes are a
-# shared budget. Windows (a preview) runs only on a push to main or a release tag, never on a pull
-# request, so pull requests cost no Windows minutes. Slow suites (the Docker smoke test, the 170M-token growth bench, the macOS run) are
+# Memev's own development checks. One short job runs on every pull request and again on every push to main, so a
+# landing that breaks main shows on main itself. Actions minutes are a shared budget. Windows (a preview) runs only on a
+# push to main or a release tag, never on a pull request, so pull requests cost no Windows minutes. Slow suites (the Docker smoke test, the 170M-token growth bench, the macOS run) are
 # run locally before merging: scripts/docker-smoke.sh, scripts/growth-bench.mjs.
 # The Memev product never installs workflows into a user's repositories.
 name: ci
@@ -41,7 +41,8 @@ concurrency:
   cancel-in-progress: true
 jobs:
   check:
-    if: github.event_name == 'pull_request'
+    # pull requests, and every push to main (a release tag is built by release.yml instead)
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -54,7 +55,10 @@ jobs:
       - run: git config --global user.name ci && git config --global user.email ci@example.invalid
       - run: npm test
       - name: CHANGELOG.md changes only at a release (notes go in changelog.d/)
-        run: node scripts/changelog-assemble.mjs --guard "origin/${{ github.base_ref }}"
+        # on a pull request the base is the target branch; on a push to main, main as it was before the push
+        env:
+          GUARD_BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || github.event.before }}
+        run: node scripts/changelog-assemble.mjs --guard "$GUARD_BASE"
       - name: Leak scan (files and every commit message)
         run: node scripts/leak-scan.mjs --history
       - name: gitleaks (pinned release, checksum verified)
