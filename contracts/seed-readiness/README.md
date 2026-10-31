@@ -91,3 +91,8 @@ The engine enabler and the gaps the memev twin measured, approved by the owner o
 | [SR-1.29](specs/SR-1.29-a-hook-starts-without-loading-the-whole.json) | G94 | memev | A hook starts without loading the whole CLI | QL-1.02 |
 | [SR-1.30](specs/SR-1.30-done-holds-across-computers-and-clones.json) | G95 | memev | Done holds across computers and clones | SR-1.27, QL-1.02 |
 | [SR-1.31](specs/SR-1.31-every-other-cli-state-writer-goes-through-the-daemon.json) | G96 | memev | Every other CLI state writer goes through the daemon or the lock | SR-1.24, SR-1.28, SR-1.01, QL-1.02 |
+| [SR-1.32](specs/SR-1.32-bus-messages-reach-the-model-as-untrusted-data.json) | G98 | memev | Bus messages reach the model as untrusted data, and the open routes are stated | QL-1.02 |
+| [SR-1.33](specs/SR-1.33-a-test-count-that-means-behaviour.json) | G99 | memev | A test count that means behaviour | QL-1.02 |
+| [SR-2.10](specs/SR-2.10-known-issues-are-listed-and-the-free-tier-holds.json) | G100 | memev | Known issues are listed, and the free tier holds for three days | QL-1.02 |
+| [SR-4.07](specs/SR-4.07-memev-uses-the-live-hosted-services.json) | G101 | memev | memev uses the live hosted services | SR-4.02, SR-4.03, SR-4.04, SR-4.05, SR-5.01, QL-1.02 |
+| [SR-6.11](specs/SR-6.11-one-product-site.json) | G102 | memev | One product site | SR-5.04, SR-6.10, QL-1.06 |

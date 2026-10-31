@@ -96,6 +96,60 @@
         "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
         "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
       ]
+    },
+    {
+      "id": "T3",
+      "title": "Saved in one app, recalled in another",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "for each ordered pair of the 8 apps, 20 seeded decisions saved through the first app are asked for in a new session of the second; the share recalled is recorded per pair with the app versions",
+        "docs/BENCH.md publishes the pair table with the hardware and the date, beside the single-app results, and says what an app's own memory does not carry across apps"
+      ],
+      "scope": [
+        "scripts/bench/**",
+        "bench/continuity/**",
+        "docs/BENCH.md"
+      ],
+      "criteria": [
+        {
+          "statement": "Cross-tool results exist",
+          "verifier": {
+            "type": "file_exists",
+            "path": "bench/continuity/cross-tool.json"
+          }
+        },
+        {
+          "statement": "Every ordered pair of the 8 apps is measured",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/bench/continuity.mjs --cross --from bench/continuity/cross-tool.json --json",
+            "key": "pairs",
+            "op": ">=",
+            "value": 56
+          }
+        },
+        {
+          "statement": "BENCH.md carries the pair table",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/BENCH.md",
+            "pattern": "Saved in one app, recalled in another"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
     }
   ]
 }

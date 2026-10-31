@@ -13,7 +13,8 @@
         "project-state drives bus task status, or is removed",
         "every exported function in src/ is imported by another src module or a bin entry",
         "the oplog HLC merge helpers are kept and listed by name in the dead-code test as the functions SR-3.04 wires; the list is removed when SR-3.04 lands",
-        "OpLog.recovered (the skipped unreadable records, src/engine/oplog.mjs:105-106) is read by status() and by the doctor's oplog check, or removed with the comment that promises it is reported"
+        "OpLog.recovered (the skipped unreadable records, src/engine/oplog.mjs:105-106) is read by status() and by the doctor's oplog check, or removed with the comment that promises it is reported",
+        "every entitlement name in src/engine/entitlements.mjs (PAID_FEATURES and each tier's services) is checked by a code path that changes behaviour, or is a status-table row marked planned; sso, audit and the hosted services are not sold as built while nothing reads them"
       ],
       "description": "",
       "scope": [
@@ -37,6 +38,14 @@
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "SR-1.15 entitlements: an entitlement name that no src module reads and no status-table row marks planned fails the test, naming it",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/dead-code.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.15 entitlements' test/dead-code.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.15 entitlements$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {

@@ -58,12 +58,16 @@
         "T1"
       ],
       "requirements": [
-        "access tokens live at most one hour, refresh tokens rotate on use and a reused refresh token revokes the family"
+        "access tokens live at most one hour, refresh tokens rotate on use and a reused refresh token revokes the family",
+        "access tokens are bound to a key the client holds (DPoP, RFC 9449): the token names the key's thumbprint, every request carries a fresh proof signed by that key over the method, the URL and a time, and the server refuses a token presented without a matching proof or with a replayed one",
+        "a client that cannot hold a key (a connector that supports only bearer tokens) is listed in docs/CLOUD.md by name with the reason, and its tokens live at most 15 minutes"
       ],
       "description": "",
       "scope": [
         "src/server/oauth.mjs",
-        "test/oauth.test.mjs"
+        "test/oauth.test.mjs",
+        "src/server/http.mjs",
+        "docs/CLOUD.md"
       ],
       "criteria": [
         {
@@ -80,6 +84,14 @@
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "SR-1.04 possession: an access token presented with no proof, with a proof signed by another key, or with a proof replayed from an earlier request is refused; with a fresh proof from its own key it is served; a server that accepts the token alone fails the test",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oauth.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.04 possession' test/oauth.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.04 possession$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {

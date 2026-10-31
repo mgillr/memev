@@ -62,7 +62,7 @@
       "closes": "Connector URLs embed the bearer token in the path (logged by tunnel providers); cloud tokens are plain replayable bearers",
       "depends_on": [],
       "tasks": 3,
-      "criteria": 10,
+      "criteria": 11,
       "spec": "specs/SR-1.04-cloud-connectors-no-bearer-in.json"
     },
     {
@@ -122,7 +122,7 @@
       "closes": "300 to 600 character lines, server imports CLI, helpers duplicated three times, empty catch blocks hide faults",
       "depends_on": [],
       "tasks": 3,
-      "criteria": 8,
+      "criteria": 9,
       "spec": "specs/SR-1.09-code-a-second-engineer-can.json"
     },
     {
@@ -134,7 +134,7 @@
       "closes": "12 tests need ssh-keygen, 8 need an authenticated gh and network, 3 fail when MEMEV_NO_SERVICE is set",
       "depends_on": [],
       "tasks": 2,
-      "criteria": 5,
+      "criteria": 6,
       "spec": "specs/SR-1.10-a-suite-that-is-green.json"
     },
     {
@@ -173,7 +173,7 @@
       "closes": "Docs and site claim 1.1 ms recall and 160 MB heap with no hardware; measured 4.55 ms and 183 MB",
       "depends_on": [],
       "tasks": 2,
-      "criteria": 4,
+      "criteria": 5,
       "spec": "specs/SR-1.13-performance-numbers-anyone-can-reproduce.json"
     },
     {
@@ -197,7 +197,7 @@
       "closes": "project-state.mjs (330 lines) and the oplog HLC merge helpers have no production caller; entitlements name features with nothing behind them",
       "depends_on": [],
       "tasks": 1,
-      "criteria": 3,
+      "criteria": 4,
       "spec": "specs/SR-1.15-no-code-without-a-caller.json"
     },
     {
@@ -209,7 +209,7 @@
       "closes": "Help omits real subcommands; CLIENTS.md says sync every few minutes (default 30); delete is not reconciled; dependency claim overstated",
       "depends_on": [],
       "tasks": 3,
-      "criteria": 8,
+      "criteria": 9,
       "spec": "specs/SR-1.16-docs-and-code-say-the.json"
     },
     {
@@ -447,6 +447,36 @@
       "status": "proposed: lead's decision under the owner's delegation, 31 Oct; signs after a clean red-team round"
     },
     {
+      "id": "SR-1.32",
+      "gap": "G98",
+      "area": "SR-1",
+      "title": "Bus messages reach the model as untrusted data, and the open routes are stated",
+      "repo": "memev",
+      "closes": "Closes G98: the seed-stage analysis of 30 October 2026 (D12, D10). The hook text quotes the body of a bus message from any seat but the operator as untrusted data and cuts it to 200 characters (src/server/http.mjs:98, UNTRUSTED_BODY at :36), but the MCP bus tools bus_unread, bus_since and bus_tail hand the model each message with its raw body (src/server/mcp.mjs:167-174, through vault.bus.unread, since and tail), and docs/THREAT-MODEL.md:15 says so; the last message bus_roster shows per seat is the same. GET /healthz and the invite redeem route answer without a token by design; /healthz gives the vault id to a direct local caller and {ok:true} to any other (http.mjs:123), and the threat model has no row saying why the two routes are open and what each discloses",
+      "depends_on": [
+        "QL-1.02"
+      ],
+      "tasks": 2,
+      "criteria": 16,
+      "spec": "specs/SR-1.32-bus-messages-reach-the-model-as-untrusted-data.json",
+      "status": "proposed: owner's request 31 Oct (the seed analysis); signs after a clean red-team round"
+    },
+    {
+      "id": "SR-1.33",
+      "gap": "G99",
+      "area": "SR-1",
+      "title": "A test count that means behaviour",
+      "repo": "memev",
+      "closes": "Closes G99: the seed-stage analysis (E1, E8). About a fifth of the test files read documents rather than run code: on main 5e1a1e05, 25 of 165 test files import nothing from src/ or bin/ and start no memev process, so the pass count overstates what is tested. The lab walk of every command (scripts/lab/cli-walk.sh) compares each command's exit code with an expected one that has gone stale, and nothing runs it",
+      "depends_on": [
+        "QL-1.02"
+      ],
+      "tasks": 2,
+      "criteria": 14,
+      "spec": "specs/SR-1.33-a-test-count-that-means-behaviour.json",
+      "status": "proposed: owner's request 31 Oct (the seed analysis); signs after a clean red-team round"
+    },
+    {
       "id": "SR-2.01",
       "gap": "G21",
       "area": "SR-2",
@@ -481,7 +511,7 @@
       "closes": "Codex, Gemini and Windsurf env markers admitted unverified (common.mjs:80); a vendor change silently breaks hooks",
       "depends_on": [],
       "tasks": 2,
-      "criteria": 6,
+      "criteria": 7,
       "spec": "specs/SR-2.03-every-client-hook-verified-against.json"
     },
     {
@@ -492,8 +522,8 @@
       "repo": "memev",
       "closes": "Claude Desktop, VS Code, Zed and Windsurf get instructions only; the compaction benchmark across apps is planned",
       "depends_on": [],
-      "tasks": 2,
-      "criteria": 6,
+      "tasks": 3,
+      "criteria": 10,
       "spec": "specs/SR-2.04-continuity-measured-in-every-app.json"
     },
     {
@@ -553,8 +583,23 @@
       "closes": "The site shows a third cloud AI provider as coming soon; nothing in the product repo supports it",
       "depends_on": [],
       "tasks": 1,
-      "criteria": 3,
+      "criteria": 4,
       "spec": "specs/SR-2.09-coming-soon-provider-build-it-or-stop.json"
+    },
+    {
+      "id": "SR-2.10",
+      "gap": "G100",
+      "area": "SR-2",
+      "title": "Known issues are listed, and the free tier holds for three days",
+      "repo": "memev",
+      "closes": "Closes G100: the seed-stage analysis (I2) lists a known-issues page and soak tests among the free tier's planned items, and neither has a contract; the only soak in the set is SR-3.04 task 2, for the paid multi-writer engine",
+      "depends_on": [
+        "QL-1.02"
+      ],
+      "tasks": 2,
+      "criteria": 16,
+      "spec": "specs/SR-2.10-known-issues-are-listed-and-the-free-tier-holds.json",
+      "status": "proposed: owner's request 31 Oct (the seed analysis); signs after a clean red-team round"
     },
     {
       "id": "SR-3.01",
@@ -610,6 +655,26 @@
       "spec": "specs/SR-3.05-one-licence-for-the-engine.json"
     },
     {
+      "id": "SR-4.07",
+      "gap": "G101",
+      "area": "SR-4",
+      "title": "memev uses the live hosted services",
+      "repo": "memev",
+      "closes": "Closes G101: the seed-stage analysis (A8, C7). memev has no built-in licence endpoint (src/cli/licensing.mjs:55-57 reads only --server and MEMEV_LICENSE_URL) and no built-in checkout address (docs/CHECKOUT.md: memev upgrade prints checkout.url from the vault's config), and hosted sync, backup and relay answer that they are not offered yet (src/services/providers.mjs:12). SR-4.02 to SR-4.05 build the services in memev-cloud and SR-5.01 the live checkout, but no contract makes memev use them. The repository still carries no address (docs/CHECKOUT.md says so, and the leak denylist names the company's domain), so a release takes the addresses from release configuration, never from the source",
+      "depends_on": [
+        "SR-4.02",
+        "SR-4.03",
+        "SR-4.04",
+        "SR-4.05",
+        "SR-5.01",
+        "QL-1.02"
+      ],
+      "tasks": 2,
+      "criteria": 16,
+      "spec": "specs/SR-4.07-memev-uses-the-live-hosted-services.json",
+      "status": "proposed: owner's request 31 Oct (the seed analysis); signs after a clean red-team round"
+    },
+    {
       "id": "SR-5.02",
       "gap": "G43",
       "area": "SR-5",
@@ -633,7 +698,7 @@
       "closes": "The $12 tier advertises automatic merge, which does not exist; the pricing test covers docs but not the site",
       "depends_on": [],
       "tasks": 1,
-      "criteria": 4,
+      "criteria": 14,
       "spec": "specs/SR-5.04-paid-tiers-sell-only-what.json"
     },
     {
@@ -648,7 +713,7 @@
         "SR-9.01"
       ],
       "tasks": 1,
-      "criteria": 5,
+      "criteria": 8,
       "spec": "specs/SR-6.01-the-repository-goes-public.json"
     },
     {
@@ -662,7 +727,7 @@
         "SR-6.01"
       ],
       "tasks": 1,
-      "criteria": 3,
+      "criteria": 5,
       "spec": "specs/SR-6.02-npx-memev-init-works.json"
     },
     {
@@ -692,6 +757,23 @@
       "tasks": 1,
       "criteria": 2,
       "spec": "specs/SR-6.04-listed-where-people-look-for.json"
+    },
+    {
+      "id": "SR-6.11",
+      "gap": "G102",
+      "area": "SR-6",
+      "title": "One product site",
+      "repo": "memev",
+      "closes": "Closes G102: the seed-stage analysis (B9, B10). The product repository still holds the older template site (site/: web/, landing/, build.mjs, DEPLOY.md), whose pages carry titles and taglines of their own (site/web/business.html) beside the README's line and the deployed site's, and whose guard against certification, uptime and SLA claims (test/deploy-docs.test.mjs) checks pages no visitor sees. QL-1.06 runs the claims check over site/**/*.html, so the template is checked while the deployed site is not",
+      "depends_on": [
+        "SR-5.04",
+        "SR-6.10",
+        "QL-1.06"
+      ],
+      "tasks": 1,
+      "criteria": 4,
+      "spec": "specs/SR-6.11-one-product-site.json",
+      "status": "proposed: owner's request 31 Oct (the seed analysis); signs after a clean red-team round"
     },
     {
       "id": "SR-9.05",

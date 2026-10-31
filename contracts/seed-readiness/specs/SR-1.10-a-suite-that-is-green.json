@@ -57,7 +57,8 @@
       ],
       "requirements": [
         "tests that touch GitHub use the fake gh on PATH and a local bare remote",
-        "service tests set their own env"
+        "service tests set their own env",
+        "every test that runs git sets GIT_CONFIG_GLOBAL to a file of its own and GIT_CONFIG_NOSYSTEM=1, through one helper, so a person's url.insteadOf, signing or hook settings never reach a test"
       ],
       "description": "",
       "scope": [
@@ -69,6 +70,14 @@
           "verifier": {
             "type": "command",
             "cmd": "mkdir -p /tmp/memev-hermetic && env -i PATH=/usr/bin:/bin:$(dirname $(command -v node)) HOME=/tmp/memev-hermetic MEMEV_NO_SERVICE=1 npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The suite passes with a git URL rewrite and commit signing set in the user's global git config",
+          "verifier": {
+            "type": "command",
+            "cmd": "H=$(mktemp -d) && printf \"[url \\\"ssh://example.invalid/\\\"]\\n\\tinsteadOf = file://\\n[commit]\\n\\tgpgsign = true\\n\" > $H/.gitconfig && MEMEV_NO_SERVICE=1 HOME=$H npm test",
             "timeout_s": 1800
           }
         },

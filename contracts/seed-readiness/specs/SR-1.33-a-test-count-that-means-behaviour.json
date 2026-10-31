@@ -1,0 +1,186 @@
+{
+  "title": "SR-1.33 A test count that means behaviour",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G99: the seed-stage analysis (E1, E8). About a fifth of the test files read documents rather than run code: on main 5e1a1e05, 25 of 165 test files import nothing from src/ or bin/ and start no memev process, so the pass count overstates what is tested. The lab walk of every command (scripts/lab/cli-walk.sh) compares each command's exit code with an expected one that has gone stale, and nothing runs it. Repository: memev. Depends on contracts: QL-1.02.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Behaviour tests and document checks counted apart",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a test file that only reads documents (it imports nothing from src/ or bin/ and starts no memev process) lives under test/docs/; every other test file exercises code",
+        "npm test runs both and prints two lines, behaviour tests: N pass, M fail and document checks: N pass, M fail; CI's job summary shows both",
+        "scripts/test-kinds.mjs, run by npm test, fails naming the file when a test file outside test/docs/ neither imports from src/ or bin/ nor starts a memev process, or when a file under test/docs/ does either",
+        "wherever the README or docs/DEVELOPING.md give a test count, it is the behaviour count"
+      ],
+      "scope": [
+        "test/**",
+        "scripts/test-kinds.mjs",
+        "package.json",
+        "docs/DEVELOPING.md",
+        "README.md",
+        ".github/workflows/**",
+        "changelog.d/SR-1.33.md"
+      ],
+      "criteria": [
+        {
+          "statement": "SR-1.33 kinds: a fixture test file outside test/docs/ that only reads a Markdown file fails scripts/test-kinds.mjs naming it; a fixture under test/docs/ that imports src/engine/vault.mjs fails it too; the real tree passes",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/test-kinds.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.33 kinds' test/test-kinds.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.33 kinds$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The real test tree passes the kinds check",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/test-kinds.mjs",
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "npm test prints the behaviour and document counts apart, each with no failure",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test 2>&1); printf \"%s\" \"$out\" | grep -qE \"behaviour tests: [0-9]+ pass, 0 fail\" && printf \"%s\" \"$out\" | grep -qE \"document checks: [0-9]+ pass, 0 fail\"",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/test-kinds.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/test-kinds.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/test-kinds.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "The lab walk runs and its expectations are current",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "scripts/lab/cli-walk.sh takes each command's expected exit code from the codes the CLI documents, and a --check mode runs the walk in a sandbox HOME with no network and exits non-zero naming each unexpected code",
+        "CI runs scripts/lab/cli-walk.sh --check on every pull request",
+        "every script under scripts/lab/ runs in CI in a check mode, or says at its top why it cannot run there"
+      ],
+      "scope": [
+        "scripts/lab/**",
+        ".github/workflows/**",
+        "test/lab-walk.test.mjs",
+        "changelog.d/SR-1.33.md"
+      ],
+      "criteria": [
+        {
+          "statement": "SR-1.33 lab walk: a copy of cli-walk.sh whose expected code for one command is changed fails --check naming that command; the script as committed passes --check",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/lab-walk.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.33 lab walk' test/lab-walk.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.33 lab walk$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "CI runs the lab walk in check mode",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -rq 'cli-walk.sh --check' .github/workflows/",
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/lab-walk.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/lab-walk.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/lab-walk.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

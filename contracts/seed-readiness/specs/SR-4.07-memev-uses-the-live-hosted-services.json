@@ -1,0 +1,206 @@
+{
+  "title": "SR-4.07 memev uses the live hosted services",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G101: the seed-stage analysis (A8, C7). memev has no built-in licence endpoint (src/cli/licensing.mjs:55-57 reads only --server and MEMEV_LICENSE_URL) and no built-in checkout address (docs/CHECKOUT.md: memev upgrade prints checkout.url from the vault's config), and hosted sync, backup and relay answer that they are not offered yet (src/services/providers.mjs:12). SR-4.02 to SR-4.05 build the services in memev-cloud and SR-5.01 the live checkout, but no contract makes memev use them. The repository still carries no address (docs/CHECKOUT.md says so, and the leak denylist names the company's domain), so a release takes the addresses from release configuration, never from the source. Repository: memev. Depends on contracts: SR-4.02, SR-4.03, SR-4.04, SR-4.05, SR-5.01, QL-1.02.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "A release knows where the licence server and the checkout are",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "the release workflow writes the licence endpoint and the checkout URL into the package it publishes, as a release config file read at start, from the repository variables MEMEV_RELEASE_LICENSE_URL and MEMEV_RELEASE_CHECKOUT_URL; no address appears in the repository's text and the leak scan still passes",
+        "precedence is --server, then MEMEV_LICENSE_URL, then the vault config, then the release config; a build from a checkout without the release config behaves as today (no address, and the command says none is set)",
+        "memev activate and memev upgrade contact nothing until the person runs them, and no other command reads or contacts these addresses, so the no-telemetry statement stays true",
+        "a release whose variables lack either address fails before anything is published"
+      ],
+      "scope": [
+        "src/cli/licensing.mjs",
+        "src/cli/main.mjs",
+        "src/cli/release-config.mjs",
+        ".github/workflows/**",
+        "docs/CHECKOUT.md",
+        "docs/RELEASING.md",
+        "test/release-config.test.mjs",
+        "changelog.d/SR-4.07.md"
+      ],
+      "criteria": [
+        {
+          "statement": "SR-4.07 release config: with a release config naming a stub licence server, memev activate <key> reaches the stub with no flag or variable set; --server, MEMEV_LICENSE_URL and the vault config each override it in that order; without the file the command says no licence server is set; no other command contacts the stub (the stub counts requests)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/release-config.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 release config' test/release-config.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 release config$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-4.07 checkout: memev upgrade prints the release config's checkout URL when the vault config has none, and the vault config's when it has one",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/release-config.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 checkout' test/release-config.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 checkout$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The release workflow reads both addresses from repository variables and refuses a release without them",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -rq 'MEMEV_RELEASE_LICENSE_URL' .github/workflows/ && grep -rq 'MEMEV_RELEASE_CHECKOUT_URL' .github/workflows/",
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "The leak scan is clean",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/release-config.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/release-config.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/release-config.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Hosted sync, backup and relay through the live services",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "src/services/providers.mjs offers hosted sync, hosted backup and the hosted relay when the licence's entitlements include sync_hosted, backup_hosted and relay_hosted and the release config names the service address; each speaks the protocol of SR-4.03, SR-4.05 and SR-4.04, with sync and backup end-to-end encrypted as SR-4.03 requires",
+        "without the entitlement or the address each says why it is not available and names the tier that includes it; no provider says it is not offered yet",
+        "memev doctor reports each hosted service as off, not entitled, reachable or failing, and contacts a service only when it is on"
+      ],
+      "scope": [
+        "src/services/**",
+        "src/cli/doctor.mjs",
+        "src/cli/release-config.mjs",
+        "docs/CLOUD.md",
+        "docs/MODULES.md",
+        "test/hosted-providers.test.mjs",
+        "changelog.d/SR-4.07.md"
+      ],
+      "criteria": [
+        {
+          "statement": "SR-4.07 hosted: against stub services that implement SR-4.03's sync and SR-4.05's backup protocols, a licensed vault syncs a note to a second vault and restores a backup byte for byte; the stub store holds no plaintext; an unlicensed vault is refused naming the tier; a provider that still answers not offered yet fails the test",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/hosted-providers.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 hosted' test/hosted-providers.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 hosted$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "No provider says it is not offered yet",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -rn 'not offered yet' src/",
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/hosted-providers.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/hosted-providers.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/hosted-providers.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

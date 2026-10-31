@@ -12,7 +12,11 @@
       "requirements": [
         "a machine-readable status table (built, planned, date) is the single source; docs and the site render from it",
         "a feature listed in a paid tier must be built or carry a delivery date",
-        "the status table carries a tiers section: each tier's name, its monthly and yearly prices in each currency the docs show, and its computer and member limits, equal to the pricing table in docs/PRICING.md, so the site renders every tier fact from the copy QL-1.06's gate sync brings in; the trial's size is a separate entry, never a tier limit"
+        "the status table carries a tiers section: each tier's name, its monthly and yearly prices in each currency the docs show, and its computer and member limits, equal to the pricing table in docs/PRICING.md, so the site renders every tier fact from the copy QL-1.06's gate sync brings in; the trial's size is a separate entry, never a tier limit",
+        "every service the tiers docs sell (setup, support, the rate-card services in docs/tiers/services.md) is a status-table row marked staffed or not staffed; a service that is not staffed is shown as planned in docs and in the exported site data, never as sold",
+        "the status table carries one positioning entry, the tagline, first the README's line (Shared context and coordination for the AI tools you already use) until the owner chooses another; the README's bold tagline equals it",
+        "docs/PRICING.md's table gives each price in USD and in CHF, as README.md and docs/SOLUTIONS.md already state them, and test/pricing-docs.test.mjs accepts both forms",
+        "the status table has one row for each AI app memev connects (each client id that src/cli/clients.mjs defines) marked built, and a planned row for each app or provider that the docs or the site name as coming"
       ],
       "description": "",
       "scope": [
@@ -21,7 +25,13 @@
         "src/engine/entitlements.mjs",
         "scripts/status-table.mjs",
         "docs/status.json",
-        "test/pricing-honesty.test.mjs"
+        "test/pricing-honesty.test.mjs",
+        "README.md",
+        "site/web/**",
+        "docs/**",
+        "src/cli/upgrade.mjs",
+        "test/upgrade.test.mjs",
+        "test/pricing-docs.test.mjs"
       ],
       "criteria": [
         {
@@ -40,11 +50,92 @@
           }
         },
         {
+          "statement": "SR-5.04 surfaces: every sentence of site/web/*.html (tags stripped, entities decoded), README.md and docs/**/*.md that contains a claim phrase of a planned row of docs/status.json also contains the whole word 'planned'. For the merge row the phrases include at least 'nothing to resolve', 'automatic merge', 'merges changes made in several places' and 'full merge engine'. A section tag in a sibling element does not count. Red at base on site/web/personal.html:56 and site/web/video.html:46. A fixture copy of personal.html with 'Automatic merge across your computers.' added under the $12 price fails, naming the page. The contract scope must be amended to add site/web/**, README.md, docs/CONVERGENCE.md, docs/ARCHITECTURE.md and docs/LICENSING-NOTICE.md.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pricing-honesty.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-5.04 surfaces$' test/pricing-honesty.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SR-5\\.04 surfaces$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-5.04 surfaces$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-5.04 tier prose: every sentence of docs/PRICING.md and docs/tiers/*.md that contains a claim phrase of a planned row of docs/status.json (for the merge row at least 'nothing to resolve', 'edit on two machines at once', 'automatic merge') contains the whole word 'planned'. Red at base on docs/tiers/free.md:74 and docs/tiers/README.md:22. A fixture copy of free.md with 'planned' removed from a labelled merge sentence fails, naming the file and line.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pricing-honesty.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-5.04 tier prose$' test/pricing-honesty.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SR-5\\.04 tier prose$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-5.04 tier prose$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-5.04 cli: import plansText from src/cli/upgrade.mjs and PLANS from src/engine/entitlements.mjs. No line of plansText(), and no PLANS[].adds, that contains a claim phrase of a planned row of docs/status.json ('merge' for the merge row) lacks the whole word 'planned'. Red at base on entitlements.mjs:70 and upgrade.mjs:21. The scope must be amended to add src/cli/upgrade.mjs and test/upgrade.test.mjs, whose :75 assertion must change in the same task.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pricing-honesty.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-5.04 cli$' test/pricing-honesty.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SR-5\\.04 cli$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-5.04 cli$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-5.04 dated: for each tier column of the PRICING.md tiers table whose Price cell is not 'free', every non-empty feature cell that maps to a planned part either is removed or names a YYYY-MM-DD delivery date equal to that part's date field in docs/status.json. Every planned row of docs/status.json that is listed in a paid tier has a valid ISO date. Red at base on PRICING.md:29 ('planned', no date). A fixture copy of status.json with the date removed from the merge row fails, naming the row.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pricing-honesty.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-5.04 dated$' test/pricing-honesty.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SR-5\\.04 dated$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-5.04 dated$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-5.04 tiers literal: the tiers section of docs/status.json deep-equals a literal written in the test, not produced by scripts/status-table.mjs. Personal: price free, 1 member, 1 computer. Personal with more computers: USD 12 monthly and 120 yearly, CHF 10 monthly and 100 yearly, 1 member, 3 computers. Business and Corporate: contact us, counted once per organisation. The trial (5 members, 10 computers) sits outside every tier. Fixture copies of PRICING.md with '$120/year' changed to '$100/year', the $12 tier's People cell changed to '2', or Business computers set to '10' each fail.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pricing-honesty.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-5.04 tiers literal$' test/pricing-honesty.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SR-5\\.04 tiers literal$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-5.04 tiers literal$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-5.04 one source: the status rows parsed from docs/tiers/README.md deep-equal the rows of docs/status.json (part, status, date). The status table in docs/tiers/README.md and the tiers table in docs/PRICING.md are byte-equal to what scripts/status-table.mjs renders from docs/status.json. In a fixture copy of status.json, flipping the merge row to built makes the render differ from the committed docs, and the test names the row.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pricing-honesty.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-5.04 one source$' test/pricing-honesty.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SR-5\\.04 one source$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-5.04 one source$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The licensing, seat, plan, site and pricing suites that read entitlements.mjs or the pricing docs still pass after the change.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/licensing.test.mjs test/seats.test.mjs test/tier-names.test.mjs test/connectors-unlimited.test.mjs test/no-nag.test.mjs test/licensing-copy.test.mjs test/invite-teammate.test.mjs test/upgrade.test.mjs test/pricing-docs.test.mjs test/pricing-figures.test.mjs test/site.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
           "statement": "SR-5.04 tiers: the tiers section of docs/status.json equals the pricing table in docs/PRICING.md (names, prices and limits), and the trial's size is not a tier limit; a fixture PRICING.md whose Personal price or a computer limit differs from the section fails the test",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/pricing-honesty.test.mjs",
             "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-5.04 tiers' test/pricing-honesty.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-5.04 tiers$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-5.04 services: a fixture status table marking a service not staffed while docs/tiers/services.md sells it fails the test; marked planned there, it passes",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pricing-honesty.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-5.04 services' test/pricing-honesty.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-5.04 services$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-5.04 tagline: the README's bold tagline equals the status table's positioning entry; a fixture README with another line fails the test",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pricing-honesty.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-5.04 tagline' test/pricing-honesty.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-5.04 tagline$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-5.04 apps: every client id that src/cli/clients.mjs defines has a built row in docs/status.json; a fixture status table missing one client's row fails, naming it",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/pricing-honesty.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-5.04 apps' test/pricing-honesty.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-5.04 apps$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
