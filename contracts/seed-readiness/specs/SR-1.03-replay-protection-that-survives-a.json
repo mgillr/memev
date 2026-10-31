@@ -12,8 +12,13 @@
       "requirements": [
         "nonces seen in the skew window are persisted (0600) and reloaded on start",
         "the store is bounded by the window and pruned",
-        "the nonce is recorded durably before the response is sent: the store is loaded when createServer starts and each use is written through atomically (write to a temporary file, then rename) with mode 0600 set on every write, and use() stays synchronous so one process cannot accept a nonce twice",
-        "the cache stays keyed by device id and nonce (the bearer token is not part of the signed payload, so keying by token would let a rotated token reopen the window); a nonce is recorded only after the proof verifies"
+        "the nonce is recorded durably before the response is sent: the store is read synchronously inside createServer, before it returns and each use is written through atomically (write to a temporary file, then rename) with mode 0600 set on every write, and use() stays synchronous so one process cannot accept a nonce twice",
+        "the cache stays keyed by device id and nonce (the bearer token is not part of the signed payload, so keying by token would let a rotated token reopen the window); a nonce is recorded only after the proof verifies",
+        "a failure to persist the nonce fails closed: the request is refused with a 5xx and the nonce stays recorded in memory so a replay is still refused; no try and catch swallows the write error",
+        "every write reads the store on disk, merges it with the in-memory set, prunes and writes the result, so two servers on one vault never lose each other's nonces",
+        "pruning is by age only: an entry is dropped once its signed timestamp is older than the skew window on both sides; no count cap ever evicts a nonce that is still inside the window, and the store is pruned while the daemon runs, not only at load",
+        "an unreadable store (EACCES) or a store of the wrong shape (null, a number, an array) stops the daemon from serving signed requests with a message naming the file, never treated as a first run and never a crash loop",
+        "no per-device last-timestamp guard: requests signed out of order inside the window are accepted once each"
       ],
       "description": "",
       "scope": [
@@ -132,6 +137,94 @@
             "type": "command",
             "cmd": "node --test test/docs-module-map.test.mjs",
             "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Test 'store write failure fails closed' (in process; skipped on win32 and when process.getuid()===0, and CI must run it as a normal user). Root under tmpdir('nonce-persist-') with remote.enabled; enroll a remote-computer; createServer; send signed A (200); the store is the file under .memev that contains A's nonce. chmod the store to 0o400 and .memev to 0o500. Send a freshly signed C and record its status. Restore the modes (.memev 0o700, store 0o600). Close the server and Vault, open new Vault(root).open() and createServer. Replay C's identical headers and body. Assert: first status !== 200, OR the replay is 401 with error 'device_key' and /already used/. In other words, any request that was answered 200 is remembered across a restart even when its write failed. Also assert /healthz is 200 throughout.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/nonce-persist.test.mjs",
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='write failure' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && echo \"$out\" | grep -qE '^# pass [1-9]'"
+          }
+        },
+        {
+          "statement": "Test 'pruned while running' (in process, Date mocked at T0). Send 100 accepted signed requests from one device. Record size S of the store (the .memev file containing the first nonce) and chmod it to 0o644. Set the clock to T0+11 min and send one freshly signed request (200). WITHOUT closing or recreating the server, assert: store size < S/10, none of the first 100 nonces appears in it, the fresh nonce does appear, and (mode & 0o077) === 0 (mode check skipped on win32).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/nonce-persist.test.mjs",
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='pruned while running' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && echo \"$out\" | grep -qE '^# pass [1-9]'"
+          }
+        },
+        {
+          "statement": "Test 'flood does not evict' (in process, Date mocked). Enroll three remote-computer devices, each sending a distinct x-forwarded-for. With the clock at T0+290 s, device 1 signs A. Set the clock to T0 and send A (200). For m = 0..8, set the clock to T0+m*60 s and send 110 freshly signed requests from each device, asserting each is 200 (2,970 accepted in total, under the 120/min token and IP buckets). With the clock at T0+540 s, A is still within skew, so only the nonce can refuse it. Replay A: assert 401, error 'device_key', /already used/. Close the server and Vault, reopen, createServer, replay A again: assert 401 /already used/.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/nonce-persist.test.mjs",
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='flood does not evict' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && echo \"$out\" | grep -qE '^# pass [1-9]'"
+          }
+        },
+        {
+          "statement": "Test 'unreadable or malformed store'. Set up as in 'damaged store': spawn the daemon on a root under 'nonce-persist-', send A (200), SIGKILL. For each case: (iii) overwrite the store with 'null'; (iv) overwrite it with '42'; (v) chmod it to 0o000 (skipped on win32 or when getuid()===0, mode restored afterwards). Respawn and assert: /healthz answers 200 within 6 s, the replay of A is 401 and its error is not 'unauthorized', and a freshly signed B returns 200.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/nonce-persist.test.mjs",
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='unreadable or malformed store' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && echo \"$out\" | grep -qE '^# pass [1-9]'"
+          }
+        },
+        {
+          "statement": "Test 'nonce on disk at writeHead' (in process). Wrap http.ServerResponse.prototype.writeHead in the test process. When it is called with status 200 and this.req.headers['x-memev-nonce'] is set, synchronously read every regular file under <root>/.memev, record whether one contains that nonce, then call the original. Send 5 distinct signed requests one after another and 10 more with Promise.all. Assert that every 200 was recorded with its nonce already on disk. Restore writeHead in finally.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/nonce-persist.test.mjs",
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='nonce on disk at writeHead' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && echo \"$out\" | grep -qE '^# pass [1-9]'"
+          }
+        },
+        {
+          "statement": "Test 'out-of-order requests' (in process). Sign D, wait 20 ms, sign C. Send C (200). Close the server and Vault, reopen, createServer. Send D: 200. Replay C: 401 /already used/. Without a restart: sign B, wait 20 ms, sign A, send A (200), then B (200). Finally, sign 5 distinct requests 5 ms apart and send them with Promise.all in reverse signing order: all 200.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/nonce-persist.test.mjs",
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='out-of-order requests' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && echo \"$out\" | grep -qE '^# pass [1-9]'"
+          }
+        },
+        {
+          "statement": "Test 'rotated token does not reopen' (in process). Enroll a remote-computer; send A with token T1 (200) and keep A's x-memev-ts, x-memev-nonce, x-memev-sig and body. Call v.devices.rotate(v.tokens, deviceId) to get T2. Close the server and Vault, reopen, createServer. Send A's signature headers and body with 'Authorization: Bearer T2': assert 401, error 'device_key', /already used/. A freshly signed request with T2 returns 200. No file under .memev contains T1.slice(12) or T2.slice(12) (the token secrets).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/nonce-persist.test.mjs",
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='rotated token' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && echo \"$out\" | grep -qE '^# pass [1-9]'"
+          }
+        },
+        {
+          "statement": "Test 'two servers on one vault' (in process). Open one Vault and call createServer(v) twice (S1 and S2, listening on two ports). Send signed A to S1 (200), B to S2 (200), then C to S1 (200). Close both and call createServer(v) again (S3). Replay A, B and C to S3: all 401 with /already used/. A write must merge with what is on disk, not replace it with one server's memory.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/nonce-persist.test.mjs",
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='two servers on one vault' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && echo \"$out\" | grep -qE '^# pass [1-9]'"
+          }
+        },
+        {
+          "statement": "Test 'store read at createServer' (in process). Send A (200) and sign B without sending it. Find the store (the .memev file containing A's nonce). Close the server and Vault and reopen the Vault. Call createServer(v), then in the same tick, before any await, rename the store to <store>.moved. Then listen. Replay A: 401 /already used/. Send B: 200, which shows the refusal is not a start-time cut-off.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/nonce-persist.test.mjs",
+            "cmd": "out=$(MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap --test-name-pattern='store read at createServer' test/nonce-persist.test.mjs 2>&1); rc=$?; echo \"$out\" | tail -30; [ $rc -eq 0 ] && echo \"$out\" | grep -qE '^# pass [1-9]'"
+          }
+        },
+        {
+          "statement": "At base, the killed-daemon test alone fails, and its TAP failure block has error 'replayed after restart' and actual: 200. The test must compare the status directly, for example assert.equal(res.status, 401, 'replayed after restart'), so that the failure block carries the actual status. assert.ok(...) would print actual: false.",
+          "verifier": {
+            "type": "command",
+            "cmd": "d=$(mktemp -d) && git archive be457dbd829c89e48fbd3f19b72d43864cd97fd8 | tar -x -C \"$d\" && cp test/nonce-persist.test.mjs \"$d/test/\" && cd \"$d\" && MEMEV_NO_SERVICE=1 HOME=\"$d/.home\" node --test --test-reporter=tap --test-name-pattern='killed daemon restart' test/nonce-persist.test.mjs > \"$d/out\" 2>&1; rc=$?; tail -40 \"$d/out\"; [ $rc -ne 0 ] && awk '/not ok [0-9]+ - replay after a killed daemon restart/{f=1} f && /error: .replayed after restart/{e=1} f && e && /actual: 200/{a=1} END{exit !(e && a)}' \"$d/out\"",
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "After the test file runs, no process whose command line contains both main.mjs and nonce-persist- is alive, whatever the argument order or form.",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" node --test --test-reporter=tap test/nonce-persist.test.mjs > /dev/null 2>&1; rc=$?; sleep 1; [ $rc -eq 0 ] && ! pgrep -f 'main\\.mjs.*nonce-persist-'",
+            "timeout_s": 300
           }
         },
         {
