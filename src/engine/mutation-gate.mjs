@@ -3,7 +3,9 @@
 // Before judging, the unmutated tests run twice, then once with every changed line rewritten to the same meaning; each
 // mutant is judged on two runs, each in its own copy of the repository; the unmutated tests run once more before a kill is
 // accepted. A failing control stops the run as noise. A changed line that carries code but that no judged mutant covers
-// leaves the change unjudged, and the run is not ok. scripts/gate/mutate.mjs is the command line over this module.
+// leaves the change unjudged, and the run is not ok. A copy's history ends at the base, so the change is uncommitted work
+// in it, and its tests run with no remote, no credential helper and refusing stubs for the service managers.
+// scripts/gate/mutate.mjs is the command line over this module.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -24,6 +26,13 @@ const PIPE_GRACE_MS = 2000;
 // command see them, so each reaches only the repository it runs in.
 const GIT_REDIRECT = ['GIT_DIR', 'GIT_INDEX_FILE', 'GIT_WORK_TREE', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY',
   'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_NAMESPACE', 'GIT_CONFIG', 'GIT_CONFIG_GLOBAL'];
+// Variables that let git or ssh authenticate to a remote. No command the gate runs sees them.
+const REMOTE_REACH = ['SSH_AUTH_SOCK', 'SSH_AGENT_PID', 'GIT_SSH', 'GIT_SSH_COMMAND', 'GIT_ASKPASS', 'SSH_ASKPASS'];
+// Configuration a copy never takes from the caller's repository: its format and worktree settings (the copy has its own),
+// and every setting that names a remote, rewrites a URL, carries a credential or an HTTP header, or runs a daemon.
+const SKIP_CONFIG = /^(core\.(repositoryformatversion|bare|worktree|fsmonitor|sshcommand)$|extensions\.|remote\.|branch\.|url\.|include\.|includeif\.|submodule\.|credential\.|http\.)/;
+// Service managers and the tunnel client: every test command finds the gate's refusing stub first on its PATH.
+export const STUBBED = ['launchctl', 'systemctl', 'schtasks', 'cloudflared'];
 const COPY = { recursive: true, verbatimSymlinks: true, mode: fs.constants.COPYFILE_FICLONE };
 
 export const USAGE = `Usage: node scripts/gate/mutate.mjs --base <sha> --test <cmd> [--scope <glob>]... [--json]
@@ -436,26 +445,32 @@ export function analyse(src) {
     if (p.t === 'kw' && ['return', 'throw', 'await', 'typeof', 'void', 'delete'].includes(p.v)) return !toks[k].nl;
     return false;
   }
-  // Every rewrite of the line, best first; the caller keeps the first one that still parses.
-  function wrapLine(line) {
+  // Every rewrite of the line, best first; the caller keeps the first one that still parses. tag is a number literal chosen
+  // per run: an operand X becomes (tag, X), so deleting parentheses, spaces and comments never restores the line. An
+  // operand after typeof or delete, or after a prefix ++ or --, is left alone, since there the sequence would change the
+  // meaning or not parse.
+  function wrapLine(line, tag) {
     const out = [];
     let first = -1;
     for (let k = 0; k < N; k++) {
       if (toks[k].line !== line) continue;
       if (first < 0) first = k;
-      if (K(k, 'return') && (!toks[k + 1] || toks[k + 1].nl || P(k + 1, ';') || P(k + 1, '}'))) out.push([{ at: toks[k].e, text: ' void 0' }]);
-      if (!operandStart(k)) continue;
+      if (K(k, 'return') && (!toks[k + 1] || toks[k + 1].nl || P(k + 1, ';') || P(k + 1, '}'))) out.push([{ at: toks[k].e, text: ` void ${tag}` }]);
+      if (!operandStart(k) || K(k - 1, 'typeof') || K(k - 1, 'delete') || P(k - 1, '++') || P(k - 1, '--')) continue;
       const ch = chainAt(k, true);
-      if (ch) out.push([{ at: toks[k].s, text: '(' }, { at: toks[ch.end].e, text: ')' }]);
+      if (ch) out.push([{ at: toks[k].s, text: `(${tag}, ` }, { at: toks[ch.end].e, text: ')' }]);
     }
-    // A statement that opens with a name or this, as in n++; or this.save(); the name alone takes the parentheses.
+    // A statement that opens with a name, this, or a prefix ++ or -- on a name, as in n++; ++n; or this.save(): the whole
+    // expression takes the sequence.
     const k = first;
-    if (k >= 0 && ((toks[k].t === 'id' && toks[k].v !== 'async') || K(k, 'this')) && toks[k + 1] && !P(k + 1, ':') && !P(k + 1, '=>')) {
+    const update = k >= 0 && (P(k, '++') || P(k, '--')) && toks[k + 1]?.t === 'id';
+    if (k >= 0 && (update || (((toks[k].t === 'id' && toks[k].v !== 'async') || K(k, 'this')) && toks[k + 1] && !P(k + 1, ':') && !P(k + 1, '=>')))) {
       const p = toks[k - 1];
       const safe = !p || P(k - 1, ';') || P(k - 1, '{') || K(k - 1, 'else') || K(k - 1, 'do') || (P(k - 1, ')') && headerParen(k - 1));
       const next = toks[k + 1];
-      if (safe && (next.t === 'tpl' || (next.t === 'p' && STATEMENT_NAME_NEXT.has(next.v)))) {
-        out.push([{ at: toks[k].s, text: '(' }, { at: toks[k].e, text: ')' }]);
+      const end = exprEnd(k, true);
+      if (safe && end >= k && statementTail(end) && (update || next.t === 'tpl' || (next.t === 'p' && STATEMENT_NAME_NEXT.has(next.v)))) {
+        out.push([{ at: toks[k].s, text: `(${tag}, ` }, { at: toks[end].e, text: ')' }]);
       }
     }
     return out;
@@ -510,8 +525,10 @@ export function ignoreReasons(comments) {
 
 function cleanEnv(extra = {}) {
   const env = { ...process.env, ...extra };
-  for (const k of GIT_REDIRECT) delete env[k];
-  return env;
+  for (const k of [...GIT_REDIRECT, ...REMOTE_REACH]) delete env[k];
+  for (const k of Object.keys(env)) if (/^GIT_CONFIG_(COUNT|KEY_\d+|VALUE_\d+|PARAMETERS)$/.test(k)) delete env[k];
+  // git's credential helpers are off for every command: an empty helper value resets the list from every config file
+  return Object.assign(env, { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'credential.helper', GIT_CONFIG_VALUE_0: '' });
 }
 function git(cwd, args) {
   const r = spawnSync('git', args, { cwd, env: cleanEnv({ GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0' }), encoding: 'utf8', maxBuffer: 512 << 20 });
@@ -545,11 +562,13 @@ export function globMatcher(glob) {
   return (f) => rx.test(f);
 }
 // Lines added or changed between base and the working tree, by file, on the new side: tracked files through git diff
-// (renames followed, so a moved file counts only its edited lines) and every line of an untracked file.
-export function changedLines(root, base) {
+// (renames followed, so a moved file counts only its edited lines) and every line of an untracked file. --text reads a file
+// under a -diff or binary attribute as text; a changed file whose diff still shows no lines ("Binary files ... differ") is
+// returned in binary, so its change is unjudged.
+export function changedLines(root, base, binary = new Set()) {
   const files = new Map();
   const r = git(root, ['-c', 'core.quotepath=off', 'diff', '--no-color', '--no-ext-diff', '--no-textconv', '--no-relative', '-M',
-    '--unified=0', '--src-prefix=a/', '--dst-prefix=b/', base, '--', ...MUTATION_DIRS]);
+    '--text', '--unified=0', '--src-prefix=a/', '--dst-prefix=b/', base, '--', ...MUTATION_DIRS]);
   if (!r.ok) throw new Error(`git diff failed: ${r.err}`);
   let file = null, oldLeft = 0, newLeft = 0, line = 0;
   for (const l of r.out.split('\n')) {
@@ -565,6 +584,8 @@ export function changedLines(root, base) {
       if (file && !files.has(file)) files.set(file, new Set());
       continue;
     }
+    const bin = /^Binary files (?:"?a\/.*"?|\/dev\/null) and ("?b\/.*"?) differ$/.exec(l);
+    if (bin) { const f = unquote(bin[1]).replace(/^b\//, ''); if (inMutationSet(f)) binary.add(f); continue; }
     const m = /^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(l);
     if (m) { oldLeft = m[1] === undefined ? 1 : Number(m[1]); line = Number(m[2]); newLeft = m[3] === undefined ? 1 : Number(m[3]); }
   }
@@ -654,36 +675,48 @@ function openLines(p, results) {
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Copies. Each test run gets a fresh, self-contained copy: the working tree as it is (ignored files included) and a
-// .git of its own. A linked worktree's .git file is replaced by a copy of the shared repository with this worktree's
-// HEAD and index; alternates are repacked away. Nothing in a copy links back to the caller's repository.
+// repository of its own whose objects are those reachable from the base, packed from the caller's repository. Its HEAD is
+// the base on the caller's branch name, and the change is uncommitted work, so no ref, reflog entry or object in a copy
+// holds a changed file's new text. It takes the caller's settings but no remote, URL rewrite, credential or HTTP header,
+// and nothing in it links back to the caller's repository.
 
-function copyGitDir(from, to) {
-  const skip = path.join(from, 'worktrees');
-  fs.cpSync(from, to, { ...COPY, filter: (s) => s !== skip && !s.endsWith('.lock') });
-}
-function seedCopy(root, dest) {
+function seedCopy(root, dest, base) {
   const dotgit = path.join(root, '.git');
   fs.cpSync(root, dest, { ...COPY, filter: (s) => s !== dotgit });
+  const where = (arg) => path.resolve(root, git(root, ['rev-parse', arg]).out.trim());
+  const common = where('--git-common-dir'), own = where('--git-dir');
+  const format = git(root, ['rev-parse', '--show-object-format']).out.trim() || 'sha1';
+  const must = (r, what) => { if (!r.ok) throw new Error(`could not make a self-contained copy (${what}): ${r.err}`); return r; };
+  must(git(dest, ['init', '-q', '--template=', ...(format === 'sha1' ? [] : [`--object-format=${format}`])]), 'init');
   const gd = path.join(dest, '.git');
-  if (fs.statSync(dotgit).isDirectory()) copyGitDir(fs.realpathSync(dotgit), gd);
-  else {
-    const own = path.resolve(root, git(root, ['rev-parse', '--git-dir']).out.trim());
-    const common = path.resolve(root, git(root, ['rev-parse', '--git-common-dir']).out.trim());
-    copyGitDir(common, gd);
-    for (const f of ['HEAD', 'index', 'config.worktree', 'ORIG_HEAD', 'MERGE_HEAD']) {
-      const p = path.join(own, f);
-      if (fs.existsSync(p)) fs.copyFileSync(p, path.join(gd, f)); else fs.rmSync(path.join(gd, f), { force: true });
+  const files = [path.join(common, 'config')];
+  if (fs.existsSync(path.join(own, 'config.worktree'))) files.push(path.join(own, 'config.worktree'));
+  for (const f of files) {
+    for (const e of must(git(root, ['config', '--file', f, '--list', '--null']), 'read config').out.split('\0').filter(Boolean)) {
+      const nl = e.indexOf('\n');
+      const key = nl < 0 ? e : e.slice(0, nl);
+      if (!SKIP_CONFIG.test(key)) must(git(dest, ['config', '--add', key, nl < 0 ? 'true' : e.slice(nl + 1)]), `set ${key}`);
     }
-    git(dest, ['config', 'core.bare', 'false']);
-    git(dest, ['config', '--unset', 'core.worktree']);
   }
-  // a copy pushes nowhere: the caller's remotes are removed, so a test's git push or fetch cannot reach a real remote
-  for (const r of git(dest, ['remote']).out.split('\n').filter(Boolean)) git(dest, ['remote', 'remove', r]);
-  const alt = path.join(gd, 'objects', 'info', 'alternates');
-  if (fs.existsSync(alt)) {
-    const r = git(dest, ['repack', '-a', '-d', '-q']);
-    if (!r.ok) throw new Error(`could not make a self-contained copy: ${r.err}`);
-    fs.rmSync(alt);
+  for (const f of ['shallow', path.join('info', 'exclude'), path.join('info', 'attributes')]) {
+    if (fs.existsSync(path.join(common, f))) { fs.mkdirSync(path.dirname(path.join(gd, f)), { recursive: true }); fs.copyFileSync(path.join(common, f), path.join(gd, f)); }
+  }
+  const pack = spawnSync('git', ['pack-objects', '--revs', '-q', path.join(gd, 'objects', 'pack', 'pack')],
+    { cwd: root, env: cleanEnv({ GIT_OPTIONAL_LOCKS: '0' }), input: `${base}\n`, encoding: 'utf8' });
+  if (pack.status !== 0) throw new Error(`could not make a self-contained copy (pack the base): ${pack.stderr || pack.error?.message}`);
+  const branch = git(root, ['symbolic-ref', '-q', 'HEAD']).out.trim();
+  if (branch) { must(git(dest, ['symbolic-ref', 'HEAD', branch]), 'HEAD'); must(git(dest, ['update-ref', branch, base]), 'branch'); }
+  else must(git(dest, ['update-ref', '--no-deref', 'HEAD', base]), 'HEAD');
+  must(git(dest, ['read-tree', base]), 'index');
+  git(dest, ['update-index', '-q', '--refresh']); // exits 1 when files differ from the base, as the change makes them
+}
+// The gate's own refusing stubs for STUBBED, in a folder each test command finds first on its PATH.
+function writeStubs(dir) {
+  fs.mkdirSync(dir, { mode: 0o700 });
+  for (const name of STUBBED) {
+    const msg = `mutation gate: ${name} is refused while a test runs under the gate`;
+    if (process.platform === 'win32') fs.writeFileSync(path.join(dir, `${name}.cmd`), `@echo ${msg} 1>&2\r\n@exit /b 1\r\n`);
+    else fs.writeFileSync(path.join(dir, name), `#!/bin/sh\necho '${msg}' >&2\nexit 1\n`, { mode: 0o755 });
   }
 }
 
@@ -724,11 +757,11 @@ function exec(ctx, cwd, env, limitMs) {
     child.on('close', finish);
   });
 }
-function testEnv(box, cwd) {
-  const env = cleanEnv();
+function testEnv(ctx, box, cwd) {
+  const env = cleanEnv({ GIT_TERMINAL_PROMPT: '0' });
   delete env.NODE_TEST_CONTEXT; // a test command that runs node --test reports on its own, not to a runner above the gate
-  // no key agent or ssh override reaches the test, so a test that runs git push cannot authenticate to a real remote
-  for (const k of ['SSH_AUTH_SOCK', 'SSH_AGENT_PID', 'GIT_SSH', 'GIT_SSH_COMMAND', 'GIT_ASKPASS', 'SSH_ASKPASS']) delete env[k];
+  const pathKey = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') || 'PATH';
+  env[pathKey] = env[pathKey] ? `${ctx.stubs}${path.delimiter}${env[pathKey]}` : ctx.stubs;
   const dirs = { HOME: 'home', MEMEV_CONFIG_DIR: 'config', XDG_CONFIG_HOME: 'xdg', MEMEV_ROOT: 'root', MEMEV_TEST_TMP: 'test-tmp', TMPDIR: 'tmp' };
   fs.mkdirSync(path.join(box, 'env'), { mode: 0o700 });
   for (const [k, d] of Object.entries(dirs)) { env[k] = path.join(box, 'env', d); fs.mkdirSync(env[k], { mode: 0o700 }); }
@@ -748,7 +781,7 @@ async function runOnce(ctx, prepare, limitMs) {
     fs.cpSync(ctx.seed, work, COPY);
     if (prepare && prepare(work) === false) return { invalid: true };
     const cwd = path.join(work, ctx.rel);
-    return await exec(ctx, cwd, testEnv(box, cwd), limitMs);
+    return await exec(ctx, cwd, testEnv(ctx, box, cwd), limitMs);
   } finally {
     fs.rmSync(box, { recursive: true, force: true, maxRetries: 3 });
   }
@@ -774,16 +807,17 @@ export function passCount(out) {
   if (last === null) for (const m of out.matchAll(/^\s*(\d+) passing\b/gm)) last = Number(m[1]);
   return last;
 }
-// The rewrite control: every changed line of every changed file with one operand wrapped in parentheses. A file whose
+// The rewrite control: every changed line of every changed file with one operand X written (tag, X). A file whose
 // rewrite does not parse is rewritten line by line, each line taking the first of its rewrites that still parses. Every
 // line that carries a mutant must be rewritten, or a test that reacts to the source text there would read as a kill; when
 // one is not, the control returns false and the run stops as noise without running the tests.
 function rewriteControl(work, files, res) {
   let lines = 0, wrapped = 0;
   const unchanged = [];
+  const tag = `0x${crypto.randomBytes(4).toString('hex')}`; // chosen per run, so no test can carry the rewritten text
   for (const f of files) {
     const target = path.join(work, f.file);
-    const options = new Map(f.lines.map((l) => [l, f.wrapLine(l)]).filter(([, w]) => w.length));
+    const options = new Map(f.lines.map((l) => [l, f.wrapLine(l, tag)]).filter(([, w]) => w.length));
     lines += f.lines.length;
     const done = new Set();
     if (options.size) {
@@ -813,7 +847,7 @@ function rewriteControl(work, files, res) {
 
 function blank() {
   return { version: GATE_VERSION, status: 'error', reason: '', base: null, mutants: 0, killed: 0, survived: null, invalid: 0, timeout: 0, ignored: 0,
-    noise: 0, survivors: [], unmutated: [], unjudged: [], ignores: [], files: [], timeoutMs: null, controls: [], rewrite: null, results: [] };
+    noise: 0, survivors: [], unmutated: [], unjudged: [], timeouts: [], ignores: [], files: [], timeoutMs: null, controls: [], rewrite: null, results: [] };
 }
 function finish(res) {
   const ok = res.status === 'ok';
@@ -824,6 +858,7 @@ function finish(res) {
   res.survived = ok ? count(judged, 'survived') : null;
   res.invalid = count(res.results, 'invalid');
   res.timeout = count(res.results, 'timeout');
+  res.timeouts = res.results.filter((r) => r.outcome === 'timeout').map(({ file, line, operator }) => ({ file, line, operator }));
   res.ignored = res.ignores.length;
   res.survivors = ok ? judged.filter((r) => r.outcome === 'survived').map(({ file, line, operator }) => ({ file, line, operator })) : [];
   res.files = res.files.map(({ file }) => {
@@ -891,12 +926,15 @@ export async function runGate({ cwd = process.cwd(), base, test, scopes = [] } =
   if (!sha.ok) return fail(`--base ${base} is not a commit in this repository`);
   res.base = sha.out.trim();
   let changes;
-  try { changes = changedLines(root, res.base); } catch (e) { return fail(e.message); }
+  const binary = new Set();
+  try { changes = changedLines(root, res.base, binary); } catch (e) { return fail(e.message); }
   if (scopes.length) {
     const tests = scopes.map(globMatcher);
     for (const f of [...changes.keys()]) if (!tests.some((t) => t(f))) changes.delete(f);
+    for (const f of [...binary]) if (!tests.some((t) => t(f))) binary.delete(f);
   }
   const p = plan(root, changes);
+  for (const f of [...binary].sort()) p.unjudged.push({ file: f, line: null, why: 'a changed file whose diff shows no lines' });
   Object.assign(res, { unmutated: p.unmutated, ignores: p.ignores, files: p.files.map(({ file }) => ({ file })) });
   // until the run judges, the unjudged lines are those it can never judge: refused or unreadable files, lines with no mutant
   res.unjudged = [...p.unjudged, ...openLines({ mutants: [], needs: p.needs.filter((n) => !n.sites) }, [])];
@@ -908,7 +946,8 @@ export async function runGate({ cwd = process.cwd(), base, test, scopes = [] } =
   const before = treeHash(root);
   const runDir = fs.mkdtempSync(path.join(os.tmpdir(), RUN_PREFIX));
   fs.chmodSync(runDir, 0o700);
-  const ctx = { runDir, cmd: test, rel: path.relative(root, fs.realpathSync(cwd)), name: path.basename(root), seq: 0, children: new Set() };
+  const ctx = { runDir, cmd: test, rel: path.relative(root, fs.realpathSync(cwd)), name: path.basename(root), seq: 0, children: new Set(),
+    stubs: path.join(runDir, 'stubs') };
   ctx.seed = path.join(runDir, 'seed', ctx.name);
   const cleanup = () => { for (const c of ctx.children) killGroup(c); fs.rmSync(runDir, { recursive: true, force: true, maxRetries: 3 }); };
   const onSignal = (sig) => { cleanup(); process.exit(sig === 'SIGINT' ? 130 : 143); };
@@ -916,7 +955,8 @@ export async function runGate({ cwd = process.cwd(), base, test, scopes = [] } =
   process.on('SIGTERM', onSignal);
   try {
     fs.mkdirSync(path.dirname(ctx.seed), { mode: 0o700 });
-    seedCopy(root, ctx.seed);
+    writeStubs(ctx.stubs);
+    seedCopy(root, ctx.seed, res.base);
     await judge(ctx, p, res);
   } catch (e) {
     res.status = 'error';
@@ -966,7 +1006,8 @@ function report(res) {
   } else lines.push(`mutation gate: ${res.status.toUpperCase()}: ${res.reason}`);
   for (const s of res.survivors) lines.push(`  survived   ${s.file}:${s.line}  ${s.operator}`);
   for (const u of res.unmutated) lines.push(`  no mutant  ${u.file}:${u.line}`);
-  for (const u of res.unjudged) lines.push(`  unjudged   ${u.file}:${u.line}  ${u.why}`);
+  for (const t of res.timeouts) lines.push(`  timed out  ${t.file}:${t.line}  ${t.operator}`);
+  for (const u of res.unjudged) lines.push(`  unjudged   ${u.file}${u.line === null ? '' : `:${u.line}`}  ${u.why}`);
   for (const g of res.ignores) lines.push(`  ignored    ${g.file}:${g.line}  ${g.reason}`);
   return `${lines.join('\n')}\n`;
 }

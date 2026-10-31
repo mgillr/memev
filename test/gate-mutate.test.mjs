@@ -948,3 +948,239 @@ test('T1-c29: a test that leaves a detached child holding the pipes does not han
     for (const pid of list) { try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ } }
   }
 });
+
+// The effective credential helper list from one `git config --get-all credential.helper` block: an empty value resets it.
+const helpersIn = (block) => { const v = block.split('\n'); const i = v.lastIndexOf(''); return v.slice(i + 1).filter(Boolean); };
+
+test('T1-c30: pushes and tags to a local origin from the test, after a normal run and a SIGKILLed one, leave the fixture and the origin as they were', async () => {
+  const fx = cmpFixture(BLOCKING);
+  const bare = path.join(scratch(), 'origin.git');
+  git(path.dirname(bare), 'init', '-q', '--bare', bare);
+  git(fx.dir, 'remote', 'add', 'origin', bare);
+  git(fx.dir, 'tag', 't0');
+  git(fx.dir, 'push', '-q', 'origin', 'HEAD:refs/heads/main', '--tags');
+  const refs = () => [git(fx.dir, 'for-each-ref'), git(bare, 'for-each-ref')];
+  const before = refs();
+  assert.match(before[1], /refs\/tags\/t0/, 'the origin holds the tag before the run');
+  const out = scratch();
+  const original = path.join(out, 'original.mjs');
+  fs.copyFileSync(path.join(fx.dir, 'src/cmp.mjs'), original);
+  const remotes = path.join(out, 'remotes.log');
+  const helpers = path.join(out, 'helpers.log');
+  // the caller's git configuration names credential helpers in a global file and in GIT_CONFIG_COUNT; no test may use one
+  const global = path.join(out, 'global.gitconfig');
+  fs.writeFileSync(global, `[credential]\n\thelper = store --file ${path.join(out, 'global-creds')}\n`);
+  const env = { GATE_LOG: path.join(out, 'runs.jsonl'), GATE_ORIGINAL: original, GIT_CONFIG_GLOBAL: global, GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: 'credential.helper', GIT_CONFIG_VALUE_0: `store --file ${path.join(out, 'env-creds')}`,
+    GIT_CONFIG_PARAMETERS: `'credential.helper'='store --file ${path.join(out, 'param-creds')}'` };
+  // and the fixture's own configuration carries a helper, an HTTP header and a URL rewrite, none of which a copy may keep
+  git(fx.dir, 'config', 'credential.helper', `store --file ${path.join(out, 'local-creds')}`);
+  git(fx.dir, 'config', 'http.https://example.invalid/.extraheader', 'X-Gate-Probe: 1');
+  git(fx.dir, 'config', `url.${bare}.insteadOf`, 'gate-origin:');
+  const local = path.join(out, 'local.log');
+  const cmd = `git push -q origin HEAD:refs/heads/gate-$$; git tag gate-$$; git push -q origin --tags; git remote -v >> '${remotes}'; ` +
+    `{ echo "global=\${GIT_CONFIG_GLOBAL:-}"; git config --get-all credential.helper; echo '--'; } >> '${helpers}' 2>/dev/null; ` +
+    `git config --local --get-regexp '^(credential|http|url|remote)[.]' >> '${local}' 2>/dev/null; node test/t.mjs`;
+  const args = [...on(fx), '--test', cmd];
+  const r = await gate(fx.dir, args, { env });
+  assert.equal(r.code, 1, 'the weak mutant survived');
+  assert.deepEqual(refs(), before, 'after a normal run');
+  await killDuringMutant(fx, args, env);
+  assert.deepEqual(refs(), before, 'after a SIGKILLed run');
+  const urls = (fs.existsSync(remotes) ? fs.readFileSync(remotes, 'utf8') : '').split('\n').filter(Boolean).map((l) => l.split(/\s+/)[1]);
+  for (const u of urls) for (const p of [fx.dir, bare]) assert.ok(path.resolve(u) !== p && path.resolve(u) !== fs.realpathSync(p), `a test saw the remote ${u}`);
+  assert.equal(fs.existsSync(local) ? fs.readFileSync(local, 'utf8') : '', '', 'no copy keeps a remote, URL rewrite, HTTP header or helper');
+  const blocks = fs.readFileSync(helpers, 'utf8').split('--\n').filter(Boolean);
+  assert.ok(blocks.length >= 6, `${blocks.length} test runs logged their git configuration`);
+  for (const b of blocks) {
+    const [first, ...rest] = b.split('\n');
+    assert.equal(first, 'global=', 'GIT_CONFIG_GLOBAL never reaches a test');
+    assert.deepEqual(helpersIn(rest.join('\n').replace(/\n$/, '')), [], `no credential helper is in effect: ${JSON.stringify(b)}`);
+  }
+});
+
+test('T1-c31: a mutant that flips a MEMEV_NO_SERVICE check never runs the caller service managers: a test finds the gate refusing stubs first', async () => {
+  const src = 'export const serviceOff = (env = process.env) => !!env.MEMEV_NO_SERVICE; //@\n';
+  const t = String.raw`import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { serviceOff } from '../src/svc.mjs';
+for (const name of ['launchctl', 'systemctl', 'schtasks', 'cloudflared']) {
+  if (!serviceOff()) fs.appendFileSync(process.env.GATE_TRIED, name + ' ' + spawnSync(name, ['bootstrap']).status + '\n');
+}
+`;
+  const fx = fixture({ src: { 'src/svc.mjs': src }, files: { 'test/t.mjs': t } });
+  const stubs = scratch();
+  const log = path.join(scratch(), 'stubs.log');
+  const tried = path.join(scratch(), 'tried.log');
+  for (const name of ['launchctl', 'systemctl', 'schtasks', 'cloudflared']) {
+    fs.writeFileSync(path.join(stubs, name), `#!/bin/sh\necho "${name} $*" >> '${log}'\n`, { mode: 0o755 });
+  }
+  const r = await gate(fx.dir, [...on(fx), ...RUN], { env: { PATH: `${stubs}${path.delimiter}${process.env.PATH}`, GATE_TRIED: tried } });
+  assert.ok(fs.existsSync(tried) && fs.readFileSync(tried, 'utf8').includes('launchctl'), 'a mutant ran the service managers by name');
+  assert.equal(fs.existsSync(log) ? fs.readFileSync(log, 'utf8') : '', '', 'no stub on the caller PATH ran');
+  for (const l of fs.readFileSync(tried, 'utf8').split('\n').filter(Boolean)) assert.notEqual(l.split(' ')[1], '0', `${l}: the name was refused`);
+  const held = (r.code === 1 && pairs(r.j.survivors).includes('src/svc.mjs:1')) ||
+    (r.code !== 0 && r.j.status !== 'ok' && pairs(r.j.unjudged).includes('src/svc.mjs:1'));
+  assert.ok(held, `exit ${r.code} ${r.j.status}: survivors ${pairs(r.j.survivors)}; unjudged ${pairs(r.j.unjudged)}`);
+});
+
+test('T1-c32: changed lines under -diff and binary attributes and in a non-ASCII path are judged at their real paths, or unjudged and not ok', async () => {
+  const fx = fixture({
+    src: {
+      'src/strong.mjs': CMP,
+      'src/weak.mjs': 'export const w1 = (a, b) => a < b; //@\n',
+      'src/other.mjs': 'export const w2 = (a, b) => a <= b; //@\n',
+      'src/café.mjs': 'export const w3 = (a, b) => a >= b; //@\n',
+    },
+    files: {
+      'src/.gitattributes': 'weak.mjs -diff\n',
+      'test/t.mjs': String.raw`import assert from 'node:assert/strict';
+import { gt } from '../src/strong.mjs';
+import { w1 } from '../src/weak.mjs';
+import { w2 } from '../src/other.mjs';
+import { w3 } from '../src/café.mjs';
+assert.equal(gt(2, 1), true);
+assert.equal(gt(1, 1), false);
+assert.equal(gt(1, 2), false);
+w1(1, 2); w2(1, 2); w3(1, 2);
+`,
+    },
+  });
+  write(fx.dir, { '.git/info/attributes': 'other.mjs binary\n' });
+  for (const f of ['src/weak.mjs', 'src/other.mjs']) assert.match(git(fx.dir, 'diff', fx.base, '--', f), /^Binary files/m, `${f} diffs as binary`);
+  const r = await gate(fx.dir, [...on(fx), ...RUN]);
+  assert.notEqual(r.code, 0);
+  assert.deepEqual(at(r.j, 'src/strong.mjs', 1).map((x) => x.outcome), ['killed']);
+  for (const file of ['src/weak.mjs', 'src/other.mjs', 'src/café.mjs']) {
+    const survived = r.j.survivors.some((s) => s.file === file && s.line === 1);
+    const unjudged = r.j.unjudged.some((u) => u.file === file) && r.j.status !== 'ok';
+    assert.ok(survived || unjudged, `${file}: survivors ${pairs(r.j.survivors)}; unjudged ${pairs(r.j.unjudged)}; ${r.j.status}`);
+  }
+  // this gate takes the first way: it reads every such file as text, so each weak line is judged at its real path
+  assert.deepEqual([r.code, r.j.status, pairs(r.j.survivors)], [1, 'ok', ['src/café.mjs:1', 'src/other.mjs:1', 'src/weak.mjs:1']]);
+});
+
+const C33 = `export function strong(a, b) {
+  return a > b; //@
+}
+export function weak(a, b, cache, ok, ready, count, price, key, value, f, x, p, q, r, s, computeLimit) {
+  let flag, total, ratio, rem, hits = 0;
+  flag = a != b; //@
+  cache ||= new Map(); //@
+  ok &&= ready; //@
+  total = count * price; //@
+  ratio = a / b; //@
+  rem = a % b; //@
+  const limit = computeLimit(); //@
+  cache[key] = value; //@
+  let y = f(x); //@
+  if (p === q && r === s) hits++; //@
+  return [flag, cache, ok, total, ratio, rem, limit, y, hits];
+}
+`;
+
+test('T1-c33: !=, ||=, &&=, *, /, %, a const initialiser, an index assignment, a let and a two-site === line each survive a weak test', async () => {
+  const t = String.raw`import assert from 'node:assert/strict';
+import { strong, weak } from '../src/ops.mjs';
+assert.equal(strong(2, 1), true);
+assert.equal(strong(1, 1), false);
+assert.equal(strong(1, 2), false);
+weak(1, 2, {}, true, true, 2, 3, 'k', 'v', (v) => v, 1, 1, 1, 1, 1, () => 5);
+`;
+  const fx = fixture({ src: { 'src/ops.mjs': C33 }, files: { 'test/t.mjs': t } });
+  const r = await gate(fx.dir, [...on(fx), ...RUN]);
+  assert.notEqual(r.code, 0);
+  assert.deepEqual(at(r.j, 'src/ops.mjs', 2).map((x) => x.outcome).filter((o) => o !== 'killed'), [], 'the strong comparison is killed');
+  const lines = C33.split('\n').map((l, i) => [l, i + 1]).filter(([l]) => l.endsWith('//@')).map(([, n]) => n).filter((n) => n !== 2);
+  assert.equal(lines.length, 10);
+  for (const n of lines) assert.ok(weakLineHeld(r, 'src/ops.mjs', n), `line ${n}: survivors ${pairs(r.j.survivors)}; unmutated ${pairs(r.j.unmutated)}`);
+  if (lines.every((n) => pairs(r.j.survivors).includes(`src/ops.mjs:${n}`))) {
+    const ops = new Set(r.j.survivors.map((s) => s.operator));
+    for (const k of ['!= -> ==', '||= -> &&=', '&&= -> ||=', '* -> /', '/ -> *', '% -> *', 'const initialiser -> undefined']) assert.ok(ops.has(k), `${k} survives`);
+    const twoSite = lines.at(-1);
+    assert.equal(r.j.survivors.filter((s) => s.line === twoSite && s.operator === '=== -> !==').length, 2, 'a mutant at each === of the two-site line');
+  } else assert.ok(r.code !== 0 && r.j.status !== 'ok');
+});
+
+test('T1-c34: a test that compares the source with the committed new text it finds through git log --all kills nothing: a copy holds no such text', async () => {
+  const t = String.raw`import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import { execSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+import { gt } from '../src/f.mjs';
+const text = execSync('git show $(git log --all -1 --format=%H -- src/f.mjs):src/f.mjs', { encoding: 'utf8' });
+const tmp = path.join(process.env.GATE_OUT, 'f-' + process.pid + '-' + process.hrtime.bigint() + '.mjs');
+fs.writeFileSync(tmp, text);
+const { gt: committed } = await import(pathToFileURL(tmp).href);
+for (const [a, b] of [[1, 2], [2, 2], [3, 2]]) assert.equal(gt(a, b), committed(a, b));
+`;
+  const fx = repo({ 'src/f.mjs': 'export const gt = (a, b) => a >= b;\n', 'test/t.mjs': t });
+  write(fx.dir, { 'src/f.mjs': 'export const gt = (a, b) => a > b;\n' });
+  git(fx.dir, 'commit', '-q', '-am', 'change');
+  const out = scratch();
+  // in the caller's own repository the test finds the new text and passes, so it would kill the mutant in a full copy
+  assert.equal(spawnSync(process.execPath, ['test/t.mjs'], { cwd: fx.dir, env: { ...process.env, GATE_OUT: out } }).status, 0);
+  const r = await gate(fx.dir, [...on(fx), ...RUN], { env: { GATE_OUT: out } });
+  assert.notEqual(r.code, 0);
+  assert.equal(r.j.killed, 0);
+  if (r.code === 1) assert.deepEqual(pairs(r.j.survivors), ['src/f.mjs:1']);
+  else assert.deepEqual([r.code, r.j.status], [2, 'noise']);
+  // every ref, reflog entry and object of each copy: the refs and reflog name the base only, and no object holds the new text
+  const log = path.join(out, 'copy.log');
+  const probe = `{ git for-each-ref --format='ref %(objectname)'; git reflog --all --format='reflog %H'; ` +
+    `git cat-file --batch-all-objects --batch | grep -aq 'a > b;' && echo 'object holds the new text'; } >> '${log}'; ` +
+    `node -e "import('./src/f.mjs').then((m) => m.gt(1, 2))"`;
+  const p = await gate(fx.dir, [...on(fx), '--test', probe]);
+  assert.equal(p.code, 1, 'the probe kills nothing');
+  const lines = fs.readFileSync(log, 'utf8').split('\n').filter(Boolean);
+  assert.ok(lines.length >= 6);
+  for (const l of lines) assert.match(l, new RegExp(`^(ref|reflog) ${fx.base}$`), l);
+});
+
+test('T1-c35: a test that embeds each changed file and compares it with parentheses, spaces and comments removed makes the rewrite control NOISE', async () => {
+  const fx = fixture({ src: { 'src/a.mjs': 'export const a = (x) => x > 1; //@\nexport const yes = () => true; //@\n' } });
+  const head = fs.readFileSync(path.join(fx.dir, 'src/a.mjs'), 'utf8');
+  const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '').replace(/[\s()]/g, '');
+  write(fx.dir, { 'test/t.mjs': `import fs from 'node:fs';
+const want = ${JSON.stringify({ 'src/a.mjs': head })};
+const strip = ${strip.toString()};
+fs.appendFileSync(process.env.GATE_SEEN, JSON.stringify(fs.readFileSync('src/a.mjs', 'utf8')) + '\\n');
+for (const [f, text] of Object.entries(want)) if (strip(fs.readFileSync(f, 'utf8')) !== strip(text)) process.exit(1);
+const m = await import('../src/a.mjs');
+m.a(0);
+m.yes();
+` });
+  const rewrites = [];
+  for (let i = 0; i < 2; i++) {
+    const seen = path.join(scratch(), 'seen.jsonl');
+    const r = await gate(fx.dir, [...on(fx), ...RUN], { env: { GATE_SEEN: seen } });
+    assert.deepEqual([r.code, r.j.status, r.j.killed], [2, 'noise', 0]);
+    assert.deepEqual(r.j.results, [], 'no mutant was judged');
+    assert.deepEqual(r.j.controls.map((c) => [c.kind, c.pass]), [['unmutated', true], ['unmutated', true], ['rewrite', false]]);
+    const other = readLog(seen).filter((text) => text !== head);
+    assert.equal(other.length, 1, 'one run saw the rewritten source');
+    assert.notEqual(strip(other[0]), strip(head), 'deleting parentheses, spaces and comments does not undo the rewrite');
+    rewrites.push(other[0]);
+  }
+  assert.notEqual(rewrites[0], rewrites[1], 'the rewrite is chosen per run');
+});
+
+test('T1-c36: a changed line whose one mutant times out beside a killed line is listed under timeouts, and the run is not ok', async () => {
+  const src = 'export const gt = (a, b) => a > b; //@\nexport function count(n) {\n  let i = 0;\n  while (i < n) {\n    i = i + 1; //@\n  }\n  return i;\n}\n';
+  const t = String.raw`import assert from 'node:assert/strict';
+import { gt, count } from '../src/m.mjs';
+assert.equal(gt(2, 1), true);
+assert.equal(gt(1, 1), false);
+assert.equal(gt(1, 2), false);
+count(3);
+`;
+  const fx = fixture({ src: { 'src/m.mjs': src }, files: { 'test/t.mjs': t } });
+  const r = await gate(fx.dir, [...on(fx), ...RUN]);
+  assert.notEqual(r.code, 0);
+  assert.notEqual(r.j.status, 'ok');
+  assert.equal(r.j.timeout, 1);
+  assert.deepEqual(at(r.j, 'src/m.mjs', 1).map((x) => x.outcome), ['killed']);
+  const listed = r.j.timeouts?.some((x) => x.file === 'src/m.mjs' && x.line === 5) || r.j.unmutated.some((x) => x.file === 'src/m.mjs' && x.line === 5);
+  assert.ok(listed, `the loop line is listed: timeouts ${JSON.stringify(r.j.timeouts)}; unmutated ${pairs(r.j.unmutated)}`);
+});
