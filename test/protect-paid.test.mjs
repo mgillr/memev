@@ -15,7 +15,7 @@ import { deviceKeygen } from '../src/engine/devices.mjs';
 import { fileChecks } from '../src/cli/doctor.mjs';
 import { setRelay, relayStateFile } from '../src/cli/relay.mjs';
 import { selectProvider } from '../src/services/providers.mjs';
-import { installLicense } from '../src/cli/licensing.mjs';
+import { installLicense, registry } from '../src/cli/licensing.mjs';
 import { initVault } from '../src/engine/vault.mjs';
 import { sha256 } from '../src/engine/util.mjs';
 
@@ -28,7 +28,7 @@ const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
 const NOW = Date.parse('2026-11-01');
 const DAY = 86400e3;
 const day = (offset) => new Date(NOW + offset * DAY).toISOString().slice(0, 10);
-const paidLicence = (exp) => signLicense({ v: 1, lid: 'lic_wo11a', tier: 'business', services: ['merge'], seats: 3, iat: day(-30), exp, grace_days: 14 }, pem, 't1');
+const paidLicence = (exp, seats = 3) => signLicense({ v: 1, lid: 'lic_wo11a', tier: 'business', services: ['merge'], seats, iat: day(-30), exp, grace_days: 14 }, pem, 't1');
 const verified = (l) => (l ? verifyLicense(l, { keys, now: NOW }) : null);
 
 // Every user-visible file under root (not .git or .memev), as [relative path, sha256] sorted by path.
@@ -109,7 +109,7 @@ test('WO-11-A AC01: with the relay down, the vault keeps working through the git
   assert.ok(relay, 'the doctor has a relay check');
   assert.equal(relay.status, 'warn', 'the relay check is a warning while the relay is down');
   assert.match(relay.detail, /on but unreachable/, 'the relay check names the down state');
-  assert.match(relay.detail, /git backup/, 'the relay check names the git backup fallback');
+  assert.match(relay.detail, /get its notes through the git backup/, 'the relay check names the git backup fallback');
   assert.doesNotMatch(relay.detail, /vault is reached/, 'the git backup carries the notes; it is not the way in');
   // a first connect under way is not a failure, and a relay the daemon is not holding is not running, not unreachable
   const relayCheck = (e = {}) => fileChecks({ root, env: { MEMEV_CONFIG_DIR: tmpdir('conf-'), ...e }, vault: v }).find((c) => c.id === 'relay');
@@ -117,7 +117,28 @@ test('WO-11-A AC01: with the relay down, the vault keeps working through the git
   assert.equal(relayCheck().status, 'ok', 'connecting is not a warning');
   fs.writeFileSync(relayStateFile(root), JSON.stringify({ state: 'cannot reach the relay (retrying)', updated: new Date(NOW).toISOString() }));
   assert.match(relayCheck({ MEMEV_NO_TUNNEL: '1' }).detail, /on but not running \(MEMEV_NO_TUNNEL is set\)/, 'a relay held off by MEMEV_NO_TUNNEL is not running');
+  // a daemon that wrote no state yet, or wrote off, is not holding the relay either
+  fs.rmSync(relayStateFile(root));
+  assert.match(relayCheck().detail, /^on but not running, so the relay address does not reach the vault/, 'no state file reads as not running');
+  fs.writeFileSync(relayStateFile(root), JSON.stringify({ state: 'off', updated: new Date(NOW).toISOString() }));
+  assert.match(relayCheck().detail, /^on but not running, so/, 'state off reads as not running');
   v.close();
+  // with no git backup the relay check promises none: it says there is none yet and how to make one, as the backup check does
+  const lone = newVault();
+  setRelay(lone.root, { enabled: true, url: 'relay://127.0.0.1:9', domain: 'relay.test' });
+  fs.writeFileSync(relayStateFile(lone.root), JSON.stringify({ state: 'cannot reach the relay (retrying)', updated: new Date(NOW).toISOString() }));
+  const checks = (r) => fileChecks({ root: r, env: { MEMEV_CONFIG_DIR: tmpdir('conf-') }, vault: lone.v });
+  const on = checks(lone.root);
+  assert.equal(on.find((c) => c.id === 'backup').status, 'warn', 'the backup check says there is no backup yet');
+  const onRelay = on.find((c) => c.id === 'relay');
+  assert.match(onRelay.detail, /on but unreachable/);
+  assert.match(onRelay.detail, /there is no backup yet, so your other computers do not get its notes: memev github setup/);
+  assert.doesNotMatch(onRelay.detail, /through the git backup/, 'no backup is promised where there is none');
+  setRelay(lone.root, { enabled: false });
+  const offRelay = checks(lone.root).find((c) => c.id === 'relay');
+  assert.equal(offRelay.status, 'ok');
+  assert.match(offRelay.detail, /^off; there is no backup yet/);
+  lone.v.close();
 });
 
 // A merge provider that counts its calls.
@@ -215,7 +236,7 @@ test('WO-11-A AC04: installing a licence over a lapsed one restores writing and 
 
 test('WO-11-A AC05: the doctor reports one check for each paid path, and each check id has its troubleshooting row', () => {
   const { v, root } = newVault();
-  const ids = ['relay', 'merge', 'license-expired'];
+  const ids = ['relay', 'merge', 'license-expired', 'license-change'];
   const checks = fileChecks({ root, env: { MEMEV_CONFIG_DIR: tmpdir('conf-') }, vault: v });
   for (const id of ids) {
     const found = checks.filter((c) => c.id === id);
@@ -255,6 +276,27 @@ test('WO-11-A AC05: the license-expired check warns on a licence past its grace 
   assert.equal(expired.status, 'warn', `an expired licence is a warning: ${expired.detail}`);
   assert.match(expired.detail, /past its grace period/);
   assert.equal(check(verified(paidLicence(day(30))), 'license-expired').status, 'ok');
-  // the constant licence-change line could not fail, so it is gone
-  assert.equal(check(verified(paidLicence(day(30))), 'license-change'), undefined);
+});
+
+test('WO-11-A AC05: the license-change check names the computers past a downgraded licence, and is ok after an upgrade with no re-enrolment', () => {
+  // the doctor as the CLI runs it with no vault open: the vault and its device registry on disk
+  const root = path.join(tmpdir(), 'vault');
+  initVault(root, { template: path.join(PKG, 'templates', 'vault') });
+  const env = { MEMEV_CONFIG_DIR: tmpdir('conf-') };
+  const three = verified(paidLicence(day(30), 3));
+  const { reg, tokens } = registry(root);
+  reg.enroll(tokens, { kind: 'remote-computer', label: 'laptop', pubkey: deviceKeygen().publicKey, policy: seatPolicy({ license: three, devices: reg.list() }) });
+  const check = (license) => fileChecks({ root, env, license }).find((c) => c.id === 'license-change');
+  // a downgrade to a licence for one computer: two use the vault, so the laptop past the count can only read
+  const down = check(verified(paidLicence(day(30), 1)));
+  assert.equal(down.status, 'warn', `a downgrade below the computers in use is a warning: ${down.detail}`);
+  assert.match(down.detail, /2 computers use this vault and the .* tier covers 1, so laptop can read but not write/);
+  assert.match(down.detail, /no re-enrolment/);
+  // no licence at all is Personal, one computer: the same warning
+  assert.equal(check(null).status, 'warn');
+  // an upgrade back to three: within the count, with the same single enrolment
+  const up = check(three);
+  assert.equal(up.status, 'ok', up.detail);
+  assert.match(up.detail, /^2 computer\(s\) use this vault, within the 3 /);
+  assert.equal(registry(root).reg.list().filter((d) => d.kind === 'remote-computer').length, 1, 'the laptop was enrolled once and never again');
 });
