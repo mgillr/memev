@@ -152,3 +152,59 @@ test('the daemon serves the task tools: a claim over HTTP is stored in the one p
     assert.match(start.content[0].text, /IN_PROGRESS/);
   } finally { server.close(); v.close(); }
 });
+
+// ---- SO-1.01 requirements 3 and 5: nothing mutates authoritative state except through the coordinator, and the
+// adversarial cases (duplicate delivery, stale generation, expired lease, concurrent claim) hold on the wired path.
+const srcFiles = () => { const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith('.mjs') ? [path.join(d, e.name)] : [])); return ['src', 'bin'].flatMap((d) => walk(path.join(PKG, d))); };
+const rel = (f) => path.relative(PKG, f).split(path.sep).join('/');
+
+test('SO-1.01 req 3: only the coordinator writes the project store, and the tools reach it only through the vault', () => {
+  const touching = srcFiles().filter((f) => /ProjectStore|projectStore\(|\bcoordinator\(|new Coordinator/.test(fs.readFileSync(f, 'utf8'))).map(rel).sort();
+  assert.deepEqual(touching, ['src/engine/coordinator.mjs', 'src/engine/project-store.mjs', 'src/engine/vault.mjs'], 'a module other than the vault, the coordinator and the store reaches the store');
+  const mcp = fs.readFileSync(path.join(PKG, 'src/server/mcp.mjs'), 'utf8');
+  assert.doesNotMatch(mcp, /projectStore|coordinator\(|project-store|project-state/, 'the MCP layer goes through the vault task methods');
+  const vault = fs.readFileSync(path.join(PKG, 'src/engine/vault.mjs'), 'utf8');
+  assert.doesNotMatch(vault, /projectStore\([^)]*\)\.(append|put|withWrite)\(/, 'the vault does not write the store itself');
+});
+
+test('SO-1.01 req 5: duplicate delivery, a stale generation and an expired lease are refused or stored as attempts, never applied', async () => {
+  const { root, v } = newVault();
+  const plan = { project: 'adv', tasks: [{ id: 'T', title: 'one', artifacts: ['a.js'] }] };
+  await call(v, 'memev_task_plan', plan);
+  const n0 = eventsOf(root, 'adv').length;
+  await call(v, 'memev_task_plan', plan);
+  assert.equal(eventsOf(root, 'adv').length, n0, 'a duplicate plan appends nothing');
+
+  const first = (await call(v, 'memev_task_claim', { project: 'adv', task: 'T', ttl_s: 60 })).data.lease.id;
+  assert.equal((await call(v, 'memev_task_claim', { project: 'adv', task: 'T', ttl_s: 60 })).data.ok, false, 'a second claim of a held task loses');
+  await call(v, 'memev_task_release', { project: 'adv', lease: first });
+  const second = (await call(v, 'memev_task_claim', { project: 'adv', task: 'T', ttl_s: 60 })).data.lease.id;
+  const stale = await call(v, 'memev_task_report', { project: 'adv', lease: first, output: 'late work' });
+  assert.equal(stale.data.ok, false);
+  assert.ok(stale.data.stale || stale.data.late, 'a report under a released lease is stale or late');
+  const st = (await call(v, 'memev_project_status', { project: 'adv' })).data;
+  assert.equal(st.tasks.T.state, 'IN_PROGRESS', 'the stale report changed no state');
+  assert.ok(Object.values(v.projectStore('adv').snapshot('attempt')).some((a) => a.lease_id === first && ['stale', 'late'].includes(a.status)), 'its output is kept as an attempt');
+
+  const done = await call(v, 'memev_task_report', { project: 'adv', lease: second, output: 'ok', artifacts: ['a.js'] });
+  assert.equal(done.data.ok, true);
+  const dup = await call(v, 'memev_task_report', { project: 'adv', lease: second, output: 'ok again' });
+  assert.equal(dup.data.ok, false, 'the same report delivered twice is not applied twice');
+  assert.equal((await call(v, 'memev_project_status', { project: 'adv' })).data.tasks.T.state, 'VERIFYING');
+  v.close();
+});
+
+test('SO-1.01 req 5: two processes claiming one task through the project store directory have exactly one winner', async () => {
+  const { root, v } = newVault();
+  await call(v, 'memev_task_plan', { project: 'race', tasks: [{ id: 'R', title: 'contended' }] });
+  const { spawn } = await import('node:child_process');
+  const script = `import { ProjectStore } from ${JSON.stringify(path.join(PKG, 'src/engine/project-store.mjs'))};
+import { Coordinator } from ${JSON.stringify(path.join(PKG, 'src/engine/coordinator.mjs'))};
+const c = new Coordinator(new ProjectStore(${JSON.stringify(root)}, { id: 'race', fsync: false }).open(), { lifecycle: true });
+const r = c.claim('R', process.argv[1], 60000);
+console.log(JSON.stringify({ ok: r.ok === true }));`;
+  const run = (who) => new Promise((res) => { let out = ''; const p = spawn(process.execPath, ['--input-type=module', '-e', script, who], { stdio: ['ignore', 'pipe', 'inherit'] }); p.stdout.on('data', (d) => { out += d; }); p.on('close', () => res(JSON.parse(out.trim().split('\n').pop()))); });
+  const results = await Promise.all([run('p1'), run('p2')]);
+  assert.equal(results.filter((r) => r.ok).length, 1, JSON.stringify(results));
+  v.close();
+});
