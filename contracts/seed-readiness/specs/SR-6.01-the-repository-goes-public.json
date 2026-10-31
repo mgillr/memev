@@ -10,7 +10,8 @@
       "phase": "release",
       "depends_on": [],
       "requirements": [
-        "history leak-clean; contributor guide, code of conduct, issue templates, security contact"
+        "history leak-clean; contributor guide, code of conduct, issue templates, security contact",
+        "a provenance check runs over the whole history: every author and committer identity is on an allowlist the owner keeps, the first commit is named, and no path, host or id from a prototype or another project remains in files or messages; its report is filed for diligence as docs/PROVENANCE.md"
       ],
       "description": "",
       "scope": [
@@ -18,7 +19,10 @@
         "CONTRIBUTING.md",
         "CODE_OF_CONDUCT.md",
         "SECURITY.md",
-        ".github/**"
+        ".github/**",
+        "scripts/provenance.mjs",
+        "docs/PROVENANCE.md",
+        "test/provenance.test.mjs"
       ],
       "criteria": [
         {
@@ -47,6 +51,29 @@
           "verifier": {
             "type": "command",
             "cmd": "gh repo view --json visibility -q .visibility | grep -qx PUBLIC"
+          }
+        },
+        {
+          "statement": "SR-6.01 provenance: a fixture repository with a commit by an identity not on the allowlist, or a message naming a prototype path, fails the check naming the commit",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/provenance.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-6.01 provenance' test/provenance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-6.01 provenance$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The provenance check is clean over the real history",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/provenance.mjs --history",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The provenance report is filed",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/PROVENANCE.md"
           }
         },
         {

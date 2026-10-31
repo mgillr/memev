@@ -10,14 +10,20 @@
       "phase": "release",
       "depends_on": [],
       "requirements": [
-        "a tagged release on npm with provenance; npx memev init passes on clean macOS, Linux and Windows"
+        "a tagged release on npm with provenance; npx memev init passes on clean macOS, Linux and Windows",
+        "once the package is on npm, no page tells people not to run npx memev (README.md and docs/INSTALL-FOR-AI.md said so at be457db), and the install pages give npx memev init as a path",
+        "the clean-machine runs are recorded: docs/testing/npx-install.md names the image, the date, the command npx memev init and its exit code for macOS, Linux and Windows"
       ],
       "description": "",
       "scope": [
         "package.json",
         "CHANGELOG.md",
         "changelog.d/**",
-        "docs/RELEASING.md"
+        "docs/RELEASING.md",
+        "README.md",
+        "docs/INSTALL-FOR-AI.md",
+        "docs/QUICKSTART.md",
+        "docs/testing/npx-install.md"
       ],
       "criteria": [
         {
@@ -32,6 +38,22 @@
           "verifier": {
             "type": "command",
             "cmd": "node scripts/release-tag-check.mjs v$(node -p \"require('./package.json').version\")"
+          }
+        },
+        {
+          "statement": "No install page tells people not to run npx memev",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -rn -i 'do not run npx memev' README.md docs/INSTALL-FOR-AI.md docs/QUICKSTART.md",
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "The npx install record names a run on each of macOS, Linux and Windows with exit 0",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=docs/testing/npx-install.md; grep -qi 'macos' $f && grep -qi 'linux' $f && grep -qi 'windows' $f && [ $(grep -c 'npx memev init.*exit 0' $f) -ge 3 ]",
+            "timeout_s": 120
           }
         },
         {

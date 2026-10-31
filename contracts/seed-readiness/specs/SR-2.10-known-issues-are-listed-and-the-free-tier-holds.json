@@ -1,0 +1,206 @@
+{
+  "title": "SR-2.10 Known issues are listed, and the free tier holds for three days",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G100: the seed-stage analysis (I2) lists a known-issues page and soak tests among the free tier's planned items, and neither has a contract; the only soak in the set is SR-3.04 task 2, for the paid multi-writer engine. Repository: memev. Depends on contracts: QL-1.02.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "A known-issues page that stays current",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "docs/KNOWN-ISSUES.md lists every open issue labelled bug and every limit the docs state (a sentence carrying the marker <!-- limit -->), each with its link or page, the date it was first seen and the workaround if there is one",
+        "scripts/docs/known-issues.mjs --check reads the open issues through the GitHub API (or a file given with --issues, for tests) and the docs, and fails naming any open bug or stated limit the page lacks and any listed issue that is closed; CI runs it on a schedule and before a release",
+        "the README and the docs index link the page"
+      ],
+      "scope": [
+        "docs/KNOWN-ISSUES.md",
+        "docs/README.md",
+        "README.md",
+        "docs/**/*.md",
+        "scripts/docs/known-issues.mjs",
+        ".github/workflows/**",
+        "test/known-issues.test.mjs",
+        "changelog.d/SR-2.10.md"
+      ],
+      "criteria": [
+        {
+          "statement": "SR-2.10 known issues: with a fixture issue list holding an open bug the page lacks, --check fails naming it; with a closed issue still listed, it fails; with a stated limit missing from the page, it fails; with the page complete, it passes",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/known-issues.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 known issues' test/known-issues.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 known issues$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The known-issues page exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/KNOWN-ISSUES.md"
+          }
+        },
+        {
+          "statement": "The README and the docs index link the page",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -q 'KNOWN-ISSUES.md' README.md && grep -q 'KNOWN-ISSUES.md' docs/README.md",
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/known-issues.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/known-issues.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/known-issues.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "A three-day soak of the free tier",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "scripts/soak/free-tier.mjs runs one vault for 72 hours on one machine: the daemon, GitHub backup to a local bare repository, the hooks of two clients driven at a fixed rate (remember, recall, the prompt hook, session end), a daemon restart every 6 hours and a network drop every hour",
+        "it writes bench/results/<date>-soak-<cpu>.json with the hardware, the hours run, the notes written and found again, notes_lost, daemon crashes, the hourly p95 of the prompt hook and of recall, and the hourly heap and disk use",
+        "a 10-minute form (--minutes 10) runs in CI on a schedule, so the script cannot rot"
+      ],
+      "scope": [
+        "scripts/soak/**",
+        "bench/results/**",
+        ".github/workflows/**",
+        "test/soak.test.mjs",
+        "changelog.d/SR-2.10.md"
+      ],
+      "criteria": [
+        {
+          "statement": "SR-2.10 soak: the soak's one-minute form on a temp vault writes a results file with every field; a note deleted from the vault mid-run makes it report notes_lost 1 and exit non-zero",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/soak.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.10 soak' test/soak.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.10 soak$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The latest soak results file reports no lost note",
+          "verifier": {
+            "type": "metric",
+            "cmd": "f=$(ls bench/results/*-soak-*.json | sort | tail -1) && cat \"$f\"",
+            "key": "notes_lost",
+            "op": "==",
+            "value": 0
+          }
+        },
+        {
+          "statement": "The latest soak ran at least 72 hours",
+          "verifier": {
+            "type": "metric",
+            "cmd": "f=$(ls bench/results/*-soak-*.json | sort | tail -1) && cat \"$f\"",
+            "key": "hours",
+            "op": ">=",
+            "value": 72
+          }
+        },
+        {
+          "statement": "CI runs the short soak on a schedule",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -rq 'free-tier.mjs --minutes' .github/workflows/",
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/soak.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/soak.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/soak.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

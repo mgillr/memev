@@ -10,14 +10,16 @@
       "phase": "implement",
       "depends_on": [],
       "requirements": [
-        "a decision record says whether the coming-soon provider is supported; if yes, a connector with a test; if no, the site drops it (SR-6.06)"
+        "a decision record says whether the coming-soon provider is supported; if yes, a connector with a test; if no, the site drops it (SR-6.06)",
+        "if the decision is build, the connector has a test that runs it against a recorded fixture of the provider's API; if drop, no status-table row is left for a provider without a connector, so the site's claims check (SR-6.10) fails on any page that still shows it"
       ],
       "description": "",
       "scope": [
         "docs/CLIENTS.md",
         "docs/decisions/**",
         "src/cli/clients.mjs",
-        "test/clients.test.mjs"
+        "test/clients.test.mjs",
+        "docs/status.json"
       ],
       "criteria": [
         {
@@ -33,6 +35,14 @@
             "type": "grep",
             "file": "docs/decisions/coming-soon-provider.md",
             "pattern": "Decision:\\s*(build|drop)"
+          }
+        },
+        {
+          "statement": "SR-2.09 outcome: with the decision record saying build, the provider's connector test runs against its recorded fixture; with drop, docs/status.json holds no provider row without a connector in src/cli/clients.mjs; a fixture status row for a provider with no connector fails under drop",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.09 outcome' test/clients.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.09 outcome$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {

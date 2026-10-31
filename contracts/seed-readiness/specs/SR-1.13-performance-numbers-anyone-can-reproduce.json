@@ -47,7 +47,8 @@
         "T1"
       ],
       "requirements": [
-        "every latency and heap figure in docs cites a results file and names its hardware"
+        "every latency and heap figure in docs cites a results file and names its hardware",
+        "every quantitative figure in docs and the README (a time, a size, a rate, a count of tokens or notes) cites a results file and names its hardware, not only latency and heap; a figure from simulated traffic (the growth bench's 170 million tokens) says it is simulated and gives the stored size beside it"
       ],
       "description": "",
       "scope": [
@@ -63,6 +64,14 @@
             "type": "test_red_green",
             "test_file": "test/docs-figures.test.mjs",
             "cmd": "node --test test/docs-figures.test.mjs"
+          }
+        },
+        {
+          "statement": "SR-1.13 every figure: a fixture page saying 170 million tokens with no results file fails; with a results file but without the word simulated and the stored size beside it, it fails; with both, it passes",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/docs-figures.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.13 every figure' test/docs-figures.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.13 every figure$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {

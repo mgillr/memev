@@ -11,7 +11,8 @@
       "depends_on": [],
       "requirements": [
         "no source line over 160 characters",
-        "a zero-dependency check script enforces it in npm test"
+        "a zero-dependency check script enforces it in npm test",
+        "the zero-dependency check also fails on an unused import, an unused top-level binding and a duplicate object key in src and bin, and runs in npm test"
       ],
       "description": "",
       "scope": [
@@ -37,6 +38,14 @@
             "key": "max",
             "op": "<=",
             "value": 160
+          }
+        },
+        {
+          "statement": "SR-1.09 unused: a fixture module with an unused import, one with an unused top-level const and one with a duplicate object key each fail the check, naming file and line",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/style.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-1.09 unused' test/style.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.09 unused$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {

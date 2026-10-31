@@ -265,9 +265,14 @@ History of the guard's form, 31 October 2026: (1) a count of matching passing li
 - SR-0.03: name guard on 2 criterion command(s).
 - SR-1.01: name guard on 41 criterion command(s).
 - SR-1.03: name guard on 27 criterion command(s).
+- SR-1.04: name guard on 1 criterion command(s).
 - SR-1.05: name guard on 26 criterion command(s).
 - SR-1.06: name guard on 32 criterion command(s).
+- SR-1.09: name guard on 1 criterion command(s).
 - SR-1.11: name guard on 1 criterion command(s).
+- SR-1.13: name guard on 1 criterion command(s).
+- SR-1.15: name guard on 1 criterion command(s).
+- SR-1.16: name guard on 1 criterion command(s).
 - SR-1.21: name guard on 31 criterion command(s).
 - SR-1.22: name guard on 33 criterion command(s).
 - SR-1.23: name guard on 8 criterion command(s).
@@ -279,7 +284,15 @@ History of the guard's form, 31 October 2026: (1) a count of matching passing li
 - SR-1.29: name guard on 9 criterion command(s).
 - SR-1.30: name guard on 29 criterion command(s).
 - SR-1.31: name guard on 12 criterion command(s).
-- SR-5.04: name guard on 1 criterion command(s).
+- SR-1.32: name guard on 4 criterion command(s).
+- SR-1.33: name guard on 2 criterion command(s).
+- SR-2.03: name guard on 1 criterion command(s).
+- SR-2.09: name guard on 1 criterion command(s).
+- SR-2.10: name guard on 2 criterion command(s).
+- SR-4.07: name guard on 3 criterion command(s).
+- SR-5.04: name guard on 10 criterion command(s).
+- SR-6.01: name guard on 1 criterion command(s).
+- SR-6.11: name guard on 1 criterion command(s).
 
 ## Subtest labels added by the build
 

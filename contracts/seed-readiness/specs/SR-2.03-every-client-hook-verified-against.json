@@ -11,14 +11,16 @@
       "depends_on": [],
       "requirements": [
         "for each of 8 clients a recorded fixture of the real hook payload and env, captured from a named app version",
-        "docs/CLIENTS.md has a supported-versions table"
+        "docs/CLIENTS.md has a supported-versions table",
+        "for each client, the conformance fixture shows whether the hook's output reaches the model (for Cursor's prompt hook, src/cli/hooks.mjs:45); where it does not, docs/CLIENTS.md says so for that client and event"
       ],
       "description": "",
       "scope": [
         "test/clients-conformance/**",
         "docs/CLIENTS.md",
         "src/cli/common.mjs",
-        "src/cli/clients.mjs"
+        "src/cli/clients.mjs",
+        "src/cli/hooks.mjs"
       ],
       "criteria": [
         {
@@ -42,6 +44,14 @@
           "verifier": {
             "type": "command",
             "cmd": "node -e \"process.exit(/unverified/.test(require('fs').readFileSync('src/cli/common.mjs','utf8'))?1:0)\""
+          }
+        },
+        {
+          "statement": "SR-2.03 reaches the model: each client's fixture records whether hook output reaches the model; a client whose output does not reach it and is not listed as a limit in docs/CLIENTS.md fails the test",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-conformance/reach.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-2.03 reaches the model' test/clients-conformance/reach.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-2.03 reaches the model$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
           }
         },
         {
