@@ -12,7 +12,11 @@
       "requirements": [
         "recover() records every path it cannot rebuild with the reason (content hash mismatch, record unreadable) instead of continuing silently",
         "status() reports unrecoverable with the paths, and memev doctor has an oplog check that fails naming them",
-        "DESIGN.md and THREAT-MODEL.md say what is rebuilt and what is reported"
+        "DESIGN.md and THREAT-MODEL.md say what is rebuilt and what is reported",
+        "an unrebuildable path is detected at open and before every later write to it (append, remember, checkpoint, journal, sync after a pull), so a later write never logs the loss as an external delete; the doctor's drift fix never deletes or overwrites such a path",
+        "the finding is shown where people look: the human memev status line and the session card name the count and point at memev doctor, and the CLI doctor shows the check with the daemon up or down",
+        "status() and the MCP status and doctor tools list an unrecoverable path only to a token whose path scope covers it; other callers see the count",
+        "when the vault has a git backup, the doctor names the last backup commit that held the lost path as the recovery source"
       ],
       "description": "",
       "scope": [
@@ -21,7 +25,13 @@
         "docs/DESIGN.md",
         "docs/THREAT-MODEL.md",
         "test/recover-unrebuildable.test.mjs",
-        "test/helpers/**"
+        "test/helpers/**",
+        "src/cli/main.mjs",
+        "src/engine/card.mjs",
+        "src/server/http.mjs",
+        "src/server/mcp.mjs",
+        "docs/MODULES.md",
+        "changelog.d/SR-1.21.md"
       ],
       "criteria": [
         {
@@ -56,6 +66,103 @@
             "type": "command",
             "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
             "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Set up the unrebuildable missing note and reopen. Then call v.append(OWNER,{path:p,text:'x'}). The call is refused with a VaultError, or no record of type 'delete' with agent 'external' is appended for p. After close() and a second open, status().unrecoverable still names p.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "node --test --test-name-pattern=\"write to an unrebuildable note\" test/recover-unrebuildable.test.mjs"
+          }
+        },
+        {
+          "statement": "With the unrebuildable missing note in place and no daemon, run every non-ok check's fix.run() from fileChecks({root,vault}) (the 'drift' check is the doctor --fix path). Then close, reopen and call fileChecks again. The 'oplog' check still fails naming p, and the log has no record of type 'delete' for p.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "node --test --test-name-pattern=\"doctor fix keeps the report\" test/recover-unrebuildable.test.mjs"
+          }
+        },
+        {
+          "statement": "In a sandbox() vault (test/helpers/cli.mjs), make a note unrebuildable (tamper its last put record's content, recompute rec.hash, remove the file). Run 'memev doctor --json' with the daemon stopped, then again after 'memev start'. Each run exits 1 and its JSON has exactly one check with id 'oplog', whose status is 'fail' and whose detail names p.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "node --test --test-name-pattern=\"memev doctor CLI\" test/recover-unrebuildable.test.mjs"
+          }
+        },
+        {
+          "statement": "(Needs src/cli/main.mjs added to scope.) In a sandbox() vault with an unrebuildable note and the daemon running, plain 'memev status' (no --json) prints a line naming p as not rebuildable, and memev_session_start's card data carries the unrecoverable paths.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "node --test --test-name-pattern=\"status text names it\" test/recover-unrebuildable.test.mjs"
+          }
+        },
+        {
+          "statement": "Write p with a single put, close (the snapshot covers it), replace that record's line with unparseable bytes (keeping the newline), remove the file and reopen. status().unrecoverable has an entry {path:p, reason:'record unreadable'}, and p is not in status() recovered.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "node --test --test-name-pattern=\"record unreadable\" test/recover-unrebuildable.test.mjs"
+          }
+        },
+        {
+          "statement": "Two cases with the same tampered log. (a) Keep the first 5 bytes of the file: p is listed with a reason that says the file is incomplete, and the file's bytes are unchanged. (b) Replace the file with different, complete text: p is not listed as missing or unrebuildable, and the hand edit is imported as an external put.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "node --test --test-name-pattern=\"present file\" test/recover-unrebuildable.test.mjs"
+          }
+        },
+        {
+          "statement": "After reopening on the unrebuildable missing note, notes/x.md still does not exist and the log has no new record for p. With a present but unreadable file (chmod 000, skipped on win32 or as root), open() does not throw, the file's bytes and mode are unchanged, and p is listed with reason 'file unreadable'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "node --test --test-name-pattern=\"never overwrites\" test/recover-unrebuildable.test.mjs"
+          }
+        },
+        {
+          "statement": "In the fixture, assert v.log.verify().ok === true after reopening, so the oplog check's failure can only come from the new detection, and assert that the check's detail contains both p and 'content hash mismatch'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "node --test --test-name-pattern=\"verify stays ok\" test/recover-unrebuildable.test.mjs"
+          }
+        },
+        {
+          "statement": "Close and reopen the unrebuildable vault twice: p is listed both times and log.seq does not grow between the two opens. With a vault already open, corrupt the record and remove the file, then call fileChecks({root,vault:v}): the 'oplog' check fails naming p without a restart.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "node --test --test-name-pattern=\"survives restarts\" test/recover-unrebuildable.test.mjs"
+          }
+        },
+        {
+          "statement": "(Needs src/server/http.mjs and src/server/mcp.mjs added to scope.) A token limited to paths ['projects/a/**'] calling GET /v1/status or memev_status on a vault where notes/x.md cannot be rebuilt gets a count but no path outside projects/a/.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "node --test --test-name-pattern=\"path-limited token\" test/recover-unrebuildable.test.mjs"
+          }
+        },
+        {
+          "statement": "MEMEV_CONTRACT_BASE is set, and the mutation run kills at least one mutant in src/engine/vault.mjs and one in src/cli/doctor.mjs with none surviving. The 'killed' key name must be checked against the QL-1.02 output, which does not exist at this commit.",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -n \"$MEMEV_CONTRACT_BASE\" && node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/recover-unrebuildable.test.mjs\" --json | node -e \"const r=JSON.parse(require('fs').readFileSync(0,'utf8'));process.exit(r.survived===0&&(r.killed||0)>0?0:1)\"",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "THREAT-MODEL.md's disk-corruption row says that a note the log cannot rebuild is reported by memev status and memev doctor.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/THREAT-MODEL.md",
+            "pattern": "cannot be rebuilt[^|]*(memev doctor|memev status)"
           }
         },
         {
