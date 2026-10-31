@@ -1,0 +1,45 @@
+{
+  "title": "SR-1.11 memev stop always ends inside its bound",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G11: REV-022 AC03 is a real flake: stop takes 5.2 s on 2 vCPU and the daemon is SIGKILLed mid shutdown-sync. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Root cause and fix",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "the shutdown sync is cancelled at its deadline, child git processes are killed, and the daemon exits before SIGKILL",
+        "the 4.8 s bound in the test is unchanged",
+        "the 20-run check prints the CPU count, the CPU model and the 1-minute load with its result, so a timing read on other hardware is labelled"
+      ],
+      "description": "",
+      "scope": [
+        "src/cli/sync.mjs",
+        "src/cli/daemon.mjs",
+        "src/server/main.mjs",
+        "test/sync-schedule.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "The stop test passes 20 runs in a row on a 2 vCPU machine",
+          "verifier": {
+            "type": "command",
+            "cmd": "for i in $(seq 1 20); do out=$(node --test --test-reporter=tap --test-name-pattern='REV-022' test/sync-schedule.test.mjs 2>&1) || exit 1; printf '%s\\n' \"$out\" | awk -v pat='^REV-022' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' || exit 1; done"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "title": "SR-1.02 No AI-drafted command runs without local approval",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G02: Contract verify runs sh -c commands a local session drafted and signed in one turn (contracts.mjs:213-228). Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Approval gate for local command criteria",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a command or metric criterion runs only after a human ran memev contract approve <id> on this machine, whatever the origin",
+        "approval records the hash of the command set; any amend needs a fresh approval",
+        "workdir must be inside a path the operator approved, never taken from the contract alone"
+      ],
+      "description": "",
+      "scope": [
+        "src/engine/contracts.mjs",
+        "src/cli/contracts-cli.mjs",
+        "docs/CONTRACTS.md",
+        "docs/THREAT-MODEL.md",
+        "test/contract-approval.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "An unapproved local contract reports BLOCKED and spawns nothing",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contract-approval.test.mjs",
+            "cmd": "node --test test/contract-approval.test.mjs"
+          }
+        },
+        {
+          "statement": "The threat model covers locally drafted commands",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/THREAT-MODEL.md",
+            "pattern": "locally drafted contract"
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
