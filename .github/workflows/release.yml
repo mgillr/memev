@@ -1,0 +1,40 @@
+# The tag-triggered release build. A push of a v* tag runs the full test suite and the leak scan,
+# checks the tag against the version in package.json, builds the release tarball and its SHA-256
+# file, and attaches both to the release. It builds and attaches only; the step that sends the
+# package to the registry is run by the maintainer from their own terminal (docs/RELEASING.md).
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+concurrency:
+  # one run per tag; a re-pushed tag supersedes the run it replaces
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Full test suite
+        run: npm test
+      - name: Leak scan (files and every commit message)
+        run: node scripts/leak-scan.mjs --history
+      - name: Check the tag against the version in package.json
+        run: node scripts/release-tag-check.mjs "${GITHUB_REF_NAME}"
+      - name: Build the release tarball and its SHA-256 file
+        run: node scripts/release-tarball.mjs --out dist
+      - name: Attach the tarball and its checksum to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || gh release create "${GITHUB_REF_NAME}" --title "memev ${GITHUB_REF_NAME}"
+          gh release upload "${GITHUB_REF_NAME}" dist/*.tgz dist/*.tgz.sha256 --clobber

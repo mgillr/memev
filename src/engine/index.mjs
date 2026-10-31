@@ -52,6 +52,10 @@ export function sections(body) {
   return out.map((s) => ({ heading: s.heading, text: s.lines.join('\n').trim(), line: s.line }));
 }
 
+// The match count rides on the result list as a property that is not enumerable, so a caller that
+// compares, copies or serialises the list sees the same list as before.
+const withTotal = (list, total) => Object.defineProperty(list, 'total', { value: total, writable: true, configurable: true });
+
 // Memory layout: one dictionary of terms; per section a sorted Int32Array of term ids and a Uint16Array
 // of counts; per term a packed array of section ids. Removing a note marks its sections dead; the
 // postings are compacted when a fifth of them are dead. This keeps the index to a few bytes per
@@ -166,14 +170,15 @@ export class RecallIndex {
   _factor(d, proj, boosts) { return { project: proj && d.project === proj ? 1.5 : 1, feedback: boosts?.[`${d.path}#${d.heading || ''}`] ?? 1 }; }
 
   /**
-   * BM25. Returns [{ path, heading, line, snippet, score, project, review_by }].
+   * BM25. Returns [{ path, heading, line, snippet, score, project, review_by }], with `total` on the
+   * array: how many sections matched and passed `prefix` and `filter`, counted without ranking them all.
    * `project` boosts that project's sections; `filter(doc)` drops sections before ranking (scope,
    * permissions, review state), so a hidden section can never push a visible one out of the top.
    */
   query(q, { limit = 8, project = null, prefix = null, boosts = null, filter = null } = {}) {
-    if (!this.docs.size) return [];
+    if (!this.docs.size) return withTotal([], 0);
     const { terms, dfs, N, avg } = this._terms(q);
-    if (!terms.length) return [];
+    if (!terms.length) return withTotal([], 0);
     const scores = new Map();
     for (const t of terms) {
       const df = dfs.get(t);
@@ -184,17 +189,18 @@ export class RecallIndex {
     }
     const proj = project ? String(project).toLowerCase() : null;
     // keep only the best `limit` (a small sorted array), not a sort of every match
-    const top = [];
+    const top = []; let total = 0;
     for (const [id, s] of scores) {
       const d = this.docs.get(id);
       if (prefix && !d.path.startsWith(prefix)) continue;
       if (filter && !filter(d)) continue;
+      total++;
       const f = this._factor(d, proj, boosts); const score = s * f.project * f.feedback;
       if (top.length === limit && score <= top[top.length - 1].score) continue;
       let i = top.length; while (i > 0 && top[i - 1].score < score) i--;
       top.splice(i, 0, { d, score }); if (top.length > limit) top.pop();
     }
-    return top.map(({ d, score }) => ({ path: d.path, heading: d.heading, line: d.line, snippet: d.snippet, score: Number(score.toFixed(3)), project: d.project, ...(d.rb ? { review_by: d.rb } : {}) }));
+    return withTotal(top.map(({ d, score }) => ({ path: d.path, heading: d.heading, line: d.line, snippet: d.snippet, score: Number(score.toFixed(3)), project: d.project, ...(d.rb ? { review_by: d.rb } : {}) })), total);
   }
 
   /** The sections of one note, optionally only the one with this heading. */

@@ -1,0 +1,53 @@
+{
+  "title": "SR-6.03 Installers and a container anyone can fetch",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G50: Installers have no download URL; the Docker image is on no registry. Repository: memev. Depends on contracts: SR-6.01.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Hosted installers and image",
+      "phase": "release",
+      "depends_on": [],
+      "requirements": [
+        "release assets plus a short install URL; signed image on ghcr.io"
+      ],
+      "description": "",
+      "scope": [
+        "scripts/install.sh",
+        "scripts/install.ps1",
+        "docs/QUICKSTART.md",
+        "docs/DOCKER.md",
+        ".github/workflows/release.yml"
+      ],
+      "criteria": [
+        {
+          "statement": "The quickstart shows the one-line install",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/QUICKSTART.md",
+            "pattern": "curl -fsSL https://"
+          }
+        },
+        {
+          "statement": "The release publishes the image",
+          "verifier": {
+            "type": "grep",
+            "file": ".github/workflows/release.yml",
+            "pattern": "ghcr.io"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

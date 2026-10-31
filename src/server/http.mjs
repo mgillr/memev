@@ -240,11 +240,14 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       vault.tokens.touch(identity.id);
       vault.devices.fresh();
       let dev = vault.devices.get(vault.devices.byToken.get(identity.id) || '');
+      // a record that a User-Agent switched to cloud-connector before issue 266 was fixed, for a token not made for a
+      // cloud app (migrate()'s note rule), goes back to remote-computer, so the upgrade closes the hole too
+      if (dev && dev.inferred && dev.kind === 'cloud-connector' && !/cloud connector|device cloud-connector/.test(identity.note || '')) dev = vault.devices.restoreSwitched(dev.id);
       let proof = null;
-      // The proof requirement is decided from the device kind as stored before observe() runs:
-      // observe() may reclassify an inferred record from the User-Agent, and that must not let a
-      // keyless computer through the gate. A token with no record yet is judged by its note, the
-      // same way observe() will store it.
+      // The proof requirement is decided from the device kind as stored, which only the person sets:
+      // observe() never changes it from the User-Agent (issue 266), so a keyless computer cannot get
+      // through the gate by naming a cloud app. A token with no record yet is judged by its note,
+      // the same way observe() will store it.
       const needsProof = !local && (dev ? dev.kind === 'remote-computer' : !/cloud connector/.test(identity.note || ''));
       if (needsProof) {
         if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) await getBody();
@@ -266,7 +269,10 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       if (!local && dev?.kind === 'cloud-connector' && computerSide({ userAgent: req.headers['user-agent'], memevClient: req.headers['x-memev-client'] })) {
         return send(403, { error: 'connector_on_computer', error_description: 'This connector URL is for a cloud AI app. To use this vault from another computer, enroll that computer with its own device key: memev devices keygen there, then memev devices enroll --kind remote-computer --pubkey <key> on the vault.' });
       }
-      const client = String(req.headers['x-memev-client'] || identity.agent).slice(0, 40);
+      // On this computer every app has its own token, so the token names the app; a header cannot make one app's token
+      // speak as another app or as the CLI (issues 248 and 263). A remote computer's one device token serves all of
+      // that computer's apps, so there the header picks which of them is calling.
+      const client = String(local ? identity.agent : req.headers['x-memev-client'] || identity.agent).slice(0, 40);
       const session = req.headers['x-memev-session'] ? String(req.headers['x-memev-session']).slice(0, 64) : null;
       const ctx = { identity, client, session, local, device: dev, cli: local && client === 'cli' };
 
@@ -299,7 +305,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
         if (route === '/v1/contract-gate') return send(200, { open: vault.contractGate(body.session) });
         if (route === '/v1/remember') return send(200, vault.remember(identity, { ...body, client }));
         if (route === '/v1/bus-pulse') { const u = vault.bus.unread(ctx, { peek: !!body.peek }); return send(200, { ...u, text: renderBus(u, { lead: !!body.lead }) }); }
-        if (route === '/v1/bus-register') { if (local) vault._seedBus(); const reg = []; for (const cl of [].concat(body.clients || [])) { try { reg.push(vault.bus.resolve({ ...ctx, client: String(cl).slice(0, 40), cli: false }).seat); } catch {} } if (local && body.operator && !vault.bus.operator()) try { vault.bus.setOperator(body.operator); } catch {} vault.commits.flush(); return send(200, { seats: reg, operator: vault.bus.operator() }); }
+        if (route === '/v1/bus-register') { if (local) vault._seedBus(); const reg = []; for (const cl of [].concat(body.clients || [])) { try { reg.push(vault.bus.resolve({ ...ctx, client: String(cl).slice(0, 40), cli: false }).seat); } catch {} } if (ctx.cli && body.operator && !vault.bus.operator()) try { vault.bus.setOperator(body.operator); } catch {} /* only the terminal picks the first lead (issue 248, the sibling route) */ vault.commits.flush(); return send(200, { seats: reg, operator: vault.bus.operator() }); }
         if (route === '/v1/bus-operator' && ctx.cli) { const seat = body.seat ? vault.bus.seatFor(body.seat) || body.seat : null; const op = vault.bus.setOperator(seat, { by: body.by || 'terminal' }); vault.commits.flush(); return send(200, { operator: op }); }
         if (route === '/v1/reload' && local && identity.scopes.includes('admin')) { vault.emit('reload'); return send(200, { ok: true }); }
       }
