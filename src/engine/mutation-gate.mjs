@@ -2,7 +2,8 @@
 // The mutation gate breaks each line a change added or edited, one mutant at a time, and fails when the tests still pass.
 // Before judging, the unmutated tests run twice, then once with every changed line rewritten to the same meaning; each
 // mutant is judged on two runs, each in its own copy of the repository; the unmutated tests run once more before a kill is
-// accepted. A failing control stops the run as noise. scripts/gate/mutate.mjs is the command line over this module.
+// accepted. A failing control stops the run as noise. A changed line that carries code but that no judged mutant covers
+// leaves the change unjudged, and the run is not ok. scripts/gate/mutate.mjs is the command line over this module.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,6 +17,9 @@ export const EXIT = { pass: 0, survived: 1, noise: 2, error: 2, 'no-mutants': 3 
 const RUN_PREFIX = 'memev-mutate-';
 const CONTROL_LIMIT_MS = 30 * 60 * 1000;
 const CHECK_LIMIT_MS = 60 * 1000;
+// How long a finished test command's output pipes may stay open, held by a process that left its group, before the run
+// stops waiting for them.
+const PIPE_GRACE_MS = 2000;
 // Variables that point git at another repository, index or config file. Neither the gate's own git calls nor a test
 // command see them, so each reaches only the repository it runs in.
 const GIT_REDIRECT = ['GIT_DIR', 'GIT_INDEX_FILE', 'GIT_WORK_TREE', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY',
@@ -24,8 +28,9 @@ const COPY = { recursive: true, verbatimSymlinks: true, mode: fs.constants.COPYF
 
 export const USAGE = `Usage: node scripts/gate/mutate.mjs --base <sha> --test <cmd> [--scope <glob>]... [--json]
   Mutates the lines added or changed since <sha> in .mjs, .js and .cjs files under src/, vendor/ and bin/, one mutant at a
-  time, and runs <cmd> on each. Exit 0 when every judged mutant is killed, 1 when one survives, 2 on noise or an error,
-  3 when no mutant could be judged. A line with the comment "mutate-ignore: <reason>" is skipped.
+  time, and runs <cmd> on each. Exit 0 when every judged mutant is killed and every changed line that carries code was
+  judged, 1 when one survives, 2 on noise, an error or a changed line left unjudged, 3 when no mutant could be judged.
+  A line with the comment "mutate-ignore: <reason>" is skipped.
 `;
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -43,6 +48,8 @@ const ESCAPE = /\\u(?:[\da-fA-F]{4}|\{[\da-fA-F]+\})/y;
 const ID_START = /[\p{ID_Start}$_]/u;
 const ID_PART = /[\p{ID_Continue}$\u200c\u200d]/u;
 const SPACE = /[\s\ufeff]/;
+// The ) that closes one of these headers ends a statement head, not an operand, so a / after it starts a regular expression.
+const HEADS = new Set(['if', 'while', 'for', 'with']);
 
 function endsOperand(list, k = list.length - 1) {
   const p = list[k];
@@ -104,6 +111,7 @@ export function tokenize(src) {
   // scan pushes tokens onto out; inside a template's ${ } it returns just past the closing brace.
   function scan(k, out, inBrace) {
     let depth = 0, nl = false;
+    const heads = [];
     while (k < n) {
       const c = src[k];
       if (c === '\n' || c === '\u2028' || c === '\u2029') { nl = true; k++; continue; }
@@ -118,21 +126,25 @@ export function tokenize(src) {
         comments.push({ s: k, e: e + 2, text: src.slice(k + 2, e) }); k = e + 2; continue;
       }
       const s = k;
-      let t;
+      let t, hdr = false;
       if (c === '"' || c === "'") { k = readStr(k); t = 'str'; }
       else if (c === '`') { k = readTpl(k); t = 'tpl'; }
       else if ((c >= '0' && c <= '9') || (c === '.' && src[k + 1] >= '0' && src[k + 1] <= '9')) {
         NUMBER.lastIndex = k; const m = NUMBER.exec(src); k += m ? m[0].length : 1; t = 'num';
       } else if (c === '#' || c === '\\' || idChar(k, ID_START)) { k = readId(k); t = KEYWORDS.has(src.slice(s, k)) ? 'kw' : 'id'; }
-      else if (c === '/' && !endsOperand(out)) { k = readRegex(k); t = 're'; }
+      else if (c === '/' && (!endsOperand(out) || out.at(-1).hdr)) { k = readRegex(k); t = 're'; }
       else {
         let v = PUNCT.find((p) => src.startsWith(p, k)) || c;
         if (v === '?.' && /\d/.test(src[k + 2] || '')) v = '?';
         k += v.length; t = 'p';
+        if (v === '(') heads.push(out.at(-1)?.t === 'kw' && HEADS.has(out.at(-1).v));
+        else if (v === ')') hdr = heads.pop() === true;
         if (v === '{') depth++;
         else if (v === '}') { if (inBrace && depth === 0) return k; depth--; }
       }
-      out.push({ t, v: src.slice(s, k), s, e: k, nl });
+      const tok = { t, v: src.slice(s, k), s, e: k, nl };
+      if (hdr) tok.hdr = true;
+      out.push(tok);
       nl = false;
     }
     if (inBrace) fail('unterminated template expression', k);
@@ -164,10 +176,15 @@ const PREFIX_P = new Set(['!', '~', '+', '-', '++', '--']);
 const OPERAND_AFTER = new Set(['===', '!==', '==', '!=', '<', '>', '<=', '>=', '&&', '||', '??', '+', '-', '*', '/', '%', '**', '&', '|',
   '^', '<<', '>>', '>>>', '!', '~', '?', '=', '+=', '-=', '*=', '/=', '%=', '**=', '<<=', '>>=', '>>>=', '&=', '|=', '^=', '&&=', '||=', '??=']);
 const STATEMENT_NAME_NEXT = new Set(['.', '?.', '(', '[', '++', '--', '=', '+=', '-=', '*=', '/=', '%=', '||=', '&&=', '??=']);
+const ASSIGN = new Set(['=', '+=', '-=', '*=', '/=', '%=', '**=', '<<=', '>>=', '>>>=', '&=', '|=', '^=', '&&=', '||=', '??=']);
+const DECLARE = new Set(['const', 'let', 'var']);
+// Tokens that never by themselves make a line carry code a test could check.
+const STRUCTURE = new Set(['{', '}', '(', ')', '[', ']', ',', ';', ':', '.', '?.', '=>', '...']);
+const BEHAVIOUR_KW = new Set(['return', 'throw', 'await', 'yield', 'delete', 'new', 'in', 'instanceof']);
 const newlines = (text) => text.replace(/[^\n]/g, '');
 
 export function analyse(src) {
-  const { toks, comments } = tokenize(src);
+  const { toks, comments, lineOf } = tokenize(src);
   const N = toks.length;
   const match = new Array(N);
   const stack = [];
@@ -259,7 +276,12 @@ export function analyse(src) {
   const statementTail = (b) => { const t = toks[b + 1]; return !t || P(b + 1, ';') || P(b + 1, '}') || (t.nl && startsStatement(t)); };
 
   const sites = [];
-  const add = (k, operator, edits, line = toks[k].line) => sites.push({ line, at: toks[k].s, operator, edits });
+  // cover is every line the mutant's edits touch, so a statement that spans lines is judged on each of them
+  const add = (k, operator, edits, line = toks[k].line) => {
+    const cover = new Set([line]);
+    for (const e of edits) for (let l = lineOf(e.s); l <= lineOf(Math.max(e.s, e.e - 1)); l++) cover.add(l);
+    sites.push({ line, at: toks[k].s, operator, edits, cover: [...cover] });
+  };
   const swap = (k, to) => add(k, `${toks[k].v} -> ${to}`, [{ s: toks[k].s, e: toks[k].e, text: to }]);
   function callStatement(start, k, operator) {
     const t = toks[k];
@@ -267,6 +289,14 @@ export function analyse(src) {
     const ch = chainAt(k);
     if (!ch || !ch.call || !statementTail(ch.end)) return;
     add(start, operator, [removal(start, ch.end)]);
+  }
+  // An assignment statement with no other mutant on its line is removed (assignStatement); a string that + joins is emptied.
+  const assigns = [], emptied = new Set();
+  function assignStatement(k) {
+    const ch = chainAt(k);
+    if (!ch || ch.call || toks[ch.end + 1]?.t !== 'p' || !ASSIGN.has(toks[ch.end + 1].v)) return;
+    const end = exprEnd(ch.end + 2, true);
+    if (end >= ch.end + 2 && statementTail(end)) assigns.push([k, end]);
   }
   for (let k = 0; k < N; k++) {
     const t = toks[k];
@@ -276,6 +306,15 @@ export function analyse(src) {
         const a = toks[k - 1], b = toks[k + 1];
         const text = (x) => x && (x.t === 'str' || x.t === 'tpl');
         if (operandEnd(k - 1) && b && !text(a) && !text(b) && (v === '-' || a.t === 'num' || b.t === 'num')) swap(k, v === '+' ? '-' : '+');
+        if (v === '+' && operandEnd(k - 1) && b) {
+          for (const j of [k - 1, k + 1]) {
+            const x = toks[j];
+            if (x.t === 'str' && x.v.length > 2 && !emptied.has(j)) {
+              emptied.add(j);
+              add(j, "concatenated string -> ''", [{ s: x.s, e: x.e, text: x.v[0] + x.v[0] }]);
+            }
+          }
+        }
       } else if (SWAP[v] && (!BINARY_ONLY.has(v) || operandEnd(k - 1))) swap(k, SWAP[v]);
       else if (v === '!') add(k, '! removed', [{ s: t.s, e: t.e, text: '' }]);
       else if (v === '?') {
@@ -294,6 +333,8 @@ export function analyse(src) {
           add(k, 'ternary branches swapped', [{ s: toks[k + 1].s, e: toks[c - 1].e, text: no }, { s: toks[c + 1].s, e: toks[end].e, text: yes }]);
         }
       }
+    } else if (t.t === 'kw' && (P(k - 1, '.') || P(k - 1, '?.'))) {
+      // a property name such as it.return or gen.throw, not a keyword
     } else if (t.t === 'kw') {
       const v = t.v;
       if (v === 'true' || v === 'false') {
@@ -309,12 +350,14 @@ export function analyse(src) {
       } else if (v === 'throw') {
         const end = exprEnd(k + 1, true);
         if (end > k) add(k, 'throw removed', [removal(k, end)]);
-      } else if (v === 'const') {
-        for (let j = k + 1; toks[j]?.t === 'id' && P(j + 1, '=') && toks[j + 2];) {
-          const end = exprEnd(j + 2, false);
-          if (end < j + 2) break;
-          if (!isFunctionValue(j + 2) && !(end === j + 2 && toks[j + 2].v === 'undefined')) {
-            add(j, 'const initialiser -> undefined', [span(j + 2, end, 'undefined')], toks[j].line);
+      } else if (DECLARE.has(v)) {
+        // a name or a destructuring pattern, then = and the initialiser
+        const target = (j) => (toks[j]?.t === 'id' ? j : (P(j, '{') || P(j, '[')) && match[j] !== undefined ? match[j] : -1);
+        for (let j = k + 1, te = target(j); te >= 0 && P(te + 1, '=') && toks[te + 2]; te = target(j)) {
+          const end = exprEnd(te + 2, false);
+          if (end < te + 2) break;
+          if (!isFunctionValue(te + 2) && !(end === te + 2 && toks[te + 2].v === 'undefined')) {
+            add(j, `${v} initialiser -> undefined`, [span(te + 2, end, 'undefined')], toks[j].line);
           }
           if (!P(end + 1, ',')) break;
           j = end + 2;
@@ -327,12 +370,53 @@ export function analyse(src) {
           add(k, ch.call ? 'call condition negated' : 'condition negated', [{ s: at, e: at, text: '!(' }, { s: close, e: close, text: ')' }]);
         }
       } else if (v === 'await' && stmtStart(k)) callStatement(k, k + 1, 'awaited call removed');
-      else if ((v === 'this' || v === 'super') && stmtStart(k)) callStatement(k, k, 'call statement removed');
-    } else if (t.t === 'id' && stmtStart(k)) callStatement(k, k, 'call statement removed');
+      else if ((v === 'this' || v === 'super') && stmtStart(k)) { callStatement(k, k, 'call statement removed'); assignStatement(k); }
+    } else if (t.t === 'id' && stmtStart(k)) { callStatement(k, k, 'call statement removed'); assignStatement(k); }
+  }
+  // one mutant is enough to judge a line, so the assignment is removed only where nothing else on its line is mutated
+  for (const [k, end] of assigns) if (!sites.some((x) => x.line === toks[k].line)) add(k, 'assignment removed', [removal(k, end)]);
+
+  // The opening bracket that encloses token k, or -1.
+  function enclosing(k) {
+    for (let j = k - 1; j >= 0; j--) {
+      if (toks[j].t !== 'p') continue;
+      if ((toks[j].v === ')' || toks[j].v === ']' || toks[j].v === '}') && match[j] !== undefined) { j = match[j]; continue; }
+      if (toks[j].v === '(' || toks[j].v === '[' || toks[j].v === '{') return j;
+    }
+    return -1;
+  }
+  // A { that opens an object literal: it stands where an operand is expected, not where a block or statement starts.
+  function objectBrace(o) {
+    if (!P(o, '{')) return false;
+    const q = toks[o - 1];
+    if (!q) return false;
+    if (q.t === 'kw') return ['return', 'throw', 'yield', 'await', 'typeof', 'void', 'delete', 'in'].includes(q.v);
+    if (q.t !== 'p') return false;
+    if (q.v === ':') return !caseColon(o - 1);
+    return OPERAND_AFTER.has(q.v) || ['(', '[', ','].includes(q.v);
+  }
+  // The : at c separates a ternary's branches (a ? at the same depth before it) or a property from its value.
+  function valueColon(c) {
+    if (caseColon(c)) return false;
+    for (let j = c - 1; j >= 0; j--) {
+      const u = toks[j];
+      if (u.t !== 'p') continue;
+      if ((u.v === ')' || u.v === ']' || u.v === '}') && match[j] !== undefined) { j = match[j]; continue; }
+      if (u.v === '?') return true;
+      if (u.v === ',' || u.v === ';' || u.v === '(' || u.v === '[' || u.v === '{') break;
+    }
+    return objectBrace(enclosing(c));
+  }
+  // An argument of a call or an element of an array literal starts after this ( [ or ,.
+  function listStart(k) {
+    const o = P(k, ',') ? enclosing(k) : k;
+    if (P(o, '(')) return callParen(o);
+    return P(o, '[') && !operandEnd(o - 1);
   }
 
-  // A rewrite of a line that keeps its meaning: one operand on it wrapped in parentheses. A call's arguments, an if, while
-  // or switch condition, and the operand after an operator, =, =>, return, throw or await all take a parenthesised operand.
+  // A rewrite of a line that keeps its meaning: one operand on it wrapped in parentheses. A call's arguments, an array's
+  // elements, an if, while or switch condition, a property's value, and the operand after an operator, =, =>, return,
+  // throw or await all take a parenthesised operand; a bare return; becomes return void 0;.
   function callParen(o) {
     if (!operandEnd(o - 1) || match[o] === undefined || P(match[o] + 1, '{') || P(match[o] + 1, '=>')) return false;
     return !(K(o - 2, 'function') || (P(o - 2, '*') && K(o - 3, 'function')) || (toks[o - 1].t === 'kw' && !VALUES.has(toks[o - 1].v)));
@@ -343,36 +427,63 @@ export function analyse(src) {
     if (p.t === 'p') {
       if (p.v === '=>') return !P(k, '{');
       if (p.v === '(') return ['if', 'while', 'switch'].some((w) => K(k - 2, w)) || callParen(k - 1);
+      if (p.v === '[' || p.v === ',') return listStart(k - 1);
+      if (p.v === ':') return valueColon(k - 1);
+      if (p.v === '++' || p.v === '--') return !operandEnd(k - 2);
       if (BINARY_ONLY.has(p.v) || p.v === '**') return operandEnd(k - 2);
       return OPERAND_AFTER.has(p.v);
     }
     if (p.t === 'kw' && ['return', 'throw', 'await', 'typeof', 'void', 'delete'].includes(p.v)) return !toks[k].nl;
     return false;
   }
+  // Every rewrite of the line, best first; the caller keeps the first one that still parses.
   function wrapLine(line) {
+    const out = [];
     let first = -1;
     for (let k = 0; k < N; k++) {
       if (toks[k].line !== line) continue;
       if (first < 0) first = k;
+      if (K(k, 'return') && (!toks[k + 1] || toks[k + 1].nl || P(k + 1, ';') || P(k + 1, '}'))) out.push([{ at: toks[k].e, text: ' void 0' }]);
       if (!operandStart(k)) continue;
       const ch = chainAt(k, true);
-      if (ch) return [{ at: toks[k].s, text: '(' }, { at: toks[ch.end].e, text: ')' }];
+      if (ch) out.push([{ at: toks[k].s, text: '(' }, { at: toks[ch.end].e, text: ')' }]);
     }
-    // A statement that opens with a name, as in n++; or save(); the name alone takes the parentheses.
+    // A statement that opens with a name or this, as in n++; or this.save(); the name alone takes the parentheses.
     const k = first;
-    if (k >= 0 && toks[k].t === 'id' && toks[k].v !== 'async' && toks[k + 1] && !P(k + 1, ':') && !P(k + 1, '=>')) {
+    if (k >= 0 && ((toks[k].t === 'id' && toks[k].v !== 'async') || K(k, 'this')) && toks[k + 1] && !P(k + 1, ':') && !P(k + 1, '=>')) {
       const p = toks[k - 1];
       const safe = !p || P(k - 1, ';') || P(k - 1, '{') || K(k - 1, 'else') || K(k - 1, 'do') || (P(k - 1, ')') && headerParen(k - 1));
       const next = toks[k + 1];
       if (safe && (next.t === 'tpl' || (next.t === 'p' && STATEMENT_NAME_NEXT.has(next.v)))) {
-        return [{ at: toks[k].s, text: '(' }, { at: toks[k].e, text: ')' }];
+        out.push([{ at: toks[k].s, text: '(' }, { at: toks[k].e, text: ')' }]);
       }
     }
-    return null;
+    return out;
+  }
+  // Lines that carry code a test could check: an operator, an assignment or initialiser (not of a function or class, not a
+  // parameter's default), a call, or return, throw, await, yield, delete, new, in (not a for header's) or instanceof. A
+  // brace, a function or class header, an import or an export list carries none.
+  function paramsAt(k) {
+    const o = enclosing(k);
+    if (!P(o, '(') || match[o] === undefined) return false;
+    return P(match[o] + 1, '=>') || (P(match[o] + 1, '{') && !headerParen(match[o]) && !K(o - 1, 'switch') && !K(o - 1, 'catch'));
+  }
+  const behaviour = new Set();
+  for (let k = 0; k < N; k++) {
+    const t = toks[k];
+    let b = false;
+    if (t.t === 'kw') b = BEHAVIOUR_KW.has(t.v) && !P(k - 1, '.') && !P(k - 1, '?.') && !(t.v === 'in' && K(enclosing(k) - 1, 'for'));
+    else if (t.t === 'p') {
+      if (t.v === '=') b = !isFunctionValue(k + 1) && !paramsAt(k);
+      else if (t.v === '(') b = callParen(k);
+      else if (t.v === '*') b = operandEnd(k - 1);
+      else b = !STRUCTURE.has(t.v);
+    }
+    if (b) behaviour.add(t.line);
   }
   const codeLines = new Set();
   for (const t of toks) for (let l = t.line; l <= t.last; l++) codeLines.add(l);
-  return { toks, comments, sites, codeLines, wrapLine };
+  return { toks, comments, sites, codeLines, wrapLine, behaviour };
 }
 
 export function applyEdits(src, edits) {
@@ -482,31 +593,63 @@ function treeHash(root) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// The plan: every mutant of every changed line, the lines skipped by a reason, and the lines that produced no mutant.
+// The plan: every mutant of every changed line, the lines skipped by a reason, the lines that produced no mutant, and the
+// lines that carry code and so need a judged mutant (needs). A changed file that is a link to a place outside the
+// repository is never mutated, so no write in a copy can reach outside it; its lines are unjudged from the start, as are
+// those of a file the tokenizer cannot read.
 
+const inside = (p, dir) => { const rel = path.relative(dir, p); return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)); };
 function plan(root, changes) {
-  const mutants = [], unmutated = [], ignores = [], files = [];
+  const mutants = [], unmutated = [], ignores = [], files = [], unjudged = [], needs = [];
   for (const [file, lines] of changes) {
-    const src = fs.readFileSync(path.join(root, file), 'utf8');
+    const abs = path.join(root, file);
+    let real;
+    try { real = fs.realpathSync(abs); } catch { real = null; }
+    if (real === null || !inside(real, root)) {
+      for (const l of lines) { unmutated.push({ file, line: l }); unjudged.push({ file, line: l, why: 'a link to a file outside the repository' }); }
+      continue;
+    }
+    // a link to a file inside the repository produces no mutant itself: that file is judged where it lives, when it changed
+    if (fs.lstatSync(abs).isSymbolicLink()) { for (const l of lines) unmutated.push({ file, line: l }); continue; }
+    const src = fs.readFileSync(abs, 'utf8');
     let a;
     try { a = analyse(src); } catch {
-      for (const l of lines) if ((src.split('\n')[l - 1] || '').trim()) unmutated.push({ file, line: l });
+      for (const l of lines) {
+        if (!(src.split('\n')[l - 1] || '').trim()) continue;
+        unmutated.push({ file, line: l });
+        unjudged.push({ file, line: l, why: 'the file could not be read as JavaScript' });
+      }
       continue;
     }
     const reasons = ignoreReasons(a.comments);
     const byLine = new Map();
     for (const s of a.sites) { if (!byLine.has(s.line)) byLine.set(s.line, []); byLine.get(s.line).push(s); }
-    const code = [];
+    // the lines a skipped mutant would have covered are skipped with it
+    const skipped = new Set(reasons.keys());
+    for (const s of a.sites) if (reasons.has(s.line)) for (const l of s.cover) skipped.add(l);
+    const code = [], mutantLines = [];
     for (const l of lines) {
       if (a.codeLines.has(l)) code.push(l);
       if (reasons.has(l)) { ignores.push({ file, line: l, reason: reasons.get(l) }); continue; }
       const here = (byLine.get(l) || []).sort((x, y) => x.at - y.at);
-      if (!here.length) { if (a.codeLines.has(l)) unmutated.push({ file, line: l }); continue; }
-      for (const s of here) mutants.push({ file, line: l, operator: s.operator, src, edits: s.edits });
+      if (!here.length && a.codeLines.has(l)) unmutated.push({ file, line: l });
+      if (here.length) mutantLines.push(l);
+      for (const s of here) mutants.push({ file, line: l, operator: s.operator, src, edits: s.edits, cover: s.cover });
+      if (!skipped.has(l) && (here.length || a.behaviour.has(l))) needs.push({ file, line: l, sites: here.length });
     }
-    files.push({ file, src, lines: code, wrapLine: a.wrapLine });
+    files.push({ file, src, lines: code, mutantLines, wrapLine: a.wrapLine });
   }
-  return { mutants, unmutated, ignores, files };
+  return { mutants, unmutated, ignores, files, unjudged, needs };
+}
+// The lines that needed a judged mutant and got none: no mutant covers them, or each one there was invalid or timed out.
+function openLines(p, results) {
+  const judged = new Set();
+  p.mutants.forEach((m, i) => {
+    const r = results[i];
+    if (r && (r.outcome === 'killed' || r.outcome === 'survived')) for (const l of m.cover) judged.add(`${m.file}:${l}`);
+  });
+  return p.needs.filter((n) => !judged.has(`${n.file}:${n.line}`))
+    .map(({ file, line, sites }) => ({ file, line, why: sites ? 'each mutant there was invalid or timed out' : 'no mutant covers it' }));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -558,7 +701,7 @@ function exec(ctx, cwd, env, limitMs) {
     const child = spawn(win ? process.env.ComSpec || 'cmd.exe' : '/bin/sh', win ? ['/d', '/s', '/c', ctx.cmd] : ['-c', ctx.cmd],
       { cwd, env, detached: !win, stdio: ['ignore', 'pipe', 'pipe'], windowsVerbatimArguments: win });
     ctx.children.add(child);
-    let out = '', timedOut = false, done = false;
+    let out = '', timedOut = false, done = false, grace = null;
     const keep = (d) => { out += d; if (out.length > 1 << 20) out = out.slice(-(1 << 19)); };
     child.stdout.on('data', keep);
     child.stderr.on('data', keep);
@@ -567,11 +710,16 @@ function exec(ctx, cwd, env, limitMs) {
       if (done) return;
       done = true;
       clearTimeout(timer);
+      clearTimeout(grace);
       ctx.children.delete(child);
       resolve({ pass: !timedOut && code === 0, code, signal, timedOut, ms: Date.now() - t0, out });
     };
-    // Once the command has exited, anything it left running in its group is stopped too.
-    child.on('exit', () => killGroup(child));
+    // Once the command has exited, anything it left running in its group is stopped too. A process that left the group
+    // (detached) can still hold the output pipes open; the result waits for them only PIPE_GRACE_MS.
+    child.on('exit', (code, signal) => {
+      killGroup(child);
+      grace = setTimeout(() => { child.stdout.destroy(); child.stderr.destroy(); finish(code, signal); }, PIPE_GRACE_MS);
+    });
     child.on('error', (e) => { keep(e.message); finish(null, null); });
     child.on('close', finish);
   });
@@ -605,6 +753,16 @@ async function runOnce(ctx, prepare, limitMs) {
     fs.rmSync(box, { recursive: true, force: true, maxRetries: 3 });
   }
 }
+// Writes a mutated or rewritten source into a copy. The file must be a regular file inside the copy, never a link and
+// never under a linked folder, so the write cannot reach outside the copy.
+function writeIn(work, file, text) {
+  const target = path.join(work, file);
+  const st = fs.lstatSync(target, { throwIfNoEntry: false });
+  if (!st || !st.isFile() || !inside(fs.realpathSync(target), fs.realpathSync(work))) {
+    throw new Error(`refused to write ${file} in a copy: it is not a regular file inside the copy`);
+  }
+  fs.writeFileSync(target, text);
+}
 function parses(file) {
   const r = spawnSync(process.execPath, ['--check', file], { cwd: path.dirname(file), env: cleanEnv(), encoding: 'utf8', timeout: CHECK_LIMIT_MS });
   return r.status === 0;
@@ -617,24 +775,37 @@ export function passCount(out) {
   return last;
 }
 // The rewrite control: every changed line of every changed file with one operand wrapped in parentheses. A file whose
-// rewrite does not parse is rewritten line by line, keeping only the lines that still parse.
+// rewrite does not parse is rewritten line by line, each line taking the first of its rewrites that still parses. Every
+// line that carries a mutant must be rewritten, or a test that reacts to the source text there would read as a kill; when
+// one is not, the control returns false and the run stops as noise without running the tests.
 function rewriteControl(work, files, res) {
   let lines = 0, wrapped = 0;
+  const unchanged = [];
   for (const f of files) {
     const target = path.join(work, f.file);
-    const wraps = f.lines.map((l) => f.wrapLine(l)).filter(Boolean);
+    const options = new Map(f.lines.map((l) => [l, f.wrapLine(l)]).filter(([, w]) => w.length));
     lines += f.lines.length;
-    if (!wraps.length) continue;
-    fs.writeFileSync(target, applyInserts(f.src, wraps.flat()));
-    if (parses(target)) { wrapped += wraps.length; continue; }
-    let kept = [];
-    for (const w of wraps) {
-      fs.writeFileSync(target, applyInserts(f.src, [...kept, ...w]));
-      if (parses(target)) { kept = [...kept, ...w]; wrapped++; }
+    const done = new Set();
+    if (options.size) {
+      const first = [...options.values()].flatMap((w) => w[0]);
+      writeIn(work, f.file, applyInserts(f.src, first));
+      if (parses(target)) for (const l of options.keys()) done.add(l);
+      else {
+        let kept = [];
+        for (const [l, ws] of options) {
+          for (const w of ws) {
+            writeIn(work, f.file, applyInserts(f.src, [...kept, ...w]));
+            if (parses(target)) { kept = [...kept, ...w]; done.add(l); break; }
+          }
+        }
+        writeIn(work, f.file, applyInserts(f.src, kept));
+      }
     }
-    fs.writeFileSync(target, applyInserts(f.src, kept));
+    wrapped += done.size;
+    for (const l of f.mutantLines) if (!done.has(l)) unchanged.push({ file: f.file, line: l });
   }
-  res.rewrite = { lines, wrapped };
+  res.rewrite = { lines, wrapped, unchanged };
+  return unchanged.length === 0;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -642,7 +813,7 @@ function rewriteControl(work, files, res) {
 
 function blank() {
   return { version: GATE_VERSION, status: 'error', reason: '', base: null, mutants: 0, killed: 0, survived: null, invalid: 0, timeout: 0, ignored: 0,
-    noise: 0, survivors: [], unmutated: [], ignores: [], files: [], timeoutMs: null, controls: [], rewrite: null, results: [] };
+    noise: 0, survivors: [], unmutated: [], unjudged: [], ignores: [], files: [], timeoutMs: null, controls: [], rewrite: null, results: [] };
 }
 function finish(res) {
   const ok = res.status === 'ok';
@@ -677,17 +848,23 @@ async function judge(ctx, p, res) {
   if (!c2.pass) return noise('the tests fail on the second run on the unmutated tree');
   if (passCount(c1.out) !== passCount(c2.out)) return noise(`the pass count differs between two unmutated runs (${passCount(c1.out)}, ${passCount(c2.out)})`);
   res.timeoutMs = Math.ceil(5 * Math.max(c1.ms, c2.ms) + 10000);
-  const rc = control('rewrite', await runOnce(ctx, (work) => rewriteControl(work, p.files, res), res.timeoutMs));
+  const rr = await runOnce(ctx, (work) => rewriteControl(work, p.files, res), res.timeoutMs);
+  if (rr.invalid) {
+    res.controls.push({ kind: 'rewrite', pass: false, timedOut: false, ms: 0, passCount: null, ran: false });
+    const at = res.rewrite.unchanged.map((u) => `${u.file}:${u.line}`).join(', ');
+    return noise(`the rewrite control could not change ${at}, so a test that reacts to the source text there would read as a kill`);
+  }
+  const rc = control('rewrite', rr);
   if (!rc.pass) return noise('the tests fail when the changed lines are rewritten to the same meaning, so they react to the source text');
   for (const m of p.mutants) {
     const text = applyEdits(m.src, m.edits);
     const entry = { file: m.file, line: m.line, operator: m.operator, outcome: 'invalid', ms: null };
     res.results.push(entry);
-    const r1 = await runOnce(ctx, (work) => { const f = path.join(work, m.file); fs.writeFileSync(f, text); return parses(f); }, res.timeoutMs);
+    const r1 = await runOnce(ctx, (work) => { writeIn(work, m.file, text); return parses(path.join(work, m.file)); }, res.timeoutMs);
     if (r1.invalid) continue;
     entry.ms = r1.ms;
     if (r1.timedOut) { entry.outcome = 'timeout'; continue; }
-    const r2 = await runOnce(ctx, (work) => { fs.writeFileSync(path.join(work, m.file), text); }, res.timeoutMs);
+    const r2 = await runOnce(ctx, (work) => { writeIn(work, m.file, text); }, res.timeoutMs);
     if (r2.timedOut || r1.pass !== r2.pass) {
       entry.outcome = 'noise';
       return noise(`the two runs on ${m.file}:${m.line} (${m.operator}) disagree`);
@@ -721,6 +898,8 @@ export async function runGate({ cwd = process.cwd(), base, test, scopes = [] } =
   }
   const p = plan(root, changes);
   Object.assign(res, { unmutated: p.unmutated, ignores: p.ignores, files: p.files.map(({ file }) => ({ file })) });
+  // until the run judges, the unjudged lines are those it can never judge: refused or unreadable files, lines with no mutant
+  res.unjudged = [...p.unjudged, ...openLines({ mutants: [], needs: p.needs.filter((n) => !n.sites) }, [])];
   if (!p.mutants.length) {
     res.status = 'no-mutants';
     res.reason = changes.size ? 'no changed line produced a mutant' : 'no line changed in the mutation set';
@@ -748,6 +927,14 @@ export async function runGate({ cwd = process.cwd(), base, test, scopes = [] } =
     cleanup();
   }
   if (treeHash(root) !== before) { res.status = 'error'; res.reason = 'the working tree changed during the run'; }
+  else if (res.status === 'ok') {
+    // a changed line that carries code and that no judged mutant covers leaves the change unjudged, so the run is not ok
+    res.unjudged = [...p.unjudged, ...openLines(p, res.results)];
+    if (res.unjudged.length) {
+      res.status = 'error';
+      res.reason = `${res.unjudged.length} changed line(s) carry code that no judged mutant covers`;
+    }
+  }
   return finish(res);
 }
 
@@ -779,6 +966,7 @@ function report(res) {
   } else lines.push(`mutation gate: ${res.status.toUpperCase()}: ${res.reason}`);
   for (const s of res.survivors) lines.push(`  survived   ${s.file}:${s.line}  ${s.operator}`);
   for (const u of res.unmutated) lines.push(`  no mutant  ${u.file}:${u.line}`);
+  for (const u of res.unjudged) lines.push(`  unjudged   ${u.file}:${u.line}  ${u.why}`);
   for (const g of res.ignores) lines.push(`  ignored    ${g.file}:${g.line}  ${g.reason}`);
   return `${lines.join('\n')}\n`;
 }

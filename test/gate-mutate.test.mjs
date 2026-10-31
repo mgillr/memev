@@ -161,25 +161,28 @@ test('T1-c04: on gt, a string holding === and a sum loop with a weak test: exit 
   assert.equal(r.code, 1);
   assert.equal(r.j.killed, 0);
   assert.deepEqual(r.j.results.map((x) => [x.line, x.operator, x.outcome]),
-    [[1, '> -> <=', 'survived'], [5, '< -> >=', 'survived'], [5, '+ -> -', 'timeout']]);
+    [[1, '> -> <=', 'survived'], [2, "concatenated string -> ''", 'survived'], [5, 'let initialiser -> undefined', 'survived'],
+      [5, '< -> >=', 'survived'], [5, '+ -> -', 'timeout']]);
   assert.equal(r.j.timeout, 1);
-  assert.deepEqual(r.j.unmutated, [{ file: 'src/m.mjs', line: 2 }], 'nothing inside the string literal is mutated');
+  assert.deepEqual(r.j.unmutated, []);
+  assert.deepEqual(at(r.j, 'src/m.mjs', 2).map((x) => x.operator), ["concatenated string -> ''"], 'the === inside the string literal is never swapped');
   const sources = fs.readdirSync(seen).filter((f) => f.endsWith('.mjs'));
   const distinct = new Set(sources.map((f) => fileSha(path.join(seen, f))));
-  assert.equal(distinct.size, 5, 'the unmutated source, its parenthesised rewrite and the three mutants each reached the test');
+  assert.equal(distinct.size, 7, 'the unmutated source, its parenthesised rewrite and the five mutants each reached the test');
   for (const f of sources) assert.ok(parsesAsModule(path.join(seen, f)), `${f} passes node --check`);
   assert.ok(r.ms < 120000, `the run took ${r.ms} ms`);
   const pids = fs.readFileSync(path.join(seen, 'pids'), 'utf8').split('\n').filter(Boolean).map(Number);
   assert.ok(await waitFor(() => pids.every((p) => !alive(p)), 10000), 'no test process is left running');
 
-  // A mutant that does not parse is invalid, never killed, and never reaches the test.
+  // A mutant that does not parse is invalid, never killed, and never reaches the test. Its line, judged by no other
+  // mutant, is unjudged, so the run is not ok.
   const badSrc = 'export const gt = (a, b) => a > b; //@\nexport const odd = (a) => a -+1; //@\n';
   const bad = fixture({ src: { 'src/m.mjs': badSrc }, files: { 'test/t.mjs': SEEN } });
   const seen2 = scratch();
   const v = await gate(bad.dir, [...on(bad), ...RUN], { env: { GATE_SEEN: seen2 } });
-  assert.equal(v.code, 1);
-  assert.deepEqual([v.j.killed, v.j.invalid, v.j.mutants], [0, 1, 1]);
+  assert.deepEqual([v.code, v.j.status, v.j.killed, v.j.invalid], [2, 'error', 0, 1]);
   assert.deepEqual(at(v.j, 'src/m.mjs', 2).map((x) => [x.operator, x.outcome]), [['- -> +', 'invalid']]);
+  assert.deepEqual(v.j.unjudged, [{ file: 'src/m.mjs', line: 2, why: 'each mutant there was invalid or timed out' }]);
   for (const f of fs.readdirSync(seen2).filter((n) => n.endsWith('.mjs'))) assert.ok(parsesAsModule(path.join(seen2, f)), `${f} passes node --check`);
 });
 
@@ -576,7 +579,7 @@ b(0);
   assert.deepEqual([r.code, r.j.status, r.j.killed], [2, 'noise', 0]);
   assert.deepEqual(r.j.results, [], 'no mutant was judged');
   assert.deepEqual(r.j.controls.map((c) => [c.kind, c.pass]), [['unmutated', true], ['unmutated', true], ['rewrite', false]]);
-  assert.deepEqual(r.j.rewrite, { lines: 2, wrapped: 2 }, 'the rewrite touched the changed line in each file');
+  assert.deepEqual(r.j.rewrite, { lines: 2, wrapped: 2, unchanged: [] }, 'the rewrite touched the changed line in each file');
 });
 
 test('T1-c17: a plain condition, a ternary, a while condition and == each survive a weak test; the run is never ok with 0 survived', async () => {
@@ -775,4 +778,173 @@ test('T1-c24: every test command sees a HOME inside the run temp folder, never t
     assert.equal(noService, '1');
   }
   assert.equal(runDirs.size, 1);
+});
+
+// The criterion's rule for a weak line: it survives, or it is listed in unmutated while the run exits non-zero and is not ok.
+function weakLineHeld(r, file, line) {
+  const p = `${file}:${line}`;
+  return pairs(r.j.survivors).includes(p) || (pairs(r.j.unmutated).includes(p) && r.code !== 0 && r.j.status !== 'ok');
+}
+
+test('T1-c25: weak lines the operator set or the tokenizer could miss never let the run exit 0; a changed line left unjudged makes it not ok', async () => {
+  const a = `export const gt = (a, b) => a > b; //@
+export function total(price, tax) {
+  let t = price + tax; //@
+  return t;
+}
+`;
+  const b = `export function check(x, y) {
+  if (x) /'/.test(y); //@
+  return x < y; //@
+}
+`;
+  const t = String.raw`import assert from 'node:assert/strict';
+import { gt, total } from '../src/a.mjs';
+import { check } from '../src/b.mjs';
+assert.equal(gt(2, 1), true);
+assert.equal(gt(1, 1), false);
+assert.equal(gt(1, 2), false);
+total(1, 2);
+check(1, 2);
+`;
+  const fx = fixture({ src: { 'src/a.mjs': a, 'src/b.mjs': b }, files: { 'test/t.mjs': t } });
+  const r = await gate(fx.dir, [...on(fx), ...RUN]);
+  assert.ok(!(r.code === 0 && r.j.survived === 0), 'never exit 0 with survived 0');
+  for (const [file, line] of [['src/a.mjs', 3], ['src/b.mjs', 2], ['src/b.mjs', 3]]) {
+    assert.ok(weakLineHeld(r, file, line), `${file}:${line}: survivors ${pairs(r.j.survivors)}; unmutated ${pairs(r.j.unmutated)}; ${r.j.status}`);
+  }
+  // here every weak line is judged, and survives, beside the killed comparison
+  assert.deepEqual([r.code, r.j.status], [1, 'ok']);
+  assert.deepEqual(at(r.j, 'src/a.mjs', 1).map((x) => x.outcome), ['killed']);
+  assert.deepEqual(pairs(r.j.survivors), ['src/a.mjs:3', 'src/b.mjs:2', 'src/b.mjs:3']);
+  assert.deepEqual(r.j.unjudged, []);
+
+  // Beside a killed line: a changed line that carries code and no mutant, a line whose only mutant times out, and a changed
+  // file the tokenizer cannot read each leave the run not ok, with the line under unjudged.
+  const cases = [
+    [{ 'src/both.mjs': 'export const both = (a, b) => a + b; //@\n' }, "import { both } from '../src/both.mjs';\nboth(1, 2);\n",
+      [{ file: 'src/both.mjs', line: 1, why: 'no mutant covers it' }]],
+    [{ 'src/count.mjs': 'export function count(n) {\n  let i = 0;\n  while (i < n) {\n    i = i + 1; //@\n  }\n  return i;\n}\n' },
+      "import { count } from '../src/count.mjs';\ncount(3);\n",
+      [{ file: 'src/count.mjs', line: 4, why: 'each mutant there was invalid or timed out' }]],
+    [{ 'src/broken.mjs': "export const s = 'open; //@\n" }, '',
+      [{ file: 'src/broken.mjs', line: 1, why: 'the file could not be read as JavaScript' }]],
+  ];
+  for (const [src, extra, unjudged] of cases) {
+    const fx2 = fixture({ src: { 'src/cmp.mjs': CMP, ...src }, files: { 'test/t.mjs': STRONG_GT + extra } });
+    const r2 = await gate(fx2.dir, [...on(fx2), ...RUN]);
+    assert.deepEqual([r2.code, r2.j.status], [2, 'error'], `${Object.keys(src)}: ${r2.j.reason}`);
+    assert.deepEqual(at(r2.j, 'src/cmp.mjs', 1).map((x) => x.outcome), ['killed']);
+    assert.deepEqual(r2.j.unjudged, unjudged);
+  }
+  // a weakly tested assignment statement is judged, and survives
+  const set = fixture({ src: { 'src/cmp.mjs': CMP, 'src/set.mjs': 'export function set(o, v) {\n  o.role = v; //@\n}\n' },
+    files: { 'test/t.mjs': `${STRONG_GT}import { set } from '../src/set.mjs';\nset({}, 1);\n` } });
+  const rs = await gate(set.dir, [...on(set), ...RUN]);
+  assert.deepEqual([rs.code, rs.j.status], [1, 'ok']);
+  assert.deepEqual(rs.j.survivors, [{ file: 'src/set.mjs', line: 2, operator: 'assignment removed' }]);
+});
+
+test('T1-c26: the rewrite control changes every changed line that carries a mutant, or the run stops as NOISE', async () => {
+  const t = String.raw`import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+const bare = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '').replace(/\s+/g, '');
+if (bare(fs.readFileSync('src/conf.mjs', 'utf8')) !== bare(execFileSync('git', ['show', 'HEAD:src/conf.mjs'], { encoding: 'utf8' }))) process.exit(1);
+const { conf } = await import('../src/conf.mjs');
+conf.on;
+`;
+  const fx = fixture({ src: { 'src/conf.mjs': 'export const conf = {\n  on: true, //@\n};\n' }, files: { 'test/t.mjs': t }, commit: true });
+  const r = await gate(fx.dir, [...on(fx), ...RUN]);
+  assert.notEqual(r.code, 0);
+  assert.deepEqual([r.code, r.j.status, r.j.killed], [2, 'noise', 0]);
+  assert.deepEqual(r.j.results, [], 'no mutant was judged');
+  // the property's value was rewritten, and the test reacted to that
+  assert.deepEqual(r.j.rewrite, { lines: 1, wrapped: 1, unchanged: [] });
+  assert.deepEqual(r.j.controls.map((c) => [c.kind, c.pass]), [['unmutated', true], ['unmutated', true], ['rewrite', false]]);
+
+  // a line with a mutant that no rewrite can change stops the run as NOISE before the tests run on the rewrite
+  const kid = 'class Base { save() { this.saved = true; } }\nexport class Kid extends Base {\n  run() {\n    super.save(); //@\n  }\n}\n';
+  const k = fixture({ src: { 'src/kid.mjs': kid }, files: { 'test/t.mjs': "import { Kid } from '../src/kid.mjs';\nnew Kid().run();\n" } });
+  const rk = await gate(k.dir, [...on(k), ...RUN]);
+  assert.deepEqual([rk.code, rk.j.status, rk.j.killed], [2, 'noise', 0]);
+  assert.deepEqual(rk.j.rewrite.unchanged, [{ file: 'src/kid.mjs', line: 4 }]);
+  assert.match(rk.j.reason, /could not change src\/kid\.mjs:4/);
+  assert.deepEqual(rk.j.controls.at(-1), { kind: 'rewrite', pass: false, timedOut: false, ms: 0, passCount: null, ran: false });
+
+  // array elements, a prefix ++, a bare return; and a statement that opens with this are all rewritten, so a weak test there
+  // gives survivors, not NOISE
+  const c = `export const flags = [
+  true, //@
+  false, //@
+];
+export function step(n, log) {
+  ++n; //@
+  if (n > 9) {
+    return; //@
+  }
+  log.push(n);
+  return n;
+}
+export class Box {
+  constructor() { this.n = 0; }
+  bump() { this.n++; }
+  put() {
+    this.bump(); //@
+  }
+}
+`;
+  const w = fixture({ src: { 'src/c.mjs': c }, files: { 'test/t.mjs': "import { flags, step, Box } from '../src/c.mjs';\nflags.length;\nstep(1, []);\nnew Box().put();\n" } });
+  const rw = await gate(w.dir, [...on(w), ...RUN]);
+  assert.deepEqual([rw.code, rw.j.status], [1, 'ok'], rw.j.reason);
+  assert.deepEqual(rw.j.rewrite.unchanged, []);
+  assert.deepEqual(pairs(rw.j.survivors), ['src/c.mjs:17', 'src/c.mjs:2', 'src/c.mjs:3', 'src/c.mjs:6', 'src/c.mjs:8']);
+});
+
+test('T1-c27: a changed file that links outside the repository is never written through, whatever the exit code', async () => {
+  const outside = scratch();
+  const target = path.join(outside, 'target.mjs');
+  fs.writeFileSync(target, 'export const gt = (a, b) => a > b;\n');
+  const fx = repo({ 'test/t.mjs': "import { gt } from '../src/link.mjs';\ngt(1, 2);\n" });
+  fs.mkdirSync(path.join(fx.dir, 'src'));
+  fs.symlinkSync(target, path.join(fx.dir, 'src', 'link.mjs'));
+  const sha0 = fileSha(target);
+  const before = hashTree(fx.dir);
+  const r = await gate(fx.dir, [...on(fx), ...RUN]);
+  assert.equal(fileSha(target), sha0, 'the file outside the repository is byte-identical');
+  assert.deepEqual(hashTree(fx.dir), before, 'the checkout hashes as before');
+  assert.notEqual(r.code, 0);
+  assert.deepEqual(r.j.unjudged, [{ file: 'src/link.mjs', line: 1, why: 'a link to a file outside the repository' }]);
+});
+
+test('T1-c28: a test that fails only on the first run of the only mutant is NOISE, and that mutant is noise, never killed', async () => {
+  const fx = cmpFixture(COUNTED_GT);
+  const r = await gate(fx.dir, [...on(fx), ...RUN], { env: { GATE_COUNT: path.join(scratch(), 'count'), GATE_FAIL: 'n === 4' } });
+  assert.deepEqual([r.code, r.j.status, r.j.killed], [2, 'noise', 0]);
+  assert.deepEqual(r.j.results.map((x) => [x.file, x.line, x.operator, x.outcome]), [['src/cmp.mjs', 1, '> -> <=', 'noise']]);
+  assert.ok(!r.j.results.some((x) => x.outcome === 'killed'), 'never reported killed');
+});
+
+// Leaves behind a detached process that holds the test command's output pipes, logs its pid outside the fixture, and exits 0.
+const DETACHED = String.raw`import fs from 'node:fs';
+import { spawn } from 'node:child_process';
+import { gt } from '../src/cmp.mjs';
+const c = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 3600000)'], { detached: true, stdio: 'inherit' });
+fs.appendFileSync(process.env.GATE_PIDS, c.pid + '\n');
+c.unref();
+gt(1, 2);
+`;
+
+test('T1-c29: a test that leaves a detached child holding the pipes does not hang the run: it exits 1 on its own within 120 s', async () => {
+  const fx = cmpFixture(DETACHED);
+  const pids = path.join(scratch(), 'pids');
+  try {
+    const r = await gate(fx.dir, [...on(fx), ...RUN], { env: { GATE_PIDS: pids }, timeoutMs: 150000 });
+    assert.equal(r.signal, null, 'the gate exited on its own, not killed by the harness');
+    assert.ok(r.ms < 120000, `the run took ${r.ms} ms`);
+    assert.equal(r.code, 1);
+    assert.deepEqual(r.j.survivors, [{ file: 'src/cmp.mjs', line: 1, operator: '> -> <=' }]);
+  } finally {
+    const list = fs.existsSync(pids) ? fs.readFileSync(pids, 'utf8').split('\n').filter(Boolean).map(Number) : [];
+    for (const pid of list) { try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ } }
+  }
 });
