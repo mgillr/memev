@@ -1,0 +1,215 @@
+{
+  "title": "SR-1.27 Done comes only from a passing verify",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G92 (issue #242) and the PROTECTED part of issue #243: contractList sets a signed contract's state to done whenever a file named contracts/closed/<id>.json exists (src/engine/contracts.mjs:262-265), and nothing checks what the file holds or who wrote it. PROTECTED covers only contracts/signed/ and contracts/keys/ (src/engine/vault.mjs:27), verify writes contracts/closed/ through the caller's own identity (contracts.mjs:248), and contracts/receipts/ is unprotected. So any token with write scope over contracts/**, including the token a paired device gets (src/engine/devices.mjs:85) and a cloud connector's (src/engine/oauth.mjs:17), takes a contract out of the Stop-hook gate and the pre-push gate with no contract.verified record, and can rewrite its receipts. Found by the SR-0.03 red-team round and reproduced on 31 October 2026 on the main source. Repository: memev. Depends on contracts: none. Lands ahead of SR-0.03. On a case-insensitive file system (macOS APFS, Windows) a case variant such as contracts/Signed/<id>.json also reaches a signed contract, because PROTECTED compares exact spelling. Sensitive path (contracts and tokens): the QL-1.03 checklist applies before merge.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Verify output is immutable to every caller",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "contracts/closed/ and contracts/receipts/ join PROTECTED; write, append and delete under either path are refused as immutable for every token, local or remote, owner included",
+        "verify writes the closed record and appends the receipt as internal writes, so its own output still lands",
+        "PROTECTED is matched on the folded path, Unicode NFC then toUpperCase() then toLowerCase(), so a case or long-s variant such as contracts/Signed/ or contracts/ſigned/ is refused like the exact spelling on every file system (issue #243: on a case-insensitive volume the variant reaches the protected file)",
+        "the refusal reaches MCP and HTTP callers as a 4xx naming the path as immutable, never a 500, and nothing is appended to the log by a refused call"
+      ],
+      "scope": [
+        "src/engine/vault.mjs",
+        "src/engine/contracts.mjs",
+        "test/contracts-closed-protected.test.mjs",
+        "test/helpers/**",
+        "docs/MODULES.md",
+        "changelog.d/SR-1.27.md"
+      ],
+      "criteria": [
+        {
+          "statement": "With a token shaped like a paired device's (scopes read and write, paths memory/**, work/**, contracts/**, bus/**, remote true), and again with the owner's token, writing, appending or deleting contracts/closed/<id>.json and contracts/receipts/<id>.md is refused as immutable through the vault, MCP and HTTP. The log's last sequence number is unchanged by each refusal, and the contract stays open and in the Stop-hook gate.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "node --test test/contracts-closed-protected.test.mjs"
+          }
+        },
+        {
+          "statement": "With a token shaped like a paired device's (scopes read and write, paths memory/**, work/**, contracts/**, bus/**, remote true), writes to contracts/Signed/<id>.json, contracts/SIGNED/<id>.json, contracts/Closed/<id>.json and contracts/ſigned/<id>.json (long s) are each refused as immutable, and the signed contract file's bytes are unchanged. The test runs the folded comparison on whatever volume it is on, so it fails on a case-sensitive file system too when the comparison is not folded.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "node --test test/contracts-closed-protected.test.mjs"
+          }
+        },
+        {
+          "statement": "A contract whose only criterion passes is verified by the owner: the verify result is PASS, contracts/closed/<id>.json holds that result, and the receipt gains one entry.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-closed-protected.test.mjs",
+            "cmd": "node --test test/contracts-closed-protected.test.mjs"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/contracts-closed-protected.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/contracts-closed-protected.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/contracts-closed-protected.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "State comes from the verify record, not a file",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "a signed contract is done when the log holds a contract.verified record for its id with ok true; the presence, absence or content of a file under contracts/closed/ plays no part in contractList, contractGate or the pre-push gate",
+        "done is a fact about a past verify: a later failing verify of a done contract is recorded and reported but does not reopen it, because a scope criterion can fail later for changes made after the work landed",
+        "memev doctor lists every contract whose contracts/closed/<id>.json exists with no passing contract.verified record, as a contract to verify again; nothing is rewritten or deleted",
+        "a vault written by the code at the base, whose contracts were closed by a real passing verify, reads them as done after the change"
+      ],
+      "scope": [
+        "src/engine/contracts.mjs",
+        "src/engine/vault.mjs",
+        "src/cli/doctor.mjs",
+        "test/contracts-done-from-log.test.mjs",
+        "test/fixtures/contracts-closed/**",
+        "test/helpers/**",
+        "docs/CONTRACTS.md",
+        "docs/MODULES.md",
+        "changelog.d/SR-1.27.md"
+      ],
+      "criteria": [
+        {
+          "statement": "A signed contract whose contracts/closed/<id>.json is placed on disk directly (not through the vault), with no passing contract.verified record, is open and in the Stop-hook gate, and memev doctor names it. After a passing verify it is done and leaves the gate.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "node --test test/contracts-done-from-log.test.mjs"
+          }
+        },
+        {
+          "statement": "A done contract verified again with a failing result stays done; the failing result is in the receipt and in contract.verified.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "node --test test/contracts-done-from-log.test.mjs"
+          }
+        },
+        {
+          "statement": "A fixture vault written by the code at the base, holding one contract closed by a passing verify and one with a hand-placed closed file, opens with the first done and the second open.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-done-from-log.test.mjs",
+            "cmd": "node --test test/contracts-done-from-log.test.mjs"
+          }
+        },
+        {
+          "statement": "docs/CONTRACTS.md states that only a passing verify makes a contract done",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CONTRACTS.md",
+            "pattern": "only a passing verify"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/contracts-done-from-log.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/contracts-done-from-log.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/contracts-done-from-log.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

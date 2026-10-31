@@ -49,3 +49,12 @@ A requirement is replaced, never silently removed, only when a round's answer na
 - SR-1.05 T1: criterion replaced after red-team round 3 answer 1 and round 2 answer 1 (the R7 replacement) (remote.cloudflare alone trusts no header, so the flood would share the loopback bucket). From: "both guards with remote.cloudflare configured". To: "both guards with activeTunnel () => 'cloudflare' passed to createServer".
 - SR-1.05 T1: criterion replaced after red-team round 3 answer round 2 answer 1 (the R7 replacement) (the requirement says such tests pass activeTunnel; the criteria now say it too). From: "three round-1 criteria simulating distinct callers by cf-connecting-ip without naming the tunnel". To: "the same criteria naming activeTunnel () => 'cloudflare'".
 - SR-1.03 T1: requirement replaced after red-team round 2 answer 9 (punctuation: the load rule and the write-through rule read as two rules). From: "the nonce is recorded durably before the response is sent: the store is read synchronously inside createServer, before it returns and each use is written through atomically (write to a temporary file, then rename) with mode 0600 set on every write, and use() stays synchronous so one process cannot accept a nonce twice". To: "the nonce is recorded durably before the response is sent: the store is read synchronously inside createServer, before it returns, and each use is written through atomically (write to a temporary file, then rename) with mode 0600 set on every write, and use() stays synchronous so one process cannot accept a nonce twice".
+
+## Test-name guards added by the build
+
+node's TAP output counts each test file as a passing test, so a name filter that matches nothing exits 0 and prints '# pass 1' (measured on node 23.7, 31 October 2026). Each command below that filters tests by name now requires, among the passing and non-skipped test lines that are not file lines, at least one line matching each alternative of its filter. Statements are unchanged.
+
+- SR-1.03: name guard on 18 criterion command(s).
+- SR-1.05: name guard on 20 criterion command(s).
+- SR-1.11: name guard on 1 criterion command(s).
+- SR-1.21: name guard on 10 criterion command(s).

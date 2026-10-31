@@ -86,3 +86,4 @@ The engine enabler and the gaps the memev twin measured, approved by the owner o
 | [SR-1.24](specs/SR-1.24-no-cli-write-beside-a-live-daemon.json) | G89 | memev | No CLI command writes vault state beside a live daemon | SR-1.01, QL-1.02 |
 | [SR-1.25](specs/SR-1.25-a-cloud-seat-addresses-one-local-seat.json) | G90 | memev | A cloud seat allowed to assign tasks addresses one local seat, never all | QL-1.02 |
 | [SR-1.26](specs/SR-1.26-one-write-can-never-make-the-vault-unopenable.json) | G91 | memev | One write can never make the vault unopenable | none |
+| [SR-1.27](specs/SR-1.27-done-comes-only-from-a-passing-verify.json) | G92 | memev | Done comes only from a passing verify | none |
