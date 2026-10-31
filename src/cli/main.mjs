@@ -29,12 +29,14 @@ Setup
   memev disconnect [client|all]    remove it again, restoring the app's config
   memev uninstall [--purge]        disconnect everything and stop; --purge also removes the service files
   memev clients                    which AI apps are installed and connected
-  memev ready [--timeout S]        wait for each connected app's first session, then for two of them to share a memory
+  memev ready [--timeout S] [--json]   wait for each connected app's first session, then for two of them to share a memory;
+                                    --json prints one machine readable object (ok, smoke, clients with id, name, joined,
+                                    joinedAt) and exits 0 when ready, 1 when not ready within the timeout, 2 on a usage error
   memev preflight [--port N]       check this computer first: Node 22 or newer, git, the port, a folder to write to
                                    (init runs it before it writes anything and stops with the fix for your system)
   memev path add|remove|status     put the memev command on your PATH (a line in your shell's startup file, or your user PATH on
                                    Windows) and take it out again; until it is there, init prints the full path in every hint
-  memev status | doctor [--fix] [--bundle]
+  memev status | doctor [--fix] [--bundle] [--json]
   memev deployment [set --mode M --ai T]   where this vault runs and what kind of AI provider it uses,
                                     and the trial path that fits; set writes the choice into the vault config
   memev cloud on|off|status|url    reach this vault from cloud AI apps through a private tunnel (off until you
@@ -80,6 +82,8 @@ Daily
 Integration (called by AI apps)
   memev mcp --client NAME           MCP over stdio
   memev hook session-start|prompt|pre-compact|stop --client NAME
+
+  memev --version                    the installed version, one line
 
 Options: --root DIR (or MEMEV_ROOT) picks the vault; default ~/memev.`;
 
