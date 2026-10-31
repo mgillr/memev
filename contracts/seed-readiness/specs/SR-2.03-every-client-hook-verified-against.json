@@ -1,0 +1,95 @@
+{
+  "title": "SR-2.03 Every client hook verified against the real app",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G23: Codex, Gemini and Windsurf env markers admitted unverified (common.mjs:80); a vendor change silently breaks hooks. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Conformance per client",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "for each of 8 clients a recorded fixture of the real hook payload and env, captured from a named app version",
+        "docs/CLIENTS.md has a supported-versions table"
+      ],
+      "description": "",
+      "scope": [
+        "test/clients-conformance/**",
+        "docs/CLIENTS.md",
+        "src/cli/common.mjs",
+        "src/cli/clients.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "Each client fixture parses and produces context",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/clients-conformance/conformance.test.mjs",
+            "cmd": "node --test test/clients-conformance/"
+          }
+        },
+        {
+          "statement": "The supported-versions table exists",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CLIENTS.md",
+            "pattern": "Supported versions"
+          }
+        },
+        {
+          "statement": "No marker is left unverified",
+          "verifier": {
+            "type": "command",
+            "cmd": "node -e \"process.exit(/unverified/.test(require('fs').readFileSync('src/cli/common.mjs','utf8'))?1:0)\""
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Scheduled drift check",
+      "phase": "monitor",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "a weekly job checks each client's latest release notes and hook schema and opens an issue on change"
+      ],
+      "description": "",
+      "scope": [
+        ".github/workflows/clients-drift.yml",
+        "scripts/clients-drift.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "The drift workflow exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": ".github/workflows/clients-drift.yml"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
