@@ -169,6 +169,12 @@ Third pass, 1 November 2026. Each has an interim red-team record under `programm
 | [PG-03.4](programme/specs/PG-03.4-cross-language-protocol-vectors.json) | [`k-pg-03-4-cross-language-p-b395d6`](signed/k-pg-03-4-cross-language-p-b395d6.json) | Cross-language protocol vectors (crdt-merge-ts), supersedes PG-03.2 | PG-03.1 |
 | [PG-03.6](programme/specs/PG-03.6-cross-language-protocol-vectors.json) | [`k-pg-03-6-cross-language-p-ead304`](signed/k-pg-03-6-cross-language-p-ead304.json) | Cross-language protocol vectors (crdt-merge-rs), supersedes PG-03.5 | PG-03.1 |
 
+Fourth pass, 1 November 2026. `PG-19.1` has an interim red-team record under `programme/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [PG-19.1](programme/specs/PG-19.1-memev-work-command-wired-to-runwork.json) | [`k-pg-19-1-memev-work-comma-565912`](signed/k-pg-19-1-memev-work-comma-565912.json) | memev work command wired to runWork with a production openStore (memev) | SO-1.01, SO-A-03 |
+
 ## Scope One build layer, 1 November 2026
 
 `scope-one/` also holds the build layer: 25 contracts adapted from the unsigned fold of 30 October 2026 (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-10, SO-F-12 and SO-F-13). They build what the design records SO-1.x and SO-2.x decide, and each cites the record it builds and the signed vault contracts it rests on, by id only. I validated each against main and the programme specs of PR #325, and changed the text where main or an owner decision of 31 October 2026 disagreed with it; every spec lists its changes in its request as adapted from the unsigned fold. SO-F-11 is dropped, with the reason in section 9.3 of [docs/scope-one/WBS.md](../docs/scope-one/WBS.md). Each has an interim red-team record (an interim solo review by the author, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`). The spec file is named by the id alone, because the gate reads the id from the file name and an id with a letter segment has no number to stop at.
