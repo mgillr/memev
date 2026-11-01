@@ -2,7 +2,7 @@
 
 Part of the [Memev documentation](README.md). Written by `node scripts/docs/module-graph.mjs` from the real imports in `bin/` and `src/`; do not edit it by hand. `node scripts/docs/module-graph.mjs --check` (and `test/docs-module-map.test.mjs`) fail when it is out of date. How the parts fit at a higher level: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-79 modules and 296 import edges (74 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
+80 modules and 296 import edges (74 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
 
 ## Layers
 
@@ -82,6 +82,7 @@ flowchart LR
     src_engine_devices["devices.mjs"]
     src_engine_diff["diff.mjs"]
     src_engine_entitlements["entitlements.mjs"]
+    src_engine_envelope["envelope.mjs"]
     src_engine_evidence["evidence.mjs"]
     src_engine_git["git.mjs"]
     src_engine_graph["graph.mjs"]
@@ -475,6 +476,7 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 | `src/engine/devices.mjs` | The device registry: every computer and client that uses this vault, each with its own credential | `engine/entitlements.mjs`, `engine/git.mjs`, `engine/util.mjs` | `cli/bus-cli.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/remote.mjs`, `cli/sync.mjs`, `engine/agentid-bind.mjs`, `engine/vault.mjs`, `server/http.mjs` |
 | `src/engine/diff.mjs` | A lossless line splice: the smallest single replaced range between two texts (common prefix and suffix kept) | none | `engine/vault.mjs` |
 | `src/engine/entitlements.mjs` | What each tier includes, and the one thing a licence limits: how many computers may use a vault | none | `cli/agentid.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/tunnel.mjs`, `cli/upgrade.mjs`, `engine/devices.mjs`, `server/http.mjs`, `services/providers.mjs` |
+| `src/engine/envelope.mjs` | The canonical operation envelope, version 1: one record shape that is built, written in one canonical form, hashed and checked | none | none |
 | `src/engine/evidence.mjs` | The execution history of a task: four distinct event kinds that are never merged into one | `engine/util.mjs` | `engine/coordinator.mjs`, `engine/project-store.mjs` |
 | `src/engine/git.mjs` | Git as the durable, human-readable history | `engine/util.mjs` | `cli/bus-cli.mjs`, `cli/github.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/onboarding.mjs`, `cli/sync.mjs`, `engine/contracts.mjs`, `engine/devices.mjs`, `engine/vault.mjs`, `services/providers.mjs` |
 | `src/engine/graph.mjs` | The memory graph: what is connected to what, how sure the vault is of each claim, and where each memory came from and was used | `engine/index.mjs`, `engine/util.mjs` | `engine/vault.mjs` |
