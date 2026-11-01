@@ -1,0 +1,3 @@
+### Added
+
+- The memory graph can hold a finding: a claim with its source events and versions, the entities and owners it affects, a scope, a time context and a confidence. Evidence alone takes a finding no further than theory; fact needs a person's adjudication or a passing verification record, and ordinary claims keep today's rule. Dismissing, correcting, adjudicating and verifying a finding are logged operations, a dismissed finding does not come back on the same sources and versions, and a reader only sees the sources their scope allows. Nothing raises a finding yet; `docs/ORGANISATIONAL-INTELLIGENCE.md` describes the model and marks the layer as planned.
