@@ -219,7 +219,7 @@ test('SO-F-09 AC02: a dismissed finding is out of the default listing and stays 
 
 // ---- AC03: a reader sees only what the source's scope allows -------------------------------------
 const MARK = 'quarterly-layoff-plan-zebra';
-const mixed = () => make({
+const mixed = (over = {}) => make({
   sources: [
     { event: 'evt-101', version: 3, scope: TEAM_A, path: 'notes/checkout.md', excerpt: 'checkout waits on the payments migration' },
     { event: 'evt-secret-77', version: 9, scope: TEAM_B, path: `hr/${MARK}.md`, excerpt: `the ${MARK} names the billing owners` },
@@ -227,6 +227,7 @@ const mixed = () => make({
   subject: `staffing ${MARK}`, object: 'billing team',
   entities: [{ id: 'ent-payments', source: 0 }, { id: `ent-${MARK}`, source: 1 }],
   owners: [{ subject: 'person:lead', source: 0 }, { subject: 'person:hr-head', source: 1 }],
+  ...over,
 });
 const readerFor = (scope) => ({ ok: true, subject: { id: 'person:reader', type: 'person' }, scope });
 
@@ -283,4 +284,112 @@ test('SO-F-09 AC03: the reader comes from the identity model, and a reader from 
   const asB = resolveRequest(identity(TEAM_B), { target: TEAM_B });
   assert.equal(asB.ok, true);
   assert.equal(g.viewFinding('f_one', asB), null, 'the finding scope is team A, so a team B reader does not reach it');
+});
+
+// ---- review response: behaviour the first version got wrong --------------------------------------
+const MARK_ID = `f_${MARK}`;
+
+test('SO-F-09 AC01: a verification record counts only when it names one of the finding\'s own source events', () => {
+  const g = make();
+  const nonexistent = { id: 'f_one', by: 'service:fake', record: { kind: 'outcome.verified', event: 'evt-does-not-exist', result: 'pass' } };
+  assert.equal(g.checkFindingEvent('claim.finding.verify', nonexistent).ok, false, 'the check refuses it');
+  g.applyOp(op('claim.finding.verify', nonexistent));
+  assert.equal(status(g, 'f_one'), 'conjecture', 'a verification of an event the finding does not rest on makes no fact');
+  assert.equal(g.claims.get('f_one').finding.history.length, 0);
+  const real = { id: 'f_one', by: VERIFIER, record: { kind: 'outcome.verified', event: 'evt-101', result: 'pass' } };
+  assert.equal(g.checkFindingEvent('claim.finding.verify', real).ok, true);
+  g.applyOp(op('claim.finding.verify', real));
+  assert.equal(status(g, 'f_one'), 'fact');
+});
+
+test('SO-F-09 AC03: a reader that did not come from the identity model is refused', () => {
+  const g = make();
+  for (const forged of [{ ok: true, scope: TEAM_A }, { ok: true, subject: { id: 'person:owner', type: 'person' }, scope: TEAM_A }, { ok: true, subject: { id: 'person:owner', type: 'person', owner: 'person:owner' }, scope: TEAM_A, credential: 'tok1' }]) {
+    assert.equal(g.viewFinding('f_one', forged), null, JSON.stringify(forged));
+    assert.deepEqual(g.listFindings(forged), []);
+  }
+});
+
+test('SO-F-09 AC03: a partial view withholds the id, status, capped flag, confidence, context and the outcome of decisions', () => {
+  const g = mixed({ id: MARK_ID });
+  for (const s of ['a', 'b']) evidence(g, MARK_ID, 'support', 0.95, s);
+  g.applyOp(op('claim.finding.adjudicate', { id: MARK_ID, by: PERSON, outcome: 'confirm', why: `ok ${MARK}` }));
+  const v = g.viewFinding(MARK_ID, readerFor(TEAM_A));
+  assert.ok(v && v.withheld === true);
+  for (const k of ['id', 'status', 'capped', 'confidence', 'context', 'dismissed', 'statement']) assert.equal(v[k], null, `${k} is withheld`);
+  assert.ok(!JSON.stringify(v).includes(MARK), 'the caller-chosen id does not appear');
+  assert.deepEqual(v.history.map((h) => Object.keys(h).sort()), [['kind', 'seq', 'ts']], 'only that a decision of some kind was made');
+  const list = g.listFindings(readerFor(TEAM_A));
+  assert.equal(list.length, 1);
+  assert.ok(!JSON.stringify(list).includes(MARK));
+  // a reader who may read every source still gets all of it
+  const full = make({ id: MARK_ID });
+  const f = full.viewFinding(MARK_ID, readerFor(TEAM_A));
+  assert.equal(f.id, MARK_ID);
+  assert.equal(f.status, 'conjecture');
+  assert.equal(f.confidence, 0.6);
+  assert.deepEqual(f.context, { from: '2026-10-01T00:00:00Z', to: null });
+});
+
+test('SO-F-09 AC03: an entity or owner tied to the finding as a whole (source null) is hidden from a partial view and shown in a full one', () => {
+  const g = make({
+    sources: [
+      { event: 'evt-101', version: 3, scope: TEAM_A, path: 'notes/checkout.md' },
+      { event: 'evt-secret-77', version: 9, scope: TEAM_B, path: `hr/${MARK}.md` },
+    ],
+    entities: [{ id: 'ent-payments', source: 0 }, { id: `ent-whole-${MARK}`, source: null }],
+    owners: [{ subject: 'person:lead', source: 0 }, { subject: 'person:whole-hr-head', source: null }],
+  });
+  const partial = g.viewFinding('f_one', readerFor(TEAM_A));
+  assert.equal(partial.withheld, true);
+  assert.deepEqual(partial.entities.map((e) => e.id), ['ent-payments']);
+  assert.deepEqual(partial.owners.map((o) => o.subject), ['person:lead']);
+  assert.ok(!JSON.stringify(partial).includes('whole'));
+  const one = make({
+    entities: [{ id: 'ent-payments', source: 0 }, { id: 'ent-whole', source: null }],
+    owners: [{ subject: 'person:lead', source: 0 }, { subject: 'person:whole-head', source: null }],
+  });
+  const full = one.viewFinding('f_one', readerFor(TEAM_A));
+  assert.deepEqual(full.entities.map((e) => e.id), ['ent-payments', 'ent-whole']);
+  assert.deepEqual(full.owners.map((o) => o.subject), ['person:lead', 'person:whole-head']);
+});
+
+test('SO-F-09 AC01: a verification does not override a person\'s decision, and a person\'s confirmation over strong opposition is marked overridden', () => {
+  const verifyPass = (id) => op('claim.finding.verify', { id, by: VERIFIER, record: { kind: 'outcome.verified', event: 'evt-101', result: 'pass' } });
+  const g = make();
+  g.applyOp(op('claim.finding.adjudicate', { id: 'f_one', by: PERSON, outcome: 'reject', why: 'not so' }));
+  g.applyOp(verifyPass('f_one'));
+  assert.equal(status(g, 'f_one'), 'refuted', 'a service verification does not turn a person\'s rejection into a fact');
+  assert.deepEqual(g.claims.get('f_one').finding.history.map((h) => [h.kind, h.effective]), [['adjudicate', true], ['verify', false]]);
+  g.applyOp(op('claim.finding.adjudicate', { id: 'f_one', by: PERSON, outcome: 'confirm', why: 'second look' }));
+  assert.equal(status(g, 'f_one'), 'fact', 'a person can change their own decision');
+  const h = make({ id: 'f_two' });
+  h.applyOp(verifyPass('f_two'));
+  h.applyOp(op('claim.finding.adjudicate', { id: 'f_two', by: PERSON, outcome: 'reject' }));
+  assert.equal(status(h, 'f_two'), 'refuted', 'a person after a verification decides');
+  const o = make({ id: 'f_three' });
+  for (const s of ['a', 'b', 'c']) evidence(o, 'f_three', 'oppose', 0.95, s);
+  assert.equal(status(o, 'f_three'), 'refuted');
+  o.applyOp(op('claim.finding.adjudicate', { id: 'f_three', by: PERSON, outcome: 'confirm', why: 'I know better' }));
+  const a = Graph.assess(o.claims.get('f_three'));
+  assert.equal(a.status, 'fact', 'a person\'s confirmation stands');
+  assert.ok(a.opposition > 0.99);
+  assert.equal(a.overridden, 'refuted', 'and says which evidence status it overrode');
+  assert.equal(Graph.assess(make({ id: 'f_four' }).claims.get('f_four')).overridden, undefined);
+});
+
+test('SO-F-09 AC02: a dismissal holds only in the scope it was made in, and the refusal does not name the dismissed finding', () => {
+  const g = make();
+  g.applyOp(op('claim.finding.dismiss', { id: 'f_one', by: PERSON, why: 'noise' }));
+  const same = finding({ id: 'f_again' });
+  const refused = g.admitFinding(same);
+  assert.equal(refused.code, 'dismissed');
+  assert.ok(!('of' in refused), 'no id of the dismissed finding');
+  assert.ok(!JSON.stringify(refused).includes('f_one'));
+  const elsewhere = finding({ id: 'f_b', scope: TEAM_B, sources: [{ event: 'evt-101', version: 3, scope: TEAM_B }] });
+  assert.equal(g.admitFinding(elsewhere).ok, true, 'the same event and version in another scope is not blocked');
+  g.applyOp(op('claim.finding', elsewhere));
+  assert.ok(g.claims.has('f_b'), 'and replay takes it in');
+  g.applyOp(op('claim.finding.dismiss', { id: 'f_b', by: PERSON }));
+  assert.equal(g.admitFinding(finding({ id: 'f_b2', scope: TEAM_B, sources: [{ event: 'evt-101', version: 3, scope: TEAM_B }] })).code, 'dismissed', 'each scope has its own dismissal');
 });
