@@ -293,25 +293,24 @@ test('SO-08-B AC03: memev work is a command of the CLI: usage exits 2 and a proj
 
 // ---- AC04: transitions travel on the bus
 
-const seats = (v) => {
-  for (const c of [WORKER.split('@')[0], 'worker-b']) v.bus.resolve({ identity: OWNER, client: c, local: true }, { need: 'write' });
-};
+// the assignee's seat, registered the way an app's first call registers it
+const seats = (v) => v.bus.resolve({ identity: OWNER, client: 'worker-a', local: true }, { need: 'write' }).seat;
 const transitionMsgs = (v) => v.bus.all().filter((m) => m.type === 'transition');
 
 test('SO-08-B AC04: every transition posts one typed message to the assignee seat and one to the operator seat, with ids and states only', () => {
   const { v } = newVault();
-  seats(v);
-  assert.ok(v.bus.seat(WORKER), 'the assignee has a seat');
+  const worker = seats(v);
+  assert.ok(v.bus.seat(worker), 'the assignee has a seat');
   const r = rig({ bus: v.bus });
   plan(r.co, [{ id: 'A', title: 'a', artifacts: ['src/a.js'] }]);
   const planned = moves(r.store, 'A').length;
   assert.equal(transitionMsgs(v).filter((m) => m.to === 'operator').length, planned, 'each planning move reached the operator');
-  assert.equal(transitionMsgs(v).filter((m) => m.to === WORKER).length, 0, 'nobody is assigned yet');
-  const lease = r.co.claim('A', WORKER, 60_000).lease;
+  assert.equal(transitionMsgs(v).filter((m) => m.to === worker).length, 0, 'nobody is assigned yet');
+  const lease = r.co.claim('A', worker, 60_000).lease;
   const all = moves(r.store, 'A');
   const msgs = transitionMsgs(v);
   assert.equal(msgs.filter((m) => m.to === 'operator').length, all.length, 'one operator message per transition');
-  const mine = msgs.filter((m) => m.to === WORKER);
+  const mine = msgs.filter((m) => m.to === worker);
   assert.equal(mine.length, all.length - planned, 'one assignee message per transition under the assignee');
   const last = JSON.parse(mine.at(-1).body);
   assert.deepEqual(Object.keys(last).sort(), ['correlation', 'from', 'project', 'task', 'to']);
@@ -335,10 +334,10 @@ test('SO-08-B AC04: a message that would carry a credential is refused by the bu
 
 test('SO-08-B AC04: the bus is transport, not the store: deleting the bus files loses no project state', () => {
   const { v } = newVault();
-  seats(v);
+  const worker = seats(v);
   const r = rig({ bus: v.bus });
   plan(r.co, [{ id: 'A', title: 'a', artifacts: ['src/a.js'] }, { id: 'B', title: 'b', artifacts: ['src/b.js'] }]);
-  r.co.claim('A', WORKER, 60_000);
+  r.co.claim('A', worker, 60_000);
   assert.ok(transitionMsgs(v).length > 0);
   const before = JSON.stringify(r.co.status('p', { history: true }));
   fs.rmSync(path.join(v.root, 'bus', 'log'), { recursive: true, force: true });
@@ -370,7 +369,7 @@ test('SO-08-B AC05: the same bus message processed twice produces one transition
   assert.equal(co.applyBusMessage(pause).duplicate, true);
   assert.equal(logged(store, 'project.paused').length, 1);
   // a second process reading the same files sees the first one's work and does not repeat it
-  const other = new Coordinator(new ProjectStore(path.dirname(store.snapshotPath('task')), { id: 'p', fsync: false }).open(), { lifecycle: true });
+  const other = new Coordinator(new ProjectStore(store.root, { id: 'p', fsync: false }).open(), { lifecycle: true });
   assert.equal(other.applyBusMessage(msg).duplicate, true);
 });
 
@@ -400,9 +399,9 @@ test('SO-08-B AC06: memev work status prints the status, active tasks with owner
   const r = await work(['status', 'shop'], {}, { call: portOf(v) });
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /shop/);
-  assert.match(r.out, /ACTIVE|NEEDS_ATTENTION/, 'the project status');
+  assert.match(r.out, /active|needs attention/i, 'the project status');
   assert.match(r.out, /A\b.*build the page/s);
-  assert.ok(r.out.includes(OWNER.agent) || /held by/.test(r.out), 'the owner is named');
+  assert.ok(r.out.includes(`held by ${lease.agent}`), 'the owner is named');
   assert.ok(r.out.includes(new Date(lease.expires).toISOString()), 'the lease expiry is shown');
   assert.match(r.out, /B\b.*owner_lost/s, 'a blocked item with its reason');
   assert.match(r.out, /appr_9/);
@@ -414,7 +413,7 @@ test('SO-08-B AC06: memev work status prints the status, active tasks with owner
   assert.equal(d.project, 'shop');
   assert.ok(d.status);
   assert.equal(d.active.length, 1);
-  assert.equal(d.active[0].task, 'A'); assert.equal(d.active[0].owner, OWNER.agent); assert.equal(d.active[0].lease_expires, lease.expires);
+  assert.equal(d.active[0].task, 'A'); assert.equal(d.active[0].owner, lease.agent); assert.equal(d.active[0].lease_expires, lease.expires);
   assert.equal(d.blocked.length, 1);
   assert.equal(d.blocked[0].task, 'B'); assert.equal(d.blocked[0].reason, 'owner_lost');
   assert.equal(d.approvals.length, 1); assert.equal(d.approvals[0].id, 'appr_9');

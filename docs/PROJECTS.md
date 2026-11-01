@@ -168,3 +168,15 @@ A stale marker clears in two ways only. A new verification clears it: an evidenc
 A projection says which event it comes from, when, the scope version, the plan version and whether it is fresh or stale. A value that cannot be confirmed, because the source event is not in the log or a version was never recorded, reads `not confirmed` and is never a guess.
 
 Progress derives from the model: a work package, a deliverable and a milestone count the verified tasks under them over all the tasks under them, through the links, and a task linked to no work package is in no figure. A percentage that a session reports about itself is not an input and moves no figure.
+
+## Recovery and control
+
+When a session stops heart-beating its lease lapses and the sweep marks the task blocked with the reason owner lost. `recover` then inspects what the session left: its checkpoint, its lease, the artifacts its attempts changed and the external actions with no recorded success. It writes one inspection record and returns a plan: resume from the checkpoint, reassign, or ask the user. A task with an action that did not succeed is never resumed or repeated blind, so the plan is to ask. With no checkpoint and nothing outstanding the plan is to reassign. A reassignment after a disconnect is refused until the inspection of the task's current generation is recorded, and a task is not dispatched to a second holder while the first lease is live.
+
+On a start the coordinator reads the project back from its store: the pause flag, the tasks in flight under live leases and the pending approvals. Leases past their expiry are marked at that point. Nothing is dispatched by a start. Dispatch comes only from an eligibility pass, which offers the tasks eligible now, never one that holds a live lease, and none while the project is paused.
+
+`memev work pause <project>` stops new dispatch at once and prints, for each task in flight, requested, confirmed or unsupported. Cooperative cancellation is asked for through the capability record of the client holding the task; with no such record the answer is unsupported, never confirmed. `memev work resume <project>` continues from the last checkpoint. `memev work cancel <project> <task> --reason <why>` records who cancelled and why, and is refused without a reason. A task in flight stays in flight, marked requested or unsupported, until its session confirms. Each of the three takes `--json`, and exits 0 when done, 1 when refused or when the project or task does not exist, and 2 on a usage error.
+
+`memev work status <project>` also lists the active tasks with their owner and lease expiry, the blocked items with their reasons, the pending approvals and the stale evidence, each with a next action. A project that does not exist exits 1 with one line.
+
+Transitions are posted on the bus as ids and states only (see the bus guide). A bus message applied twice changes the project once.
