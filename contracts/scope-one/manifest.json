@@ -715,7 +715,7 @@
     "SO-2.01"
    ],
    "tasks": 2,
-   "criteria": 16,
+   "criteria": 17,
    "spec": "specs/SO-F-02.2.json",
    "adapted_from": "fold of 30 Oct 2026",
    "status": "proposed and unsigned; no red-team record",

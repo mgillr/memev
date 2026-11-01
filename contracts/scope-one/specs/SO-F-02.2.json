@@ -114,11 +114,12 @@
         "the writes of the coordinator keep using snapshot(), so a conflicted task is never written back as CONFLICTED and the stored status stays the one the task had (source: docs/PROJECTS.md, the semantic conflict rule of pull request #354)",
         "no change to the store, the schema or the conflict derivation: those are T1 and pull request #354; this task only consumes them (source: owner delegation, 1 Nov 2026)"
       ],
-      "description": "Repo: memev. Starts once pull request #354 (T1) merges: store.view('task') and store.conflicts() exist only there. A task with unresolved approve and reject approvals shows as CONFLICTED in the view while its stored status is unchanged. Today the coordinator reads snapshot() everywhere, so such a task can be claimed. This task changes only the read side (claim, the eligibility check, status and the listing around _tasksOf) to read the view; every write still reads and writes through snapshot(). The coordinator unit tests run over a store double: the double gains a view method that returns the snapshot, so they stay as they are. SO-A-01, SO-A-03 and PGP-1.02 also list src/engine/coordinator.mjs in their scope: land this change after those that are open, or merge main into this branch first.",
+      "description": "Repo: memev. Starts once pull request #354 (T1) merges: store.view('task') and store.conflicts() exist only there. A task with unresolved approve and reject approvals shows as CONFLICTED in the view while its stored status is unchanged. Today the coordinator reads snapshot() everywhere, so such a task can be claimed. This task changes only the read side (claim, the eligibility check, status and the listing around _tasksOf) to read the view; every write still reads and writes through snapshot(). The coordinator unit tests run over a store double: the double gains a view method that returns the snapshot, added in test/coordinator.test.mjs, which is in this task's scope for that reason; the existing assertions of that file stay as they are. SO-A-01, SO-A-03 and PGP-1.02 also list src/engine/coordinator.mjs in their scope: land this change after those that are open, or merge main into this branch first.",
       "scope": [
         "src/engine/coordinator.mjs",
         "test/coordinator-conflict.test.mjs",
-        "test/helpers/**"
+        "test/helpers/**",
+        "test/coordinator.test.mjs"
       ],
       "criteria": [
         {
@@ -147,12 +148,21 @@
           }
         },
         {
-          "statement": "the coordinator unit tests and the wired-path tests pass unchanged: node --test test/coordinator.test.mjs test/project-wiring.test.mjs test/project-wiring-remaining.test.mjs test/task-verify-from-contract.test.mjs (none is in this task's scope)",
+          "statement": "the coordinator unit tests and the wired-path tests pass: node --test test/coordinator.test.mjs test/project-wiring.test.mjs test/project-wiring-remaining.test.mjs test/task-verify-from-contract.test.mjs; the existing assertions of test/coordinator.test.mjs are unchanged (the file is in this task's scope, so that an assertion for the new read side may be added) and the other three files are unchanged and not in this task's scope",
           "verifier": {
             "type": "command",
             "cmd": "node --test test/coordinator.test.mjs test/project-wiring.test.mjs test/project-wiring-remaining.test.mjs test/task-verify-from-contract.test.mjs",
             "expect_exit": 0,
             "timeout_s": 600
+          }
+        },
+        {
+          "statement": "the existing assertions of test/coordinator.test.mjs are unchanged: against origin/main no line of that file is removed or changed, and the other three test files have no difference",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ -z \"$(git diff -U0 origin/main -- test/coordinator.test.mjs | grep -E '^-[^-]')\" ] && git diff --exit-code origin/main -- test/project-wiring.test.mjs test/project-wiring-remaining.test.mjs test/task-verify-from-contract.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 120
           }
         },
         {
