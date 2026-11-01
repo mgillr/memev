@@ -92,7 +92,7 @@ test('WP19-01 AC05: openStore reads the vault\'s own project, adds no second sto
     assert.deepEqual(Object.keys(reader.snapshot('task')).sort(), tasks.sort(), 'it reads the tasks that were written');
     assert.equal(openStore('nope', { root }), null);
     assert.equal(fs.existsSync(path.join(root, '.memev', 'projects', 'nope')), false, 'an unknown project is not created');
-    assert.throws(() => openStore('p'), /root/, 'the port needs the vault root');
+    assert.throws(() => openStore('p'), /needs the vault/, 'the port needs the vault root');
   } finally { closeStores(); }
 });
 
