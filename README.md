@@ -66,19 +66,19 @@ The tier decision of 31 October 2026 is recorded in [docs/scope-one/DECISIONS.md
 | Price | free, for good | $12/month or $120/year (CHF 10 or CHF 100), early-supporter price | contact us |
 | What it includes | the whole core: vault, recall, graph, hooks, contracts, comms bus, doctor, GitHub backup, several cloud AI apps side by side | everything in Free, with the same vault on up to 3 computers over the secure link, priority support | scoped with you: see below |
 | Trial | the free core is the trial | none | a Business trial and a sales-assisted pilot are planned ([docs/BUSINESS-TRIAL.md](docs/BUSINESS-TRIAL.md)) |
-| Status | available now | available now for what exists today; merging, hosted sync, backup and relay are planned | planned, no dates |
+| Status | closed preview, invite only | paid multi-computer tier; simultaneous editing and convergence remain planned | planned, no dates |
 
 The tier names in the app and the licence tooling today are Personal for the free core and Personal with more computers for the paid tier. [docs/PRICING.md](docs/PRICING.md) and [docs/tiers/README.md](docs/tiers/README.md) use those names and say what is built and what is planned for each. The free core is never limited ([CHARTER.md](CHARTER.md)).
 
 ## How it fits together
 
-Memev connects three parts of AI work that are usually handled separately:
+Memev connects the operating parts of human and AI work:
 
-- **Shared context:** keep project decisions, constraints and useful prior work available across supported tools and sessions.
-- **Coordination:** let connected sessions discover one another, check presence and hand off tasks through a shared communications bus.
-- **Defined work:** describe expected outcomes and acceptance criteria in work contracts, then retain verification results where those checks are available.
+- **Shared state:** project records, decisions, constraints, obligations and provenance are retained in a durable local store and exposed to authorised tools.
+- **Coordination:** connected people and agents can identify seats, exchange messages and hand off work through the communications bus.
+- **Governed execution:** contracts define what is required; the project lifecycle records assignment, claims, leases, execution, exceptions, evidence and verification. Verification is distinct from acceptance, and an agent's report is not proof.
 
-The vault and coordination bus provide the common working layer. What happens next depends on the connected AI client and workflow: Memev supplies the shared context and coordination mechanisms, while agents and people carry out the work.
+The local vault is the durable record substrate, not the product boundary. The client applications and people perform the work; Memev supplies the shared state, coordination and governance mechanisms around it.
 
 ```mermaid
 flowchart LR
