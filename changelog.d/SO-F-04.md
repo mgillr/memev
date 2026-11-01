@@ -1,0 +1,3 @@
+### Added
+
+- The record of a federation relationship (`docs/schemas/membership-v1.json`) and the policy document (`docs/schemas/policy-v1.json`), with validators, a deny-by-default evaluation that returns the id of the rule that decided, and a relationship book kept in the node's own operation log so a revocation survives a restart. A personal scope or vault is never a party. Two sandbox nodes establish a relationship, exchange one permitted contribution through the real admission, refuse one outside the scope, revoke, and refuse everything after. Nothing sends a contribution yet; `docs/FEDERATION.md` marks federation as planned.

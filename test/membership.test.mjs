@@ -225,6 +225,7 @@ test('SO-F-04 AC04: two nodes establish a scoped relationship, exchange one perm
   assert.equal(none.code, 'deny.no_relationship');
   // the two nodes establish: A proposes, B accepts, both nodes hold the accepted record
   const p = M.proposeRelationship({ id: 'rel-1', proposer: { node: 'node-a', scope: ORG_A }, counterparty: { node: 'node-b', scope: ORG_B }, scope: SHARED, purpose: 'joint delivery of the shared project', expires: '2027-06-30T00:00:00Z', revocable_by: 'either_party', policy_version: POLICY.version }, { at: T0 });
+  assert.equal(book.add(p.record).code, 'not_established', 'a proposal waiting for the other party is not held');
   const acc = M.acceptRelationship(p.record, { node: 'node-b', at: T0 });
   assert.equal(acc.ok, true);
   assert.equal(book.add(acc.record).ok, true);
