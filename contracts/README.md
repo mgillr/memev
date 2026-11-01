@@ -292,3 +292,9 @@ Third signing pass, 1 November 2026 (pull request #374, spec deltas). `SO-F-03.4
 | [SO-F-03.4](scope-one/specs/SO-F-03.4.json) | [`k-so-f-03-4-contribution-s-dc2792`](signed/k-so-f-03-4-contribution-s-dc2792.json) | Contribution signature and two-step admission, replay mark per sender and scope; supersedes SO-F-03.3 | SO-F-01, SO-F-02, PG-04.1 |
 | [SO-F-04A](scope-one/specs/SO-F-04A.json) | [`k-so-f-04a-composition-of--ec8c74`](signed/k-so-f-04a-composition-of--ec8c74.json) | Composition of the checks on the Admission external hook | SO-F-04, SO-F-03.4 |
 | [SO-F-04B](scope-one/specs/SO-F-04B.json) | [`k-so-f-04b-one-admission-p-ed3c3b`](signed/k-so-f-04b-one-admission-p-ed3c3b.json) | One Admission per scope: an AdmissionSet that routes a contribution to the Admission of its scope | SO-F-04, SO-F-03.4 |
+
+Fourth signing pass, 1 November 2026 (pull request #382, spec delta). `SO-F-04C` is an additive follow-up of `SO-F-04` and supersedes nothing: the relationship gate refuses a contribution unless the sending node is a party node of a relationship of the scope, with the new fixed rule `deny.not_a_party`. It has an interim red-team record under `scope-one/redteam/` (an interim solo review, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1, with the base `2f24e942e2b80649487829ed021c1f0b78b6bccb` recorded.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [SO-F-04C](scope-one/specs/SO-F-04C.json) | [`k-so-f-04c-the-relationshi-49a1e8`](signed/k-so-f-04c-the-relationshi-49a1e8.json) | The relationship gate refuses a contribution unless the sending node is a party node of a relationship of the scope | SO-F-04 |

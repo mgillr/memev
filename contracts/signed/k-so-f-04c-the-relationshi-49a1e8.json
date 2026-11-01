@@ -1,0 +1,284 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "The relationship gate refuses a contribution unless the sending node is a party node of a relationship of the scope",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "evaluate(request, ...) accepts an optional node in the request. With no node in the request every result is exactly what it is at the base. With a node: it must be a non-empty text, otherwise deny.bad_request; the relationships considered are those valid for the scope that name the node as a party; if none is valid for the scope the denial is deny.no_relationship; if some are and none names the node it is deny.not_a_party; otherwise the existing evaluation (live, revoked, expired, not yet established, policy version, class rule, action) runs over the relationships that name the node (source: src/engine/federation/policy.mjs, evaluate, as merged by pull request #368)",
+        "relationshipGate always passes the envelope's origin.node to evaluate(); an envelope with no origin.node, or one that is not a non-empty text, is refused with code deny.bad_request and a fixed reason, and the gate never throws; a pass still returns { ok: true, rule }",
+        "deny.not_a_party is a new fixed deny rule: it is added at the end of DENY_RULES, the nine existing rules keep their order, its reason is one fixed text whichever node sent the envelope, and no refusal holds the node id, the subject, the scope id, the payload or the relationship id of the envelope",
+        "a revoked, expired or not yet established relationship refuses the node that is its party with that relationship's own rule, and refuses any other node with deny.not_a_party; a live relationship of the same scope that names a node admits that node and no other",
+        "docs/FEDERATION.md says that the relationship gate checks the sending node (origin.node) against the parties of the relationships of the scope, names deny.not_a_party, and says that it does not check that a subject may speak from that node",
+        "no other file of src, scripts or vendor changes, policy.mjs gains no import, and the modules are reached by the new test through namespace import() with typeof asserts, each red-green criterion running only its own subtest whose name starts with T1-cNN: (source: the convention of SR-0.03.3 T1 requirement 8)"
+      ],
+      "description": "Repo: memev. Depends on the merge of pull request #368 (SO-F-04), which is in the base. The fixtures are plain relationship records of schema memev-membership/1 and a policy document, with the book given to relationshipGate as { list: () => records }; the envelopes carry only the fields the gate reads. A read-only run of the five subtests at the base with the change applied was green, and without it subtests 1 to 4 failed on an assertion and subtest 5 passed.",
+      "scope": {
+        "allow": [
+          "src/engine/federation/policy.mjs",
+          "test/relationship-gate-origin.test.mjs",
+          "docs/FEDERATION.md",
+          "changelog.d/SO-F-04C.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "A contribution whose origin.node is not a party of the relationship (node-c against a relationship of node-a and node-b, the subject a member) is refused with ok false and the code deny.not_a_party; DENY_RULES ends with it and keeps its nine rules in order; the reason is the same text whichever node sent it; the refusal holds none of the node id, the subject, the scope id, the payload marker or the relationship id. The test fails before the change on an assertion, not on a load error, and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/relationship-gate-origin.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/relationship-gate-origin.test.mjs"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "A party node is admitted: both parties of one relationship, and with two live relationships of the same scope (node-a with node-b, node-a with node-c) each of node-a, node-b and node-c is admitted and node-d is refused with deny.not_a_party. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/relationship-gate-origin.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c02:' test/relationship-gate-origin.test.mjs"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "A revoked, an expired and a not yet established relationship each refuse the party node with deny.revoked, deny.expired and deny.not_established and any other node with deny.not_a_party; with a live relationship of the same scope beside it, its own party is still refused with its own rule, the live relationship's party is admitted and a stranger is refused with deny.not_a_party. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/relationship-gate-origin.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/relationship-gate-origin.test.mjs"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "An envelope with no origin, an origin with no node, a node that is not a text, an empty node, null, undefined or a string is refused with ok false and the code deny.bad_request, holds no payload, and the gate does not throw. The test fails before the change (the contribution passes) on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/relationship-gate-origin.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/relationship-gate-origin.test.mjs"
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "evaluate() without a node in the request decides as before: allow with the relationship id, deny.revoked, deny.no_relationship, and a request with a node and no relationship at all is deny.no_relationship. This holds before and after the change",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/relationship-gate-origin.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "The SO-F-04 test of the relationship and policy modules, with its two sandbox nodes and the real Admission, stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/membership.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "One full run of test/relationship-gate-origin.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03, T1-c04, T1-c05) with nothing skipped and nothing todo, and prints its whole output.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/relationship-gate-origin.test.mjs > \"$f\" 2>&1; rc=$?; cat \"$f\"; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c01:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c02:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c03:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c04:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c05:' \"$f\"",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "docs/FEDERATION.md names the sending-node check and its rule, and neither it nor policy.mjs still says that the gate does not yet bind the sending node",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -Eq 'deny\\.not_a_party' docs/FEDERATION.md && ! grep -Eq 'does not yet bind the sending node|Binding the sending node in the gate' docs/FEDERATION.md src/engine/federation/policy.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "src/engine/federation/policy.mjs holds the new rule",
+          "verifier": {
+            "type": "grep",
+            "file": "src/engine/federation/policy.mjs",
+            "pattern": "deny\\.not_a_party"
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "The change touches no other file of src, scripts or vendor, adds no import to policy.mjs, and the test file has no static import of the modules under test",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git diff --name-only \"$MEMEV_CONTRACT_BASE\" HEAD -- src scripts vendor | grep -vx src/engine/federation/policy.mjs)\" && test -z \"$(git diff \"$MEMEV_CONTRACT_BASE\" HEAD -- src/engine/federation/policy.mjs | grep -E '^\\+import ')\" && ! grep -Eq \"^import .*src/engine\" test/relationship-gate-origin.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "T1-AC11",
+          "mandatory": true,
+          "statement": "This contract is drafted with the memev checkout as its workdir and a pinned base. The workdir is the checkout top level (git rev-parse --show-toplevel equals the working directory). The base is 2f24e942e2b80649487829ed021c1f0b78b6bccb, the memev main commit that merged pull request #368 (SO-F-04), the commit the red runs are judged at; policy.mjs exists at it",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$MEMEV_CONTRACT_BASE\" = 2f24e942e2b80649487829ed021c1f0b78b6bccb ] && [ \"$(git rev-parse --show-toplevel)\" = \"$(pwd -P)\" ] && git cat-file -e \"$MEMEV_CONTRACT_BASE:src/engine/federation/policy.mjs\"",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "T1-AC12",
+          "mandatory": true,
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "T1-AC13",
+          "mandatory": true,
+          "statement": "The leak scan passes on files",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T1-AC14",
+          "mandatory": true,
+          "statement": "The leak scan passes on every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T1-AC15",
+          "mandatory": true,
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "id": "T1-AC16",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "T1-AC17",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing.",
+        "Anything outside the requirements of this task is not built, not stubbed and not defaulted in code; if the work seems to need it, stop and report what it needs.",
+        "A test_red_green command of this contract prints its whole output: it is never piped through tail or head, and never captures its output without printing it."
+      ]
+    }
+  ],
+  "id": "k-so-f-04c-the-relationshi-49a1e8",
+  "title": "SO-F-04C The relationship gate refuses a contribution unless the sending node is a party node of a relationship of the scope (memev)",
+  "workdir": null,
+  "created": "2026-11-01T08:54:51.416Z",
+  "version": 1,
+  "request": "Contract SO-F-04C in memev: the relationship gate refuses a contribution unless the envelope's origin.node is a party node of a relationship of the scope. Unsigned: a spec delta proposed for red-team review. It is additive to the signed SO-F-04 and does not supersede or edit it: SO-F-04 keeps its ten criteria. The id has no '.N' suffix because in this repository a '.N' id is a superseding version; this is an additive follow-up, as SO-F-04A and SO-F-04B are, and its specIdOf is the whole name, so it has its own record path and does not collapse into SO-F-04. Problem: relationshipGate (src/engine/federation/policy.mjs, lines 111 to 113 in pull request #368) passes evaluate() the subject, the scope, the action and the class of the contribution and never the node it came from, and evaluate() reads no node. A contribution from node-c therefore passes a relationship between node-a and node-b whenever its subject is a member of the scope. A relationship is the agreement between two nodes (parties[].node in memev-membership/1), so the node that sends is part of what it covers. What the spec requires: (1) evaluate() accepts an optional node in the request. When the request has no node it decides exactly as before. When it has one, the relationships considered are those valid for the scope that name the node as a party: with none covering the scope the denial is deny.no_relationship as before; with some covering the scope and none naming the node it is the new fixed rule deny.not_a_party; otherwise the existing evaluation runs over the relationships that name the node, so a revoked, expired or not yet established relationship refuses its own party with its own rule, and a live relationship beside it admits its own party. (2) relationshipGate always passes the envelope's origin.node, and refuses an envelope that names no sending node as deny.bad_request; it never throws. (3) deny.not_a_party is added to the end of DENY_RULES, with a fixed reason text, and nothing of the envelope (node id, subject, scope id, payload, relationship id) is echoed in a refusal. (4) docs/FEDERATION.md says so, and the sentence and the list item that say the gate does not yet bind the sending node are removed. Boundaries: (a) this checks the node an envelope names; that the signing subject may speak from that node is not checked anywhere today (Admission verifies the subject's key only), so the check closes a stranger node and not a member who names a party node; that gap is an open follow-up row in docs/scope-one/RECONCILIATION.md and is not closed here. (b) The composition of this gate with other checks on the Admission external hook is SO-F-04A (pull request #374); this contract changes the gate and not the hook, and both touch docs/FEDERATION.md in different places. (c) PG-W-21B and its eligibility gate are not touched. (d) The topology of work breakdown row 1.3.6 stays OPEN and is an input to none of this. Depends on: SO-F-04 (signed) and the merge of pull request #368, which brought policy.mjs, membership.mjs and the Admission external gate into main (merge commit 2f24e942e2b80649487829ed021c1f0b78b6bccb). Base revision: 2f24e942e2b80649487829ed021c1f0b78b6bccb (the main commit that merged pull request #368); the red runs are judged at it, the signer drafts with --workdir at the checkout top level and --base that commit, and criterion 11 pins it. No production caller beyond the gate itself: relationshipGate is already the external option of an Admission built by a node. The tests reach the modules by namespace import() inside each test with typeof asserts, so a missing export fails on an assertion and not at load. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository; tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier. Nothing in this contract decides ADR 3, ADR 5, ADR 7 or SO-A-05.",
+  "provenance": {
+    "spec_sha256": "af608dcd529b66efa85322d840353803f76526a5bc4deaf543e3f7e1ddf49ccb",
+    "record": "contracts/scope-one/redteam/SO-F-04C.json",
+    "review": "interim solo review by the signer, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local",
+  "base": {
+    "sha": "2f24e942e2b80649487829ed021c1f0b78b6bccb",
+    "recorded_at": "2026-11-01T08:54:51.583Z"
+  }
+}

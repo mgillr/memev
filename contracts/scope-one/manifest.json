@@ -1068,7 +1068,7 @@
    "spec": "specs/SO-F-04C.json",
    "adapted_from": "none; written from the review of pull request #368 (merged)",
    "base": "2f24e942e2b80649487829ed021c1f0b78b6bccb (the main commit that merged pull request #368)",
-   "status": "proposed and unsigned; no red-team record; a spec delta for red-team review; the base is recorded"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); an additive spec delta of SO-F-04; the base is recorded"
   }
  ]
 }
