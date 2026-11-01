@@ -3,6 +3,7 @@
 // kinds kept apart and said in plain words: asked for (requested), taken on (accepted), seen running (observed) and
 // confirmed (verified). Only a confirmed task counts as done; a task that was seen running is not done.
 import { Vault } from '../engine/vault.mjs';
+import { impact } from '../engine/relationships.mjs';
 
 const WORDS = { requested: 'asked for', accepted: 'taken on', observed: 'seen running', verified: 'confirmed' };
 const STAGE_WORDS = { none: 'not started', ...WORDS };
@@ -32,10 +33,30 @@ export function renderWorkStatus(w) {
 }
 
 const CLI = { agent: 'cli', scopes: ['read'], paths: ['**'] };
-const USAGE = 'usage: memev work status <project> [--json]';
+const USAGE = 'usage: memev work status <project> [--json] | memev work impact <id> [--json]';
 
-/** The command: `status <project>`. Returns the exit code. */
-export async function runWork(pos, flags = {}, { root, vault = null, out = console.log, err = console.error } = {}) {
+/** The text of an impact listing: each dependent, whether it is stale, and why it depends. */
+export function renderImpact(r) {
+  if (!r.dependents.length) return `${r.source}: nothing depends on it`;
+  return [`${r.source}: ${r.dependents.length} dependent(s)`, ...r.dependents.map((d) => `  ${d.kind} ${d.id}  ${d.stale ? 'stale' : 'not stale'}  ${d.reason}`)].join('\n');
+}
+
+/** The commands: `status <project>` and `impact <id>`. Returns the exit code. The impact listing reads a project store that the
+ *  caller passes in, as a port: `openStore(project)` returns the store of that project (or null), or `store` is the store itself.
+ *  This module never imports or builds a store. */
+export async function runWork(pos, flags = {}, { root, vault = null, store = null, openStore = null, out = console.log, err = console.error } = {}) {
+  if (pos[0] === 'impact' && pos[1]) {
+    let s = store;
+    if (!s && typeof openStore === 'function') {
+      if (!flags.project) { err('memev work impact needs --project <project>'); return 1; }
+      s = openStore(String(flags.project));
+      if (!s) { err(`no project ${flags.project}`); return 1; }
+    }
+    if (!s) { err('no project store was given to read the impact from'); return 1; }
+    const r = impact(s, pos[1]);
+    out(flags.json ? JSON.stringify(r, null, 2) : renderImpact(r));
+    return 0;
+  }
   if (pos[0] !== 'status' || !pos[1]) { err(USAGE); return 1; }
   const own = !vault;
   const v = vault ?? new Vault(root, { git: false }).open();

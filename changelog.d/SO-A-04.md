@@ -1,0 +1,3 @@
+### Added
+
+- Milestones, deliverables and work packages are entities of the project store, and the links between scope, plans, tasks, artifacts, checks, evidence, blockers and permissions are stored as events with stable ids. A change to a scope version marks every dependent plan, task, artifact, approval and evidence record stale with its reason, and a marker clears only by a new verification or an explicit re-acceptance. Projections carry their source event, time, scope and plan version and freshness, and read "not confirmed" when they cannot be confirmed. Progress derives from milestones, work packages and verified tasks. `memev work impact <id>` lists what a change reaches.
