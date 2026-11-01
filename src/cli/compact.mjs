@@ -22,7 +22,7 @@ export async function command(cmd, pos, flags, { root }) {
   try { v = new Vault(root, { git: false }).open(); }
   catch (e) {
     if (!(e instanceof VaultLocked)) throw e;
-    out.bad(`VaultLocked: ${e.pid ? `pid ${e.pid} holds` : 'another process holds'} the vault, and compact needs it to itself. Stop it first (memev stop for the daemon), then run memev compact${e.pid ? '' : ' (the lock names no holder)'}.`);
+    out.bad(`VaultLocked: ${e.pid ? `pid ${e.pid} holds` : 'another process holds'} the vault, and compact works on a stopped vault. Stop it first (memev stop for the daemon), then run memev compact${e.pid ? '' : ' (the lock names no holder)'}.`);
     return 1;
   }
   let rep;
