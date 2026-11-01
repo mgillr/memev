@@ -1,0 +1,88 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SO-F-03",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "31342e8308e6bb11afb6ce945e9ac21cc5ae6212afe0f52ef2cbeafd0c65e2aa",
+      "base_commit": "fff993f5e244f2533c0d714650220590de38057b",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/agentid-bind.mjs",
+            "sha256": "ca2599b6e72edf680192a8c393d898fd2253ed5635a10d28d1403feefc42e9ff"
+          },
+          {
+            "path": "src/engine/devices.mjs",
+            "sha256": "37391e4cd0f4e5a1f52eab59d5081c0731da925d24e938f0ab990862ec09d21f"
+          },
+          {
+            "path": "src/engine/oplog.mjs",
+            "sha256": "35a8cfc7b849a274e356cc96e362ce627f2ec20d83108407d87251b28a230465"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "every named test is red at the base only because its test file does not exist yet, so a red result does not show that the test would catch a wrong implementation (5 test_red_green criteria)",
+          "disposition": "rejected",
+          "reason": "this is the shape of every implement contract of this repository (the SR-1 contracts have it): the criteria name seeded cases with asserted refusals, the gate checks that each command runs its own test file, and the independent re-review reads the tests when they exist. A mutation check belongs to the mutation gate (QL-1.02), not to this spec"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "the vault contracts the request names are not visible in this repository, so the prerequisite chain is not machine-checked",
+          "disposition": "rejected",
+          "reason": "the manifest depends_on lists only ids that are manifest rows, as the gate and the manifest test require; the vault ids are named in the request with a dagger, as SO-2.14 names them, and section 9 of the WBS lists what each build contract was checked against"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "1 grep or file criteria point at pages that are not on main (docs/FEDERATION.md), so they are red at base by construction",
+          "disposition": "rejected",
+          "reason": "each such page is in the scope of this contract and is created or extended by it; a page that is absent on main cannot already satisfy the criterion, and the pages that come from the federation documentation (PR #223) are named in the request"
+        },
+        {
+          "n": 4,
+          "severity": "medium",
+          "how": "possible duplicate of PG-04.1 WP04-01 to WP04-04: a second envelope next to the operation envelope",
+          "disposition": "rejected",
+          "reason": "the overlap is settled in the spec text and in WBS section 9.2: one contract owns the thing and the other cites it, and this contract takes only the part named in its provenance; the programme specs are cited by id and nothing is copied"
+        },
+        {
+          "n": 5,
+          "severity": "low",
+          "how": "the signature tests need ssh-keygen, which is absent on some development machines",
+          "disposition": "rejected",
+          "reason": "ssh-keygen is present on the CI image and on every machine that runs the role-binding tests of MEM-145, which use the same path; a machine without it fails those tests for the same reason"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of this adapted spec, made against main at fff993f5e244. It has 1 task and 11 criteria. Checks run, and the only checks made: the task drafts through makeTask; each command parses with sh -n; no criterion statement repeats; each grep pattern compiles with its flags and is within 200 characters; every criterion target (test file, page, schema) is inside the scope; no criterion was already satisfied on main (grep, file and test targets); each test name prefix starts with the contract id and is unique across the build layer; no test file or created file is repeated by another spec of this repository or of the programme branch (PR #325); every manifest depends_on is a manifest row; the leak scan is clean. All passed. Before this round I changed the fold where main or an owner decision disagreed with it; those changes are listed in the provenance of the spec (request) and are part of what this round reviewed. I did not read the vault contracts the request names, which this repository cannot show, I did not run any named test (its file does not exist yet), and I did not review the addendum or the owner baseline text itself. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YmNhMmQ1NzlkODJjZGE3MzhkMzI2MWM5NTM3NGM0YmM0NGVhZTIzZDE0ZjQ5NWRkODZjMGY0ZjI3YzYxYzI4Ng==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "/pOMD4iEIE/8tUXR1teIFQQ+gmkdgaJ5NgyW74YHl9Psye2IFJCG6Ssab6kgP5dI4azsdJ/4MnPnMaP9afg5Bg=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZjkyYjA3YzdjNDQ3MWRjNjU5NmFlZTFlZjFiMzFjNTNhNDRlZTE3MDA4NDU3MjkwZTk1YjY0MTRlMjVjNTA2YQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "LGdcwC/dPdo9bhgLNvHdC6NVERsz6/jxDYj3CI4bPahpKyUjBfMXJR7ohCXQUCq8t1eKv/1kGd2tdIElCpu6AA=="
+          }
+        ]
+      }
+    }
+  ]
+}

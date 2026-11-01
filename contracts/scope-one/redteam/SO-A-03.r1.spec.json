@@ -1,0 +1,109 @@
+{
+  "title": "SO-A-03 Requested, accepted, observed, verified: four distinct event kinds in the execution history, and the guard that an observed execution precedes verification",
+  "project": "memev",
+  "workdir": null,
+  "request": "Build layer of the Scope One programme, adapted from the unsigned fold of 30 Oct 2026 (fold id SO-A-03) and validated against memev main at d1c65ef. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository; they are cited by id only. Implements the design record SO-1.04 (Dispatch events: a requested action, an accepted dispatch, an observed execution and a verified outcome stay apart) (contracts/scope-one/specs). The decision record cites this contract by id and keeps only the gaps this one does not cover. Builds on signed vault contracts: SO-04-A†, SO-05-D†, SO-07-A†, SO-08-A†, SO-C-C†. Memev contracts that land first: SO-1.01. Source in the fold: #222 recommendation 3 (distinguish requested, accepted, observed, verified; never report success from a success-shaped response) and recommendation 4 (an assertion is evidence to inspect). Settled decisions this contract follows (owner decision 31 Oct 2026, docs/scope-one/DECISIONS.md): topology is local-first and the cloud is only a relay and a backup; every supported provider stands on equal footing and no work or tier depends on one; crdt-merge is reached only through the provider boundary of src/engine/merge.mjs (docs/EXTENSION-POINTS.md) and this contract adds no merge engine to the core; tiers follow docs/PRICING.md (Free core, Personal for up to 3 computers with no per-computer add-on, higher tiers by contacting us) with no Personal trial; the git backup keeps running every few minutes (sync.interval_min). Memory authority: ADR 7 (memory and project-state authority) is proposed in PR #325 and is not decided here; this contract cites it and the local-first decision, and keeps one store under the vault with no second database. Provenance: adapted from the unsigned fold of 30 Oct 2026. Changes: (1) converted from the vault task format to the memev spec format (named tests run as red-green checks on the own test file of the contract; inline regular expression flags became the flags key; hygiene and decision verifiers became commands or doc checks). (2) removed fold-only fields and the owner-decision marker field, reworded the stop rule that named a patent, and made the text pass the leak scan. (3) The guard lands on the report path that SO-1.01 (#326) wired: coordinator.report now moves a task to VERIFYING. The wired-path tests of #326 stay in force as they are (a criterion runs them unchanged; they are outside this scope, so they cannot be edited to pass). (4) The word accepted in dispatch.accepted is a dispatch event; it is not the acceptance state of PG-06.1 (received, replicated, evaluated, accepted). The description now says so, so the two are not confused.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Requested, accepted, observed, verified: four distinct event kinds in the execution history, and the guard that an observed execution precedes verification",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "the event schema carries dispatch.requested, dispatch.accepted, execution.observed and outcome.verified as distinct kinds with the resource, time and",
+        "memev work status (SO-08-B AC06) renders the four kinds distinctly in the user vocabulary, and a report of work in progress never counts an observed",
+        "docs/PROJECTS.md defines the four kinds and states that a provider's success response is not completion",
+        "the wired-path tests of SO-1.01 pass unchanged"
+      ],
+      "description": "The addendum (recommendations 3 and 4) requires the history to distinguish a requested action, an accepted dispatch, an observed execution and a verified outcome. The store (SO-07-A), the state machine (SO-04-A, eleven TASK_STATES) and the coordinator (SO-08-A) exist; the evidence rule for VERIFIED is SO-04-A AC02 and SO-05-D AC02 and a report saying done without evidence is SO-05-D AC02 and SO-09-A AC06. This contract pins the four event kinds and the guard that a task leaves IN_PROGRESS only after an observed execution; it does not restate the evidence rule. The dispatch.accepted event is a dispatch event of the coordinator, not the acceptance state of replicated operations (PG-06.1 in the programme decomposition); the two vocabularies stay apart.",
+      "scope": [
+        "changelog.d/SO-A-03.md",
+        "docs/MODULES.md",
+        "docs/PROJECTS.md",
+        "src/cli/work.mjs",
+        "src/engine/coordinator.mjs",
+        "src/engine/evidence.mjs",
+        "src/engine/project-state.mjs",
+        "src/engine/project-store.mjs",
+        "test/execution-events.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "the event schema carries dispatch.requested, dispatch.accepted, execution.observed and outcome.verified as distinct kinds with the resource, time and payload hash; a task moves IN_PROGRESS to VERIFYING only after an execution.observed event under its current lease, and VERIFYING to VERIFIED only through the evidence rule of SO-04-A AC02; the test replays a history with dispatch.accepted and no execution.observed and asserts the task stays IN_PROGRESS",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/execution-events.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-A-03 AC01:' test/execution-events.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-A-03 AC01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "memev work status (SO-08-B AC06) renders the four kinds distinctly in the user vocabulary, and a report of work in progress never counts an observed task as done; the workspace rendering is SO-A-08",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/execution-events.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-A-03 AC02:' test/execution-events.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-A-03 AC02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "docs/PROJECTS.md defines the four kinds and states that a provider's success response is not completion",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/PROJECTS.md",
+            "pattern": "requested.*accepted.*observed.*verified"
+          }
+        },
+        {
+          "statement": "the wired-path tests of SO-1.01 pass unchanged: node --test test/project-wiring.test.mjs test/project-wiring-remaining.test.mjs test/task-verify-from-contract.test.mjs (none is in this contract scope)",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/project-wiring.test.mjs test/project-wiring-remaining.test.mjs test/task-verify-from-contract.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The full test suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "The leak scan passes on files and every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Every changed file is inside this contract's scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "Stop and post BLOCKED when a criterion cannot pass without weakening a test, skipping a test or relaxing an assertion.",
+        "Stop and ask when the work would name a client product, a person, a server or a seat in repository text; the client names live in docs/CLIENTS.md only.",
+        "Stop when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would move convergence logic into the core, vendor the engine, or add a merge engine beside the provider boundary of src/engine/merge.mjs.",
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
