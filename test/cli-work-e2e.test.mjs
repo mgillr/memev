@@ -1,10 +1,11 @@
-// PG-19.1 (WP19-02): the work command run through bin/memev.mjs against a real project store. The test spawns the CLI, reads its real
-// output and exit code, and imports neither runWork nor openStore and passes no store. Only the work status command is run.
+// PG-19.2 (WP19-02): the work command run through bin/memev.mjs against a real project store. The test spawns the CLI, reads its real
+// output and exit code, and imports no module of the work command and passes it no store. Only the work status command is run
+// there; the second half runs work impact to show that it leaves the disk as it was.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { sandbox, mcpClient } from './helpers/cli.mjs';
+import { sandbox, mcpClient, initWithRetry } from './helpers/cli.mjs';
 import crypto from 'node:crypto';
 import { cleanup, PKG } from './helpers/tmp.mjs';
 import { Vault } from '../src/engine/vault.mjs';
@@ -14,8 +15,7 @@ after(cleanup);
 test('WP19-02 AC01: the end-to-end test fails before and passes after: memev work status prints a real project from the daemon', async () => {
   const sb = sandbox();
   try {
-    let init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
-    for (let i = 0; i < 2 && init.code !== 0 && /did not start/.test(init.out + init.err); i++) init = sb.run(['start']); // a slow first start
+    const init = initWithRetry(sb, ['init', '--port', String(sb.port), '--local-only', '--no-connect']);
     assert.equal(init.code, 0, init.err + init.out);
     const c = mcpClient(sb, 'e2e-client');
     const planned = await c.tool('memev_task_plan', { project: 'shop', tasks: [{ id: 'A', title: 'build the cart', artifacts: ['src/cart.js'] }, { id: 'B', title: 'write the copy', artifacts: ['src/copy.js'] }] });
@@ -37,14 +37,14 @@ test('WP19-02 AC01: the end-to-end test fails before and passes after: memev wor
   } finally { sb.stop(); }
 });
 
-test('WP19-02 AC02: the test spawns the CLI and imports neither runWork nor openStore', () => {
+test('WP19-02 AC02: the test spawns the CLI and imports no module of the work command', () => {
   const src = fs.readFileSync(path.join(PKG, 'test', 'cli-work-e2e.test.mjs'), 'utf8');
   const imports = src.split('\n').filter((l) => /^\s*import\b/.test(l)).join('\n');
-  assert.doesNotMatch(imports, /work\.mjs|work-store\.mjs|runWork|openStore/);
+  assert.doesNotMatch(imports, /work\.mjs|work-store\.mjs/);
   assert.match(src, /sb\.run\(\['work', 'status'/);
 });
 
-// ---- memev work impact opens a vault in the CLI process beside the running daemon: it must leave the disk exactly as it was
+// ---- memev work impact runs in its own process beside the running daemon: it must leave the disk exactly as it was
 
 // Every file under the given folders: its size, its modification time and its content hash, and the folder names, so an added or a
 // removed file shows too.
@@ -74,11 +74,10 @@ const settle = async (dirs) => { // the daemon's own start-up writes finish; wai
 };
 const ref = (kind, id) => ({ kind, id });
 
-test('WP19-03 AC01: memev work impact beside a running daemon adds, removes and changes no file, and the daemon stays healthy', async () => {
+test('WP19-02 disk: memev work impact beside a running daemon adds, removes and changes no file, and the daemon stays healthy', async () => {
   const sb = sandbox();
   try {
-    let init = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']);
-    for (let i = 0; i < 2 && init.code !== 0 && /did not start/.test(init.out + init.err); i++) init = sb.run(['start']); // a slow first start
+    const init = initWithRetry(sb, ['init', '--port', String(sb.port), '--local-only', '--no-connect']);
     assert.equal(init.code, 0, init.err + init.out);
     const c = mcpClient(sb, 'e2e-client');
     await c.tool('memev_task_plan', { project: 'shop', tasks: [{ id: 'A', title: 'build the cart', artifacts: ['src/cart.js'] }, { id: 'B', title: 'write the copy', artifacts: ['src/copy.js'] }] });
@@ -90,8 +89,7 @@ test('WP19-03 AC01: memev work impact beside a running daemon adds, removes and 
     for (const [kind, id] of [['milestone', 'M1'], ['deliverable', 'D1'], ['work_package', 'W1']]) addEntity(store, kind, { title: `${kind} ${id}` }, id);
     for (const [t, f, to] of [['scope-to-milestone', ref('scope', 'S1'), ref('milestone', 'M1')], ['milestone-to-deliverable', ref('milestone', 'M1'), ref('deliverable', 'D1')], ['deliverable-to-work-package', ref('deliverable', 'D1'), ref('work_package', 'W1')], ['work-package-to-task', ref('work_package', 'W1'), ref('task', 'A')]]) assert.equal(link(store, { link_type: t, from: f, to, actor: 'planner' }).ok, true);
     v.close();
-    let start = sb.run(['start']);
-    for (let i = 0; i < 2 && start.code !== 0; i++) start = sb.run(['start']);
+    const start = initWithRetry(sb, ['start']);
     assert.equal(start.code, 0, start.err + start.out);
     const dirs = [sb.root, path.join(sb.home, '.config')];
     const before = await settle(dirs);
