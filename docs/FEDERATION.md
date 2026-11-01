@@ -249,13 +249,13 @@ The relationship is a record, `memev-membership/1`, and `src/engine/federation/m
 
 A personal scope or a personal vault is never a party, and never the scope a relationship covers: personal data does not join an organisation. The validator refuses both, and the evaluation denies a personal scope whatever a record says.
 
-One party proposes and the other accepts; a record without both acceptances is not established. Revoking makes a new value with the revocation filled in. A node holds its relationships in its own operation log as `federation.relationship` and `federation.relationship.revoked`, and rebuilds them when it opens, so a restart does not forget a revocation, and a record that was revoked cannot be added again to undo it. There is no other store.
+One party proposes and the other accepts; a record without both acceptances is not established. Revoking makes a new value with the revocation filled in. A node holds its relationships in its own operation log as `federation.relationship` and `federation.relationship.revoked`, and rebuilds them when it opens, so a restart does not forget a revocation, and a record that was revoked cannot be added again to undo it. A book reads the log on from the last entry it read before each read or write, so several books over one log agree. A revocation takes the time the revoking party gives, past or future, as given; the relationship denies from that time on and the first revocation stands. There is no other store.
 
 The policy is a second record, `memev-policy/1` (`src/engine/federation/policy.mjs`). For each data class it says whether each of six actions is allowed (discover, read, replicate, compute, retain, export) and gives the recovery point and recovery time objectives of the class, which the backup and recovery work reads. The list of classes is open: the classification schema of a later contract pins the names, and a class the policy does not list has no rule.
 
 ### The evaluation
 
-`evaluate` maps a request, (subject, scope, action, class), to allow or deny with the id of the rule that decided. It denies by default and never throws. The rules, in the order they are tried:
+`evaluate` maps a request, (subject, scope, action, class), to allow or deny with the id of the rule that decided. It denies by default and never throws (the gate built on it can throw only if the `now` it is given throws). The rules, in the order they are tried:
 
 | Rule id | Denies when |
 |---|---|
@@ -271,11 +271,12 @@ The policy is a second record, `memev-policy/1` (`src/engine/federation/policy.m
 
 An allow carries `allow:<policy id>:<class>:<action>`. The subject is checked to be a subject id of the identity model; no rule depends on which subject it is, because who may act inside a site is membership in the identity model, and a node still judges the subject itself in its own admission.
 
-The gate (`relationshipGate`) turns the evaluation into the optional check that the node's admission runs before its two steps: a contribution is a request to replicate its class into its scope. A refusal is recorded as a rejected event, with the rule id as the code and nothing of the payload. The same hook is the place for the external admission service, so a node that wants both composes them.
+The gate (`relationshipGate`) turns the evaluation into the optional check that the node's admission runs before its two steps: a contribution is a request to replicate its class into its scope. A refusal is recorded as a rejected event, with the rule id as the code and nothing of the payload. The relationship gate does not yet bind the sending node; a non-party node with member subjects passes it. The same hook is the place for the external admission service, so a node that wants both composes them.
 
 ### What is planned for relationships
 
 - Carrying a relationship record, an acceptance or a revocation from one node to the other. The test carries them itself.
+- Binding the sending node in the gate: refusing a contribution whose `origin.node` is not a party of the live relationship.
 - The classification schema that pins the class names, and enforcement of the other actions (read, compute, retain, export) at the point each happens; the evaluation only answers.
 
 ## Partitions, offline operation and recovery

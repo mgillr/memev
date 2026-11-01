@@ -6,7 +6,7 @@
 // pins is allowed here, and a class the policy does not list has no rule. evaluate() maps (subject, scope, action, class) to allow or
 // deny with the id of the rule that decided, and denies by default: no relationship for the scope, one that is revoked, expired or not
 // yet established, a policy version the relationship did not accept, a class or action the policy does not allow, a personal scope,
-// or a request it cannot read are all a denial with a rule id. It never throws.
+// or a request it cannot read are all a denial with a rule id. evaluate() never throws; the gate can, if the `now` it is given throws.
 //
 // The subject is checked to be a subject id and no rule here depends on which subject it is, because who may act inside a site is
 // the membership of the identity model. relationshipGate() turns evaluate() into the optional check that the node's
@@ -102,7 +102,8 @@ export function evaluate(request, { relationships, policy, at = Date.now() } = {
 /**
  * The check a node's admission runs before its two steps (the `external` option of Admission): a contribution is a request to replicate
  * its class into its scope, and the relationships of the node's book and the policy decide. `now` gives the time to decide at.
- * Returns (envelope) => { ok: true } or { ok: false, code: <rule id>, reason }.
+ * Returns (envelope) => { ok: true, rule: <allow rule id> } or { ok: false, code: <rule id>, reason }. The gate decides on the subject,
+ * scope and class of the contribution and does not yet bind the sending node (origin.node).
  */
 export function relationshipGate({ book, policy, now = Date.now } = {}) {
   if (!book || typeof book.list !== 'function') throw new TypeError('a gate needs a relationship book');
