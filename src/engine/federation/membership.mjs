@@ -138,44 +138,67 @@ export function revokeRelationship(record, { by, at = Date.now() } = {}) {
 
 /**
  * A node's relationships. They live in the node's own operation log (federation.relationship, federation.relationship.revoked) and
- * are rebuilt from it when the book is made, so a revocation survives a restart and an old record cannot be added again to undo it.
+ * are rebuilt from it, so a revocation survives a restart and an old record cannot be added again to undo it. Each read (get, list,
+ * add, revoke) first reads the log on from the last seq this book read, so several books over one log see each other's records. An
+ * append of the book's own advances that cursor only when its seq is the next one; otherwise the next read picks it up from the log.
  */
 export class RelationshipBook {
   constructor({ log } = {}) {
     if (!log || typeof log.append !== 'function' || typeof log.iterate !== 'function') throw new TypeError('a relationship book needs the vault operation log');
     this.log = log;
     this.records = new Map();
-    for (const rec of log.iterate()) {
-      if (rec.type === RELATIONSHIP && isObj(rec.data?.record) && validateRelationship(rec.data.record).ok && !this.records.has(rec.data.record.id)) this.records.set(rec.data.record.id, structuredClone(rec.data.record));
-      else if (rec.type === REVOKED && isObj(rec.data) && this.records.has(rec.data.id)) {
-        const r = revokeRelationship(this.records.get(rec.data.id), { by: rec.data.by, at: Date.parse(rec.data.at) });
-        if (r.ok) this.records.set(rec.data.id, r.record);
-      }
+    this.lastRead = 0;
+    this.sync();
+  }
+
+  /** Read the log from the seq after the last one read. */
+  sync() {
+    for (const rec of this.log.iterate({ fromSeq: this.lastRead + 1 })) {
+      this.apply(rec);
+      if (Number.isSafeInteger(rec.seq) && rec.seq > this.lastRead) this.lastRead = rec.seq;
     }
   }
 
-  get(id) { const r = this.records.get(id); return r ? structuredClone(r) : null; }
-  list() { return [...this.records.values()].map((r) => structuredClone(r)); }
+  apply(rec) {
+    if (rec.type === RELATIONSHIP && isObj(rec.data?.record) && validateRelationship(rec.data.record).ok && !this.records.has(rec.data.record.id)) this.records.set(rec.data.record.id, structuredClone(rec.data.record));
+    else if (rec.type === REVOKED && isObj(rec.data) && this.records.has(rec.data.id)) {
+      const r = revokeRelationship(this.records.get(rec.data.id), { by: rec.data.by, at: Date.parse(rec.data.at) });
+      if (r.ok) this.records.set(rec.data.id, r.record);
+    }
+  }
+
+  /** Apply an append of the book's own; the cursor moves only when nothing else was appended in between. */
+  own(rec, update) {
+    if (rec?.seq === this.lastRead + 1) { update(); this.lastRead = rec.seq; } else this.sync();
+  }
+
+  get(id) { this.sync(); const r = this.records.get(id); return r ? structuredClone(r) : null; }
+  list() { this.sync(); return [...this.records.values()].map((r) => structuredClone(r)); }
 
   /** Hold an established relationship. A record that is invalid, not accepted by both parties, or already held is refused. */
   add(record) {
     const v = validateRelationship(record);
     if (!v.ok) return fail('invalid', v.errors);
     if (relationshipState(record, 0) === 'proposed') return fail('not_established', `${record.id} has not been accepted by both parties`);
+    this.sync();
     if (this.records.has(record.id)) return fail('exists', `${record.id} is already held`);
     const rec = this.log.append({ type: RELATIONSHIP, agent: null, client: record.parties[0].node, data: { record: structuredClone(record) } });
-    this.records.set(record.id, structuredClone(record));
+    this.own(rec, () => this.records.set(record.id, structuredClone(record)));
     return { ok: true, record: structuredClone(record), seq: rec.seq };
   }
 
-  /** Record that a party revoked a held relationship. */
+  /**
+   * Record that a party revoked a held relationship. `at` is the time the party gives for the revocation and is taken as given, in the
+   * past or the future: the relationship denies from that time on, and a first revocation stands, so a later one cannot move it.
+   */
   revoke(id, { by, at = Date.now() } = {}) {
+    this.sync();
     const cur = this.records.get(id);
     if (!cur) return fail('not_found', `no relationship ${String(id).slice(0, 128)}`);
     const r = revokeRelationship(cur, { by, at });
     if (!r.ok) return r;
     const rec = this.log.append({ type: REVOKED, agent: null, client: by, data: { id, by, at: iso(at) } });
-    this.records.set(id, r.record);
+    this.own(rec, () => this.records.set(id, r.record));
     return { ok: true, record: structuredClone(r.record), seq: rec.seq };
   }
 }
