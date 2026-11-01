@@ -130,20 +130,20 @@ test('T2-c05: memev contract new runs the gate first: a NOT SIGNABLE or NO RECOR
     // the command line, through the daemon (which holds the real reviewer keys): the committed fixtures
     const notSignable = freshFixture(OK_FIXTURE);
     const specPath = path.join(notSignable, 'contracts/quality-loop/specs/QL-0.01.json');
-    const refused = sb.run(['contract', 'new', specPath]);
+    const refused = sb.run(['contract', 'new', specPath, '--workdir', notSignable]);
     assert.notEqual(refused.code, 0, refused.out + refused.err);
     assert.match(refused.out + refused.err, /red-team gate.*NOT SIGNABLE/);
     assert.deepEqual(draftFiles(sb.root), []);
     const noRecord = freshFixture(OK_FIXTURE);
     fs.rmSync(path.join(noRecord, 'contracts/quality-loop/redteam/QL-0.01.json'));
     commitAll(noRecord, 'no record');
-    const none = sb.run(['contract', 'new', path.join(noRecord, 'contracts/quality-loop/specs/QL-0.01.json')]);
+    const none = sb.run(['contract', 'new', path.join(noRecord, 'contracts/quality-loop/specs/QL-0.01.json'), '--workdir', noRecord]);
     assert.notEqual(none.code, 0, none.out + none.err);
     assert.match(none.out + none.err, /red-team gate.*NO RECORD/);
     assert.deepEqual(draftFiles(sb.root), []);
     const good = freshFixture(BASE_FIXTURE);
     const goodSpec = path.join(good, 'contracts/quality-loop/specs/QL-0.01.json');
-    const made1 = sb.run(['contract', 'new', goodSpec]);
+    const made1 = sb.run(['contract', 'new', goodSpec, '--workdir', good]);
     assert.equal(made1.code, 0, made1.out + made1.err);
     const id = cliJson(made1);
     assert.ok(id, made1.out);
@@ -214,7 +214,7 @@ test('T2-c06: with records required, no route to a signed contract passes a spec
   try {
     const outside = tmpdir('outside-'); const copy = path.join(outside, 'QA-1.json');
     fs.writeFileSync(copy, fs.readFileSync(repo.abs(QA_SPEC)));
-    const r = sb.run(['contract', 'new', copy]);
+    const r = sb.run(['contract', 'new', copy, '--workdir', repo.dir]);
     assert.notEqual(r.code, 0, r.out + r.err);
     assert.match(r.out + r.err, REFUSED);
     assert.deepEqual(draftFiles(sb.root), []);
@@ -274,7 +274,7 @@ test('T2-c11: with contracts.redteam_required off, a repository that holds recor
     for (const [name, change] of Object.entries(variants)) {
       const repo = qaRepo({ signable: false });
       change(repo);
-      const r = sb.run(['contract', 'new', repo.abs(QA_SPEC)]);
+      const r = sb.run(['contract', 'new', repo.abs(QA_SPEC), '--workdir', repo.dir]);
       assert.notEqual(r.code, 0, `${name}: ${r.out}${r.err}`);
       assert.match(r.out + r.err, REFUSED, name);
       assert.deepEqual(draftFiles(sb.root), [], `${name}: no draft`);
@@ -311,7 +311,7 @@ test('T2-c13: a record signed only by a test reviewer key is refused with review
   const sb = cliVault({ contracts: keysConfig });
   try {
     sb.run(['stop']);
-    const r = sb.run(['contract', 'new', repo.abs(QA_SPEC)], { extraEnv: env });
+    const r = sb.run(['contract', 'new', repo.abs(QA_SPEC), '--workdir', repo.dir], { extraEnv: env });
     assert.notEqual(r.code, 0, r.out + r.err);
     assert.match(r.out + r.err, /review_sig/);
     assert.deepEqual(draftFiles(sb.root), []);

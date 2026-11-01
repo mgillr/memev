@@ -241,8 +241,8 @@ export function attach(Vault) {
   const P = Vault.prototype;
 
   /** The red-team judgement of a draft (see redteamCheck); throws a refusal that names the gate. The reviewer and stop keys are the Vault constructor's options, never the environment or the vault config. */
-  P._redteam = function ({ spec = null, c }) {
-    const r = redteamCheck({ config: this.config, spec, workdir: c.workdir, title: c.title, tasks: c.tasks, provenance: c.provenance, reviewerKeys: this.opts.reviewerKeys, stopKeys: this.opts.stopKeys });
+  P._redteam = function ({ spec = null, c, remote = false }) {
+    const r = redteamCheck({ config: this.config, spec, workdir: c.workdir, title: c.title, tasks: c.tasks, provenance: c.provenance, reviewerKeys: this.opts.reviewerKeys, stopKeys: this.opts.stopKeys, noGit: remote });
     if (r.required && !r.ok) throw new ContractError('red_team', r.reason);
     return r;
   };
@@ -266,7 +266,7 @@ export function attach(Vault) {
     if (errs.length) throw new ContractError('invalid', `the contract is not valid: ${errs.slice(0, 5).join('; ')}`);
     // the red-team gate, before anything is written: wherever the repository holds red-team records (or contracts.redteam_required is on)
     // the spec this draft comes from must be SIGNABLE now and the draft must be the tasks drafted from it. Local and tunnel callers alike.
-    const gated = this._redteam({ spec, c });
+    const gated = this._redteam({ spec, c, remote: !!identity?.remote });
     if (gated.required) c.provenance = { ...(c.provenance || {}), ...gated.provenance };
     const body = `${JSON.stringify(c, null, 2)}\n`;
     this.write(identity, { path: `contracts/drafts/${id}.json`, body, client });
@@ -287,7 +287,7 @@ export function attach(Vault) {
     // spec or the code under review may have changed since the draft was made
     const known = this._redteamKnown(id);
     if (known && known !== crypto.createHash('sha256').update(draft).digest('hex')) throw new ContractError('red_team', 'red-team gate: the draft was changed after it was checked; draft it again');
-    const gated = this._redteam({ c });
+    const gated = this._redteam({ c, remote: !local });
     if (gated.required && !gated.provenance) throw new ContractError('red_team', 'red-team gate: no record backs this draft');
     const key = signingKey(this.opts.keyDir || path.join(configDir(), 'keys'));
     const origin = local ? 'local' : 'remote';
@@ -422,8 +422,8 @@ export function attach(Vault) {
     };
     // the same callers supply grep patterns: past the budget their remaining grep criteria fail unchecked
     let grepLeft = inVault ? GREP_VERIFY_BUDGET_MS : Infinity;
-    // a spec whose record ends with a stop decision is verified only after a clean implementation round (QL-1.01 task 2)
-    const blocked = stopBlocks({ config: this.config, workdir: wd, title: c.title, tasks: c.tasks, provenance: c.provenance, reviewerKeys: this.opts.reviewerKeys, stopKeys: this.opts.stopKeys });
+    // a spec whose record ends with a stop decision is verified only after a clean implementation round (QL-1.01 task 2); a remote caller's verify finds the repository without running git
+    const blocked = stopBlocks({ config: this.config, workdir: wd, title: c.title, tasks: c.tasks, provenance: c.provenance, reviewerKeys: this.opts.reviewerKeys, stopKeys: this.opts.stopKeys, noGit: !local });
     if (blocked) return { id, ok: false, verdict: 'BLOCKED', signature: s.detail, detail: blocked.detail, tasks: [] };
     // red-green (SR-0.03 task 3): red in a temporary worktree of the base holding the head's test-side files, green in the workdir
     const redGreen = async (v) => {

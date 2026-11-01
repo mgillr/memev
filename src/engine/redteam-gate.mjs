@@ -1252,9 +1252,15 @@ function cleanCommit(root, r) {
 
 // ---- what the engine's draft, sign and verify paths use (QL-1.01 task 2) ----
 
-/** The top of the git work tree that holds `dir`, or null when it is not in one. */
-export function repoRoot(dir) {
+/** The top of the git work tree that holds `dir`, or null when it is not in one. With noGit it runs no command: the nearest parent that holds a .git entry. */
+export function repoRoot(dir, { noGit = false } = {}) {
   try { if (!fs.statSync(dir).isDirectory()) return null; } catch { return null; }
+  if (noGit) {
+    for (let d = path.resolve(dir); ; d = path.dirname(d)) {
+      if (fs.existsSync(path.join(d, '.git'))) { try { return fs.realpathSync(d); } catch { return null; } }
+      if (path.dirname(d) === d) return null;
+    }
+  }
   const r = git(dir, ['rev-parse', '--show-toplevel']);
   if (!r.ok || !r.out) return null;
   try { return fs.realpathSync(r.out); } catch { return null; }
@@ -1263,13 +1269,16 @@ export function repoRoot(dir) {
 /**
  * Whether a repository holds red-team records: a file under contracts/<area>/redteam/ in its working tree, or one its history
  * ever held (so removing the folder, from the working tree or in a later commit, does not switch the rule off).
+ * With noGit (a remote caller) a repository with no contracts folder is judged from its files alone, and no command runs.
  */
-export function holdsRecords(root) {
+export function holdsRecords(root, { noGit = false } = {}) {
   let areas = [];
   try { areas = fs.readdirSync(path.join(root, 'contracts'), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); } catch { /* none */ }
   for (const a of areas) {
     try { if (fs.readdirSync(path.join(root, 'contracts', a, 'redteam')).some((n) => n.endsWith('.json'))) return true; } catch { /* none */ }
   }
+  // a remote caller's check runs no command in a repository with no contracts folder (nothing there could have held records); with one, history is read as for any caller
+  if (noGit && !areas.length) return false;
   if (!isRepo(root)) return false;
   const r = git(root, ['log', '--all', '--format=%H', '-n', '1', '--', ':(glob)contracts/*/redteam/*']);
   return r.ok && r.out.length > 0;
@@ -1280,14 +1289,14 @@ export function holdsRecords(root) {
  * (on: always) and contracts.redteam_root (an absolute repository path); without the latter the repository is the one holding the
  * spec, else the one holding the workdir. A repository that holds records requires them whatever the setting says.
  */
-export function redteamPolicy({ config = {}, spec = null, workdir = null } = {}) {
+export function redteamPolicy({ config = {}, spec = null, workdir = null, noGit = false } = {}) {
   const c = config?.contracts || {};
   const on = !!c.redteam_required;
   let root = null;
   if (typeof c.redteam_root === 'string' && path.isAbsolute(c.redteam_root)) { try { root = fs.realpathSync(c.redteam_root); } catch { root = null; } }
-  if (!root && spec) root = repoRoot(path.dirname(path.resolve(String(spec))));
-  if (!root && workdir) root = repoRoot(path.resolve(String(workdir)));
-  return { on, root, required: on || (root ? holdsRecords(root) : false) };
+  if (!root && spec) root = repoRoot(path.dirname(path.resolve(String(spec))), { noGit });
+  if (!root && workdir) root = repoRoot(path.resolve(String(workdir)), { noGit });
+  return { on, root, required: on || (root ? holdsRecords(root, { noGit }) : false) };
 }
 
 /** The specs a draft or a verify can come from: the gate's default directories and every other contracts/<area>/specs/ folder. */
@@ -1313,8 +1322,8 @@ const draftedCanon = (obj) => { try { return canonical(draftTasks(obj)); } catch
  * provenance.spec_sha256, else the ones sharing its title or its tasks) must be SIGNABLE, now, and the draft's tasks must be the
  * tasks drafted from it. Returns { required: false } when no record applies, else { required: true, ok, reason, provenance }.
  */
-export function redteamCheck({ config = {}, spec = null, workdir = null, title = null, tasks = [], provenance = null, reviewerKeys, stopKeys } = {}) {
-  const pol = redteamPolicy({ config, spec, workdir });
+export function redteamCheck({ config = {}, spec = null, workdir = null, title = null, tasks = [], provenance = null, reviewerKeys, stopKeys, noGit = false } = {}) {
+  const pol = redteamPolicy({ config, spec, workdir, noGit });
   if (!pol.required) return { required: false };
   const refuse = (reason) => ({ required: true, ok: false, reason: `red-team gate: ${reason}` });
   const cwd = pol.root || (spec ? path.dirname(path.resolve(String(spec))) : null);
@@ -1364,8 +1373,8 @@ export function inScopeDrift({ cwd, spec, from }) {
  * implementation round that is clean and whose reviewed commit has the same in-scope files as the working tree. Returns null
  * (nothing to say) or { detail }.
  */
-export function stopBlocks({ config = {}, workdir = null, title = null, tasks = [], provenance = null, reviewerKeys, stopKeys } = {}) {
-  const pol = redteamPolicy({ config, workdir });
+export function stopBlocks({ config = {}, workdir = null, title = null, tasks = [], provenance = null, reviewerKeys, stopKeys, noGit = false } = {}) {
+  const pol = redteamPolicy({ config, workdir, noGit });
   if (!pol.required || !pol.root) return null;
   const cwd = pol.root;
   const want = (() => { try { return canonical(tasks); } catch { return null; } })();
