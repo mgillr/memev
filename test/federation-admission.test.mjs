@@ -704,9 +704,10 @@ for (const withSeq of [true, false]) for (const refusal of ['format', 'signature
     assert.equal(log.seq, 2);
     const before = c.reads.length;
     const r = x.admit(seventy);
+    const made = c.reads.slice(before);   // the reads of this one call, taken before highWater reads again
     assert.deepEqual({ ok: r.ok, step: r.step, code: r.code }, { ok: false, step: 'replay', code: 'replay' });
+    assert.deepEqual(made, [1], 'the read starts at the last seq X had read, none, plus 1');
     assert.equal(x.highWater(SENDER), 70);
-    assert.deepEqual(c.reads.slice(before), [1], 'the read starts at the last seq X had read, none, plus 1');
     assert.deepEqual(admittedSeqs(log), [70], 'the log holds the federation.admitted record of sequence 70 exactly once');
   });
 }
