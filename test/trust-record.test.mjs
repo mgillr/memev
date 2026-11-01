@@ -638,6 +638,171 @@ test('PG-W-21A AC07: scope.parent is accepted by the validator, ignored by the e
   assert.match(readSchema().$defs.grant.properties.scope.properties.parent.description, /ignored/i, 'the schema says so too');
 });
 
+// ---- findings of the second review
+
+const MALFORMED = { 'an extra field': { colour: 'red' }, 'schema memev-trust/2': { schema: 'memev-trust/2' }, 'a reason off the list': { reason: 'bored' }, 'a time with no zone': { time: '2026-01-25T00:00:00' } };
+
+test('PG-W-21A AC04: a malformed revocation is honoured only if its issuer could have revoked, so it never beats a valid one from the same issuer', () => {
+  // the parent p is issued by the root, its subject operator:o1 issues the child c
+  const chain = [parentGrant(), childGrant()];
+  const issuers = { 'the root': ROOT, 'a stranger': 'person:stranger', 'an operator that did not issue it': 'operator:o2', 'the subject itself': 'device:d1', 'the subject of the parent, who issued the child': 'operator:o1' };
+  for (const target of ['p', 'c']) for (const [who, issuer] of Object.entries(issuers)) for (const [what, o] of Object.entries(MALFORMED)) {
+    for (const subject of ['device:d1', 'operator:o1']) {
+      const valid = evaluate(ask({ subject }), ctx([...chain, revocation({ id: 'v1', grant: target, issuer })], LATER));
+      const bad = evaluate(ask({ subject }), ctx([...chain, revocation({ id: 'v1', grant: target, issuer, ...o })], LATER));
+      assert.equal(bad.eligible, valid.eligible, `${what}, by ${who}, of ${target}, asked for ${subject}: the malformed one acts as the valid one does`);
+      if (bad.eligible) assert.deepEqual(bad, valid);
+    }
+  }
+  // a stranger: the valid record and the malformed record are both ignored
+  const stranger = 'person:stranger';
+  assert.equal(evaluate(ask(), ctx([grant(), revocation({ issuer: stranger })], LATER)).rule, 'allow.grant', 'a valid revocation by a stranger is ignored');
+  for (const [what, o] of Object.entries(MALFORMED)) {
+    assert.equal(evaluate(ask(), ctx([grant(), revocation({ issuer: stranger, ...o })], LATER)).rule, 'allow.grant', `${what}: a malformed revocation by a stranger is ignored`);
+    assert.equal(evaluate(ask(), ctx([grant(), revocation({ issuer: stranger, ...o })], { at: '2026-01-12T00:00:00Z' })).rule, 'allow.grant', `${what}: at any time`);
+  }
+  // the issuer of the grant, and a root: a malformed revocation denies
+  for (const [what, o] of Object.entries(MALFORMED)) {
+    const byIssuer = evaluate(ask(), ctx([parentGrant(), childGrant(), revocation({ grant: 'c', issuer: 'operator:o1', ...o })], LATER));
+    assert.equal(byIssuer.eligible, false, `${what}: the issuer of the grant`); assert.equal(byIssuer.rule, 'deny.bad_revocation'); assert.deepEqual(byIssuer.chain, ['c']);
+    const byRoot = evaluate(ask(), ctx([parentGrant(), childGrant(), revocation({ grant: 'c', issuer: ROOT, ...o })], LATER));
+    assert.equal(byRoot.rule, 'deny.bad_revocation', `${what}: a root`);
+    const bySecondRoot = evaluate(ask(), ctx([grant(), revocation({ issuer: 'person:r2', ...o })], { ...LATER, roots: [ROOT, 'person:r2'] }));
+    assert.equal(bySecondRoot.rule, 'deny.bad_revocation', `${what}: a second root`);
+    assert.equal(evaluate(ask(), ctx([grant(), revocation({ issuer: 'person:r2', ...o })], LATER)).rule, 'allow.grant', `${what}: the same person when it is not a root`);
+    // the parent: by its issuer it denies the parent and the child below it, and by anyone else it does not
+    const parentByIssuer = evaluate(ask(), ctx([parentGrant(), childGrant(), revocation({ grant: 'p', issuer: ROOT, ...o })], LATER));
+    assert.equal(parentByIssuer.eligible, false, `${what}: the issuer of the parent`); assert.equal(parentByIssuer.rule, 'deny.bad_revocation'); assert.ok(parentByIssuer.chain.includes('p') && parentByIssuer.chain.includes('c'));
+    assert.equal(evaluate(ask(), ctx([parentGrant(), childGrant(), revocation({ grant: 'p', issuer: 'operator:o1', ...o })], LATER)).eligible, true, `${what}: the subject of the parent is not its issuer`);
+    assert.equal(evaluate(ask({ subject: 'operator:o1' }), ctx([parentGrant(), childGrant(), revocation({ grant: 'c', issuer: ROOT, ...o })], LATER)).eligible, true, `${what}: the parent is not denied by a revocation of its child`);
+  }
+  // an issuer that is missing or cannot be read as a subject id: the deny stays, whoever wrote it
+  for (const issuer of [undefined, null, 5, 'nobody', '', 'person:', 'person:stranger ', ['person:stranger'], { id: 'person:stranger' }]) {
+    const r = evaluate(ask(), ctx([grant(), revocation({ issuer, reason: 'bored' })], LATER));
+    assert.equal(r.eligible, false, `an issuer of ${JSON.stringify(issuer)}`); assert.equal(r.rule, 'deny.bad_revocation', JSON.stringify(issuer));
+    assert.equal(evaluate(ask(), ctx([parentGrant(), childGrant(), revocation({ grant: 'p', issuer, colour: 'red' })], LATER)).rule, 'deny.bad_revocation', `through the parent, ${JSON.stringify(issuer)}`);
+  }
+  const noIssuer = revocation({ reason: 'bored' }); delete noIssuer.issuer;
+  assert.equal(evaluate(ask(), ctx([grant(), noIssuer], LATER)).rule, 'deny.bad_revocation', 'no issuer field at all');
+});
+
+test('PG-W-21A AC04: a revocation must name its grant exactly, and one whose target cannot be read revokes nothing', () => {
+  // PROVISIONAL (ADR 8, question 6, in part): this is a stated limit, not a fail-closed rule: one unreadable record must not deny every grant
+  const unreadable = { 'a number': { grant: 1 }, 'an array': { grant: ['g1'] }, 'an object': { grant: { id: 'g1' } }, 'a missing grant': { grant: undefined }, 'a trailing space': { grant: 'g1 ' }, 'a trailing newline': { grant: 'g1\n' }, 'another case': { grant: 'G1' }, 'a zero-width character': { grant: 'g1\u200b' }, 'kind Revocation': { kind: 'Revocation' }, 'kind revoke': { kind: 'revoke' }, 'an array kind': { kind: ['revocation'] }, 'no kind': { kind: undefined } };
+  for (const [what, o] of Object.entries(unreadable)) {
+    const r = evaluate(ask(), ctx([grant(), revocation(o)], LATER));
+    assert.equal(r.rule, 'allow.grant', `${what}: it names no grant, so it revokes nothing`);
+  }
+  assert.equal(evaluate(ask(), ctx([grant(), revocation({ grant: 'g1' })], LATER)).rule, 'deny.revoked', 'named exactly, it revokes');
+  const header = SRC().split('\nimport ')[0].replace(/\n\/\/ ?/g, ' ');
+  assert.match(header, /must name its grant exactly/, 'the header states the limit');
+  assert.match(header, /cannot revoke anything/); assert.match(header, /validate records before/);
+  const s = readSchema();
+  assert.match(s.description, /must name its grant exactly/); assert.match(s.description, /validate records before/);
+  assert.match(s.$defs.revocation.properties.grant.description, /exactly/);
+});
+
+test('PG-W-21A AC04: the header, the schema and the changelog say who can make a malformed revocation count', () => {
+  const header = SRC().split('\nimport ')[0].replace(/\n\/\/ ?/g, ' ');
+  assert.match(header, /malformed revocation[^.]*only when its issuer/, 'the header');
+  assert.match(header, /issuer of the grant or a root or an issuer that cannot be read/);
+  const s = readSchema();
+  assert.match(s.$defs.revocation.description, /malformed[^.]*only when its issuer/); assert.match(s.$defs.revocation.description, /cannot be read/);
+  assert.match(s.description, /only when its issuer/);
+  const note = fs.readFileSync(path.join(PKG, 'changelog.d', 'PG-W-21A.md'), 'utf8');
+  assert.match(note, /only when its issuer/); assert.match(note, /name its grant exactly/); assert.match(note, /validate records before/);
+});
+
+test('PG-W-21A AC02: grants that evaluation cannot tell apart are one grant, and a real difference is still a conflict', () => {
+  const base = () => grant({ purposes: ['contribute', 'verify'], evidence: ['a', 'b'], scope: { type: 'team', id: 't1' }, delegation: { depth: 0 } });
+  const same = {
+    'purposes in another order': { purposes: ['verify', 'contribute'] },
+    'a duplicate purpose': { purposes: ['contribute', 'verify', 'contribute'] },
+    'evidence in another order': { evidence: ['b', 'a'] },
+    'more evidence': { evidence: ['a', 'b', 'c'] },
+    'no evidence': { evidence: undefined },
+    'a different scope.parent': { scope: { type: 'team', id: 't1', parent: 'org9' } },
+    'the same start instant in another zone': { start: '2026-01-10T01:00:00+01:00' },
+    'the same expiry instant in another zone': { expires: '2026-02-10T05:30:00+05:30' },
+    'the same expiry with a fraction': { expires: '2026-02-10T00:00:00.000Z' },
+    'no delegation block, which is depth 0': { delegation: undefined },
+    'the keys in another order': Object.fromEntries(Object.entries(base()).reverse()),
+  };
+  for (const [what, o] of Object.entries(same)) {
+    const other = o.schema ? o : { ...base(), ...o };
+    assert.equal(validate(other).ok, true, `${what} is a valid record`);
+    for (const records of [[base(), other], [other, base()], [other, base(), other]]) {
+      const r = evaluate(ask(), ctx(records));
+      assert.equal(r.eligible, true, what); assert.equal(r.rule, 'allow.grant', what); assert.deepEqual(r.chain, ['g1']);
+      assert.deepEqual(r, evaluate(ask(), ctx([base()])), `${what}: the same answer as one grant`);
+    }
+  }
+  const differs = {
+    'a different scope type': { scope: { type: 'project', id: 't1' } },
+    'a different scope id': { scope: { type: 'team', id: 't2' } },
+    'an expiry one millisecond later': { expires: '2026-02-10T00:00:00.001Z' },
+    'a start one millisecond later': { start: '2026-01-10T00:00:00.001Z' },
+    'another purpose set': { purposes: ['contribute'] },
+    'another depth': { delegation: { depth: 1 } },
+    'a parent': { delegation: { depth: 0, parent: 'p' } },
+    'another subject': { subject: 'device:d2' },
+    'another issuer': { issuer: 'person:r2' },
+  };
+  for (const [what, o] of Object.entries(differs)) {
+    for (const records of [[base(), { ...base(), ...o }], [{ ...base(), ...o }, base()]]) {
+      const r = evaluate(ask(), ctx(records, { roots: [ROOT, 'person:r2'] }));
+      assert.equal(r.eligible, false, what); assert.equal(r.rule, 'deny.conflicting_grant', what);
+    }
+  }
+  // the validator is unchanged: the spec does not say purposes are unique, so a duplicate purpose is still a valid record
+  assert.equal(validate(grant({ purposes: ['contribute', 'contribute'] })).ok, true);
+  // a chain whose parent is repeated in other forms is still one chain
+  const p2 = parentGrant({ purposes: ['verify', 'contribute'], expires: '2026-02-10T01:00:00+01:00' });
+  const c = evaluate(ask(), ctx([parentGrant(), childGrant(), p2, childGrant()]));
+  assert.equal(c.eligible, true); assert.deepEqual(c.chain, ['p', 'c']);
+  // renewing a grant under its old id is a conflict: a renewal needs a new id
+  assert.equal(evaluate(ask(), ctx([grant(), grant({ expires: '2026-06-10T00:00:00Z' })])).rule, 'deny.conflicting_grant');
+  const header = SRC().split('\nimport ')[0].replace(/\n\/\/ ?/g, ' ');
+  assert.match(header, /renewed grant under the same id is a permanent deny/, 'the header says so');
+  assert.match(header, /evidence/, 'and says what the comparison leaves out');
+  assert.match(readSchema().$defs.grant.properties.evidence.description, /not read by the evaluation/);
+});
+
+test('PG-W-21A AC01: an array with a hole in it is not a list: purposes, evidence, roots and records must be dense', () => {
+  const holey = (...xs) => { const a = new Array(xs.length); xs.forEach((x, i) => { if (x !== undefined) a[i] = x; }); return a; };
+  names(grant({ purposes: new Array(1) }), /^purposes/);
+  names(grant({ purposes: holey('contribute', undefined, 'verify') }), /^purposes/);
+  names(grant({ purposes: holey(undefined, 'verify') }), /^purposes/);
+  names(grant({ evidence: new Array(2) }), /^evidence/);
+  names(grant({ evidence: holey('a', undefined) }), /^evidence/);
+  assert.equal(validate(grant({ purposes: ['contribute', 'verify'], evidence: ['a', 'b'] })).ok, true, 'a dense list is still fine');
+  assert.equal(validate(grant({ evidence: [] })).ok, true, 'an empty evidence list is dense');
+  const r = evaluate(ask(), ctx([grant({ purposes: new Array(1) })]));
+  assert.equal(r.eligible, false); assert.equal(r.rule, 'deny.no_records', 'a record with a hole is not a valid grant');
+  assert.equal(evaluate(ask(), ctx([grant()], { roots: holey(undefined, ROOT) })).rule, 'deny.bad_request', 'a hole in the roots');
+  assert.equal(evaluate(ask(), ctx(holey(grant(), undefined, grant({ id: 'g2' })))).rule, 'deny.bad_request', 'a hole in the records');
+  assert.equal(evaluate(ask(), ctx([grant()], { roots: [ROOT] })).eligible, true);
+});
+
+test('PG-W-21A AC02: among denies at one stage the rule listed first in RULES wins, even where the chain would sort the other way', () => {
+  const ids = Object.values(mod().RULES);
+  const at = { at: '2026-02-01T00:00:00Z' };
+  // each pair: the grant with the LATER id holds the rule listed FIRST, so ordering by chain alone would pick the other
+  const pairs = [
+    ['deny.not_yet_valid', 'deny.expired', [grant({ id: 'zz', start: '2026-03-01T00:00:00Z', expires: '2026-04-01T00:00:00Z' }), grant({ id: 'aa', start: '2025-01-01T00:00:00Z', expires: '2025-02-01T00:00:00Z' })]],
+    ['deny.revoked', 'deny.bad_revocation', [grant({ id: 'zz' }), grant({ id: 'aa' }), revocation({ id: 'v1', grant: 'zz', time: START }), revocation({ id: 'v2', grant: 'aa', reason: 'bored' })]],
+    ['deny.untrusted_issuer', 'deny.chain.parent_missing', [grant({ id: 'zz', issuer: 'person:stranger' }), grant({ id: 'aa', issuer: 'operator:o1', delegation: { depth: 0, parent: 'nope' } })]],
+    ['deny.untrusted_issuer', 'deny.chain.parent_depth_zero', [grant({ id: 'zz', issuer: 'person:stranger' }), grant({ id: 'aa', issuer: 'operator:o1', delegation: { depth: 0, parent: 'pp' } }), parentGrant({ id: 'pp', delegation: { depth: 0 } })]],
+  ];
+  for (const [first, second, records] of pairs) {
+    assert.ok(ids.indexOf(first) < ids.indexOf(second), `${first} is listed before ${second}`);
+    for (const order of permutations(records)) {
+      const r = evaluate(ask(), ctx(order, at));
+      assert.equal(r.rule, first, `${first} beats ${second} in every order`);
+    }
+  }
+});
+
 // ---- the fixed set of rule ids
 
 const SCENARIOS = () => {
