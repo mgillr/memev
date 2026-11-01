@@ -204,10 +204,15 @@ test('SO-F-01 AC03: over HTTP and MCP one request of each kind resolves, and the
     assert.equal(orgMcp.status, 403);
   } finally { await new Promise((r) => server.close(r)); p.v.close(); }
   // the MCP handler resolves on its own when the transport did not
-  const refused = await handle(p.v, { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'memev_list', arguments: {} } }, { identity: { scopes: ['read'], paths: ['**'] }, client: 'x', local: true });
+  // (memev_contract_list reads no note, so only the handler's own resolution can refuse it)
+  const askList = (id, ctx) => handle(p.v, { jsonrpc: '2.0', id, method: 'tools/call', params: { name: 'memev_contract_list', arguments: {} } }, ctx);
+  const refused = await askList(2, { identity: { scopes: ['read'], paths: ['**'] }, client: 'x', local: true });
   assert.equal(refused.result.isError, true);
-  assert.match(refused.result.content[0].text, /no_subject/);
-  const fine = await handle(p.v, { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'memev_list', arguments: {} } }, { identity: p.v.tokens.verify(todayToken(p.v).token), client: 'x', local: true });
+  assert.match(refused.result.content[0].text, /^no_subject: /);
+  const mismatch = await askList(4, { identity: p.v.tokens.verify(orgToken(p.v).token), client: 'x', local: true });
+  assert.equal(mismatch.result.isError, true);
+  assert.match(mismatch.result.content[0].text, /^scope_mismatch: .*organisational/);
+  const fine = await askList(3, { identity: p.v.tokens.verify(todayToken(p.v).token), client: 'x', local: true });
   assert.equal(fine.result.isError, undefined);
 });
 
