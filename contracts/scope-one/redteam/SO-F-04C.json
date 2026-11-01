@@ -1,0 +1,52 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SO-F-04C",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "af608dcd529b66efa85322d840353803f76526a5bc4deaf543e3f7e1ddf49ccb",
+      "base_commit": "2f24e942e2b80649487829ed021c1f0b78b6bccb",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/federation/policy.mjs",
+            "sha256": "e2f199ebad379d95ed8595553af5e4589929cfc32247028ce5083827dbdec631"
+          },
+          {
+            "path": "src/engine/federation/membership.mjs",
+            "sha256": "ce0fc9d3a1775904f8457b139ecc15ed2b689c0731d0935e25c2246456c82fb3"
+          },
+          {
+            "path": "src/engine/federation/admission.mjs",
+            "sha256": "49ee79820656d77c1bdc7cfa6c3cc80e6278181700810ad35c80eb52a0f7784a"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM RECORD, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), so this record is signed with the interim reviewer key on the owner's standing decision, and the contract it makes signable waits for an independent re-review. The review was a red-team read of pull request #382 at head d396c64 (spec hash af608dcd529b), made before this record, and the signer confirmed that the head and its spec bytes are the ones reviewed. It read the whole spec and found no blocking finding.\nWhat the review ran: the five labelled subtests were written and run at the pinned base 2f24e94 in a scratch worktree, and for the green half a change of policy.mjs that follows the five requirements. Red: T1-c01 to T1-c04 each fail on code: 'ERR_ASSERTION' at the base (not a load error or TypeError, the modules are reached by namespace import with a typeof guard); T1-c05 passes at the base and with the change, as the spec says. Green: all five pass with the change. Mutants: dropping the party filter fails c01, c02 and c03; putting deny.not_a_party first in DENY_RULES fails c01; echoing the node in the reason fails c01; a gate that passes no node fails c01, c02 and c03. The manifest row states 17 criteria and the spec has 17, no command pipes through tail or head, every command parses with sh -n, the grep of criterion 9 does not match the base, the docs sentence and list item that criterion 8 removes exist at the base, and the scope is policy.mjs, the new test, docs/FEDERATION.md and the changelog entry. The gate --report on main merged with the pull request shows 0 NOT SIGNABLE and only SO-F-04C as NO RECORD; the history leak scan is clean. Criterion 6 (test/membership.test.mjs) could not be run to green on this box: its three end-to-end subtests need OpenSSH 8.0 and fail the same way at the base; by reading, their contributions come from node-a against a relationship of node-a and node-b, so they stay admitted. I did not run npm test.\nNon-blocking notes for the builder: (1) no criterion has a node that is a party of a relationship of another scope: a change that counts such a relationship (a party match that ignores the scope) passes all five subtests, so add the case to c01 or c03: a node that is a party only in another scope is refused with deny.not_a_party when some relationship covers the scope, and with deny.no_relationship when none does; (2) criterion 4 lists 'or a string' among the bad nodes, which reads as a valid node, so it should say an envelope that is a string; (3) the spec says 'non-empty text' for the node while a party node is an id of at most 128 characters of letters, digits and . _ : -, so say whether a longer or odd node is bad_request or not_a_party, and test one; (4) deny.not_a_party against deny.no_relationship tells a sender whether any relationship covers a scope, which is acceptable only if refusals are not returned to the sender; (5) criteria 10 and the scope criterion hold only on a branch that starts at 2f24e94 and has not merged main when verify runs; (6) criterion 6 depends on the box having OpenSSH 8.0 or later; (7) whether evaluate treats a node key that is present but undefined as no node should be said (the change refuses it as bad_request). No finding is open.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YzRhMTM1ZjIxYjdmZjczOGUyYWU2YzQ4NDM0YzVjNmQwYTVmN2VlNWVmMWU3MTJhOWRlNzQ2MjI0OWQ5Njg4MA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "9Bu0aKK2XDcMLklZWXkjlu5pyt+uTy6CJ6EaiRQvt+IsgPOSwt9s9TMFZ3nV1NWnr9+zWTlb9Gbd9sEza/qoAw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YTljNTA1N2JkNmUzZGE1OGMzODJlMDRiNjUyMzcyMDU4YTEyY2IzNWJiMjM5NzZkOWFiNGZmYTM4NWI4ZDc5Nw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "tm9bfyN3jvECFSRpWsl5uz716dRnB1FNCmUAolLXQKTdPJZbg4Tw5sd26kNePFyZA8sSYh92gfSIl5b2vS82BA=="
+          }
+        ]
+      }
+    }
+  ]
+}
