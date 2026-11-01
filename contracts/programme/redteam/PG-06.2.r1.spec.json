@@ -1,0 +1,258 @@
+{
+  "title": "PG-06.2 Replication separate from acceptance (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract for work package WP06 in memev: Replication separate from acceptance. Supersedes PG-06.1 (signed; the PG-06.1 file is unchanged and stays on record, and the manifest and RECONCILIATION mark it superseded by this contract). Reason: the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer; the signer decided to supersede the signed version. Each task below that overlaps a fold contract cites the fold id and keeps only the gap the fold does not cover; the criteria of PG-06.1 that are still a gap are kept. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP06.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP04-01, WP07-02. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json.  Build layer (owner delegation, 1 Nov 2026): the signed fold contracts SO-A-03, SO-F-12 (cited by id; delivered by pull request #341, WBS.md section 9.2 on its branch) are the build layer. Each task below that overlaps them cites the fold id and keeps only what the fold does not cover. Tasks of this spec that name no fold contract have no fold overlap. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "WP06-01",
+      "title": "Acceptance state model: received, replicated, evaluated, accepted, rejected, superseded; transitions and who may make them",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "MV-ARCH-06: Replication and acceptance are separate: a node may receive and replicate an operation without accepting its consequences into authoritative project state. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:15; evidence docs/scope-one/programme/DECOMPOSITION.md:70; baseline 8.5)",
+        "SO-A-03 (signed fold contract, cited by id; pull request #341) owns the four execution event kinds requested, accepted, observed and verified, and the guard that observation precedes verification; this task cites it and does not restate it (source: pull request #341, WBS.md section 9.2)"
+      ],
+      "description": "Repo: memev. Resolves ADR 4 (policy defaults) for acceptance. Boundary with the fold: SO-A-03 owns the four execution event kinds (requested, accepted, observed, verified) and the guard that a task leaves IN_PROGRESS only after an observed execution. The six states here describe the acceptance of a replicated operation into authoritative project state, which is a different axis; this page defines no event kind and no task state, and its word accepted is not the dispatch.accepted event of SO-A-03.",
+      "scope": [
+        "docs/ACCEPTANCE.md"
+      ],
+      "criteria": [
+        {
+          "statement": "doc exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/ACCEPTANCE.md"
+          }
+        },
+        {
+          "statement": "The state model names all six states",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in received replicated evaluated accepted rejected superseded; do grep -qi \"$n\" docs/ACCEPTANCE.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The document says who may make each transition",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/ACCEPTANCE.md",
+            "pattern": "who may.*(accept|make)",
+            "flags": "is"
+          }
+        },
+        {
+          "statement": "The document says replicated is not accepted",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/ACCEPTANCE.md",
+            "pattern": "replicat.*not.*accept",
+            "flags": "i"
+          }
+        },
+        {
+          "statement": "The page cites SO-A-03 as the owner of the execution event kinds",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/ACCEPTANCE.md",
+            "pattern": "SO-A-03"
+          }
+        },
+        {
+          "statement": "The page says the acceptance states are separate from the event kinds of SO-A-03",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/ACCEPTANCE.md",
+            "pattern": "SO-A-03.{0,300}(not|separate|distinct|different)|(not|separate|distinct|different).{0,300}SO-A-03",
+            "flags": "is"
+          }
+        },
+        {
+          "statement": "The page has no section that defines the dispatch event kinds or the task states, which are SO-A-03",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eqi '^#+ .*(dispatch|execution\\.observed|outcome\\.verified|task state)' docs/ACCEPTANCE.md",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP06-02",
+      "title": "Acceptance evaluator implementing the seven questions (authorised, invariant, superseded dependency, auto-accept, verification, offline, global authority)",
+      "phase": "implement",
+      "depends_on": [
+        "WP06-01"
+      ],
+      "requirements": [
+        "MV-ARCH-07: Memev decides, per change: is the agent authorised, does it break an invariant, does it depend on a superseded decision, is it safe to auto-accept, does it need verification, may it proceed offline, does it need global authorisation. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:16; evidence docs/scope-one/programme/DECOMPOSITION.md:71; baseline 8.5)",
+        "SO-F-12 (signed fold contract, cited by id; pull request #341) owns the per-scope operation-log streams, the split of the operation log and the two-node check that a local-only item never reaches the peer; this task cites it and does not restate it (source: pull request #341, WBS.md section 9.2)"
+      ],
+      "description": "Repo: memev. One test per question. Boundary with the fold: SO-F-12 owns the replication stream record (the operation envelope of PG-04.1 with scope, classification and causal context) and the split into per-scope streams, and lands first. The evaluator decides on one delivered record of that form and defines no record format, no split and no delivery.",
+      "scope": [
+        "src/engine/acceptance.mjs",
+        "test/acceptance.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "evaluator tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/acceptance.test.mjs",
+            "cmd": "node --test test/acceptance.test.mjs"
+          }
+        },
+        {
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "One test is present for each of the seven questions",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"acceptance: is the agent authorised\" \"acceptance: does it break an invariant\" \"acceptance: does it depend on a superseded decision\" \"acceptance: is it safe to auto-accept\" \"acceptance: does it need verification\" \"acceptance: may it proceed offline\" \"acceptance: does it need global authorisation\"; do grep -qF \"$n\" test/acceptance.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The seven question tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^acceptance:' test/acceptance.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The evaluator tests build their input records with the SO-F-12 stream code (src/engine/replication), not a local record format",
+          "verifier": {
+            "type": "grep",
+            "file": "test/acceptance.test.mjs",
+            "pattern": "from '[^']*replication/"
+          }
+        },
+        {
+          "statement": "The evaluator exports no function that splits, delivers or serialises a stream record, which is SO-F-12",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f src/engine/acceptance.mjs && ! grep -Eq \"export (async )?function (split|deliver|serialize|serialise)\" src/engine/acceptance.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP06-03",
+      "title": "Acceptance is on the default path: a replicated operation does not change authoritative state until accepted",
+      "phase": "implement",
+      "depends_on": [
+        "WP06-02"
+      ],
+      "requirements": [
+        "MV-ARCH-06: Replication and acceptance are separate: a node may receive and replicate an operation without accepting its consequences into authoritative project state. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:15; evidence docs/scope-one/programme/DECOMPOSITION.md:70; baseline 8.5)",
+        "SO-F-12 (signed fold contract, cited by id; pull request #341) owns the per-scope operation-log streams, the split of the operation log and the two-node check that a local-only item never reaches the peer; this task cites it and does not restate it (source: pull request #341, WBS.md section 9.2)"
+      ],
+      "description": "Repo: memev. Shares src/engine/project-store.mjs with PGP-1.02 (lands first) and PG-10.1 (lands after). Boundary with the fold: SO-F-12 delivers per-scope streams between two sandbox nodes in its own test and keeps a local-only item from the peer; this task asserts only that a delivered record leaves authoritative state unchanged until it is accepted, and adds no transport.",
+      "scope": [
+        "src/engine/project-store.mjs",
+        "src/engine/acceptance.mjs",
+        "test/acceptance-wired.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "project-store.mjs calls evaluateAcceptance on the write path",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -q evaluateAcceptance src/engine/project-store.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "wired test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/acceptance-wired.test.mjs",
+            "cmd": "node --test test/acceptance-wired.test.mjs"
+          }
+        },
+        {
+          "statement": "The wired test names the replicated-is-not-accepted behaviour",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"replicated operation does not change authoritative state until accepted\"; do grep -qF \"$n\" test/acceptance-wired.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The wired test delivers its record with the SO-F-12 stream code",
+          "verifier": {
+            "type": "grep",
+            "file": "test/acceptance-wired.test.mjs",
+            "pattern": "from '[^']*replication/"
+          }
+        },
+        {
+          "statement": "The wired test opens no listener of its own: delivery is the SO-F-12 stream code",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f test/acceptance-wired.test.mjs && ! grep -Eq \"createServer|\\.listen\\(\" test/acceptance-wired.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}

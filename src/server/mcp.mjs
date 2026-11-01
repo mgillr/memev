@@ -3,6 +3,7 @@
 import { VERSION, VaultError, RECALL_OFFSET_MAX } from '../engine/vault.mjs';
 import { PROTOCOL, PROTOCOL_POINTER, renderCard } from '../engine/card.mjs';
 import { HOOK_CLIENTS } from '../cli/clients.mjs';
+import { resolveRequest, vaultScope } from '../engine/identity.mjs';
 
 const S = (props, required = []) => ({ type: 'object', properties: props, required });
 const str = (description) => ({ type: 'string', description });
@@ -234,6 +235,9 @@ export async function handle(vault, msg, ctx) {
       const t = TOOLS.get(msg.params?.name);
       if (!t) return fail(-32602, `unknown tool: ${msg.params?.name}`);
       if (t.localOnly && !ctx.local) return reply({ isError: true, content: [{ type: 'text', text: `${t.name} runs only from this machine, not through the tunnel` }] });
+      // SO-F-01: a call resolves to a subject and a scope; the transport has done it, and a caller that did not is resolved here
+      const who = ctx.subject && ctx.scope ? { ok: true } : resolveRequest(ctx.identity, { target: vaultScope(vault.config) });
+      if (!who.ok) return reply({ isError: true, content: [{ type: 'text', text: `${who.code}: ${who.reason}` }] });
       try {
         const out = await t.run(vault, msg.params.arguments || {}, ctx);
         const text = out.text ?? JSON.stringify(out.data, null, 1);

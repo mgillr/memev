@@ -4,7 +4,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { sandbox } from './helpers/cli.mjs';
+import { sandbox, initWithRetry } from './helpers/cli.mjs';
 import { newVault, cleanup, OWNER, PKG } from './helpers/tmp.mjs';
 import { PROTOCOL, PROTOCOL_POINTER, PROTOCOL_REVIEW } from '../src/engine/card.mjs';
 import { INSTRUCTIONS, HOOK_CLIENTS, clientDefs } from '../src/cli/clients.mjs';
@@ -41,7 +41,7 @@ test('MEM-113 AC02: For each client with hooks, the MCP initialize instructions 
   // and the session-start hook of each app that has one does bring it, in that app's format
   const sb = sandbox();
   try {
-    assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
+    assert.equal(initWithRetry(sb, ['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
     for (const id of HOOK_CLIENTS) {
       const ctx = contextOf(sb.hook('session-start', { session_id: `once-${id}`, source: 'startup' }, id, FORMAT[id] || []).out);
       assert.ok(ctx.includes(PROTOCOL), `${id}: the hook sends the protocol`);
@@ -79,7 +79,7 @@ test('MEM-113 AC05: The CLAUDE.md, AGENTS.md and GEMINI.md block does not repeat
   const sb = sandbox();
   try {
     for (const d of ['.claude', '.codex', '.gemini']) fs.mkdirSync(path.join(sb.home, d), { recursive: true });
-    assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only']).code, 0);
+    assert.equal(initWithRetry(sb, ['init', '--port', String(sb.port), '--local-only']).code, 0);
     for (const f of [['.claude', 'CLAUDE.md'], ['.codex', 'AGENTS.md'], ['.gemini', 'GEMINI.md']]) {
       const text = fs.readFileSync(path.join(sb.home, ...f), 'utf8');
       assert.ok(text.includes('<!-- memev:start -->'), f.join('/'));
@@ -91,7 +91,7 @@ test('MEM-113 AC05: The CLAUDE.md, AGENTS.md and GEMINI.md block does not repeat
 test('the no-lead notice stops at session start once the setup session has asked', () => {
   const sb = sandbox();
   try {
-    assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
+    assert.equal(initWithRetry(sb, ['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
     const start = (id) => contextOf(sb.hook('session-start', { session_id: id, source: 'startup' }).out);
     assert.match(start('lead-a'), /No lead AI is set/);
     const f = path.join(sb.root, 'bus', 'operator.json');

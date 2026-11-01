@@ -128,6 +128,67 @@ shows where each sits is [docs/scope-one/WBS.md](../docs/scope-one/WBS.md).
 | [SO-2.13](scope-one/specs/SO-2.13-commercial-integration-services.json) | [`k-so-2-13-commercial-integ-d4d6ec`](signed/k-so-2-13-commercial-integ-d4d6ec.json) | G-SO-24 | Commercial integration services that keep the open-core boundary neutral | none |
 | [SO-2.14](scope-one/specs/SO-2.14-business-team-administration.json) | [`k-so-2-14-business-deploym-5aa59d`](signed/k-so-2-14-business-deploym-5aa59d.json) | G-SO-25 | Business deployment: multi-person project permissions and team administration | none |
 
+## Programme contracts, 1 November 2026
+
+`programme/` holds what the Scope One contracts do not already cover, plus one contract per pull request that closes programme work: 28 specs in all. Twenty-six have an interim red-team record under `programme/redteam/` (an interim solo review, pending independent re-review; the record cites the owner confirmation of the engine decision, t542u, 31 Oct 2026). All twenty-six passed and are signed by signer-2, in two passes: eight in the first, of which PG-03.2, PG-03.3, PG-06.1 and PG-12.1 are since superseded (the signed files stay unchanged and the manifest marks them superseded), and eighteen in the second, among them PG-06.2 and PG-12.2, which supersede PG-06.1 and PG-12.1. PG-03.4 and PG-03.6, and SR-0.03.3 (version 3 of SR-0.03), are signed in a third pass, listed below; PG-03.6 supersedes PG-03.5, which superseded PG-03.3, and PG-03.5 is not signed and stays on record.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [PGP-1.05](programme/specs/PGP-1.05-memev-site-plans-match-tier-decision.json) | [`k-pgp-1-05-memev-site-plan-a03d0c`](signed/k-pgp-1-05-memev-site-plan-a03d0c.json) | memev-site: plans, home and trial copy follow the tier decision, and federation is stated as planned | none |
+| [PG-02.1](programme/specs/PG-02.1-crdt-conformance-gate-history-based-ci.json) | [`k-pg-02-1-crdt-conformance-f7cb3e`](signed/k-pg-02-1-crdt-conformance-f7cb3e.json) | CRDT conformance gate (history-based, CI) (crdt-merge) | PGP-1.01 |
+| [PG-03.1](programme/specs/PG-03.1-cross-language-protocol-vectors.json) | [`k-pg-03-1-cross-language-p-a519ac`](signed/k-pg-03-1-cross-language-p-a519ac.json) | Cross-language protocol vectors (crdt-merge) | PG-02.1 |
+| [PG-03.2](programme/specs/PG-03.2-cross-language-protocol-vectors.json) | [`k-pg-03-2-cross-language-p-d32de4`](signed/k-pg-03-2-cross-language-p-d32de4.json) | Cross-language protocol vectors (crdt-merge-ts) | PG-03.1 |
+| [PG-03.3](programme/specs/PG-03.3-cross-language-protocol-vectors.json) | [`k-pg-03-3-cross-language-p-fde764`](signed/k-pg-03-3-cross-language-p-fde764.json) | Cross-language protocol vectors (crdt-merge-rs) | PG-03.1 |
+| [PG-06.1](programme/specs/PG-06.1-replication-separate-from-acceptance.json) | [`k-pg-06-1-replication-sepa-c68fcd`](signed/k-pg-06-1-replication-sepa-c68fcd.json) | Replication separate from acceptance (memev) | PG-04.1, PGP-1.02 |
+| [PG-12.1](programme/specs/PG-12.1-multi-node-gossip-transport.json) | [`k-pg-12-1-multi-node-gossi-63c027`](signed/k-pg-12-1-multi-node-gossi-63c027.json) | Multi-node gossip transport (memev) | PG-04.1, PG-05.1, PG-09.1 |
+| [PG-18.1](programme/specs/PG-18.1-interop-sdks-a2a-and-payments.json) | [`k-pg-18-1-interop-sdks-a2a-645104`](signed/k-pg-18-1-interop-sdks-a2a-645104.json) | Interop SDKs, A2A and payments (memev) | PG-02.1, PG-04.1, PG-10.1, SO-1.04, SO-2.08 |
+| [PG-06.2](programme/specs/PG-06.2-replication-separate-from-acceptance.json) | [`k-pg-06-2-replication-sepa-96144e`](signed/k-pg-06-2-replication-sepa-96144e.json) | Replication separate from acceptance (memev), supersedes PG-06.1 | PG-04.1, PGP-1.02 |
+| [PG-12.2](programme/specs/PG-12.2-multi-node-gossip-transport.json) | [`k-pg-12-2-multi-node-gossi-32f0e0`](signed/k-pg-12-2-multi-node-gossi-32f0e0.json) | Multi-node gossip transport (memev), supersedes PG-12.1 | PG-04.1, PG-05.1, PG-09.1 |
+| [PG-10.1](programme/specs/PG-10.1-evidence-knowledge-status-and-receipts.json) | [`k-pg-10-1-evidence-knowled-c8fc31`](signed/k-pg-10-1-evidence-knowled-c8fc31.json) | Evidence, knowledge status and receipts (memev) | PG-04.1, PG-06.2, PGP-1.02, SO-2.03 |
+| [PG-14.1](programme/specs/PG-14.1-federation-demonstrators-and-benchmark.json) | [`k-pg-14-1-federation-demon-95c542`](signed/k-pg-14-1-federation-demon-95c542.json) | Federation demonstrators and benchmark (memev) | PG-03.4, PG-09.1, PG-10.1, PG-12.2, PG-13.1, SO-2.04, SO-2.05, SO-2.06 |
+| [PG-01.1](programme/specs/PG-01.1-crdt-merge-correctness-fixes-for-the-agent-memor.json) | [`k-pg-01-1-crdt-merge-corre-756d9c`](signed/k-pg-01-1-crdt-merge-corre-756d9c.json) | crdt-merge correctness fixes for the agent/memory subsystems (crdt-merge) | PGP-1.01 |
+| [PG-09.1](programme/specs/PG-09.1-identity-admission-and-acfa-boundary.json) | [`k-pg-09-1-identity-admissi-7e5fce`](signed/k-pg-09-1-identity-admissi-7e5fce.json) | Identity, admission and ACFA boundary (memev) | PG-04.1, PG-06.2 |
+| [PGP-1.01](programme/specs/PGP-1.01-crdt-merge-four-correctness-bugs.json) | [`k-pgp-1-01-crdt-merge-four-b1cfd3`](signed/k-pgp-1-01-crdt-merge-four-b1cfd3.json) | crdt-merge: four correctness bugs fixed (ORSet resurrection, LWWMap get/value, TrustAgentState delete, tag collisions) | none |
+| [PG-04.1](programme/specs/PG-04.1-canonical-operation-envelope.json) | [`k-pg-04-1-canonical-operat-b77c7c`](signed/k-pg-04-1-canonical-operat-b77c7c.json) | Canonical operation envelope (memev) | SO-1.01, SO-1.04 |
+| [PG-05.1](programme/specs/PG-05.1-engine-integration-merge-semantics-mapping-bound.json) | [`k-pg-05-1-engine-integrati-8d9e24`](signed/k-pg-05-1-engine-integrati-8d9e24.json) | Engine integration: merge semantics, mapping, boundary (memev) | PG-01.1, PG-04.1, PGP-1.06, SO-2.12, SO-2.13, WO-05-B |
+| [PG-08.1](programme/specs/PG-08.1-scope-one-lifecycle-gaps-intake-to-delivery.json) | [`k-pg-08-1-scope-one-lifecy-ae8b1c`](signed/k-pg-08-1-scope-one-lifecy-ae8b1c.json) | Scope One lifecycle gaps (intake to delivery) (memev) | PG-10.1, PGP-1.02, SO-1.04, SO-1.10, SO-1.11, SO-2.08 |
+| [PG-09.2](programme/specs/PG-09.2-identity-admission-and-acfa-boundary.json) | [`k-pg-09-2-identity-admissi-3e4883`](signed/k-pg-09-2-identity-admissi-3e4883.json) | Identity, admission and ACFA boundary (memev-ops) | none |
+| [PG-13.1](programme/specs/PG-13.1-federation-sites-sharing-classes-disclosure.json) | [`k-pg-13-1-federation-sites-fb61c9`](signed/k-pg-13-1-federation-sites-fb61c9.json) | Federation sites, sharing classes, disclosure (memev) | PG-04.1, PG-06.2, PG-09.1, PG-10.1, PG-12.2, SO-2.02 |
+| [PG-15.1](programme/specs/PG-15.1-licensing-boundary.json) | [`k-pg-15-1-licensing-bounda-48851a`](signed/k-pg-15-1-licensing-bounda-48851a.json) | Licensing boundary (memev-ops) | PGP-1.06 |
+| [PG-16.1](programme/specs/PG-16.1-positioning-tiers-public-claims-blueprint.json) | [`k-pg-16-1-positioning-tier-580e00`](signed/k-pg-16-1-positioning-tier-580e00.json) | Positioning, tiers, public claims, blueprint (memev) | PG-05.1, SO-1.02 |
+| [PGP-1.02](programme/specs/PGP-1.02-wire-project-engine-and-licence-guard.json) | [`k-pgp-1-02-memev-the-proje-e98154`](signed/k-pgp-1-02-memev-the-proje-e98154.json) | memev: the project store, state machine and coordinator wired into the daemon, with a licence-boundary guard | SO-1.01 |
+| [PGP-1.03](programme/specs/PGP-1.03-memev-docs-tiers-reconciliation.json) | [`k-pgp-1-03-memev-engine-de-11cd89`](signed/k-pgp-1-03-memev-engine-de-11cd89.json) | memev: engine decision recorded, tier docs aligned, README rewritten, reconciliation against the work breakdown | SO-1.02 |
+| [PGP-1.04](programme/specs/PGP-1.04-converge-fair-mem0-comparison.json) | [`k-pgp-1-04-converge-the-me-2441f7`](signed/k-pgp-1-04-converge-the-me-2441f7.json) | converge: the Mem0 comparison states Mem0's published design and what converge does differently | none |
+| [PGP-1.06](programme/specs/PGP-1.06-memev-ops-sr3-engine-decision.json) | [`k-pgp-1-06-memev-ops-sr-3-d345d7`](signed/k-pgp-1-06-memev-ops-sr-3-d345d7.json) | memev-ops: SR-3.01 and SR-3.03 superseded by the call-out engine decision, SR-3.05 states the licences once | none |
+
+Third pass, 1 November 2026. Each has an interim red-team record under `programme/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1. The signed contracts they replace in intent (PG-03.2, and the signed SR-0.03 version 2) stay unchanged and are not marked superseded in the signed files; the manifest records the supersession.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [SR-0.03.3](programme/specs/SR-0.03.3-verify-runs-every-verifier-type.json) | [`k-sr-0-03-3-verify-runs-ev-02455e`](signed/k-sr-0-03-3-verify-runs-ev-02455e.json) | Verify runs every verifier type, version 3 of SR-0.03 (memev) | none |
+| [PG-03.4](programme/specs/PG-03.4-cross-language-protocol-vectors.json) | [`k-pg-03-4-cross-language-p-b395d6`](signed/k-pg-03-4-cross-language-p-b395d6.json) | Cross-language protocol vectors (crdt-merge-ts), supersedes PG-03.2 | PG-03.1 |
+| [PG-03.6](programme/specs/PG-03.6-cross-language-protocol-vectors.json) | [`k-pg-03-6-cross-language-p-ead304`](signed/k-pg-03-6-cross-language-p-ead304.json) | Cross-language protocol vectors (crdt-merge-rs), supersedes PG-03.5 | PG-03.1 |
+
+Fourth pass, 1 November 2026. `PG-19.1` has an interim red-team record under `programme/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [PG-19.1](programme/specs/PG-19.1-memev-work-command-wired-to-runwork.json) | [`k-pg-19-1-memev-work-comma-565912`](signed/k-pg-19-1-memev-work-comma-565912.json) | memev work command wired to runWork with a production openStore (memev) | SO-1.01, SO-A-03 |
+
+Fifth pass, 1 November 2026 (pull request #363). `PG-05.2` supersedes the signed `PG-05.1` (the PG-05.1 file and contract are unchanged): it keeps every criterion and adds three scope entries. `PG-20.1` is a new spec. Each has an interim red-team record under `programme/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [PG-05.2](programme/specs/PG-05.2-engine-integration-merge-semantics-mapping-bound.json) | [`k-pg-05-2-engine-integrati-57bd85`](signed/k-pg-05-2-engine-integrati-57bd85.json) | Engine integration: merge semantics, mapping, boundary (memev), supersedes PG-05.1 | PG-01.1, PG-04.1, PGP-1.06, SO-2.12, SO-2.13, WO-05-B |
+| [PG-20.1](programme/specs/PG-20.1-scope-verifier-allows-own-change-note.json) | [`k-pg-20-1-the-scope-verifi-d2e89d`](signed/k-pg-20-1-the-scope-verifi-d2e89d.json) | The scope verifier allows a spec's own change note (memev) | SR-0.03.3 |
+
+Sixth pass, 1 November 2026 (pull request #363, second signing pass). `PG-04.2` supersedes the signed `PG-04.1` and `PG-19.2` supersedes the signed `PG-19.1` (both earlier files and contracts are unchanged). Each has an interim red-team record under `programme/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [PG-04.2](programme/specs/PG-04.2-canonical-operation-envelope.json) | [`k-pg-04-2-canonical-operat-9d598a`](signed/k-pg-04-2-canonical-operat-9d598a.json) | Canonical operation envelope (memev), supersedes PG-04.1 | SO-1.01, SO-1.04 |
+| [PG-19.2](programme/specs/PG-19.2-memev-work-command-wired-to-runwork.json) | [`k-pg-19-2-memev-work-comma-6c8a9e`](signed/k-pg-19-2-memev-work-comma-6c8a9e.json) | memev work command wired to runWork with a production openStore (memev), supersedes PG-19.1 | SO-1.01, SO-A-03 |
+
 ## Scope One build layer, 1 November 2026
 
 `scope-one/` also holds the build layer: 25 contracts adapted from the unsigned fold of 30 October 2026 (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-10, SO-F-12 and SO-F-13). They build what the design records SO-1.x and SO-2.x decide, and each cites the record it builds and the signed vault contracts it rests on, by id only. I validated each against main and the programme specs of PR #325, and changed the text where main or an owner decision of 31 October 2026 disagreed with it; every spec lists its changes in its request as adapted from the unsigned fold. SO-F-11 is dropped, with the reason in section 9.3 of [docs/scope-one/WBS.md](../docs/scope-one/WBS.md). Each has an interim red-team record (an interim solo review by the author, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`). The spec file is named by the id alone, because the gate reads the id from the file name and an id with a letter segment has no number to stop at.
@@ -184,3 +245,24 @@ round was committed. No signed file was edited and the earlier versions stay, li
 | [SO-F-10](scope-one/specs/SO-F-10.json) | [`k-so-f-10-federated-comput-46e7e6`](signed/k-so-f-10-federated-comput-46e7e6.json) | 2 | [`k-so-f-10-federated-comput-be4e45`](signed/k-so-f-10-federated-comput-be4e45.json) |
 | [SO-F-12](scope-one/specs/SO-F-12.json) | [`k-so-f-12-replication-unit-156f69`](signed/k-so-f-12-replication-unit-156f69.json) | 2 | [`k-so-f-12-replication-unit-3feee3`](signed/k-so-f-12-replication-unit-3feee3.json) |
 | [SO-F-13](scope-one/specs/SO-F-13.json) | [`k-so-f-13-cross-functional-8c65b0`](signed/k-so-f-13-cross-functional-8c65b0.json) | 2 | [`k-so-f-13-cross-functional-c6f060`](signed/k-so-f-13-cross-functional-c6f060.json) |
+
+`SO-F-03.2` supersedes the signed `SO-F-03` (owner delegation, 1 November 2026): it adds PG-04.1 as a predecessor and names the operation envelope files in its scope, and keeps every criterion. It has an interim red-team record under `scope-one/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1 of its own contract. The signed `SO-F-03` contracts are unchanged and the manifest records `superseded_by` on `SO-F-03`.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [SO-F-03.2](scope-one/specs/SO-F-03.2.json) | [`k-so-f-03-2-contribution-s-bc1be8`](signed/k-so-f-03-2-contribution-s-bc1be8.json) | Contribution signature and two-step admission, built after the operation envelope; supersedes SO-F-03 | SO-F-01, SO-F-02, PG-04.1 |
+
+`SO-F-03.3` supersedes the signed `SO-F-03.2` (owner delegation, 1 November 2026, pull request #363): it adds README.md to the scope of T1 and keeps every criterion. It has an interim red-team record under `scope-one/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1 of its own contract. The signed `SO-F-03.2` contract is unchanged.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [SO-F-03.3](scope-one/specs/SO-F-03.3.json) | [`k-so-f-03-3-contribution-s-0bb27e`](signed/k-so-f-03-3-contribution-s-0bb27e.json) | Contribution signature and two-step admission, built after the operation envelope; supersedes SO-F-03.2 | SO-F-01, SO-F-02, PG-04.1 |
+
+Second signing pass on pull request #363, 1 November 2026. `SO-F-02.2` supersedes the signed `SO-F-02` and `SO-F-09.2` supersedes the signed `SO-F-09` (the earlier files and contracts are unchanged, and the manifest records `superseded_by` on them). `SO-W-08B` and `SO-W-08C` were `SO-08-B` and `SO-08-C` until they were renamed, because the gate reduces a file name such as `SO-08-B.json` to the id `SO-08` and the two shared one record path; `SO-08-B` stays the id of the signed vault contract that `SO-W-08B` restates. Each has an interim red-team record under `scope-one/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1 of its own contract.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [SO-F-02.2](scope-one/specs/SO-F-02.2.json) | [`k-so-f-02-2-canonical-proj-d5d282`](signed/k-so-f-02-2-canonical-proj-d5d282.json) | Canonical project schema, version 1, with authority and merge classes: every entity type declares its owner authority, scope version and ...; supersedes SO-F-02 | SO-F-01, SO-1.01 |
+| [SO-F-09.2](scope-one/specs/SO-F-09.2.json) | [`k-so-f-09-2-finding-model--e25d9e`](signed/k-so-f-09-2-finding-model--e25d9e.json) | Finding model for organisational intelligence: a finding is a graph claim capped at theory by evidence, promoted to fact only by a ...; supersedes SO-F-09 | SO-F-01, SO-F-02 |
+| [SO-W-08B](scope-one/specs/SO-W-08B.json) | [`k-so-w-08b-recovery-and-co-f2e9ed`](signed/k-so-w-08b-recovery-and-co-f2e9ed.json) | Recovery and control: disconnect recovery, restart reconstruction, pause, resume and cancel through memev work, transitions on the ...; repository text of the signed vault contract SO-08-B | SO-1.01, SO-A-03 |
+| [SO-W-08C](scope-one/specs/SO-W-08C.json) | [`k-so-w-08c-production-call-efbd86`](signed/k-so-w-08c-production-call-efbd86.json) | Production callers for recovery and control, and the bus for the Coordinator; production callers of the SO-08-B functions | SO-W-08B, SO-1.01, SO-A-03 |

@@ -23,6 +23,7 @@ import { assess, DEFAULT_GATE } from './quality.mjs';
 import { STATE, isVault } from './vault-marker.mjs';
 import { ProjectStore } from './project-store.mjs';
 import { Coordinator } from './coordinator.mjs';
+import { resolveRequest, vaultScope } from './identity.mjs';
 
 export const VERSION = readJson(new URL('../../package.json', import.meta.url), {}).version;
 export { STATE, isVault };
@@ -268,6 +269,9 @@ export class Vault extends EventEmitter {
   _need(identity, scope, p) {
     if (scope !== 'read' && identity?.read_only) throw new VaultError('forbidden', identity.read_only);
     if (!allowed(identity, scope, p)) throw new VaultError('forbidden', `this token may not ${scope}${p ? ` ${p}` : ''}`);
+    // SO-F-01: every store read and write resolves to a subject and a scope, and the scope is held against this vault's own
+    const who = resolveRequest(identity, { target: vaultScope(this.config) });
+    if (!who.ok) throw new VaultError('forbidden', `${who.code}: ${who.reason}`);
   }
   _guard(p, text, allowSecrets, internal) {
     // the bus writes its own files (messages, seats, the lead record) without the note API, so no token writes under bus/

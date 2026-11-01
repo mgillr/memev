@@ -1,0 +1,59 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PG-03.4",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "1682d4bc9374c1f03306b8fbf4bc01d8e68b703c761a8150eb092b8df5997311",
+      "base_commit": "5ba301aeafd643a2e7e4fbd926fa91f69d7eb238",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "contracts/programme/manifest.json",
+            "sha256": "f52de7b15e613a1829be1b6c409e903c8b870e08ce381dd2fbb1df0e27273f7b"
+          }
+        ]
+      },
+      "manifest_kind": "evidence",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "low",
+          "how": "the file_exists criteria on the three vector files prove the files are there, not that their content is right",
+          "disposition": "rejected",
+          "reason": "the same task carries a command that compares each vector file by git blob hash with the crdt-merge main commit aab0099, which is the content check; I confirmed the three blob hashes (orset 36fab745f945, lwwmap 2f2fce35f62c, agentstate ccdb98a13864) against the repository at aab0099"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "the implement targets are in another repository (crdt-merge-ts) and are not visible here, so the red-green commands cannot be run from this repository",
+          "disposition": "rejected",
+          "reason": "the manifest row says evidence, so the gate requires no test_red_green over a test file in this repository; the commands run in the edition repository named in the request, and I ran none of them there"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the signer, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of PG-03.4 as changed by pull request #345, made against main at 5ba301aeafd6. It has 3 tasks and 29 criteria. Checks run, and the only checks made: the spec hash equals the hash the owner delegation gave (1682d4bc9374); the manifest kind is evidence; the tasks draft through makeTask; every command parses with sh -n; no criterion statement repeats within a task; every grep pattern compiles and is within 200 characters; every depends_on is a manifest row; the leak scan is clean; the spec names no agent label. Its three vector blob hashes were compared with crdt-merge at aab0099 and match. I did not run any named test or command in its target repository, and I did not re-read the vault contracts the request names. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MTkzZmU0NmQ1ZGNmODdhZjYyZDc4NDJmZTY4YzYxOGVhODMzYTM3MTZjYzIxZTQ3ZDkxODU5ZTExM2U0NmJiZQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "2CO7f1dMW/4712GPg6+mtXBxxDFb93gejc2Le3AMOlDra+E/F9lqadSq0fU7UExnkX50tPY2t2xN1ms++RQFDw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NDllZDNmYTM3OGIzNTIwNTMxZWZiYTNmZmRkYzlmZDQ1MTU2M2M2ZTY3OGU2MTM0ZjhkMzIzN2VlODQ5YmY1Ng==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "kEaByARWMMZ43pze5Km2Pj6ZjhAMDxfZSURqcHwot11UcWLTzirFiKQTOeN34uFFsAfzGlWVBHHHCMktuw79BA=="
+          }
+        ]
+      }
+    }
+  ]
+}

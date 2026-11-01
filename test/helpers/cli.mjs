@@ -34,6 +34,13 @@ export function freePort({ span = 1 } = {}) {
   }
   throw new Error('no free port for the test daemon');
 }
+// Run init, and while it reports that the daemon did not start (a slow first start on a busy machine) ask for the start again,
+// up to `tries` runs in all. A failure of any other kind is returned at once.
+export function initWithRetry(sb, args, { tries = 3 } = {}) {
+  let r = sb.run(args);
+  for (let i = 1; i < tries && r.code !== 0 && /did not start/.test(`${r.out}${r.err}`); i++) r = sb.run(['start']);
+  return r;
+}
 // The sandbox has the launcher folder on PATH, as a person who ran memev path add does; a test of the other case sets PATH itself.
 export function sandbox({ ports = 1 } = {}) {
   const home = tmpdir('home-');
@@ -76,3 +83,20 @@ export function transcript(file, entries) {
 export const user = (text) => ({ type: 'user', message: { role: 'user', content: text } });
 export const assistant = (text, tools = []) => ({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text }, ...tools.map(([name, input], i) => ({ type: 'tool_use', id: `t${i}`, name, input }))] } });
 export const todos = (list) => ['TodoWrite', { todos: list.map(([status, content]) => ({ status, content, activeForm: content })) }];
+
+const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+/** Run step again, up to timeoutMs, until ok(result) is true; return the last result either way. A result that a slow machine delivers
+ *  a moment late is read when it arrives, and one that never arrives is still the caller's failed assertion. */
+export function pollUntil(step, ok, { timeoutMs = 20000, intervalMs = 500 } = {}) {
+  const end = Date.now() + timeoutMs;
+  let r = step();
+  while (!ok(r) && Date.now() < end) { sleepSync(intervalMs); r = step(); }
+  return r;
+}
+
+/** Run a hook through the sandbox, and while it prints its not-reachable notice (the daemon did not answer inside the hook's own
+ *  timeout on a slow machine; the hook still exits 0) ask again, up to timeoutMs. args are the arguments of sb.hook.
+ *  Returns the last result either way. */
+export function hookUntil(sb, args, { timeoutMs = 30000, intervalMs = 500 } = {}) {
+  return pollUntil(() => sb.hook(...args), (r) => !/Memev is not reachable|Memev could not start/.test(r.out), { timeoutMs, intervalMs });
+}
