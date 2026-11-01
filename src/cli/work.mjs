@@ -41,12 +41,19 @@ export function renderImpact(r) {
   return [`${r.source}: ${r.dependents.length} dependent(s)`, ...r.dependents.map((d) => `  ${d.kind} ${d.id}  ${d.stale ? 'stale' : 'not stale'}  ${d.reason}`)].join('\n');
 }
 
-/** The commands: `status <project>` and `impact <id>`. Returns the exit code. The impact listing reads the project store it is
- *  given as `store`. */
-export async function runWork(pos, flags = {}, { root, vault = null, store = null, out = console.log, err = console.error } = {}) {
+/** The commands: `status <project>` and `impact <id>`. Returns the exit code. The impact listing reads a project store that the
+ *  caller passes in, as a port: `openStore(project)` returns the store of that project (or null), or `store` is the store itself.
+ *  This module never imports or builds a store. */
+export async function runWork(pos, flags = {}, { root, vault = null, store = null, openStore = null, out = console.log, err = console.error } = {}) {
   if (pos[0] === 'impact' && pos[1]) {
-    if (!store) { err('no project store was given to read the impact from'); return 1; }
-    const r = impact(store, pos[1]);
+    let s = store;
+    if (!s && typeof openStore === 'function') {
+      if (!flags.project) { err('memev work impact needs --project <project>'); return 1; }
+      s = openStore(String(flags.project));
+      if (!s) { err(`no project ${flags.project}`); return 1; }
+    }
+    if (!s) { err('no project store was given to read the impact from'); return 1; }
+    const r = impact(s, pos[1]);
     out(flags.json ? JSON.stringify(r, null, 2) : renderImpact(r));
     return 0;
   }
