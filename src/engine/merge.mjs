@@ -15,9 +15,9 @@ import { verifyLicense, LICENSE_KEYS } from './license.mjs';
  * allows it while valid or in grace. No licence, an invalid licence, or a licence without the
  * merge service does not.
  */
-export function engineAllowed(license, { now = Date.now(), keys = LICENSE_KEYS } = {}) {
+export function engineAllowed(license, { now = Date.now(), keys = LICENSE_KEYS, floor = null } = {}) {
   if (!license) return false;
-  const v = verifyLicense(license, { keys, now });
+  const v = verifyLicense(license, { keys, now, floor });
   if (v.state !== 'valid' && v.state !== 'grace') return false;
   if (!v.services || !v.services.includes('merge')) return false;
   if (license.trial === true && v.state !== 'valid') return false;
@@ -76,8 +76,8 @@ export function commandProvider(command, { args = [], timeoutMs = 30000, maxBuff
  * the merged text. When the licence does not allow the engine, or the provider is missing,
  * refuses, or fails, both versions are kept and a line names the reason.
  */
-export function resolveMerge({ a, b, base = null, license = null, config = null, now = Date.now(), keys = LICENSE_KEYS, log = () => {} }) {
-  if (!engineAllowed(license, { now, keys })) {
+export function resolveMerge({ a, b, base = null, license = null, config = null, now = Date.now(), keys = LICENSE_KEYS, floor = null, log = () => {} }) {
+  if (!engineAllowed(license, { now, keys, floor })) {
     log('kept both versions: the licence does not allow the merge engine');
     return { resolved: false, keepBoth: true, reason: 'the licence does not allow the merge engine' };
   }

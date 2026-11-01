@@ -194,10 +194,10 @@ t('T1-c11: the header of license.mjs shows the licence, names the non-identity f
   assert.ok(Array.isArray(L.LICENSE_FIELDS), 'LICENSE_FIELDS is exported');
   const src = fs.readFileSync(path.join(PKG, 'src', 'engine', 'license.mjs'), 'utf8');
   const head = src.slice(0, src.search(/^import /m)).split('\n').filter((l) => l.startsWith('//')).map((l) => l.replace(/^\/\/ ?/, '')).join('\n');
-  const wrapperAt = head.indexOf('{ "license"');
-  assert.ok(wrapperAt > 0, 'the header has a separate wrapper example');
-  const example = head.slice(head.indexOf('{ "v"'), wrapperAt);
-  const wrapper = head.slice(wrapperAt);
+  const example = (head.match(/\{ "v"[\s\S]*?\}\n/) || [''])[0];
+  const wrapper = (head.match(/\{ "license"[\s\S]*?\} \}/) || [''])[0];
+  assert.ok(example.includes('"sig"'), 'the header has a licence example');
+  assert.ok(wrapper.length > 0, 'the header has a separate wrapper example');
   const quoted = new Set([...example.matchAll(/"([a-z_]+)":/g)].map((m) => m[1]));
   assert.deepEqual([...quoted].sort(), [...L.LICENSE_FIELDS].sort(), 'the quoted keys of the licence example are the LICENSE_FIELDS');
   for (const w of ['license', 'relay', 'default_url', 'default_domain']) assert.ok(new RegExp(`"${w}"`).test(wrapper), `the wrapper example names ${w}`);
