@@ -127,3 +127,60 @@ shows where each sits is [docs/scope-one/WBS.md](../docs/scope-one/WBS.md).
 | [SO-2.12](scope-one/specs/SO-2.12-federated-computation.json) | [`k-so-2-12-federated-comput-0d4271`](signed/k-so-2-12-federated-comput-0d4271.json) | G-SO-23 | Federated computation behind the provider boundary | none |
 | [SO-2.13](scope-one/specs/SO-2.13-commercial-integration-services.json) | [`k-so-2-13-commercial-integ-d4d6ec`](signed/k-so-2-13-commercial-integ-d4d6ec.json) | G-SO-24 | Commercial integration services that keep the open-core boundary neutral | none |
 | [SO-2.14](scope-one/specs/SO-2.14-business-team-administration.json) | [`k-so-2-14-business-deploym-5aa59d`](signed/k-so-2-14-business-deploym-5aa59d.json) | G-SO-25 | Business deployment: multi-person project permissions and team administration | none |
+
+## Scope One build layer, 1 November 2026
+
+`scope-one/` also holds the build layer: 25 contracts adapted from the unsigned fold of 30 October 2026 (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-10, SO-F-12 and SO-F-13). They build what the design records SO-1.x and SO-2.x decide, and each cites the record it builds and the signed vault contracts it rests on, by id only. I validated each against main and the programme specs of PR #325, and changed the text where main or an owner decision of 31 October 2026 disagreed with it; every spec lists its changes in its request as adapted from the unsigned fold. SO-F-11 is dropped, with the reason in section 9.3 of [docs/scope-one/WBS.md](../docs/scope-one/WBS.md). Each has an interim red-team record (an interim solo review by the author, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`). The spec file is named by the id alone, because the gate reads the id from the file name and an id with a letter segment has no number to stop at.
+
+| Spec | Contract | Builds | Title | Depends on |
+|---|---|---|---|---|
+| [SO-A-01](scope-one/specs/SO-A-01.json) | [`k-so-a-01-lead-agent-assig-fe4345`](signed/k-so-a-01-lead-agent-assig-fe4345.json) | SO-1.03 | Lead agent: assignment preferences and overrides in ordinary language | SO-1.01 |
+| [SO-A-02](scope-one/specs/SO-A-02.json) | [`k-so-a-02-default-agent-su-518f1f`](signed/k-so-a-02-default-agent-su-518f1f.json) | SO-1.03 | Default agent suitability analysis: capability requirements per task | SO-1.01 |
+| [SO-A-03](scope-one/specs/SO-A-03.json) | [`k-so-a-03-requested-accept-0955eb`](signed/k-so-a-03-requested-accept-0955eb.json) | SO-1.04 | Requested | SO-1.01 |
+| [SO-A-04](scope-one/specs/SO-A-04.json) | [`k-so-a-04-relationship-mod-f75831`](signed/k-so-a-04-relationship-mod-f75831.json) | SO-1.07 | Relationship model and change propagation: milestones | SO-1.01 |
+| [SO-A-05](scope-one/specs/SO-A-05.json) | [`k-so-a-05-decision-and-blo-5b0148`](signed/k-so-a-05-decision-and-blo-5b0148.json) | SO-1.08 | Decision and blocker queue as a workflow: seven states | SO-A-04, SO-1.01 |
+| [SO-A-06](scope-one/specs/SO-A-06.json) | [`k-so-a-06-artifact-registr-c34e6d`](signed/k-so-a-06-artifact-registr-c34e6d.json) | SO-1.09 | Artifact registry: every material artifact linked to its requirement | SO-A-04, SO-1.01 |
+| [SO-A-07](scope-one/specs/SO-A-07.json) | [`k-so-a-07-connections-and--af599b`](signed/k-so-a-07-connections-and--af599b.json) | SO-1.06 | Connections and access: one table over the folder grants | SO-1.01 |
+| [SO-A-08](scope-one/specs/SO-A-08.json) | [`k-so-a-08-workspace-first--2598e4`](signed/k-so-a-08-workspace-first--2598e4.json) | SO-1.05 | Workspace | SO-A-01, SO-A-03, SO-A-04, SO-A-05, SO-A-06, SO-1.01 |
+| [SO-A-09](scope-one/specs/SO-A-09.json) | [`k-so-a-09-workspace-second-b05b28`](signed/k-so-a-09-workspace-second-b05b28.json) | SO-1.05 | Workspace | SO-A-04, SO-A-08 |
+| [SO-A-12](scope-one/specs/SO-A-12.json) | [`k-so-a-12-workspace-third--bd2b44`](signed/k-so-a-12-workspace-third--bd2b44.json) | SO-1.05, SO-1.09 | Workspace | SO-A-06, SO-A-09 |
+| [SO-A-10](scope-one/specs/SO-A-10.json) | [`k-so-a-10-fault-injection--399469`](signed/k-so-a-10-fault-injection--399469.json) | SO-1.10, SO-1.11 | Fault injection and the reference journey: the failure matrix extended to F31 | SO-A-01, SO-A-02, SO-A-03, SO-A-06, SO-A-07, SO-A-08 |
+| [SO-A-11](scope-one/specs/SO-A-11.json) | [`k-so-a-11-baseline-reconci-5902ed`](signed/k-so-a-11-baseline-reconci-5902ed.json) | SO-1.02 | Baseline reconciliation: a register check over the takeover record with implemented | none |
+| [SO-R-E](scope-one/specs/SO-R-E.json) | [`k-so-r-e-publish-the-versi-5db602`](signed/k-so-r-e-publish-the-versi-5db602.json) | none | Publish the versioned container image by a maintainer-run script after the Docker smoke passes: the registry account read from the environment or the origin remote | none |
+| [SO-F-01](scope-one/specs/SO-F-01.json) | [`k-so-f-01-identity-and-sco-a635b7`](signed/k-so-f-01-identity-and-sco-a635b7.json) | SO-2.02, SO-2.14 | Identity and scopes model | none |
+| [SO-F-02](scope-one/specs/SO-F-02.json) | [`k-so-f-02-canonical-projec-38d008`](signed/k-so-f-02-canonical-projec-38d008.json) | SO-1.07, SO-2.01 | Canonical project schema | SO-F-01, SO-1.01 |
+| [SO-F-03](scope-one/specs/SO-F-03.json) | [`k-so-f-03-contribution-sig-f6fdc0`](signed/k-so-f-03-contribution-sig-f6fdc0.json) | SO-2.02, SO-2.03 | Contribution signature and two-step admission: a signed | SO-F-01, SO-F-02 |
+| [SO-F-04](scope-one/specs/SO-F-04.json) | [`k-so-f-04-federation-membe-b99147`](signed/k-so-f-04-federation-membe-b99147.json) | SO-2.02, SO-2.14 | Federation membership and policy exchange specification: the relationship record | SO-F-01, SO-F-03 |
+| [SO-F-05](scope-one/specs/SO-F-05.json) | [`k-so-f-05-classification-m-1a82cb`](signed/k-so-f-05-classification-m-1a82cb.json) | SO-2.02, SO-2.03 | Classification model: six replication classes on notes and entities | SO-F-02, SO-F-04 |
+| [SO-F-12](scope-one/specs/SO-F-12.json) | [`k-so-f-12-replication-unit-3feee3`](signed/k-so-f-12-replication-unit-3feee3.json) | SO-2.03 | Replication unit: per-scope operation-log streams carrying classification and causal context | SO-F-05, SO-F-03 |
+| [SO-F-06](scope-one/specs/SO-F-06.json) | [`k-so-f-06-structured-state-f66a52`](signed/k-so-f-06-structured-state-f66a52.json) | SO-2.01 | Structured-state convergence contract for the engine: input and output schemas per merge class validated in the single boundary | SO-F-02, SO-1.01 |
+| [SO-F-07](scope-one/specs/SO-F-07.json) | [`k-so-f-07-federated-query--4be6eb`](signed/k-so-f-07-federated-query--4be6eb.json) | SO-2.02, SO-2.12 | Federated query and continuity specification: an authorised view with provenance and freshness | SO-F-04, SO-F-12 |
+| [SO-F-08](scope-one/specs/SO-F-08.json) | [`k-so-f-08-admission-adapte-61bb48`](signed/k-so-f-08-admission-adapte-61bb48.json) | SO-2.13 | Admission adapter boundary: the admission service behind an adapter beside the merge boundary | SO-F-03 |
+| [SO-F-09](scope-one/specs/SO-F-09.json) | [`k-so-f-09-finding-model-fo-768791`](signed/k-so-f-09-finding-model-fo-768791.json) | SO-2.04, SO-2.01 | Finding model for organisational intelligence: a finding is a graph claim capped at theory by evidence | SO-F-01, SO-F-02 |
+| [SO-F-13](scope-one/specs/SO-F-13.json) | [`k-so-f-13-cross-functional-c6f060`](signed/k-so-f-13-cross-functional-c6f060.json) | SO-2.05, SO-2.06 | Cross-functional conflict detection on a bounded programme: the seeded two-plan conflict detected | SO-F-09, SO-A-05 |
+| [SO-F-10](scope-one/specs/SO-F-10.json) | [`k-so-f-10-federated-comput-be4e45`](signed/k-so-f-10-federated-comput-be4e45.json) | SO-2.12 | Federated computation specification as an interface reservation: the work specification and receipt schemas | SO-F-03, SO-F-04 |
+
+## Build layer re-signed after a README re-review, 1 November 2026
+
+Thirteen of the build layer specs above have `docs/README.md` in their scope. Index rows for the SO-2.02 to SO-2.06 decision
+records landed there after the specs' round 1 was read, so the red-team gate reported `head_stale_src` for them. Each now has
+a round 2 in its record (an interim solo review by the author, pending independent re-review, on the unchanged spec hash)
+and is signed again by signer-2 (`keys/45c92c2850024872.pub`) as the next version, naming the one it supersedes, after that
+round was committed. No signed file was edited and the earlier versions stay, listed as superseded by
+`node scripts/gate/redteam-gate.mjs --report`.
+
+| Spec | Contract | Version | Supersedes |
+|---|---|---|---|
+| [SO-A-01](scope-one/specs/SO-A-01.json) | [`k-so-a-01-lead-agent-assig-861b14`](signed/k-so-a-01-lead-agent-assig-861b14.json) | 2 | [`k-so-a-01-lead-agent-assig-fe4345`](signed/k-so-a-01-lead-agent-assig-fe4345.json) |
+| [SO-A-07](scope-one/specs/SO-A-07.json) | [`k-so-a-07-connections-and--0fd80a`](signed/k-so-a-07-connections-and--0fd80a.json) | 2 | [`k-so-a-07-connections-and--af599b`](signed/k-so-a-07-connections-and--af599b.json) |
+| [SO-A-10](scope-one/specs/SO-A-10.json) | [`k-so-a-10-fault-injection--0b84bc`](signed/k-so-a-10-fault-injection--0b84bc.json) | 2 | [`k-so-a-10-fault-injection--399469`](signed/k-so-a-10-fault-injection--399469.json) |
+| [SO-F-01](scope-one/specs/SO-F-01.json) | [`k-so-f-01-identity-and-sco-2276e1`](signed/k-so-f-01-identity-and-sco-2276e1.json) | 2 | [`k-so-f-01-identity-and-sco-a635b7`](signed/k-so-f-01-identity-and-sco-a635b7.json) |
+| [SO-F-03](scope-one/specs/SO-F-03.json) | [`k-so-f-03-contribution-sig-2ba083`](signed/k-so-f-03-contribution-sig-2ba083.json) | 2 | [`k-so-f-03-contribution-sig-f6fdc0`](signed/k-so-f-03-contribution-sig-f6fdc0.json) |
+| [SO-F-04](scope-one/specs/SO-F-04.json) | [`k-so-f-04-federation-membe-8cc66d`](signed/k-so-f-04-federation-membe-8cc66d.json) | 2 | [`k-so-f-04-federation-membe-b99147`](signed/k-so-f-04-federation-membe-b99147.json) |
+| [SO-F-05](scope-one/specs/SO-F-05.json) | [`k-so-f-05-classification-m-b3c790`](signed/k-so-f-05-classification-m-b3c790.json) | 2 | [`k-so-f-05-classification-m-1a82cb`](signed/k-so-f-05-classification-m-1a82cb.json) |
+| [SO-F-07](scope-one/specs/SO-F-07.json) | [`k-so-f-07-federated-query--085a5f`](signed/k-so-f-07-federated-query--085a5f.json) | 2 | [`k-so-f-07-federated-query--4be6eb`](signed/k-so-f-07-federated-query--4be6eb.json) |
+| [SO-F-08](scope-one/specs/SO-F-08.json) | [`k-so-f-08-admission-adapte-1f2357`](signed/k-so-f-08-admission-adapte-1f2357.json) | 2 | [`k-so-f-08-admission-adapte-61bb48`](signed/k-so-f-08-admission-adapte-61bb48.json) |
+| [SO-F-09](scope-one/specs/SO-F-09.json) | [`k-so-f-09-finding-model-fo-cbe213`](signed/k-so-f-09-finding-model-fo-cbe213.json) | 2 | [`k-so-f-09-finding-model-fo-768791`](signed/k-so-f-09-finding-model-fo-768791.json) |
+| [SO-F-10](scope-one/specs/SO-F-10.json) | [`k-so-f-10-federated-comput-46e7e6`](signed/k-so-f-10-federated-comput-46e7e6.json) | 2 | [`k-so-f-10-federated-comput-be4e45`](signed/k-so-f-10-federated-comput-be4e45.json) |
+| [SO-F-12](scope-one/specs/SO-F-12.json) | [`k-so-f-12-replication-unit-156f69`](signed/k-so-f-12-replication-unit-156f69.json) | 2 | [`k-so-f-12-replication-unit-3feee3`](signed/k-so-f-12-replication-unit-3feee3.json) |
+| [SO-F-13](scope-one/specs/SO-F-13.json) | [`k-so-f-13-cross-functional-8c65b0`](signed/k-so-f-13-cross-functional-8c65b0.json) | 2 | [`k-so-f-13-cross-functional-c6f060`](signed/k-so-f-13-cross-functional-c6f060.json) |

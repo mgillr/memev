@@ -24,7 +24,7 @@ function setup() {
 }
 const state = (v, id) => v.contractList().find((c) => c.id === id)?.state;
 
-test('issues 242 and 243: no token writes closed/, receipts/, signed/ or keys/ in any letter case; verify still closes', () => {
+test('issues 242 and 243: no token writes closed/, receipts/, signed/ or keys/ in any letter case; verify still closes', async () => {
   const { v, work, a } = setup();
   try {
     for (const who of [REMOTE, OWNER]) {
@@ -38,7 +38,7 @@ test('issues 242 and 243: no token writes closed/, receipts/, signed/ or keys/ i
     assert.deepEqual(v.contractGate('sess-x').map((c) => c.id), [a.id]);
     // the engine's own verify still writes the receipt and the close
     fs.writeFileSync(path.join(work, 'a.txt'), 'done\n');
-    assert.equal(v.contractVerify(OWNER, { id: a.id }).ok, true);
+    assert.equal((await v.contractVerify(OWNER, { id: a.id })).ok, true);
     assert.equal(state(v, a.id), 'done');
     assert.deepEqual(v.contractGate('sess-x'), []);
   } finally { v.close(); }
@@ -70,7 +70,7 @@ test('issue 247 and a swapped body: a signature naming a key outside contracts/k
   } finally { v.close(); }
 });
 
-test('issue 257: a superseding contract retires the old one only once signed here and passed; an empty one is not signed', () => {
+test('issue 257: a superseding contract retires the old one only once signed here and passed; an empty one is not signed', async () => {
   const { root, v, work, a, draft } = setup();
   try {
     // a remote token writes an empty draft that supersedes A and signs it
@@ -85,7 +85,7 @@ test('issue 257: a superseding contract retires the old one only once signed her
     v.write(REMOTE, { path: 'contracts/drafts/x-trivial.json', body: `${JSON.stringify(trivial, null, 2)}\n` });
     v.contractSign(REMOTE, { id: 'x-trivial', local: false });
     v.write(REMOTE, { path: 'work/t.txt', body: 'x\n' });
-    assert.equal(v.contractVerify(OWNER, { id: 'x-trivial' }).ok, true);
+    assert.equal((await v.contractVerify(OWNER, { id: 'x-trivial' })).ok, true);
     assert.equal(state(v, a.id), 'open', 'a remotely signed contract retired A');
     assert.deepEqual(v.contractGate('sess-x').map((c) => c.id), [a.id]);
     // a version signed on this computer retires A, but only after its own verify passes
@@ -93,7 +93,7 @@ test('issue 257: a superseding contract retires the old one only once signed her
     v.contractSign(OWNER, { id: b.id });
     assert.equal(state(v, a.id), 'open', 'a signed but unverified version retired A');
     fs.writeFileSync(path.join(work, 'b2.txt'), 'x\n');
-    assert.equal(v.contractVerify(OWNER, { id: b.id }).ok, true);
+    assert.equal((await v.contractVerify(OWNER, { id: b.id })).ok, true);
     assert.equal(state(v, a.id), 'superseded');
     assert.deepEqual(v.contractGate('sess-x'), []);
   } finally { v.close(); }
