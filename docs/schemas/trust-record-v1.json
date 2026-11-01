@@ -77,7 +77,7 @@
           }
         },
         "purposes": {
-          "description": "The purposes the grant covers, a closed list of two in version 1.",
+          "description": "The purposes the grant covers, a closed list of two in version 1. PROVISIONAL: two purposes are option A of question 7 in ADR 8, which is proposed, and a further purpose is a new schema version.",
           "type": "array",
           "minItems": 1,
           "items": {
@@ -111,7 +111,7 @@
       }
     },
     "delegation": {
-      "description": "A grant with a depth of 1 or more may be delegated from. A delegated grant names its parent, has a lower depth, and only narrows it: the same scope, the same or fewer purposes, an expiry no later than the parent's.",
+      "description": "A grant with a depth of 1 or more may be delegated from. A delegated grant names its parent, has a lower depth, and only narrows it: the same scope, the same or fewer purposes, an expiry no later than the parent's, a start no earlier than the parent's. PROVISIONAL: narrowing-only delegation to a stated depth is option B of question 9 in ADR 8, which is proposed.",
       "type": "object",
       "required": [
         "depth"
@@ -130,7 +130,7 @@
       }
     },
     "revocation": {
-      "description": "Takes effect from its time. It is applied only when its issuer is the issuer of the grant or a root, and it makes every grant delegated from the revoked one ineligible.",
+      "description": "Takes effect from its time. It is applied only when its issuer is the issuer of the grant or a root the caller passes, and it makes every grant delegated from the revoked one ineligible. PROVISIONAL: who may revoke is a part of question 6 in ADR 8, which is proposed; this adds no role-by-action matrix.",
       "type": "object",
       "required": [
         "schema",

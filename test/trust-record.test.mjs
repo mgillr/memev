@@ -204,7 +204,7 @@ test('PG-W-21A AC03: a child with no usable parent is not honoured and a chain c
   assert.equal(evaluate(ask(), ctx([parentGrant({ start: '2026-01-15T00:00:00Z' }), childGrant({ start: '2026-01-16T00:00:00Z' })])).eligible, true, 'a later start narrows');
   // a grant with no delegation block has depth 0: it cannot delegate, and a non-root issuer with no block holds no authority
   const plain = (o) => grant({ id: 'plain', subject: 'operator:o1', purposes: ['contribute', 'verify'], ...o });
-  assert.equal(rule([without(plain(), 'delegation'), childGrant()]), 'deny.chain.parent_depth_zero', 'a parent with no delegation block cannot delegate');
+  assert.equal(rule([without(plain({ id: 'p' }), 'delegation'), childGrant()]), 'deny.chain.parent_depth_zero', 'a parent with no delegation block cannot delegate');
   assert.equal(rule([without(grant({ issuer: 'operator:o1' }), 'delegation')]), 'deny.untrusted_issuer', 'a non-root issuer with no delegation block');
   assert.equal(rule([without(grant({ issuer: 'operator:o1' }), 'delegation'), without(plain({ id: 'p' }), 'delegation')]), 'deny.untrusted_issuer', 'a holder of a grant with no block does not make its grants honoured');
   assert.equal(evaluate(ask(), ctx([without(grant(), 'delegation')])).eligible, true, 'a root-issued grant needs no delegation block');
@@ -454,7 +454,7 @@ test('PG-W-21A AC07: the module marks every choice as provisional and names the 
   // the three choices that answer an ADR 8 question are each labelled where they are made
   const label = (re, what) => { const m = re.exec(SRC()); assert.ok(m, `${what} is in the module`); const before = SRC().slice(Math.max(0, m.index - 600), m.index + m[0].length + 200); assert.match(before, /PROVISIONAL/, `${what} is labelled PROVISIONAL near its code`); assert.match(before, /ADR 8/, `${what} names ADR 8 near its code`); };
   label(/export const TRUST_PURPOSES/, 'the two purposes');
-  label(/deny\.chain\.depth|RULES\.CHAIN_DEPTH/, 'narrowing-only delegation');
+  label(/stop\(RULES\.CHAIN_DEPTH/, 'narrowing-only delegation');
   label(/v\.issuer === g\.issuer/, 'issuer-or-root revocation');
   const schema = JSON.parse(fs.readFileSync(SCHEMA_FILE, 'utf8'));
   assert.match(schema.description, /PROVISIONAL/);
@@ -467,7 +467,7 @@ test('PG-W-21A AC07: the module marks every choice as provisional and names the 
 
 test('PG-W-21A AC08: the only static import is ../identity.mjs, and no import is dynamic, required, created or resolved at run time', () => {
   const code = CODE();
-  const statics = [...code.matchAll(/(?:^|[;\n}])\s*(?:import|export)\b[^;'"`]*?(?:\bfrom\s*)?['"]([^'"]+)['"]/g)].map((m) => m[1]);
+  const statics = [...code.matchAll(/(?:^|[;\n}])\s*(?:import\s*(?:[^;'"`]*?\sfrom\s*)?|export\s[^;'"`]*?\sfrom\s*)['"]([^'"]+)['"]/g)].map((m) => m[1]);
   assert.deepEqual(statics, ['../identity.mjs'], 'a strict allow-list of one static import');
   assert.deepEqual(code.split('\n').filter((l) => /^import /.test(l)).length, 1, 'one import line, so the contract grep reads it');
   assert.equal((code.match(/\bimport\b/g) ?? []).length, 1, 'the word import appears once');
