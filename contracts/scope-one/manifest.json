@@ -679,7 +679,32 @@
    "criteria": 11,
    "spec": "specs/SO-F-03.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026; superseded by SO-F-03.2 (owner delegation, 1 Nov 2026); this spec file is unchanged and stays on record",
+   "superseded_by": "SO-F-03.2",
+   "superseded_reason": "owner delegation, 1 Nov 2026: build PG-04.1 WP04-01 and WP04-02 (the operation envelope) first, then SO-F-03; SO-F-03.2 adds PG-04.1 as a predecessor and the envelope files to the scope, and keeps every other criterion"
+  },
+  {
+   "id": "SO-F-03.2",
+   "area": "SO-F",
+   "title": "Contribution signature and two-step admission: a signed, scoped, classified contribution built on the operation envelope, admission into the node's own operation log, replay refused across restarts, and authority checked apart from the signature",
+   "repo": "memev",
+   "closes": "Build layer of the design records SO-2.02, SO-2.03: the fold contract SO-F-03 adapted to memev main, as the fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-F-01",
+    "SO-F-02",
+    "PG-04.1"
+   ],
+   "implements": [
+    "SO-2.02",
+    "SO-2.03"
+   ],
+   "tasks": 1,
+   "criteria": 11,
+   "spec": "specs/SO-F-03.2.json",
+   "adapted_from": "fold of 30 Oct 2026",
+   "status": "proposed: unsigned, signs after a clean red-team round",
+   "supersedes": "SO-F-03",
+   "supersedes_signed_contract": "k-so-f-03-contribution-sig-2ba083 (version 2; the spec file contracts/scope-one/specs/SO-F-03.json is unchanged)"
   },
   {
    "id": "SO-F-04",
