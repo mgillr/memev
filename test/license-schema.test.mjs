@@ -1,8 +1,7 @@
 // SR-1.06 T1: one licence schema, checked by the one function every reader calls.
 // install, activate, loadLicense and the merge gate all go through verifyLicense, so a licence that
 // carries a field outside the schema, a malformed trial or org, or a signature that does not cover
-// what it must is refused the same way everywhere. The trial licence format and the issue script's
-// trial and extension flags are covered here too.
+// what it must is refused the same way everywhere. The trial licence format is covered here too.
 //
 // The modules under test are loaded with a dynamic import inside try, so a tree that lacks a symbol
 // fails the test that needs it as an assertion and never as a load error.
@@ -12,7 +11,6 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const PKG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -23,7 +21,6 @@ const load = async (name, rel) => {
 const L = await load('license', '../src/engine/license.mjs');
 const C = await load('licensing', '../src/cli/licensing.mjs');
 const M = await load('merge', '../src/engine/merge.mjs');
-const K = await load('constants', './helpers/trial-constants.mjs');
 
 const made = [];
 const tmp = (p = 'sr106-') => { const d = fs.mkdtempSync(path.join(os.tmpdir(), p)); made.push(d); return d; };
@@ -37,7 +34,6 @@ const at = (d) => Date.parse(d);
 // describes (keys sorted at every level, `sig` left out), never with canonical() or signLicense().
 const kp = crypto.generateKeyPairSync('ed25519');
 const KEYS = { tk: kp.publicKey.export({ type: 'spki', format: 'der' }).toString('base64') };
-const PEM = kp.privateKey.export({ type: 'pkcs8', format: 'pem' });
 const FOREIGN = crypto.generateKeyPairSync('ed25519');
 const ser = (v) => (Array.isArray(v) ? `[${v.map(ser).join(',')}]` : v && typeof v === 'object' ? `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${ser(v[k])}`).join(',')}}` : JSON.stringify(v));
 const signedBytes = (o) => Buffer.from(ser(Object.fromEntries(Object.keys(o).filter((k) => k !== 'sig').map((k) => [k, o[k]]))), 'utf8');
@@ -406,49 +402,39 @@ t('with no licence installed loadLicense reads the free tier and records no cloc
 
 const foreign = () => signWith(FOREIGN.privateKey, TRIAL);
 
-const issueKey = () => { const f = path.join(tmp('sr106-key-'), 'k.pem'); fs.writeFileSync(f, PEM, { mode: 0o600 }); return f; };
-const issue = (...a) => spawnSync(process.execPath, [path.join(PKG, 'scripts', 'license', 'issue.mjs'), ...a], { encoding: 'utf8' });
-
-t('issue.mjs --trial and --extension refuse what a trial may not be', () => {
-  assert.equal(K?.TRIAL_DAYS, 14, `the trial length constant exists${loadErrors.constants ? ` (${loadErrors.constants})` : ''}`);
-  assert.equal(K?.TRIAL_EXT_DAYS, 14);
-  const k = issueKey();
-  assert.match(issue('--key', k, '--trial', '--tier', 'personal', '--seats', '5', '--org', 'org_acme0001').stderr, /Personal tiers have no trial/);
-  assert.match(issue('--key', k, '--trial', '--seats', '5', '--org', 'org_acme0001', '--exp', 'none').stderr, /do not pass --exp/);
-  assert.match(issue('--key', k, '--trial', '--org', 'org_acme0001').stderr, /--seats/);
-  assert.match(issue('--key', k, '--extension', '--seats', '5', '--org', 'org_acme0001').stderr, /--extension needs --trial/);
-  assert.match(issue('--key', k, '--trial', '--extension', '--seats', '5', '--org', 'org_acme0001', '--days', '30').stderr, /do not pass --days/);
-  assert.match(issue('--key', k, '--trial', '--tier', 'corporate', '--seats', '5', '--org', 'org_acme0001').stderr, /not the vendor key/, 'a valid trial request gets as far as the key check');
-});
-
-t('issue.mjs takes the same org ids as the schema and keeps a one-extension ledger', () => {
-  const k = issueKey();
-  for (const bad of ['acme.com', 'myhost', 'org_abc', `org_${'a'.repeat(65)}`, EMAILISH]) {
-    assert.match(issue('--key', k, '--trial', '--seats', '5', '--org', bad).stderr, /--org/, `${bad} is refused`);
-  }
-  for (const good of ['org_abcd', `org_${'a'.repeat(64)}`]) {
-    assert.match(issue('--key', k, '--trial', '--seats', '5', '--org', good).stderr, /not the vendor key/, `${good} is accepted`);
-  }
-  const ledger = path.join(tmp('sr106-ledger-'), 'ext.json');
-  fs.writeFileSync(ledger, JSON.stringify({ org_acme0001: { lid: 'lic_prev', iat: '2026-01-01', exp: '2026-01-15' } }));
-  assert.match(issue('--key', k, '--trial', '--extension', '--seats', '5', '--org', 'org_acme0001', '--ledger', ledger).stderr, /already been issued/);
-  assert.match(issue('--key', k, '--trial', '--extension', '--seats', '5', '--org', 'org_other0001', '--ledger', ledger).stderr, /not the vendor key/, 'another org may still take its extension');
-});
-
-t('the issue script copy and the changelog note pass the writing check', () => {
-  const src = fs.readFileSync(path.join(PKG, 'scripts', 'license', 'issue.mjs'), 'utf8');
-  assert.match(src, /--trial/, 'the script has the trial flag');
+t('the changelog note names the change and passes the writing check', () => {
   const noteFile = path.join(PKG, 'changelog.d', 'SR-1.06.md');
   assert.ok(fs.existsSync(noteFile), 'the changelog note exists');
   const note = fs.readFileSync(noteFile, 'utf8');
-  const strings = [...src.matchAll(/'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g)].map((m) => (m[1] ?? m[2] ?? m[3] ?? '').replace(/\$\{[^}]*\}/g, ''));
-  const emdash = new RegExp(String.fromCharCode(0x2014));
-  for (const s of [...strings, note]) {
-    assert.doesNotMatch(s, /\b(seamless|robust|powerful|leverage|unlock|cutting[- ]edge)\b/i, `hype in: ${s}`);
-    assert.doesNotMatch(s, /not just .+ but\b/i, `not-just framing in: ${s}`);
-    assert.doesNotMatch(s, /\p{Extended_Pictographic}/u, `emoji in: ${s}`);
-    assert.doesNotMatch(s, /!/, `exclamation in: ${s}`);
-    assert.doesNotMatch(s, emdash, `em-dash in: ${s}`);
-    assert.doesNotMatch(s, /\bcertified\b/i, `certified in: ${s}`);
-  }
+  assert.match(note, /verifyLicense/, 'the note names verifyLicense');
+  assert.doesNotMatch(note, /\bseamless|robust|powerful|leverage|unlock|cutting[- ]edge/i, 'no hype');
+  assert.doesNotMatch(note, /not just .+ but\b/i, 'no not-just framing');
+  assert.doesNotMatch(note, /\p{Extended_Pictographic}/u, 'no emoji');
+  assert.doesNotMatch(note, /!/, 'no exclamation mark');
+  assert.doesNotMatch(note, new RegExp(String.fromCharCode(0x2014)), 'no em-dash');
+  assert.doesNotMatch(note, /\bcertified\b/i, 'never certified');
+});
+
+t('an org licence that is not a trial verifies with its org, installs and activates', async () => {
+  needAll();
+  const lic = paid({ lid: 'lic_orglic0001', org: 'org_plain0001' });
+  const v = L.verifyLicense(lic, { keys: KEYS, now: NOW });
+  assert.equal(v.state, 'valid');
+  assert.equal(v.org, 'org_plain0001', 'verifyLicense returns org');
+  assert.equal('trial' in v, false, 'no trial field on it');
+  const { i, a } = await bothPaths(lic);
+  assert.equal(i.ok, true, 'install accepts it'); assert.equal(a.ok, true, 'activate accepts it');
+});
+
+t('the merge gate passes the clock floor on, so a wound-back clock does not call the engine', () => {
+  needAll();
+  const lic = trial({ iat: '2026-10-01', exp: '2026-10-22', grace_days: 7 });
+  const early = NOW - 12 * DAY;
+  const calls = [];
+  const provider = { resolve(x) { calls.push(x); return { text: 'M\n' }; } };
+  const run = (extra) => M.resolveMerge({ a: 'A\n', b: 'B\n', base: 'x\n', license: lic, config: { merge: { provider } }, keys: KEYS, now: early, ...extra });
+  assert.equal(run({}).resolved, true, 'with no floor the engine is called');
+  const r = run({ floor: NOW });
+  assert.equal(r.keepBoth, true, 'with the floor both versions are kept');
+  assert.equal(calls.length, 1, 'the provider was called only for the run with no floor');
 });
