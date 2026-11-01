@@ -9,11 +9,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { newVault, cleanup, tmpdir } from './helpers/tmp.mjs';
-import { syncOnce, syncOnceWithin, syncOnceAsync, paidEngineStatus } from '../src/cli/sync.mjs';
+import * as S from '../src/cli/sync.mjs';
 import { git } from '../src/engine/git.mjs';
 import { signLicense } from '../src/engine/license.mjs';
 
 after(cleanup);
+
+// sync.mjs is loaded as a namespace and each export a test needs is asserted first, so a run on a tree without the paid client fails
+// on its own assertion (ERR_ASSERTION), not on a missing export at load time
+const needs = (...names) => { for (const n of names) assert.equal(typeof S[n], 'function', `src/cli/sync.mjs must export ${n}`); };
+const syncOnce = (...a) => S.syncOnce(...a);
+const syncOnceWithin = (...a) => S.syncOnceWithin(...a);
+const syncOnceAsync = (...a) => S.syncOnceAsync(...a);
+const paidEngineStatus = (...a) => S.paidEngineStatus(...a);
 
 // The other computer's clone commits as a plain test user, since it has no vault of its own.
 const otherGit = (root, ...args) => git(root, ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', ...args]);
@@ -94,10 +102,11 @@ function assertFree(root, note, rec) {
 }
 
 test('WO-05-B AC01: the flag is off by default and no call leaves the computer', () => {
+  needs('syncOnce', 'syncOnceWithin', 'syncOnceAsync', 'paidEngineStatus');
   // the flag reports off when the install has not turned it on, and on when it has
-  assert.deepEqual(paidEngineStatus({}), { on: false, installed: true, reason: 'the paid engine flag is off' });
-  assert.deepEqual(paidEngineStatus({ merge: {} }), { on: false, installed: true, reason: 'the paid engine flag is off' });
-  assert.deepEqual(paidEngineStatus({ merge: { paid: true } }), { on: true, installed: true, reason: null });
+  assert.deepEqual(paidEngineStatus({}), { on: false, installed: false, reason: 'the paid engine flag is off' });
+  assert.deepEqual(paidEngineStatus({ merge: {} }), { on: false, installed: false, reason: 'the paid engine flag is off' });
+  assert.deepEqual(paidEngineStatus({ merge: { paid: true, command: process.execPath } }), { on: true, installed: true, reason: null });
   // and when the paid client module is entirely absent from the tree, the flag reports that the engine is not installed
   const absent = paidEngineStatus({ merge: { paid: true } }, { client: new URL('file:///nonexistent/paid-merge.mjs') });
   assert.equal(absent.on, true);
@@ -129,6 +138,7 @@ test('WO-05-B AC01: the flag is off by default and no call leaves the computer',
 });
 
 test('WO-05-B AC02: the flag on calls the boundary and falls back to the free behaviour on any failure', () => {
+  needs('syncOnce', 'syncOnceWithin', 'syncOnceAsync', 'paidEngineStatus');
   // the flag on and a licence: the conflicted note goes to the engine and the merge lands
   let eng = stubEngine('ok');
   let { v, root, note } = noteConflict();
@@ -161,6 +171,7 @@ test('WO-05-B AC02: the flag on calls the boundary and falls back to the free be
 });
 
 test('WO-05-B AC03: the licence gate still decides when the engine is called', () => {
+  needs('syncOnce', 'syncOnceWithin', 'syncOnceAsync', 'paidEngineStatus');
   // no licence: the engine is not called and the free behaviour runs
   let eng = stubEngine('ok');
   let { v, root, note } = noteConflict();
@@ -195,6 +206,7 @@ test('WO-05-B AC03: the licence gate still decides when the engine is called', (
 });
 
 test('WO-05-B AC04: the stop sync skips the engine and keeps both inside the stop window', () => {
+  needs('syncOnce', 'syncOnceWithin', 'syncOnceAsync', 'paidEngineStatus');
   // a hanging engine (sleeps 4 s) with a 30 s timeout would hold the stop sync past its 3 s
   // window; the stop flag skips the engine so the sync finishes in time and keeps both
   const eng = stubEngine('slow');
@@ -213,6 +225,7 @@ test('WO-05-B AC04: the stop sync skips the engine and keeps both inside the sto
 });
 
 test('WO-05-B AC05: the interval sync bounds the engine call under the health window', async () => {
+  needs('syncOnce', 'syncOnceWithin', 'syncOnceAsync', 'paidEngineStatus');
   // a slow engine (sleeps 4 s) would hold the event loop past the daemon's 800 ms health window;
   // the interval sync bounds the engine call to 500 ms so the health check still succeeds
   const eng = stubEngine('slow');
@@ -230,6 +243,7 @@ test('WO-05-B AC05: the interval sync bounds the engine call under the health wi
 });
 
 test('WO-05-B AC06: a note over 1 MB merges without ENOBUFS', () => {
+  needs('syncOnce', 'syncOnceWithin', 'syncOnceAsync', 'paidEngineStatus');
   // the default spawnSync maxBuffer is 1 MB; a 2 MB note would fail with ENOBUFS unless the
   // engine call raises it. The boundary's commandProvider now passes ENGINE_MAX_BUFFER (64 MB).
   const big = 'x'.repeat(2 * 1024 * 1024);
@@ -269,4 +283,29 @@ test('WO-05-B AC06: a note over 1 MB merges without ENOBUFS', () => {
   const content = fs.readFileSync(path.join(root, note), 'utf8');
   assert.ok(content.includes(big), 'the merged note carries the 2 MB content');
   v.close();
+});
+
+test('WO-05-B AC07: installed means an engine the install can call, not the shipped client module', () => {
+  needs('paidEngineStatus');
+  // the client module always ships, so the flag on with no engine configured is not installed
+  const none = paidEngineStatus({ merge: { paid: true } });
+  assert.equal(none.installed, false, 'no engine configured is not installed');
+  assert.equal(none.reason, 'the paid engine has no command configured');
+  // a configured command that does not exist is not installed, by path or by name on the PATH
+  const gone = paidEngineStatus({ merge: { paid: true, command: '/nonexistent/merge-engine' } });
+  assert.equal(gone.installed, false);
+  assert.match(gone.reason, /the engine command is not installed/);
+  const unnamed = paidEngineStatus({ merge: { paid: true, command: 'memev-no-such-merge-engine-7f3a' } });
+  assert.equal(unnamed.installed, false);
+  // a command that exists, by path or found on the PATH, is installed
+  assert.deepEqual(paidEngineStatus({ merge: { paid: true, command: process.execPath } }), { on: true, installed: true, reason: null });
+  const dir = tmpdir('enginebin-');
+  const bin = path.join(dir, 'memev-test-merge-engine');
+  fs.writeFileSync(bin, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  assert.equal(paidEngineStatus({ merge: { paid: true, command: 'memev-test-merge-engine' } }, { env: { PATH: dir } }).installed, true);
+  // a provider the install set itself is installed
+  assert.equal(paidEngineStatus({ merge: { paid: true, provider: { id: 'p', merge: () => ({ ok: false }) } } }).installed, true);
+  // with the flag off the engine is reported but not used
+  const off = paidEngineStatus({ merge: { command: process.execPath } });
+  assert.deepEqual(off, { on: false, installed: true, reason: 'the paid engine flag is off' });
 });
