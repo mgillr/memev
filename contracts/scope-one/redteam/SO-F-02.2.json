@@ -1,0 +1,85 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SO-F-02.2",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "bd95b47342e262c7cef3cad2a70b3302f375b0fed95836aee5b70a8bb81bfec6",
+      "base_commit": "713f5b7a925c83f6e16f7e1522ae88792ae925f2",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/coordinator.mjs",
+            "sha256": "540783ec1d0352ff77f17b77852fa2d2bff9ca8f8488b35de046d7c4f3498fa5"
+          },
+          {
+            "path": "src/engine/project-state.mjs",
+            "sha256": "27d8fcb296415dd6b22439d4d60c68fa4fcb0a2af93d53db981206347ef5920d"
+          },
+          {
+            "path": "src/engine/project-store.mjs",
+            "sha256": "b015593048bc7c1d8ef6e633797c49bbfb91aacb4635b2a27cc6e0e57a03e7f3"
+          },
+          {
+            "path": "test/coordinator.test.mjs",
+            "sha256": "5fe3432bde2e2fd4fd327adbb3280640a3b174678c52fcf135e5ff988abbdbe8"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "T2 cannot pass until pull request #354 merges, because store.view and conflicts exist only there; every T2 criterion is red on main, including the criterion that the existing coordinator tests pass once the double has a view method",
+          "disposition": "rejected",
+          "reason": "the request and the task description say in terms that T2 starts once #354 merges; red at the base is by construction for every spec with a predecessor, and T1 is unchanged and judged against #354"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "the no-line-removed criterion filters git diff -U0 with grep -E \"^-[^-]\", so a removed test line that itself begins with two dashes is not seen, and it cannot tell a weakened assertion from an added line that cancels it",
+          "disposition": "rejected",
+          "reason": "a removed line begins with one dash plus the line text, and test lines do not begin with a dash; an added line cannot change a removed one, and the stop rules forbid weakening a test; the independent re-review reads the diff of the file"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "the check that the coordinator names view('task') at least three times counts lines, so comments could satisfy it",
+          "disposition": "rejected",
+          "reason": "the behaviour is carried by the two red-green tests (claim refused, and writes never store CONFLICTED); the count only guards that the three read paths were touched"
+        },
+        {
+          "n": 4,
+          "severity": "low",
+          "how": "test/helpers/** and test/coordinator.test.mjs are both in the scope of T2, so a change to the shared helpers could affect every test",
+          "disposition": "rejected",
+          "reason": "unchanged scope entry for helpers from T1, and the criterion requires the three other test files to have no difference from main"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the signer, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of SO-F-02.2, which supersedes the signed SO-F-02 (k-so-f-02-canonical-projec-38d008), made against the #363 branch at 713f5b7a925c (the second signing pass; the first pass of 1 Nov 2026 held this spec for the findings named below). It has 2 tasks and 17 criteria. The spec hash equals the hash the owner delegation gave (bd95b47342e2). Earlier finding, fixed: the first pass held SO-F-02.2 because the store double of the coordinator unit tests is a class inside test/coordinator.test.mjs (store.snapshot at line 118 there), which T2 did not list and a criterion required unchanged. T2 now lists test/coordinator.test.mjs, the description says the double gains a view method there, and a new command criterion requires that against main no line of that file is removed or changed and the other three test files have no difference. Checks run: the criteria and scope of T1 equal those of the signed SO-F-02 byte for byte (T1 is built by pull request #354, and I ran its static criteria against that head earlier, all pass); T2 is the one new task, with 2 red-green criteria, the view count, the unchanged-tests and the unchanged-assertions criteria; the SO-F-02 spec file is byte-unchanged against main; the manifest kind is feature and each implement task has a mandatory test_red_green criterion that runs its own test file; every task drafts through makeTask; every command parses with sh -n; no criterion statement repeats within a task; every grep pattern compiles and is within 200 characters; every depends_on is a row of the Scope One or programme manifest; the leak scan is clean; the specIdOf and locate of the gate give this spec its own record path and no other spec of the 154 shares one. I did not run T2's tests (no pull request builds T2) or npm test. Four findings (one medium, three low), none blocks signing. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MWNiNTMxZTQ1YzhkMTU0NzdmMDNkOWNjYjdlMDZhYTllMjgxMzJkNGNmYmM1NTlkMTNkMmEwYzY3MTQxZmRmMQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "AxO/Ih05IqcMosRAtsWAFkjP+K89NUzQ7gj5jHQqrgV76olkmzGDCKcJbPjsuqd1Mr6Wg/i203y2O1U7RYKTCQ=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZmY1YTIzZDdhNjZiNGRlMWUzYmVmYzMzMzNjNWIzNjc1YTYwOWI3MTg2ZGU4YzcxYjhlNDE2MjM1NThkODY1Ng==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "/1TC1TjW86IzSZHocmC0+JJViEbxKgihJ98JNtlGM7NkoAl3wcpHLtZKTwNedwuWJI+eqyNUVekRvDvxtUZdCw=="
+          }
+        ]
+      }
+    }
+  ]
+}
