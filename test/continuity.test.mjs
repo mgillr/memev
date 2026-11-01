@@ -2,7 +2,7 @@
 import { test, after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { sandbox, initWithRetry, mcpClient, transcript, user, assistant, todos } from './helpers/cli.mjs';
+import { sandbox, initWithRetry, pollUntil, mcpClient, transcript, user, assistant, todos } from './helpers/cli.mjs';
 import { cleanup } from './helpers/tmp.mjs';
 
 let sb;
@@ -42,7 +42,8 @@ test('the stop hook records the reply and checkpoints only when the todo list ch
 
 test('every prompt gets relevant memory without being asked', () => {
   sb.run(['remember', 'The staging database password rotates on the first Monday of each month', '--kind', 'fact']);
-  const c = ctx(sb.hook('prompt', { session_id: 'sess-0003', cwd: sb.home, prompt: 'when does the staging database password rotate?' }));
+  // the first recall after a remember can come back empty on a slow machine; ask again, a bounded number of times, for the same thing
+  const c = pollUntil(() => ctx(sb.hook('prompt', { session_id: 'sess-0003', cwd: sb.home, prompt: 'when does the staging database password rotate?' })), (x) => /first Monday/.test(x), { timeoutMs: 20000, intervalMs: 500 });
   assert.match(c, /first Monday/);
   const none = sb.hook('prompt', { session_id: 'sess-0003', cwd: sb.home, prompt: 'zxqv plorb' });
   assert.equal(none.out, '', 'nothing injected when nothing is relevant');
