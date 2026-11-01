@@ -1,0 +1,77 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PG-19.2",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "0c1cf90f5fa0b9961d7d10cba5ca8334c30b43b8fb15d37c23d6c5dec49e5085",
+      "base_commit": "713f5b7a925c83f6e16f7e1522ae88792ae925f2",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/cli/main.mjs",
+            "sha256": "0915c5b38d2b7530cb4a07fa7715e6f73fffebd2646a959348eeddfa1b5c52ef"
+          },
+          {
+            "path": "src/engine/vault.mjs",
+            "sha256": "0ba848b4dc3f7e0d1ef477947269bc4528084c897a4b0e0ecad5d7e297253196"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "the implementing pull request #365 (draft, bcb1020) does not yet satisfy the spec: its tests in test/cli-work.test.mjs are not named PG-19.2 WP19-03 AC01 to AC06, so the six WP19-03 criteria are red there, and its test/cli-work-e2e.test.mjs contains the words runWork and openStore in a header comment and in its own test name, so the WP19-02 criterion \"the test spawns the CLI and imports neither runWork nor openStore\", a grep of the whole file, fails on it",
+          "disposition": "rejected",
+          "reason": "both are pull request work, not a defect of the spec: #365 is a draft built against the earlier text, tasksReader already exists in its vault.mjs with the frozen reader and structuredClone copies the spec describes, and its static criteria and the SO-1.01 req 3 test pass; the criterion is inherited word for word from the signed PG-19.1 and the author of #365 rewords the comment and the test title when the tests are renamed"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "the whole-file grep for runWork and openStore in the end-to-end test is brittle: any comment that names them fails it, and a real import could be hidden behind a different spelling",
+          "disposition": "rejected",
+          "reason": "inherited from the signed PG-19.1; the red-green end-to-end test spawns bin/memev.mjs against a real store, which a mock cannot satisfy"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "test/cli-work.test.mjs is the test file of both WP19-01 and WP19-03, so one file serves two tasks and a failure of one blocks the other",
+          "disposition": "rejected",
+          "reason": "the red-green commands select tests by name pattern (^PG-19.2 WP19-03 ACn:), so each criterion judges only its own tests"
+        },
+        {
+          "n": 4,
+          "severity": "low",
+          "how": "the reader is read-only by construction (Object.freeze of one function) but the function closes over the store, so a bug in the vault method could hand out a live record",
+          "disposition": "rejected",
+          "reason": "AC03 and AC05 test copies by mutating a returned record and a nested value and by walking the reachable values for a ProjectStore, and AC04 compares the event log bytes before and after"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the signer, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of PG-19.2, which supersedes the signed PG-19.1 (k-pg-19-1-memev-work-comma-565912), made against the #363 branch at 713f5b7a925c (the second signing pass; the first pass of 1 Nov 2026 held this spec for the findings named below). It has 3 tasks and 27 criteria. The spec hash equals the hash the owner delegation gave (0c1cf90f5fa0). Earlier finding, fixed (the agreed design): the spec now specifies Vault#tasksReader(identity, project) in src/engine/vault.mjs, which needs a credential that may read, returns null for a project with no store and otherwise returns Object.freeze({ snapshot }) whose only member is snapshot(kind), returning a structured copy of the records of that kind; the name workImpactView appears nowhere in the spec, and the manifest boundary text reads \"PG-19.2 wires them\". Every criterion of PG-19.1 (11) is kept word for word (statement and verifier); WP19-03 is the new task, with six red-green criteria (frozen, one member, copies, no write, no ProjectStore, serves what impact needs), the one-added-method criterion and the unchanged SO-1.01 req 3 test. I read #365 at bcb1020 against the spec: vault.mjs:584 has tasksReader(identity, project) with _need(identity, 'read'), null for no store, and Object.freeze with a snapshot that returns structuredClone, as specified; I ran the criteria against it (the findings above). Checks run: the manifest kind is feature and each implement task has a mandatory test_red_green criterion that runs its own test file; every task drafts through makeTask; every command parses with sh -n; no criterion statement repeats within a task; every grep pattern compiles and is within 200 characters; every depends_on is a row of the Scope One or programme manifest; the leak scan is clean; the specIdOf and locate of the gate give this spec its own record path and no other spec of the 154 shares one. I did not run npm test. One medium and three low findings; none is a defect of the spec, none blocks signing. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "N2I0OGNlZWJjMWQ2OGJkNGQyYTY1ZDliMzU4NzRkZTA2NTk5YjY5MWFlMDQ1NGNjMmExN2Y0MGMwZDkyNjMwZQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "pcJONbngd19h0IzUnDCnIYiJP51WuKc8a/BBubkNk3aAHWvUBi9CXnP5+kq4zBzxBmbXtQJCHrF6TQs1SK4XAQ=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NTA4ZWY2ZDk2OTdmOWEwMTMzZDMyYTc5YWNjNWY4NTY5M2ZmYTczNmYxNGQzYTQ4NzY5ZDBjZjBmZTA0OGY4OA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "xTswkUj1pgsco4m6qZz5+k5dQQarqhVis3jAlT2TKo4el/IA2IYN14h2zeN9f2lVvvR6mConCZg1MaXyEqARBg=="
+          }
+        ]
+      }
+    }
+  ]
+}
