@@ -9,15 +9,34 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { PKG, cleanup } from './helpers/tmp.mjs';
-import { sandboxNode, identityDoc, contribute } from './helpers/federation-node.mjs';
-import { Admission } from '../src/engine/federation/admission.mjs';
-import * as membership from '../src/engine/federation/membership.mjs';
-import * as policyModule from '../src/engine/federation/policy.mjs';
 
 after(cleanup);
 
-const M = membership;
-const P = policyModule;
+// The modules under test are loaded as namespaces and a missing one reads as empty, so before the code exists every test fails on its
+// own assertion that the export it needs is there (ERR_ASSERTION), not on a load error or a TypeError.
+const load = async (rel) => {
+  try { return await import(rel); } catch (e) { if (e?.code === 'ERR_MODULE_NOT_FOUND') return {}; throw e; }
+};
+const M = await load('../src/engine/federation/membership.mjs');
+const P = await load('../src/engine/federation/policy.mjs');
+const H = await load('./helpers/federation-node.mjs');
+const A = await load('../src/engine/federation/admission.mjs');
+const NEEDS = {
+  membership: [M, ['RELATIONSHIP_FIELDS', 'validateRelationship', 'relationshipState', 'proposeRelationship', 'acceptRelationship', 'revokeRelationship', 'RelationshipBook']],
+  policy: [P, ['validatePolicy', 'evaluate', 'relationshipGate', 'DENY_RULES', 'POLICY_ACTIONS']],
+  helpers: [H, ['sandboxNode', 'identityDoc', 'contribute']],
+  admission: [A, ['Admission']],
+};
+const KIND = { RELATIONSHIP_FIELDS: 'object', DENY_RULES: 'object', POLICY_ACTIONS: 'object', RelationshipBook: 'function', Admission: 'function' };
+function needs(...mods) {
+  for (const m of mods) {
+    const [ns, names] = NEEDS[m];
+    for (const n of names) assert.equal(typeof ns[n], KIND[n] ?? 'function', `${m} must export ${n}`);
+  }
+}
+const sandboxNode = (...a) => H.sandboxNode(...a);
+const identityDoc = (...a) => H.identityDoc(...a);
+const contribute = (...a) => H.contribute(...a);
 const ORG_A = { type: 'organisation', id: 'org-a' };
 const ORG_B = { type: 'organisation', id: 'org-b' };
 const SHARED = { type: 'project', id: 'proj-shared' };
@@ -48,6 +67,7 @@ const evaluate = (req, { rels = [REL()], policy = POLICY, at = T1 } = {}) => P.e
 // ---- AC02: the relationship record, the policy document, the validators
 
 test('SO-F-04 AC02: the relationship record names both parties, the scope, the purpose, the expiry, the revocation and the accepted policy version', () => {
+  needs('membership', 'policy');
   const schema = JSON.parse(fs.readFileSync(path.join(PKG, 'docs/schemas/membership-v1.json'), 'utf8'));
   assert.equal(schema.schema, 'memev-membership/1');
   assert.deepEqual(Object.keys(schema.properties).sort(), [...M.RELATIONSHIP_FIELDS].sort());
@@ -59,6 +79,7 @@ test('SO-F-04 AC02: the relationship record names both parties, the scope, the p
 });
 
 test('SO-F-04 AC02: the validator refuses a relationship that is missing a part, malformed, or has a personal scope or vault as a party', () => {
+  needs('membership', 'policy');
   const bad = [
     ['a personal scope as a party', (r) => { r.parties[1].scope = { type: 'personal', id: 'personal' }; }, /personal/],
     ['a personal scope as the shared scope', (r) => { r.scope = { type: 'personal', id: 'personal' }; }, /personal/],
@@ -88,6 +109,7 @@ test('SO-F-04 AC02: the validator refuses a relationship that is missing a part,
 });
 
 test('SO-F-04 AC02: two parties establish a relationship by proposing and accepting, and an unaccepted one is not established', () => {
+  needs('membership', 'policy');
   const p = M.proposeRelationship({ id: 'rel-2', proposer: { node: 'node-a', scope: ORG_A }, counterparty: { node: 'node-b', scope: ORG_B }, scope: SHARED, purpose: 'joint delivery', expires: '2027-06-30T00:00:00Z', revocable_by: 'either_party', policy_version: POLICY.version }, { at: T0 });
   assert.equal(p.ok, true, JSON.stringify(p));
   assert.deepEqual(p.record.parties.map((x) => [x.node, x.accepted_at]), [['node-a', iso(T0)], ['node-b', null]]);
@@ -101,6 +123,7 @@ test('SO-F-04 AC02: two parties establish a relationship by proposing and accept
 });
 
 test('SO-F-04 AC02: the policy document states per data class whether each of the six actions is allowed, with recovery objectives, and the validator accepts the fixture', () => {
+  needs('membership', 'policy');
   const schema = JSON.parse(fs.readFileSync(path.join(PKG, 'docs/schemas/policy-v1.json'), 'utf8'));
   assert.equal(schema.schema, 'memev-policy/1');
   assert.deepEqual(P.POLICY_ACTIONS, ['discover', 'read', 'replicate', 'compute', 'retain', 'export']);
@@ -133,6 +156,7 @@ test('SO-F-04 AC02: the policy document states per data class whether each of th
 // ---- AC03: the evaluation function
 
 test('SO-F-04 AC03: the evaluation function maps (subject, scope, action, class) to allow or deny with the rule id', () => {
+  needs('membership', 'policy');
   const a = evaluate(REQ());
   assert.equal(a.decision, 'allow');
   assert.equal(a.rule, 'allow:pol-1:internal:replicate');
@@ -146,6 +170,7 @@ test('SO-F-04 AC03: the evaluation function maps (subject, scope, action, class)
 });
 
 test('SO-F-04 AC03: the evaluation function denies when no rule matches', () => {
+  needs('membership', 'policy');
   const cases = [
     ['no relationship at all', { rels: [] }, REQ(), 'deny.no_relationship'],
     ['a scope no relationship covers', {}, REQ({ scope: OTHER }), 'deny.no_relationship'],
@@ -166,6 +191,7 @@ test('SO-F-04 AC03: the evaluation function denies when no rule matches', () => 
 });
 
 test('SO-F-04 AC03: an expired relationship and a revoked one deny, and only from their time', () => {
+  needs('membership', 'policy');
   const rel = REL();
   rel.expires = iso(T2);
   assert.equal(evaluate(REQ(), { rels: [rel], at: T2 - 1 }).decision, 'allow');
@@ -185,6 +211,7 @@ test('SO-F-04 AC03: an expired relationship and a revoked one deny, and only fro
 });
 
 test('SO-F-04 AC03: a personal scope is refused whatever a relationship says, and the evaluation never throws', () => {
+  needs('membership', 'policy');
   const sneaky = REL(); sneaky.scope = { type: 'personal', id: 'personal' };
   assert.equal(evaluate(REQ({ scope: sneaky.scope }), { rels: [sneaky] }).rule, 'deny.personal_scope');
   for (const junk of [null, undefined, 1, 'x', [], { subject: {} }, { subject: 'agent:a', scope: 1, action: [], class: {} }]) {
@@ -207,7 +234,7 @@ function twoNodes() {
   const bring = () => {
     const book = new M.RelationshipBook({ log: b.log });
     const gate = P.relationshipGate({ book, policy: POLICY, now: () => b.now });
-    const admission = new Admission({ log: b.log, identity, scope: SHARED, policy: { accept: [{ scope: SHARED, classifications: ['internal', 'restricted'] }, { scope: OTHER, classifications: ['internal'] }] }, external: gate });
+    const admission = new A.Admission({ log: b.log, identity, scope: SHARED, policy: { accept: [{ scope: SHARED, classifications: ['internal', 'restricted'] }, { scope: OTHER, classifications: ['internal'] }] }, external: gate });
     return { book, admission };
   };
   b.now = T1;
@@ -215,6 +242,7 @@ function twoNodes() {
 }
 
 test('SO-F-04 AC04: two nodes establish a scoped relationship, exchange one permitted contribution and refuse one outside the scope', () => {
+  needs('membership', 'policy', 'helpers', 'admission');
   const { a, b, book, admission } = twoNodes();
   const outbox = [];
   // before any relationship: refused by the relationship gate, ahead of the node's own two steps
@@ -252,6 +280,7 @@ test('SO-F-04 AC04: two nodes establish a scoped relationship, exchange one perm
 });
 
 test('SO-F-04 AC04: after revocation every contribution is refused, a queued one included, and a restart does not forget the revocation', () => {
+  needs('membership', 'policy', 'helpers', 'admission');
   const { a, b, book, admission, bring } = twoNodes();
   const p = M.proposeRelationship({ id: 'rel-1', proposer: { node: 'node-a', scope: ORG_A }, counterparty: { node: 'node-b', scope: ORG_B }, scope: SHARED, purpose: 'joint delivery', expires: '2027-06-30T00:00:00Z', revocable_by: 'either_party', policy_version: POLICY.version }, { at: T0 });
   assert.equal(book.add(M.acceptRelationship(p.record, { node: 'node-b', at: T0 }).record).ok, true);
@@ -283,6 +312,7 @@ test('SO-F-04 AC04: after revocation every contribution is refused, a queued one
 });
 
 test('SO-F-04 AC04: the relationship and policy modules open no connection and start no process', () => {
+  needs('membership', 'policy', 'helpers', 'admission');
   for (const f of ['membership.mjs', 'policy.mjs']) {
     const src = fs.readFileSync(path.join(PKG, 'src/engine/federation', f), 'utf8');
     assert.ok(Object.keys(f === 'membership.mjs' ? M : P).length > 0, `${f} exports something`);
