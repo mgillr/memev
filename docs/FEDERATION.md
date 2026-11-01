@@ -1,16 +1,17 @@
-# Federation (planned)
+# Federation (foundations implemented; end-to-end federation planned)
 
 Part of the [Memev documentation](README.md). Up: the [README](../README.md). Related:
 [Architecture](ARCHITECTURE.md), [Organisational intelligence](ORGANISATIONAL-INTELLIGENCE.md),
 [Federated computation](FEDERATED-COMPUTATION.md), [Data sovereignty](DATA-SOVEREIGNTY.md),
 [Convergence](CONVERGENCE.md), [Threat model](THREAT-MODEL.md).
 
-> **Planned. Architectural target, not shipped code.** Nothing on this page is built. The first
-> Business release is the one-node case that the tier pages call the company vault: one
-> organisation node that members' work data syncs into and that the company can see and search
-> ([tiers/business.md](tiers/business.md)). Every multi-site statement on this page is planned, and
-> federation is a planned capability of Corporate, and of a Business licence whose services list
-> includes the multi-site federation design ([tiers/services.md](tiers/services.md)), not a tier ([tiers/README.md](tiers/README.md#several-sites-and-federation-planned)).
+> **Status: partial foundations are implemented; operational multi-node federation is not shipped.**
+> The repository contains contribution envelopes and signature validation, two-step local admission,
+> relationship records and a relationship book, policy evaluation and deny-by-default gates. These
+> are local primitives and tests, not a complete inter-node product. Cross-node transport, a complete
+> external admission service, end-to-end sender-node binding and production replay/recovery guarantees
+> remain subject to their own contracts and verification. Do not offer federation as an available
+> Free Core capability. Business and Corporate remain planned.
 
 ## Purpose
 
