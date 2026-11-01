@@ -109,6 +109,51 @@ pause: a confirmed cancellation stays `CANCELLED`, and work that moved on stays 
 The checkpoint taken at the pause is used only to withdraw the cancellation request the pause
 itself made, on a task whose state has not changed since.
 
+## Entity types and merge classes
+
+The store keeps nine entity types. The canonical project schema, `docs/schemas/project-v1.json`, declares three things for each, and the store holds the same declarations in `ENTITY_KINDS` in `src/engine/project-store.mjs`; a test keeps the two equal:
+
+- the **authority owner**: whose word settles the entity when sources disagree. It is a subject type of the [identity model](IDENTITY-AND-SCOPES.md): `person`, `agent`, `device`, `node`, `operator` or `service`
+- the **scope version field**: the field that carries the entity's scope version, `scope_version`. When an entity has it, it is a positive whole number
+- the **merge class**: what is supposed to happen when two sources write the same entity
+
+There are four merge classes:
+
+- `last-writer` the newest write stands
+- `set-union` the elements of every write stand
+- `append-only` nothing is replaced, every write is kept
+- `human-resolution` competing writes are surfaced and a person settles them
+
+| Entity type | Authority owner | Merge class |
+|---|---|---|
+| `project` | `person` | `last-writer` |
+| `task` | `person` | `human-resolution` |
+| `lease` | `service` | `last-writer` |
+| `attempt` | `agent` | `append-only` |
+| `evidence` | `service` | `append-only` |
+| `conflict` | `person` | `human-resolution` |
+| `session` | `device` | `last-writer` |
+| `approval` | `person` | `human-resolution` |
+| `event` | `service` | `append-only` |
+
+No type uses `set-union` yet; the class is there for the types that come later.
+
+The core records the merge class of a type and applies none. The free path keeps both versions of a competing write: both stay in the event log, and the store shows the later one as it is, without merging them. Applying a class is the job of the merge provider behind `src/engine/merge.mjs`, which is not in the core. The store refuses an entity of a type that declares no merge class, or no authority owner, and writes nothing.
+
+A store that is migrated to a newer schema version carries that version in its files and on every record it writes, and the schema names the store version it describes.
+
+## The semantic conflict rule
+
+The version check in the state machine (invariant 8) catches two updates from different sources on the same version. It does not catch two approvals on one task that say incompatible things when they were given on different versions. For example, one computer records an approval of version 1 while another records a rejection of version 2, and the two logs then converge.
+
+That is a semantic conflict. When the store rebuilds its state from the log, it finds the tasks that have approvals with more than one decision (`approve` and `reject`). For each of them it:
+
+- puts the task in `CONFLICTED`, with the status it had kept as `prior_status`
+- attaches a conflict record that names every event involved, with the approvals, their decisions and the versions they were given on
+- applies neither approval
+
+Both approvals stay in the log and as entities, unchanged. Nothing is written to the log for the conflict: it is derived again on every open, and the same log always gives the same result. A person settles it by recording an approval that lists the events it resolves; once every event but the resolving one is settled, the conflict ends and the task shows the status the store holds. Approvals that agree, a single approval, and approvals with no decision are not conflicts.
+
 ## The coordinator
 
 The coordinator (`src/engine/coordinator.mjs`) is the duplicate-work control. It sits on top of the

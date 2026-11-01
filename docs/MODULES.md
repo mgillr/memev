@@ -2,7 +2,7 @@
 
 Part of the [Memev documentation](README.md). Written by `node scripts/docs/module-graph.mjs` from the real imports in `bin/` and `src/`; do not edit it by hand. `node scripts/docs/module-graph.mjs --check` (and `test/docs-module-map.test.mjs`) fail when it is out of date. How the parts fit at a higher level: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-74 modules and 283 import edges (72 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
+74 modules and 284 import edges (72 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
 
 ## Layers
 
@@ -357,6 +357,7 @@ flowchart LR
   src_engine_milestones --> src_engine_oplog
   src_engine_milestones --> src_engine_util
   src_engine_oplog --> src_engine_util
+  src_engine_project_store --> src_engine_identity
   src_engine_project_store --> src_engine_oplog
   src_engine_project_store --> src_engine_secrets
   src_engine_project_store --> src_engine_util
@@ -457,7 +458,7 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 | `src/engine/entitlements.mjs` | What each tier includes, and the one thing a licence limits: how many computers may use a vault | none | `cli/agentid.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/tunnel.mjs`, `cli/upgrade.mjs`, `engine/devices.mjs`, `server/http.mjs`, `services/providers.mjs` |
 | `src/engine/git.mjs` | Git as the durable, human-readable history | `engine/util.mjs` | `cli/bus-cli.mjs`, `cli/github.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/onboarding.mjs`, `cli/sync.mjs`, `engine/contracts.mjs`, `engine/devices.mjs`, `engine/vault.mjs`, `services/providers.mjs` |
 | `src/engine/graph.mjs` | The memory graph: what is connected to what, how sure the vault is of each claim, and where each memory came from and was used | `engine/index.mjs`, `engine/util.mjs` | `engine/vault.mjs` |
-| `src/engine/identity.mjs` | The identity and scopes model, version 1 (SO-F-01): who a request is (a subject) and where it may act (a scope) | `engine/agentid-bind.mjs` | `engine/tokens.mjs`, `engine/vault.mjs`, `server/http.mjs`, `server/mcp.mjs` |
+| `src/engine/identity.mjs` | The identity and scopes model, version 1 (SO-F-01): who a request is (a subject) and where it may act (a scope) | `engine/agentid-bind.mjs` | `engine/project-store.mjs`, `engine/tokens.mjs`, `engine/vault.mjs`, `server/http.mjs`, `server/mcp.mjs` |
 | `src/engine/importers/ai-history.mjs` | Find AI history files already on the machine: Claude Code and Cursor memory files, CLAUDE.md and similar rule files | `engine/secrets.mjs` | `engine/importers/core.mjs` |
 | `src/engine/importers/core.mjs` | Import orchestration: scan sources, filter secrets, write notes, dedup, list, undo | `cli/common.mjs`, `cli/daemon.mjs`, `engine/importers/ai-history.mjs`, `engine/importers/exports.mjs`, `engine/importers/project.mjs`, `engine/util.mjs`, `engine/vault.mjs` | `cli/import.mjs` |
 | `src/engine/importers/exports.mjs` | Read ChatGPT and Claude chat export zips: find conversations.json and extract readable text | `engine/secrets.mjs`, `engine/zip.mjs` | `engine/importers/core.mjs` |
@@ -471,7 +472,7 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 | `src/engine/net.mjs` | Every request Memev makes goes through fetchOut, except a hook process's calls to the daemon on this computer, which use node:http (cli/common.mjs) | none | `cli/common.mjs`, `cli/doctor.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/mcp-stdio.mjs`, `cli/onboarding.mjs`, `cli/remote.mjs`, `cli/tunnel.mjs` |
 | `src/engine/oplog.mjs` | The operation log: append-only, segmented, snapshotted, streamed | `engine/util.mjs` | `cli/transcript.mjs`, `engine/index.mjs`, `engine/milestones.mjs`, `engine/project-store.mjs`, `engine/vault.mjs` |
 | `src/engine/project-state.mjs` | The project and task state machine: the eleven task states, the seven derived project statuses, one transition table, and the invariants of the... | none | `engine/coordinator.mjs` |
-| `src/engine/project-store.mjs` | The project store: one canonical project state per project, under the vault's .memev directory | `engine/oplog.mjs`, `engine/secrets.mjs`, `engine/util.mjs` | `engine/vault.mjs` |
+| `src/engine/project-store.mjs` | The project store: one canonical project state per project, under the vault's .memev directory | `engine/identity.mjs`, `engine/oplog.mjs`, `engine/secrets.mjs`, `engine/util.mjs` | `engine/vault.mjs` |
 | `src/engine/quality.mjs` | The write gate for memories | `engine/index.mjs` | `engine/vault.mjs` |
 | `src/engine/redteam-gate.mjs` | gate-version: 1 The red-team gate: whether a contract spec may be signed, judged from its red-team record | `vendor/attest` | none |
 | `src/engine/secrets.mjs` | The secrets guard: text that looks like a credential is refused unless the caller says allow_secrets | none | `cli/doctor.mjs`, `engine/bus.mjs`, `engine/importers/ai-history.mjs`, `engine/importers/exports.mjs`, `engine/importers/project.mjs`, `engine/project-store.mjs`, `engine/vault.mjs` |

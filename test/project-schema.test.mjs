@@ -234,3 +234,14 @@ test('SO-F-02 AC03: an approval names a decision the schema knows, or none', () 
   assert.ok(store.put('approval', { task_id: 't', note: 'an approval from before the decision field' }), 'an older approval with no decision is still accepted');
   store.close();
 });
+
+test('SO-F-02 AC05: docs/PROJECTS.md lists every entity type with its authority owner and merge class, and names the rule', () => {
+  const page = read('docs/PROJECTS.md');
+  for (const [kind, d] of Object.entries(ENTITY_KINDS)) {
+    assert.ok(page.includes(`| \`${kind}\` | \`${d.authority}\` | \`${d.mergeClass}\` |`), `${kind} is in the table with ${d.authority} and ${d.mergeClass}`);
+  }
+  for (const c of MERGE_CLASSES) assert.ok(page.includes(`\`${c}\``), `${c} is described`);
+  assert.match(page, /merge class/);
+  assert.match(page, /## The semantic conflict rule/);
+  assert.match(page, /applies neither approval/);
+});
