@@ -1376,6 +1376,37 @@
       "kind": "feature"
     },
     {
+      "id": "PG-19.3",
+      "type": "programme work package",
+      "area": "PG-19",
+      "title": "Shared pure replay of a project's event log for the project store and the read-only reader (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP19-04, WP19-05 (a gap found at the review of pull request #365; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "PG-19.2",
+          "boundary": "it owns the facade of Vault#tasksReader, src/cli/work-store.mjs and the e2e test; PG-19.3 changes none of them and moves only the replay inside the reader and the store onto one function; PG-19.2 is not superseded"
+        },
+        {
+          "contract": "SO-1.01",
+          "boundary": "requirement 3 stands: only the vault, the coordinator and the project store name the store; PG-19.3 adds a module with no import and no store handle"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "PG-19.2 (signed) defines the reader; this spec adds only src/engine/project-replay.mjs, the two callers and the tests",
+      "depends_on": [
+        "PG-19.2",
+        "SO-1.01",
+        "SO-F-02"
+      ],
+      "tasks": 2,
+      "criteria": 47,
+      "spec": "specs/PG-19.3-shared-replay-for-the-project-store-and-reader.json",
+      "status": "proposed and unsigned; no red-team record; the spec is open as pull request #383 and is signed after pull request #365 merges",
+      "kind": "feature"
+    },
+    {
       "id": "PG-20.1",
       "type": "programme work package",
       "area": "PG-20",
@@ -2095,6 +2126,18 @@
       "task": "WP19-03",
       "title": "A narrow read-only vault method, Vault#tasksReader, serves memev work impact: a frozen reader with one member, snapshot, and no ProjectStore or write path leave the vault",
       "contract": "PG-19.2",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP19-04",
+      "title": "One pure shared replay of a project's event log in src/engine/project-replay.mjs, with no import",
+      "contract": "PG-19.3",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP19-05",
+      "title": "The project store and the read-only reader both replay through the shared function and agree on one fixed log",
+      "contract": "PG-19.3",
       "note": "specified in this set"
     },
     {
