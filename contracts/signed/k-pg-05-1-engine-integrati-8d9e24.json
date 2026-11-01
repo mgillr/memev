@@ -1,0 +1,385 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "WP05-01",
+      "title": "Merge-semantics table: object classes (observations, metadata, membership, counters, task ownership, task state, contracts, approvals, external actions) to semantics, with rationale",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "MV-ARCH-05: Merge semantics are chosen per object class (observations, metadata, membership, counters, task ownership, task state, contracts, approvals, external actions), never one CRDT for everything. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:14; evidence docs/scope-one/programme/DECOMPOSITION.md:69; baseline 8.5)",
+        "The call-out boundary WO-05-A sends one JSON line {a, b, base} of text and expects {text} or {refuse:true}, and crdt-merge has no three-way text merge, so a provider shim maps a note to structured state (for example lines to a set); the shim lives outside the Memev core (in memev-ops or on the crdt-merge side) (source: repository analysis of 1 Nov 2026, section 5; signed vault contract WO-05-A, cited by id only)",
+        "SO-F-02 (signed fold contract, cited by id; pull request #341) owns an authority owner, a scope version and a merge class on every entity type, and the semantic-conflict rule for incompatible approvals; this task cites it and does not restate it (source: pull request #341, WBS.md section 9.2)"
+      ],
+      "description": "Repo: memev. Task ownership is a lease/claim, not a counter. Contracts and approvals are never silently merged. The merge-class names in the table are those of SO-F-02: last-writer, set-union, append-only and human-resolution. SO-F-02 declares the class on each entity type in docs/schemas/project-v1.json and enforces it in the store; this task owns the table and its rationale and declares and enforces nothing.",
+      "scope": {
+        "allow": [
+          "docs/MERGE-SEMANTICS.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP05-01-AC01",
+          "mandatory": true,
+          "statement": "table exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/MERGE-SEMANTICS.md"
+          }
+        },
+        {
+          "id": "WP05-01-AC02",
+          "mandatory": true,
+          "statement": "All nine object classes are named in the table",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in observations metadata membership counters \"task ownership\" \"task state\" contracts approvals \"external action\"; do grep -qi \"$n\" docs/MERGE-SEMANTICS.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP05-01-AC03",
+          "mandatory": true,
+          "statement": "The table states that the engine has no three-way text merge and that a provider shim outside the core maps a note to structured state",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"provider shim\" \"three-way text merge\" \"structured state\" outside; do grep -qi \"$n\" docs/MERGE-SEMANTICS.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP05-01-AC04",
+          "mandatory": true,
+          "statement": "The table uses the four merge-class names of SO-F-02 and cites SO-F-02",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"last-writer\" \"set-union\" \"append-only\" \"human-resolution\" \"SO-F-02\"; do grep -qi \"$n\" docs/MERGE-SEMANTICS.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP05-01-AC05",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP05-01-AC06",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP05-03",
+      "title": "Integration design: how vault operations, agent state, bus events, project state and contracts map to the replicated event model",
+      "phase": "design",
+      "depends_on": [
+        "WP05-01"
+      ],
+      "requirements": [
+        "MV-INT-04: A Memev integration design maps vault operations, agent state, bus events, project state and contracts into one replicated event model (deliverable 2). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:43; evidence docs/scope-one/programme/DECOMPOSITION.md:89; baseline 8.5)",
+        "MV-ARCH-04: Responsibility split is explicit: Memev owns project semantics, identity, authority, contracts, coordination, approvals, policy; the engine owns CRDT state, causal sync, trust/identity primitives and receipts. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:13; evidence docs/scope-one/programme/DECOMPOSITION.md:68; baseline 8.5)"
+      ],
+      "description": "Repo: memev. Deliverable 2 of the notes. Foundation, cited by id: WO-05-A (the call-out boundary) and WO-05-C (the external convergence service specification); this design does not specify them again.",
+      "scope": {
+        "allow": [
+          "docs/INTEGRATION-DESIGN.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP05-03-AC01",
+          "mandatory": true,
+          "statement": "design exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/INTEGRATION-DESIGN.md"
+          }
+        },
+        {
+          "id": "WP05-03-AC02",
+          "mandatory": true,
+          "statement": "design names the engine call-out boundary",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/INTEGRATION-DESIGN.md",
+            "pattern": "call-out",
+            "flags": "i"
+          }
+        },
+        {
+          "id": "WP05-03-AC03",
+          "mandatory": true,
+          "statement": "design states the responsibility split: Memev owns semantics, authority and acceptance; the engine owns convergence",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/INTEGRATION-DESIGN.md",
+            "pattern": "memev owns",
+            "flags": "i"
+          }
+        },
+        {
+          "id": "WP05-03-AC04",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP05-03-AC05",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP05-04",
+      "title": "Vault note and agent-state mapping to CRDT-compatible state",
+      "phase": "implement",
+      "depends_on": [
+        "WP05-03"
+      ],
+      "requirements": [
+        "MV-INT-01: Memev vault data is represented in CRDT-compatible state (P0 agent memory integration). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:40; evidence docs/scope-one/programme/DECOMPOSITION.md:86; baseline 8.5)",
+        "The representation is structured state that a provider shim can pass to the engine; the shim that translates the call-out line protocol lives outside the Memev core and the core holds no convergence logic (source: repository analysis of 1 Nov 2026, section 5; signed vault contract WO-05-A, cited by id only)",
+        "SO-F-06 (signed fold contract, cited by id; pull request #341) owns validation of engine input and output per merge class at the one boundary src/engine/merge.mjs, and the keep-both fallback when the engine is unavailable; this task cites it and does not restate it (source: pull request #341, WBS.md section 9.2)"
+      ],
+      "description": "Repo: memev. SO-F-06 validates the engine payload against docs/schemas/convergence-v1.json at the one boundary src/engine/merge.mjs; the state map produces the structured state and calls neither the engine nor the validator.",
+      "scope": {
+        "allow": [
+          "src/engine/state-map.mjs",
+          "test/state-map.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP05-04-AC01",
+          "mandatory": true,
+          "statement": "mapping round-trip test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/state-map.test.mjs",
+            "cmd": "node --test test/state-map.test.mjs"
+          }
+        },
+        {
+          "id": "WP05-04-AC02",
+          "mandatory": true,
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP05-04-AC03",
+          "mandatory": true,
+          "statement": "The two named state-map tests are present",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"state map: a note maps to structured state and back without loss\" \"state map: the core holds no text merge, only the representation\"; do grep -qF \"$n\" test/state-map.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP05-04-AC04",
+          "mandatory": true,
+          "statement": "The state map contains no text-merge code",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eiq \"diff3|three-way|3-way|mergeText\" src/engine/state-map.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP05-04-AC05",
+          "mandatory": true,
+          "statement": "The state map does not import the merge boundary or name the convergence schema, which are SO-F-06",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f src/engine/state-map.mjs && ! grep -Eq \"from '[^']*merge\\.mjs'|convergence-v1\" src/engine/state-map.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP05-04-AC06",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP05-04-AC07",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP05-06",
+      "title": "Engine round trip: a memev state change replicates through crdt-merge and back on two local vaults",
+      "phase": "implement",
+      "depends_on": [
+        "WP05-04"
+      ],
+      "requirements": [
+        "MV-INT-01: Memev vault data is represented in CRDT-compatible state (P0 agent memory integration). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:40; evidence docs/scope-one/programme/DECOMPOSITION.md:86; baseline 8.5)",
+        "MV-INT-05: The engine is integrated as a separately licensed dependency across the existing external call-out boundary, never vendored. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:44; evidence docs/scope-one/programme/DECOMPOSITION.md:90; baseline 8.5)",
+        "SO-2.12 requirement 8: \"The system must remain useful locally and degrade safely if a paid or remote service is unavailable. It must not falsely claim distributed convergence, trust verification or evidence admission while those services are unavailable.\" (source: contract SO-2.12 T1)",
+        "SO-2.13 requirement 3: \"Keep paid multi-device convergence behind a stable, tested interface.\" (source: contract SO-2.13 T1)",
+        "SO-2.13 requirement 4: \"Do not let cloud availability become a hidden dependency for local project integrity.\" (source: contract SO-2.13 T1)",
+        "The round trip runs through the paid-engine client of signed vault contract WO-05-B (off by default; draft PR #201) and does not rebuild it (source: signed vault contract WO-05-B, cited by id only)",
+        "SO-F-06 (signed fold contract, cited by id; pull request #341) owns validation of engine input and output per merge class at the one boundary src/engine/merge.mjs, and the keep-both fallback when the engine is unavailable; this task cites it and does not restate it (source: pull request #341, WBS.md section 9.2)"
+      ],
+      "description": "Repo: memev. Skipped with a stated reason when the paid engine is not installed (reported as not run, not as pass). The client that this test exercises is WO-05-B, not a task of this spec. The refusal of malformed engine output and of forbidden transitions at the boundary is tested by SO-F-06 with a stub engine; this task does not repeat those tests and runs the real engine once through the boundary.",
+      "scope": {
+        "allow": [
+          "test/engine-roundtrip.test.mjs",
+          "scripts/**"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP05-06-AC01",
+          "mandatory": true,
+          "statement": "round-trip test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/engine-roundtrip.test.mjs",
+            "cmd": "node --test test/engine-roundtrip.test.mjs"
+          }
+        },
+        {
+          "id": "WP05-06-AC02",
+          "mandatory": true,
+          "statement": "The round trip test repeats no refusal test of SO-F-06",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f test/engine-roundtrip.test.mjs && ! grep -Eqi 'malformed|forbidden' test/engine-roundtrip.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP05-06-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP05-06-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ],
+  "id": "k-pg-05-1-engine-integrati-8d9e24",
+  "title": "PG-05.1 Engine integration: merge semantics, mapping, boundary (memev)",
+  "workdir": null,
+  "created": "2026-11-01T01:10:42.622Z",
+  "version": 1,
+  "request": "Programme contract for work package WP05 in memev: Engine integration: merge semantics, mapping, boundary. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP05.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP01-03, WP04-01, WP04-03, WP05-02, WP05-05. Depends on contracts: SO-2.12, SO-2.13, WO-05-B. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.12 and SO-2.13: WP05-06 degrades as SO-2.12 requirement 8 says when the paid engine is absent and keeps the paid interface behind SO-2.13 requirements 3 and 4; neither is restated here. Signed vault contract WO-05-A and WO-05-C (cited by id only): foundation: the call-out boundary and the external convergence service specification; this spec cites them and does not specify them again. Signed vault contract WO-05-B (cited by id only): the paid-engine client behind a flag, off by default (draft PR #201, still open); WP05-05 is dropped from this spec because that signed contract owns it, and WP05-06 depends on it. Build layer (owner delegation, 1 Nov 2026): the signed fold contracts SO-F-02, SO-F-06 (cited by id; delivered by pull request #341, WBS.md section 9.2 on its branch) are the build layer. Each task below that overlaps them cites the fold id and keeps only what the fold does not cover. Tasks of this spec that name no fold contract have no fold overlap. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "provenance": {
+    "spec_sha256": "06401d988d6b685e9c64e762724e3eadd266ca2649eaa47418eb758c37bb7275",
+    "record": "contracts/programme/redteam/PG-05.1.json",
+    "review": "interim solo review by the signer, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}
