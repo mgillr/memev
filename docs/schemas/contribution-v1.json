@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Memev contribution, version 1: the signature and admission block",
+  "description": "The block that a contribution carries in the extension block of the operation envelope (docs/OPERATION-ENVELOPE.md), under the key `contribution`. It is not a second envelope: the schema version, the causal context, the operation id and the content hash are the envelope's own. The validator is src/engine/federation/contribution.mjs; the admission is src/engine/federation/admission.mjs. Planned: see docs/FEDERATION.md.",
+  "schema": "memev-contribution/1",
+  "extends": "memev-envelope/1",
+  "store_key": "extension.contribution",
+  "type": "object",
+  "required": [
+    "classification",
+    "payload_hash",
+    "provenance",
+    "scope",
+    "schema",
+    "sequence",
+    "signature",
+    "subject"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "memev-contribution/1"
+    },
+    "subject": {
+      "type": "string",
+      "pattern": "^(person|agent|device|node|operator|service):[A-Za-z0-9._@+-]+$",
+      "description": "The subject that wrote it. It is the origin identity of the envelope."
+    },
+    "scope": {
+      "type": "object",
+      "required": [
+        "id",
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._@+-]+$"
+        },
+        "type": {
+          "enum": [
+            "personal",
+            "team",
+            "department",
+            "project",
+            "programme",
+            "portfolio",
+            "site",
+            "organisation"
+          ]
+        }
+      },
+      "description": "The scope it is written for, one of the scope types of docs/IDENTITY-AND-SCOPES.md."
+    },
+    "classification": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "A label. The classification schema of SO-F-05 constrains its values later; until then any non-empty string is accepted by the validator, and the node's policy lists the labels it accepts."
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The per-sender sequence. The node refuses a sequence that is not above the high-water mark of the sender, which it keeps in its own operation log."
+    },
+    "payload_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "The SHA-256 of the canonical text of the envelope payload."
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "source",
+        "derived_from"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "derived_from": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+          },
+          "description": "Operation ids this was derived from, sorted, without repeats."
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "required": [
+        "namespace",
+        "principal",
+        "sshsig"
+      ],
+      "additionalProperties": false,
+      "description": "Made with the role key through ssh-keygen, over the text that src/engine/federation/contribution.mjs names, in a namespace of its own. A signature made for a role binding (namespace memev) is not valid here.",
+      "properties": {
+        "principal": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._@+][A-Za-z0-9._@+-]*$",
+          "description": "The id of the subject's key that signed."
+        },
+        "namespace": {
+          "const": "memev-contribution"
+        },
+        "sshsig": {
+          "type": "string",
+          "pattern": "^-----BEGIN SSH SIGNATURE-----",
+          "maxLength": 8192
+        }
+      }
+    }
+  }
+}
