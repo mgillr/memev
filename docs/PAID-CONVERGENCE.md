@@ -16,11 +16,26 @@ to resolve.
 
 - **Personal with more computers:** automatic merge across several computers at once (planned).
 - **Business and Corporate:** vault convergence for a company (both coming, planned).
+- **Several sites:** convergence of authorised state between independently operated site nodes
+  (planned, with federation).
 
 Today the engine is not built into any released Memev. These features are planned and are not
 sold until they are built ([tiers/README.md](tiers/README.md#what-is-built-and-what-is-planned)).
 The free behaviour never changes: one computer at a time, git sync as single-writer backup, and a
 conflict left for a person to resolve ([CONVERGENCE.md](CONVERGENCE.md#what-free-users-get)).
+
+## Scope of this contract
+
+The service contract below is the note-conflict contract: one note, two versions and their common
+base. It is not a contract for structured state, for project, programme or portfolio records, for
+business approvals, or for federation between sites. Extending crdt-merge into those areas is
+planned and needs explicit input and output schemas, ownership and authority rules, provenance,
+failure behaviour, policy checks and conformance tests first. Memev keeps the business semantics
+and the permission decisions; the engine does not decide whether a contribution is true, authorised
+or approved. Federated computation on top of federation needs workload-specific algorithms as well;
+converging contribution state does not provide them. See [FEDERATION.md](FEDERATION.md),
+[ORGANISATIONAL-INTELLIGENCE.md](ORGANISATIONAL-INTELLIGENCE.md) and
+[FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).
 
 ## The engine is an external dependency
 

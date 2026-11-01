@@ -1,0 +1,70 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PG-06.1",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "c174b68f950a78194a38295d5f09a149574f2af3efc2a2f821216cfdf81aa555",
+      "base_commit": "afdccd6413dca3c3715633696e3b7bf76ed9f6b9",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/scope-one/programme/REQUIREMENTS.md",
+            "sha256": "8b70ac41d38fe2f855bf9d74e1409358a1a89d6e68d571aea20186f15db81705"
+          },
+          {
+            "path": "docs/scope-one/WBS.md",
+            "sha256": "15f122b0a8bd47fea7591256767a5707b98578dfbfdf8dc197e57e1522e5ff91"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "WP06-03 C1 is now a grep for evaluateAcceptance in src/engine/project-store.mjs, a weaker check than the wiring verifier it replaced (a mention in a comment would pass)",
+          "disposition": "rejected",
+          "reason": "C2 is the red then green wired test and C3 requires the named test \"a replicated operation does not change authoritative state until accepted\"; the grep only pins where the call lives"
+        },
+        {
+          "n": 2,
+          "severity": "medium",
+          "how": "the contract depends on PG-04.1 and PGP-1.02, which are unsigned, and shares src/engine/project-store.mjs with PGP-1.02 and PG-10.1",
+          "disposition": "rejected",
+          "reason": "the order is stated in the task (PGP-1.02 lands first, PG-10.1 after) and in depends_on; signing the spec does not sign the order"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "WP06-01 C3 greps one phrase for who may make each transition",
+          "disposition": "rejected",
+          "reason": "it is a design document the owner reads; C2 names all six states and C4 the replicated-is-not-accepted statement"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Third review, of pull request #325 at head afdccd6 (the second, at 79cbaae, found the weak criteria and the open layer question; the criteria are tightened and the layer is decided by owner delegation of 1 Nov 2026, as DECISIONS.md records). The engine decision is owner-confirmed (t542u, 31 Oct 2026). Checks run, and the only checks made: the spec hash equals specSha256 of the file at the reviewed head; every MV citation resolves to the cited line of docs/scope-one/programme/REQUIREMENTS.md or DECOMPOSITION.md and its text matches; every quoted SO-1.x, SO-2.x, SR and QL requirement is a verbatim stretch of the signed contract it cites; each verifier (grep pattern, file_exists path, wiring entry) was run against the tree it names (this tree, or the pull request head where the spec is for another repository); the request, tasks and manifest rows were read against the leak rules of this repository (the leak scan stays clean, and I also read by hand for agent and lane labels, which the scan does not catch); no duplicate of SO-1.01, SO-1.02, SO-1.04, SO-1.10, SO-1.11, SO-2.x, SR, QL, WBS or baseline section 8 was found. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Changed since the first pass: C2 to C4 of WP06-01 (all six states, who may make a transition), the seven named question tests with a run criterion for WP06-02, and the stated order for WP06-03. The seven names match the seven questions of MV-ARCH-07. The weak criteria of the first review are replaced by named, countable tests.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZGM0NzgwYjI0ZmMyOTU1ZDM1ODQyZGQ3YjcwODk1OTQ0ZjYyYjhjYzE2YjZkYzgxNjRlZmM1ODNkNDY3MTU0OA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "Lcbd47/OvNtp5POEThdHgfvZh8/uCH8ALbHMOza+fLX1iIbROEy63LLFfsFtCJ1ZRDMCe88TfzzbslZIHylCCw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZGYwMjZlZmY1MTFhOTYxZjZjZWVkZGM1OGZkZGFmZDBlNmQzOTRjNWVkMjk2MmY1ZGI3MzY1MTcwMTZlZmQ4Ng==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "xAc912g8IEqezNmbtEl7VnIfUVDdknBzaAye6CCEYPMTPtmrr0ZL6UVnKrdDvUWS5SyyB92PmYuafiqDMHdlBQ=="
+          }
+        ]
+      }
+    }
+  ]
+}
