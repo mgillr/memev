@@ -98,7 +98,7 @@ Three things are the same in every tier:
 Personal is one person. On one computer it is free. Personal with more computers is the paid step: a
 second computer joins the vault over the secure link with its own device key (built), and several
 computers editing at once with the convergence engine merging them is planned. A person can connect
-several cloud AI apps side by side, and local coding tools, all to the same memory.
+several cloud AI apps side by side, and local coding tools, all to the same authorised project state and knowledge context.
 
 ```mermaid
 flowchart LR
