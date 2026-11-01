@@ -1,0 +1,350 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP17-01",
+      "title": "Reconcile register: replace the stale '27 open draft PRs' inventory with live PR, branch and contract state",
+      "phase": "plan",
+      "owner": "owner",
+      "depends_on": [],
+      "requirements": [
+        "MV-PGM-01",
+        "MV-S1-06"
+      ],
+      "description": "Repo: memev. Refresh docs/scope-one/INVENTORY.md from live `gh pr list` and `git branch -r`; record the date and main SHA. Live state on 2026-10-31: 8 open PRs, 8 branches without a PR.",
+      "scope": {
+        "allow": [
+          "docs/scope-one/INVENTORY.md",
+          "docs/scope-one/REGISTER-REFRESH.md",
+          "test/**"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP17-01-AC01",
+          "mandatory": true,
+          "statement": "inventory no longer says 27 open draft PRs",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/INVENTORY.md",
+            "pattern": "27 open draft pull requests",
+            "must": "absent"
+          }
+        },
+        {
+          "id": "WP17-01-AC02",
+          "mandatory": true,
+          "statement": "refresh record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/REGISTER-REFRESH.md"
+          }
+        },
+        {
+          "id": "WP17-01-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP17-01-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP17-02",
+      "title": "Disposition for every open PR and every branch without a PR (merge, rework, close or supersede) recorded in one table",
+      "phase": "plan",
+      "owner": "owner",
+      "depends_on": [
+        "WP17-01"
+      ],
+      "requirements": [
+        "MV-PGM-02"
+      ],
+      "description": "Repo: memev. One row per item in the live 8 PRs + 8 branches: id, disposition, owner, reason. Owner approves; no PR is closed by this task.",
+      "scope": {
+        "allow": [
+          "docs/scope-one/DISPOSITIONS.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP17-02-AC01",
+          "mandatory": true,
+          "statement": "disposition table exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/DISPOSITIONS.md"
+          }
+        },
+        {
+          "id": "WP17-02-AC02",
+          "mandatory": true,
+          "statement": "every row has a disposition word",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/DISPOSITIONS.md",
+            "pattern": "\\| (merge|rework|close|supersede) \\|",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP17-02-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP17-02-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP17-03",
+      "title": "One canonical contract format and id namespace: decide attest/1 specs versus proofline/1 and write the mapping",
+      "phase": "design",
+      "owner": "owner",
+      "depends_on": [
+        "WP17-01"
+      ],
+      "requirements": [
+        "MV-PGM-04"
+      ],
+      "description": "Repo: memev-ops. Decision record: which format new work uses, how an id maps (SR-*, QL-*, SO-*, WO-*, MV-*), and whether memev's vendor/attest signing applies to proofline fragments. Owner decision, so the task asks and records.",
+      "scope": {
+        "allow": [
+          "contracts/FORMAT.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP17-03-AC01",
+          "mandatory": true,
+          "statement": "format record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "contracts/FORMAT.md"
+          }
+        },
+        {
+          "id": "WP17-03-AC02",
+          "mandatory": true,
+          "statement": "record names the chosen format",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/FORMAT.md",
+            "pattern": "(?i)chosen format:",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP17-03-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP17-03-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP17-04",
+      "title": "Requirement ownership map: each MV-* id is either covered by an existing SR/QL/SO/WO contract or by a new task here",
+      "phase": "plan",
+      "owner": "owner",
+      "depends_on": [
+        "WP17-03"
+      ],
+      "requirements": [
+        "MV-PGM-05"
+      ],
+      "description": "Repo: memev-ops. Map MV-REC-04, MV-LIC-03, MV-LIC-04, MV-ARCH-02 and the SR-3.x family to their existing contracts; mark duplicates for the later writer.",
+      "scope": {
+        "allow": [
+          "contracts/OWNERSHIP.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP17-04-AC01",
+          "mandatory": true,
+          "statement": "ownership map exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "contracts/OWNERSHIP.md"
+          }
+        },
+        {
+          "id": "WP17-04-AC02",
+          "mandatory": true,
+          "statement": "map names SR-2.01",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/OWNERSHIP.md",
+            "pattern": "SR-2\\.01",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP17-04-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP17-04-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP17-05",
+      "title": "Claim register so that two authors do not write the same WBS or contract at once",
+      "phase": "plan",
+      "owner": "owner",
+      "depends_on": [],
+      "requirements": [
+        "MV-PGM-06",
+        "MV-PGM-03"
+      ],
+      "description": "Repo: memev-ops. A file listing, per work package, which claim holds it. Starts with the known overlap: the Scope One WBS and SO-* contract work in the same repo on 31 Oct.",
+      "scope": {
+        "allow": [
+          "contracts/CLAIMS.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP17-05-AC01",
+          "mandatory": true,
+          "statement": "claim register exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "contracts/CLAIMS.md"
+          }
+        },
+        {
+          "id": "WP17-05-AC02",
+          "mandatory": true,
+          "statement": "register lists area names",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/CLAIMS.md",
+            "pattern": "area-engine",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP17-05-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP17-05-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP17-06",
+      "title": "Judgement rule recorded: a feature is accepted only with an answer to 'does this make Memev more essential to a distributed agent ecosystem'",
+      "phase": "design",
+      "owner": "owner",
+      "depends_on": [
+        "WP17-05"
+      ],
+      "requirements": [
+        "MV-PRD-09"
+      ],
+      "description": "Repo: memev. Add the acceptance question to DECISIONS.md or the contract template.",
+      "scope": {
+        "allow": [
+          "docs/scope-one/DECISIONS.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP17-06-AC01",
+          "mandatory": true,
+          "statement": "rule present",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/DECISIONS.md",
+            "pattern": "essential to a distributed",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP17-06-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP17-06-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}
