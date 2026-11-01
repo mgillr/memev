@@ -131,6 +131,7 @@ test('PG-19.2 WP19-03 AC01: the reader is frozen: assigning to snapshot, adding 
 });
 
 test('PG-19.2 WP19-03 AC02: the reader has exactly one member, snapshot, and nothing on its prototype', () => {
+  assert.equal(typeof Vault.prototype.tasksReader, 'function', 'Vault#tasksReader exists');
   const { v } = newVault(); v.projectStore('p').append({ type: 'task.upserted', entity: { kind: 'task', id: 'T1', data: { title: 't', project: 'p', status: 'READY', scope_version: 1 } } });
   const reader = v.tasksReader(READER, 'p');
   assert.deepEqual(Reflect.ownKeys(reader), ['snapshot']);
@@ -142,6 +143,7 @@ test('PG-19.2 WP19-03 AC02: the reader has exactly one member, snapshot, and not
 });
 
 test('PG-19.2 WP19-03 AC03: the records it returns are copies: changing one changes nothing in the store or in a second read', () => {
+  assert.equal(typeof Vault.prototype.tasksReader, 'function', 'Vault#tasksReader exists');
   const { root, v } = newVault();
   const store = v.projectStore('p');
   store.append({ type: 'task.upserted', entity: { kind: 'task', id: 'T1', data: { title: 'task T1', project: 'p', status: 'READY', scope_version: 1, nested: { deep: ['a'] } } } });
@@ -159,6 +161,7 @@ test('PG-19.2 WP19-03 AC03: the records it returns are copies: changing one chan
 });
 
 test('PG-19.2 WP19-03 AC04: the reader cannot write: no write method, and the event log bytes are the same after every call', () => {
+  assert.equal(typeof Vault.prototype.tasksReader, 'function', 'Vault#tasksReader exists');
   const { root, v } = newVault();
   const store = v.projectStore('p');
   store.append({ type: 'task.upserted', entity: { kind: 'task', id: 'T1', data: { title: 'task T1', project: 'p', status: 'READY', scope_version: 1 } } });
@@ -179,6 +182,7 @@ test('PG-19.2 WP19-03 AC04: the reader cannot write: no write method, and the ev
 });
 
 test('PG-19.2 WP19-03 AC05: the reader does not expose the ProjectStore: nothing reachable is a store, and what snapshot returns survives structuredClone and JSON', async () => {
+  assert.equal(typeof Vault.prototype.tasksReader, 'function', 'Vault#tasksReader exists');
   const { v } = newVault(); const store = v.projectStore('p');
   for (const id of ['T1', 'T2']) store.append({ type: 'task.upserted', entity: { kind: 'task', id, data: { title: `task ${id}`, project: 'p', status: 'READY', scope_version: 1 } } });
   addEntity(store, 'milestone', { title: 'm' }, 'M1');
