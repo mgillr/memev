@@ -85,12 +85,70 @@ const held = new Map();
 
 /** The holder a lock file's bytes name: { pid, host } or {} when they are not a lock. */
 function holderOf(bytes) {
-  try { const o = JSON.parse(bytes); return o && Number.isInteger(o.pid) ? { pid: o.pid, host: o.host ?? null } : {}; } catch { return {}; }
+  try { const o = JSON.parse(bytes); return o && validPid(o.pid) ? { pid: o.pid, host: o.host ?? null } : {}; } catch { return {}; }
 }
 const lockedBy = (dir, bytes) => {
   const h = holderOf(bytes);
   return new VaultLocked(h.pid === undefined ? `the vault's op log at ${dir} has a lock file (LOCK) that names no holder` : `the vault's op log at ${dir} is locked by pid ${h.pid}${h.host ? ` on ${h.host}` : ''}`, h);
 };
+
+const validPid = (pid) => Number.isInteger(pid) && pid > 0;
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+const bootTime = () => Date.now() - os.uptime() * 1000;
+
+/** The fields a lock (and the recovery mutex) records about its writer. */
+const writerRecord = (token) => ({ pid: process.pid, host: os.hostname(), boot: String(Math.round(bootTime())), start: processStart(process.pid), machine: machineBootId(), ns: pidNamespace(), token });
+
+/** Same host, same boot (os.uptime() times within 120 s), same per-boot machine identifier and same pid namespace: pids are comparable. */
+function sameEnvironment(o) {
+  return o.host === os.hostname() && Math.abs(Number(o.boot) - bootTime()) <= 120000 && (o.machine ?? null) === machineBootId() && (o.ns ?? null) === pidNamespace();
+}
+
+/**
+ * Is this lock stale? `bytes` and `ageMs` (the mtime's age) are what the file held when it was read. An empty, unparsable or
+ * pid-less lock is held for 60 s. A lock from another host or boot is stale after 90 s. On this host, boot, machine and pid
+ * namespace, together and before any pid rule: stale when the pid is not alive, when it is alive with a start time more than 2 s
+ * from the recorded one (the pid was reused), or when it is this process's own pid and this process holds no token for it (an
+ * earlier run, as in a restarted container). A start time that cannot be read counts as alive.
+ */
+function isStale(bytes, ageMs) {
+  let o = null;
+  try { o = JSON.parse(bytes); } catch { /* not a lock */ }
+  if (!o || !validPid(o.pid)) return ageMs > 60000;
+  if (!sameEnvironment(o)) return ageMs > 90000;
+  if (o.pid === process.pid) return ![...held.values()].includes(o.token);
+  if (!alive(o.pid)) return true;
+  const start = processStart(o.pid);
+  return start !== null && typeof o.start === 'number' && Math.abs(start - o.start) > 2000;
+}
+
+/** Test seam: MEMEV_LOCK_TEST_PAUSE=after-judge:<ms>,after-rename:<ms> pauses a recoverer at that point. */
+function pause(point) {
+  for (const spec of String(process.env.MEMEV_LOCK_TEST_PAUSE || '').split(',')) {
+    const [name, ms] = spec.split(':');
+    if (name === point && Number(ms) > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Number(ms));
+  }
+}
+
+/** A file's bytes and the age of its mtime, or null when it is not there. */
+function readAged(file) {
+  try { const bytes = fs.readFileSync(file, 'utf8'); return { bytes, age: Date.now() - fs.statSync(file).mtimeMs }; } catch (e) { if (e.code === 'ENOENT') return null; throw e; }
+}
+
+/**
+ * Rename `file` away, and if what was moved is not `bytes` (it changed meanwhile, or another opener's lock stood there) put it
+ * back with a link that never replaces a file: it is never moved over a file that exists. Returns true when `bytes` were removed.
+ */
+function removeIf(file, bytes, tag, afterRename = () => {}) {
+  const away = `${file}.stale-${tag}`;
+  try { fs.renameSync(file, away); } catch (e) { if (e.code === 'ENOENT') return false; throw e; }
+  afterRename();
+  let same = false;
+  try { same = fs.readFileSync(away, 'utf8') === bytes; } catch { /* unreadable: not the lock we judged */ }
+  if (same) { fs.rmSync(away, { force: true }); return true; }
+  try { fs.linkSync(away, file); fs.rmSync(away, { force: true }); } catch { /* a lock stands there: the moved file stays where it is */ }
+  return false;
+}
 
 /**
  * The lease. It runs in a worker_threads worker, so a main thread blocked in a long synchronous call keeps the lock: every `ms` it
@@ -145,19 +203,51 @@ export class OpLog {
     const key = fs.realpathSync(this.dir), file = path.join(key, LOCK);
     if (held.has(key)) throw new VaultLocked(`the vault's op log at ${key} is already open in this process (pid ${process.pid}); the lock is not re-entrant`, { pid: process.pid, host: os.hostname() });
     const token = crypto.randomBytes(16).toString('hex');
-    let fd;
-    try { fd = fs.openSync(file, 'wx', 0o600); } catch (e) {
-      if (e.code !== 'EEXIST') throw e;
-      throw lockedBy(key, fs.readFileSync(file, 'utf8'));
-    }
-    try {
-      fs.writeSync(fd, `${JSON.stringify({ pid: process.pid, host: os.hostname(), boot: String(Math.round(Date.now() - os.uptime() * 1000)), start: processStart(process.pid), machine: machineBootId(), ns: pidNamespace(), token })}\n`);
-      fs.fsyncSync(fd);
-    } catch (e) { fs.closeSync(fd); fs.rmSync(file, { force: true }); throw e; }
-    fs.closeSync(fd);
+    // an exclusive create of `target` with this process's record in it; false when it already exists, any other error is thrown
+    const create = (target, tok) => {
+      let fd;
+      try { fd = fs.openSync(target, 'wx', 0o600); } catch (e) { if (e.code === 'EEXIST') return false; throw e; }
+      try { fs.writeSync(fd, `${JSON.stringify(writerRecord(tok))}\n`); fs.fsyncSync(fd); } catch (e) { fs.closeSync(fd); fs.rmSync(target, { force: true }); throw e; }
+      fs.closeSync(fd);
+      return true;
+    };
+    if (!create(file, token)) this._recover(key, token, create);
     held.set(key, token); this.token = token; this.lockKey = key; this.lockFile = file;
     this.renewer = new Worker(`(${renewLoop})()`, { eval: true, workerData: { file, token, ms: Number(process.env.MEMEV_LOCK_RENEW_MS) || 15000 } });
     this.renewer.on('error', () => {}); this.renewer.unref();
+  }
+
+  /**
+   * LOCK exists: judge it. A live lock is never moved. A stale one is replaced under the recovery mutex (LOCK.recover, an exclusive
+   * create): LOCK is read again inside the mutex and recovery goes on only if its bytes still are the stale lock judged, which is
+   * then renamed away, checked once more, and replaced by this opener's own LOCK (an exclusive create); the mutex is released last.
+   */
+  _recover(key, token, create) {
+    const file = path.join(key, LOCK), mutexFile = path.join(key, `${LOCK}.recover`);
+    for (let tries = 0; tries < 5; tries++) {
+      const seen = readAged(file);
+      if (seen === null) { if (create(file, token)) return; continue; }
+      if (!isStale(seen.bytes, seen.age)) throw lockedBy(key, seen.bytes);
+      pause('after-judge');
+      const mtoken = crypto.randomBytes(16).toString('hex');
+      if (!create(mutexFile, mtoken)) {
+        const m = readAged(mutexFile);
+        if (m !== null && m.age > 10000 && isStale(m.bytes, m.age)) removeIf(mutexFile, m.bytes, token);   // a mutex whose writer is gone
+        else if (m !== null) throw lockedBy(key, m.bytes);
+        continue;
+      }
+      try {
+        const again = readAged(file);
+        if (again === null) continue;
+        if (again.bytes !== seen.bytes || !isStale(again.bytes, again.age)) throw lockedBy(key, again.bytes);
+        if (!removeIf(file, seen.bytes, token, () => pause('after-rename'))) throw lockedBy(key, readAged(file)?.bytes ?? '');
+        if (!create(file, token)) throw lockedBy(key, readAged(file)?.bytes ?? '');
+        return;
+      } finally {
+        if (readAged(mutexFile)?.bytes.includes(mtoken)) fs.rmSync(mutexFile, { force: true });
+      }
+    }
+    throw new VaultLocked(`the vault's op log at ${key} is being recovered by another opener`);
   }
 
   /** Does the lock file still carry this log's token? */

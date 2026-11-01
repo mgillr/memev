@@ -392,7 +392,6 @@ test('T1-c06: another host or boot is held while the mtime is fresh and stale af
   assert.equal(mine.pid, process.pid);
   v.close();
   // no open in this process: a lock naming this pid, host and boot (an earlier run with the same pid) is recovered
-  const left = readLock.call(null, lock) ?? null; void left;
   plant(dir, (o) => ({ ...o, pid: process.pid }));
   const w = openVault(root);
   assert.ok(w.log.verify().ok);
@@ -440,6 +439,7 @@ test('T1-c11: one field at a time: another boot is held while fresh and stale af
     assert.equal(sample.ns, fs.readlinkSync('/proc/self/ns/pid'), 'the lock records the pid namespace');
     plant(dir, (o) => ({ ...o, pid: dead, ns: 'pid:[1]' }));
     refuses(dir);
+    fs.rmSync(lockPath(dir));
     plant(dir, (o) => ({ ...o, pid: dead }));
     openAppendVerify(dir);
   }
@@ -610,7 +610,7 @@ test('T1-mutex: a recovery mutex younger than 10 s, or older with a live writer,
     const dir = bareDir();
     const sample = plant(dir, (o) => ({ ...o, pid: dead }));
     const mutex = path.join(dir, 'LOCK.recover');
-    writeLock(mutex, { ...sample, pid: mutexPid });
+    writeLock(mutex, { ...sample, pid: mutexPid, start: UTIL.processStart(mutexPid) });
     age(mutex, ageS);
     if (stale) { openAppendVerify(dir); assert.equal(fs.existsSync(mutex), false, `${name}: the stale mutex is gone`); }
     else {
