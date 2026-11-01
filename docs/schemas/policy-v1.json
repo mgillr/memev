@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema": "memev-policy/1",
+  "title": "Federation policy",
+  "description": "What may be done with each data class under a federation relationship: six actions per class, and the recovery objectives of the class. The class list is open; the classification schema of a later contract pins the names. A class the policy does not list has no rule, and no rule is a denial. Validated by validatePolicy in src/engine/federation/policy.mjs; docs/FEDERATION.md describes it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "version", "classes"],
+  "properties": {
+    "schema": { "const": "memev-policy/1" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$" },
+    "version": { "type": "string", "minLength": 1, "maxLength": 64, "description": "The version a relationship names as accepted." },
+    "classes": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[A-Za-z0-9._:-]{1,64}$" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["discover", "read", "replicate", "compute", "retain", "export", "recovery"],
+        "properties": {
+          "discover": { "type": "boolean" },
+          "read": { "type": "boolean" },
+          "replicate": { "type": "boolean" },
+          "compute": { "type": "boolean" },
+          "retain": { "type": "boolean" },
+          "export": { "type": "boolean" },
+          "recovery": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["rpo_seconds", "rto_seconds"],
+            "properties": {
+              "rpo_seconds": { "type": "integer", "minimum": 0, "description": "Recovery point objective of the class, in seconds." },
+              "rto_seconds": { "type": "integer", "minimum": 0, "description": "Recovery time objective of the class, in seconds." }
+            }
+          }
+        }
+      }
+    }
+  }
+}
