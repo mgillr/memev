@@ -70,6 +70,7 @@ Who writes which task, so that two authors do not write the same one. Claims are
 | `PG-02.1` (CRDT conformance gate; `WP02-01` to `WP02-04`) | Claim C | crdt-merge, branch `feat/pg-02-1-crdt-conformance-gate` | queued after `SO-2.01` to `SO-2.06` |
 | `PG-03.1` (vectors, crdt-merge); one pull request | Claim C | branch `feat/pg-03-1-*` | queued after `SO-2.01` to `SO-2.06` |
 | `PG-03.4` (crdt-merge-ts; supersedes the signed `PG-03.2`) and `PG-03.5` (crdt-merge-rs; supersedes the signed `PG-03.3`); one pull request per package; depend on `PG-03.1` | Claim C | branches `feat/pg-03-4-*`, `feat/pg-03-5-*` | active |
+| `SO-F-01` (identity and scopes model, version 1; a signed fold contract of pull request #341) | Claim C | branch `feat/so-f-01-identity-and-scopes` | claimed |
 | `PG-03.2` and `PG-03.3` (signed; files unchanged) | superseded | none | superseded by `PG-03.4` and `PG-03.5` (signer's decision, 1 Nov 2026; reason: the editions lack the features the vectors need, so the signed scope cannot be met); the manifest records `superseded_by` |
 | `PG-12.2` (multi-node gossip transport; `WP12-01` to `WP12-03`; supersedes the signed `PG-12.1`) | unclaimed | none | open, unclaimed |
 | `PG-06.2` (replication separate from acceptance; `WP06-01` to `WP06-03`; supersedes the signed `PG-06.1`) | unclaimed | none | open, unclaimed |
@@ -78,6 +79,8 @@ Who writes which task, so that two authors do not write the same one. Claims are
 | Upgrade, rollback, backup and restore, and uninstall (work breakdown 5.1.3, requirements 70 and 96) | signed vault contract `SO-R-C` | cited by id, no programme task | covered by the vault contract |
 | `SR-6.03` installers and public release | signed vault contracts `WO-02-A` and `MEM-015` | cited by id, no programme task | covered by the vault contracts |
 | `SR-0.03` tasks 1, 3 and 4 (one pull request) | Claim D | branch `feat/sr-0-03-tasks-1-3-4` | active |
+| `SR-0.03` task 2 (the scope verifier, 16 criteria) | Claim D | branch `feat/sr-0-03-task-2-scope-verifier`, stacked on #336 | claimed |
+| `SR-0.03` version 2 (signed as `k-sr-0-03-verify-runs-ever-2259f2`; files unchanged) | superseded | none | superseded by `SR-0.03.3` (version 3, in `contracts/programme/specs`; owner delegation, 1 Nov 2026); the spec pins a base that is still pending (the memev main commit after the README re-sign fix); the manifest records `superseded_by` |
 | `QL-1.01` task 2 (the red-team gate, linked to #314) | Claim D | branch `feat/ql-1-01-task-2` | queued after `SR-0.03` |
 | Every other `WP*` task (the work itself) | unclaimed | none | not started |
 
@@ -226,6 +229,13 @@ One row per requirement of [programme/REQUIREMENTS.md](programme/REQUIREMENTS.md
 | `MV-PGM-05` | Requirements owned by an existing contract stay covered by it; no duplicate contracts are written for them | same | 9 (owner index and overlap check) |
 | `MV-PGM-07` | The three engine plans are reconciled into one: the notes (crdt-merge via call-out, never vendored), PI-04/PI-05 on branch dev-integration-specs (vend... | conflicting | 7.1 PI-04 and PI-05 and 1.2.4 SR-3.01, SR-3.03 are open or covered; superseded by owner decision 31 Oct 2026 |
 | `MV-PGM-06` | Parallel work is deconflicted: one claim register for who is writing which WBS or contract | missing | this register |
+
+## Open follow-ups
+
+| Follow-up | Where | Detail | Status |
+| --- | --- | --- | --- |
+| `LWWRegister` merge with equal timestamp and equal `node_id` | the crdt-merge reference first, then the TypeScript and Rust editions (`PG-03.4`, `PG-03.5`) | The Python reference keeps self and the Rust edition keeps other, so merge is not commutative in that case. The case is excluded from the vectors and must not be asserted. A higher timestamp wins, and on equal timestamps the greater `node_id` wins, in all editions. Fix the reference first; the editions follow (owner delegation, 1 Nov 2026) | open |
+
 
 ## Programme tasks by work package
 
