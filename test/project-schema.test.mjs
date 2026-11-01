@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { tmpdir, cleanup, PKG } from './helpers/tmp.mjs';
-import { ProjectStore, ProjectStoreError, SCHEMA_VERSION, ENTITY_KINDS, MERGE_CLASSES, semanticConflicts } from '../src/engine/project-store.mjs';
+import { ProjectStore, ProjectStoreError, SCHEMA_VERSION, ENTITY_KINDS, MERGE_CLASSES, APPROVAL_DECISIONS, TERMINAL_TASK_STATUSES, semanticConflicts } from '../src/engine/project-store.mjs';
+import { TRANSITIONS } from '../src/engine/project-state.mjs';
 import { SUBJECT_TYPES } from '../src/engine/identity.mjs';
 import { recordHash } from '../src/engine/oplog.mjs';
 
@@ -34,8 +35,8 @@ test('SO-F-02 AC02: every entity type in the schema declares an authority owner,
     assert.ok(MERGE_CLASSES.includes(d.mergeClass), `${kind}: merge class ${d.mergeClass}`);
     assert.match(d.scopeVersionField, /^[a-z_]+$/, `${kind}: scope version field`);
     assert.deepEqual(
-      { authority: s.authority, scope_version_field: s.scope_version_field, merge_class: s.merge_class, file: s.file, id_prefix: s.id_prefix, required: s.required },
-      { authority: d.authority, scope_version_field: d.scopeVersionField, merge_class: d.mergeClass, file: d.file, id_prefix: d.prefix, required: d.required },
+      { authority: s.authority, scope_version_field: s.scope_version_field, merge_class: s.merge_class, file: s.file, id_prefix: s.id_prefix, required: s.required, provisional: s.provisional ?? {} },
+      { authority: d.authority, scope_version_field: d.scopeVersionField, merge_class: d.mergeClass, file: d.file, id_prefix: d.prefix, required: d.required, provisional: d.provisional },
       `${kind}: the schema and the store declare the same thing`,
     );
   }
@@ -100,7 +101,8 @@ test('SO-F-02 AC02: a migration carries the schema version, in the file and on e
 
 test('SO-F-02 AC02: the core applies no merge class itself, and the free path keeps both versions', () => {
   for (const f of ['src/engine/project-store.mjs', 'src/engine/project-state.mjs']) {
-    assert.ok(!/from '\.\/merge\.mjs'|import\(['"]\.\/merge\.mjs/.test(read(f)), `${f} does not reach the merge provider boundary`);
+    // any import form and either quote, a path with or without the extension: from, side-effect import, import() and require()
+    assert.ok(!/(?:from|import|require)\s*\(?\s*['"`][^'"`]*\/merge(?:\.mjs)?['"`]/.test(read(f)), `${f} does not reach the merge provider boundary`);
     assert.ok(!/crdt-merge/.test(read(f).replace(/\/\/.*$/gm, '')), `${f} holds no merge engine`);
   }
   const root = tmpdir();
@@ -168,7 +170,8 @@ test('SO-F-02 AC03: converging two incompatible approval events gives CONFLICTED
   const approvalEvents = readLog(dir).filter((r) => r.entity?.kind === 'approval');
   assert.equal(approvalEvents.length, 2);
   const store = new ProjectStore(root, { id, deviceId: 'dev-a' }).open();
-  const task = store.snapshot('task')['task-1'];
+  assert.equal(store.snapshot('task')['task-1'].status, 'PROPOSED', 'the stored task is not changed');
+  const task = store.view('task')['task-1'];
   assert.equal(task.status, 'CONFLICTED');
   assert.equal(task.prior_status, 'PROPOSED');
   assert.equal(task.conflict.kind, 'semantic');
@@ -177,18 +180,22 @@ test('SO-F-02 AC03: converging two incompatible approval events gives CONFLICTED
   assert.deepEqual(task.conflict.applied, [], 'neither approval is applied');
   assert.equal(task.approved, undefined);
   // a conflict entity carries the same record
-  const confs = Object.values(store.snapshot('conflict')).filter((c) => c.kind === 'semantic');
+  const confs = store.conflicts();
   assert.equal(confs.length, 1);
+  assert.equal(Object.keys(store.snapshot('conflict')).length, 0, 'it is derived, not stored as an entity');
+  assert.equal(Object.values(store.view('conflict')).filter((c) => c.kind === 'semantic').length, 1);
   assert.deepEqual(confs[0].events, task.conflict.events);
   // both inputs stay intact: the two approvals and their events, byte for byte
   assert.deepEqual(store.snapshot('approval')['appr-a'], { task_id: 'task-1', decision: 'approve', task_version: 1, by: 'person:p1' });
   assert.deepEqual(store.snapshot('approval')['appr-b'], { task_id: 'task-1', decision: 'reject', task_version: 2, by: 'person:p2' });
   assert.deepEqual(logLines(dir), before, 'opening the store wrote nothing to the log');
   store.close();
-  // the snapshot on disk shows the derived state, and the log still wins on the next open
-  assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'tasks.json'), 'utf8')).entities['task-1'].status, 'CONFLICTED');
+  // the snapshot on disk holds the stored task, and the derivation is the same on the next open
+  const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'tasks.json'), 'utf8')).entities['task-1'];
+  assert.equal(onDisk.status, 'PROPOSED');
+  assert.equal(onDisk.conflict, undefined);
   const again = new ProjectStore(root, { id, deviceId: 'dev-a' }).open();
-  assert.deepEqual(again.snapshot('task')['task-1'], task, 'the derivation is repeatable');
+  assert.deepEqual(again.view('task')['task-1'], task, 'the derivation is repeatable');
   assert.deepEqual(logLines(dir), before);
   again.close();
 });
@@ -200,27 +207,28 @@ test('SO-F-02 AC03: a state with only one approval, or compatible ones, is not a
   store.append({ type: 'approval.upserted', entity: { kind: 'approval', id: 'appr-1', data: { task_id: 'task-1', decision: 'approve', task_version: 1 } } });
   assert.equal(store.snapshot('task')['task-1'].status, 'PROPOSED');
   store.append({ type: 'approval.upserted', entity: { kind: 'approval', id: 'appr-2', data: { task_id: 'task-1', decision: 'approve', task_version: 2 } } });
-  assert.equal(store.snapshot('task')['task-1'].status, 'PROPOSED');
-  assert.equal(store.snapshot('task')['task-1'].conflict, undefined);
-  assert.equal(Object.keys(store.snapshot('conflict')).length, 0);
+  assert.equal(store.view('task')['task-1'].status, 'PROPOSED');
+  assert.equal(store.view('task')['task-1'].conflict, undefined);
+  assert.equal(Object.keys(store.view('conflict')).length, 0);
   // an incompatible one arrives live: the conflict appears at once, without a reopen, and the caller's record is not touched
   const rec = store.append({ type: 'approval.upserted', entity: { kind: 'approval', id: 'appr-3', data: { task_id: 'task-1', decision: 'reject', task_version: 3 } } });
-  assert.equal(store.snapshot('task')['task-1'].status, 'CONFLICTED');
+  assert.equal(store.view('task')['task-1'].status, 'CONFLICTED');
+  assert.equal(store.snapshot('task')['task-1'].status, 'PROPOSED', 'the stored task is not changed');
   assert.equal(rec.entity.data.decision, 'reject');
-  assert.equal(store.snapshot('task')['task-1'].conflict.events.length, 3, 'every live approval of the task is named');
+  assert.equal(store.view('task')['task-1'].conflict.events.length, 3, 'every live approval of the task is named');
   store.close();
 });
 
 test('SO-F-02 AC03: a resolving approval ends the conflict, and the log still holds both inputs', () => {
   const { root, id, dir } = convergedStore();
   const store = new ProjectStore(root, { id, deviceId: 'dev-a' }).open();
-  const both = store.snapshot('task')['task-1'].conflict.events;
+  const both = store.view('task')['task-1'].conflict.events;
   assert.equal(both.length, 2);
   store.append({ type: 'approval.upserted', entity: { kind: 'approval', id: 'appr-r', data: { task_id: 'task-1', decision: 'approve', task_version: 2, resolves: both, by: 'person:p1' } } });
-  const task = store.snapshot('task')['task-1'];
-  assert.equal(task.status, 'PROPOSED', 'the stored state is back, and nothing was applied on the way');
+  const task = store.view('task')['task-1'];
+  assert.equal(task.status, 'PROPOSED', 'the stored state shows again, and nothing was applied on the way');
   assert.equal(task.conflict, undefined);
-  assert.equal(Object.values(store.snapshot('conflict')).filter((c) => c.kind === 'semantic').length, 0);
+  assert.equal(store.conflicts().length, 0);
   const inLog = readLog(dir).filter((r) => r.entity?.kind === 'approval').map((r) => r.entity.id).sort();
   assert.deepEqual(inLog, ['appr-a', 'appr-b', 'appr-r']);
   store.close();
@@ -245,6 +253,15 @@ test('SO-F-02 AC05: docs/PROJECTS.md lists every entity type with its authority 
   assert.match(page, /merge class/);
   assert.match(page, /## The semantic conflict rule/);
   assert.match(page, /applies neither approval/);
+  assert.match(page, /not the memory authority of ADR 7/);
+  assert.match(page, /not the permission matrix of ADR 5/);
+  assert.match(page, /newest in log order/);
+  assert.match(page, /tie is broken by the merge provider/);
+  assert.match(page, /Only approvals are surfaced today/);
+  assert.match(page, /ADR 3 \(lease semantics\)/);
+  for (const [kind, d] of Object.entries(ENTITY_KINDS)) {
+    if (Object.keys(d.provisional).length) assert.ok(new RegExp(`\\| \`${kind}\` \\|[^\\n]*provisional`).test(page), `${kind} is marked provisional in the table`);
+  }
 });
 
 // ---- review response: tests that pin the declarations and the conflict rule by behaviour ----
@@ -252,7 +269,7 @@ test('SO-F-02 AC05: docs/PROJECTS.md lists every entity type with its authority 
 const open = (id) => new ProjectStore(tmpdir(), { id }).open();
 const putTask = (s, id, status = 'PROPOSED') => s.append({ type: 'task.upserted', entity: { kind: 'task', id, data: { title: id, status } } });
 const putAppr = (s, id, task, decision, extra = {}) => s.append({ type: 'approval.upserted', entity: { kind: 'approval', id, data: { task_id: task, decision, ...extra } } });
-const semanticOf = (s) => Object.values(s.snapshot('conflict')).filter((c) => c.kind === 'semantic');
+const semanticOf = (s) => s.conflicts();
 // a record that arrived by convergence from another log: it was never checked by this store's write path
 function injectApproval(store, dir, id, data) {
   const last = readLog(dir).at(-1);
@@ -399,4 +416,78 @@ test('SO-F-02 AC03: replay ignores a resolution from another task that arrived b
   assert.equal(semanticOf(s2).length, 1, 'task-1 is still in conflict');
   assert.ok(s2.stats().recovered.some((m) => /resolves/.test(m)), 'the resolution that was ignored is reported');
   s2.close();
+});
+
+test('SO-F-02 AC02: provisional declarations are named and carry a reason', () => {
+  const prov = Object.fromEntries(Object.entries(ENTITY_KINDS).filter(([, d]) => Object.keys(d.provisional).length).map(([k, d]) => [k, Object.keys(d.provisional).sort()]));
+  assert.deepEqual(prov, { lease: ['authority', 'merge_class'], evidence: ['authority'], event: ['authority'] });
+  for (const d of Object.values(ENTITY_KINDS)) for (const r of Object.values(d.provisional)) assert.ok(r.length > 20);
+  assert.match(ENTITY_KINDS.lease.provisional.merge_class, /ADR 3/);
+  assert.match(ENTITY_KINDS.lease.provisional.authority, /service subject/);
+  assert.ok(!Object.values(ENTITY_KINDS).some((d) => d.authority !== 'service' && d.provisional.authority), 'only the service owner is provisional');
+});
+
+test('SO-F-02 AC02: the schema file validates against itself', () => {
+  // no validator library is a dependency, so the checks the schema makes of its own declarations are made here by hand
+  const top = SCHEMA.properties;
+  for (const k of SCHEMA.required) assert.ok(Object.hasOwn(SCHEMA, k), `the file has ${k}`);
+  assert.equal(SCHEMA.schema, top.schema.const);
+  assert.equal(SCHEMA.store_schema_version, top.store_schema_version.const);
+  for (const k of Object.keys(SCHEMA)) assert.ok(Object.hasOwn(top, k), `${k} is a key the schema allows at the top`);
+  const decl = SCHEMA.$defs.entityDeclaration;
+  for (const [kind, e] of Object.entries(SCHEMA.entities)) {
+    for (const k of decl.required) assert.ok(Object.hasOwn(e, k), `${kind} has ${k}`);
+    for (const k of Object.keys(e)) assert.ok(Object.hasOwn(decl.properties, k), `${kind}: ${k} is a declared key`);
+    assert.ok(SCHEMA.$defs.authority.enum.includes(e.authority));
+    assert.ok(SCHEMA.$defs.mergeClass.enum.includes(e.merge_class));
+    assert.match(e.scope_version_field, new RegExp(decl.properties.scope_version_field.pattern));
+    for (const f of Object.keys(e.provisional ?? {})) assert.ok(decl.properties.provisional.propertyNames.enum.includes(f));
+  }
+  assert.deepEqual(SCHEMA.$defs.approval.properties.decision.enum, APPROVAL_DECISIONS);
+  assert.match(SCHEMA.$defs.approval.properties.decision.description, /Provisional/);
+});
+
+test('SO-F-02 AC03: a terminal task is one the state machine has no move out of', () => {
+  const terminal = Object.entries(TRANSITIONS).filter(([, to]) => to.length === 0).map(([from]) => from).sort();
+  assert.deepEqual(terminal, TERMINAL_TASK_STATUSES.slice().sort());
+});
+
+test('SO-F-02 AC03: the derived view shows CONFLICTED on a live task and leaves a terminal one as it is', () => {
+  const s = open('p-view');
+  putTask(s, 'task-1', 'IN_PROGRESS'); putTask(s, 'task-2', 'CANCELLED');
+  for (const t of ['task-1', 'task-2']) { putAppr(s, `a-${t}`, t, 'approve'); putAppr(s, `b-${t}`, t, 'reject'); }
+  const v = s.view('task');
+  assert.equal(v['task-1'].status, 'CONFLICTED');
+  assert.equal(v['task-1'].prior_status, 'IN_PROGRESS');
+  assert.equal(v['task-2'].status, 'CANCELLED', 'never applied to a terminal task');
+  assert.equal(s.conflicts().length, 2, 'both conflicts are still surfaced');
+  assert.equal(s.snapshot('task')['task-1'].status, 'IN_PROGRESS', 'the stored task is not changed');
+  assert.equal(s.snapshot('task')['task-1'].conflict, undefined);
+  s.view('task')['task-1'].status = 'DONE';
+  assert.equal(s.snapshot('task')['task-1'].status, 'IN_PROGRESS', 'a view is a copy');
+  s.close();
+});
+
+test('SO-F-02 AC03: one person who changes their mind, and a stale version, are conflicts until a resolution names both events', () => {
+  const s = open('p-mind');
+  putTask(s, 'task-1');
+  const a = putAppr(s, 'a', 'task-1', 'approve', { task_version: 1, by: 'person:p1' });
+  const b = putAppr(s, 'b', 'task-1', 'reject', { task_version: 2, by: 'person:p1' });
+  assert.equal(s.conflicts().length, 1, 'a change of mind is a conflict');
+  putAppr(s, 'r', 'task-1', 'reject', { task_version: 2, resolves: [a.id, b.id], by: 'person:p1' });
+  assert.equal(s.conflicts().length, 0);
+  putAppr(s, 'c', 'task-1', 'approve', { task_version: 1 });
+  assert.equal(s.conflicts().length, 1, 'a later approval of an old version still counts, and conflicts with the resolving reject');
+  s.close();
+});
+
+test('SO-F-02 AC03: the resolver is not checked, and the documentation says so', () => {
+  const s = open('p-by');
+  putTask(s, 'task-1');
+  const a = putAppr(s, 'a', 'task-1', 'approve', { by: 'person:p1' });
+  const b = putAppr(s, 'b', 'task-1', 'reject', { by: 'person:p2' });
+  putAppr(s, 'r', 'task-1', 'approve', { resolves: [a.id, b.id], by: 'agent:x' });
+  assert.equal(s.conflicts().length, 0, 'a decision on who may settle is not made here');
+  s.close();
+  assert.match(read('docs/PROJECTS.md'), /Who may settle a conflict is not checked/);
 });

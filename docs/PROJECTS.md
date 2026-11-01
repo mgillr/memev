@@ -111,34 +111,44 @@ itself made, on a task whose state has not changed since.
 
 ## Entity types and merge classes
 
-The store keeps nine entity types. The canonical project schema, `docs/schemas/project-v1.json`, declares three things for each, and the store holds the same declarations in `ENTITY_KINDS` in `src/engine/project-store.mjs`; a test keeps the two equal:
+The store keeps nine entity types. The canonical project schema, `docs/schemas/project-v1.json`, declares three things for each, and the store holds the same declarations in `ENTITY_KINDS` in `src/engine/project-store.mjs`; a test keeps the two equal and another pins every owner and class, so changing one of them fails a test:
 
-- the **authority owner**: whose word settles the entity when sources disagree. It is a subject type of the [identity model](IDENTITY-AND-SCOPES.md): `person`, `agent`, `device`, `node`, `operator` or `service`
-- the **scope version field**: the field that carries the entity's scope version, `scope_version`. When an entity has it, it is a positive whole number
+- the **owner**: a subject type of the [identity model](IDENTITY-AND-SCOPES.md): `person`, `agent`, `device`, `node`, `operator` or `service`. It is a declaration of which kind of subject the type belongs to. Nothing enforces it: the store checks that it is a subject type and does not check who writes. It is not the memory authority of ADR 7, which is still proposed, and it is not the permission matrix of ADR 5, which is still open. Both are decided elsewhere, and this declaration does not stand in for either
+- the **scope version field**: the field that carries the entity's scope version, `scope_version`. When an entity has it, it is a positive whole number. It is the same field for every type today
 - the **merge class**: what is supposed to happen when two sources write the same entity
 
 There are four merge classes:
 
-- `last-writer` the newest write stands
+- `last-writer` the newest write stands. Newest means newest in log order. A tie is broken by the merge provider, not by the core
 - `set-union` the elements of every write stand
 - `append-only` nothing is replaced, every write is kept
-- `human-resolution` competing writes are surfaced and a person settles them
+- `human-resolution` competing writes are surfaced and a person settles them. They are never silently merged
 
-| Entity type | Authority owner | Merge class |
-|---|---|---|
-| `project` | `person` | `last-writer` |
-| `task` | `person` | `human-resolution` |
-| `lease` | `service` | `last-writer` |
-| `attempt` | `agent` | `append-only` |
-| `evidence` | `service` | `append-only` |
-| `conflict` | `person` | `human-resolution` |
-| `session` | `device` | `last-writer` |
-| `approval` | `person` | `human-resolution` |
-| `event` | `service` | `append-only` |
+| Entity type | Owner | Merge class | Status |
+|---|---|---|---|
+| `project` | `person` | `last-writer` | `scope_version` is the exception: it is monotonic and the highest value stands, never the newest write |
+| `task` | `person` | `human-resolution` | declared, not surfaced yet |
+| `lease` | `service` | `human-resolution` | provisional: the class and the owner |
+| `attempt` | `agent` | `append-only` | declared, not surfaced yet |
+| `evidence` | `service` | `append-only` | provisional: the owner |
+| `conflict` | `person` | `human-resolution` | declared, not surfaced yet |
+| `session` | `device` | `last-writer` | declared, not surfaced yet |
+| `approval` | `person` | `human-resolution` | surfaced: the semantic conflict rule below |
+| `event` | `service` | `append-only` | provisional: the owner |
 
 No type uses `set-union` yet; the class is there for the types that come later.
 
-The core records the merge class of a type and applies none. The free path keeps both versions of a competing write: both stay in the event log, and the store shows the later one as it is, without merging them. Applying a class is the job of the merge provider behind `src/engine/merge.mjs`, which is not in the core. The store refuses an entity of a type that declares no merge class, or no authority owner, and writes nothing.
+Only approvals are surfaced today. Every other class is declared and recorded, and nothing applies or surfaces it; that is the work of the merge provider (SO-F-06). `task` is declared `human-resolution` and a competing task write is not surfaced either: the version check of the state machine is what catches two updates of one task, not this table.
+
+Three entries are provisional, which means they wait on a decision and may change with it:
+
+- The `lease` class waits on ADR 3 (lease semantics), which is open. Its safe default is one active writer with contending writes queued, not merged, and none of the four classes is a queue. A lease is not `last-writer`, because the newest write would then pre-empt the writer that holds it; the coordinator already refuses a second claim on a live lease. `human-resolution` is the nearest class, since a competing lease write is never settled by the newest one. When ADR 3 is decided, the class follows it.
+- The `lease`, `evidence` and `event` owner is `service`, and no `service` subject can be issued yet ([IDENTITY-AND-SCOPES.md](IDENTITY-AND-SCOPES.md)). The declaration is kept until the model issues one, and until then no subject holds that ownership.
+- The decisions an approval can record, `approve` and `reject`, are a closed pair that stands in for the seven decision states of the decision queue (SO-A-05, SO-1.08), which are not in code yet.
+
+Moving an entity from one owner to another, and several concurrent owners of one type, are not defined here. Both are deferred.
+
+The core records the merge class of a type and applies none. The free path keeps both versions of a competing write: both stay in the event log, and the store shows the later one as it is, without merging them. Applying a class is the job of the merge provider behind `src/engine/merge.mjs`, which is not in the core. The store refuses an entity of a type that declares no merge class, or no owner, and writes nothing. A type passed to the store can add to the built-in ones and cannot take the name of one.
 
 A store that is migrated to a newer schema version carries that version in its files and on every record it writes, and the schema names the store version it describes.
 
@@ -146,13 +156,25 @@ A store that is migrated to a newer schema version carries that version in its f
 
 The version check in the state machine (invariant 8) catches two updates from different sources on the same version. It does not catch two approvals on one task that say incompatible things when they were given on different versions. For example, one computer records an approval of version 1 while another records a rejection of version 2, and the two logs then converge.
 
-That is a semantic conflict. When the store rebuilds its state from the log, it finds the tasks that have approvals with more than one decision (`approve` and `reject`). For each of them it:
+That is a semantic conflict. The store reads every approval event in the log, and each write is its own event: two writes that happen to share an approval id are two events, so one approving and one rejecting is a conflict like any other. For each task with approvals of more than one decision (`approve` and `reject`) it derives one conflict record that names every event involved, with the approvals, their decisions and the versions they were given on, and applies neither approval.
 
-- puts the task in `CONFLICTED`, with the status it had kept as `prior_status`
-- attaches a conflict record that names every event involved, with the approvals, their decisions and the versions they were given on
-- applies neither approval
+Both approvals stay in the log and as entities, unchanged. Nothing is written to the log for the conflict, and it is never written into a task: the stored task keeps its own status, and the conflict is read through `store.conflicts()` and `store.view('task')`. The view shows a task that is not in a terminal state as `CONFLICTED`, with the status it had as `prior_status` and the record attached. It is a display and makes no transition, so a cancelled task stays `CANCELLED`, and anything that acts on a task reads the stored one. The same log always gives the same result.
 
-Both approvals stay in the log and as entities, unchanged. Nothing is written to the log for the conflict: it is derived again on every open, and the same log always gives the same result. A person settles it by recording an approval that lists the events it resolves; once every event but the resolving one is settled, the conflict ends and the task shows the status the store holds. Approvals that agree, a single approval, and approvals with no decision are not conflicts.
+A person settles a conflict by recording an approval, with a decision, whose `resolves` lists the events it settles. The list is honoured only when:
+
+- every entry is an earlier approval event of the same task, so an approval on another task settles nothing here
+- it names both sides, at least one approve and at least one reject, so a rejection cannot be dropped alone
+
+The store refuses such a write if it breaks either rule. A log that converged in from another computer is not refused, because it was written elsewhere: on replay a resolution that breaks a rule is ignored, an approval with a decision the store does not know is not used, and each is reported in the store's recovered list while the record stays in the log as it arrived.
+
+Some choices are made on purpose:
+
+- The approval's `task_version` does not decide anything. A stale approval after a scope amendment still counts, and an approve and a reject on the same version are a conflict too. The rule applies no approval, it only surfaces them, and whether an approval covers the current scope is the question the state machine answers through the scope version its evidence binds to.
+- One person who approves and then rejects has made a conflict, and a resolving approval that names both events settles it. A later write never replaces an earlier one.
+- Who may settle a conflict is not checked: `by` is a note on the approval and is not verified, so any subject that can write an approval can name both sides. The permission matrix is ADR 5, which is open, and who a writer is gets resolved at the store boundary by SO-F-01. This rule does not decide either.
+- The set of decisions is provisional, as above.
+
+Approvals that agree, a single approval, and approvals with no decision are not conflicts.
 
 ## The coordinator
 

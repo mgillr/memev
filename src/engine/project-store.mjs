@@ -22,31 +22,76 @@ const STATE = '.memev';
 // append-only: nothing is replaced, every write is kept. human-resolution: competing writes are surfaced and a person settles them.
 export const MERGE_CLASSES = Object.freeze(['last-writer', 'set-union', 'append-only', 'human-resolution']);
 
-/** The decisions an approval can record. Two different decisions on one task are incompatible. */
+/**
+ * The decisions an approval can record. Provisional: this closed pair of values is what the store knows today, and it
+ * pre-empts the seven decision states of the decision queue (SO-A-05, SO-1.08), which do not exist in code yet. When
+ * they land, this list is replaced by them. Two different decisions on one task are incompatible.
+ */
 export const APPROVAL_DECISIONS = Object.freeze(['approve', 'reject']);
 
+// A task in one of these states is never shown as CONFLICTED: the state machine has no move out of it (the empty row of
+// TRANSITIONS in project-state.mjs, which a test holds equal to this list). The store may not import the state machine.
+export const TERMINAL_TASK_STATUSES = Object.freeze(['CANCELLED']);
+
+// Why an approval's data cannot be used by the conflict rule, or null. The write path refuses such data; replay, which
+// also reads what another log converged in, reports it and leaves the record in the log as it arrived.
+const unusableApproval = (data) => {
+  const d = data && typeof data === 'object' ? data : {};
+  if (d.decision !== undefined && !APPROVAL_DECISIONS.includes(d.decision)) return `unknown decision ${JSON.stringify(d.decision)} (one of ${APPROVAL_DECISIONS.join(', ')})`;
+  if (d.resolves !== undefined && !(Array.isArray(d.resolves) && d.resolves.every((x) => typeof x === 'string'))) return 'resolves is not a list of event ids';
+  return null;
+};
+
 /**
- * The semantic part of conflict detection that the version check (applyUpdate in project-state.mjs) does not catch: approvals on one task that
- * say incompatible things, whatever version each was given on. Input is the approvals in log order, each
- * { event, id, task_id, decision, task_version, resolves? } where `event` is the id of the log event that recorded it.
- * An approval with no decision is ignored, and an approval that lists event ids in `resolves` takes those events out of
- * the comparison (a person settling it). A task whose remaining approvals hold more than one decision gives one conflict
- * record that names every one of those events and applies none of them. Pure: it changes nothing it is given.
+ * The semantic part of conflict detection that the version check (applyUpdate in project-state.mjs) does not catch:
+ * approvals on one task that say incompatible things, whatever version each was given on. Input is the approval events in
+ * log order, each { event, id, task_id, decision, task_version, resolves? } where `event` is the id of the log event that
+ * recorded it. Each event counts, even when two share an approval id: nothing is replaced by a later write.
+ *
+ * An approval with no decision is ignored. A person settles a conflict with an approval that lists event ids in
+ * `resolves`. The list is honoured only when every id is an earlier approval event of the same task and the list names
+ * both sides, at least one approve and at least one reject, so that one side cannot be dropped alone and another task
+ * cannot clear this one. A list that fails this resolves nothing. Who may settle is not decided here: `by` is not
+ * checked (ADR 5 holds the permission matrix, and the identity of a writer is resolved at the store boundary by SO-F-01).
+ * task_version does not decide anything: a stale approval and a same-version pair count like any other, because this
+ * rule applies no approval, it only surfaces them. Whether an approval covers the current scope is the state machine's
+ * question (evidence binds to the scope version). One person who changes their mind is a conflict until a resolving
+ * approval names both events.
+ *
+ * A task whose remaining approvals hold more than one decision gives one conflict record that names every one of those
+ * events and applies none of them. Returns { conflicts, ignored }, ignored being the resolutions that were not honoured.
+ * Pure: it changes nothing it is given.
  */
-export function semanticConflicts(approvals) {
+export function analyseApprovals(approvals) {
   const decided = (approvals ?? []).filter((a) => a && APPROVAL_DECISIONS.includes(a.decision));
-  const settled = new Set(decided.flatMap((a) => (Array.isArray(a.resolves) ? a.resolves : [])));
+  const seen = new Map();
+  const settled = new Set();
+  const ignored = [];
+  for (const a of decided) {
+    if (Array.isArray(a.resolves)) {
+      const named = a.resolves.map((e) => seen.get(e));
+      const reason = named.some((n) => !n) ? 'it names an event that is not an earlier approval'
+        : named.some((n) => n.task_id !== a.task_id) ? 'it names an event of another task'
+        : !(named.some((n) => n.decision === 'approve') && named.some((n) => n.decision === 'reject')) ? 'it does not name both an approve and a reject'
+        : null;
+      if (reason) ignored.push({ event: a.event, id: a.id, reason });
+      else for (const e of a.resolves) settled.add(e);
+    } else if (a.resolves !== undefined && !Array.isArray(a.resolves)) {
+      ignored.push({ event: a.event, id: a.id, reason: 'resolves is not a list' });
+    }
+    seen.set(a.event, a);
+  }
   const byTask = new Map();
   for (const a of decided) {
     if (settled.has(a.event)) continue;
     if (!byTask.has(a.task_id)) byTask.set(a.task_id, []);
     byTask.get(a.task_id).push(a);
   }
-  const out = [];
+  const conflicts = [];
   for (const [task_id, list] of byTask) {
     const decisions = [...new Set(list.map((a) => a.decision))];
     if (decisions.length < 2) continue;
-    out.push({
+    conflicts.push({
       kind: 'semantic',
       task_id,
       events: list.map((a) => a.event),
@@ -57,25 +102,35 @@ export function semanticConflicts(approvals) {
       reason: `incompatible approvals on one task (${decisions.join(' and ')}): neither is applied, a person must resolve it`,
     });
   }
-  return out;
+  return { conflicts, ignored };
 }
 
+export function semanticConflicts(approvals) { return analyseApprovals(approvals).conflicts; }
+
 // The entity types (the handoff's section 7), each declared the way docs/schemas/project-v1.json declares it: a snapshot
-// file, an id prefix, the required fields its validator enforces, the authority owner (a subject type of the identity
-// model: whose word settles the entity when sources disagree), the scope version field it may carry, and its merge class
-// (SO-F-02). `event` has no snapshot: it lives only in the log. The store refuses an entity of a type that declares no
-// merge class. The declarations are frozen: a test holds them equal to the schema file.
-const declare = (file, prefix, required, authority, mergeClass) => Object.freeze({ file, prefix, required: Object.freeze(required), authority, scopeVersionField: 'scope_version', mergeClass });
+// file, an id prefix, the required fields its validator enforces, the owner (a subject type of the identity model), the
+// scope version field it may carry, and its merge class (SO-F-02). `event` has no snapshot: it lives only in the log.
+// The store refuses an entity of a type that declares no merge class. The declarations are frozen, a test holds them equal
+// to the schema file, and a test pins every owner and class.
+//
+// The owner is a declaration, not an enforcement and not an answer to who may write. It is not the memory authority of
+// ADR 7 (proposed) and not the permission matrix of ADR 5 (open); the store checks that it is a subject type and nothing else.
+// `provisional` names a declared field that waits on a decision, with the reason.
+const NO_SERVICE = 'no service subject can be issued yet (docs/IDENTITY-AND-SCOPES.md), so no one can hold this ownership';
+const declare = (file, prefix, required, authority, mergeClass, provisional = {}) => Object.freeze({ file, prefix, required: Object.freeze(required), authority, scopeVersionField: 'scope_version', mergeClass, provisional: Object.freeze(provisional) });
 export const ENTITY_KINDS = Object.freeze({
   project: declare('project.json', 'proj', ['name'], 'person', 'last-writer'),
   task: declare('tasks.json', 'task', ['title'], 'person', 'human-resolution'),
-  lease: declare('leases.json', 'lease', ['task_id'], 'service', 'last-writer'),
+  lease: declare('leases.json', 'lease', ['task_id'], 'service', 'human-resolution', {
+    authority: NO_SERVICE,
+    merge_class: 'ADR 3 (lease semantics) is open; its safe default is one active writer with contending writes queued, not merged, and no class here is a queue. human-resolution is the closest: a competing lease write is never settled by the newest one',
+  }),
   attempt: declare('attempts.json', 'att', ['task_id'], 'agent', 'append-only'),
-  evidence: declare('evidence.json', 'ev', ['task_id'], 'service', 'append-only'),
+  evidence: declare('evidence.json', 'ev', ['task_id'], 'service', 'append-only', { authority: NO_SERVICE }),
   conflict: declare('conflicts.json', 'conf', ['task_id'], 'person', 'human-resolution'),
   session: declare('sessions.json', 'sess', ['project_id'], 'device', 'last-writer'),
   approval: declare('approvals.json', 'appr', ['task_id'], 'person', 'human-resolution'),
-  event: declare(null, 'evt', ['type'], 'service', 'append-only'),
+  event: declare(null, 'evt', ['type'], 'service', 'append-only', { authority: NO_SERVICE }),
 });
 
 export class ProjectStoreError extends Error {
@@ -99,12 +154,16 @@ export class ProjectStore {
     this.deviceId = deviceId;
     this.fsync = fsync;
     this.allowSecrets = allowSecrets;
-    this.kinds = { ...ENTITY_KINDS, ...kinds };
+    // a type passed in can add to the built-in ones, never replace one: the frozen declarations stay what the schema says
+    for (const name of Object.keys(kinds)) {
+      if (Object.hasOwn(ENTITY_KINDS, name)) throw new ProjectStoreError('bad_declaration', `refused: the entity type ${name} is built in and cannot be redeclared`);
+    }
+    this.kinds = Object.freeze({ ...ENTITY_KINDS, ...kinds });
     this.dir = path.join(this.root, STATE, 'projects', this.id);
     this._open = false;
     this._lockDepth = 0;
     this.seq = 0; this.generation = 0; this.entities = new Map(); this.eventKeys = new Map(); this.usedIds = new Set(); this.recovered = []; this.clock = { ms: 0, c: 0 };
-    this.approvals = new Map(); this._overlaid = [];
+    this.approvals = new Map(); this.derived = []; this._unusable = new Map(); this._ignored = [];
   }
 
   get eventsPath() { return path.join(this.dir, 'events.jsonl'); }
@@ -155,7 +214,7 @@ export class ProjectStore {
   // torn or edited: it is skipped and reported, and every valid record after it is kept.
   _replay() {
     this.seq = 0; this.generation = 0; this.entities = new Map(); this.eventKeys = new Map(); this.usedIds = new Set(); this.recovered = []; this.clock = { ms: 0, c: 0 };
-    this.approvals = new Map(); this._overlaid = [];
+    this.approvals = new Map(); this.derived = []; this._unusable = new Map(); this._ignored = [];
     if (!exists(this.eventsPath)) return;
     let content = fs.readFileSync(this.eventsPath, 'utf8');
     if (content.length && !content.endsWith('\n')) {
@@ -171,6 +230,8 @@ export class ProjectStore {
       this._applyRecord(rec);
     }
     this._derive();
+    for (const [event, why] of this._unusable) this.recovered.push(`events.jsonl: approval event ${event}: ${why}, not used by the conflict rule`);
+    for (const g of this._ignored) this.recovered.push(`events.jsonl: approval ${g.id} (event ${g.event}): resolves ignored, ${g.reason}`);
   }
 
   _applyRecord(rec) {
@@ -182,10 +243,13 @@ export class ProjectStore {
     if (rec.entity) {
       const { kind, id, data } = rec.entity;
       if (!this.entities.has(kind)) this.entities.set(kind, new Map());
-      // a write replaces whatever the derivation laid over this entity; the derivation is run again after it
-      if (this._overlaid.length) this._overlaid = this._overlaid.filter((o) => !(o.kind === kind && o.id === id));
       this.entities.get(kind).set(id, data);
-      if (kind === 'approval') { this.approvals.delete(id); this.approvals.set(id, { event: rec.id, id, data }); }
+      // every approval write is its own event: a later write with the same id replaces the entity, never the event
+      if (kind === 'approval') {
+        const why = unusableApproval(data);
+        if (why) this._unusable.set(rec.id, why);
+        else this.approvals.set(rec.id, { event: rec.id, id, data });
+      }
       if (id) this.usedIds.add(id);
     }
     this.generation = Math.max(this.generation, (rec.gen ?? 0) + 1);
@@ -238,40 +302,45 @@ export class ProjectStore {
     this._writeLine(rec);
     this._applyRecord(rec);
     this._derive();
-    if (entity) {
-      const kinds = new Set([entity.kind]);
-      if (['approval', 'task', 'conflict'].includes(entity.kind)) { kinds.add('task'); kinds.add('conflict'); }
-      for (const k of kinds) this._writeSnapshot(k);
-    }
+    if (entity) this._writeSnapshot(entity.kind);
     return rec;
   }
 
-  // The semantic part of the project layer (SO-F-02), derived from the log and never written to it: approvals on one task
-  // that say incompatible things, whatever version each was given on, put the task in CONFLICTED with a conflict record
-  // that names every one of those log events. Neither approval is applied, and both stay in the log and as entities.
-  // A person settles it with an approval that lists the events it resolves. The stored task is laid over by a copy; the
-  // entities the log holds are not changed, so the next replay derives the same thing again.
+  // The semantic part of the project layer (SO-F-02), derived from the log and never written to it or into any entity:
+  // approvals on one task that say incompatible things, whatever version each was given on, are a conflict record that
+  // names every one of those log events. Neither approval is applied, and both stay in the log and as entities.
+  // A person settles it with an approval that lists the events it resolves (see analyseApprovals). The record is
+  // kept apart from the entities (`conflicts()`, `view()`), so no caller that reads a snapshot, changes it and writes it
+  // back can persist it, and the next replay derives the same thing again.
   _derive() {
-    for (const o of this._overlaid.splice(0)) {
-      const m = this.entities.get(o.kind);
-      if (!m) continue;
-      if (o.raw === undefined) m.delete(o.id); else m.set(o.id, o.raw);
-    }
     const live = [...this.approvals.values()].map((a) => ({ event: a.event, id: a.id, task_id: a.data.task_id, decision: a.data.decision, task_version: a.data.task_version, resolves: a.data.resolves }));
-    const lay = (kind, id, data) => {
-      if (!this.entities.has(kind)) this.entities.set(kind, new Map());
-      const m = this.entities.get(kind);
-      this._overlaid.push({ kind, id, raw: m.get(id) });
-      m.set(id, data);
-    };
-    for (const c of semanticConflicts(live)) {
-      const raw = this.entities.get('task')?.get(c.task_id);
-      if (raw) {
-        const conflict = raw.conflict ? { ...c, prior: raw.conflict } : { ...c };
-        lay('task', c.task_id, { ...raw, status: 'CONFLICTED', prior_status: raw.status, conflict });
+    const { conflicts, ignored } = analyseApprovals(live);
+    this._ignored = ignored;
+    this.derived = conflicts.map((c) => ({ ...c, id: `conf_sem_${sha256(c.events.join('|')).slice(0, 12)}` }));
+  }
+
+  /** The semantic conflicts the log derives right now, as plain records. Derived, never stored. */
+  conflicts() { return this.derived.map((c) => ({ ...c })); }
+
+  /**
+   * A derived read of a kind. For `task`: the stored tasks, and where a semantic conflict stands on a task that is not in
+   * a terminal state, a copy shown as CONFLICTED with `prior_status` and the conflict record. This is a display: it makes
+   * no transition, a terminal task keeps its status, and the stored task is never changed, so a caller that acts on a
+   * task reads `snapshot`. For `conflict`: the stored conflicts and the derived ones. Any other kind is its snapshot.
+   */
+  view(kind) {
+    const out = this.snapshot(kind);
+    if (kind === 'task') {
+      for (const c of this.derived) {
+        const raw = out[c.task_id];
+        if (!raw || TERMINAL_TASK_STATUSES.includes(raw.status)) continue;
+        const { id, ...record } = c; void id;
+        out[c.task_id] = { ...raw, status: 'CONFLICTED', prior_status: raw.status, conflict: record };
       }
-      lay('conflict', `conf_sem_${sha256(c.events.join('|')).slice(0, 12)}`, { ...c });
+    } else if (kind === 'conflict') {
+      for (const c of this.derived) out[c.id] = { ...c };
     }
+    return out;
   }
 
   // Validate an entity: the kind must be known and declare a merge class, every required field must be present, a scope
@@ -295,7 +364,16 @@ export class ProjectStore {
     }
     if (ent.kind === 'approval') {
       if (data.decision !== undefined && !APPROVAL_DECISIONS.includes(data.decision)) throw new ProjectStoreError('invalid', `decision must be one of ${APPROVAL_DECISIONS.join(', ')}`);
-      if (data.resolves !== undefined && !(Array.isArray(data.resolves) && data.resolves.every((x) => typeof x === 'string'))) throw new ProjectStoreError('invalid', 'resolves must be a list of event ids');
+      if (data.resolves !== undefined) {
+        if (!(Array.isArray(data.resolves) && data.resolves.every((x) => typeof x === 'string'))) throw new ProjectStoreError('invalid', 'resolves must be a list of event ids');
+        // the same rule the derivation applies, run on this write before it is made, so a resolution that would
+        // resolve nothing is refused instead of being stored as if it did
+        if (data.decision === undefined) throw new ProjectStoreError('invalid', 'an approval that resolves events must carry a decision');
+        const live = [...this.approvals.values()].map((a) => ({ event: a.event, id: a.id, task_id: a.data.task_id, decision: a.data.decision, resolves: a.data.resolves }));
+        const probe = { event: '(this write)', id: ent.id ?? '(new)', task_id: data.task_id, decision: data.decision, resolves: data.resolves };
+        const refused = analyseApprovals([...live, probe]).ignored.find((g) => g.event === probe.event);
+        if (refused) throw new ProjectStoreError('invalid', `resolves must name an earlier approval event of this task on both sides, an approve and a reject: ${refused.reason}`);
+      }
     }
     const id = ent.id || this._newId(ent.kind);
     return { kind: ent.kind, id, data };
