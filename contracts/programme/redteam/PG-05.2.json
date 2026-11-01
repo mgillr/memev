@@ -1,0 +1,74 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PG-05.2",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "3c8bc0cd3ed60efe3972ce22f3607d17509bc6db8fa765024ce96130687512f4",
+      "base_commit": "90e3fe29bb3f256fe7f82d32b17a48633afca25b",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/CONVERGENCE.md",
+            "sha256": "47e28bcfcb039b2e3222ed56fa7d54b0a051166ea79302522c77a98638a7e74c"
+          },
+          {
+            "path": "docs/scope-one/programme/REQUIREMENTS.md",
+            "sha256": "84e62695045dedc65095f75fe25dd7982846dcf2bd8b0b5b351a4da17693041b"
+          },
+          {
+            "path": "docs/scope-one/WBS.md",
+            "sha256": "3fffabe91feecb143598d1ffb6f90539c21ac3549aaa586515f4971dbfe3e6b0"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "low",
+          "how": "WP05-06 lists scripts/** in its scope, wider than a round trip test needs (test/engine-roundtrip.test.mjs is the only file the task is built from)",
+          "disposition": "rejected",
+          "reason": "the entry is inherited unchanged from the signed PG-05.1, whose pull request #364 contains no file under scripts/; narrowing it is a change of the programme, not of this supersession, which changes only the three scope entries the request names, and a scope wider than the work does not let any behaviour criterion pass without the behaviour"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "the design-task criteria (WP05-01, WP05-03) and the negative greps on src/engine/state-map.mjs (diff3, three-way, 3-way, mergeText) prove that words are present or absent, so a table with the nine class names or a state map that names a text merge in other words would pass them",
+          "disposition": "rejected",
+          "reason": "the behaviour is carried by the mandatory red-green tests (state-map round trip, engine round trip), which the criteria require to run their own file, and the criteria are byte-identical to the signed PG-05.1; a stricter check belongs to the independent re-review"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "the two named-test criteria check that the test names occur in the file (grep -F) and the red-green criterion runs the whole file, so a name inside a comment or a skipped test satisfies the grep",
+          "disposition": "rejected",
+          "reason": "the red-green command runs the file with node --test and the stop rules forbid a skip; the suite criterion runs the same file again; unchanged from PG-05.1"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the signer, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of PG-05.2, which supersedes the signed PG-05.1 (k-pg-05-1-engine-integrati-8d9e24), made against the #363 branch at 90e3fe29bb3f. It has 4 tasks and 22 criteria. Checks run: the spec hash equals the hash the owner delegation gave (3c8bc0cd3ed6); the PG-05.1 spec file is byte-unchanged against main; every task of this spec has the criteria, requirements and stop rules of PG-05.1 byte for byte, and the scope of each task keeps PG-05.1's entries in order and adds only WP05-01:docs/CONVERGENCE.md, WP05-04:docs/MODULES.md, WP05-04:changelog.d/PG-05.1.md; the one other difference is the WP05-01 description, which gains one sentence that docs/CONVERGENCE.md is edited only to add a link to docs/MERGE-SEMANTICS.md; the manifest kind is feature and each implement task has a mandatory test_red_green criterion that runs its own test file; every task drafts through makeTask; every command parses with sh -n; no criterion statement repeats within a task; every grep pattern compiles and is within 200 characters; every depends_on is a row of the Scope One or programme manifest (or, for PG-05.2, a vault contract cited by id that PG-05.1 cites too: WO-05-B); the leak scan is clean. I also read the implementing pull request #364 at eb2bd48: its files other than contracts are docs/CONVERGENCE.md (a two-line diff that adds the link only), docs/MERGE-SEMANTICS.md, docs/MODULES.md, src/engine/state-map.mjs, test/state-map.test.mjs, test/engine-roundtrip.test.mjs and changelog.d/PG-05.1.md, and every one is inside the union of the task scopes of this spec (docs/README.md is not touched); I ran the grep, file_exists and command criteria of WP05-01 and WP05-04 against that head, and the three state-map criteria and the red-green test pass. I did not run npm test or the WP05-03 and WP05-06 work, which do not exist yet. Three low findings, none blocks signing. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OGM2YTI3NzNmZjE0MzdhOWNiNmNkOTllYjRiZGNiMDA5ZDVmNTM0YTc5YTBkNTM2NThlZTExNmQ2ODI0YzlhMA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "vollXUcqeHeZGAMhhJGm4MXhfj86EmGts1J9Zh5QLWx1ZG2gANs4Co8SWXeVzFIP3YMM4HTNVeJpd+8qwIhnAw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ODBhNjk0YzI0NzgzOTQ4NjRhY2M3ZjUzYmQxOWEyNWU1MzdlMTQ2YTBjNWM1NGUxMTJmNTMwMGIwN2RhZWE3Zg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "0I86TLpQ6zRP7ChMrJ8H+OCr5HtwP4/B6VOz19kgcQrEe+R7YwWKzCA+/OBfQ5QaTX0qeDV5DWkgkKRWeCREBw=="
+          }
+        ]
+      }
+    }
+  ]
+}

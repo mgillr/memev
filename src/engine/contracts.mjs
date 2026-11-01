@@ -10,10 +10,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
-import { configDir, randomToken, slug, now, readJson, writePrivate, exists, truncate, runAsync } from './util.mjs';
+import { configDir, randomToken, slug, now, readJson, writePrivate, exists, truncate, run as runSync, runAsync } from './util.mjs';
 import { git } from './git.mjs';
 import { redteamCheck, stopBlocks } from './redteam-gate.mjs';
+import { allowed } from './tokens.mjs';
 import * as A from '../../vendor/attest/contract.mjs';
+import { matchAny } from '../../vendor/attest/util.mjs';
 import { decompose as attestDecompose } from '../../vendor/attest/decompose.mjs';
 import { sign as dsseSign, verify as dsseVerify, keyId, generateKeyPair, canonicalHash } from '../../vendor/attest/signature.mjs';
 
@@ -209,6 +211,58 @@ export function criterionEnv(base, env = process.env) {
   delete out.NODE_TEST_CONTEXT;
   if (base) out[BASE_ENV] = base;
   return out;
+}
+
+// ---- the scope verifier (SR-0.03 task 2)
+// A scope criterion compares what changed since the recorded base with a task's globs. The range is the commits reachable from HEAD and
+// not from the base and nothing else: no branch, remote-tracking ref or fetched ref decides what is excluded, since a worker can move
+// every one of them. Each source of change is judged on its own: a commit (a non-merge one against the scope of the task its single
+// Contract-Task trailer names, an untrailered one against the union of the contract's task scopes), a merge commit on what it adds
+// beyond its parents (its remerge diff, against the union), and the working tree (tracked changes, untracked files and files hidden by
+// skip-worktree or assume-unchanged, against the union). Ignore rules come only from the .gitignore files tracked at the base.
+// git runs hardened: no fsmonitor, hooks off (an empty folder), no filter or merge driver the repository configures, no external
+// diff or textconv, no replace refs, and every failure of git makes the criterion BLOCKED, never PASS.
+const SCOPE_LIST_MAX = 20;
+const SCOPE_GIT_TIMEOUT_MS = 120000;
+const GENERATOR_TIMEOUT_MS = 120000;
+const GENERATED_FILES = ['docs/MODULES.md'];
+const GENERATOR_DIR = 'scripts/docs';
+const GENERATOR = `${GENERATOR_DIR}/module-graph.mjs`;
+const TRAILER_KEY = /^\s*contract-task\s*:(.*)$/i;
+class ScopeBlocked extends Error {}
+/** The Contract-Task trailer lines of a commit message, anywhere in it (a squash holds one in each paragraph): { contract, task } or { bad }. */
+export function contractTaskTrailers(message) {
+  const out = [];
+  for (const line of String(message).split('\n')) {
+    const m = TRAILER_KEY.exec(line.replace(/\r$/, ''));
+    if (!m) continue;
+    const parts = m[1].trim().split(/\s+/).filter(Boolean);
+    out.push(parts.length === 2 ? { contract: parts[0], task: parts[1] } : { bad: line.trim() });
+  }
+  return out;
+}
+/** The paths in `git ... --name-status -z` output; both the old and the new path of a rename or copy. */
+function nameStatusPaths(out) {
+  const t = out.split('\0'); if (t[t.length - 1] === '') t.pop();
+  const paths = [];
+  for (let i = 0; i < t.length;) { const n = /^[RC]/.test(t[i++]) ? 2 : 1; for (let k = 0; k < n && i < t.length; k++) paths.push(t[i++]); }
+  return paths;
+}
+const nulList = (out) => { const t = out.split('\0'); if (t[t.length - 1] === '') t.pop(); return t; };
+const scopeEnv = () => {
+  const e = { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' };
+  for (const k of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_PREFIX', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_EXTERNAL_DIFF', 'GIT_ATTR_SOURCE', 'GIT_NAMESPACE', 'GIT_REPLACE_REF_BASE', 'GIT_NO_REPLACE_OBJECTS']) delete e[k];
+  return e;
+};
+/** git for the scope verifier: `shield` holds the hardening arguments. A failure to run, or an exit status not in `ok`, throws ScopeBlocked. */
+function makeScopeGit(shield, detail) {
+  const run = (cwd, args, { input, ok = [0], raw = false, env } = {}) => {
+    const r = runSync('git', [...shield, ...args], { cwd, env: env || scopeEnv(), input, encoding: raw ? 'buffer' : 'utf8', maxBuffer: 1024 * 1024 * 1024, timeout: SCOPE_GIT_TIMEOUT_MS });
+    if (r.error) throw new ScopeBlocked(`git could not be run${detail ? `: ${truncate(r.error, 120)}` : ''}`);
+    if (!ok.includes(r.status)) throw new ScopeBlocked(`git ${args.find((a) => !a.startsWith('-')) || 'command'} failed (exit ${r.status})${detail ? `: ${truncate(String(r.stderr).trim(), 160)}` : ''}`);
+    return { status: r.status, out: r.stdout, err: r.stderr };
+  };
+  return { run, out: (cwd, args, o) => run(cwd, args, o).out };
 }
 
 export const PRE_COMMIT = `#!/bin/sh
@@ -416,7 +470,7 @@ export function attach(Vault) {
     const baseCheck = () => {
       if (baseProblem !== undefined) return baseProblem;
       if (!base) return (baseProblem = `no base revision recorded${baseNote ? ` (${baseNote})` : ''}`);
-      if (!git(wd, ['cat-file', '-e', `${base}^{commit}`]).ok) return (baseProblem = headOf(wd) ? `base ${base} is not a commit in the workdir` : 'the workdir is not a git checkout');
+      if (!git(wd, ['cat-file', '-e', `${base}^{commit}`]).ok) return (baseProblem = headOf(wd) ? `base ${base} not found` : 'the workdir is not a git checkout');
       const a = git(wd, ['merge-base', '--is-ancestor', base, 'HEAD']);
       return (baseProblem = a.status === 0 ? null : a.status === 1 ? `base ${base} is not an ancestor of HEAD` : `base ${base} could not be compared with HEAD`);
     };
@@ -508,7 +562,181 @@ export function attach(Vault) {
       const ok = op(got.value, v.value);
       return { status: ok ? 'PASS' : 'FAIL', detail: `${v.key} = ${got.value}, wanted ${v.op} ${v.value} (measured ${got.value}, threshold ${v.value}, ${where})` };
     };
-    const run = async (crit) => {
+
+    // scope (SR-0.03 task 2): what changed since the base, judged against the task's globs. Everything git reports is gathered once per
+    // verify; each scope criterion then judges the sources that belong to its task.
+    const wdInVault = () => { try { const rel = path.relative(fs.realpathSync(this.root), fs.realpathSync(wd)); return !(rel.startsWith('..') || path.isAbsolute(rel)); } catch { return false; } };
+    const outsideVault = () => (inVault && !wdInVault() ? { status: 'BLOCKED', detail: 'the workdir is outside the vault' } : null);
+    const taskGlobs = (t) => (Array.isArray(t?.scope?.allow) ? t.scope.allow : Array.isArray(t?.scope) ? t.scope : []).filter((g) => typeof g === 'string');
+    const unionGlobs = c.tasks.flatMap(taskGlobs);
+    const noteFiles = new Set([`changelog.d/${id}.md`, ...String(c.title || '').match(/\bSR-\d+\.\d+\b/g)?.map((n) => `changelog.d/${n}.md`) || [], ...(typeof c.provenance?.record === 'string' ? [`changelog.d/${path.basename(c.provenance.record, '.json')}.md`] : [])]);
+    const gatherScope = async () => {
+      const tmp = fs.mkdtempSync(path.join(tmpBase(), 'memev-scope-'));
+      const hooks = path.join(tmp, 'hooks'); fs.mkdirSync(hooks);
+      const worktrees = [];
+      let G; let top;
+      try {
+        const hardening = ['--no-replace-objects', '--no-optional-locks', '--literal-pathspecs', '-c', `core.hooksPath=${hooks}`, '-c', 'core.fsmonitor=false'];
+        const G0 = makeScopeGit(hardening, local);
+        top = G0.out(wd, ['rev-parse', '--show-toplevel']).replace(/\n$/, '');
+        // no filter driver and no merge driver the repository (or anything it includes) configures may run
+        const extra = []; const seen = new Set();
+        for (const k of nulList(G0.out(top, ['config', '--name-only', '--list', '-z']))) {
+          const f = /^filter\.(.+)\.(clean|smudge|process|required)$/i.exec(k); const m = /^merge\.(.+)\.(driver|recursive)$/i.exec(k);
+          if (f && !seen.has(`f ${f[1]}`)) { seen.add(`f ${f[1]}`); extra.push('-c', `filter.${f[1]}.clean=`, '-c', `filter.${f[1]}.smudge=`, '-c', `filter.${f[1]}.process=`, '-c', `filter.${f[1]}.required=false`); }
+          if (m && !seen.has(`m ${m[1]}`)) { seen.add(`m ${m[1]}`); extra.push('-c', `merge.${m[1]}.driver=`, '-c', `merge.${m[1]}.recursive=binary`); }
+        }
+        G = makeScopeGit([...hardening, ...extra], local);
+        const head = G.out(top, ['rev-parse', '--verify', 'HEAD^{commit}']).trim();
+        if (!SHA40.test(head)) throw new ScopeBlocked('HEAD is not a commit');
+        const vaultRepo = (() => { try { return fs.realpathSync(top) === fs.realpathSync(this.root); } catch { return false; } })();
+        // the receipts and signed files of the vault are never part of the comparison when the workdir is the vault itself
+        const skip = (p) => vaultRepo && (p === 'contracts' || p.startsWith('contracts/'));
+        const taskIds = new Set(c.tasks.map((t) => t.id));
+        const sources = [];
+        const dedupe = (paths) => [...new Set(paths)].filter((p) => !skip(p));
+        for (const line of G.out(top, ['rev-list', '--reverse', '--topo-order', '--parents', `${base}..${head}`]).split('\n').filter(Boolean)) {
+          const [sha, ...parents] = line.split(' ');
+          const label = `commit ${sha}`;
+          if (parents.length > 1) {
+            // a merge is judged on what it adds beyond its parents: its remerge diff (an octopus merge: the files that differ from every parent)
+            const paths = parents.length === 2
+              ? nameStatusPaths(G.out(top, ['diff-tree', '-r', '--no-commit-id', '--remerge-diff', '--name-status', '-z', '--no-ext-diff', '--no-textconv', sha]))
+              : nulList(G.out(top, ['diff-tree', '-r', '--no-commit-id', '-c', '--name-only', '-z', '--no-ext-diff', '--no-textconv', sha]));
+            sources.push({ label, task: null, paths: dedupe(paths) });
+            continue;
+          }
+          const raw = G.out(top, ['cat-file', 'commit', sha]);
+          const message = raw.slice(raw.indexOf('\n\n') + 2);
+          const trailers = contractTaskTrailers(message);
+          const distinct = [...new Map(trailers.filter((t) => !t.bad).map((t) => [`${t.contract}\0${t.task}`, t])).values()];
+          let task = null; let violation = null;
+          if (trailers.some((t) => t.bad)) violation = `${label} has a Contract-Task trailer that is not "<contract id> <task id>"`;
+          else if (distinct.length > 1) violation = `${label} names more than one task (${truncate(distinct.map((d) => (d.contract === id ? d.task : `${d.task} of ${d.contract}`)).join(', '), 160)})`;
+          else if (distinct.length === 1) {
+            const d = distinct[0];
+            if (d.contract !== id) violation = `${label} names task ${truncate(d.task, 40)} of another contract (${truncate(d.contract, 60)})`;
+            else if (!taskIds.has(d.task)) violation = `${label} names task ${truncate(d.task, 40)}, which this contract does not have`;
+            else task = d.task;
+          }
+          const paths = nameStatusPaths(G.out(top, ['diff-tree', '-r', '--root', '--no-commit-id', '--name-status', '-M', '-z', '--no-ext-diff', '--no-textconv', sha]));
+          sources.push({ label, task, paths: dedupe(paths), violation });
+        }
+        // the working tree: tracked changes, files hidden by skip-worktree or assume-unchanged, and untracked files
+        const work = new Set(nameStatusPaths(G.out(top, ['diff', '--name-status', '-M', '-z', '--no-ext-diff', '--no-textconv', '--ignore-submodules=none', head, '--'])));
+        const hidden = nulList(G.out(top, ['ls-files', '-v', '-z'])).filter((e) => /^[hsS] /.test(e)).map((e) => e.slice(2));
+        if (hidden.length) {
+          const fmt = (() => { try { return G.out(top, ['rev-parse', '--show-object-format']).trim(); } catch { return 'sha1'; } })();
+          const inHead = new Map();
+          for (let i = 0; i < hidden.length; i += 200) {
+            for (const e of nulList(G.out(top, ['ls-tree', '-z', head, '--', ...hidden.slice(i, i + 200)]))) { const m = /^(\d+) \w+ ([0-9a-f]+)\t(.*)$/s.exec(e); if (m) inHead.set(m[3], { mode: m[1], oid: m[2] }); }
+          }
+          for (const h of hidden) {
+            let st = null; try { st = fs.lstatSync(path.join(top, h)); } catch { /* absent */ }
+            const was = inHead.get(h);
+            if (!st) { if (was) work.add(h); continue; }
+            if (st.isDirectory() || was?.mode === '160000') continue;
+            const body = st.isSymbolicLink() ? Buffer.from(fs.readlinkSync(path.join(top, h))) : fs.readFileSync(path.join(top, h));
+            const oid = crypto.createHash(fmt === 'sha256' ? 'sha256' : 'sha1').update(`blob ${body.length}\0`).update(body).digest('hex');
+            if (!was || was.oid !== oid || (was.mode === '120000') !== st.isSymbolicLink()) work.add(h);
+          }
+        }
+        // untracked files: ignore rules come only from the .gitignore files tracked at the base, so a worker's .git/info/exclude,
+        // core.excludesFile or untracked .gitignore hides nothing. They are applied by git itself in a scratch repository that holds those files.
+        let ign = null;
+        const notIgnored = (cands) => {
+          if (!cands.length) return cands;
+          if (!ign) {
+            ign = path.join(tmp, 'ignore'); fs.mkdirSync(ign);
+            const env = { ...scopeEnv(), HOME: tmp, XDG_CONFIG_HOME: tmp, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: os.devNull };
+            ign = { dir: ign, env, G: makeScopeGit(['-c', `core.hooksPath=${hooks}`, '-c', 'core.fsmonitor=false'], local) };
+            ign.G.run(ign.dir, ['init', '-q', '--template='], { env });
+            for (const e of nulList(G.out(top, ['ls-tree', '-r', '-z', base]))) {
+              const m = /^(\d+) blob ([0-9a-f]+)\t(.*)$/s.exec(e);
+              if (!m || m[1] === '120000' || path.posix.basename(m[3]) !== '.gitignore') continue;
+              const f = path.join(ign.dir, ...m[3].split('/')); fs.mkdirSync(path.dirname(f), { recursive: true });
+              fs.writeFileSync(f, G.run(top, ['cat-file', 'blob', m[2]], { raw: true }).out);
+            }
+          }
+          for (const x of cands) fs.mkdirSync(path.join(ign.dir, ...(x.endsWith('/') ? x : path.posix.dirname(x)).split('/')), { recursive: true });
+          const hit = new Set(nulList(ign.G.out(ign.dir, ['check-ignore', '--no-index', '-z', '--stdin'], { input: `${cands.join('\0')}\0`, ok: [0, 1], env: ign.env })));
+          return cands.filter((x) => !hit.has(x));
+        };
+        for (const e of notIgnored(nulList(G.out(top, ['ls-files', '-o', '-z', '--directory', '--no-empty-directory'])))) {
+          if (!e.endsWith('/')) { work.add(e); continue; }
+          for (const f of notIgnored(nulList(G.out(top, ['ls-files', '-o', '-z', '--', e])))) work.add(f);
+        }
+        sources.push({ label: 'uncommitted', task: null, paths: dedupe([...work]), uncommitted: true });
+
+        // files a generator writes count as in scope when the generator taken from the base reproduces them, run in a temporary
+        // worktree of the commit (or of HEAD with the working tree laid over it); the workdir's copy of the generator never runs
+        const wantsGenerated = sources.filter((x) => !x.violation && x.paths.some((p) => GENERATED_FILES.includes(p)));
+        if (wantsGenerated.length && G.run(top, ['cat-file', '-e', `${base}:${GENERATOR}`], { ok: [0, 1, 128] }).status === 0) {
+          pruneStaleVerifyWorktrees(top);
+          for (const x of wantsGenerated) {
+            const wt = path.join(tmpBase(), `${VERIFY_WORKTREE_PREFIX}${process.pid}-${crypto.randomBytes(4).toString('hex')}`);
+            worktrees.push(wt);
+            G.run(top, ['worktree', 'add', '--detach', '--quiet', wt, x.uncommitted ? head : x.label.slice(7)]);
+            if (x.uncommitted) {
+              for (const p of x.paths) {
+                if (p.endsWith('/') || p === GENERATOR_DIR || p.startsWith(`${GENERATOR_DIR}/`)) continue;
+                const to = path.join(wt, ...p.split('/')); fs.rmSync(to, { recursive: true, force: true });
+                let st = null; try { st = fs.lstatSync(path.join(top, ...p.split('/'))); } catch { /* deleted */ }
+                if (st && !st.isDirectory()) { fs.mkdirSync(path.dirname(to), { recursive: true }); fs.cpSync(path.join(top, ...p.split('/')), to, { dereference: false }); }
+              }
+            }
+            fs.rmSync(path.join(wt, GENERATOR_DIR), { recursive: true, force: true });
+            G.run(wt, ['checkout', base, '--', GENERATOR_DIR]);
+            const r = await runAsync(process.execPath, [GENERATOR], { cwd: wt, env: criterionEnv(base), timeout: GENERATOR_TIMEOUT_MS });
+            if (!r.ok) continue;
+            let made = null; try { made = fs.readFileSync(path.join(wt, 'docs', 'MODULES.md')); } catch { /* none written */ }
+            let want = null;
+            if (x.uncommitted) { try { want = fs.readFileSync(path.join(top, 'docs', 'MODULES.md')); } catch { /* absent */ } }
+            else { const b = G.run(top, ['cat-file', 'blob', `${x.label.slice(7)}:docs/MODULES.md`], { raw: true, ok: [0, 128] }); if (b.status === 0) want = b.out; }
+            if (made && want && made.equals(want)) x.generated = new Set(GENERATED_FILES);
+          }
+        }
+        // where the repository sits in the vault's namespace ('' for the vault itself), which is what a token's paths are written in
+        let prefix = '';
+        try { prefix = path.relative(fs.realpathSync(this.root), fs.realpathSync(top)).split(path.sep).join('/'); } catch { prefix = ''; }
+        return { sources, prefix };
+      } finally {
+        for (const wt of worktrees) { try { if (top) vgit(top, ['worktree', 'remove', '--force', wt]); } catch { /* removed below */ } fs.rmSync(wt, { recursive: true, force: true }); }
+        fs.rmSync(tmp, { recursive: true, force: true });
+      }
+    };
+    let scopeFacts;
+    const judgeScope = async (t) => {
+      const F = await (scopeFacts ||= gatherScope());
+      const own = taskGlobs(t);
+      const shown = (p) => local || allowed(identity, 'read', F.prefix ? `${F.prefix}/${p}` : p);
+      const touched = new Set(); const bad = [];
+      for (const x of F.sources) {
+        if (x.violation) { bad.push({ text: x.violation }); continue; }
+        if (x.task && x.task !== t.id) continue;
+        const globs = x.task ? own : unionGlobs;
+        for (const p of x.paths) {
+          touched.add(p);
+          if (matchAny(p, globs) || noteFiles.has(p) || x.generated?.has(p)) continue;
+          bad.push({ path: p, text: `${p} (${x.label})` });
+        }
+      }
+      if (!bad.length) return { status: 'PASS', detail: `${touched.size} changed file${touched.size === 1 ? '' : 's'}, all inside the scope` };
+      const seenText = new Set(); const rows = bad.filter((b) => { const k = b.text; if (seenText.has(k)) return false; seenText.add(k); return true; });
+      const visible = rows.filter((b) => !b.path || shown(b.path));
+      const hiddenCount = rows.length - visible.length;
+      const list = visible.slice(0, SCOPE_LIST_MAX).map((b) => b.text).join('; ');
+      const more = visible.length > SCOPE_LIST_MAX ? `; and ${visible.length - SCOPE_LIST_MAX} more` : '';
+      const rest = hiddenCount ? `${list ? '; and ' : ''}${hiddenCount} more outside this token's paths` : '';
+      return { status: 'FAIL', detail: `outside the scope: ${list}${more}${rest}` };
+    };
+    const scope = async (t) => {
+      const o = outsideVault(); if (o) return o;
+      const g = commandGate(); if (g) return g;
+      const b = baseCheck(); if (b) return { status: 'BLOCKED', detail: b };
+      try { return await judgeScope(t); } catch (e) { return { status: 'BLOCKED', detail: e instanceof ScopeBlocked ? e.message : `the scope check could not finish${local ? `: ${truncate(String(e?.message || e), 160)}` : ''}` }; }
+    };
+    const run = async (crit, task) => {
       const v = crit.verifier;
       if (v.type === 'command') {
         const g = commandGate(); if (g) return g;
@@ -519,16 +747,16 @@ export function attach(Vault) {
       if (v.type === 'file_exists') { let p; try { p = this._confinePath(wd, v.path, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.path } : { status: 'FAIL', detail: `${v.path} is missing` }; }
       if (v.type === 'test_exists') { let p; try { p = this._confinePath(wd, v.test_file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } return exists(p) ? { status: 'PASS', detail: v.test_file } : { status: 'FAIL', detail: `${v.test_file} is missing` }; }
       if (v.type === 'grep') { let p; try { p = this._confinePath(wd, v.file, { inVault }); } catch (e) { return { status: 'BLOCKED', detail: e.message }; } const pat = String(v.pattern ?? ''); if (!pat) return { status: 'FAIL', detail: 'the pattern is missing' }; if (pat.length > GREP_PATTERN_MAX) return { status: 'FAIL', detail: `a pattern over ${GREP_PATTERN_MAX} characters is not checked` }; let t = ''; try { t = fs.readFileSync(p, 'utf8'); } catch { return { status: 'FAIL', detail: `${v.file} is missing` }; } if (grepLeft <= 0) return { status: 'FAIL', detail: 'not checked: the grep time for this verify is used up' }; const limit = Math.min(GREP_TIMEOUT_MS, grepLeft); const g0 = Date.now(); const m = grepMatch(pat, String(v.flags || ''), t, limit); grepLeft -= Date.now() - g0; if (m.timeout) return { status: 'FAIL', detail: `the pattern did not finish within ${limit} ms and is not checked` }; if (m.error) return { status: 'FAIL', detail: 'the pattern is not a usable regular expression' }; return m.ok ? { status: 'PASS', detail: `${v.file} matches` } : { status: 'FAIL', detail: `${v.file} does not match ${v.pattern}` }; }
+      if (v.type === 'scope') return scope(task);
       if (v.type === 'metric' || v.type === 'test_red_green') { const g = commandGate(); if (g) return g; }
       if (v.type === 'metric') return metric(v);
-      if (v.type === 'scope' || v.type === 'test_red_green') { const b = baseCheck(); if (b) return { status: 'BLOCKED', detail: b }; }
-      if (v.type === 'test_red_green') return redGreen(v);
+      if (v.type === 'test_red_green') { const b = baseCheck(); if (b) return { status: 'BLOCKED', detail: b }; return redGreen(v); }
       return { status: 'BLOCKED', detail: `${v.type} criteria are checked by a person or CI, not here` };
     };
     const tasks = [];
     for (const t of c.tasks) {
       const criteria = [];
-      for (const cr of t.criteria) criteria.push({ id: cr.id, statement: cr.statement || `${cr.verifier?.type || "check"} check`, mandatory: cr.mandatory !== false, ...(await run(cr)) });
+      for (const cr of t.criteria) criteria.push({ id: cr.id, statement: cr.statement || `${cr.verifier?.type || "check"} check`, mandatory: cr.mandatory !== false, ...(await run(cr, t)) });
       tasks.push({ id: t.id, title: t.title, criteria });
     }
     // behaviour criteria (a command, red-green or metric run, a scope check) apart from document checks (grep, file_exists, test_exists)

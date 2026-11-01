@@ -1,0 +1,183 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "WP20-01",
+      "title": "The scope verifier allows a spec's own change note: changelog.d/<id>.md and its base id, and nothing else beyond what it allows today",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a scope criterion treats changelog.d/<T>.md and changelog.d/<B>.md as in scope for every task of the contract, where T is the spec id that opens the contract title (for example SO-F-03.2) and B is T without its last .N version suffix (SO-F-03); no other path under changelog.d, and no other file, is added to the allowed set (source: changelog.d/README.md, which says to name the note after the contract it delivers; owner delegation, 1 Nov 2026)",
+        "docs/MODULES.md stays in scope only as the scope verifier already judges it: when the generator scripts/docs/module-graph.mjs, taken from the base, reproduces the committed file; this task changes nothing there (source: SR-0.03.3 T2, src/engine/contracts.mjs)",
+        "a contract whose title does not open with a spec id gets no default path, so its scope lists its own note as today (source: owner delegation, 1 Nov 2026)"
+      ],
+      "description": "Repo: memev. Feature pull requests keep failing the scope criterion on changelog.d/<id>.md, and on docs/MODULES.md when the generated file differs from the generator output, because the specs do not list them. The scope verifier of SR-0.03.3 T2 (src/engine/contracts.mjs, pull request #347) already counts docs/MODULES.md as in scope when the generator from the base reproduces it. This task adds the one missing path: the contract's own change note, changelog.d/<T>.md, and the same name without a trailing .N version suffix, which is how the change notes of versioned specs are named (changelog.d/SO-F-03.md for SO-F-03.2). Nothing else is added: a note of another contract, a path in a subfolder of changelog.d, a name that is not <id>.md and every other file still fail. Starts once pull request #347 merges, because the verifier exists only there. A spec that needs a different note name still lists it in its scope.",
+      "scope": {
+        "allow": [
+          "src/engine/contracts.mjs",
+          "docs/CONTRACTS.md",
+          "changelog.d/PG-20.1.md",
+          "test/contracts-scope-defaults.test.mjs",
+          "test/helpers/**"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP20-01-AC01",
+          "mandatory": true,
+          "statement": "in a fixture contract titled 'SO-F-03.2 ...' with task scope ['src/a/**'], a commit that changes src/a/x.js, changelog.d/SO-F-03.2.md and changelog.d/SO-F-03.md passes the scope criterion for every task of the contract; the test fails on the current code, where both note paths are reported outside the scope, and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-defaults.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-20.1 AC01:' test/contracts-scope-defaults.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-20.1 AC01:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "id": "WP20-01-AC02",
+          "mandatory": true,
+          "statement": "each of these still fails the scope criterion with the path named: changelog.d/SO-F-04.md (another contract's note), changelog.d/sub/SO-F-03.md, changelog.d/SO-F-03.txt, changelog.d/SO-F-03.md.bak, changelog.d/so-f-03.md, changelog.d/README.md, docs/OTHER.md and src/b/y.js; and a contract whose title opens with no spec id gets no default path",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-defaults.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-20.1 AC02:' test/contracts-scope-defaults.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-20.1 AC02:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "id": "WP20-01-AC03",
+          "mandatory": true,
+          "statement": "docs/MODULES.md is judged as before: a hand-edited file that the generator from the base does not reproduce still fails, and a regenerated one passes; the verdict is the same as on the base for both",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-defaults.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-20.1 AC03:' test/contracts-scope-defaults.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-20.1 AC03:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "id": "WP20-01-AC04",
+          "mandatory": true,
+          "statement": "docs/CONTRACTS.md states the rule: the contract own note and its base-id note are in scope for every task, and nothing else under changelog.d",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CONTRACTS.md",
+            "pattern": "scope.*changelog\\.d/<id>\\.md.*version suffix",
+            "flags": "s"
+          }
+        },
+        {
+          "id": "WP20-01-AC05",
+          "mandatory": true,
+          "statement": "the scope tests of SR-0.03.3 T2 pass unchanged: node --test test/contracts-scope*.test.mjs, and none of those files differs from origin/main",
+          "verifier": {
+            "type": "command",
+            "cmd": "git diff --exit-code origin/main -- test/contracts-scope.test.mjs test/contracts-scope-cases.test.mjs test/contracts-scope-tasks.test.mjs test/contracts-scope-history.test.mjs && node --test test/contracts-scope*.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "id": "WP20-01-AC06",
+          "mandatory": true,
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP20-01-AC07",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP20-01-AC08",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ],
+  "id": "k-pg-20-1-the-scope-verifi-d2e89d",
+  "title": "PG-20.1 The scope verifier allows a spec's own change note (memev)",
+  "workdir": null,
+  "created": "2026-11-01T03:49:02.511Z",
+  "version": 1,
+  "request": "Programme contract for work package WP20 in memev: the scope verifier allows a spec's own change note. Proposed and unsigned; the signer signs it after the red-team gate. WP20 is a gap found after the programme decomposition of 31 Oct 2026 and decided under owner delegation, 1 Nov 2026; it is not in docs/scope-one/programme/fragments/. Why: docs/MODULES.md and changelog.d/<id>.md landed outside the scope of almost every feature pull request so far (SR-0.03.3, PG-04.1, SO-08-B, PG-19.1 and PG-05.1), each time costing a superseding spec to add two paths. The scope criterion is judged by the scope verifier in src/engine/contracts.mjs (SR-0.03.3 T2, pull request #347), which already treats docs/MODULES.md as in scope when the generator reproduces it; the redteam gate (src/engine/redteam-gate.mjs) only reads the scope for staleness and is unchanged. This contract adds the one path the verifier lacks, the contract's own change note, as one rule in the verifier, so that no later spec has to list it. Options weighed: a default scope in a spec template needs a template the repository does not have and must be repeated in every spec; a rule in the redteam gate would not change what the scope criterion judges. The rule in the verifier is one change, signable once. Depends on contracts: SR-0.03.3 (the scope verifier, built in #347). Boundary: this contract changes no existing scope criterion of any signed spec and widens no scope beyond the two note paths. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "provenance": {
+    "spec_sha256": "f15223b607df9f47a8d7423fd8d083cd018012e4835805e1e4190e9605f15b2d",
+    "record": "contracts/programme/redteam/PG-20.1.json",
+    "review": "interim solo review by the signer, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}

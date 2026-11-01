@@ -1,0 +1,84 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SO-F-09.2",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "93fa169b6696783edfd96d4b9cd75cefb02c9f65a0abb92077af9d25f0bb3fc4",
+      "base_commit": "713f5b7a925c83f6e16f7e1522ae88792ae925f2",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/graph.mjs",
+            "sha256": "f62490835d8e5f94e12875e7b35b6d4e8fab2b90da8d65339d4a10f80926e42a"
+          },
+          {
+            "path": "src/engine/project-store.mjs",
+            "sha256": "b015593048bc7c1d8ef6e633797c49bbfb91aacb4635b2a27cc6e0e57a03e7f3"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "src/engine/identity.mjs, which T1 now lists in its scope and the credential-bound entry point depends on, does not exist on main: it is delivered by SO-F-01 (pull request #350 and its stack), so criteria D3a to D3c and the identity tests cannot pass on main, and the file cannot be listed as a reviewed input",
+          "disposition": "rejected",
+          "reason": "the request says SO-F-01 and SO-F-02 land first; the file is added to the scope so that a change to it after this review is caught once it exists; pull request #362 (stacked on SO-F-01) carries identity.mjs with resolveActor and graph.mjs with bindFindingEvent and FINDING_AUTHORITY"
+        },
+        {
+          "n": 2,
+          "severity": "medium",
+          "how": "pull request #362 at 95f07ed does not yet have a test named SO-F-09.2 D6 (dismissal limited to person and operator), so D6 is red there; it has D5 and the other new tests, which pass",
+          "disposition": "rejected",
+          "reason": "D6 is the red-green test the lead's decision adds; the table FINDING_AUTHORITY.dismiss already allows person and operator only and the history entry carries effective, so the implementation is one test and one assertion away; this is pull request work, the spec is what the lead decided"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "the spec says the personal-scope agent resolves to agent:<role>, while the lead decision text names agent:<name>",
+          "disposition": "rejected",
+          "reason": "the credential field the code reads is the agent role (credential.role, or credential.agent through resolveBinding), the criterion D3c states agent:<role> and checks the owner is person:owner; they name the same value"
+        },
+        {
+          "n": 4,
+          "severity": "low",
+          "how": "FINDING_AUTHORITY is provisional by design (ADR 5 and SO-A-05 are undecided), so the table's contents are pinned by a test that must change when they are decided",
+          "disposition": "rejected",
+          "reason": "that is the intent: one table, one place, with the contents asserted by D5 and the provisional text asserted in docs/ORGANISATIONAL-INTELLIGENCE.md by a grep"
+        },
+        {
+          "n": 5,
+          "severity": "low",
+          "how": "the scope is wide (11 entries, including docs/DESIGN.md and docs/README.md) for one task",
+          "disposition": "rejected",
+          "reason": "every entry is inherited from the signed SO-F-09 except identity.mjs; the scope verifier judges each commit against it"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the signer, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of SO-F-09.2, which supersedes the signed SO-F-09 (k-so-f-09-finding-model-fo-cbe213, version 2), made against the #363 branch at 713f5b7a925c (the second signing pass; the first pass of 1 Nov 2026 held this spec for the findings named below). It has 1 tasks and 20 criteria. The spec hash equals the hash the owner delegation gave (93fa169b6696). This spec was rewritten after the first pass (the lead's four definitions, decided under owner delegation 1 Nov 2026). Checks run: all 8 criteria of SO-F-09 are kept verbatim (statement and verifier) and 12 are new, among them D3a to D3d (the by field comes from the resolved credential through Graph.bindFindingEvent; a forged by on an adjudication or a verification makes no finding a fact; resolveActor maps a personal-scope agent credential to an agent subject owned by person:owner through resolveBinding; resolveRequest returns what it did before and the SO-F-01 tests pass unchanged; a positive control shows a person's confirm and a service's pass do promote), D4 (an entity or owner with source null is withheld from every partial view, one readable source still shows), D5 (one frozen FINDING_AUTHORITY table) and D6 (dismissal by an agent or a service is recorded as not effective and changes nothing, person and operator take effect, and the same sources cannot be raised again only after an effective dismissal; the test is red on the current code); every requirement of SO-F-09 is kept; the scope keeps SO-F-09's entries in order and adds only src/engine/identity.mjs; the red-green criteria name an exact test, so a missing test is red, not a zero-match pass. I ran the criteria against pull request #362 at 95f07ed (findings above): fifteen red-green and doc criteria pass, D6 is not written yet. Checks: the manifest kind is feature and each implement task has a mandatory test_red_green criterion that runs its own test file; every task drafts through makeTask; every command parses with sh -n; no criterion statement repeats within a task; every grep pattern compiles and is within 200 characters; every depends_on is a row of the Scope One or programme manifest; the leak scan is clean; the specIdOf and locate of the gate give this spec its own record path and no other spec of the 154 shares one. I did not run npm test. Two medium and three low findings, none blocks signing. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ODMxYjI5ZjE4NzVmOTk4NzQ5OGE4NGVhNDA2OGQwYjdiNmVkNzlmNTU2OWU3ZjQxMmQzNDZmZTdkYzViMGE0Ng==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "LfxwvgeBuDht2Kmxl6kQQ8PwjRlzE/ppY+WAdm3MyUF3NX2EQA4fb2leJZqA5vgDHYd27NJlL1CKpb4N0MWQDw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MjBiNGE5ZWEwYjc3YjJlNWFhYWFkNzc1MGYyMGMxMTBkZWJkM2ZlYTQ1Y2IxODg0ZGVlNWJjNWI2MGZmNmQyYQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "rCIWFWn6ds0XPCdoE9TRSnPJiSyIq79x4ErMQ0fq0Dg6Yr8/peLltuqoOuVy24LcWxd5bkzWnwwLFvWc3BHqCQ=="
+          }
+        ]
+      }
+    }
+  ]
+}
