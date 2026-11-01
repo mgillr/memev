@@ -12,12 +12,13 @@ time, and why. It is a table and its rationale. Merge semantics are chosen per e
 - Memev is local first (decided 31 Oct 2026). Whether the vault is the only authority is ADR 7, proposed. Free users keep one computer at a time and lose nothing: when
   two versions compete, the free path keeps both ([CONVERGENCE.md](CONVERGENCE.md)). The table says what a merge, when one is
   allowed to run, should do. It does not make a merge run.
-- The nine entity types, the owner of each and the four class names are those of SO-F-02 (#354, at 9955a0d).
+- The nine entity types, the owner of each and the four class names are those of SO-F-02 (#354, at 1316fe3).
   SO-F-02 declares the owner and the class on each entity type and holds them in the project store.
   This page declares nothing and enforces nothing. It cites SO-F-02, it owns the rationale, and its names must stay equal to
   those of SO-F-02.
-- SO-F-06 owns the enforcement: it applies a class, checks what goes to the engine and what comes back, at the one boundary
-  `src/engine/merge.mjs`, and keeps both versions when the engine is not there. This page does not restate it.
+- SO-F-06 owns the enforcement: it validates what goes to the engine and what comes back, at the one boundary
+  `src/engine/merge.mjs`, rejects forbidden transitions, keeps human-resolution items for a person, and keeps both versions when
+  the engine is not there. This page does not restate it.
 - The engine, crdt-merge, lives in its own repository under its own licence and is never vendored. Memev reaches it only across
   the external call-out boundary ([EXTENSION-POINTS.md](EXTENSION-POINTS.md)).
 
@@ -34,8 +35,8 @@ The four classes mean:
 
 No type uses `set-union` yet. The class is there for the types that come later.
 
-Only approvals are surfaced today. Every other class is declared and recorded, and nothing applies or surfaces it. That is the work
-of SO-F-06.
+Only approvals are surfaced today. Every other class is declared and recorded, and nothing enforces or surfaces it. Enforcement is the
+work of SO-F-06.
 
 The case where the engine meets two writes to a LWWRegister with an equal timestamp is an open follow-up on the engine side.
 Until it is settled, nothing here relies on how that tie falls, and this page defines no tie-break.
@@ -54,7 +55,7 @@ and it is not the permission matrix of ADR 5, which is still open. Neither is de
 | `conflict` | `person` | `human-resolution` | declared, not surfaced yet | A conflict is the record that competing writes were found. Two records of one conflict are not merged into one, and a person settles it. The one conflict record derived today is for approvals. It is read through the store and not written to the log, and a conflict of any other type is not surfaced yet. |
 | `session` | `device` | `last-writer` | declared, not surfaced yet | A session is the current state of one device. It has one current value, and the newest in log order is the one that stands. |
 | `approval` | `person` | `human-resolution` | declared, surfaced: the approve and reject set is PROVISIONAL (SO-A-05) | Approvals are never silently merged. Each approval write is its own event. Incompatible decisions on one task, for example an approve and a reject, are surfaced, neither is applied, and a person settles it. On the same approval id, a later write replaces the stored entity and both events stay in the log. The set of decisions, approve and reject, is PROVISIONAL against SO-A-05: it is a closed pair that stands in for the seven decision states of the decision queue, which are not in code yet. |
-| `event` | `service` | `append-only` | PROVISIONAL: owner | The event log only grows. Every event is kept and none is replaced. The owner is declared as `service`, and no `service` subject can be issued yet. |
+| `event` | `service` | `append-only` | PROVISIONAL: owner | The event log only grows, and every event is kept. On the same event id, a later write replaces the stored entity and both events stay in the log. The owner is declared as `service`, and no `service` subject can be issued yet. |
 
 ### The scope version moves only forward
 
