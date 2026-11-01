@@ -64,6 +64,35 @@ memev contract approve <id>  # allow a remote-signed contract's commands to run 
 After approval, the contract verifies normally. File-existence and grep criteria are always
 confined to the vault root; paths that escape it are refused.
 
+## Base revision
+
+A contract's base revision is the commit its work starts from. Scope and red-green criteria compare
+the work against it, and every criterion command can read it.
+
+- **Where it comes from.** `memev contract sign` records `base = { sha, recorded_at }` in the signed
+  contract before the signature is made, so the signature covers it: the spec's explicit `base` when it
+  names one, else `git rev-parse HEAD` of the contract's workdir when that is a git checkout. An explicit
+  base is a commit sha of 40 hex characters; anything else (a ref name such as `HEAD`, a short sha, a value
+  starting with `-`) is refused when the contract is drafted, over the CLI and over MCP alike, and no draft
+  is written.
+- **Remote signing.** The base is recorded only when a contract is signed on this machine. A contract
+  signed from a remote origin records none, and signing it runs no git. Its base is recorded at local
+  approval (`memev contract approve`) from the workdir's HEAD at that moment, in an approval record signed
+  with this machine's contract key. If that record is edited on disk, verify stops with
+  `approval record changed` before any criterion runs.
+- **Where verify reads it.** For a contract signed here, from `base.sha` in `contracts/signed/<id>.json`
+  (an edit there breaks the signature). For a remote-signed contract, from its approval record in
+  `contracts/signed/<id>.approval.txt`.
+- **What verify does with it.** Command, metric and red-green commands run with `MEMEV_CONTRACT_BASE` set
+  to the base sha in their environment, or with it removed when the contract has no base, whatever the
+  daemon's own environment holds. A scope or red-green criterion of a contract with no base revision
+  recorded is BLOCKED with `no base revision recorded`, never PASS; so is one whose base is not a commit in
+  the workdir, or not an ancestor of the workdir's HEAD (`base <sha> is not an ancestor of HEAD`). Git only
+  ever receives a checked 40-hex sha, never a value that could read as an option or a ref.
+- **The workdir.** `memev contract new` refuses a spec whose `workdir` is null unless `--workdir` is given,
+  and records the absolute real path, so commands, the base and scope never fall back to the vault root by
+  accident. `--base <sha>` names the explicit base on the command line.
+
 ## Immutability and versions
 
 Once signed a contract cannot change:
@@ -277,7 +306,7 @@ are listed by hash in `GRANDFATHERED`, and `--report` passes them.
 ```sh
 memev contract list | status [id]
 memev contract from-request "build me a CLI that ..." [--project P] [--workdir DIR]
-memev contract new spec.json | sign <id> | amend <id> | decompose scope.json
+memev contract new spec.json [--workdir DIR] [--base SHA] | sign <id> | amend <id> | decompose scope.json
 ```
 
 The signing key is created on first use in `~/.config/memev/keys/` (readable only by you) and never
