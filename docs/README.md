@@ -39,7 +39,7 @@ this folder links back here, and this page links down to every page.
 | [ISOLATION.md](ISOLATION.md) | how this repository is kept separate from earlier work |
 | [THREAT-MODEL.md](THREAT-MODEL.md) | assets, threats and mitigations; also [SECURITY.md](../SECURITY.md) |
 | [SOLUTIONS.md](SOLUTIONS.md) | the problems users report, what Memev does, the check for each |
-| [COMPARISON.md](COMPARISON.md) | how Memev compares with hosted memory services |
+| [COMPARISON.md](COMPARISON.md) | how Memev compares with hosted context services and project-work infrastructure |
 
 ### Per-app pages
 
