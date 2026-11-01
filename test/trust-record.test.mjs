@@ -3,7 +3,7 @@
 // function answers whether a subject is eligible for a purpose in a scope as of a stated time: it denies by default,
 // delegation only narrows, and revocation cascades. Every choice is provisional (ADR 8 is proposed). Test names start
 // with the id the contract's checks select on.
-import { test } from 'node:test';
+import { test as nodeTest } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,12 +12,28 @@ import { PKG } from './helpers/tmp.mjs';
 const MODULE = path.join(PKG, 'src', 'engine', 'federation', 'trust-record.mjs');
 const SCHEMA_FILE = path.join(PKG, 'docs', 'schemas', 'trust-record-v1.json');
 
-// The module does not exist on main, so it is loaded here and each test reports its own failure when it is missing.
+// The module does not exist on main, so it is loaded defensively (a dynamic import inside a try) and a missing module or
+// export is reported by an assertion in every test, never by a load error: each test starts with need(), which asserts
+// that the module loaded and that every export is there with the right type.
 let M = null; let loadError = null;
 try { M = await import('../src/engine/federation/trust-record.mjs'); } catch (e) { loadError = e; }
-const mod = () => { if (!M) throw new Error(`the trust record module does not load: ${loadError?.message}`); return M; };
+const EXPORT_TYPES = {
+  validateTrustRecord: 'function', evaluate: 'function', RULES: 'object', TRUST_SCHEMA: 'string', TRUST_KINDS: 'object',
+  TRUST_PURPOSES: 'object', REVOCATION_REASONS: 'object', GRANT_FIELDS: 'object', REVOCATION_FIELDS: 'object',
+  DELEGATION_FIELDS: 'object', MAX_EVIDENCE: 'number', MAX_EVIDENCE_LENGTH: 'number',
+};
+function need() {
+  assert.ok(M !== null && typeof M === 'object', `the trust record module exists and loads (${loadError?.code ?? 'no load error'})`);
+  for (const [name, type] of Object.entries(EXPORT_TYPES)) assert.ok(typeof M[name] === type && M[name] !== null, `the module exports ${name} as a ${type}`);
+  return M;
+}
+const mod = need;
+// Every test starts by asserting the module, so a missing module or export is an AssertionError in each of them.
+const test = (name, fn) => nodeTest(name, (...a) => { need(); return fn(...a); });
 const validate = (r) => mod().validateTrustRecord(r);
 const evaluate = (req, ctx) => mod().evaluate(req, ctx);
+// The schema file is asserted to exist before it is read, so a missing file is an AssertionError and never ENOENT.
+const readSchema = () => { assert.ok(fs.existsSync(SCHEMA_FILE), `the schema file exists: ${path.relative(PKG, SCHEMA_FILE)}`); return JSON.parse(fs.readFileSync(SCHEMA_FILE, 'utf8')); };
 
 const SCHEMA = 'memev-trust/1';
 const ROOT = 'person:r1';
@@ -129,8 +145,9 @@ test('PG-W-21A AC02: a subject that holds a grant is the only one it makes eligi
   const broken = [without(grant({ id: 'b1' }), 'expires'), grant({ id: 'b2', purposes: ['admin'] }), null, 7, 'x', { kind: 'grant' }];
   assert.equal(evaluate(ask(), ctx(broken)).eligible, false);
   assert.equal(evaluate(ask(), ctx([...broken, grant()])).eligible, true);
-  // two grants with one id are ambiguous and neither is honoured
-  assert.equal(evaluate(ask(), ctx([grant(), grant({ purposes: ['verify'] })])).eligible, false);
+  // two different grants with one id are ambiguous: neither is honoured, and the answer has its own rule
+  const clash = evaluate(ask(), ctx([grant(), grant({ purposes: ['verify'] })]));
+  assert.equal(clash.eligible, false); assert.equal(clash.rule, 'deny.conflicting_grant'); assert.deepEqual(clash.chain, ['g1']);
 });
 
 test('PG-W-21A AC02: evaluation denies an invalid request with deny.bad_request', () => {
@@ -251,7 +268,10 @@ test('PG-W-21A AC04: a revocation by a subject that is not the issuer of the gra
   assert.equal(evaluate(ask(), ctx([parentGrant(), childGrant(), revocation({ grant: 'c', issuer: 'operator:o1' })], later)).rule, 'deny.revoked', 'the issuer of a delegated grant');
   assert.equal(evaluate(ask(), ctx([parentGrant(), childGrant(), revocation({ grant: 'c', issuer: ROOT })], later)).rule, 'deny.revoked', 'a root revokes a delegated grant');
   assert.equal(evaluate(ask(), ctx([parentGrant(), childGrant(), revocation({ grant: 'c', issuer: 'operator:o2' })], later)).eligible, true, 'an operator that did not issue it');
-  assert.equal(evaluate(ask(), ctx([grant(), revocation({ reason: 'bored' })], later)).eligible, true, 'a record that fails the validator is not applied');
+  // PROVISIONAL (ADR 8, question 6, in part): a revocation that fails the validator and names a grant is not applied as a
+  // revocation, and it is not ignored either: it denies that grant, so that a malformed withdrawal never leaves it allowed.
+  const bad = evaluate(ask(), ctx([grant(), revocation({ reason: 'bored' })], later));
+  assert.equal(bad.eligible, false); assert.equal(bad.rule, 'deny.bad_revocation', 'a record that fails the validator denies the grant it names');
 });
 
 // ---- AC05: the evaluation is pure
@@ -353,7 +373,7 @@ test('PG-W-21A AC05: hostile input is a deny and never a throw', () => {
 
 const FIELDS = (def) => Object.keys(def.properties).sort();
 test('PG-W-21A AC06: docs/schemas/trust-record-v1.json parses, names schema memev-trust/1 and lists exactly the validator fields, purposes and reasons', () => {
-  const s = JSON.parse(fs.readFileSync(SCHEMA_FILE, 'utf8'));
+  const s = readSchema();
   assert.equal(s.$defs.grant.properties.schema.const, SCHEMA);
   assert.equal(s.$defs.revocation.properties.schema.const, SCHEMA);
   assert.equal(mod().TRUST_SCHEMA, SCHEMA);
@@ -379,7 +399,7 @@ test('PG-W-21A AC06: docs/schemas/trust-record-v1.json parses, names schema meme
 });
 
 test('PG-W-21A AC06: every field the schema lists is accepted by the validator and a field it does not list is refused', () => {
-  const s = JSON.parse(fs.readFileSync(SCHEMA_FILE, 'utf8'));
+  const s = readSchema();
   const full = grant({ evidence: ['e'], delegation: { depth: 1, parent: 'p' } });
   assert.deepEqual(Object.keys(full).sort(), FIELDS(s.$defs.grant), 'a grant with every field is the schema');
   assert.equal(validate(full).ok, true);
@@ -390,6 +410,232 @@ test('PG-W-21A AC06: every field the schema lists is accepted by the validator a
   assert.equal(Object.isFrozen(mod().GRANT_FIELDS) && Object.isFrozen(mod().REVOCATION_FIELDS) && Object.isFrozen(mod().DELEGATION_FIELDS), true);
   for (const f of mod().GRANT_FIELDS) assert.ok(s.$defs.grant.properties[f], `grant field ${f} is in the schema`);
   for (const f of mod().REVOCATION_FIELDS) assert.ok(s.$defs.revocation.properties[f], `revocation field ${f} is in the schema`);
+});
+
+// ---- findings of the red-team review: fail closed
+
+const LATER = { at: '2026-02-01T00:00:00Z' };
+const permutations = (xs) => (xs.length <= 1 ? [xs] : xs.flatMap((x, i) => permutations([...xs.slice(0, i), ...xs.slice(i + 1)]).map((r) => [x, ...r])));
+// A property that reads as `values[n]` on the nth read, and as the last value from then on.
+const reads = (target, key, values) => { let n = 0; Object.defineProperty(target, key, { enumerable: true, configurable: true, get() { const v = values[Math.min(n, values.length - 1)]; n += 1; return v; } }); return target; };
+
+test('PG-W-21A AC04: a malformed revocation that names a grant denies that grant and every grant delegated from it', () => {
+  const malformed = {
+    'an extra field': { colour: 'red' },
+    'schema memev-trust/2': { schema: 'memev-trust/2' },
+    'a reason off the list': { reason: 'bored' },
+    'a time with no zone': { time: '2026-01-25T00:00:00' },
+    'a time that is not a time': { time: 'soon' },
+    'no reason': { reason: undefined },
+    'no issuer': { issuer: undefined },
+  };
+  for (const [what, o] of Object.entries(malformed)) {
+    const bad = revocation({ grant: 'g1', ...o });
+    assert.equal(validate(bad).ok, false, what);
+    const own = evaluate(ask(), ctx([grant(), bad], LATER));
+    assert.equal(own.eligible, false, `${what}: the grant it names`); assert.equal(own.rule, 'deny.bad_revocation', what); assert.deepEqual(own.chain, ['g1']);
+    const viaParent = evaluate(ask(), ctx([parentGrant(), childGrant(), revocation({ grant: 'p', ...o })], LATER));
+    assert.equal(viaParent.eligible, false, `${what}: through its parent`); assert.equal(viaParent.rule, 'deny.bad_revocation', what); assert.ok(viaParent.chain.includes('p') && viaParent.chain.includes('c'));
+    assert.equal(evaluate(ask({ subject: 'operator:o1' }), ctx([parentGrant(), childGrant(), revocation({ grant: 'p', ...o })], LATER)).rule, 'deny.bad_revocation', `${what}: the parent itself`);
+    const viaGrandparent = [parentGrant(), grant({ id: 'm', subject: 'node:n1', issuer: 'operator:o1', delegation: { depth: 1, parent: 'p' } }), grant({ id: 'l', subject: 'service:s1', issuer: 'node:n1', delegation: { depth: 0, parent: 'm' } }), revocation({ grant: 'p', ...o })];
+    assert.equal(evaluate(ask({ subject: 'service:s1' }), ctx(viaGrandparent, LATER)).eligible, false, `${what}: through a grandparent`);
+  }
+  // it denies at any time, since a time that cannot be read cannot be placed before the evaluation
+  assert.equal(evaluate(ask(), ctx([grant(), revocation({ time: '2026-01-25T00:00:00' })], { at: '2026-01-12T00:00:00Z' })).rule, 'deny.bad_revocation');
+  // it denies only the grant it names and the grants below it
+  assert.equal(evaluate(ask(), ctx([grant(), revocation({ grant: 'g9', reason: 'bored' })], LATER)).eligible, true, 'another grant is not named');
+  assert.equal(evaluate(ask({ subject: 'operator:o1' }), ctx([parentGrant(), childGrant(), revocation({ grant: 'c', reason: 'bored' })], LATER)).eligible, true, 'a parent is not denied by a bad revocation of its child');
+  // a record that does not name a grant cannot deny one, and a record of another kind is not a revocation
+  assert.equal(evaluate(ask(), ctx([grant(), revocation({ grant: 'no space', reason: 'bored' })], LATER)).eligible, true, 'it names no grant');
+  assert.equal(evaluate(ask(), ctx([grant(), revocation({ grant: 7, reason: 'bored' })], LATER)).eligible, true, 'it names no grant');
+  assert.equal(evaluate(ask(), ctx([grant(), revocation({ kind: 'note', reason: 'bored' })], LATER)).eligible, true, 'not a revocation');
+  // a well-formed revocation still wins the plainer rule, and a bad one never lifts a revocation
+  assert.equal(evaluate(ask(), ctx([grant(), revocation(), revocation({ id: 'v2', reason: 'bored' })], LATER)).eligible, false);
+  assert.equal(evaluate(ask(), ctx([grant(), revocation({ time: '2026-01-25T00:00:00' })], LATER)).rule, 'deny.bad_revocation');
+});
+
+test('PG-W-21A AC02: a duplicate of a grant is idempotent, and a different grant with the same id is a conflict that denies', () => {
+  const same = evaluate(ask(), ctx([grant(), grant()]));
+  assert.equal(same.eligible, true); assert.equal(same.rule, 'allow.grant'); assert.deepEqual(same.chain, ['g1']);
+  assert.deepEqual(evaluate(ask(), ctx([grant(), grant(), grant()])), evaluate(ask(), ctx([grant()])), 'replaying a log twice changes nothing');
+  assert.deepEqual(evaluate(ask(), ctx([grant(), grant(), revocation(), revocation()], LATER)), evaluate(ask(), ctx([grant(), revocation()], LATER)), 'duplicate revocations change nothing');
+  // canonically equal: the order of the keys is not a difference
+  const reordered = { expires: EXPIRES, start: START, purposes: ['contribute'], scope: { id: 't1', type: 'team' }, issuer: ROOT, subject: 'device:d1', id: 'g1', kind: 'grant', schema: SCHEMA };
+  assert.equal(evaluate(ask(), ctx([grant(), reordered])).rule, 'allow.grant', 'key order is not a difference');
+  assert.equal(evaluate(ask(), ctx([grant(), { ...grant(), evidence: undefined }])).rule, 'allow.grant', 'an absent field and an undefined one are the same record');
+  // a delegated chain with a duplicated parent and a duplicated child
+  const chain = evaluate(ask(), ctx([parentGrant(), childGrant(), parentGrant(), childGrant()]));
+  assert.equal(chain.eligible, true); assert.deepEqual(chain.chain, ['p', 'c']);
+  // different records with one id: an injected grant never lets one be honoured, and the id has its own rule
+  const injections = { 'another purpose': grant({ purposes: ['verify'] }), 'another subject': grant({ subject: 'device:evil' }), 'another expiry': grant({ expires: '2026-01-11T00:00:00Z' }), 'another issuer': grant({ issuer: 'person:stranger' }), 'a different list order': grant({ purposes: ['verify', 'contribute'] }), 'with evidence': grant({ evidence: ['e'] }) };
+  for (const [what, injected] of Object.entries(injections)) {
+    for (const records of [[grant(), injected], [injected, grant()]]) {
+      const r = evaluate(ask(), ctx(records));
+      assert.equal(r.eligible, false, what); assert.equal(r.rule, 'deny.conflicting_grant', what); assert.deepEqual(r.chain, ['g1']);
+    }
+  }
+  assert.equal(evaluate(ask({ subject: 'device:evil' }), ctx([grant(), grant({ subject: 'device:evil' })])).rule, 'deny.conflicting_grant', 'the injected subject is refused too');
+  assert.equal(evaluate(ask({ subject: 'device:other' }), ctx([grant(), grant({ purposes: ['verify'] })])).rule, 'deny.no_grant', 'a subject of neither record is not touched');
+  assert.equal(evaluate(ask(), ctx([grant(), grant({ purposes: ['verify'] }), grant({ id: 'own', purposes: ['contribute'] })])).eligible, true, 'another grant with its own id still stands');
+  // an invalid record with the same id is not a grant and does not conflict
+  assert.equal(evaluate(ask(), ctx([grant(), grant({ purposes: ['admin'] })])).rule, 'allow.grant', 'a record that fails the validator is ignored');
+  // a conflict reaches every grant delegated from it
+  const lower = evaluate(ask(), ctx([parentGrant(), parentGrant({ purposes: ['contribute'] }), childGrant()]));
+  assert.equal(lower.eligible, false); assert.equal(lower.rule, 'deny.conflicting_grant'); assert.ok(lower.chain.includes('c') && lower.chain.includes('p'));
+  assert.equal(evaluate(ask({ subject: 'operator:o1' }), ctx([parentGrant(), parentGrant({ purposes: ['contribute'] })])).rule, 'deny.conflicting_grant');
+});
+
+test('PG-W-21A AC05: every input is read once, into a snapshot: a property that changes between reads cannot change the decision', () => {
+  // the 2030 case: an expiry that reads as 2026 while the record is checked and as garbage afterwards
+  const evaluated2030 = (records, o = {}) => evaluate(ask(), ctx(records, { at: '2030-01-01T00:00:00Z', ...o }));
+  for (let n = 0; n <= 14; n += 1) {
+    const live = reads({ ...grant() }, 'expires', [...Array(n).fill(EXPIRES), 'not a time']);
+    assert.equal(evaluated2030([live]).eligible, false, `an expiry that turns bad after ${n} reads is not allowed in 2030`);
+  }
+  for (let n = 1; n <= 14; n += 1) assert.equal(evaluated2030([reads({ ...grant() }, 'expires', [...Array(n).fill(EXPIRES), '2999-01-01T00:00:00Z'])]).eligible, false, `an expiry that turns to 2999 after ${n} reads`);
+  for (let n = 0; n <= 14; n += 1) {
+    const r = evaluated2030([reads({ ...grant() }, 'expires', [...Array(n).fill(EXPIRES), 'not a time'])]);
+    assert.equal(r.rule, n === 0 ? 'deny.no_records' : 'deny.expired', `after ${n} reads: ${r.reason}`);
+  }
+  // the start, and a chain that compares a child with its parent
+  for (let n = 0; n <= 14; n += 1) {
+    const early = reads({ ...grant({ expires: '2026-04-01T00:00:00Z' }) }, 'start', [...Array(n).fill('2026-03-01T00:00:00Z'), 'not a time']);
+    const r = evaluate(ask(), ctx([early], { at: AT }));
+    assert.equal(r.eligible, false, `a start that turns bad after ${n} reads`);
+    assert.equal(r.rule, n === 0 ? 'deny.no_records' : 'deny.not_yet_valid', `after ${n} reads: ${r.reason}`);
+    const child = reads({ ...childGrant() }, 'expires', [...Array(n).fill(EXPIRES), 'not a time']);
+    const c = evaluate(ask(), ctx([parentGrant(), child], { at: '2026-02-09T00:00:00Z' }));
+    assert.equal(c.eligible, n >= 1, `a child expiry that turns bad after ${n} reads: ${c.rule}`);
+  }
+  // a revocation time that reads as valid while the record is checked and as garbage when it is applied is still applied
+  for (let n = 1; n <= 14; n += 1) {
+    const v = reads({ ...revocation() }, 'time', [...Array(n).fill('2026-01-25T00:00:00Z'), 'not a time']);
+    const r = evaluate(ask(), ctx([grant(), v], LATER));
+    assert.equal(r.eligible, false, `a revocation time that turns bad after ${n} reads`);
+    assert.equal(r.rule, 'deny.revoked', `after ${n} reads`);
+  }
+  // a value that is different on every read is read once
+  const wobbling = reads({ ...grant() }, 'expires', ['2026-02-10T00:00:00Z', '2030-06-01T00:00:00Z', '2040-01-01T00:00:00Z']);
+  assert.equal(evaluated2030([wobbling]).rule, 'deny.expired', 'the first read is the one used');
+  // every property is read at most once by an evaluation, and once by the validator
+  const counted = (o) => { const n = {}; const c = {}; for (const k of Object.keys(o)) { n[k] = 0; Object.defineProperty(c, k, { enumerable: true, get() { n[k] += 1; return o[k]; } }); } return [c, n]; };
+  const [g, gn] = counted(grant({ evidence: ['e'], delegation: { depth: 0 } })); const [v, vn] = counted(revocation()); const [q, qn] = counted(ask()); const [k, kn] = counted(ctx([g, v]));
+  evaluate(q, k);
+  for (const n of [gn, vn, qn, kn]) for (const [key, count] of Object.entries(n)) assert.ok(count <= 1, `${key} was read ${count} times`);
+  const [one, on] = counted(grant()); validate(one);
+  for (const [key, count] of Object.entries(on)) assert.ok(count <= 1, `${key} was read ${count} times by the validator`);
+});
+
+test('PG-W-21A AC05: an input whose getter throws is a deny and never a throw, in a grant, a revocation, the request, the roots and the call', () => {
+  const boom = (target, key) => Object.defineProperty(target, key, { enumerable: true, configurable: true, get() { throw new Error('boom'); } });
+  const cases = {
+    'a grant': ctx([boom({ ...grant() }, 'purposes')]),
+    'a revocation that would have revoked': ctx([grant(), boom({ ...revocation() }, 'reason')], LATER),
+    'a revocation whose grant cannot be read': ctx([grant(), boom({ ...revocation() }, 'grant')], LATER),
+    'a record next to a good one': ctx([grant(), boom({ ...grant({ id: 'g2' }) }, 'subject')]),
+    'the roots': { records: [grant()], roots: boom([ROOT], 0), at: AT },
+    'the time': boom({ records: [grant()], roots: [ROOT] }, 'at'),
+  };
+  for (const [what, c] of Object.entries(cases)) {
+    let r; assert.doesNotThrow(() => { r = evaluate(ask(), c); }, what);
+    assert.equal(r.eligible, false, what); assert.equal(r.rule, 'deny.bad_request', what);
+  }
+  let r; assert.doesNotThrow(() => { r = evaluate(boom(ask(), 'purpose'), ctx([grant()])); });
+  assert.equal(r.eligible, false); assert.equal(r.rule, 'deny.bad_request');
+  assert.doesNotThrow(() => { r = evaluate(ask(), boom(ctx([grant()]), 'records')); });
+  assert.equal(r.rule, 'deny.bad_request');
+  // a value that cannot be copied is a deny too
+  for (const c of [ctx([grant({ note: () => 1 })]), ctx([grant({ note: Symbol('s') })]), ctx([grant()], { roots: [ROOT], extra: new Proxy({}, {}) })]) {
+    assert.doesNotThrow(() => { r = evaluate(ask(), c); });
+    assert.equal(r.eligible, false); assert.equal(r.rule, 'deny.bad_request');
+  }
+  assert.equal(validate(boom({ ...grant() }, 'id')).ok, false);
+});
+
+test('PG-W-21A AC05: a time that is not a number never lets a window pass: every window check is written to fail closed', () => {
+  const code = CODE();
+  // a comparison with a time that can be NaN is false either way, so it is written as the negation of the passing case
+  const open = [...code.matchAll(/(?<!!\()(\bnow|\bms\([^()]*\))\s*(<=|>=|<|>)\s*(now\b|ms\()/g)].map((m) => m[0]);
+  assert.deepEqual(open, [], 'a window comparison that is not of the form !(...)');
+  assert.match(code, /!\(now < ms\(\w+\.expires\)\)/, 'expiry: !(now < ms(expires))');
+  assert.match(code, /!\(ms\(\w+\.start\) <= now\)/, 'start: !(ms(start) <= now)');
+  assert.match(code, /!\(now < ms\(\w+\.time\)\)/, 'a revocation time: !(now < ms(time))');
+  // behaviour: times that parse to NaN are refused by the validator and by the request, never passed
+  for (const t of ['NaN', 'Invalid Date', '2026-01-10T00:00:00', '2026-01-10T25:00:00Z', '2026-13-10T00:00:00Z', '', ' ', '0']) {
+    assert.equal(validate(grant({ start: t })).ok, false, `start ${t}`); assert.equal(validate(grant({ expires: t })).ok, false, `expires ${t}`); assert.equal(validate(revocation({ time: t })).ok, false, `time ${t}`);
+    assert.equal(evaluate(ask(), ctx([grant()], { at: t })).rule, 'deny.bad_request', `at ${t}`);
+    assert.equal(evaluate(ask(), ctx([grant({ expires: t })], { at: '2030-01-01T00:00:00Z' })).eligible, false, `an expiry of ${t} never allows`);
+    assert.equal(evaluate(ask(), ctx([grant({ start: t })])).eligible, false, `a start of ${t} never allows`);
+  }
+});
+
+test('PG-W-21A AC01: a time is a real calendar date and a real time of day: nothing rolls over', () => {
+  const refused = ['2026-02-30T00:00:00Z', '2026-02-29T00:00:00Z', '2025-02-29T00:00:00Z', '2026-04-31T00:00:00Z', '2026-06-31T00:00:00Z', '2026-09-31T00:00:00Z', '2026-11-31T00:00:00Z', '2026-01-32T00:00:00Z', '2026-00-10T00:00:00Z', '2026-01-00T00:00:00Z', '2026-13-01T00:00:00Z',
+    '2026-01-10T24:00:00Z', '2026-01-10T24:00:00.000Z', '2026-01-10T24:00:00+01:00', '2026-01-10T25:00:00Z', '2026-01-10T23:60:00Z', '2026-01-10T23:59:60Z', '2026-01-10T00:00:00+24:00', '2026-01-10T00:00:00+01:60', '2026-01-10T00:00:00-99:00', '1900-02-29T00:00:00Z', '2100-02-29T00:00:00Z'];
+  for (const t of refused) {
+    names(grant({ start: t, expires: '2030-01-01T00:00:00Z' }), /^start/); names(grant({ expires: t }), /^expires/); names(revocation({ time: t }), /^time/);
+    assert.equal(evaluate(ask(), ctx([grant()], { at: t })).rule, 'deny.bad_request', `at ${t}`);
+  }
+  const accepted = ['2024-02-29T00:00:00Z', '2000-02-29T00:00:00Z', '2026-02-28T23:59:59Z', '2026-04-30T23:59:59Z', '2026-12-31T23:59:59.999Z', '2026-01-10T00:00:00+23:59', '2026-01-10T23:59:59-23:59', '2026-01-10T00:00:00.123456Z', '2026-07-31T00:00:00+02:00', '2026-01-01T00:00:00Z'];
+  for (const t of accepted) {
+    assert.equal(validate(revocation({ time: t })).ok, true, t);
+    assert.equal(evaluate(ask(), ctx([grant({ start: '2000-01-01T00:00:00Z', expires: '2999-01-01T00:00:00Z' })], { at: t })).eligible, true, `at ${t}`);
+  }
+  // 28 February and 1 March are two days, and the grant of one day does not cover the other
+  assert.equal(validate(grant({ start: '2026-02-28T00:00:00Z', expires: '2026-03-01T00:00:00Z' })).ok, true);
+  assert.equal(evaluate(ask(), ctx([grant({ start: '2026-02-28T00:00:00Z', expires: '2026-03-01T00:00:00Z' })], { at: '2026-03-01T00:00:00Z' })).rule, 'deny.expired');
+});
+
+test('PG-W-21A AC02: the deny that is reported does not depend on the order of the records', () => {
+  // several grants of one subject that stop at the same stage with different rules
+  const windowStage = [grant({ id: 'a', start: '2026-03-01T00:00:00Z', expires: '2026-04-01T00:00:00Z' }), grant({ id: 'b', start: '2025-01-01T00:00:00Z', expires: '2025-02-01T00:00:00Z' }), grant({ id: 'c', start: '2025-01-01T00:00:00Z', expires: '2025-03-01T00:00:00Z' })];
+  const authorityStage = [grant({ id: 'a', issuer: 'person:stranger' }), grant({ id: 'b', issuer: 'operator:o1', delegation: { depth: 0, parent: 'zz' } }), grant({ id: 'c', issuer: 'operator:o1', delegation: { depth: 0, parent: 'p' } }), parentGrant({ id: 'p', delegation: { depth: 0 } })];
+  const scopeStage = [grant({ id: 'a', scope: { type: 'team', id: 'z1' } }), grant({ id: 'b', scope: { type: 'team', id: 'z2' } }), grant({ id: 'c', scope: { type: 'team', id: 'z3' } })];
+  const revokedStage = [grant({ id: 'a' }), grant({ id: 'b' }), revocation({ id: 'v1', grant: 'b', reason: 'bored' }), revocation({ id: 'v2', grant: 'a', time: START })];
+  const allowStage = [grant({ id: 'a' }), grant({ id: 'b' }), grant({ id: 'c', purposes: ['contribute', 'verify'] })];
+  const conflict = [grant({ id: 'a' }), grant({ id: 'a', purposes: ['verify'] }), grant({ id: 'b', start: '2026-03-01T00:00:00Z', expires: '2026-04-01T00:00:00Z' }), revocation({ id: 'v3', grant: 'b', reason: 'bored' })];
+  const sets = { windowStage, authorityStage, scopeStage, revokedStage, allowStage, conflict };
+  const expected = { windowStage: 'deny.not_yet_valid', authorityStage: 'deny.untrusted_issuer', scopeStage: 'deny.scope_not_granted', revokedStage: 'deny.revoked', allowStage: 'allow.grant', conflict: 'deny.conflicting_grant' };
+  for (const [name, records] of Object.entries(sets)) {
+    const all = permutations(records).map((order) => evaluate(ask(), ctx(order, { at: '2026-02-01T00:00:00Z' })));
+    for (const r of all) assert.deepEqual(r, all[0], `${name}: the whole answer is the same for every order`);
+    assert.equal(all[0].rule, expected[name], `${name}: ${all[0].reason}`);
+    const rev = permutations(records).map((order) => evaluate(ask(), ctx(order, { at: '2026-02-01T00:00:00Z', roots: [ROOT, 'person:r9'] })));
+    for (const r of rev) assert.deepEqual(r, rev[0], `${name}: with another root`);
+  }
+  // within one stage the order of RULES decides: not_yet_valid is listed before expired, and the first listed wins
+  const ids = Object.values(mod().RULES);
+  assert.ok(ids.indexOf('deny.not_yet_valid') < ids.indexOf('deny.expired'));
+  assert.ok(ids.indexOf('deny.untrusted_issuer') < ids.indexOf('deny.chain.parent_missing'));
+  const authority = evaluate(ask(), ctx(authorityStage, { at: '2026-02-01T00:00:00Z' }));
+  assert.equal(authority.rule, ids.filter((id) => ['deny.untrusted_issuer', 'deny.chain.parent_missing', 'deny.chain.parent_not_issuer', 'deny.chain.parent_depth_zero'].includes(id))[0]);
+  // the chain of an allow is the one that sorts first, whatever the order of the records
+  const two = [grant({ id: 'z' }), grant({ id: 'm' }), grant({ id: 'q' })];
+  for (const order of permutations(two)) assert.deepEqual(evaluate(ask(), ctx(order)).chain, ['m']);
+});
+
+test('PG-W-21A AC07: the module header says subject and issuer are unauthenticated and the caller evaluates over its own log', () => {
+  const header = SRC().split('\nimport ')[0].replace(/\n\/\/ ?/g, ' ');
+  assert.match(header, /unauthenticated/i, 'subject and issuer are unauthenticated strings');
+  assert.match(header, /\bsubject\b[\s\S]*\bissuer\b|\bissuer\b[\s\S]*\bsubject\b/);
+  assert.match(header, /own log/, 'the caller evaluates over its own log');
+  assert.match(header, /resolved actor/, 'with a resolved actor');
+  assert.match(header, /credential/, 'and a credential-resolved subject');
+  assert.match(header, /trust-governance\.md/, 'it names the design note');
+  const s = readSchema();
+  assert.match(s.description, /unauthenticated/i); assert.match(s.description, /own log/); assert.match(s.description, /resolved actor/); assert.match(s.description, /credential/);
+  assert.match(s.$defs.grant.properties.subject.description, /unauthenticated/i); assert.match(s.$defs.grant.properties.issuer.description, /unauthenticated/i);
+  assert.match(s.$defs.revocation.properties.issuer.description, /unauthenticated/i);
+});
+
+test('PG-W-21A AC07: scope.parent is accepted by the validator, ignored by the evaluation, and documented as such', () => {
+  const withParent = (parent) => grant({ scope: { ...SCOPE, parent } });
+  assert.equal(validate(withParent('org1')).ok, true);
+  assert.equal(evaluate(ask(), ctx([withParent('org1')])).eligible, true, 'the parent of a scope is not part of what a grant names');
+  assert.equal(evaluate(ask({ scope: { ...SCOPE, parent: 'other' } }), ctx([withParent('org1')])).eligible, true, 'nor of what a request names');
+  assert.equal(evaluate(ask({ scope: { type: 'team', id: 'org1' } }), ctx([withParent('org1')])).rule, 'deny.scope_not_granted', 'a parent scope is not reached');
+  assert.match(SRC(), /scope\.parent[^\n]*ignored|ignored[^\n]*scope\.parent/i, 'the module says scope.parent is ignored');
+  assert.match(readSchema().$defs.grant.properties.scope.properties.parent.description, /ignored/i, 'the schema says so too');
 });
 
 // ---- the fixed set of rule ids
@@ -418,6 +664,8 @@ const SCENARIOS = () => {
     [ask(), ctx(ch({}, { expires: '2026-03-01T00:00:00Z' })), 'deny.chain.expiry'],
     [ask(), ctx(ch({ start: '2026-01-15T00:00:00Z' }, { start: '2026-01-10T00:00:00Z' })), 'deny.chain.start'],
     [ask(), ctx([...ch({}, {}), revocation({ id: 'v2', grant: 'p', time: START })]), 'deny.chain.parent_revoked'],
+    [ask(), ctx([grant(), revocation({ reason: 'bored' })]), 'deny.bad_revocation'],
+    [ask(), ctx([grant(), grant({ purposes: ['verify'] })]), 'deny.conflicting_grant'],
   ];
 };
 
@@ -447,7 +695,7 @@ test('PG-W-21A AC02: every decision carries a rule id from the fixed, exported s
 
 // ---- AC07 to AC09: the greps of the contract, kept here so they run with the suite, and the stricter behaviour behind them
 
-const SRC = () => fs.readFileSync(MODULE, 'utf8');
+const SRC = () => { assert.ok(fs.existsSync(MODULE), 'the module file exists'); return fs.readFileSync(MODULE, 'utf8'); };
 const CODE = () => SRC().replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '');
 test('PG-W-21A AC07: the module marks every choice as provisional and names the decision record', () => {
   assert.match(SRC(), /ADR 8.*PROVISIONAL|PROVISIONAL.*ADR 8/s);
@@ -456,13 +704,15 @@ test('PG-W-21A AC07: the module marks every choice as provisional and names the 
   label(/export const TRUST_PURPOSES/, 'the two purposes');
   label(/stop\(RULES\.CHAIN_DEPTH/, 'narrowing-only delegation');
   label(/v\.issuer === g\.issuer/, 'issuer-or-root revocation');
-  const schema = JSON.parse(fs.readFileSync(SCHEMA_FILE, 'utf8'));
+  const schema = readSchema();
   assert.match(schema.description, /PROVISIONAL/);
   assert.match(schema.$defs.grant.properties.purposes.description, /PROVISIONAL/, 'the schema labels the two purposes');
   assert.match(schema.$defs.delegation.description, /PROVISIONAL/, 'the schema labels narrowing-only delegation');
   assert.match(schema.$defs.revocation.description, /PROVISIONAL/, 'the schema labels who may revoke');
   for (const d of [schema.$defs.grant.properties.purposes.description, schema.$defs.delegation.description, schema.$defs.revocation.description]) assert.match(d, /ADR 8/);
-  assert.match(fs.readFileSync(path.join(PKG, 'changelog.d', 'PG-W-21A.md'), 'utf8'), /provisional/i);
+  const changelog = path.join(PKG, 'changelog.d', 'PG-W-21A.md');
+  assert.ok(fs.existsSync(changelog), 'the changelog note exists');
+  assert.match(fs.readFileSync(changelog, 'utf8'), /provisional/i);
 });
 
 test('PG-W-21A AC08: the only static import is ../identity.mjs, and no import is dynamic, required, created or resolved at run time', () => {
@@ -491,7 +741,9 @@ test('PG-W-21A AC08: nothing outside the tests imports the module: it has no pro
   const callers = ['bin', 'src', 'scripts', 'vendor'].filter((d) => fs.existsSync(path.join(PKG, d))).flatMap((d) => walk(path.join(PKG, d)))
     .filter((f) => /\.(mjs|js|cjs|json)$/.test(f) && f !== MODULE && /trust-record/.test(fs.readFileSync(f, 'utf8')));
   assert.deepEqual(callers.map((f) => path.relative(PKG, f)), [], 'no module, script or command names the trust record module');
-  const graph = fs.readFileSync(path.join(PKG, 'docs', 'MODULES.md'), 'utf8');
+  const graphFile = path.join(PKG, 'docs', 'MODULES.md');
+  assert.ok(fs.existsSync(graphFile), 'the module map exists');
+  const graph = fs.readFileSync(graphFile, 'utf8');
   assert.ok(graph.includes('src/engine/federation/trust-record.mjs'), 'the module is on the map');
   const row = graph.split('\n').find((l) => l.includes('src/engine/federation/trust-record.mjs') && l.startsWith('|'));
   assert.ok(row, 'the module has a row on the map');
