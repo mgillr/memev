@@ -539,7 +539,7 @@
       "tasks": 3,
       "criteria": 29,
       "spec": "specs/PG-03.4-cross-language-protocol-vectors.json",
-      "status": "proposed: unsigned, signs after a clean red-team round",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
       "supersedes": "PG-03.2",
       "supersedes_reason": "the signed PG-03.2 cannot be met as scoped because the TypeScript edition lacks the features its vectors need (ORSet tombstones and element_types, and AgentState); the signer decided to supersede it with a contract that builds them"
     },
@@ -1238,7 +1238,7 @@
       "criteria": 51,
       "spec": "specs/SR-0.03.3-verify-runs-every-verifier-type.json",
       "base": "3989c80bea615381947758e0ab1d28dfe18f115b (the memev main commit that merged pull request #343, which carried the README re-sign fix; owner delegation, 1 Nov 2026); pinned on T1 criterion 7 of the spec",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-03.6",
@@ -1258,7 +1258,7 @@
       "tasks": 3,
       "criteria": 27,
       "spec": "specs/PG-03.6-cross-language-protocol-vectors.json",
-      "status": "proposed: unsigned, signs after a clean red-team round",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
       "supersedes": "PG-03.5",
       "supersedes_reason": "owner delegation, 1 Nov 2026: pin crdt-merge main aab0099 (b92d0ef is an ancestor with byte-identical vectors) and check the three vector files by blob hash; everything else of PG-03.5 is kept",
       "kind": "evidence"
