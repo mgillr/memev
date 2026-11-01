@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const src = path.join(here, '..', '..', '..', 'src', 'engine');
-const spec = JSON.parse(process.argv[2]);
+const spec = JSON.parse(process.argv[2] ?? process.env.OPLOCK_SPEC);
 const { OpLog, VaultLocked } = await import(path.join(src, 'oplog.mjs'));
 const { Vault } = await import(path.join(src, 'vault.mjs'));
 const emit = (o) => process.stdout.write(`${JSON.stringify(o)}\n`);
@@ -17,6 +17,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const fail = (e, from) => ({ event: 'refused', from, name: e.name, code: e.code ?? null, message: e.message, pid: e.pid ?? null, locked: typeof VaultLocked === 'function' && e instanceof VaultLocked, syscall: e.syscall ?? null, errno: e.errno ?? null });
 const OWNER = { id: 'test', agent: 'test', scopes: ['read', 'write', 'admin'], paths: ['**'] };
 
+emit({ event: 'waiting', pid: process.pid });
 if (spec.startFile) while (!fs.existsSync(spec.startFile)) await sleep(2);
 emit({ event: 'starting', pid: process.pid });
 let vault = null, log;
@@ -36,6 +37,11 @@ if (spec.appends) {
     try { put(); } catch (e) { emit(fail(e, 'append')); process.exit(0); }
   }
   emit({ event: 'appended', n: spec.appends });
+}
+if (spec.every) {   // append every `every` ms for `for` ms, and report how many went in and how many were refused
+  let n = 0, errors = 0; const end = Date.now() + spec.for;
+  while (Date.now() < end) { try { put(); n++; } catch (e) { errors++; emit(fail(e, 'append')); } await sleep(spec.every); }
+  emit({ event: 'ticked', n, errors });
 }
 const close = () => (vault ? vault.close() : log.close());
 if (spec.hold) { await sleep(spec.hold); try { close(); emit({ event: 'closed' }); } catch (e) { emit(fail(e, 'close')); } process.exit(0); }

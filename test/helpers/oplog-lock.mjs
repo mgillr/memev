@@ -9,6 +9,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { tmpdir, OWNER, PKG } from './tmp.mjs';
 import { initVault, Vault } from '../../src/engine/vault.mjs';
+import * as OplogMod from '../../src/engine/oplog.mjs';
 
 export { OWNER, PKG, tmpdir };
 export const CHILD = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures', 'oplog-lock', 'child.mjs');
@@ -35,9 +36,12 @@ const live = new Set();
 export function killAll() { for (const c of live) { try { c.proc.kill('SIGKILL'); } catch {} } live.clear(); }
 /** A child process: events arrive on stdout, commands go to stdin. */
 export class Child {
-  constructor(spec, { env = {} } = {}) {
+  constructor(spec, { env = {}, sh = 0 } = {}) {
     this.events = []; this.waiters = []; this.out = '';
-    this.proc = spawn(process.execPath, [CHILD, JSON.stringify(spec)], { env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
+    // sh: start through /bin/sh -c 'sleep N; exec node child.mjs', so the pid's kernel start time precedes node's own start by N s
+    this.proc = sh
+      ? spawn('/bin/sh', ['-c', `sleep ${sh}; exec "$0" "$1"`, process.execPath, CHILD], { env: { ...process.env, ...env, OPLOCK_SPEC: JSON.stringify(spec) }, stdio: ['pipe', 'pipe', 'pipe'] })
+      : spawn(process.execPath, [CHILD, JSON.stringify(spec)], { env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
     this.pid = this.proc.pid; this.stderr = ''; live.add(this);
     this.proc.stderr.on('data', (d) => { this.stderr += d; });
     this.proc.stdin.on('error', () => {});
@@ -143,3 +147,24 @@ export function stealLock(lock) {
 }
 /** bytes(dir) without the LOCK file. */
 export const bytesNoLock = (dir) => { const b = bytes(dir); delete b.LOCK; return b; };
+/** A bare op log folder (no vault) with a lock the implementation wrote, as an object; the lock file is removed again. */
+export function bareDir() { return path.join(fs.realpathSync(tmpdir('oplock-')), 'oplog'); }
+export function sampleBare(dir) {
+  const log = new OplogMod.OpLog(dir, { fsync: false }).open();
+  const o = readLock(path.join(dir, 'LOCK'));
+  log.close();
+  return o;
+}
+/** Plant a lock in `dir`: the implementation's own lock for this process, changed by `edit`, with an mtime `ageS` seconds old. */
+export function plant(dir, edit = (o) => o, ageS = 0) {
+  const o = edit(sampleBare(dir));
+  const lock = path.join(dir, 'LOCK');
+  writeLock(lock, o);
+  if (ageS) age(lock, ageS);
+  return o;
+}
+/** Release the children together: they report `waiting`, then the start file appears. */
+export async function releaseTogether(children, startFile) {
+  await Promise.all(children.map((c) => c.next((e) => e.event === 'waiting')));
+  fs.writeFileSync(startFile, '');
+}
