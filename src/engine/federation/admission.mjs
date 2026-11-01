@@ -6,11 +6,15 @@
 //   signature  step one: the signature verifies, offline, with a key of the subject the node knows
 //   authority  step two: the subject has authority for the scope, and the policy accepts the scope and the classification.
 //              A signature proves a key signed; whether that subject may write there is a separate check.
-//   replay     the sequence is above the high-water mark of that sender
+//   replay     the sequence is above the high-water mark of a sender in that scope
 //
 // A contribution that passes is appended to the vault's operation log as federation.admitted. A failure at any step, and a replay,
 // is appended as federation.rejected, and nothing of the payload goes with it. There is no store but the log: the high-water mark of
-// each sender is kept in memory and rebuilt from the admitted records when the object is made, so it survives a restart.
+// a sender and scope is kept in memory and rebuilt from the admitted records, so it survives a restart. The mark is kept per sender and
+// scope, and the scope of a stored record is the scope of its stored envelope. The log is read again, with its own iterate({ fromSeq }),
+// from the record after the last one read and only when the log has moved, before the replay check and in highWater, so that no two
+// Admissions over one log admit one sequence. An append of its own moves the read cursor only when its seq is the last seq read plus 1;
+// otherwise the next read starts at the last seq read plus 1, and a record another Admission appended in between is still read.
 import { validateContribution, contributionMessage } from './contribution.mjs';
 import { validateIdentityDocument, validateScope, authorizeScope } from '../identity.mjs';
 import { verifyNamespaced, CONTRIBUTION_NAMESPACE } from '../agentid-bind.mjs';
@@ -40,12 +44,54 @@ export class Admission {
     }
     this.log = log; this.identity = identity; this.scope = { type: scope.type, id: scope.id }; this.policy = policy; this.external = external; this.verify = verify;
     this.subjects = new Map(identity.subjects.map((s) => [s.id, s]));
+    // The marks are held by a structured key: the sender, then the scope type, then the scope id. A joined text would let two pairs
+    // whose parts run together share one mark.
     this.highs = new Map();
-    for (const rec of log.iterate()) if (rec.type === ADMITTED && typeof rec.data?.sender === 'string' && Number.isSafeInteger(rec.data.sequence)) this.highs.set(rec.data.sender, Math.max(this.highs.get(rec.data.sender) ?? 0, rec.data.sequence));
+    this.lastRead = 0;
+    this._readLog();
   }
 
-  highWater(sender) { return this.highs.get(sender) ?? 0; }
+  /** The high-water mark of a sender in a scope (the scope this Admission holds when none is given); 0 when nothing was admitted. */
+  highWater(sender, scope = this.scope) {
+    this._readLog();
+    return this.highs.get(sender)?.get(scope?.type)?.get(scope?.id) ?? 0;
+  }
   static sender(envelope) { return `${envelope.origin.node}|${envelope.extension.contribution.subject}`; }
+
+  // Read what the log holds from the record after the last one read, unless the log says it has not moved.
+  _readLog() {
+    const top = this.log.seq;
+    if (Number.isSafeInteger(top) && top <= this.lastRead) return;
+    for (const rec of this.log.iterate({ fromSeq: this.lastRead + 1 })) {
+      this._note(rec);
+      if (Number.isSafeInteger(rec?.seq) && rec.seq > this.lastRead) this.lastRead = rec.seq;
+    }
+  }
+
+  // An admitted record moves the mark of its sender in the scope of its stored envelope. A record with no usable sender, scope or
+  // sequence moves nothing, and nothing is thrown.
+  _note(rec) {
+    if (rec?.type !== ADMITTED) return;
+    const d = rec.data, scope = d?.envelope?.extension?.contribution?.scope;
+    if (typeof d?.sender !== 'string' || !Number.isSafeInteger(d.sequence)) return;
+    if (typeof scope?.type !== 'string' || !scope.type || typeof scope?.id !== 'string' || !scope.id) return;
+    this._mark(d.sender, scope, d.sequence);
+  }
+
+  _mark(sender, scope, sequence) {
+    if (!this.highs.has(sender)) this.highs.set(sender, new Map());
+    const byType = this.highs.get(sender);
+    if (!byType.has(scope.type)) byType.set(scope.type, new Map());
+    const byId = byType.get(scope.type);
+    byId.set(scope.id, Math.max(byId.get(scope.id) ?? 0, sequence));
+  }
+
+  // An append of its own moves the cursor only when it is the very next record after the last one read. Otherwise another Admission
+  // appended in between, and the next read must still start at the last seq read plus 1 to see it.
+  _appended(rec) {
+    if (Number.isSafeInteger(rec?.seq) && rec.seq === this.lastRead + 1) this.lastRead = rec.seq;
+    return rec;
+  }
 
   /** Step one on its own: { ok: true } or { ok: false, code, reason }. It reads and writes nothing. */
   verifySignature(envelope, { at = Date.now() } = {}) {
@@ -87,14 +133,14 @@ export class Admission {
    */
   admit(envelope, { at = Date.now() } = {}) {
     const fail = (step, code, reason, signatureValid) => {
-      const rec = this._reject(envelope, step, code, reason);
+      const rec = this._appended(this._reject(envelope, step, code, reason));
       return { ok: false, step, code, reason, signature_valid: signatureValid, record: rec };
     };
     const v = validateContribution(envelope);
     if (!v.ok) return fail('format', 'bad_contribution', v.errors[0], false);
     if (this.external) {
       let r;
-      try { r = this.external(envelope); } catch (e) { return fail('external', 'external_failed', `the external admission service failed: ${e?.message ?? e}`, false); }
+      try { r = this.external(envelope); } catch { return fail('external', 'external_failed', 'the external admission service failed', false); }
       if (!r || r.ok !== true) return fail('external', short(r?.code, 64) || 'external_refused', short(r?.reason) || 'the external admission service refused it', false);
     }
     const sig = this.verifySignature(envelope, { at });
@@ -102,9 +148,10 @@ export class Admission {
     const auth = this.authorize(envelope, { at });
     if (!auth.ok) return fail('authority', auth.code, auth.reason, true);
     const sender = Admission.sender(envelope), b = envelope.extension.contribution;
-    if (b.sequence <= this.highWater(sender)) return fail('replay', 'replay', `sequence ${b.sequence} is not above the high-water mark ${this.highWater(sender)} of ${sender}`, true);
-    const record = this.log.append({ type: ADMITTED, agent: b.subject, client: envelope.origin.node, data: { envelope, sender, sequence: b.sequence } });
-    this.highs.set(sender, b.sequence);
+    const high = this.highWater(sender, b.scope);
+    if (b.sequence <= high) return fail('replay', 'replay', `sequence ${b.sequence} is not above the high-water mark ${high} of ${sender} in ${b.scope.type} ${b.scope.id}`, true);
+    const record = this._appended(this.log.append({ type: ADMITTED, agent: b.subject, client: envelope.origin.node, data: { envelope, sender, sequence: b.sequence } }));
+    this._mark(sender, b.scope, b.sequence);
     return { ok: true, record, sender, sequence: b.sequence };
   }
 

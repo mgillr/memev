@@ -2,7 +2,7 @@
 // A contribution: an operation envelope (PG-04.1) that carries the signature and admission block in its extension block.
 //
 // The envelope stays the one record shape. The block lives in extension.contribution and holds what the node needs to judge the
-// record: the subject, the scope, a classification string, the per-sender sequence, the provenance, the hash of the payload and the
+// record: the subject, the scope, a classification string, the sequence (held per sender and scope), the provenance, the hash of the payload and the
 // signature. The schema version and the causal context are the envelope's own (schema, deps, hlc). The signature is made with the
 // role key through ssh-keygen in the namespace memev-contribution, over the canonical text of the envelope without the signature, so
 // it covers every other field, the payload hash included. The content hash is taken after the signature is in the block.

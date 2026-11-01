@@ -95,7 +95,7 @@ The envelope follows the wire-compatibility policy of the acfa-rs project (Apach
 
 ## What other contracts add
 
-- **SO-F-03** adds the signature and admission block, the per-sender sequence and the rejected event on top of this envelope, as an extension block with fields of its own. None of them is defined here, and the envelope does not interpret them.
+- **SO-F-03** adds the signature and admission block, the sequence held per sender and scope, and the rejected event on top of this envelope, as an extension block with fields of its own. None of them is defined here, and the envelope does not interpret them.
 - **SO-F-12** adds scope and classification to the same envelope for stream records, and defines no second record format.
 
 Both extend this envelope. Neither defines another.

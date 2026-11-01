@@ -62,7 +62,7 @@
     "sequence": {
       "type": "integer",
       "minimum": 1,
-      "description": "The per-sender sequence. The node refuses a sequence that is not above the high-water mark of the sender, which it keeps in its own operation log."
+      "description": "The sequence, held per sender and scope. The node refuses a sequence that is not above the high-water mark of a sender and scope, which it keeps in its own operation log."
     },
     "payload_hash": {
       "type": "string",

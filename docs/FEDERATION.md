@@ -203,7 +203,7 @@ A contribution is an [operation envelope](OPERATION-ENVELOPE.md) that carries on
 | `subject` | The subject that wrote it (a subject of the [identity model](IDENTITY-AND-SCOPES.md)). It is the origin identity of the envelope. |
 | `scope` | `{ type, id }`: the scope it is written for. |
 | `classification` | A string. Its values are constrained later by a classification schema; until then the node's policy lists the labels it accepts. |
-| `sequence` | The per-sender sequence, a whole number of 1 or more. |
+| `sequence` | The sequence, held per sender and scope, a whole number of 1 or more. |
 | `payload_hash` | The SHA-256 of the canonical payload of the envelope. |
 | `provenance` | `{ source, derived_from }`: where it came from, and the operation ids it was derived from. |
 | `signature` | `{ principal, namespace, sshsig }`: see below. |
@@ -221,7 +221,7 @@ A node admits a contribution into its own operation log in two steps before it a
 1. **Signature.** The subject is one the node knows, it has a live key of that name, and the signature verifies with it. A revoked or expired key does not count.
 2. **Authority and policy.** The scope is the scope the node holds (a personal scope and an organisational scope never mix), the subject is not revoked or expired and has a live membership in that scope in the node's own identity document, and the node's policy accepts the classification for that scope. The policy is deny by default: a scope and classification it does not list are refused.
 
-Then the sequence is held against the high-water mark of the sender, which is the node and the subject. A sequence that is not above it is a replay and is refused. The mark is kept in the operation log: it is rebuilt from the admitted records when the node opens, so a restart does not forget it.
+Then the sequence is held against the replay mark, which is kept per sender and scope: the sender is the node and the subject, and the scope is the scope of the stored envelope of each admitted record, so one sender has its own mark in each scope and an Admission for one scope never takes another scope's sequence for a replay. A sequence that is not above the mark is a replay and is refused. The mark is kept in the operation log and in memory only: it is rebuilt from the admitted records, so a restart does not forget it, and an Admission reads the log again, from the record after the last one it read, when the log has moved, before the replay check and when it is asked for a mark, so that no two Admissions over one log admit one sequence. A message replayed into a different scope fails at the signature step, because the scope is inside the signed bytes.
 
 A contribution that passes is appended to the vault's operation log as `federation.admitted`, with the envelope as it came. A contribution that fails at either step, a malformed one, a refusal by the external service and a replay are each appended as `federation.rejected`, through the same operation log API and in no other store. The rejected event names the operation, the sender, the scope, the sequence, the step, the code and the reason, and holds nothing of the payload: not the payload, not the extension block and not the payload hash.
 
