@@ -46,9 +46,10 @@ flowchart LR
 
 ## Limits
 
-- One computer at a time, with no licence and no network needed. Adding a second computer to the
-  vault needs a licence: the vault refuses it with "This vault is licensed for 1 computer". Cloud AI
-  apps through the secure link are not computers and are not refused.
+- One computer at a time, with no licence. The local core works without a network; optional cloud
+  connectors and GitHub backup require a network. Adding a second computer to the vault needs a
+  licence: the vault refuses it with "This vault is licensed for 1 computer". Cloud AI apps through
+  the secure link are not computers and are not refused.
 - Switching computers goes through your own GitHub backup: once `memev github setup` has run on the
   old computer, `memev init` on the new one offers to join that backup.
 - Git sync is single-writer backup, not a way to edit on two computers at once. If a second computer
