@@ -84,17 +84,69 @@ test('WP19-01 AC06: the production port holds no test double', () => {
   assert.doesNotMatch(read(PORT), /mock|stub|fake|test double|in-memory|inmemory/i);
 });
 
-test('WP19-01 AC05: openStore opens the vault\'s own project store, adds no second one, and returns null for an unknown project', async () => {
+test('WP19-01 AC05: openStore reads the vault\'s own project, adds no second store, and returns null for an unknown project', async () => {
   const { root, tasks } = vaultWithProject();
   const { openStore, closeStores } = await import('../src/cli/work-store.mjs');
   try {
-    const store = openStore('p', { root });
-    assert.deepEqual(Object.keys(store.snapshot('task')).sort(), tasks.sort(), 'it reads the tasks that were written');
-    assert.equal(store.dir, path.join(root, '.memev', 'projects', 'p'), 'the store of this vault, in its own folder');
-    assert.equal(openStore('p', { root }), store, 'asking twice gives the same store');
+    const reader = openStore('p', { root });
+    assert.deepEqual(Object.keys(reader.snapshot('task')).sort(), tasks.sort(), 'it reads the tasks that were written');
     assert.equal(openStore('nope', { root }), null);
     assert.equal(fs.existsSync(path.join(root, '.memev', 'projects', 'nope')), false, 'an unknown project is not created');
     assert.throws(() => openStore('p'), /root/, 'the port needs the vault root');
+  } finally { closeStores(); }
+});
+
+// Every value reachable from the object through its own properties and prototype chain, never entering a function's closure.
+function reachable(root) {
+  const seen = new Set(); const out = [];
+  const walk = (o) => {
+    if (o === null || (typeof o !== 'object' && typeof o !== 'function') || seen.has(o)) return;
+    seen.add(o); out.push(o);
+    for (const k of Reflect.ownKeys(o)) { const d = Object.getOwnPropertyDescriptor(o, k); walk(d.value); walk(d.get); walk(d.set); }
+    walk(Object.getPrototypeOf(o));
+  };
+  walk(root);
+  return out;
+}
+
+test('WP19-01 AC05: the object openStore returns cannot write: it has no write method and rejects mutation', async () => {
+  const { root } = vaultWithProject();
+  const { openStore, closeStores } = await import('../src/cli/work-store.mjs');
+  try {
+    const reader = openStore('p', { root });
+    assert.equal(Object.isFrozen(reader), true, 'the object is frozen');
+    assert.deepEqual(Object.keys(reader), ['snapshot'], 'the one read function and nothing else');
+    for (const w of ['append', 'put', 'withWrite', 'close', 'open', 'update', 'delete', 'remove']) {
+      assert.equal(typeof reader[w], 'undefined', `${w} does not exist`);
+      assert.throws(() => reader[w](), TypeError, `calling ${w} fails`);
+      assert.throws(() => { reader[w] = () => {}; }, TypeError, `assigning ${w} fails`);
+    }
+    assert.throws(() => { reader.snapshot = () => ({}); }, TypeError, 'the read function cannot be replaced');
+    assert.throws(() => { delete reader.snapshot; }, TypeError);
+    // what it returns is a copy: changing it changes nothing in the store
+    const before = fs.readFileSync(path.join(root, '.memev', 'projects', 'p', 'events.jsonl'), 'utf8');
+    const tasks = reader.snapshot('task');
+    tasks.T1.title = 'changed'; delete tasks.T2;
+    assert.equal(reader.snapshot('task').T1.title, 'task T1', 'a second read is unchanged');
+    assert.ok(reader.snapshot('task').T2);
+    assert.equal(fs.readFileSync(path.join(root, '.memev', 'projects', 'p', 'events.jsonl'), 'utf8'), before, 'the store file is untouched');
+  } finally { closeStores(); }
+});
+
+test('WP19-01 AC05: the object openStore returns does not expose the store itself', async () => {
+  const { root } = vaultWithProject();
+  const { openStore, closeStores } = await import('../src/cli/work-store.mjs');
+  const { ProjectStore } = await import('../src/engine/project-store.mjs');
+  try {
+    const reader = openStore('p', { root });
+    assert.equal(reader instanceof ProjectStore, false);
+    const all = [...reachable(reader), ...['task', 'event', 'approval'].flatMap((k) => reachable(reader.snapshot(k)))];
+    assert.ok(all.length > 3);
+    for (const o of all) {
+      assert.equal(o instanceof ProjectStore, false, 'nothing reachable is a store');
+      for (const k of ['withWrite', 'append', 'snapshotPath', 'sourceOf', 'hasRecord']) assert.equal(Object.hasOwn(o, k) && typeof o[k] === 'function' && o !== Object.prototype, false, `${k} is not reachable`);
+    }
+    assert.equal(Object.getPrototypeOf(reader), Object.prototype, 'a plain object, with no class behind it');
   } finally { closeStores(); }
 });
 
