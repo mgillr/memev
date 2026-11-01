@@ -1401,9 +1401,9 @@
         "SO-F-02"
       ],
       "tasks": 2,
-      "criteria": 47,
+      "criteria": 58,
       "spec": "specs/PG-19.3-shared-replay-for-the-project-store-and-reader.json",
-      "status": "proposed and unsigned; no red-team record; the spec is open as pull request #383 and is signed after pull request #365 merges",
+      "status": "proposed and unsigned; no red-team record; the spec is open as pull request #383 and is to be signed on base 4db3030 or later",
       "kind": "feature"
     },
     {
