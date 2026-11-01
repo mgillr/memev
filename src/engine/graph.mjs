@@ -43,7 +43,7 @@ const CORRECTABLE = ['subject', 'predicate', 'object', 'confidence', 'context', 
 // Provisional (ADR 5, the permission matrix, is open; SO-A-05, the decision workflow, is not built): who may adjudicate, verify and
 // dismiss, and the confirm and reject outcomes, are this one table and nothing else. Each of the three reads its rule from here, so
 // deciding them changes one place. The outcomes stand in for the seven decision states of SO-A-05 and SO-1.08, which are not in code.
-// The operator and service subjects cannot be issued yet. Correcting a finding is not in the table: any subject may, which is
+// No command issues an operator or service subject yet (TokenStore.issue accepts one, nothing calls it with one). Correcting a finding is not in the table: any subject may, which is
 // provisional too. A subject outside a rule is recorded in the history and changes nothing.
 const freeze = (o) => Object.freeze(Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Array.isArray(v) ? Object.freeze([...v]) : v])));
 export const FINDING_AUTHORITY = Object.freeze({
@@ -253,7 +253,7 @@ export class Graph {
   }
 
   /** Errors for a dismissal, correction, adjudication or verification, and whether the finding exists. */
-  checkFindingEvent(type, d) {
+  checkFindingEvent(type, d, { events } = {}) {
     const errors = [];
     if (!FINDING_EVENTS.includes(type)) return { ok: false, code: 'invalid', errors: [`${type} is not a finding event`] };
     if (!d || typeof d !== 'object') return { ok: false, code: 'invalid', errors: ['an event must be an object'] };
@@ -263,7 +263,7 @@ export class Graph {
     if (type === 'claim.finding.verify') {
       const r = d.record;
       if (!r || r.kind !== 'outcome.verified' || typeof r.event !== 'string' || !EVENT_ID.test(r.event) || !['pass', 'fail'].includes(r.result)) errors.push('record must be an outcome.verified record naming its event and a pass or fail result');
-      else if (this.claims.get(d.id)?.finding && !this.claims.get(d.id).finding.sources.some((s) => s.event === r.event)) errors.push('record.event must be one of the source events the finding rests on');
+      else if (this.claims.get(d.id)?.finding && !(events ?? this.claims.get(d.id).finding.sources.map((s) => s.event)).includes(r.event)) errors.push('record.event must be one of the source events the finding rests on');
     }
     if (type === 'claim.finding.correct') {
       const ch = d.changes;
@@ -320,11 +320,16 @@ export class Graph {
    * one of FINDING_EVENTS. Returns { ok: true, type, data } for a writer to append, or { ok: false, code, errors }: no_credential when
    * `actor` is not a result of resolveActor (one that did not resolve included), scope_mismatch when a finding is raised in a scope the
    * actor does not reach, and not_found for a finding it does not reach, the same as for a missing one.
-   * A verification must name one of the finding's own source events. Nothing in the product writes these operations yet.
+   * A verification must name one of the finding's own source events that the actor may read; one it may not read, one the finding
+   * does not rest on and a missing one get the same refusal, so the check is not a way to find out what a finding rests on.
+   * The data is copied as plain data first, and every check and the returned operation use the copy, so an object that changes
+   * between the check and the append cannot get past it. Nothing in the product writes these operations yet.
    */
   bindFindingEvent(actor, type, data) {
     if (!isResolvedActor(actor)) return { ok: false, code: 'no_credential', errors: ['a finding operation is made with an actor from resolveActor'] };
-    const d = { ...(data && typeof data === 'object' && !Array.isArray(data) ? data : {}), by: actor.subject.id };
+    let copy;
+    try { copy = data === undefined || data === null ? {} : JSON.parse(JSON.stringify(data)); } catch { return { ok: false, code: 'invalid', errors: ['the data must be plain data'] }; }
+    const d = { ...(copy && typeof copy === 'object' && !Array.isArray(copy) ? copy : {}), by: actor.subject.id };
     if (type === 'claim.finding') {
       if (!validateScope(d.scope).length && !authorizeScope(actor.scope, d.scope).ok) return { ok: false, code: 'scope_mismatch', errors: ['the credential does not reach the scope of this finding'] };
       const r = this.admitFinding(d);
@@ -332,7 +337,8 @@ export class Graph {
     }
     const c = typeof d.id === 'string' ? this.claims.get(d.id) : null;
     if (c?.finding && !authorizeScope(actor.scope, c.finding.scope).ok) return { ok: false, code: 'not_found', errors: [`no finding ${d.id.slice(0, 64)}`] };
-    const r = this.checkFindingEvent(type, d);
+    const events = c?.finding ? c.finding.sources.filter((x) => authorizeScope(actor.scope, x.scope).ok).map((x) => x.event) : undefined;
+    const r = this.checkFindingEvent(type, d, { events });
     return r.ok ? { ok: true, type, data: d } : r;
   }
 
