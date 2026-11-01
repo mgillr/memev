@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // Capability tokens: mv_<id>_<secret>. Only a SHA-256 of the secret is stored; the token is shown once.
 // Scopes: read, write, admin. Paths: globs the token may touch. Expiry: ttl days (0 = never).
+// Identity scope: a field of its own (identity_scope, with a subject), set only for an organisational token; it is not one of
+// the read, write and admin scopes. A token without it resolves to the owner subject and the personal scope (identity.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
 import { sha256, randomToken, readJson, writePrivateJson, timingSafeEqualHex, now, globMatch } from './util.mjs';
+import { validateScope, validateSubject } from './identity.mjs';
 
 export const TOKEN_RE = /^mv_([0-9a-f]{8})_([0-9a-f]{32,})$/;
 
@@ -29,13 +32,23 @@ export class TokenStore {
   /** Another process (the CLI) may have minted or revoked a token: pick that up before answering. */
   fresh() { if (this._mtime() !== this.mtime) this.reload(); }
 
-  issue({ agent, scopes = ['read', 'write'], paths = ['**'], ttlDays = 180, note = '', remote = false } = {}) {
+  issue({ agent, scopes = ['read', 'write'], paths = ['**'], ttlDays = 180, note = '', remote = false, identityScope = null, subject = null } = {}) {
     if (!agent) throw new Error('a token needs an agent name');
     this.fresh();
     for (const s of scopes) if (!['read', 'write', 'admin'].includes(s)) throw new Error(`unknown scope: ${s}`);
+    let identity = null;
+    if (identityScope !== null) {
+      const bad = validateScope(identityScope);
+      if (bad.length) throw new Error(`bad identity scope: ${bad[0]}`);
+      if (identityScope.type !== 'personal' || subject !== null) {
+        const worse = subject === null ? ['an organisational token names its subject'] : validateSubject(subject);
+        if (worse.length) throw new Error(`bad subject for the identity scope: ${worse[0]}`);
+      }
+      identity = { identity_scope: { type: identityScope.type, id: identityScope.id }, ...(subject === null ? {} : { subject: JSON.parse(JSON.stringify(subject)) }) };
+    }
     const id = randomToken(4), secret = randomToken(20);
     const expires = ttlDays > 0 ? new Date(this._clock() + ttlDays * 86400e3).toISOString() : null;
-    this.data.tokens[id] = { id, agent, scopes, paths, hash: sha256(secret), created: now(), expires, revoked: false, note, remote, last_used: null };
+    this.data.tokens[id] = { id, agent, scopes, paths, hash: sha256(secret), created: now(), expires, revoked: false, note, remote, last_used: null, ...identity };
     this.save();
     return { id, token: `mv_${id}_${secret}`, expires };
   }
@@ -49,7 +62,7 @@ export class TokenStore {
     if (!rec || rec.revoked) return null;
     if (!timingSafeEqualHex(rec.hash, sha256(m[2]))) return null;
     if (rec.expires && Date.parse(rec.expires) < this._clock()) return null;
-    return { id: rec.id, agent: rec.agent, scopes: rec.scopes, paths: rec.paths, remote: !!rec.remote, expires: rec.expires, note: rec.note || '' };
+    return { id: rec.id, agent: rec.agent, scopes: rec.scopes, paths: rec.paths, remote: !!rec.remote, expires: rec.expires, note: rec.note || '', ...(rec.identity_scope ? { identity_scope: rec.identity_scope, ...(rec.subject ? { subject: rec.subject } : {}) } : {}) };
   }
 
   touch(id) { const r = this.data.tokens[id]; if (r) { r.last_used = now(); } }
