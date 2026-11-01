@@ -1187,6 +1187,35 @@
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
+      "id": "PG-19.1",
+      "type": "programme work package",
+      "area": "PG-19",
+      "title": "memev work command wired to runWork with a production openStore (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP19-01, WP19-02 (a gap found after the decomposition; decided under owner delegation, 1 Nov 2026; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "SO-A-03",
+          "boundary": "it defines runWork and memev work status in src/cli/work.mjs; PG-19.1 wires them and does not change them"
+        },
+        {
+          "contract": "SO-08-B",
+          "boundary": "it stays recovery and control under WP08-02; PG-19.1 adds no recovery or control command"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "SO-A-03 (signed fold contract, cited by id) defines runWork; this spec adds only the dispatch, the openStore port and the tests",
+      "depends_on": [
+        "SO-1.01",
+        "SO-A-03"
+      ],
+      "tasks": 2,
+      "criteria": 14,
+      "spec": "specs/PG-19.1-memev-work-command-wired-to-runwork.json",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+    },
+    {
       "id": "PG-18.1",
       "type": "programme work package",
       "area": "PG-18",
@@ -1759,6 +1788,18 @@
       "task": "WP18-04",
       "title": "Payment after verified acceptance: agentic payment protocol adapters and a Stripe adapter, idempotency, reconciliation; a payment receipt is never taken as proof of delivery",
       "contract": "PG-18.1",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP19-01",
+      "title": "memev work dispatches to runWork from main.mjs, with a production openStore port that opens the real project store",
+      "contract": "PG-19.1",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP19-02",
+      "title": "An end-to-end CLI test runs the work command through bin/memev.mjs against a real project store",
+      "contract": "PG-19.1",
       "note": "specified in this set"
     }
   ]
