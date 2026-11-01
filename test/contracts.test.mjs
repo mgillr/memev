@@ -17,7 +17,7 @@ function setup() {
   return { root, v, work, d };
 }
 
-test('self-sign, open until verified, then closed; the signature covers the exact bytes', () => {
+test('self-sign, open until verified, then closed; the signature covers the exact bytes', async () => {
   const { root, v, work, d } = setup();
   const s = v.contractSign(OWNER, { id: d.id, session: 'sess-k' });
   assert.equal(s.signed, true);
@@ -25,17 +25,17 @@ test('self-sign, open until verified, then closed; the signature covers the exac
   assert.equal(v.contractCheckSignature(d.id).ok, true);
   assert.deepEqual(v.contractGate('sess-k').map((c) => c.id), [d.id]);
   assert.deepEqual(v.contractGate('another-session'), []);
-  const r1 = v.contractVerify(OWNER, { id: d.id });
+  const r1 = await v.contractVerify(OWNER, { id: d.id });
   assert.equal(r1.ok, false);
   fs.writeFileSync(path.join(work, 'health.js'), 'export default () => ({ ok: true });\n');
-  const r2 = v.contractVerify(OWNER, { id: d.id });
+  const r2 = await v.contractVerify(OWNER, { id: d.id });
   assert.equal(r2.ok, true, JSON.stringify(r2));
   assert.equal(v.contractList().find((c) => c.id === d.id).state, 'done');
   assert.deepEqual(v.contractGate('sess-k'), []);
   v.close();
 });
 
-test('signed contracts are immutable: refused by the vault, rejected by git, and an edit breaks verification', () => {
+test('signed contracts are immutable: refused by the vault, rejected by git, and an edit breaks verification', async () => {
   const { root, v, d } = setup();
   v.contractSign(OWNER, { id: d.id });
   v.commits.flush();
@@ -45,7 +45,7 @@ test('signed contracts are immutable: refused by the vault, rejected by git, and
   const file = path.join(root, p);
   const c = JSON.parse(fs.readFileSync(file, 'utf8')); c.tasks[0].criteria.pop(); fs.writeFileSync(file, JSON.stringify(c, null, 2));
   assert.match(v.contractCheckSignature(d.id).detail, /changed after signing/);
-  assert.equal(v.contractVerify(OWNER, { id: d.id }).ok, false);
+  assert.equal((await v.contractVerify(OWNER, { id: d.id })).ok, false);
   execFileSync('git', ['add', p], { cwd: root });
   assert.throws(() => execFileSync('git', ['commit', '-q', '-m', 'weaken', '--', p], { cwd: root, stdio: 'pipe' }), /refusing to change signed contract files/);
   execFileSync('git', ['checkout', 'HEAD', '--', p], { cwd: root });
@@ -56,10 +56,10 @@ test('signed contracts are immutable: refused by the vault, rejected by git, and
   v.close();
 });
 
-test('commands in criteria never run for remote callers', () => {
+test('commands in criteria never run for remote callers', async () => {
   const { v, d } = setup();
   v.contractSign(OWNER, { id: d.id });
-  const r = v.contractVerify(OWNER, { id: d.id }, { local: false });
+  const r = await v.contractVerify(OWNER, { id: d.id }, { local: false });
   assert.equal(r.tasks[0].criteria[2].status, 'BLOCKED');
   v.close();
 });
