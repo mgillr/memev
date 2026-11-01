@@ -16,19 +16,19 @@ Reconciled 31 October 2026 against main at `4823064`. The requirement register a
 
 ## Summary
 
-Leaves: 276. delivered 21, covered 212, new 27, blocked 16. Of the covered leaves, 96 rest wholly or partly on a contract that only the owner's vault holds and this repository cannot check.
+Leaves: 276. delivered 21, covered 212, new 29, blocked 14. Of the covered leaves, 96 rest wholly or partly on a contract that only the owner's vault holds and this repository cannot check.
 
 | Section | Leaves | delivered | covered | new | blocked |
 | --- | --- | --- | --- | --- | --- |
 | 1 Control and decisions | 19 | 1 | 12 | 2 | 4 |
 | 2 Platform contracts | 57 | 0 | 57 | 0 | 0 |
 | 3 Requirements | 98 | 4 | 86 | 5 | 3 |
-| 4 Addendum | 23 | 0 | 13 | 4 | 6 |
+| 4 Addendum | 23 | 0 | 13 | 5 | 5 |
 | 5 Delivery families | 52 | 0 | 34 | 16 | 2 |
-| 6 Pull requests | 7 | 0 | 6 | 0 | 1 |
+| 6 Pull requests | 7 | 0 | 6 | 1 | 0 |
 | 7 Branches | 7 | 3 | 4 | 0 | 0 |
 | 8 Merged foundations | 13 | 13 | 0 | 0 | 0 |
-| Total | 276 | 21 | 212 | 27 | 16 |
+| Total | 276 | 21 | 212 | 29 | 14 |
 
 The sections are lenses on the same work, so the total counts a thing once per lens; the requirement lens (98 leaves) is the one that must reach "delivered".
 
@@ -368,13 +368,15 @@ Real inventory of the failure tests, from the code on main. The register records
 | 4.3.1 | 13.1 Personal deployment, one or several machines | SR-3.04; SR-1.25; SR-1.30 | covered | owner decision 31 Oct 2026: Personal covers up to 3 computers; SR-3.04 owns concurrent editing of one vault |
 | 4.3.2 | 13.2 Small business shared memory | SO-2.01; SO-2.02; SO-2.14 | new | the organisational knowledge model (SO-2.01), the permission model (SO-2.02) and multi-person project permissions (SO-2.14) are design-record contracts released by the owner on 31 October 2026; the records are not yet written; build layer SO-F-01, SO-F-02 |
 | 4.3.3 | 13.3 Larger businesses and offices | none | blocked | depends on 13.2 and on the node-identity task (5.5.5), which the programme decomposition proposes as WP09-01 and WP13-03 |
-| 4.3.4 | 13.4 Enterprise and international federation | #224 (merged 1 Nov 2026) | blocked | the federation architecture of #224 is not yet accepted |
+| 4.3.4 | 13.4 Enterprise and international federation | #224 (merged 1 Nov 2026) | new | the federated architecture of #224 is in scope by owner direction, 1 Nov 2026; it is not yet built |
 | 4.3.5 | 13.5 Governed shared memory | SO-2.02; SO-2.03 | new | permission-aware access (SO-2.02) and provenance, retention and invalidation (SO-2.03); the status lattice of a note is WP10-01 and WP10-02 of the programme decomposition; build layer SO-F-01, SO-F-03, SO-F-05 |
 | 4.3.6 | 13.6 Cross-project intelligence | SO-2.04; SO-2.05; SO-2.06 | new | findings (SO-2.04), cross-functional routing (SO-2.05) and the acceptance tests (SO-2.06); a prototype is WP08-04 of the programme decomposition and consumes these records; build layer SO-F-09, SO-F-13 |
 | 4.3.7 | 13.6.1 Federated site memory | none | blocked | owner decision 31 Oct 2026 settles local-first with the cloud only a relay and a backup; the review also asks for the two named integrations to be defined, and the trust-governance one is undefined in this repository; build layer SO-F-05, SO-F-07, SO-F-12 |
 | 4.3.8 | 13.7 Convergence, accountable admission and trust governance | SR-3.01, SR-3.02, SR-3.05 (convergence engine boundary); WO-05-D (#206, specification merged) | blocked | the admission and trust-governance integrations have no contract and no definition in this repository; build layer SO-F-03, SO-F-06, SO-F-08 |
 | 4.3.9 | 13.8 Deployment profiles | owner decision 31 Oct 2026 on tiers | covered | illustrative profiles, not thresholds; the tier set is decided |
 | 4.3.10 | 13.9 Acceptance tests for the final state | none | blocked | cannot be written before the contracts above exist |
+
+Rows 4.3.4 and 6.2 changed from blocked to new: the status change follows the owner's direction of 1 Nov 2026 that the federated architecture is in scope, and it is not yet built.
 
 ## 5. Delivery families of the master baseline
 
@@ -467,7 +469,7 @@ Section 8 of the baseline lists proposed contract families and says their ids ar
 | WBS | PR | Work | State on 31 Oct | Owner | Status | Disposition |
 | --- | --- | --- | --- | --- | --- | --- |
 | 6.1 | #222 | Scope One addendum | open, draft, CI green after two merges of main | review row table | covered | independent review done in the table; the owner accepts or rejects each row. This page and SO-1.01 to SO-1.11 are what accepted rows became |
-| 6.2 | #224 | Federation and deployment documentation | merged 1 Nov 2026 | 13.4, 5.5 | blocked | the owner accepts or rejects the architecture; it is not an implementation |
+| 6.2 | #224 | Federation and deployment documentation | merged 1 Nov 2026 | 13.4, 5.5 | new | the federated architecture is in scope by owner direction, 1 Nov 2026; it is not an implementation and is not yet built |
 | 6.3 | #201 | Paid-engine client, off by default | open, draft | SR-3.02; WO-05-B | covered | one lifecycle with #154, #163, #177; keep the engine external; reconcile with the landing branch (section 7) |
 | 6.4 | #177 | Trial separation and abuse guards | open, draft | SR-5.02; MEM-134 | covered | review with #154 and #163 |
 | 6.5 | #163 | Merge-engine entitlement and trial seat policy | open, draft | MEM-130 | covered | reconcile with the licence schema (SR-1.06, signed) and #201 |
