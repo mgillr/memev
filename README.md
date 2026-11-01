@@ -23,6 +23,7 @@ Shared project state, coordination, governed execution and evidence-based verifi
 <p>
 <a href="docs/QUICKSTART.md">Quickstart</a> &middot;
 <a href="docs/FREE-CORE-PREVIEW.md">Free Core Preview</a> &middot;
+<a href="docs/KNOWN-ISSUES.md">Known Issues</a> &middot;
 <a href="docs/README.md">Documentation</a> &middot;
 <a href="docs/ARCHITECTURE.md">Architecture</a> &middot;
 <a href="docs/tiers/README.md">Tiers</a> &middot;
