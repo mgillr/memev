@@ -42,7 +42,7 @@ flowchart LR
 - `memev doctor`
 - Several cloud AI apps side by side through the secure link, such as Claude and ChatGPT, next to
   your local coding tools over MCP (up to 5 connectors counted; nothing is refused)
-- Backup to your own private GitHub repository
+- Optional backup to your own private GitHub repository
 
 ## Limits
 
