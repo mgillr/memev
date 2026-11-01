@@ -1,0 +1,389 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP16-01",
+      "title": "Owner decision on the Federated tier: add a distinct tier, or keep the decided four-name model",
+      "phase": "design",
+      "owner": "owner",
+      "depends_on": [
+        "WP17-01"
+      ],
+      "requirements": [
+        "MV-PRD-04",
+        "MV-PRD-05"
+      ],
+      "description": "Repo: memev. OQ-01. The owner decision of 31 Oct 2026 (a8e5332) fixed the tier set without a Federated tier; this task records whether a distinct federation offer exists above it, in DECISIONS.md before any page changes.",
+      "scope": {
+        "allow": [
+          "docs/PRICING.md",
+          "docs/scope-one/DECISIONS.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP16-01-AC01",
+          "mandatory": true,
+          "statement": "decision recorded",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/DECISIONS.md",
+            "pattern": "(?i)federated tier",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP16-01-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP16-01-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP16-02",
+      "title": "Converge README: remove the claim that Mem0 'gave up' on conflict resolution; keep the technical distinction",
+      "phase": "implement",
+      "owner": "area-product",
+      "depends_on": [],
+      "requirements": [
+        "MV-PRD-01"
+      ],
+      "description": "Repo: converge. README L126, L165 and L465.",
+      "scope": {
+        "allow": [
+          "README.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP16-02-AC01",
+          "mandatory": true,
+          "statement": "claim removed",
+          "verifier": {
+            "type": "grep",
+            "file": "README.md",
+            "pattern": "gave up on conflict resolution",
+            "must": "absent"
+          }
+        },
+        {
+          "id": "WP16-02-AC02",
+          "mandatory": true,
+          "statement": "claim removed (line 465)",
+          "verifier": {
+            "type": "grep",
+            "file": "README.md",
+            "pattern": "Mem0 abandoned conflict resolution",
+            "must": "absent"
+          }
+        },
+        {
+          "id": "WP16-02-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP16-02-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP16-03",
+      "title": "Public README, tier pages and site describe the real ambition without claiming planned federation (supersedes the wording in PR #224)",
+      "phase": "implement",
+      "owner": "area-product",
+      "depends_on": [
+        "WP16-01"
+      ],
+      "requirements": [
+        "MV-PRD-02",
+        "MV-ARCH-01"
+      ],
+      "description": "Repo: memev. Coordinates with SR-6.07 and SR-6.10 in memev-ops which own the site claims; planned and delivered capability are listed separately.",
+      "scope": {
+        "allow": [
+          "README.md",
+          "docs/README.md",
+          "docs/tiers/**"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP16-03-AC01",
+          "mandatory": true,
+          "statement": "README states infrastructure framing",
+          "verifier": {
+            "type": "grep",
+            "file": "README.md",
+            "pattern": "(?i)operating infrastructure",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP16-03-AC02",
+          "mandatory": true,
+          "statement": "README does not claim federation as shipped",
+          "verifier": {
+            "type": "grep",
+            "file": "README.md",
+            "pattern": "(?i)federation is (available|shipped)",
+            "must": "absent"
+          }
+        },
+        {
+          "id": "WP16-03-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP16-03-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP16-04",
+      "title": "Deployment model scales by topology and trust boundary, not by computer count, documented",
+      "phase": "design",
+      "owner": "area-product",
+      "depends_on": [
+        "WP16-01"
+      ],
+      "requirements": [
+        "MV-FED-06",
+        "MV-ARCH-10"
+      ],
+      "description": "Repo: memev.",
+      "scope": {
+        "allow": [
+          "docs/DEPLOYMENT-MODEL.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP16-04-AC01",
+          "mandatory": true,
+          "statement": "doc exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/DEPLOYMENT-MODEL.md"
+          }
+        },
+        {
+          "id": "WP16-04-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP16-04-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP16-05",
+      "title": "Portfolio sequence: Operating Environment, Federation, Network",
+      "phase": "design",
+      "owner": "area-product",
+      "depends_on": [
+        "WP16-01"
+      ],
+      "requirements": [
+        "MV-PRD-03",
+        "MV-PRD-08"
+      ],
+      "description": "Repo: memev.",
+      "scope": {
+        "allow": [
+          "docs/PORTFOLIO.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP16-05-AC01",
+          "mandatory": true,
+          "statement": "doc exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/PORTFOLIO.md"
+          }
+        },
+        {
+          "id": "WP16-05-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP16-05-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP16-06",
+      "title": "Infrastructure Strategy and Architecture Blueprint: target architecture, repository mapping, missing capabilities, interfaces, licensing boundaries, build sequence, first wedge",
+      "phase": "design",
+      "owner": "area-product",
+      "depends_on": [
+        "WP05-03",
+        "WP17-02"
+      ],
+      "requirements": [
+        "MV-PRD-06",
+        "MV-PRD-07"
+      ],
+      "description": "Repo: memev. Folds in the integration audit across memev, crdt-merge and converge.",
+      "scope": {
+        "allow": [
+          "docs/BLUEPRINT.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP16-06-AC01",
+          "mandatory": true,
+          "statement": "blueprint exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/BLUEPRINT.md"
+          }
+        },
+        {
+          "id": "WP16-06-AC02",
+          "mandatory": true,
+          "statement": "blueprint lists missing capabilities",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/BLUEPRINT.md",
+            "pattern": "(?i)missing capabilities",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP16-06-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP16-06-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP16-07",
+      "title": "Commercial value tracks nodes, trust domains, governance and managed services: pricing dimensions documented",
+      "phase": "design",
+      "owner": "area-product",
+      "depends_on": [
+        "WP16-01"
+      ],
+      "requirements": [
+        "MV-PRD-05"
+      ],
+      "description": "Repo: memev. Subject to the WP16-01 decision.",
+      "scope": {
+        "allow": [
+          "docs/PRICING.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP16-07-AC01",
+          "mandatory": true,
+          "statement": "pricing names trust domains",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/PRICING.md",
+            "pattern": "(?i)trust domain",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP16-07-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP16-07-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}

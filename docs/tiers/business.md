@@ -104,7 +104,7 @@ work; it is a planned capability, not a tier, and it is not sold before it is bu
 
 ### Licence and trial
 
-A licence counts once per organisation, by person and by computer. The Business trial is a
+The terms of a Business licence are agreed with you: contact us. The Business trial is a
 time-limited trial: 5 members and 10 computers, 14 days with one 14-day extension. It is self-serve
 when the organisation uses hosted AI providers, or a mix of hosted providers and local tools.
 Organisations that need an on-premises LLM, an air-gapped install or a compliance-led rollout get a
@@ -243,7 +243,7 @@ yours; see above.
 
 ## Limits
 
-- A licence counts once per organisation, by person and by computer. The trial is 5 members and 10
+- The terms of a licence are agreed with you. The trial is 5 members and 10
   computers, 14 days with one 14-day extension. There is no public price: contact us. For identity
   sync, SIEM export, retention, legal hold or high availability, see [Corporate](corporate.md).
 - Every app on every enrolled computer gets a seat on the comms bus. IT or a team lead can run a

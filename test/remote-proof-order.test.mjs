@@ -65,14 +65,14 @@ test('REV-012 AC03: a remote grep criterion is bounded by a pattern cap and a ma
   const draft = (criteria) => { const d = v.contractDraft(REMOTE, { title: 'Bounded grep', project: 'api', workdir: work, tasks: [{ id: 'T1', title: 'grep', scope: ['**'], criteria }] }); v.contractSign(REMOTE, { id: d.id, local: false }); return d.id; };
   // the pattern length is capped
   const cap = draft([{ statement: 'too long', verifier: { type: 'grep', file: 'big.txt', pattern: 'a'.repeat(201) } }]);
-  const r1 = v.contractVerify(REMOTE, { id: cap }, { local: false });
+  const r1 = await v.contractVerify(REMOTE, { id: cap }, { local: false });
   assert.equal(r1.tasks[0].criteria[0].status, 'FAIL');
   assert.match(r1.tasks[0].criteria[0].detail, /200/);
   // a pathological pattern over a large file is terminated, not allowed to hang
   fs.writeFileSync(path.join(work, 'big.txt'), 'a'.repeat(1_000_000));
   const redos = draft([{ statement: 'pathological', verifier: { type: 'grep', file: 'big.txt', pattern: '(a+)+b' } }]);
   const s0 = performance.now();
-  const r2 = v.contractVerify(REMOTE, { id: redos }, { local: false });
+  const r2 = await v.contractVerify(REMOTE, { id: redos }, { local: false });
   const ms = performance.now() - s0;
   t.diagnostic(`pathological grep returned in ${ms.toFixed(0)} ms`);
   assert.ok(ms < 15000, `the verify took ${ms.toFixed(0)} ms`);
@@ -81,7 +81,7 @@ test('REV-012 AC03: a remote grep criterion is bounded by a pattern cap and a ma
   // the grep time of one verify is capped as a whole, so ten pathological criteria do not stall it for ten seconds
   const many = draft(Array.from({ length: 10 }, (_, i) => ({ statement: `pathological ${i}`, verifier: { type: 'grep', file: 'big.txt', pattern: '(a+)+b' } })));
   const s1 = performance.now();
-  const r4 = v.contractVerify(REMOTE, { id: many }, { local: false });
+  const r4 = await v.contractVerify(REMOTE, { id: many }, { local: false });
   const ms2 = performance.now() - s1;
   t.diagnostic(`ten pathological greps returned in ${ms2.toFixed(0)} ms`);
   assert.ok(ms2 < GREP_VERIFY_BUDGET_MS + 1500, `the verify took ${ms2.toFixed(0)} ms`);
@@ -89,7 +89,7 @@ test('REV-012 AC03: a remote grep criterion is bounded by a pattern cap and a ma
   assert.ok(r4.tasks[0].criteria.some((c) => /grep time for this verify is used up/.test(c.detail)));
   // a normal pattern still passes
   const ok = draft([{ statement: 'plain', verifier: { type: 'grep', file: 'big.txt', pattern: 'aa' } }]);
-  const r3 = v.contractVerify(REMOTE, { id: ok }, { local: false });
+  const r3 = await v.contractVerify(REMOTE, { id: ok }, { local: false });
   assert.equal(r3.tasks[0].criteria[0].status, 'PASS');
   v.close();
 });

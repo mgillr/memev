@@ -1,0 +1,226 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP02-01",
+      "title": "History generator: random interleavings of operations on N replicas with drop, duplicate, reorder and restart",
+      "phase": "implement",
+      "owner": "area-engine",
+      "depends_on": [
+        "WP01-01",
+        "WP01-02"
+      ],
+      "requirements": [
+        "MV-CONF-02"
+      ],
+      "description": "Repo: crdt-merge. Hypothesis-based; seeds recorded so a failure replays.",
+      "scope": {
+        "allow": [
+          "tests/conformance/history.py",
+          "tests/conformance/test_history_generator.py"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP02-01-AC01",
+          "mandatory": true,
+          "statement": "generator test passes (red on base: module absent)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/conformance/test_history_generator.py",
+            "cmd": "python -m pytest -x -q {test}"
+          }
+        },
+        {
+          "id": "WP02-01-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP02-01-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP02-02",
+      "title": "Conformance suite for ORSet, LWWMap, AgentState, TrustAgentState and gossip: commutativity, associativity, idempotency",
+      "phase": "implement",
+      "owner": "area-engine",
+      "depends_on": [
+        "WP02-01"
+      ],
+      "requirements": [
+        "MV-CONF-01",
+        "MV-CONF-03"
+      ],
+      "description": "Repo: crdt-merge.",
+      "scope": {
+        "allow": [
+          "tests/conformance/test_laws.py"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP02-02-AC01",
+          "mandatory": true,
+          "statement": "law tests pass",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/conformance/test_laws.py",
+            "cmd": "python -m pytest -x -q {test}"
+          }
+        },
+        {
+          "id": "WP02-02-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP02-02-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP02-03",
+      "title": "Scenario suite: deletion propagation, stale replica, duplicate and out-of-order delivery, process restart, clock skew, replica id collision, partition and heal",
+      "phase": "implement",
+      "owner": "area-engine",
+      "depends_on": [
+        "WP02-01"
+      ],
+      "requirements": [
+        "MV-CONF-03"
+      ],
+      "description": "Repo: crdt-merge. One test per scenario named in the notes list.",
+      "scope": {
+        "allow": [
+          "tests/conformance/test_scenarios.py"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP02-03-AC01",
+          "mandatory": true,
+          "statement": "scenario tests pass",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/conformance/test_scenarios.py",
+            "cmd": "python -m pytest -x -q {test}"
+          }
+        },
+        {
+          "id": "WP02-03-AC02",
+          "mandatory": true,
+          "statement": "all 7 scenario names present",
+          "verifier": {
+            "type": "grep",
+            "file": "tests/conformance/test_scenarios.py",
+            "pattern": "def test_partition_and_heal",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP02-03-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP02-03-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP02-04",
+      "title": "Run the conformance gate in CI on every PR to crdt-merge",
+      "phase": "release",
+      "owner": "area-engine",
+      "depends_on": [
+        "WP02-02",
+        "WP02-03"
+      ],
+      "requirements": [
+        "MV-CONF-01"
+      ],
+      "description": "Repo: crdt-merge.",
+      "scope": {
+        "allow": [
+          ".github/workflows/conformance.yml"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP02-04-AC01",
+          "mandatory": true,
+          "statement": "workflow exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": ".github/workflows/conformance.yml"
+          }
+        },
+        {
+          "id": "WP02-04-AC02",
+          "mandatory": true,
+          "statement": "workflow runs the conformance dir",
+          "verifier": {
+            "type": "grep",
+            "file": ".github/workflows/conformance.yml",
+            "pattern": "tests/conformance",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP02-04-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP02-04-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}
