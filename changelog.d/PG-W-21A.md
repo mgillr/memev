@@ -1,0 +1,3 @@
+### Added
+
+- A trust record, version 1 (`memev-trust/1`), with its validator and schema (`docs/schemas/trust-record-v1.json`), and a pure `evaluate` that answers whether a subject is eligible for a purpose (contribute or verify) in a scope as of a stated time. It denies by default, lets delegation only narrow, and cascades a revocation from its time. Roots are a parameter, there is no default root and no clock read, and trust is an eligibility input only: it never grants a permission, a membership or a read, and a personal scope is never shared. The record format is provisional (ADR 8 is proposed), and the module is a library with tests that nothing calls yet.
