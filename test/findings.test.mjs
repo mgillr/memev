@@ -593,19 +593,46 @@ test('SO-F-09.2 D5: who may adjudicate, verify and dismiss are one frozen provis
   assert.ok(Object.isFrozen(A) && Object.isFrozen(A.adjudicate) && Object.isFrozen(A.adjudicate.subjects) && Object.isFrozen(A.adjudicate.outcomes) && Object.isFrozen(A.verify.subjects) && Object.isFrozen(A.dismiss) && Object.isFrozen(A.dismiss.subjects));
   assert.throws(() => { A.dismiss.subjects.push('agent'); });
   assert.throws(() => { A.dismiss = {}; });
-  for (const by of ['agent:stub-session', 'service:checker', 'device:laptop', 'node:n1']) {
+});
+
+test('SO-F-09.2 D6: a dismissal by an agent or a service changes nothing and the finding stays raisable, while one by a person or an operator takes effect and blocks it', () => {
+  const lead = resolveActor(PERSON_TOKEN(TEAM_A), { target: TEAM_A });
+  const agent = resolveActor({ id: 'tok2', agent: 'stub-session', identity_scope: TEAM_A, subject: { id: 'agent:stub-session', type: 'agent', owner: 'person:lead', role: 'worker' } }, { target: TEAM_A });
+  const svc = resolveActor({ id: 'tok7', agent: 'checker', identity_scope: TEAM_A, subject: { id: 'service:checker', type: 'service', owner: 'person:lead' } }, { target: TEAM_A });
+  const ops = resolveActor({ id: 'tok8', agent: 'ops', identity_scope: TEAM_A, subject: { id: 'operator:ops', type: 'operator', owner: 'person:lead' } }, { target: TEAM_A });
+  for (const r of [lead, agent, svc, ops]) assert.equal(r.ok, true);
+  const again = () => finding({ id: 'f_again' });
+  const listed = (g) => g.listFindings(readerFor(TEAM_A)).length;
+
+  // an agent subject and a service subject: recorded as not effective, nothing else
+  for (const [who, actor, by] of [['agent', agent, 'agent:stub-session'], ['service', svc, 'service:checker']]) {
     const g = make();
-    g.applyOp(op('claim.finding.dismiss', { id: 'f_one', by }));
+    const r = bound(g, actor, 'claim.finding.dismiss', { id: 'f_one', by: 'person:forged', why: 'not wanted' });
+    assert.equal(r.ok, true, `the ${who} event is accepted and recorded`);
     const f = g.claims.get('f_one').finding;
-    assert.equal(f.dismissed, null, `${by} did not dismiss it`);
-    assert.equal(f.history.at(-1).effective, false);
-    assert.equal(g.admitFinding(finding({ id: 'f_again' })).ok, true, 'the finding stays raisable');
-    assert.equal(g.listFindings(readerFor(TEAM_A), {}).length, 1, 'and stays in the listing');
+    assert.deepEqual(f.history.map((h) => [h.kind, h.by, h.effective]), [['dismiss', by, false]], `${who}: the history says it did not take effect`);
+    assert.equal(f.dismissed, null, `${who}: the finding is not dismissed`);
+    assert.equal(g.viewFinding('f_one', readerFor(TEAM_A)).dismissed, false);
+    assert.equal(listed(g), 1, `${who}: it stays in the default listing`);
+    assert.equal(g.admitFinding(again()).ok, true, `${who}: a finding on the same sources and versions can still be raised`);
   }
-  for (const by of ['person:lead', 'operator:ops']) {
+  // the same through the log directly, for the other subject types
+  for (const by of ['device:laptop', 'node:n1']) {
     const g = make();
     g.applyOp(op('claim.finding.dismiss', { id: 'f_one', by }));
-    assert.equal(g.claims.get('f_one').finding.dismissed.by, by);
-    assert.equal(g.admitFinding(finding({ id: 'f_again' })).code, 'dismissed');
+    assert.equal(g.claims.get('f_one').finding.dismissed, null, `${by} did not dismiss it`);
+    assert.equal(g.admitFinding(again()).ok, true);
+  }
+  // a person subject and an operator subject: it takes effect, leaves the listing and blocks the same sources and versions
+  for (const [who, actor, by] of [['person', lead, 'person:lead'], ['operator', ops, 'operator:ops']]) {
+    const g = make();
+    bound(g, actor, 'claim.finding.dismiss', { id: 'f_one', by: 'agent:forged', why: 'not wanted' });
+    const f = g.claims.get('f_one').finding;
+    assert.equal(f.history.at(-1).effective, true, `${who}: it took effect`);
+    assert.equal(f.dismissed.by, by);
+    assert.equal(g.viewFinding('f_one', readerFor(TEAM_A)).dismissed, true);
+    assert.equal(listed(g), 0, `${who}: it leaves the default listing`);
+    assert.equal(g.admitFinding(again()).code, 'dismissed', `${who}: the same sources and versions cannot be raised again`);
+    assert.equal(g.admitFinding(finding({ id: 'f_new', sources: [{ event: 'evt-101', version: 4, scope: TEAM_A }] })).ok, true, 'a new version is new evidence');
   }
 });
