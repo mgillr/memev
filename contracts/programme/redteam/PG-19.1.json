@@ -1,0 +1,73 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PG-19.1",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "715bad8c908bcc10a865dc5efc7cac6f312fc55562d2c892ce8f3eb7ad61e523",
+      "base_commit": "3d78c2f4ef5b570e344962ff8839757f95bf144e",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/cli/main.mjs",
+            "sha256": "0915c5b38d2b7530cb4a07fa7715e6f73fffebd2646a959348eeddfa1b5c52ef"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "runWork and src/cli/work.mjs do not exist on main yet (they come from SO-A-03, pull request #348), so no criterion of this spec can pass until that merges",
+          "disposition": "rejected",
+          "reason": "depends_on names SO-A-03 and the request says in terms that SO-A-03 defines runWork and this spec only wires it; the red-green tests are red at the recorded base by construction, and the contract is built after SO-A-03, as every spec with a predecessor is"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "the wiring criterion (main.mjs reaches runWork) and the grep-style commands prove the import and the case exist, not that the command works",
+          "disposition": "rejected",
+          "reason": "the end-to-end test of WP19-02 spawns bin/memev.mjs against a real project store and a command criterion refuses a test that imports runWork or openStore, so it cannot be a mock-only check"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "the \"no test double\" check on work-store.mjs is a grep for words, which a determined author could avoid",
+          "disposition": "rejected",
+          "reason": "it is a guard against the plain mistake, the end-to-end test is the real check, and the independent re-review reads the port when it exists; a mutation check belongs to the mutation gate, not to this spec"
+        },
+        {
+          "n": 4,
+          "severity": "low",
+          "how": "src/cli/main.mjs is also in the scope of SO-A-01 (memev work prefer), so two specs may change the same file",
+          "disposition": "rejected",
+          "reason": "the request states the boundary: SO-A-01 owns the prefer subcommand, this spec adds only the dispatch and the port; the two edit different lines, and the scope criterion of each judges only its own diff"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the signer, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of PG-19.1, a new programme spec added by pull request #356, made against main at 3d78c2f4ef5b. It has 2 tasks and 14 criteria. Checks run, and the only checks made: the spec hash equals the hash the owner delegation gave (715bad8c908b); the manifest kind is feature and each task has a mandatory test_red_green criterion whose command runs its own test file; the tasks draft through makeTask; every command parses with sh -n; no criterion statement repeats within a task; every grep pattern compiles and is within 200 characters; every depends_on is a row of the programme or the Scope One manifest; the criteria name no test or file that another spec of the repository names (src/cli/work-store.mjs, test/cli-work.test.mjs and test/cli-work-e2e.test.mjs are new); the one input under src/ the scope names (src/cli/main.mjs) is listed with its hash at the reviewed commit; the leak scan is clean. All passed. I did not run any named test (its files do not exist yet), I did not re-read the vault contracts the request names, and I did not read SO-A-03 beyond its id, because its code is not on main. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NjgwZWMwNzQ5MWRjMzlkYjhjZjZmYTI4ZTVlOTA3NDQyYjU5NjdhOGVlNjAyNjM1MDQ3OWU0NGZlNDI1NTI0YQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "uwZF8c/ty8Az+kDdXjjAUzOf1XyYcodPyTRV/am3C1/vJVsRZassv+Kb60p5I7KVieHWtWmFUTDPHx159Pw9CQ=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZDMyM2E2OTViN2ZiOTc5Yjc3YTMyZDBiZjMwMjFmZGU2YTQ5NWQ1MjVhMzA1MGQ1NWNlYWM5Mzc0NTdkNmI3NA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "zxw44O1eFLWtbIzrsvb3rcoMoovCWKtllzdekwE1a3jN0IAWeepMkV+M0HJjyq9FOSm4+uKQWEituc/7aySJBA=="
+          }
+        ]
+      }
+    }
+  ]
+}
