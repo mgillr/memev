@@ -1502,7 +1502,7 @@
       "tasks": 1,
       "criteria": 15,
       "spec": "specs/PG-W-21A.json",
-      "status": "proposed, unsigned; independent of every open pull request and of every open owner question; the record format is provisional (ADR 8, proposed)",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); independent of every open pull request and of every open owner question; the record format is provisional (ADR 8, proposed)",
       "kind": "feature"
     },
     {
