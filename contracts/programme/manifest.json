@@ -66,6 +66,12 @@
       "manifest": "this manifest (contracts/programme/specs, signed as k-pg-04-1-canonical-operat-b77c7c; the file is unchanged)",
       "reason": "owner delegation, 1 Nov 2026: pull request #357 must map src/engine/envelope.mjs into docs/MODULES.md, so docs/MODULES.md is added to the scope of WP04-02; no other scope entry, requirement or criterion changes",
       "superseded_by": "PG-04.2"
+    },
+    {
+      "id": "PG-19.1",
+      "manifest": "this manifest (contracts/programme/specs, signed 1 Nov 2026; the file is unchanged)",
+      "reason": "owner delegation, 1 Nov 2026: PG-19.1 says src/cli/work-store.mjs returns the real project store, which SO-1.01 requirement 3 forbids (only the vault, the coordinator and the project store reach the store); PG-19.2 routes openStore through one read-only vault method, workImpactView, that returns plain data and no ProjectStore instance, adds task WP19-03 with scope src/engine/vault.mjs and docs/MODULES.md, and keeps every PG-19.1 criterion",
+      "superseded_by": "PG-19.2"
     }
   ],
   "resolved_without_contract": [
@@ -1273,6 +1279,38 @@
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
+      "id": "PG-19.2",
+      "type": "programme work package",
+      "area": "PG-19",
+      "title": "memev work command wired to runWork with a production openStore through a read-only vault method (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP19-01, WP19-02, WP19-03 (a gap found after the decomposition; decided under owner delegation, 1 Nov 2026; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "SO-A-03",
+          "boundary": "it defines runWork and memev work status in src/cli/work.mjs; PG-19.1 wires them and does not change them"
+        },
+        {
+          "contract": "SO-08-B",
+          "boundary": "it stays recovery and control under WP08-02; PG-19.1 adds no recovery or control command"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "SO-A-03 (signed fold contract, cited by id) defines runWork; this spec adds only the dispatch, the openStore port, one read-only vault method and the tests",
+      "depends_on": [
+        "SO-1.01",
+        "SO-A-03"
+      ],
+      "tasks": 3,
+      "criteria": 24,
+      "spec": "specs/PG-19.2-memev-work-command-wired-to-runwork.json",
+      "status": "proposed and unsigned; no red-team record",
+      "supersedes": "PG-19.1",
+      "supersedes_reason": "owner delegation, 1 Nov 2026: PG-19.1 says src/cli/work-store.mjs returns the real project store, which SO-1.01 requirement 3 forbids (only the vault, the coordinator and the project store reach the store); PG-19.2 routes openStore through one read-only vault method, workImpactView, that returns plain data and no ProjectStore instance, adds task WP19-03 with scope src/engine/vault.mjs and docs/MODULES.md, and keeps every PG-19.1 criterion",
+      "kind": "feature"
+    },
+    {
       "id": "PG-18.1",
       "type": "programme work package",
       "area": "PG-18",
@@ -1850,13 +1888,19 @@
     {
       "task": "WP19-01",
       "title": "memev work dispatches to runWork from main.mjs, with a production openStore port that opens the real project store",
-      "contract": "PG-19.1",
+      "contract": "PG-19.2",
       "note": "specified in this set"
     },
     {
       "task": "WP19-02",
       "title": "An end-to-end CLI test runs the work command through bin/memev.mjs against a real project store",
-      "contract": "PG-19.1",
+      "contract": "PG-19.2",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP19-03",
+      "title": "A narrow read-only vault method serves memev work impact: no ProjectStore instance and no write path leave the vault",
+      "contract": "PG-19.2",
       "note": "specified in this set"
     }
   ]
