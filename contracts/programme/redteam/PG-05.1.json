@@ -25,7 +25,9 @@
         {
           "n": 1,
           "severity": "high",
-          "how": "the request names the layer decision as a lane label of another agent (\"lead ...\" plus the word for a work lane) and the same label sits in docs/scope-one/DECISIONS.md; it is an agent label in a public repository, and a signed contract is immutable, so it would be permanent. Replace it with \"owner delegation, 1 Nov 2026\""
+          "how": "the request names the layer decision as a lane label of another agent (\"lead ...\" plus the word for a work lane) and the same label sits in docs/scope-one/DECISIONS.md; it is an agent label in a public repository, and a signed contract is immutable, so it would be permanent. Replace it with \"owner delegation, 1 Nov 2026\"",
+          "disposition": "rejected",
+          "reason": "Fixed in the text, not by a criterion: the request now names the layer decision as owner delegation, 1 Nov 2026. I searched the spec and the programme manifest for lane, agent and seat labels and found none."
         }
       ],
       "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Third review, of pull request #325 at head afdccd6 (the second, at 79cbaae, found the weak criteria and the open layer question; the criteria are tightened and the layer is decided by owner delegation of 1 Nov 2026, as DECISIONS.md records). The engine decision is owner-confirmed (t542u, 31 Oct 2026). Checks run, and the only checks made: the spec hash equals specSha256 of the file at the reviewed head; every MV citation resolves to the cited line of docs/scope-one/programme/REQUIREMENTS.md or DECOMPOSITION.md and its text matches; every quoted SO-1.x, SO-2.x, SR and QL requirement is a verbatim stretch of the signed contract it cites; each verifier (grep pattern, file_exists path, wiring entry) was run against the tree it names (this tree, or the pull request head where the spec is for another repository); the request, tasks and manifest rows were read against the leak rules of this repository (the leak scan stays clean, and I also read by hand for agent and lane labels, which the scan does not catch); no duplicate of SO-1.01, SO-1.02, SO-1.04, SO-1.10, SO-1.11, SO-2.x, SR, QL, WBS or baseline section 8 was found. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. The tightened criteria are real: the table, the state map and the no-text-merge grep on src/engine/state-map.mjs. R2 matches the WO-05-A line protocol. WO-05-B is cited as signed with its build in draft pull request #201. The layer hold is released (owner delegation, 1 Nov 2026). Engine decision confirmed (t542u, 31 Oct 2026). Held for the label.",
@@ -36,6 +38,152 @@
           {
             "keyid": "ba7f5a5b8f8aa026",
             "sig": "AqU7FD9iaRv6WCLR2wxwAmiWn+FsK7ZMOLFXweVa149AKBbiJ903lufsi4NquigejK/eXO3c6BjdE8ZoNPYeDQ=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "06401d988d6b685e9c64e762724e3eadd266ca2649eaa47418eb758c37bb7275",
+      "base_commit": "2df1272008a9f32d2c69d130003a0d521b846d2d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "scripts/bench/check.mjs",
+            "sha256": "b1d333c18c7516756bfd2fbdfad066b46fbb6e0f1380bc45856b2e3d4dac1617"
+          },
+          {
+            "path": "scripts/bench/determinism.mjs",
+            "sha256": "efb873b9d8978075ae9b3b5d3e3e565a80eadce83caba78da721a8c851e6c8f5"
+          },
+          {
+            "path": "scripts/bench/harness.mjs",
+            "sha256": "4c72bdeacb25d665f37ae4efb82081886fdc6fc9b100e78a97d346d5f06f150c"
+          },
+          {
+            "path": "scripts/bench/o200k.mjs",
+            "sha256": "7a548d00a9eb662aa552d7dfcd0bb9e76e83b4f4581ba3428a7cf14da492d731"
+          },
+          {
+            "path": "scripts/bench/o200k_base.tiktoken.gz",
+            "sha256": "d6e1076513d1ebd773d00f4595efb2751aa27573d5e42adf4c9d7b603d2792db"
+          },
+          {
+            "path": "scripts/bench/run.mjs",
+            "sha256": "9e9afca32e98c3039ac4f94c6d7f300978eefa17ce0498dc67f2320b91939d08"
+          },
+          {
+            "path": "scripts/bench/seed.mjs",
+            "sha256": "e73e345ea1ac2b4dfbe87a44ca4c0fdeafef0890a24b3f8e13817ceaf6f313b2"
+          },
+          {
+            "path": "scripts/changelog-assemble.mjs",
+            "sha256": "d246214a7a6e91ef5e261709164bf3097d80f270f4acd4c0488d89097c0e273c"
+          },
+          {
+            "path": "scripts/docker-smoke.sh",
+            "sha256": "7bd709506f6b788b0cd7d85a155360b57351e21800f54af06d5a6b25fdbfc4ea"
+          },
+          {
+            "path": "scripts/docker-trial-smoke.sh",
+            "sha256": "ca028e8cf752f516cc32780536d86f95f14eb67ec9f92c6fdbe6ab844d55e8f5"
+          },
+          {
+            "path": "scripts/docs/module-graph.mjs",
+            "sha256": "fe6e35d655bc242a8c2359855f3711176208d1969c1770099c8e40bbf2f20eb1"
+          },
+          {
+            "path": "scripts/gate/mutate.mjs",
+            "sha256": "52b884ec18ccb2017a5c65e096e14210484e9d2b4d3f3843f76b37ee82f20c65"
+          },
+          {
+            "path": "scripts/gate/redteam-gate.mjs",
+            "sha256": "dcc09c9b623f9f61b600afe66e7681b4b5f5049a1ce0dd750f6602974dac643a"
+          },
+          {
+            "path": "scripts/growth-bench.mjs",
+            "sha256": "3eaf2235ff81a5078298132d5437266b2f4d40e53a5d7d2efa2d47f1fa9fd50f"
+          },
+          {
+            "path": "scripts/install.ps1",
+            "sha256": "9ba1feff920f89f6ced0bc84715a313a9a8ac8f8570c8b26ce6b5a23673b5064"
+          },
+          {
+            "path": "scripts/install.sh",
+            "sha256": "47ef2a6282a42fe714359103096aa6f6aa03aebd41ef38be33efbab97e182adb"
+          },
+          {
+            "path": "scripts/lab/cli-walk.sh",
+            "sha256": "732dbd39716d8ea572c71032f889ac711a46e0f1fc70668ea294595d976dde18"
+          },
+          {
+            "path": "scripts/lab/measure.mjs",
+            "sha256": "02e499dce464d76627deb02373b8752ddb1dea9aed0b8ee79044c86376d64964"
+          },
+          {
+            "path": "scripts/leak-denylist.json",
+            "sha256": "dc0900785c2d93ac50fef1331600fd13c8b44bb5442ae33290ec70f2b7b50767"
+          },
+          {
+            "path": "scripts/leak-scan.mjs",
+            "sha256": "b9e4c817f51c640c3d72f0be7c09d050ebdd907c5679b0b84dbe55d9b0e8b4a9"
+          },
+          {
+            "path": "scripts/license-dev.mjs",
+            "sha256": "a268d7c0cd6b52534717609b8b3cfe297fe4a9490ae1bbad21e530c56308ef8a"
+          },
+          {
+            "path": "scripts/license/issue.mjs",
+            "sha256": "ae5fba0de1a8d0ab97612e2512197077a0472938c31dccdf66ea0acba9d1db7c"
+          },
+          {
+            "path": "scripts/metrics/gates.json",
+            "sha256": "8219b1fa2fbdd1b053b80a7a86ceb2a7c530cbf628ba0014822dafbcc817d49d"
+          },
+          {
+            "path": "scripts/metrics/report.mjs",
+            "sha256": "b18be4109d85fece4cb38227fbb76315b4687c0a3dcb1f846bef259be648f3d6"
+          },
+          {
+            "path": "scripts/node-runtime.json",
+            "sha256": "7ebe63d1113ff32ad1694e6db70d75bc75a7d149a6de9408328cd5d155fc3b92"
+          },
+          {
+            "path": "scripts/release-tag-check.mjs",
+            "sha256": "fc3a66d5341c4e5ab6643c80d23fe95660aa29127bb6b02f51b8b6eab86bfae0"
+          },
+          {
+            "path": "scripts/release-tarball.mjs",
+            "sha256": "0a8dcde79e8796306be4fa7b743424ac63681be6893b4f7465132a29e9af1766"
+          },
+          {
+            "path": "scripts/smoke.sh",
+            "sha256": "435b7086f73756eaf3dae79d63d8b08b7b1c1705162aab7aadda59c7f5c2b837"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Fourth review, of the merged tree of pull requests #325 and #340 at the reviewed head. Round 1 (afdccd6) held one high answer (an agent label in the request). Commit 3da0df2 of #325 changes the request and adds the fold requirements SO-F-02 and SO-F-06 to WP05-01, WP05-04 and WP05-06 and one criterion in each that fails if the task repeats what the fold owns. Nothing of round 1 was removed or reworded. Checks run, and the only checks made: the spec hash equals specSha256 of the file on disk at the reviewed head; every task drafts through makeTask; every command criterion parses with sh -n; every grep pattern compiles as a regular expression; no criterion statement repeats within a task; every test_red_green command names its own test file and that file is inside the task scope; every MV citation resolves to a line of docs/scope-one/programme/REQUIREMENTS.md, DECOMPOSITION.md or WBS.md; every fold id the spec cites (SO-A, SO-F) matches the title of a signed contract under contracts/signed; every SO, SR, QL and PG spec id it names resolves to a spec file here, except ids of specs that live in the other repository (SR-3.03, SR-3.06), which I did not resolve; I read the request, task descriptions and requirements by hand for agent, lane and seat labels (a word search for agent, lane and seat labels finds none in the spec or in the programme manifest) and the leak scan stays clean. All passed. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZDgyMWY3NmQ5OGM2ZGRlZGE3MGUzNTY5ZGJlZThhNDVkMDBlNTdkMzJkMzdkZmY0OTUwYzk5N2NlYjRhNTE0NQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "Yymxu2pjZnzQcNSLe0edYDbZEFmRyZkAGqWqdf4GXZ+I5A1GNrLBwaxBuAYZ04fqovxxQ3BG0IJGrDOcD/pbAQ=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NzFiOWZkOTk3MjY0OTlmMGNlYzk2OTk2NGQ0M2VjMTM1MjZjMTYzN2M4MDdjNmVkZWNiMjA3YjIxNjQwMWFkNg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "VfjY2ppg+Hy8gIkwIXPOvp1kzl31InEvEdbOdQ+LJ9uL5/zeCZnSegXK6WPtfwZufJOEYjDjNFJr/CrF1WkmAQ=="
           }
         ]
       }

@@ -25,17 +25,41 @@
         {
           "n": 1,
           "severity": "medium",
-          "how": "T2 only greps SR-3.05 for ACFA-RS and for 2028-03-29, which proves little about \"states the licences once\""
+          "how": "T2 only greps SR-3.05 for ACFA-RS and for 2028-03-29, which proves little about \"states the licences once\"",
+          "disposition": "added",
+          "reason": "T2 now checks that SR-3.05 names all four licences and still has the notice section that states the licences once.",
+          "folded_as": {
+            "task": "T2",
+            "statement": "The spec names all four licences: the Apache-2.0 core, BSL for crdt-merge, ACFA-RS and the commercial federated services",
+            "verifier": {
+              "type": "command",
+              "cmd": "for n in \"Apache-2.0\" \"BSL\" \"ACFA-RS\" \"federated services\"; do grep -q \"$n\" contracts/seed-readiness/specs/SR-3.05-one-licence-for-the-engine.json || exit 1; done",
+              "expect_exit": 0
+            }
+          }
         },
         {
           "n": 2,
           "severity": "medium",
-          "how": "the request cites WO-05-E for the text guard of the two licence pages, but SR-3.05 does not cite WO-05-E, so the claim is unfulfilled in the spec it describes"
+          "how": "the request cites WO-05-E for the text guard of the two licence pages, but SR-3.05 does not cite WO-05-E, so the claim is unfulfilled in the spec it describes",
+          "disposition": "added",
+          "reason": "T2 now has a criterion that the spec cites WO-05-E by id.",
+          "folded_as": {
+            "task": "T2",
+            "statement": "The spec cites the signed vault contract WO-05-E by id",
+            "verifier": {
+              "type": "grep",
+              "file": "contracts/seed-readiness/specs/SR-3.05-one-licence-for-the-engine.json",
+              "pattern": "WO-05-E"
+            }
+          }
         },
         {
           "n": 3,
           "severity": "low",
-          "how": "the request says the SR files are kept identical between memev and memev-ops; that is true of SR-3.01 and SR-3.05 and not of SR-5.02 (memev #321 repointed MEM-067, memev-ops did not)"
+          "how": "the request says the SR files are kept identical between memev and memev-ops; that is true of SR-3.01 and SR-3.05 and not of SR-5.02 (memev #321 repointed MEM-067, memev-ops did not)",
+          "disposition": "rejected",
+          "reason": "Fixed in the text: the request now limits the statement that the files are kept identical to the SR files for which it is true."
         }
       ],
       "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Second review, of pull request #325 at head 79cbaae (the first, at ea7e95d, found the agent label, the manifest kinds, wrong paths and missing citations; each of those is fixed at this head). The engine decision is owner-confirmed (t542u, 31 Oct 2026). Checks run, and the only checks made: the spec hash equals specSha256 of the file at 79cbaae; every MV citation resolves to the cited line of docs/scope-one/programme/REQUIREMENTS.md or DECOMPOSITION.md and its text matches; every quoted SO-1.x, SO-2.x, SR and QL requirement is a verbatim stretch of the signed contract it cites; each verifier (grep pattern, file_exists path, wiring entry) was run against the tree it names (this tree, or the pull request head where the spec is for another repository); the request, tasks and manifest rows were read against the leak rules of this repository (the leak scan stays clean, and I also read by hand for agent and lane labels, which the scan does not catch); no duplicate of SO-1.01, SO-1.02, SO-1.04, SO-1.10, SO-1.11, SO-2.x, SR, QL, WBS or baseline section 8 was found. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. The T1 criteria are real (the supersession marks and the SR-3.03 negative grep pass against memev-ops #13 at 080c7aa). Weak T2 criteria, so held. Engine decision confirmed (t542u, 31 Oct 2026).",
@@ -46,6 +70,48 @@
           {
             "keyid": "ba7f5a5b8f8aa026",
             "sig": "m0u/Pyeo9P0Lm1iF0AabVbkQTz0pjKLBnIb4thIDlxseSaVsfHCTfbGXeMSqM5F3AQCVYDVyvTjzue2Y/dU0Bw=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "15656f5f671a9d9534c300f64eab2ab1d64de86e5dbbeb90c38e5e46d2aa3f1d",
+      "base_commit": "2df1272008a9f32d2c69d130003a0d521b846d2d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/scope-one/programme/REQUIREMENTS.md",
+            "sha256": "84e62695045dedc65095f75fe25dd7982846dcf2bd8b0b5b351a4da17693041b"
+          },
+          {
+            "path": "docs/scope-one/WBS.md",
+            "sha256": "77a1f842357671ba8ff0ab85f9b91d4023d09aef08eba052f0b135d19c6688aa"
+          }
+        ]
+      },
+      "manifest_kind": "docs",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Fourth review, of the merged tree of pull requests #325 and #340 at the reviewed head. Round 1 (afdccd6) held two medium answers (a weak T2 check and a claim about WO-05-E) and one low (a claim that the SR files are kept identical). Commit 3da0df2 of #325 adds criteria to T1 (the superseded status, the reasons, the call-out approach, the dependency table) and T2 (WO-05-E by id, all four licences, the notice section, the manifest row of SR-3.05), and limits the request. Nothing was removed or reworded. The hash of round 1 differs from this round because the spec changed in those places. Checks run, and the only checks made: the spec hash equals specSha256 of the file on disk at the reviewed head; every task drafts through makeTask; every command criterion parses with sh -n; every grep pattern compiles as a regular expression; no criterion statement repeats within a task; every test_red_green command names its own test file and that file is inside the task scope; every MV citation resolves to a line of docs/scope-one/programme/REQUIREMENTS.md, DECOMPOSITION.md or WBS.md; every fold id the spec cites (SO-A, SO-F) matches the title of a signed contract under contracts/signed; every SO, SR, QL and PG spec id it names resolves to a spec file here, except ids of specs that live in the other repository (SR-3.03, SR-3.06), which I did not resolve; I read the request, task descriptions and requirements by hand for agent, lane and seat labels (a word search for agent, lane and seat labels finds none in the spec or in the programme manifest) and the leak scan stays clean. All passed. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OGZlMjE1OTYzYTc4ZWU2YmIxYTJjYzc4YjhmYzY2YTI3ZDFkNzBkNzAxYTBmZGE1MmYzMTY1MmU0N2JhNjE3Ng==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "V4bABKWz5IE7/paGnoOfNYSs2Uw452xwGDBkpCZDnOcLrloKNJUrRwP+OHzmfv5RJ2SFrgOl6H0fkRLQpoiAAg=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZWQ1ZTNjN2QyNDZmNDk1ZjIyNzBiMzQzZTdmNTk2YTFiYjA1OWMwNzkyYzZkNWY2NWEyM2FhYzQ5ZDk3MDY3Zg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "xPUdx5V2teKEGjUvXivpVjokBHE2NA8Ve9ENiL+PbjP08SGG7AWj6ly3jflfm/rhlkKpJ1m66Q1ge485/TAVAw=="
           }
         ]
       }

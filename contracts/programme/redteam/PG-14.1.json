@@ -25,17 +25,41 @@
         {
           "n": 1,
           "severity": "high",
-          "how": "the request names the layer decision as a lane label of another agent (\"lead ...\" plus the word for a work lane) and the same label sits in docs/scope-one/DECISIONS.md; it is an agent label in a public repository, and a signed contract is immutable, so it would be permanent. Replace it with \"owner delegation, 1 Nov 2026\""
+          "how": "the request names the layer decision as a lane label of another agent (\"lead ...\" plus the word for a work lane) and the same label sits in docs/scope-one/DECISIONS.md; it is an agent label in a public repository, and a signed contract is immutable, so it would be permanent. Replace it with \"owner delegation, 1 Nov 2026\"",
+          "disposition": "rejected",
+          "reason": "Fixed in the text, not by a criterion: the request now names the layer decision as owner delegation, 1 Nov 2026. I searched the spec for lane, agent and seat labels and found none."
         },
         {
           "n": 2,
           "severity": "medium",
-          "how": "WP14-05 (no claim without a measured value) still has no criterion beyond file_exists and a grep for \"method\""
+          "how": "WP14-05 (no claim without a measured value) still has no criterion beyond file_exists and a grep for \"method\"",
+          "disposition": "added",
+          "reason": "WP14-05 now has a red-then-green test and three named tests that a published number comes from a measured run.",
+          "folded_as": {
+            "task": "WP14-05",
+            "statement": "The federation bench tests are red on the base and green after",
+            "verifier": {
+              "type": "test_red_green",
+              "test_file": "test/bench-federation.test.mjs",
+              "cmd": "node --test test/bench-federation.test.mjs"
+            }
+          }
         },
         {
           "n": 3,
           "severity": "medium",
-          "how": "WP14-04 criteria are still greps for three names and the SO-2.04 and SO-2.05 citation, not a check that each demonstrator exists"
+          "how": "WP14-04 criteria are still greps for three names and the SO-2.04 and SO-2.05 citation, not a check that each demonstrator exists",
+          "disposition": "added",
+          "reason": "WP14-04 now has one section and one acceptance line for each demonstrator.",
+          "folded_as": {
+            "task": "WP14-04",
+            "statement": "The page has one section for each of the three demonstrators",
+            "verifier": {
+              "type": "command",
+              "cmd": "for n in \"Autonomous project delivery\" \"Organisational intelligence\" \"Independent-site federation\"; do grep -qi \"^## $n\" docs/DEMONSTRATORS.md || exit 1; done",
+              "expect_exit": 0
+            }
+          }
         }
       ],
       "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Third review, of pull request #325 at head afdccd6 (the second, at 79cbaae, found the weak criteria and the open layer question; the criteria are tightened and the layer is decided by owner delegation of 1 Nov 2026, as DECISIONS.md records). The engine decision is owner-confirmed (t542u, 31 Oct 2026). Checks run, and the only checks made: the spec hash equals specSha256 of the file at the reviewed head; every MV citation resolves to the cited line of docs/scope-one/programme/REQUIREMENTS.md or DECOMPOSITION.md and its text matches; every quoted SO-1.x, SO-2.x, SR and QL requirement is a verbatim stretch of the signed contract it cites; each verifier (grep pattern, file_exists path, wiring entry) was run against the tree it names (this tree, or the pull request head where the spec is for another repository); the request, tasks and manifest rows were read against the leak rules of this repository (the leak scan stays clean, and I also read by hand for agent and lane labels, which the scan does not catch); no duplicate of SO-1.01, SO-1.02, SO-1.04, SO-1.10, SO-1.11, SO-2.x, SR, QL, WBS or baseline section 8 was found. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Only the request changed since 79cbaae. The layer hold is released (owner delegation, 1 Nov 2026). Weak criteria remain.",
@@ -46,6 +70,106 @@
           {
             "keyid": "ba7f5a5b8f8aa026",
             "sig": "OKWhqDJFCnxbcesVlaT5IBXo/CmDYUA8GrbDdGHvJtAQU2ru/ZDkW0He9Qoi2FUcUeEo8sXjta/KqgX4x2rDAQ=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "39c9eec0f58a055557ce72f45f16ddd7f863b75df6b22774361c5e81080fd3a2",
+      "base_commit": "2df1272008a9f32d2c69d130003a0d521b846d2d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/scope-one/programme/REQUIREMENTS.md",
+            "sha256": "84e62695045dedc65095f75fe25dd7982846dcf2bd8b0b5b351a4da17693041b"
+          },
+          {
+            "path": "docs/scope-one/WBS.md",
+            "sha256": "77a1f842357671ba8ff0ab85f9b91d4023d09aef08eba052f0b135d19c6688aa"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Fourth review, of the merged tree of pull requests #325 and #340 at the reviewed head. Round 1 (afdccd6) held one high answer (an agent label in the request) and two medium (weak WP14-04 and WP14-05 criteria). Commit 3da0df2 of #325 changes the request, replaces the file_exists and bare red-green criteria with named tests, and adds test/bench-federation.test.mjs to the scope of WP14-05; the removed or reworded criteria are in the amendments below. Checks run, and the only checks made: the spec hash equals specSha256 of the file on disk at the reviewed head; every task drafts through makeTask; every command criterion parses with sh -n; every grep pattern compiles as a regular expression; no criterion statement repeats within a task; every test_red_green command names its own test file and that file is inside the task scope; every MV citation resolves to a line of docs/scope-one/programme/REQUIREMENTS.md, DECOMPOSITION.md or WBS.md; every fold id the spec cites (SO-A, SO-F) matches the title of a signed contract under contracts/signed; every SO, SR, QL and PG spec id it names resolves to a spec file; I read the request, task descriptions and requirements by hand for agent, lane and seat labels (a word search for agent, lane and seat labels finds none) and the leak scan stays clean. All passed. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Nothing high.",
+      "amendments": [
+        {
+          "task": "WP14-01",
+          "field": "statement",
+          "from": "demo test fails before, passes after",
+          "to": "The demo federation tests are red on the base and green after",
+          "reviewer_note": 1
+        },
+        {
+          "task": "WP14-02",
+          "field": "statement",
+          "from": "workflow test fails before, passes after",
+          "to": "The demo workflow tests are red on the base and green after",
+          "reviewer_note": 1
+        },
+        {
+          "task": "WP14-03",
+          "field": "statement",
+          "from": "adversary test fails before, passes after",
+          "to": "The demo adversary tests are red on the base and green after",
+          "reviewer_note": 1
+        },
+        {
+          "task": "WP14-05",
+          "field": "criterion",
+          "from": "bench script exists",
+          "to": null,
+          "reviewer_note": 1
+        },
+        {
+          "task": "WP14-05",
+          "field": "criterion",
+          "from": "The benchmark page states its method",
+          "to": null,
+          "reviewer_note": 1
+        },
+        {
+          "task": "WP14-05",
+          "scope_add": "test/bench-federation.test.mjs",
+          "answer": "1.2"
+        }
+      ],
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NTU5YzQ4NTlhYmQ3N2RlYWJjYWQxNTRjMTA4YTViZjI2NWU5Mzk1NWQ0N2FjNDIwYzI1YzU5ZGM4ZWIwNDU2Ng==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "H8sSbAHhE4nGS4gb2q9xYu43zMSU2gX/z02WbAmCeBlyVY+eARWjgHdiTeaB9Yrv5zOIiJ53K9xWHp8+XyP2CA=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OTU5NDQ5OTM2ZmZjMzkzNzQwMDNmMjYwZjhkN2MwYzk4ZjNjNDE3YjI3ZGQyNDE4NmIyYTQ5NTY4NzJiZWFkNg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "U386tOVnGAhjpXQQzOplNPw9P+cyfOwyH/AmCHo/5ah0X95jH4NxkKkU1dmsW6CY3LIh4KVmMc+bSnKYYlWuCw=="
+          }
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": [
+    {
+      "n": 1,
+      "text": "INTERIM SOLO REVIEW, pending independent re-review. Round 2 of PG-14.1 replaces criteria that round 1 read. Reworded with the same verifier: \"demo test fails before, passes after\" is now \"The demo federation tests are red on the base and green after\"; \"workflow test fails before, passes after\" is now \"The demo workflow tests are red on the base and green after\"; \"adversary test fails before, passes after\" is now \"The demo adversary tests are red on the base and green after\". Removed in WP14-05: \"bench script exists\" (a file_exists check of scripts/bench/federation.mjs) is carried by the red-then-green test test/bench-federation.test.mjs, which runs the script it names, and the three named bench tests; \"The benchmark page states its method\" (a grep for the word method) is carried by the criterion that the page has the sections Method, Failure scenarios, Results and Hardware and by the named test that every published number names its method. The scope of WP14-05 gains test/bench-federation.test.mjs, the file its red-then-green test runs.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MzNmMGYyNWQxNGZlZWUyNDYxNGNjZTQwYzc2YjJmMjBiNGVhMzg2ODIwNGE3NzE2MzdkY2M4OTg2NzE4YmZlYg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "Kcd4aJ8CI42t/P7KmFrqYgrxfA8h6WJSTqXdZ2YXqQCwWq0i8DF6RLsBYgPsa3jurfMQk/3buPXJhz4SMV5YAw=="
           }
         ]
       }

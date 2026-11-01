@@ -25,12 +25,35 @@
         {
           "n": 1,
           "severity": "medium",
-          "how": "WP16-05 is file_exists only"
+          "how": "WP16-05 is file_exists only",
+          "disposition": "added",
+          "reason": "WP16-05 now checks the adoption order of the three products, the three entry stages, that federation is planned and that no Federated tier is named.",
+          "folded_as": {
+            "task": "WP16-05",
+            "statement": "The three products appear in the adoption order: Operating Environment, Federation, Network",
+            "verifier": {
+              "type": "grep",
+              "file": "docs/PORTFOLIO.md",
+              "pattern": "^## Memev Operating Environment[\\s\\S]*^## Memev Federation[\\s\\S]*^## Memev Network",
+              "flags": "m"
+            }
+          }
         },
         {
           "n": 2,
           "severity": "medium",
-          "how": "WP16-06 checks that docs/BLUEPRINT.md exists and contains \"missing capabilities\", which does not check the other six blueprint parts, and R2 (an integration audit across memev, crdt-merge and converge) has no criterion"
+          "how": "WP16-06 checks that docs/BLUEPRINT.md exists and contains \"missing capabilities\", which does not check the other six blueprint parts, and R2 (an integration audit across memev, crdt-merge and converge) has no criterion",
+          "disposition": "added",
+          "reason": "WP16-06 now checks the ten blueprint sections, the licensing boundaries and the integration audit across memev, crdt-merge and converge.",
+          "folded_as": {
+            "task": "WP16-06",
+            "statement": "The blueprint has the ten sections of MV-PRD-06 and MV-PRD-07",
+            "verifier": {
+              "type": "command",
+              "cmd": "for n in \"Target architecture\" \"Repository mapping\" \"Missing capabilities\" \"Interfaces\" \"Licensing boundaries\" \"Build sequence\" \"Positioning\" \"First wedge\" \"Ecosystem route\" \"Integration audit\"; do grep -qi \"^## $n\" docs/BLUEPRINT.md || exit 1; done",
+              "expect_exit": 0
+            }
+          }
         }
       ],
       "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Second review, of pull request #325 at head 79cbaae (the first, at ea7e95d, found the agent label, the manifest kinds, wrong paths and missing citations; each of those is fixed at this head). The engine decision is owner-confirmed (t542u, 31 Oct 2026). Checks run, and the only checks made: the spec hash equals specSha256 of the file at 79cbaae; every MV citation resolves to the cited line of docs/scope-one/programme/REQUIREMENTS.md or DECOMPOSITION.md and its text matches; every quoted SO-1.x, SO-2.x, SR and QL requirement is a verbatim stretch of the signed contract it cites; each verifier (grep pattern, file_exists path, wiring entry) was run against the tree it names (this tree, or the pull request head where the spec is for another repository); the request, tasks and manifest rows were read against the leak rules of this repository (the leak scan stays clean, and I also read by hand for agent and lane labels, which the scan does not catch); no duplicate of SO-1.01, SO-1.02, SO-1.04, SO-1.10, SO-1.11, SO-2.x, SR, QL, WBS or baseline section 8 was found. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Weak criteria, so held. SO-2.14 is cited for WP16-04.",
@@ -41,6 +64,87 @@
           {
             "keyid": "ba7f5a5b8f8aa026",
             "sig": "zKfx4I+XckOklFl76ipatLkJIXo9zYO9EgPPl73JPvMA0ms51ZlwA6zIXW+7bdUffGQchxwvvMxR9wvplLeTBg=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "b52822f724beef56d6ff4c51615d0ce3b90725d4be02497dccb280a13cc8897e",
+      "base_commit": "2df1272008a9f32d2c69d130003a0d521b846d2d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/scope-one/programme/REQUIREMENTS.md",
+            "sha256": "84e62695045dedc65095f75fe25dd7982846dcf2bd8b0b5b351a4da17693041b"
+          },
+          {
+            "path": "docs/scope-one/WBS.md",
+            "sha256": "77a1f842357671ba8ff0ab85f9b91d4023d09aef08eba052f0b135d19c6688aa"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Fourth review, of the merged tree of pull requests #325 and #340 at the reviewed head. Round 1 (afdccd6) held two medium answers (weak criteria on WP16-05 and WP16-06). Commit 3da0df2 of #325 replaces the file and word checks with criteria on the content, as the added answers record and the reviewer note quotes. Checks run, and the only checks made: the spec hash equals specSha256 of the file on disk at the reviewed head; every task drafts through makeTask; every command criterion parses with sh -n; every grep pattern compiles as a regular expression; no criterion statement repeats within a task; every test_red_green command names its own test file and that file is inside the task scope; every MV citation resolves to a line of docs/scope-one/programme/REQUIREMENTS.md, DECOMPOSITION.md or WBS.md; every fold id the spec cites (SO-A, SO-F) matches the title of a signed contract under contracts/signed; every SO, SR, QL and PG spec id it names resolves to a spec file here, except ids of specs that live in the other repository (SR-3.03, SR-3.06), which I did not resolve; I read the request, task descriptions and requirements by hand for agent, lane and seat labels (a word search for agent, lane and seat labels finds none in the spec or in the programme manifest) and the leak scan stays clean. All passed. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Nothing high.",
+      "amendments": [
+        {
+          "task": "WP16-05",
+          "field": "criterion",
+          "from": "doc exists",
+          "to": null,
+          "reviewer_note": 1
+        },
+        {
+          "task": "WP16-06",
+          "field": "criterion",
+          "from": "blueprint exists",
+          "to": null,
+          "reviewer_note": 1
+        },
+        {
+          "task": "WP16-06",
+          "field": "criterion",
+          "from": "blueprint lists missing capabilities",
+          "to": null,
+          "reviewer_note": 1
+        }
+      ],
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MzFmZWI2YWI4YmFjZTA2YjAyMjM0MTdkYTNmY2IxNTAzYjViYzZiMTYyOThlMzY1MTk2ZGQ2MDNjMjNlYmJhMQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "LUo6k7ifJP14zI+FfWMYtm3ztQkqyoaGUNULw4/DsZf2HnGIazschbbmliIAlharovimQlfmNspCSiEd3rklDA=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YzNiYzFhMzdlMzhlZTUzOTMwYTk2ZTY4OGI2M2ZjN2RlYzUzNGVhMWI1MDFkYWExZDQ4NmRhOGI2YmNjM2I1Yg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "cj6kUbk+MiC/Kj2ER5kV9FqqTnrLOBxCGhJhZF9IkVberjgsYpakX+rLjkkLbw+FE0kf/9azaNi9PkwuH9p6Dg=="
+          }
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": [
+    {
+      "n": 1,
+      "text": "INTERIM SOLO REVIEW, pending independent re-review. Round 2 of PG-16.1 replaces three criteria of round 1, all file or word checks. Removed: \"doc exists\" (a file_exists check of docs/PORTFOLIO.md) is carried by the four content criteria of WP16-05, which read the same file and fail when it is missing; \"blueprint exists\" (a file_exists check of docs/BLUEPRINT.md) and \"blueprint lists missing capabilities\" (a grep for the words missing capabilities) are carried by the three criteria of WP16-06 that read docs/BLUEPRINT.md for its ten sections, its licensing boundaries and the integration audit, and the missing capabilities requirement stays in the requirements of the task.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "Mzc4YmMxNjJjNzc1YzQxY2VlMWQ5MTRhMDU1NTMwNmYzMzBjMjExMzIxNjRmOGU5Mzc0YjQ4NDdjNWI5YWJmMA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "SAfkKMmmAiNhRXlODzDliqg1m8ROazRW+ovjm/9zyZxKnkwzKUXsnCDZ5lKT0qlAnyZfCcaZVnbK3HUpvNVTDw=="
           }
         ]
       }

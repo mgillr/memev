@@ -25,17 +25,42 @@
         {
           "n": 1,
           "severity": "medium",
-          "how": "R2 (what converge does differently) has no criterion; C1 to C4 check the heading, one phrase and two negative greps"
+          "how": "R2 (what converge does differently) has no criterion; C1 to C4 check the heading, one phrase and two negative greps",
+          "disposition": "added",
+          "reason": "The README comparison now has criteria for what converge does differently: the table has its seven property rows and the section says neither design makes the other unnecessary.",
+          "folded_as": {
+            "task": "T1",
+            "statement": "The comparison section says neither design makes the other unnecessary",
+            "verifier": {
+              "type": "grep",
+              "file": "README.md",
+              "pattern": "^## A comparison with Mem0(?:(?!^## )[\\s\\S])*neither makes the other unnecessary",
+              "flags": "m"
+            }
+          }
         },
         {
           "n": 2,
           "severity": "medium",
-          "how": "R3 (the in-progress fix is stated as in progress) and R4 (no benchmark figure is quoted) have no criterion either"
+          "how": "R3 (the in-progress fix is stated as in progress) and R4 (no benchmark figure is quoted) have no criterion either",
+          "disposition": "added",
+          "reason": "The stale-replica fix is stated as in progress by a criterion, and no benchmark number is quoted, by another.",
+          "folded_as": {
+            "task": "T1",
+            "statement": "The comparison section quotes no benchmark number or percentage for Mem0 or for converge",
+            "verifier": {
+              "type": "command",
+              "cmd": "! awk '/^## A comparison with Mem0/{f=1;next} /^## /{f=0} f' README.md | grep -Eqi '[0-9]+(\\.[0-9]+)? ?(%|x |ms|tokens)'",
+              "expect_exit": 0
+            }
+          }
         },
         {
           "n": 3,
           "severity": "low",
-          "how": "R1 cites the Mem0 post of 16 April 2026 and its documentation as read on 31 Oct 2026; I re-read them here (the post, the migration pages, the v2.0.0 release notes and the README) and the claim holds, but a verifier cannot"
+          "how": "R1 cites the Mem0 post of 16 April 2026 and its documentation as read on 31 Oct 2026; I re-read them here (the post, the migration pages, the v2.0.0 release notes and the README) and the claim holds, but a verifier cannot",
+          "disposition": "rejected",
+          "reason": "A verifier cannot check that a source was read on a given date. The spec now has criteria that the section cites Mem0's own announcement and its own migration guide, and the claim itself was re-read in round 1."
         }
       ],
       "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Second review, of pull request #325 at head 79cbaae (the first, at ea7e95d, found the agent label, the manifest kinds, wrong paths and missing citations; each of those is fixed at this head). The engine decision is owner-confirmed (t542u, 31 Oct 2026). Checks run, and the only checks made: the spec hash equals specSha256 of the file at 79cbaae; every MV citation resolves to the cited line of docs/scope-one/programme/REQUIREMENTS.md or DECOMPOSITION.md and its text matches; every quoted SO-1.x, SO-2.x, SR and QL requirement is a verbatim stretch of the signed contract it cites; each verifier (grep pattern, file_exists path, wiring entry) was run against the tree it names (this tree, or the pull request head where the spec is for another repository); the request, tasks and manifest rows were read against the leak rules of this repository (the leak scan stays clean, and I also read by hand for agent and lane labels, which the scan does not catch); no duplicate of SO-1.01, SO-1.02, SO-1.04, SO-1.10, SO-1.11, SO-2.x, SR, QL, WBS or baseline section 8 was found. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. The only criteria are greps in a README, so three of four requirements are carried by text the owner reads. Weak criteria, so held. Checked against converge #1 at 9e08319: the greps and the negative greps pass.",
@@ -46,6 +71,74 @@
           {
             "keyid": "ba7f5a5b8f8aa026",
             "sig": "N1DjEwi908FQ8iBWsiH6rwAML+yHT+O7mDV42HcYGgL+rXYcm94OvUyB/mn0Qky1mw5hgvUaA1u7gryAaLVHDA=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "f48550734c866d03c32508f16388b69c46fab537cb2ab9899cadfc2a077a7b7a",
+      "base_commit": "2df1272008a9f32d2c69d130003a0d521b846d2d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "CHARTER.md",
+            "sha256": "de16b92298453bc73e865e882f6f7866ee0005da3cae35d6130cf8bf457a17dc"
+          },
+          {
+            "path": "README.md",
+            "sha256": "b2ec5ce73f811dddc60e9ecc42bd252997df9058ce6b5ee1a6428d96013d137b"
+          }
+        ]
+      },
+      "manifest_kind": "docs",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Fourth review, of the merged tree of pull requests #325 and #340 at the reviewed head. Round 1 (afdccd6) held two medium answers (requirements R2 to R4 without criteria) and one low. Commit 3da0df2 of #325 adds criteria for each of R1 to R4 (single-pass ADD-only extraction, citation of Mem0's own announcement and migration guide, a published design decision and not a gap, neither design makes the other unnecessary, the seven property rows, no benchmark number) and the multiline flag on the heading criterion. Nothing was removed; the only change to a round 1 criterion is the flag, recorded in the reviewer note. Checks run, and the only checks made: the spec hash equals specSha256 of the file on disk at the reviewed head; every task drafts through makeTask; every command criterion parses with sh -n; every grep pattern compiles as a regular expression; no criterion statement repeats within a task; every test_red_green command names its own test file and that file is inside the task scope; every MV citation resolves to a line of docs/scope-one/programme/REQUIREMENTS.md, DECOMPOSITION.md or WBS.md; every fold id the spec cites (SO-A, SO-F) matches the title of a signed contract under contracts/signed; every SO, SR, QL and PG spec id it names resolves to a spec file here, except ids of specs that live in the other repository (SR-3.03, SR-3.06), which I did not resolve; I read the request, task descriptions and requirements by hand for agent, lane and seat labels (a word search for agent, lane and seat labels finds none in the spec or in the programme manifest) and the leak scan stays clean. All passed. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. I did not re-read the Mem0 sources in this round. Nothing high.",
+      "amendments": [
+        {
+          "task": "T1",
+          "field": "verifier.flags",
+          "statement": "The README has the comparison section",
+          "from": null,
+          "to": "m",
+          "reviewer_note": 1
+        }
+      ],
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MDE2ZWZlM2RhZTRmYTBmOWYyZjczMDE0ZWQyZTA5NTdiNzU1ZGUzNDIyNmU2MzFkYTA2MjMzY2EyM2Y0MjQwOA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "uVYfGBwNOtco3TFlm2qKz59ofVA7Us5YwimNX0JIwmo84/SJ/FC8YZSOQc6vmdKp+uXqygdEd8lwVAGw68hqDg=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "Y2YwMThhMDg3MGEyYWIyNWIxOWI5MGJlMDNjYzU5Zjg1OGY3MjJmOGY4NmFmZDVlNzI3YjU3ZDY0ODRiZDAyMA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "GFJCgKHxnyeIWmtANt5pGDMgKx6gJ/m6jYBBP9yynvOzRI3m+zgoQlhTQU9Sk7OQarZrRcSYX3D/oFBcqGMSAA=="
+          }
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": [
+    {
+      "n": 1,
+      "text": "INTERIM SOLO REVIEW, pending independent re-review. Round 2 of PGP-1.04 adds the multiline flag to the verifier of one criterion of round 1, \"The README has the comparison section\", which anchors on a heading. The flag makes the anchor match at a line start, so the pattern is the same and the criterion still fails when the heading is missing.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NTExYTJmMDEwNzAwY2EyZGNlY2E4ZmM3OTFkODUxMWFhYjdjNzE4MWI3N2M1MTg2MjA0ZGZiMTNhMWEwMjM5NA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "VbllYMuIT5V4WGvnZH9M+xEI4uuVD8WVwopxsSKjD1DOflcktSrJ9hhitydbyBcZ4wr/p/bkW5efn/HQnWACBw=="
           }
         ]
       }
