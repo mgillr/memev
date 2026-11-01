@@ -15,10 +15,10 @@ Contracts cited by id. None is in this repository; each is held in the owner's v
 
 | Id | Status | Vault bundle and file | Cited for |
 | --- | --- | --- | --- |
-| SO-A-06 | fold contract, unsigned, proposed | `memev-fold-addendum-2026-10-30`, `set-fold/proofline.json` | the artefact registry, states, history, diff, previews |
-| SO-A-12 | fold contract, unsigned, proposed | same bundle and file | the artefact canvas (AC04) |
-| SO-A-04 | fold contract, unsigned, proposed | same bundle and file | deliverable, work package and milestone entities; stale markers on artefacts |
-| SO-A-08 | fold contract, unsigned, proposed | same bundle and file | deliverable acceptance recorded as an event (AC05) |
+| SO-A-06 | fold contract, signed by pull request #341 | `memev-fold-addendum-2026-10-30`, `set-fold/proofline.json` | the artefact registry, states, history, diff, previews |
+| SO-A-12 | fold contract, signed by pull request #341 | same bundle and file | the artefact canvas (AC04) |
+| SO-A-04 | fold contract, signed by pull request #341 | same bundle and file | deliverable, work package and milestone entities; stale markers on artefacts |
+| SO-A-08 | fold contract, signed by pull request #341 | same bundle and file | deliverable acceptance recorded as an event (AC05) |
 | SO-05-D | signed | `memev-pi17-2026-10-29`, `set-work/proofline.json` | evidence bound to artefact hash; reported, inferred, verified |
 | SO-02-B | signed | same bundle and file | deliverables with version and provenance in the delivery summary |
 | SO-C-C | signed | same bundle and file | Changes (AC01) and Deliverables (AC03) views |
@@ -27,7 +27,7 @@ Contracts cited by id. None is in this repository; each is held in the owner's v
 
 Decision D-SO-MEMORY-AUTHORITY (vault bundle `memev-fold-addendum-2026-10-30`, file `set-fold/decisions.json`) is decided: the vault and its store are the canonical authority and there is no second database. It is cited for requirement 5.
 
-Because SO-A-06, SO-A-12, SO-A-04 and SO-A-08 are unsigned, what they decide is a proposal until the owner signs them. This record cites them as the intended owner and does not treat them as settled.
+Because SO-A-06, SO-A-12, SO-A-04 and SO-A-08 are signed (pull request #341) and the fold is the build layer (owner delegation, 1 Nov 2026), this record cites them as the owner of the parts they cover.
 
 Artefact record: originating requirement, deliverable or work package; creation event; revision events; relevant scope and plan version; verification status. The five elements are fixed by the spec (`contracts/scope-one/specs/SO-1.09-artefact-history-and-previews.json:13`) and carried by SO-A-06 AC01, which adds the state draft, reviewed or accepted.
 
@@ -73,4 +73,4 @@ Each needs an owner decision before a build contract is written. The rest of the
 5. Whether previews are generated on demand or kept, and where (requirements 3 and 5).
 6. Where a per-artefact limitation is recorded and who writes it (requirement 4).
 7. What "explicitly configured storage" means and who configures it (requirement 5).
-8. SO-A-06, SO-A-12, SO-A-04 and SO-A-08 are unsigned; the owner decides whether SO-1.09 is built against them (all requirements).
+8. Resolved: SO-A-06, SO-A-12, SO-A-04 and SO-A-08 are signed (pull request #341) and are the build layer, so SO-1.09 is built against them (all requirements; owner delegation, 1 Nov 2026).

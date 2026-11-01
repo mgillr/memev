@@ -83,3 +83,13 @@ export function transcript(file, entries) {
 export const user = (text) => ({ type: 'user', message: { role: 'user', content: text } });
 export const assistant = (text, tools = []) => ({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text }, ...tools.map(([name, input], i) => ({ type: 'tool_use', id: `t${i}`, name, input }))] } });
 export const todos = (list) => ['TodoWrite', { todos: list.map(([status, content]) => ({ status, content, activeForm: content })) }];
+
+const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+/** Run step again, up to timeoutMs, until ok(result) is true; return the last result either way. A result that a slow machine delivers
+ *  a moment late is read when it arrives, and one that never arrives is still the caller's failed assertion. */
+export function pollUntil(step, ok, { timeoutMs = 20000, intervalMs = 500 } = {}) {
+  const end = Date.now() + timeoutMs;
+  let r = step();
+  while (!ok(r) && Date.now() < end) { sleepSync(intervalMs); r = step(); }
+  return r;
+}
