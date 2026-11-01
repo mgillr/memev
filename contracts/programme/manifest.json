@@ -72,6 +72,12 @@
       "manifest": "this manifest (contracts/programme/specs, signed 1 Nov 2026; the file is unchanged)",
       "reason": "owner delegation, 1 Nov 2026: PG-19.1 says src/cli/work-store.mjs returns the real project store, which SO-1.01 requirement 3 forbids (only the vault, the coordinator and the project store reach the store); PG-19.2 routes openStore through one read-only vault method, workImpactView, that returns plain data and no ProjectStore instance, adds task WP19-03 with scope src/engine/vault.mjs and docs/MODULES.md, and keeps every PG-19.1 criterion",
       "superseded_by": "PG-19.2"
+    },
+    {
+      "id": "PG-05.1",
+      "manifest": "this manifest (contracts/programme/specs, signed 1 Nov 2026; the file is unchanged)",
+      "reason": "owner delegation, 1 Nov 2026: pull request #364 changes docs/CONVERGENCE.md (a link to docs/MERGE-SEMANTICS.md only), docs/MODULES.md (generated; src/engine/state-map.mjs is a new module) and changelog.d/PG-05.1.md, which PG-05.1 does not list in a scope; PG-05.2 adds docs/CONVERGENCE.md to the scope of WP05-01 and docs/MODULES.md and changelog.d/PG-05.1.md to the scope of WP05-04, and changes no criterion",
+      "superseded_by": "PG-05.2"
     }
   ],
   "resolved_without_contract": [
@@ -179,7 +185,7 @@
           "SO-F-03",
           "SO-F-12"
         ],
-        "PG-05.1": [
+        "PG-05.2": [
           "SO-F-02",
           "SO-F-06"
         ],
@@ -231,7 +237,7 @@
             "SO-F-12"
           ]
         },
-        "PG-05.1": {
+        "PG-05.2": {
           "WP05-01": [
             "SO-F-02"
           ],
@@ -778,6 +784,59 @@
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
+      "id": "PG-05.2",
+      "type": "superseding spec (version 2 of PG-05)",
+      "area": "PG-05",
+      "title": "Engine integration: merge semantics, mapping, boundary (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP05-01, WP05-03, WP05-04, WP05-06",
+      "requirements": [
+        "MV-ARCH-04",
+        "MV-ARCH-05",
+        "MV-INT-01",
+        "MV-INT-04",
+        "MV-INT-05"
+      ],
+      "cross_references": [
+        {
+          "contract": "SO-2.12 and SO-2.13",
+          "boundary": "WP05-06 degrades as SO-2.12 requirement 8 says when the paid engine is absent and keeps the paid interface behind SO-2.13 requirements 3 and 4; neither is restated here"
+        }
+      ],
+      "vault_contracts": [
+        "WO-05-A and WO-05-C",
+        "WO-05-B"
+      ],
+      "build_layer": "the fold (SO-F-02, SO-F-06) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP05-01": [
+          "SO-F-02"
+        ],
+        "WP05-04": [
+          "SO-F-06"
+        ],
+        "WP05-06": [
+          "SO-F-06"
+        ]
+      },
+      "depends_on": [
+        "PG-01.1",
+        "PG-04.1",
+        "PGP-1.06",
+        "SO-2.12",
+        "SO-2.13",
+        "WO-05-B"
+      ],
+      "tasks": 4,
+      "criteria": 22,
+      "spec": "specs/PG-05.2-engine-integration-merge-semantics-mapping-bound.json",
+      "status": "proposed and unsigned; no red-team record",
+      "supersedes": "PG-05.1",
+      "supersedes_signed_contract": "k-pg-05-1-engine-integrati-8d9e24 (the spec file contracts/programme/specs/PG-05.1-engine-integration-merge-semantics-mapping-bound.json is unchanged)",
+      "supersedes_reason": "owner delegation, 1 Nov 2026: pull request #364 changes docs/CONVERGENCE.md (a link to docs/MERGE-SEMANTICS.md only), docs/MODULES.md (generated; src/engine/state-map.mjs is a new module) and changelog.d/PG-05.1.md, which PG-05.1 does not list in a scope; PG-05.2 adds docs/CONVERGENCE.md to the scope of WP05-01 and docs/MODULES.md and changelog.d/PG-05.1.md to the scope of WP05-04, and changes no criterion",
+      "kind": "feature"
+    },
+    {
       "id": "PG-06.2",
       "type": "programme work package",
       "area": "PG-06",
@@ -1311,6 +1370,30 @@
       "kind": "feature"
     },
     {
+      "id": "PG-20.1",
+      "type": "programme work package",
+      "area": "PG-20",
+      "title": "The scope verifier allows a spec's own change note (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP20-01 (a gap found after the decomposition; decided under owner delegation, 1 Nov 2026; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "SR-0.03.3",
+          "boundary": "its T2 builds the scope verifier in src/engine/contracts.mjs (pull request #347) and already treats docs/MODULES.md as in scope when the generator reproduces it; PG-20.1 adds only the contract's own change note and changes no existing scope criterion"
+        }
+      ],
+      "vault_contracts": [],
+      "depends_on": [
+        "SR-0.03.3"
+      ],
+      "tasks": 1,
+      "criteria": 8,
+      "spec": "specs/PG-20.1-scope-verifier-allows-own-change-note.json",
+      "status": "proposed and unsigned; no red-team record",
+      "kind": "feature"
+    },
+    {
       "id": "PG-18.1",
       "type": "programme work package",
       "area": "PG-18",
@@ -1500,7 +1583,7 @@
     {
       "task": "WP05-01",
       "title": "Merge-semantics table: object classes (observations, metadata, membership, counters, task ownership, task state, contracts, approvals, external actions) to semantics, with rationale",
-      "contract": "PG-05.1",
+      "contract": "PG-05.2",
       "note": "specified in this set"
     },
     {
@@ -1512,13 +1595,13 @@
     {
       "task": "WP05-03",
       "title": "Integration design: how vault operations, agent state, bus events, project state and contracts map to the replicated event model",
-      "contract": "PG-05.1",
+      "contract": "PG-05.2",
       "note": "specified in this set"
     },
     {
       "task": "WP05-04",
       "title": "Vault note and agent-state mapping to CRDT-compatible state",
-      "contract": "PG-05.1",
+      "contract": "PG-05.2",
       "note": "specified in this set"
     },
     {
@@ -1530,7 +1613,7 @@
     {
       "task": "WP05-06",
       "title": "Engine round trip: a memev state change replicates through crdt-merge and back on two local vaults",
-      "contract": "PG-05.1",
+      "contract": "PG-05.2",
       "note": "specified in this set"
     },
     {
@@ -1901,6 +1984,12 @@
       "task": "WP19-03",
       "title": "A narrow read-only vault method serves memev work impact: no ProjectStore instance and no write path leave the vault",
       "contract": "PG-19.2",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP20-01",
+      "title": "The scope verifier allows a spec's own change note: changelog.d/<id>.md and its base id, and nothing else beyond what it allows today",
+      "contract": "PG-20.1",
       "note": "specified in this set"
     }
   ]
