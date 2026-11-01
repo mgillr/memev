@@ -134,14 +134,14 @@ test('PG-W-21A AC02: a subject that holds a grant is the only one it makes eligi
 });
 
 test('PG-W-21A AC02: evaluation denies an invalid request with deny.bad_request', () => {
-  const bad = (req, c = ctx([grant()])) => { const r = evaluate(req, c); assert.equal(r.eligible, false); assert.equal(r.rule, 'deny.bad_request', JSON.stringify(req)); };
+  const bad = (req, ...rest) => { const c = rest.length ? rest[0] : ctx([grant()]); const r = evaluate(req, c); assert.equal(r.eligible, false); assert.equal(r.rule, 'deny.bad_request', JSON.stringify(req)); };
   bad(null); bad(undefined); bad(7); bad('device:d1');
   bad(ask({ subject: 'robot:r1' })); bad(ask({ subject: undefined })); bad(ask({ subject: 5 }));
   bad(ask({ scope: undefined })); bad(ask({ scope: { id: 't1' } })); bad(ask({ scope: { type: 'galaxy', id: 't1' } }));
   bad(ask({ scope: { type: 'personal', id: 'personal' } }), ctx([grant({ scope: { type: 'personal', id: 'personal' } })])); // never shared
   bad(ask({ purpose: 'admin' })); bad(ask({ purpose: undefined })); bad(ask({ purpose: ['contribute'] }));
   bad(ask(), { roots: [ROOT], at: AT }); bad(ask(), { records: [grant()], at: AT }); bad(ask(), ctx([grant()], { roots: [7] })); bad(ask(), ctx([grant()], { roots: ['nobody'] }));
-  bad(ask(), ctx([grant()], { at: 'tomorrow' })); bad(ask(), undefined); bad(ask(), null);
+  bad(ask(), ctx([grant()], { at: 'tomorrow' })); bad(ask(), null); bad(ask(), 'now'); bad(ask(), []);
 });
 
 test('PG-W-21A AC02: evaluation allows one root-issued grant for its purpose, scope and live window, with the grant id in the chain', () => {

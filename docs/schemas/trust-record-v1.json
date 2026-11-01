@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Memev trust record, version 1",
+  "description": "A grant (who trusts which subject, for which purposes, in which scope, between which times) and a revocation (which grant is withdrawn, by whom, from when, and why). PROVISIONAL: the choices come from ADR 8 in docs/scope-one/DECISIONS.md, which is proposed, and a change is a new schema version, not an edit of memev-trust/1. Trust is an eligibility input only: a record never grants a permission, a membership or a read, and a personal scope is never shared. The validator and the evaluation are src/engine/federation/trust-record.mjs; the module has no production caller yet.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/grant"
+    },
+    {
+      "$ref": "#/$defs/revocation"
+    }
+  ],
+  "$defs": {
+    "grant": {
+      "type": "object",
+      "required": [
+        "schema",
+        "kind",
+        "id",
+        "subject",
+        "issuer",
+        "scope",
+        "purposes",
+        "start",
+        "expires"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "memev-trust/1"
+        },
+        "kind": {
+          "const": "grant"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._@+-]+$"
+        },
+        "subject": {
+          "description": "The subject trusted.",
+          "type": "string",
+          "pattern": "^(person|agent|device|node|operator|service):[A-Za-z0-9._@+-]+$"
+        },
+        "issuer": {
+          "description": "The subject that grants the trust: a root the evaluation is given, or the holder of a live grant that delegates.",
+          "type": "string",
+          "pattern": "^(person|agent|device|node|operator|service):[A-Za-z0-9._@+-]+$"
+        },
+        "scope": {
+          "description": "One scope. A personal scope is never shared, so it is not a choice here.",
+          "type": "object",
+          "required": [
+            "type",
+            "id"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "enum": [
+                "team",
+                "department",
+                "project",
+                "programme",
+                "portfolio",
+                "site",
+                "organisation"
+              ]
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._@+-]+$"
+            },
+            "parent": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._@+-]+$"
+            }
+          }
+        },
+        "purposes": {
+          "description": "The purposes the grant covers, a closed list of two in version 1.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "contribute",
+              "verify"
+            ]
+          }
+        },
+        "start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires": {
+          "description": "Required, and after the start.",
+          "type": "string",
+          "format": "date-time"
+        },
+        "evidence": {
+          "description": "References only, never a body.",
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "delegation": {
+          "$ref": "#/$defs/delegation"
+        }
+      }
+    },
+    "delegation": {
+      "description": "A grant with a depth of 1 or more may be delegated from. A delegated grant names its parent, has a lower depth, and only narrows it: the same scope, the same or fewer purposes, an expiry no later than the parent's.",
+      "type": "object",
+      "required": [
+        "depth"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "depth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "parent": {
+          "description": "The id of the grant this one is delegated from.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._@+-]+$"
+        }
+      }
+    },
+    "revocation": {
+      "description": "Takes effect from its time. It is applied only when its issuer is the issuer of the grant or a root, and it makes every grant delegated from the revoked one ineligible.",
+      "type": "object",
+      "required": [
+        "schema",
+        "kind",
+        "id",
+        "grant",
+        "issuer",
+        "time",
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": "memev-trust/1"
+        },
+        "kind": {
+          "const": "revocation"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._@+-]+$"
+        },
+        "grant": {
+          "description": "The id of the grant revoked.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._@+-]+$"
+        },
+        "issuer": {
+          "type": "string",
+          "pattern": "^(person|agent|device|node|operator|service):[A-Za-z0-9._@+-]+$"
+        },
+        "time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reason": {
+          "enum": [
+            "compromised",
+            "left",
+            "error",
+            "other"
+          ]
+        }
+      }
+    }
+  }
+}
