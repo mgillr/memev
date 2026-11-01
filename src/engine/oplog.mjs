@@ -13,8 +13,9 @@
 // summarised, truncated or compacted: every record is recoverable byte for byte.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { sha256, readJson, writeJson, now } from './util.mjs';
+import { sha256, readJson, writeJson, now, machineBootId, pidNamespace, processStart } from './util.mjs';
 import { mergeContractHash } from './envelope.mjs';
 import { oplogRecordToEnvelope, LOCAL_MERGE_CONTRACT } from './envelope-adapters.mjs';
 
@@ -68,9 +69,31 @@ export function recordHash(rec) {
   return sha256(JSON.stringify(rest));
 }
 
+/**
+ * The error a second writer gets: the vault's op log is held by another opener, or this process has lost its own lock.
+ * `pid` is the holder's pid when its lock file can be read.
+ */
+export class VaultLocked extends Error {
+  constructor(message, holder = {}) { super(message); this.name = 'VaultLocked'; this.code = 'VaultLocked'; this.pid = holder.pid ?? null; this.holder = holder; }
+}
+
+const LOCK = 'LOCK';
+// The locks this process holds, by the real path of the op log folder: a symlink, a trailing slash or a '..' spelling of one vault is
+// one entry, and a second writable open in this process is refused whatever the file says.
+const held = new Map();
+
+/** The holder a lock file's bytes name: { pid, host } or {} when they are not a lock. */
+function holderOf(bytes) {
+  try { const o = JSON.parse(bytes); return o && Number.isInteger(o.pid) ? { pid: o.pid, host: o.host ?? null } : {}; } catch { return {}; }
+}
+const lockedBy = (dir, bytes) => {
+  const h = holderOf(bytes);
+  return new VaultLocked(h.pid === undefined ? `the vault's op log at ${dir} has a lock file (LOCK) that names no holder` : `the vault's op log at ${dir} is locked by pid ${h.pid}${h.host ? ` on ${h.host}` : ''}`, h);
+};
+
 export class OpLog {
-  constructor(dir, { segmentBytes = 16 * 1024 * 1024, snapshotEvery = 1000, fsync = true, deviceId = null, mergeContract = LOCAL_MERGE_CONTRACT, envelopes = true } = {}) {
-    this.dir = dir; this.segmentBytes = segmentBytes; this.snapshotEvery = snapshotEvery; this.fsync = fsync;
+  constructor(dir, { segmentBytes = 16 * 1024 * 1024, snapshotEvery = 1000, fsync = true, deviceId = null, mergeContract = LOCAL_MERGE_CONTRACT, envelopes = true, readOnly = false } = {}) {
+    this.dir = dir; this.readOnly = readOnly; this.token = null; this.segmentBytes = segmentBytes; this.snapshotEvery = snapshotEvery; this.fsync = fsync;
     this.heads = new Map(); this.seq = 0; this.sinceSnapshot = 0; this.fd = null; this.recovered = [];
     // Each record names the device that wrote it and carries a hybrid logical clock, so logs from
     // several devices can later be merged in a deterministic order. Records written before this
@@ -96,8 +119,43 @@ export class OpLog {
   /** Where a segment's file lives: the log directory, or the archive folder once it has been archived. */
   _segFile(seg) { return path.join(this.dir, seg.archived ? path.join('archive', seg.name) : seg.name); }
 
+  /**
+   * Take the lock: .memev/oplog/LOCK, an exclusive create (wx), written whole with the holder's pid, host, boot, start time, machine
+   * identifier, pid namespace and a random token, and fsynced. Its bytes never change while it is held.
+   */
+  _acquire() {
+    const key = fs.realpathSync(this.dir), file = path.join(key, LOCK);
+    if (held.has(key)) throw new VaultLocked(`the vault's op log at ${key} is already open in this process (pid ${process.pid}); the lock is not re-entrant`, { pid: process.pid, host: os.hostname() });
+    const token = crypto.randomBytes(16).toString('hex');
+    let fd;
+    try { fd = fs.openSync(file, 'wx', 0o600); } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      throw lockedBy(key, fs.readFileSync(file, 'utf8'));
+    }
+    try {
+      fs.writeSync(fd, `${JSON.stringify({ pid: process.pid, host: os.hostname(), boot: String(Math.round(Date.now() - os.uptime() * 1000)), start: processStart(process.pid), machine: machineBootId(), ns: pidNamespace(), token })}\n`);
+      fs.fsyncSync(fd);
+    } catch (e) { fs.closeSync(fd); fs.rmSync(file, { force: true }); throw e; }
+    fs.closeSync(fd);
+    held.set(key, token); this.token = token; this.lockKey = key; this.lockFile = file;
+  }
+
+  /** Give the lock up, if it is still ours: a lock file with another token is never deleted. */
+  _release() {
+    if (this.token === null) return;
+    try { if (JSON.parse(fs.readFileSync(this.lockFile, 'utf8')).token === this.token) fs.rmSync(this.lockFile, { force: true }); } catch { /* gone or not ours */ }
+    held.delete(this.lockKey); this.token = null;
+  }
+
+  /** A read-only log never writes: its writers refuse here. */
+  _writable() { if (this.readOnly) throw new Error('op log is open read-only'); }
+
   open() {
-    fs.mkdirSync(this.dir, { recursive: true, mode: 0o700 });
+    if (!this.readOnly) { fs.mkdirSync(this.dir, { recursive: true, mode: 0o700 }); this._acquire(); }
+    try { return this._open(); } catch (e) { this._release(); throw e; }
+  }
+
+  _open() {
     this.manifest = readJson(this.manifestPath, null) || { version: 1, segments: [] };
     if (!this.manifest.segments.length) this.manifest.segments.push({ name: segName(1), first: 1, last: 0, bytes: 0, sealed: false, created: now() });
     const snap = readJson(this.snapshotPath, null);
@@ -126,9 +184,10 @@ export class OpLog {
         seg.last = rec.seq;
       }
       const size = fs.existsSync(file) ? fs.statSync(file).size : 0;
-      if (!seg.sealed && size > complete) fs.truncateSync(file, complete);   // a torn last line from a crash
+      if (!seg.sealed && size > complete && !this.readOnly) fs.truncateSync(file, complete);   // a torn last line from a crash
       if (!seg.sealed) seg.bytes = complete;
     }
+    if (this.readOnly) return this;
     const active = this.active;
     this.fd = fs.openSync(path.join(this.dir, active.name), 'a', 0o600);
     this._saveManifest();
@@ -148,6 +207,7 @@ export class OpLog {
 
   /** Append one operation. `op` = { type, path?, agent?, client?, data? }. Returns the stored record. */
   append(op) {
+    this._writable();
     if (this.fd === null) throw new Error('op log is not open');
     const rec = { seq: this.seq + 1, ts: now(), type: op.type, path: op.path ?? null, agent: op.agent ?? null, client: op.client ?? null, data: op.data ?? null, prev: op.path ? this.heads.get(op.path)?.hash ?? null : null };
     if (this.deviceId) rec.dev = this.deviceId;
@@ -173,6 +233,7 @@ export class OpLog {
   }
 
   roll() {
+    this._writable();
     const a = this.active;
     if (!a.bytes) return;
     fs.fsyncSync(this.fd); fs.closeSync(this.fd);
@@ -189,6 +250,7 @@ export class OpLog {
    * Returns the number of segments moved.
    */
   archiveSealed() {
+    this._writable();
     const arch = path.join(this.dir, 'archive');
     let moved = 0;
     for (const seg of this.manifest.segments) {
@@ -205,12 +267,13 @@ export class OpLog {
   }
 
   snapshot() {
+    this._writable();
     writeJson(this.snapshotPath, { version: 1, seq: this.seq, hlc: formatHlc(this.clock), at: now(), active: { name: this.active.name, offset: this.active.bytes }, heads: Object.fromEntries(this.heads) }, 0o600);
     this._saveManifest();
     this.sinceSnapshot = 0;
   }
 
-  _saveManifest() { writeJson(this.manifestPath, this.manifest, 0o600); }
+  _saveManifest() { this._writable(); writeJson(this.manifestPath, this.manifest, 0o600); }
 
   /** Stream records in order, optionally from a seq and for one path. Bounded memory. */
   *iterate({ fromSeq = 1, path: only = null, raw = false } = {}) {
@@ -251,5 +314,5 @@ export class OpLog {
     return { seq: this.seq, segments: this.manifest.segments.length, sealed: this.manifest.segments.filter((s) => s.sealed).length, bytes, paths: this.heads.size };
   }
 
-  close() { if (this.fd !== null) { try { fs.fsyncSync(this.fd); } catch {} fs.closeSync(this.fd); this.fd = null; this.snapshot(); } }
+  close() { if (this.fd !== null) { try { fs.fsyncSync(this.fd); } catch {} fs.closeSync(this.fd); this.fd = null; this.snapshot(); this._release(); } }
 }

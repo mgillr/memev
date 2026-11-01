@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn as spawnChild, spawnSync } from 'node:child_process';
+import { spawn as spawnChild, spawnSync, execFileSync } from 'node:child_process';
 
 export const sha256 = (data) => crypto.createHash('sha256').update(data).digest('hex');
 /** True when a symbolic link is on the way from `root` down to `abs` (the existing segments below root, `abs` included), or when
@@ -117,3 +117,45 @@ export function slug(s, max = 48) {
 }
 
 export function truncate(s, n) { s = String(s ?? ''); return s.length > n ? `${s.slice(0, n - 1)}…` : s; }
+
+// ---- what the vault lock (src/engine/oplog.mjs) records about this process and this boot. Each reader takes its file and process
+// calls as arguments so a test can stand in for another platform. None of them goes through PATH.
+
+/** The per-boot identifier of this machine: /proc/sys/kernel/random/boot_id on Linux, kern.bootsessionuuid on macOS, else null. */
+export function machineBootId({ platform = process.platform, readFile = fs.readFileSync, exec = execFileSync } = {}) {
+  try {
+    if (platform === 'linux') return readFile('/proc/sys/kernel/random/boot_id', 'utf8').trim() || null;
+    if (platform === 'darwin') return exec('/usr/sbin/sysctl', ['-n', 'kern.bootsessionuuid'], { encoding: 'utf8', env: {}, stdio: ['ignore', 'pipe', 'ignore'] }).trim() || null;
+  } catch { /* unreadable: no identifier */ }
+  return null;
+}
+
+/** The pid namespace of this process (readlink /proc/self/ns/pid) on Linux, else null. */
+export function pidNamespace({ platform = process.platform, readlink = fs.readlinkSync } = {}) {
+  if (platform !== 'linux') return null;
+  try { return readlink('/proc/self/ns/pid'); } catch { return null; }
+}
+
+/** The milliseconds of `ps -o lstart=` output ("Sun Nov  1 09:00:00 2026", in UTC), or null when it is not that shape. */
+export function parseLstart(text) {
+  const m = /^[A-Za-z]{3} ([A-Za-z]{3}) +(\d{1,2}) (\d{2}):(\d{2}):(\d{2}) (\d{4})$/.exec(String(text).trim());
+  const month = m ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].indexOf(m[1]) : -1;
+  return month < 0 ? null : Date.UTC(Number(m[6]), month, Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]));
+}
+
+/**
+ * When a process started, in milliseconds on a scale that is the same for every reader on this boot, or null when it cannot be
+ * read (the holder then counts as alive). Linux: field 22 of /proc/<pid>/stat, in clock ticks since boot (100 a second), which no
+ * change of the wall clock moves. macOS: /bin/ps -o lstart= -p <pid> run with TZ=UTC and LC_ALL=C.
+ */
+export function processStart(pid, { platform = process.platform, readFile = fs.readFileSync, exec = execFileSync } = {}) {
+  try {
+    if (platform === 'linux') {
+      const stat = readFile(`/proc/${pid}/stat`, 'utf8');
+      const ticks = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19]);
+      return Number.isFinite(ticks) ? ticks * 10 : null;
+    }
+    if (platform === 'darwin') return parseLstart(exec('/bin/ps', ['-o', 'lstart=', '-p', String(pid)], { encoding: 'utf8', env: { TZ: 'UTC', LC_ALL: 'C' }, stdio: ['ignore', 'pipe', 'ignore'] }));
+  } catch { /* the process is gone or unreadable */ }
+  return null;
+}

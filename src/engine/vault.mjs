@@ -58,11 +58,14 @@ export class Vault extends EventEmitter {
     // existing vaults predate the opt-in: contracts stay on for them
     if (!fileCfg.contracts || fileCfg.contracts.enabled === undefined) this.config.contracts = { ...DEFAULT_CONFIG.contracts, ...fileCfg.contracts, enabled: true };
     this.tokens = new TokenStore(path.join(this.state, 'tokens.json'));
-    this.host = hostDevice(this.root);
-    this.log = new OpLog(path.join(this.state, 'oplog'), { segmentBytes: this.opts.segmentBytes, snapshotEvery: this.opts.snapshotEvery, fsync: this.opts.fsync ?? true, deviceId: this.host.id }).open();
-    this.devices = new DeviceRegistry(path.join(this.state, 'devices.json'));
+    // a read-only open (opts.readOnly) takes no lock and writes nothing: no torn-tail truncate, no device or token file, no bus
+    // seeding, no recovery of notes, no index, graph or commit, on open or on close
+    const ro = !!this.opts.readOnly;
+    this.host = hostDevice(this.root, { readOnly: ro });
+    this.log = new OpLog(path.join(this.state, 'oplog'), { segmentBytes: this.opts.segmentBytes, snapshotEvery: this.opts.snapshotEvery, fsync: this.opts.fsync ?? true, deviceId: this.host.id, readOnly: ro }).open();
+    this.devices = new DeviceRegistry(path.join(this.state, 'devices.json'), { readOnly: ro });
     this.devices.ensureHost(this.host);
-    this.devices.migrate(this.tokens); // existing installs: every token becomes its own device entry
+    if (!ro) this.devices.migrate(this.tokens); // existing installs: every token becomes its own device entry
     this.bus = new Bus({ root: this.root, devices: this.devices, commit: (p) => this.commits.add(p, 'bus'), config: this.config.bus || {} });
     this.index = new RecallIndex(path.join(this.state, 'index.jsonl'));
     this.graph = new Graph();
@@ -72,8 +75,7 @@ export class Vault extends EventEmitter {
     this.contractSessions = new Map();
     this.contractResults = new Map();
     this.commits = new CommitQueue(this.root, { enabled: this.opts.git !== false, delayMs: this.opts.commitDelayMs ?? 400 });
-    this._seedBus();
-    this.recover();
+    if (!ro) { this._seedBus(); this.recover(); }
     const loaded = this.index.load();
     if (!loaded || this.index.stats().notes === 0) this.reindexAll(); else for (const p of this.allNotes()) this.graph.indexNote(p, this._read(p));
     this._replayGraph();
@@ -94,7 +96,12 @@ export class Vault extends EventEmitter {
     } catch {}
   }
 
-  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.index.save(); this._saveGraph(); this.devices?.saveSoon(); this.log.close(); }
+  close() {
+    for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} }
+    this._projectStores?.clear(); this._coordinators?.clear();
+    if (!this.opts.readOnly) { this.commits.flush(); this.index.save(); this._saveGraph(); this.devices?.saveSoon(); }
+    this.log.close();
+  }
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }
@@ -167,7 +174,7 @@ export class Vault extends EventEmitter {
     const walk = (d, rel) => { let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of ents) { if (e.name.startsWith('.') || e.name === 'node_modules' || e.isSymbolicLink()) continue; const r = rel ? `${rel}/${e.name}` : e.name; if (e.isDirectory()) { if (r === 'work/archive') continue; walk(path.join(d, e.name), r); } else if (e.name.endsWith('.md')) out.push(r); } };
     walk(base, dir.replace(/\/$/, '')); return out.sort();
   }
-  reindexAll() { for (const p of this.allNotes()) { const b = this._read(p); this.index.update(p, b); this.graph.indexNote(p, b); } this.index.save(); }
+  reindexAll() { for (const p of this.allNotes()) { const b = this._read(p); this.index.update(p, b); this.graph.indexNote(p, b); } if (!this.opts.readOnly) this.index.save(); }
 
   /**
    * Reconcile the files with the log at startup (and before every write to a note):

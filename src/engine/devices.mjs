@@ -25,10 +25,10 @@ const ACTIVE_DAYS = 30;
 const REUSE_WINDOW_MS = 10 * 60e3;
 
 /** This machine's id for this vault, created once in .memev/device.json (not in git, not shared). */
-export function hostDevice(root) {
+export function hostDevice(root, { readOnly = false } = {}) {
   const f = path.join(root, '.memev', 'device.json');
   let d = readJson(f, null);
-  if (!d?.id) { d = { id: `dev_${randomToken(8)}`, created: now(), platform: `${process.platform}-${process.arch}` }; writePrivateJson(f, d); }
+  if (!d?.id) { d = { id: `dev_${randomToken(8)}`, created: now(), platform: `${process.platform}-${process.arch}` }; if (!readOnly) writePrivateJson(f, d); }
   return d;
 }
 
@@ -45,17 +45,17 @@ export function coarseOrigin(ip) {
 const CLOUD_UA = /\b(claude|anthropic|openai|chatgpt|gpt-?actions|gemini|google|xai|x\.ai|perplexity|mistral|le ?chat|copilot)\b/i;
 
 export class DeviceRegistry {
-  constructor(file) { this.file = file; this.data = readJson(file, null) || { version: 1, devices: {} }; this.dirty = false; this.byToken = new Map(); this._reindex(); this.mtime = this._mtime(); }
+  constructor(file, { readOnly = false } = {}) { this.file = file; this.readOnly = readOnly; this.data = readJson(file, null) || { version: 1, devices: {} }; this.dirty = false; this.byToken = new Map(); this._reindex(); this.mtime = this._mtime(); }
   _mtime() { try { const s = fs.statSync(this.file); return `${s.ino}:${s.mtimeMs}:${s.size}`; } catch { return ''; } }
   /** The CLI may have enrolled, renamed or revoked a device: take its version of the file. */
   fresh() { if (this._mtime() !== this.mtime) { this.data = readJson(this.file, null) || this.data; this._reindex(); this.mtime = this._mtime(); } }
   _reindex() { this.byToken.clear(); for (const d of Object.values(this.data.devices)) if (d.token_id && d.status === 'active') this.byToken.set(d.token_id, d.id); }
-  save() { writePrivateJson(this.file, this.data); this.dirty = false; this.mtime = this._mtime(); }
+  save() { if (this.readOnly) throw new Error('the device registry is open read-only'); writePrivateJson(this.file, this.data); this.dirty = false; this.mtime = this._mtime(); }
   /** Write pending observations, unless the CLI changed the file meanwhile: its change wins. */
   saveSoon() { if (!this.dirty) return; if (this._mtime() !== this.mtime) { this.fresh(); this.dirty = false; return; } this.save(); }
 
   ensureHost(host) {
-    if (!this.data.devices[host.id]) { this.data.devices[host.id] = { id: host.id, kind: 'host', label: process.env.MEMEV_MACHINE_NAME || os.hostname().split('.')[0].slice(0, 40) || 'this computer', status: 'active', created: now(), first_seen: now(), last_seen: now(), token_id: null, pubkey: null, flags: [] }; this.save(); }
+    if (!this.data.devices[host.id]) { this.data.devices[host.id] = { id: host.id, kind: 'host', label: process.env.MEMEV_MACHINE_NAME || os.hostname().split('.')[0].slice(0, 40) || 'this computer', status: 'active', created: now(), first_seen: now(), last_seen: now(), token_id: null, pubkey: null, flags: [] }; if (!this.readOnly) this.save(); }
     this.hostId = host.id;
     return this.data.devices[host.id];
   }
