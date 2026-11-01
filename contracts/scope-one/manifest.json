@@ -992,6 +992,23 @@
    "spec": "specs/SO-F-10.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
    "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
+  },
+  {
+   "id": "SO-F-04C",
+   "area": "SO-F",
+   "title": "SO-F-04C The relationship gate refuses a contribution unless the sending node is a party node of a relationship of the scope: evaluate() takes an optional node, relationshipGate passes the envelope's origin.node, the new fixed deny rule deny.not_a_party, and a revoked relationship refuses both its party and a stranger",
+   "repo": "memev",
+   "closes": "Follow-up to SO-F-04: relationshipGate (src/engine/federation/policy.mjs, pull request #368) never reads origin.node, so a contribution from a node that is no party passes a relationship whenever its subject is a member; additive, it supersedes nothing",
+   "depends_on": [
+    "SO-F-04"
+   ],
+   "implements": [],
+   "tasks": 1,
+   "criteria": 17,
+   "spec": "specs/SO-F-04C.json",
+   "adapted_from": "none; written from the review of pull request #368",
+   "base": "TBD: a main commit that contains the merge of pull request #368 (not merged when this row was written); recorded here and in the request before signing",
+   "status": "proposed and unsigned; no red-team record; a spec delta for red-team review; cannot be signed until pull request #368 merges and its base is recorded"
   }
  ]
 }
