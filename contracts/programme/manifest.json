@@ -1221,13 +1221,13 @@
       "repo": "memev",
       "supersedes": "SR-0.03",
       "supersedes_signed_contract": "k-sr-0-03-verify-runs-ever-2259f2 (version 2; the spec file contracts/seed-readiness/specs/SR-0.03-verify-runs-every-verifier-type.json is unchanged)",
-      "supersedes_reason": "owner delegation, 1 Nov 2026: pin a current base and the workdir (base pending), name in the scope of T3 every file of pull request #336, and state that verify returns BLOCKED for the scope criterion of T1, T3 and T4 until T2 lands; no scope beyond those files",
+      "supersedes_reason": "owner delegation, 1 Nov 2026: pin a current base and the workdir (base 3989c80), name in the scope of T3 every file of pull request #336, and state that verify returns BLOCKED for the scope criterion of T1, T3 and T4 until T2 lands; no scope beyond those files",
       "related_pull_request": "#336",
       "depends_on": [],
       "tasks": 5,
       "criteria": 51,
       "spec": "specs/SR-0.03.3-verify-runs-every-verifier-type.json",
-      "base": "PENDING: the memev main commit after the README re-sign fix lands; the placeholder is the 40-zero sha on T1 criterion 7 of the spec",
+      "base": "3989c80bea615381947758e0ab1d28dfe18f115b (the memev main commit that merged pull request #343, which carried the README re-sign fix; owner delegation, 1 Nov 2026); pinned on T1 criterion 7 of the spec",
       "status": "proposed: unsigned, signs after a clean red-team round"
     }
   ],

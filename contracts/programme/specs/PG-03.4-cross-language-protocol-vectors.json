@@ -30,7 +30,8 @@
         ".github/workflows/**",
         "CHANGELOG.md",
         "package.json",
-        "package-lock.json"
+        "package-lock.json",
+        "dist/**"
       ],
       "criteria": [
         {
@@ -117,7 +118,8 @@
         ".github/workflows/**",
         "CHANGELOG.md",
         "package.json",
-        "package-lock.json"
+        "package-lock.json",
+        "dist/**"
       ],
       "criteria": [
         {
@@ -198,7 +200,8 @@
         ".github/workflows/**",
         "CHANGELOG.md",
         "package.json",
-        "package-lock.json"
+        "package-lock.json",
+        "dist/**"
       ],
       "criteria": [
         {

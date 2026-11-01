@@ -45,7 +45,7 @@ A task takes the strongest class of the requirements it serves: conflicting, the
 
 ## Claim register
 
-Who writes which task, so that two authors do not write the same one. Claims are anonymous ids: Claim A is the Scope One baseline and the signing of contracts, Claim B the programme specs and their work pull requests, Claim C the crdt-merge conformance work and the Scope One decision records, Claim D the seed-readiness and quality-loop follow-ups. A status is as of the date above.
+Who writes which task, so that two authors do not write the same one. Claims are anonymous ids: Claim A is the Scope One baseline and the signing of contracts, Claim B the programme specs and their work pull requests, Claim C the crdt-merge conformance work and the Scope One decision records, Claim D the seed-readiness and quality-loop follow-ups, Claim E the Scope One build-layer contracts of the fold (`SO-A-xx`). A status is as of the date above.
 
 | Task id | Claim | Branch or pull request | Status |
 | --- | --- | --- | --- |
@@ -71,6 +71,8 @@ Who writes which task, so that two authors do not write the same one. Claims are
 | `PG-03.1` (vectors, crdt-merge); one pull request | Claim C | branch `feat/pg-03-1-*` | queued after `SO-2.01` to `SO-2.06` |
 | `PG-03.4` (crdt-merge-ts; supersedes the signed `PG-03.2`) and `PG-03.5` (crdt-merge-rs; supersedes the signed `PG-03.3`); one pull request per package; depend on `PG-03.1` | Claim C | branches `feat/pg-03-4-*`, `feat/pg-03-5-*` | active |
 | `SO-F-01` (identity and scopes model, version 1; a signed fold contract of pull request #341) | Claim C | branch `feat/so-f-01-identity-and-scopes` | claimed |
+| `SO-A-03` (the four execution event kinds; a signed fold contract of pull request #341) | Claim E | branch `feat/so-a-03-*` (none pushed yet) | claimed |
+| `SO-A-04` (relationship model and change propagation; a signed fold contract of pull request #341) | Claim E | branch `feat/so-a-04-*` (none pushed yet) | claimed |
 | `PG-03.2` and `PG-03.3` (signed; files unchanged) | superseded | none | superseded by `PG-03.4` and `PG-03.5` (signer's decision, 1 Nov 2026; reason: the editions lack the features the vectors need, so the signed scope cannot be met); the manifest records `superseded_by` |
 | `PG-12.2` (multi-node gossip transport; `WP12-01` to `WP12-03`; supersedes the signed `PG-12.1`) | unclaimed | none | open, unclaimed |
 | `PG-06.2` (replication separate from acceptance; `WP06-01` to `WP06-03`; supersedes the signed `PG-06.1`) | unclaimed | none | open, unclaimed |
@@ -80,7 +82,7 @@ Who writes which task, so that two authors do not write the same one. Claims are
 | `SR-6.03` installers and public release | signed vault contracts `WO-02-A` and `MEM-015` | cited by id, no programme task | covered by the vault contracts |
 | `SR-0.03` tasks 1, 3 and 4 (one pull request) | Claim D | branch `feat/sr-0-03-tasks-1-3-4` | active |
 | `SR-0.03` task 2 (the scope verifier, 16 criteria) | Claim D | branch `feat/sr-0-03-task-2-scope-verifier`, stacked on #336 | claimed |
-| `SR-0.03` version 2 (signed as `k-sr-0-03-verify-runs-ever-2259f2`; files unchanged) | superseded | none | superseded by `SR-0.03.3` (version 3, in `contracts/programme/specs`; owner delegation, 1 Nov 2026); the spec pins a base that is still pending (the memev main commit after the README re-sign fix); the manifest records `superseded_by` |
+| `SR-0.03` version 2 (signed as `k-sr-0-03-verify-runs-ever-2259f2`; files unchanged) | superseded | none | superseded by `SR-0.03.3` (version 3, in `contracts/programme/specs`; owner delegation, 1 Nov 2026); the spec pins the base `3989c80bea615381947758e0ab1d28dfe18f115b` on T1 criterion 7 (the memev main commit that merged pull request #343, which carried the README re-sign fix; owner delegation, 1 Nov 2026); the manifest records `superseded_by` |
 | `QL-1.01` task 2 (the red-team gate, linked to #314) | Claim D | branch `feat/ql-1-01-task-2` | queued after `SR-0.03` |
 | Every other `WP*` task (the work itself) | unclaimed | none | not started |
 
