@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { newVault, cleanup, tmpdir, OWNER } from './helpers/tmp.mjs';
 import { sandbox } from './helpers/cli.mjs';
-import { entry, pidFile, saveRunner, sweep, watch } from '../src/cli/runner.mjs';
+import { entry, pidFile, saveRunner, sweep, watch, command } from '../src/cli/runner.mjs';
 
 after(cleanup);
 
@@ -190,4 +190,23 @@ test('MEM-061 review 5: one watch per seat: a live pid holds the lock, a stale p
   fs.writeFileSync(pidFile(s.root, seat), String(p.pid));
   await watch({ root: s.root, seat, stop: () => true });
   assert.ok(!fs.existsSync(pidFile(s.root, seat)), 'the lock is dropped when the watch ends');
+});
+
+test('SR-1.01 T1: runner on, status, off and watch open the vault read-only, so they run while a writer holds it and leave the op log as it was', async () => {
+  const s = seats();                       // this process holds the vault writable: a writable open of it is refused
+  const oplog = path.join(s.root, '.memev', 'oplog');
+  const tree = () => Object.fromEntries(fs.readdirSync(oplog).filter((f) => f !== 'LOCK').map((f) => [f, fs.statSync(path.join(oplog, f)).isDirectory() ? 'dir' : fs.readFileSync(path.join(oplog, f)).toString('base64')]));
+  const before = tree();
+  const lock = fs.readFileSync(path.join(oplog, 'LOCK'));
+  const quiet = console.log; console.log = () => {};
+  try {
+    assert.equal(await command('runner', ['on', 'cursor@host'], { 'max-runs-per-day': '2', command: 'echo' }, { root: s.root, env: {} }), 0);
+    assert.equal(await command('runner', ['status'], {}, { root: s.root, env: {} }), 0);
+    await watch({ root: s.root, seat: 'cursor@host', stop: () => true });
+    assert.equal(await command('runner', ['off', 'cursor@host'], {}, { root: s.root, env: {} }), 0);
+  } finally { console.log = quiet; }
+  assert.equal(entry(s.root, 'cursor@host').enabled, false);
+  assert.deepEqual(tree(), before, 'the op log folder is as it was');
+  assert.ok(fs.readFileSync(path.join(oplog, 'LOCK')).equals(lock), 'and the writer still holds its lock');
+  s.v.close();
 });
