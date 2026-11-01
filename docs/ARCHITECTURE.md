@@ -47,7 +47,8 @@ flowchart LR
 | The daemon, HTTP and MCP | `src/server/main.mjs`, `src/server/http.mjs`, `src/server/mcp.mjs` | [DESIGN.md](DESIGN.md), [THREAT-MODEL.md](THREAT-MODEL.md) |
 | The vault, log, index and graph | `src/engine/vault.mjs`, `oplog.mjs`, `index.mjs`, `graph.mjs`, `quality.mjs` | [DESIGN.md](DESIGN.md) |
 | Tokens, device keys and the licence | `src/engine/tokens.mjs`, `devices.mjs`, `license.mjs`, `entitlements.mjs` | [PRICING.md](PRICING.md), [CHARTER.md](../CHARTER.md) |
-| The comms bus | `src/engine/bus.mjs`, `src/cli/bus-cli.mjs` | [BUS.md](BUS.md) |\n| Project state and governed execution | `src/engine/project-store.mjs`, `project-state.mjs`, `coordinator.mjs`, `relationships.mjs` | [PROJECTS.md](PROJECTS.md) |\n| Federation foundations | `src/engine/federation/` (contributions, admission, membership and policy) | [FEDERATION.md](FEDERATION.md) |
+| The comms bus | `src/engine/bus.mjs`, `src/cli/bus-cli.mjs` | [BUS.md](BUS.md) |
+| Project state and governed execution | `src/engine/project-store.mjs`, `project-state.mjs`, `coordinator.mjs`, `relationships.mjs` | [PROJECTS.md](PROJECTS.md) |\n| Federation foundations | `src/engine/federation/` (contributions, admission, membership and policy) | [FEDERATION.md](FEDERATION.md) |
 | Signed contracts | `src/engine/contracts.mjs`, `vendor/attest` | [CONTRACTS.md](CONTRACTS.md) |
 | Secure link and relay | `src/cli/tunnel.mjs`, `src/cli/relay.mjs`, `src/cli/remote.mjs`, `src/cli/invite.mjs` | [CLOUD.md](CLOUD.md), [RELAY.md](RELAY.md) |
 | Backup and sync | `src/cli/github.mjs`, `src/cli/sync.mjs`, `src/engine/git.mjs` | [GITHUB.md](GITHUB.md) |
@@ -207,9 +208,10 @@ flowchart LR
 
 Details: [tiers/corporate.md](tiers/corporate.md).
 
-### Several sites and federation (foundations partial; multi-node operation planned)
+### Several sites and federation (planned)
 
-Nothing in this section is built. The architectural target is a federation of independently
+No end-to-end multi-node deployment is shipped. Local federation primitives are implemented as
+specified in [FEDERATION.md](FEDERATION.md); the architectural target is a federation of independently
 operated site nodes: each site owns its node and its memory, sites converge the state they are
 authorised to share through the convergence engine under its contract, and no central coordinator
 sequences ordinary updates. The company vault and the main corporate vault above are the one-node
