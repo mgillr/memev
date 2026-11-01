@@ -196,7 +196,18 @@ test('PG-W-21A AC03: a child with no usable parent is not honoured and a chain c
   assert.equal(rule([grant({ id: 'x', issuer: 'operator:o1', delegation: { depth: 1 } })]), 'deny.untrusted_issuer', 'a non-root issuer must name its parent');
   assert.equal(rule([grant({ id: 'self', issuer: 'device:d1', delegation: { depth: 3, parent: 'self' } })]), 'deny.chain.depth', 'a grant that names itself');
   assert.equal(rule([grant({ id: 'a', subject: 'device:d1', issuer: 'device:d2', delegation: { depth: 2, parent: 'b' } }), grant({ id: 'b', subject: 'device:d2', issuer: 'device:d1', delegation: { depth: 2, parent: 'a' } })]), 'deny.chain.depth', 'a cycle');
-  assert.equal(rule([parentGrant({ start: '2026-01-15T00:00:00Z' }), childGrant({ start: '2026-01-10T00:00:00Z' })], ask(), { at: '2026-01-12T00:00:00Z' }), 'deny.chain.parent_not_yet_valid', 'the child cannot be live before its parent');
+  // a child that starts before its parent is not honoured, whether the time asked is before or after the parent's start
+  const early = [parentGrant({ start: '2026-01-15T00:00:00Z' }), childGrant({ start: '2026-01-10T00:00:00Z' })];
+  assert.equal(rule(early, ask(), { at: '2026-01-12T00:00:00Z' }), 'deny.chain.start', 'asked before the parent starts');
+  assert.equal(rule(early), 'deny.chain.start', 'asked after the parent has started');
+  assert.equal(evaluate(ask(), ctx([parentGrant({ start: '2026-01-15T00:00:00Z' }), childGrant({ start: '2026-01-15T00:00:00Z' })])).eligible, true, 'the same start narrows');
+  assert.equal(evaluate(ask(), ctx([parentGrant({ start: '2026-01-15T00:00:00Z' }), childGrant({ start: '2026-01-16T00:00:00Z' })])).eligible, true, 'a later start narrows');
+  // a grant with no delegation block has depth 0: it cannot delegate, and a non-root issuer with no block holds no authority
+  const plain = (o) => grant({ id: 'plain', subject: 'operator:o1', purposes: ['contribute', 'verify'], ...o });
+  assert.equal(rule([without(plain(), 'delegation'), childGrant()]), 'deny.chain.parent_depth_zero', 'a parent with no delegation block cannot delegate');
+  assert.equal(rule([without(grant({ issuer: 'operator:o1' }), 'delegation')]), 'deny.untrusted_issuer', 'a non-root issuer with no delegation block');
+  assert.equal(rule([without(grant({ issuer: 'operator:o1' }), 'delegation'), without(plain({ id: 'p' }), 'delegation')]), 'deny.untrusted_issuer', 'a holder of a grant with no block does not make its grants honoured');
+  assert.equal(evaluate(ask(), ctx([without(grant(), 'delegation')])).eligible, true, 'a root-issued grant needs no delegation block');
   // a grant that is not issued by a root and whose parent is itself not issued by a root or a live delegator is refused
   assert.equal(rule([parentGrant({ issuer: 'person:stranger' }), childGrant()]), 'deny.untrusted_issuer');
 });
@@ -265,13 +276,67 @@ test('PG-W-21A AC05: a call with no at returns a deny with rule deny.bad_request
     const r = evaluate(ask(), c); assert.equal(r.eligible, false); assert.equal(r.rule, 'deny.bad_request');
   }
   assert.equal(evaluate(ask(), { records: [live], roots: [ROOT], at: '2026-06-01T00:00:00Z' }).eligible, true);
-  const realNow = Date.now;
-  Date.now = () => { throw new Error('the clock was read'); };
-  try {
-    assert.equal(evaluate(ask(), { records: [live], roots: [ROOT] }).rule, 'deny.bad_request');
-    assert.equal(evaluate(ask(), ctx([grant()])).eligible, true);
-    assert.equal(validate(grant()).ok, true);
-  } finally { Date.now = realNow; }
+  assert.equal(evaluate(ask(), { records: [live], roots: [ROOT] }).rule, 'deny.bad_request');
+});
+
+// Every route to a clock, a random number, a file or the process is replaced by one that records the call; the module
+// is then used for every kind of decision, and none of them may be called.
+function trapped(fn) {
+  const calls = [];
+  const saved = [];
+  const trap = (obj, key, label) => {
+    if (typeof obj?.[key] !== 'function') return;
+    saved.push([obj, key, Object.getOwnPropertyDescriptor(obj, key)]); // undefined when the function lives on the prototype
+    Object.defineProperty(obj, key, { configurable: true, writable: true, enumerable: false, value: () => { calls.push(label); throw new Error(`${label} was called`); } });
+  };
+  for (const k of Object.getOwnPropertyNames(fs)) if (typeof fs[k] === 'function') trap(fs, k, `fs.${k}`);
+  for (const k of Object.getOwnPropertyNames(fs.promises)) if (typeof fs.promises[k] === 'function') trap(fs.promises, k, `fs.promises.${k}`);
+  trap(Date, 'now', 'Date.now'); trap(performance, 'now', 'performance.now'); trap(Math, 'random', 'Math.random');
+  trap(process.hrtime, 'bigint', 'process.hrtime.bigint'); trap(process, 'hrtime', 'process.hrtime'); trap(process, 'uptime', 'process.uptime'); trap(process, 'cpuUsage', 'process.cpuUsage');
+  trap(globalThis, 'fetch', 'fetch'); trap(globalThis, 'setTimeout', 'setTimeout'); trap(globalThis, 'setInterval', 'setInterval'); trap(globalThis, 'queueMicrotask', 'queueMicrotask');
+  const RealDate = globalThis.Date;
+  // a Date built with no argument reads the clock; one built from a stated time does not
+  globalThis.Date = new Proxy(RealDate, { construct(t, a, nt) { if (a.length === 0) { calls.push('new Date()'); throw new Error('new Date() was called'); } return Reflect.construct(t, a, nt); } });
+  try { fn(); } finally {
+    globalThis.Date = RealDate;
+    for (const [obj, key, d] of saved.reverse()) { if (d) Object.defineProperty(obj, key, d); else delete obj[key]; }
+  }
+  return calls;
+}
+
+test('PG-W-21A AC05: no clock, random, file, network, timer or process call is made, whatever the decision', () => {
+  const records = [parentGrant(), childGrant(), revocation({ id: 'v2', grant: 'zz' }), grant({ id: 'g7', subject: 'node:n7' })];
+  const requests = [ask(), ask({ subject: 'node:nobody' }), ask({ purpose: 'verify' }), ask({ subject: 'node:n7' }), ask({ subject: 7 })];
+  const results = [];
+  const calls = trapped(() => {
+    for (const q of requests) for (const at of [AT, '2026-03-01T00:00:00Z', undefined]) {
+      results.push(evaluate(q, { records, roots: [ROOT], at }));
+      results.push(evaluate(q, { records: [], roots: [ROOT], at }));
+    }
+    for (const r of records) validate(r);
+    validate({ nonsense: true });
+  });
+  assert.deepEqual(calls, [], 'a forbidden call was made');
+  assert.ok(results.some((r) => r.eligible) && results.some((r) => !r.eligible && r.rule !== 'deny.bad_request'), 'the decisions the trap covered were real ones');
+  // the trap itself works: it sees a call
+  assert.deepEqual(trapped(() => { try { Math.random(); } catch { /* the trap throws */ } }), ['Math.random']);
+  assert.deepEqual(trapped(() => { try { fs.readFileSync('x'); } catch { /* the trap throws */ } }), ['fs.readFileSync']);
+  assert.deepEqual(trapped(() => { try { new Date(); } catch { /* the trap throws */ } }), ['new Date()']);
+  assert.equal(typeof Math.random(), 'number'); assert.equal(typeof Date.now(), 'number'); assert.equal(typeof fs.readFileSync, 'function');
+});
+
+test('PG-W-21A AC05: the same inputs give deep-equal outputs on every call, and no call changes them', () => {
+  const records = [parentGrant(), childGrant(), grant({ id: 'g1', subject: 'device:d9' }), revocation({ id: 'v2', grant: 'zz' }), { junk: true }];
+  const roots = [ROOT]; const c = { records, roots, at: AT };
+  const snapshot = JSON.stringify({ records, roots, c });
+  const first = Array.from({ length: 5 }, () => evaluate(ask(), c));
+  for (const r of first) assert.deepEqual(r, first[0]);
+  assert.equal(JSON.stringify({ records, roots, c }), snapshot, 'records, roots and the call are unchanged');
+  const q = ask(); const qs = JSON.stringify(q); evaluate(q, c); assert.equal(JSON.stringify(q), qs, 'the request is unchanged');
+  const shuffled = [...records].reverse();
+  assert.deepEqual(evaluate(ask(), { ...c, records: shuffled }), first[0], 'the order of the records does not matter');
+  const g = grant(); const gs = JSON.stringify(g); validate(g); validate(g); assert.equal(JSON.stringify(g), gs, 'the validator does not change its input');
+  assert.deepEqual(validate(g), validate(g));
 });
 
 test('PG-W-21A AC05: hostile input is a deny and never a throw', () => {
@@ -327,20 +392,107 @@ test('PG-W-21A AC06: every field the schema lists is accepted by the validator a
   for (const f of mod().REVOCATION_FIELDS) assert.ok(s.$defs.revocation.properties[f], `revocation field ${f} is in the schema`);
 });
 
-// ---- AC07 to AC09: the greps of the contract, kept here so they run with the suite
+// ---- the fixed set of rule ids
+
+const SCENARIOS = () => {
+  const stranger = grant({ issuer: 'person:stranger' });
+  const ch = (po, co) => [parentGrant(po), childGrant(co)];
+  return [
+    [ask(), ctx([grant()]), 'allow.grant'],
+    [ask({ subject: 'x' }), ctx([grant()]), 'deny.bad_request'],
+    [ask(), ctx([]), 'deny.no_records'],
+    [ask(), ctx([grant()], { roots: [] }), 'deny.no_roots'],
+    [ask({ subject: 'device:other' }), ctx([grant()]), 'deny.no_grant'],
+    [ask({ scope: { type: 'team', id: 'other' } }), ctx([grant()]), 'deny.scope_not_granted'],
+    [ask({ purpose: 'verify' }), ctx([grant()]), 'deny.purpose_not_granted'],
+    [ask(), ctx([grant()], { at: '2025-01-01T00:00:00Z' }), 'deny.not_yet_valid'],
+    [ask(), ctx([grant()], { at: '2027-01-01T00:00:00Z' }), 'deny.expired'],
+    [ask(), ctx([grant(), revocation({ time: START })]), 'deny.revoked'],
+    [ask(), ctx([stranger]), 'deny.untrusted_issuer'],
+    [ask(), ctx([childGrant()]), 'deny.chain.parent_missing'],
+    [ask(), ctx([parentGrant({ subject: 'operator:o2' }), childGrant()]), 'deny.chain.parent_not_issuer'],
+    [ask(), ctx(ch({ delegation: { depth: 0 } }, {})), 'deny.chain.parent_depth_zero'],
+    [ask(), ctx(ch({ delegation: { depth: 1 } }, {})), 'deny.chain.depth'],
+    [ask({ scope: { type: 'team', id: 't2' } }), ctx(ch({}, { scope: { type: 'team', id: 't2' } })), 'deny.chain.scope'],
+    [ask(), ctx(ch({ purposes: ['contribute'] }, { purposes: ['contribute', 'verify'] })), 'deny.chain.purposes'],
+    [ask(), ctx(ch({}, { expires: '2026-03-01T00:00:00Z' })), 'deny.chain.expiry'],
+    [ask(), ctx(ch({ start: '2026-01-15T00:00:00Z' }, { start: '2026-01-10T00:00:00Z' })), 'deny.chain.start'],
+    [ask(), ctx([...ch({}, {}), revocation({ id: 'v2', grant: 'p', time: START })]), 'deny.chain.parent_revoked'],
+  ];
+};
+
+test('PG-W-21A AC02: every decision carries a rule id from the fixed, exported set, and every id in the set is reachable', () => {
+  const RULES = mod().RULES;
+  assert.ok(Object.isFrozen(RULES), 'the set is frozen');
+  const ids = Object.values(RULES);
+  assert.equal(new Set(ids).size, ids.length, 'no id twice');
+  assert.ok(ids.every((id) => /^(allow|deny)(\.[a-z_]+)+$/.test(id)), 'every id is a dotted lower-case name');
+  const seen = new Set();
+  for (const [req, c, want] of SCENARIOS()) {
+    const r = evaluate(req, c);
+    assert.equal(r.rule, want, `${want}: ${r.reason}`);
+    assert.ok(ids.includes(r.rule), `${r.rule} is in the set`);
+    assert.equal(r.eligible, r.rule.startsWith('allow.'));
+    seen.add(r.rule);
+  }
+  assert.deepEqual([...seen].sort(), [...ids].sort(), 'the scenarios reach every id and no other');
+  // nothing hostile or unusual can produce an id outside the set
+  for (const c of [null, 5, { records: [null], roots: [ROOT], at: AT }, { records: [grant()], roots: [ROOT, 3], at: AT }, ctx([{ get id() { throw new Error('x'); } }])]) assert.ok(ids.includes(evaluate(ask(), c).rule));
+  // the module writes no rule id of its own: every id it returns is one of the constants of the set
+  const code = SRC().replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const literals = [...code.matchAll(/'((?:allow|deny)\.[a-z_.]+)'/g)].map((m) => m[1]);
+  assert.deepEqual([...new Set(literals)].filter((x) => !ids.includes(x)), [], 'an id literal outside the set');
+  assert.doesNotMatch(code, /rule:\s*[`"]|\bdeny\(\s*[`"]|`deny\./, 'no rule id is built from text');
+});
+
+// ---- AC07 to AC09: the greps of the contract, kept here so they run with the suite, and the stricter behaviour behind them
 
 const SRC = () => fs.readFileSync(MODULE, 'utf8');
+const CODE = () => SRC().replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '');
 test('PG-W-21A AC07: the module marks every choice as provisional and names the decision record', () => {
   assert.match(SRC(), /ADR 8.*PROVISIONAL|PROVISIONAL.*ADR 8/s);
+  // the three choices that answer an ADR 8 question are each labelled where they are made
+  const label = (re, what) => { const m = re.exec(SRC()); assert.ok(m, `${what} is in the module`); const before = SRC().slice(Math.max(0, m.index - 600), m.index + m[0].length + 200); assert.match(before, /PROVISIONAL/, `${what} is labelled PROVISIONAL near its code`); assert.match(before, /ADR 8/, `${what} names ADR 8 near its code`); };
+  label(/export const TRUST_PURPOSES/, 'the two purposes');
+  label(/deny\.chain\.depth|RULES\.CHAIN_DEPTH/, 'narrowing-only delegation');
+  label(/v\.issuer === g\.issuer/, 'issuer-or-root revocation');
+  const schema = JSON.parse(fs.readFileSync(SCHEMA_FILE, 'utf8'));
+  assert.match(schema.description, /PROVISIONAL/);
+  assert.match(schema.$defs.grant.properties.purposes.description, /PROVISIONAL/, 'the schema labels the two purposes');
+  assert.match(schema.$defs.delegation.description, /PROVISIONAL/, 'the schema labels narrowing-only delegation');
+  assert.match(schema.$defs.revocation.description, /PROVISIONAL/, 'the schema labels who may revoke');
+  for (const d of [schema.$defs.grant.properties.purposes.description, schema.$defs.delegation.description, schema.$defs.revocation.description]) assert.match(d, /ADR 8/);
+  assert.match(fs.readFileSync(path.join(PKG, 'changelog.d', 'PG-W-21A.md'), 'utf8'), /provisional/i);
 });
-test('PG-W-21A AC08: every import line of the module names ../identity.mjs and nothing else', () => {
-  const imports = SRC().split('\n').filter((l) => /^import /.test(l));
-  assert.ok(imports.length >= 1);
-  for (const l of imports) assert.match(l, /'\.\.\/identity\.mjs'/);
-  assert.doesNotMatch(SRC(), /\bimport\s*\(/, 'no dynamic import');
-  assert.doesNotMatch(SRC(), /\brequire\s*\(/);
+
+test('PG-W-21A AC08: the only static import is ../identity.mjs, and no import is dynamic, required, created or resolved at run time', () => {
+  const code = CODE();
+  const statics = [...code.matchAll(/(?:^|[;\n}])\s*(?:import|export)\b[^;'"`]*?(?:\bfrom\s*)?['"]([^'"]+)['"]/g)].map((m) => m[1]);
+  assert.deepEqual(statics, ['../identity.mjs'], 'a strict allow-list of one static import');
+  assert.deepEqual(code.split('\n').filter((l) => /^import /.test(l)).length, 1, 'one import line, so the contract grep reads it');
+  assert.equal((code.match(/\bimport\b/g) ?? []).length, 1, 'the word import appears once');
+  for (const banned of [/\bimport\s*\(/, /\bimport\s*\.\s*meta/, /\brequire\b/, /\bcreateRequire\b/, /\bimport\.meta\.resolve\b/, /\bmodule\.require\b/, /\beval\b/, /\bFunction\s*\(/, /\bnew\s+Function\b/, /\bglobalThis\b/, /\bprocess\b/, /\bBuffer\b/, /\bWebAssembly\b/])
+    assert.doesNotMatch(code, banned, String(banned));
+  // the one import names exactly the two things the module takes from identity.mjs
+  assert.match(code, /^import \{ SUBJECT_TYPES, validateScope \} from '\.\.\/identity\.mjs';$/m);
 });
-test('PG-W-21A AC09: the module names no clock, file, network or process call', () => {
+
+test('PG-W-21A AC09: the module names no clock, random, file, network or process call', () => {
   assert.doesNotMatch(SRC(), /Date\.now|new Date\(\)|node:fs|node:net|node:http|node:child_process|fetch\(/);
-  assert.doesNotMatch(SRC(), /\b(process\.|performance\.|Math\.random|hrtime|from 'fs'|from 'net'|from 'http'|from 'os')/);
+  const code = CODE();
+  for (const banned of [/Date\.now/, /\bnew\s+Date\b/, /\bperformance\b/, /Math\.random/, /\bhrtime\b/, /\bcrypto\b/, /\brandom/i, /\bfetch\b/, /\bXMLHttpRequest\b/, /\bsetTimeout\b|\bsetInterval\b|\bsetImmediate\b|\bqueueMicrotask\b/, /\bfs\b/, /\bnet\b/, /\bhttps?\b/, /\bchild_process\b/, /\bos\b/, /\bnode:/, /\bAtomics\b|\bSharedArrayBuffer\b/, /\bconsole\b/])
+    assert.doesNotMatch(code, banned, String(banned));
+  assert.match(code, /Date\.parse\(/, 'a stated time is parsed, which reads no clock');
+  assert.equal([...code.matchAll(/\bDate\b/g)].length, [...code.matchAll(/\bDate\.parse\b/g)].length, 'Date is used only to parse a stated time');
+});
+
+test('PG-W-21A AC08: nothing outside the tests imports the module: it has no production caller', () => {
+  const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? (e.name === 'node_modules' ? [] : walk(path.join(d, e.name))) : [path.join(d, e.name)]));
+  const callers = ['bin', 'src', 'scripts', 'vendor'].filter((d) => fs.existsSync(path.join(PKG, d))).flatMap((d) => walk(path.join(PKG, d)))
+    .filter((f) => /\.(mjs|js|cjs|json)$/.test(f) && f !== MODULE && /trust-record/.test(fs.readFileSync(f, 'utf8')));
+  assert.deepEqual(callers.map((f) => path.relative(PKG, f)), [], 'no module, script or command names the trust record module');
+  const graph = fs.readFileSync(path.join(PKG, 'docs', 'MODULES.md'), 'utf8');
+  assert.ok(graph.includes('src/engine/federation/trust-record.mjs'), 'the module is on the map');
+  const row = graph.split('\n').find((l) => l.includes('src/engine/federation/trust-record.mjs') && l.startsWith('|'));
+  assert.ok(row, 'the module has a row on the map');
 });
