@@ -76,3 +76,5 @@ schemas, authority rules and conformance tests before any page describes it as a
 
 This page states no merge strategy names, benchmark figures or release dates for the engine, because
 none are published for Memev. A page for any of them is written when the feature ships.
+
+[MERGE-SEMANTICS.md](MERGE-SEMANTICS.md)
