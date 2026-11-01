@@ -310,7 +310,7 @@
       "requirements": [
         "MV-CRDT-07"
       ],
-      "description": "Repo: crdt-merge. PR #179 open since 2026-09-28 and mergeable. Review against the E4 tests; merge is the owner's call.",
+      "description": "Repo: crdt-merge. PR #179 merged to crdt-merge main through #181 as 252c93e6. Review was against the E4 tests.",
       "scope": {
         "allow": [
           "crdt_merge/e4/**",

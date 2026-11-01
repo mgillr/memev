@@ -1,0 +1,292 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PGP-1.03",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "14741278b9d3f61ab18fffaf2a74eada2297ce4baa9972c7a3098a13f3b9a240",
+      "base_commit": "79cbaae69bd9120bfc6cf5d600fe0233728825c2",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/scope-one/programme/REQUIREMENTS.md",
+            "sha256": "8b70ac41d38fe2f855bf9d74e1409358a1a89d6e68d571aea20186f15db81705"
+          },
+          {
+            "path": "docs/scope-one/WBS.md",
+            "sha256": "15f122b0a8bd47fea7591256767a5707b98578dfbfdf8dc197e57e1522e5ff91"
+          }
+        ]
+      },
+      "manifest_kind": "docs",
+      "verdict": "findings",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "high",
+          "how": "T4 R2 requires the reconciliation to carry a claim register that names each work lane, so a published document must name the lanes of the other agents; that is an agent label in a public repository, and docs/scope-one/RECONCILIATION.md and the programme DECOMPOSITION.md carry it already",
+          "disposition": "rejected",
+          "reason": "Fixed in the text, not by a criterion: requirement 2 of T4 now says the claim register names each claim, not each workstream, so the published page need not name any work lane."
+        },
+        {
+          "n": 2,
+          "severity": "medium",
+          "how": "the note texts of the manifest mapping rows use work-lane labels as owners; the same labels leak through the manifest, which is not hashed and so can be corrected without a new spec",
+          "disposition": "rejected",
+          "reason": "Fixed in the manifest: I searched contracts/programme/manifest.json for lane, agent and seat labels and found none."
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Second review, of pull request #325 at head 79cbaae (the first, at ea7e95d, found the agent label, the manifest kinds, wrong paths and missing citations; each of those is fixed at this head). The engine decision is owner-confirmed (t542u, 31 Oct 2026). Checks run, and the only checks made: the spec hash equals specSha256 of the file at 79cbaae; every MV citation resolves to the cited line of docs/scope-one/programme/REQUIREMENTS.md or DECOMPOSITION.md and its text matches; every quoted SO-1.x, SO-2.x, SR and QL requirement is a verbatim stretch of the signed contract it cites; each verifier (grep pattern, file_exists path, wiring entry) was run against the tree it names (this tree, or the pull request head where the spec is for another repository); the request, tasks and manifest rows were read against the leak rules of this repository (the leak scan stays clean, and I also read by hand for agent and lane labels, which the scan does not catch); no duplicate of SO-1.01, SO-1.02, SO-1.04, SO-1.10, SO-1.11, SO-2.x, SR, QL, WBS or baseline section 8 was found. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. The criteria are strong (six grep criteria on DECISIONS.md, PRICING.md, README.md, INVENTORY.md and RECONCILIATION.md, and the pricing, readme, docs-links and wbs tests) and cite SO-1.02 requirements verbatim. Held for the agent-label findings only. Engine decision confirmed (t542u, 31 Oct 2026). Not signed.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MjhmNTAyNWUwYjkxMGI1ZTVlZWY5OTAxMWIyMGNjNDZjNmE5MDUxN2ViYjQyZWY4OTBjNTIzMzAzMjNhYmFmNA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "rXVry8UotFo3aQBn1gMSwgX+N7c03dmQJcyBmnkr54NB0G6+Wa07TYGdhVdSriidsFpqzU77wvtgyIiTpCf8Aw=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "29e442d7ad5ed7db032b3592e3cbad12f1f7272c53169ae4c42488964b8cd108",
+      "base_commit": "2df1272008a9f32d2c69d130003a0d521b846d2d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "README.md",
+            "sha256": "b2ec5ce73f811dddc60e9ecc42bd252997df9058ce6b5ee1a6428d96013d137b"
+          },
+          {
+            "path": "docs/CONVERGENCE.md",
+            "sha256": "47e28bcfcb039b2e3222ed56fa7d54b0a051166ea79302522c77a98638a7e74c"
+          },
+          {
+            "path": "docs/PRICING.md",
+            "sha256": "0460e815213a48f7bb24a89d3ebdb926719d8e60862052bb2e2d1943c46dcffb"
+          },
+          {
+            "path": "docs/README.md",
+            "sha256": "0206e9fb527e15becf9b38a7240a1d25748b23278e6a4e74ba40be4f1d7cc097"
+          },
+          {
+            "path": "docs/scope-one/DECISIONS.md",
+            "sha256": "8e9cde4e4dc7d208d6cd340a0aeae44c469427a404ef7ad43ff618dfc97ca8b9"
+          },
+          {
+            "path": "docs/scope-one/INVENTORY.md",
+            "sha256": "712a08abbfbeddb163102449032acebdd3a4aaec8e0542d37b903e20c686dc2d"
+          },
+          {
+            "path": "docs/scope-one/RECONCILIATION.md",
+            "sha256": "bd70a74905c5087f84df5a49dadde465fbb7f89c11b1b1b1e145edd7686a238b"
+          },
+          {
+            "path": "docs/scope-one/programme/DECOMPOSITION.md",
+            "sha256": "58f5b6ccf043547f8aadd2d58e30cd21c7b61480cbd79bcbd5fd61733ee62d09"
+          },
+          {
+            "path": "docs/scope-one/programme/OVERLAPS.md",
+            "sha256": "937b6be05bfbea69c088369092cf2fd6ecc069a7be82fd15535b375fb0d709ac"
+          },
+          {
+            "path": "docs/scope-one/programme/README.md",
+            "sha256": "13c2a2e0455807ab704acf1e6c90c7f0150423993f841c0669ce5249b98c86e8"
+          },
+          {
+            "path": "docs/scope-one/programme/REQUIREMENTS.md",
+            "sha256": "84e62695045dedc65095f75fe25dd7982846dcf2bd8b0b5b351a4da17693041b"
+          },
+          {
+            "path": "docs/scope-one/programme/VALIDATION.md",
+            "sha256": "32fbb11111467f7ae261958bf6ef76d3f1372d9cbb350bb645c13d9049b34a52"
+          },
+          {
+            "path": "docs/scope-one/programme/WBS.md",
+            "sha256": "e67ec5bfe2bd93cf638269a7469f784ab5214eba57117b09f54c2a953118ea53"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP01.json",
+            "sha256": "075f172acf5d73bc27e9970e61a8a37cd05896339c226b6a7847455db721bc0c"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP02.json",
+            "sha256": "c7a7910d349ee8bdb466105d3655246d94e57159f7f9e923ba688d971b53f775"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP03.json",
+            "sha256": "2050a0f629eb04c3a6f44c54e4df8338f9c93521ce255fdecce4f2d5d7ea1ca1"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP04.json",
+            "sha256": "7bdf034af52c6dd956fd67e5f37fc2d8608c2480fdce6e13671d112ae92144f8"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP05.json",
+            "sha256": "91cf9ecc21659ad141503b65bfc5a30b80b1693e8dc960b4ef6613a7ad5fcf96"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP06.json",
+            "sha256": "b535df2997f35719a876f57d3d725617ea3984eb362af5c6508779f58f731f96"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP07.json",
+            "sha256": "a105d92b0a65a175c6c1680267f57a2805771cc7814938ca38abf2146d10c83f"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP08.json",
+            "sha256": "2f52805e6180733ce0ff32901d275ab4f4c2ca1f903a3943b67bbfcf0ba39781"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP09.json",
+            "sha256": "709c39997bc30d46d74eb73f99eb28abb4e5f49b57f7753d1172f53211fdd444"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP10.json",
+            "sha256": "d446038289dfbe3f6506757ecec751d216a28318849cddf5cc048c217477c3e7"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP11.json",
+            "sha256": "83439d9665665f5673627fb9179ecba3286771fb4257a0ea921bc7e9ed21b3ec"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP12.json",
+            "sha256": "938cbceb62a521e1902d99d834be2f508b19c289f588a3ac22f0f828d1a7e2d2"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP13.json",
+            "sha256": "12c89ad545cb013e620d97a01a91fd14b74481c6650fd70ee2ecfb79575eaf04"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP14.json",
+            "sha256": "87bc29e3beba395925d5248d4c4c40d0d81630baa6c6dfb521ef5207bc6d4283"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP15.json",
+            "sha256": "d9cb985c366efb2729f67c192d53fdd9602a40d2281a2fb4381d93f89cb3f716"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP16.json",
+            "sha256": "0bdba9aa3d464d94f9c6f3c95f38a7aff0e946e206bcb2d0e0a3c71055bc45a8"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP17.json",
+            "sha256": "f8a965b167e18bc949a509ec07970d70ec7ea9411b81773e203884b33b352b1e"
+          },
+          {
+            "path": "docs/scope-one/programme/fragments/WP18.json",
+            "sha256": "f40ef9e6ee7c9a6cae89d4e120af6e1d09bbf8247c076d772698f878073c33dc"
+          },
+          {
+            "path": "docs/scope-one/programme/memev-programme.proofline.json",
+            "sha256": "9e72eeaf51ab8a1d8c3995bccfdf07dd20b75ecf71257eaf748993daa43c5e4d"
+          },
+          {
+            "path": "docs/scope-one/programme/merge-order.txt",
+            "sha256": "27b30d570d7f49e7fd718a7ab0ce672492956aebb4b5ebb4ea3fac1a01064157"
+          },
+          {
+            "path": "docs/scope-one/programme/wp-graph.json",
+            "sha256": "4cc9cc559f666ba9ddfd8c066e8e1bb4fe09584479596a34b0053c6942dbad4c"
+          },
+          {
+            "path": "docs/tiers/README.md",
+            "sha256": "5b57e2e4c17e5899939f32bcea1aa8dfdc3eb1ed6e5f55b4aac7ddc8ce7fdcb2"
+          },
+          {
+            "path": "docs/tiers/business.md",
+            "sha256": "46dc83ac424983385ef4af0fb631c0f7f9ecc5b3e0419ff0802ede131eec2462"
+          },
+          {
+            "path": "docs/tiers/corporate.md",
+            "sha256": "8a55462e18479e835ca644ecbdfc5ff1ba9a750aa4a8b1a44baf4d73b53ec7ef"
+          }
+        ]
+      },
+      "manifest_kind": "docs",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Fourth review, of the merged tree of pull requests #325 and #340 at the reviewed head. Round 1 (afdccd6) held one high answer (the register had to name each work lane) and one medium (labels in the manifest rows). Commit 3da0df2 of #325 rewords that requirement, adds the SO-A-11 requirement and a criterion for it, and adds the multiline flag to four anchored grep criteria. Checks run, and the only checks made: the spec hash equals specSha256 of the file on disk at the reviewed head; every task drafts through makeTask; every command criterion parses with sh -n; every grep pattern compiles as a regular expression; no criterion statement repeats within a task; every test_red_green command names its own test file and that file is inside the task scope; every MV citation resolves to a line of docs/scope-one/programme/REQUIREMENTS.md, DECOMPOSITION.md or WBS.md; every fold id the spec cites (SO-A, SO-F) matches the title of a signed contract under contracts/signed; every SO, SR, QL and PG spec id it names resolves to a spec file here, except ids of specs that live in the other repository (SR-3.03, SR-3.06), which I did not resolve; I read the request, task descriptions and requirements by hand for agent, lane and seat labels (a word search for agent, lane and seat labels finds none in the spec or in the programme manifest) and the leak scan stays clean. All passed. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Nothing high.",
+      "amendments": [
+        {
+          "task": "T4",
+          "field": "requirement",
+          "from": "docs/scope-one/RECONCILIATION.md maps every programme requirement against docs/scope-one/WBS.md as same, missing or conflicting, with a claim register naming each workstream (source: owner request of 31 Oct 2026)",
+          "to": "docs/scope-one/RECONCILIATION.md maps every programme requirement against docs/scope-one/WBS.md as same, missing or conflicting, with a claim register naming each claim (source: owner request of 31 Oct 2026)",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "verifier.flags",
+          "statement": "The README has a plans and roadmap section",
+          "from": null,
+          "to": "m",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T3",
+          "field": "verifier.flags",
+          "statement": "The README has a licensing section",
+          "from": null,
+          "to": "m",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "verifier.flags",
+          "statement": "The reconciliation has a claim register",
+          "from": null,
+          "to": "m",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T4",
+          "field": "verifier.flags",
+          "statement": "The reconciliation states its headline counts",
+          "from": null,
+          "to": "m",
+          "reviewer_note": 1
+        }
+      ],
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "Zjk3N2JkYjQxNzQzN2I5MzhhZWFjYmRjZTBlMmEyNGQ2MTdkZDY3MDk0MzQzMzk5ZGFjYjdiODc0MGVjNmEzOA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "4sWflOjQ6UuRZM6VAAUSPT4yjpsKRbX69Bh8W29ZyMCj6eCL76FC/5xetFAlILDL88l2KuEwo7ozemMHdvefBA=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YjE3NDdmNmFlMDVmM2YxNTU2MDIzMGM2NzY5Yzk1MDk5MjVhMmRmOTU0NTk3NzNjOWMyNWNkZmFjODgzYzBiNg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "zPLEL1syoAEprqtTHhZJQWx3qd+75wGN1SPORrUb2u3m2AMq+7+GKgEb+SEyMStKRXjakXnqaUnG7gRY+cotDA=="
+          }
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": [
+    {
+      "n": 1,
+      "text": "INTERIM SOLO REVIEW, pending independent re-review. Round 2 of PGP-1.03 rewords one requirement of T4. From: \"docs/scope-one/RECONCILIATION.md maps every programme requirement against docs/scope-one/WBS.md as same, missing or conflicting, with a claim register naming each workstream (source: owner request of 31 Oct 2026)\". The new text says a claim register naming each claim. The change removes the need for the published page to name a work stream by its owner label, which round 1 found to be a label of another agent; the register still names every claim and the criteria that the reconciliation has a claim register and states its headline counts are kept. The multiline flag was added to the four grep criteria of T3 and T4 that anchor on a heading, which makes the anchor match at a line start. SO-A-11 is cited for the register check script.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YjExM2RmYmI1MDBjMzRmNTdjMWU5OGQwMmFhNjgzNjZhN2FkMGUzZDBmMGI4YjNkYzkwNDcxNWY2MjY0MWY3NQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "5pHXj77fbOY8K2lot5KqhUv3hIiiuu7Rgha0qMmtlGGQWoQakjbWchexrBbzCiM5ElfxZQSaR7LMDdWp5LfhBQ=="
+          }
+        ]
+      }
+    }
+  ]
+}
