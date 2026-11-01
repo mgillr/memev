@@ -1559,15 +1559,15 @@
       "id": "SR-1.34",
       "type": "seed-readiness follow-up spec (the spec file is in contracts/seed-readiness/specs)",
       "area": "SR-1",
-      "title": "A daemon start waits long enough for a slow machine, and a hook says 'starting'",
+      "title": "A daemon start waits long enough for a slow machine, a kept daemon ends, and one daemon serves",
       "repo": "memev",
-      "closes": "the open follow-up 'Raise the daemon start wait' in docs/scope-one/RECONCILIATION.md, and the open product question 'Session start on a slow machine' (the session-start card says 'starting', not 'not reachable', while the daemon is still starting)",
+      "closes": "the open follow-up 'Raise the daemon start wait' in docs/scope-one/RECONCILIATION.md, and the start path of the open question 'Session start on a slow machine' (partly covered); the one-writer criteria need SR-1.01 T1 and T3, built first under Claim F",
       "depends_on": [
         "SR-1.01",
         "SR-1.24"
       ],
       "tasks": 1,
-      "criteria": 23,
+      "criteria": 29,
       "spec": "../seed-readiness/specs/SR-1.34-a-daemon-start-waits-long-enough-for-a-slow-machine.json",
       "status": "proposed 1 Nov 2026 (ASTL decision); unsigned; red-team review by ASTL Team, signing by ASTL; builder Claim F; no code until signed",
       "kind": "feature"
