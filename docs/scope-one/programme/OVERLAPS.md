@@ -17,7 +17,7 @@ All contracts in fragments/ are unsigned proofline/1 planning drafts. Nothing wa
 | SR-3.05 / SR-3.06 (one licence statement, patents) | MV-LIC-03, MV-LIC-04, WP15-02/03 | Same requirement | Keep SR-3.05/3.06; WP15 tasks consume their results. |
 | SR-6.07 / SR-6.10 (site claims) | MV-PRD-02, WP16-03 | Same area | Keep SR-6.x; WP16-03 is the README/tier-page half. |
 | SR-1.15 (no code without a caller) | WP07, WP04-04, WP06-03 | Consistent | Rule applied through wiring verifiers. |
-| PR #224 (federation and deployment levels, draft) | MV-ARCH-01, MV-FED-06, MV-PRD-02 | Consistent with the 31 Oct owner decision | Rework (still draft, 105 commits behind main) rather than merge as is. |
+| PR #224 (federation and deployment levels, open, not draft, checks green on 1 Nov 2026) | MV-ARCH-01, MV-FED-06, MV-PRD-02 | Consistent with the 31 Oct owner decision | Rework (58 commits behind main on 1 Nov 2026) rather than merge as is. |
 | PR #222 (architecture and delivery addendum, draft) | the notes' architecture | Advisory by its own text: only recommendations with explicit acceptance become contracts; rec. 13 (federated sites) needs owner decisions first | WP12-WP14 are gated on owner acceptance of that recommendation. |
 | Owner decision 31 Oct 2026 (DECISIONS.md, a8e5332) | MV-PRD-04, MV-PRD-05, OQ-01 | Closes topology, providers, tier set; no Federated tier named | WP16-01 records whether a federation offer exists above it. |
 | memev attest/1 signed contracts (contracts/signed, QL gates) | all fragments here | Different format (proofline/1 here) | Keep fragments as planning contracts in memev-ops; convert to attest specs only after the owner accepts a work package and its red-team record exists (QL-1.01). Do not sign. |

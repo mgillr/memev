@@ -122,7 +122,7 @@ Dated 2026-10-30, at the baseline commit recorded in BASELINE.md; the open pull 
 | id | source | requirement ids covered | status | owner | last known activity | overlaps and conflicts | disposition |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | #324 | gh pr list, 31 Oct 2026 | none | in progress | SO-1.02 | open, not draft; WBS.md, test/wbs.test.mjs and SO-1.01 to SO-1.11 | none | MERGE |
-| #224 | gh pr list, 31 Oct 2026 | none | in progress | unowned | open, draft; federation and deployment documentation, created 30 Oct | federation is planned, not available; the tier decision names no Federated tier | REPAIR |
+| #224 | gh pr list, 31 Oct 2026 | none | in progress | unowned | open, not draft, checks green (1 Nov 2026); federation and deployment documentation, created 30 Oct | federation is planned, not available; the tier decision names no Federated tier | REPAIR |
 | #222 | gh pr list, 31 Oct 2026 | none | in progress | unowned | open, draft; Scope One architecture and delivery addendum, created 30 Oct | advisory: only recommendations the owner accepts become contracts | KEEP |
 | #201 | gh pr list, 31 Oct 2026 | none | in progress | WO-05-B | open, draft; paid-engine client behind a flag, created 30 Oct | one lifecycle with #154, #163 and #177; the engine stays external behind the WO-05-A call-out boundary | INTEGRATE |
 | #177 | gh pr list, 31 Oct 2026 | none | in progress | MEM-134 | open, draft; separation and abuse guards for the trial, created 29 Oct | #154, #163 and #201 | INTEGRATE |
