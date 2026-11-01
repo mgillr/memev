@@ -38,16 +38,16 @@ You must have been granted access to the private GitHub repository by the Memev 
 
 ```sh
 # Replace OWNER and REPOSITORY with the values from the GitHub Code menu.
-git clone https://github.com/OWNER/REPOSITORY.git
+git clone https://github.com/mgillr/memev.git
 cd memev
 node --version
 git --version
 git rev-parse HEAD
 npm install -g .
-memev init --local-only --no-service
+memev init --local-only --no-service --no-connect
 ```
 
-Use a new, empty vault location if the installer offers a choice. Do not point it at another vault. This starts the daemon for the test session but does not register a login service. The standard init flow may configure detected AI clients; use a dedicated test OS account, or add `--no-connect` if you want to connect one client manually after inspecting the setup. See [AI app integrations](CLIENTS.md).
+Use a new, empty vault location if the installer offers a choice. Do not point it at another vault. This starts the daemon for the test session, does not register a login service, and leaves detected AI-client configuration untouched. After inspecting the setup, connect only the app you intend to test with `memev connect <app>`. Use a dedicated test OS account or disposable VM regardless. See [AI app integrations](CLIENTS.md).
 
 Then run:
 
@@ -62,7 +62,7 @@ Record the output of `git rev-parse HEAD` as the build identifier for every repo
 ## First test: local operation
 
 - Confirm that the daemon is running and that `memev doctor` reports its findings.
-- Open one supported AI application and confirm its Memev integration is present.
+- Connect one supported AI application with `memev connect <app>`, then open it and confirm its Memev integration is present.
 - Ask it to save a harmless test decision or project note.
 - Start a separate session or use a second connected AI application and ask it to retrieve that note.
 - Check the result in the local vault. Confirm that the content is understandable and that no unrelated content is returned.
