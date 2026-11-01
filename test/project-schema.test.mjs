@@ -10,6 +10,7 @@ import path from 'node:path';
 import { tmpdir, cleanup, PKG } from './helpers/tmp.mjs';
 import { ProjectStore, ProjectStoreError, SCHEMA_VERSION, ENTITY_KINDS, MERGE_CLASSES, semanticConflicts } from '../src/engine/project-store.mjs';
 import { SUBJECT_TYPES } from '../src/engine/identity.mjs';
+import { recordHash } from '../src/engine/oplog.mjs';
 
 after(cleanup);
 
@@ -244,4 +245,158 @@ test('SO-F-02 AC05: docs/PROJECTS.md lists every entity type with its authority 
   assert.match(page, /merge class/);
   assert.match(page, /## The semantic conflict rule/);
   assert.match(page, /applies neither approval/);
+});
+
+// ---- review response: tests that pin the declarations and the conflict rule by behaviour ----
+
+const open = (id) => new ProjectStore(tmpdir(), { id }).open();
+const putTask = (s, id, status = 'PROPOSED') => s.append({ type: 'task.upserted', entity: { kind: 'task', id, data: { title: id, status } } });
+const putAppr = (s, id, task, decision, extra = {}) => s.append({ type: 'approval.upserted', entity: { kind: 'approval', id, data: { task_id: task, decision, ...extra } } });
+const semanticOf = (s) => Object.values(s.snapshot('conflict')).filter((c) => c.kind === 'semantic');
+// a record that arrived by convergence from another log: it was never checked by this store's write path
+function injectApproval(store, dir, id, data) {
+  const last = readLog(dir).at(-1);
+  const rec = { ...last, seq: last.seq + 1, id: `evt_injected_${id}`, entity: { kind: 'approval', id, data }, hash: null };
+  rec.hash = recordHash(rec);
+  fs.appendFileSync(path.join(dir, 'events.jsonl'), `${JSON.stringify(rec)}\n`);
+  return rec;
+}
+
+test('SO-F-02 AC02: each entity type pins its authority owner and merge class, so a flip of any one fails', () => {
+  const expected = {
+    project: ['person', 'last-writer'],
+    task: ['person', 'human-resolution'],
+    lease: ['service', 'human-resolution'],
+    attempt: ['agent', 'append-only'],
+    evidence: ['service', 'append-only'],
+    conflict: ['person', 'human-resolution'],
+    session: ['device', 'last-writer'],
+    approval: ['person', 'human-resolution'],
+    event: ['service', 'append-only'],
+  };
+  assert.deepEqual(Object.keys(ENTITY_KINDS).sort(), Object.keys(expected).sort());
+  for (const [kind, [authority, mergeClass]] of Object.entries(expected)) {
+    assert.equal(ENTITY_KINDS[kind].authority, authority, `${kind} owner`);
+    assert.equal(ENTITY_KINDS[kind].mergeClass, mergeClass, `${kind} class`);
+    assert.equal(SCHEMA.entities[kind].authority, authority, `${kind} owner in the schema`);
+    assert.equal(SCHEMA.entities[kind].merge_class, mergeClass, `${kind} class in the schema`);
+  }
+  // a decision a person settles is never a last-writer type
+  for (const kind of ['approval', 'conflict', 'task', 'lease']) assert.equal(ENTITY_KINDS[kind].mergeClass, 'human-resolution', kind);
+  for (const kind of ['event', 'evidence', 'attempt']) assert.equal(ENTITY_KINDS[kind].mergeClass, 'append-only', kind);
+});
+
+test('SO-F-02 AC02: a type declared through kinds cannot take the name of a built-in type', () => {
+  const root = tmpdir();
+  assert.throws(
+    () => new ProjectStore(root, { id: 'p-shadow', kinds: { approval: { ...ENTITY_KINDS.approval, mergeClass: 'last-writer' } } }),
+    (e) => e instanceof ProjectStoreError && e.code === 'bad_declaration' && /approval/.test(e.message),
+  );
+});
+
+test('SO-F-02 AC03: a resolution is honoured only for its own task, so another task cannot clear a conflict', () => {
+  const pure = [ev('a', 't1', 'approve', 1), ev('b', 't1', 'reject', 1), ev('r', 't2', 'approve', 1, { resolves: ['evt-a', 'evt-b'] })];
+  assert.equal(semanticConflicts(pure).length, 1, 'an approval on t2 does not resolve t1');
+  const s = open('p-cross');
+  putTask(s, 'task-1'); putTask(s, 'task-2');
+  const a = putAppr(s, 'a', 'task-1', 'approve');
+  const b = putAppr(s, 'b', 'task-1', 'reject');
+  assert.throws(() => putAppr(s, 'r', 'task-2', 'approve', { resolves: [a.id, b.id] }), (e) => e.code === 'invalid' && /task/.test(e.message), 'refused at write time');
+  assert.equal(semanticOf(s).length, 1, 'task-1 is still in conflict');
+  s.close();
+});
+
+test('SO-F-02 AC03: a resolution must name both sides, so one side cannot be dropped alone', () => {
+  const base = [ev('a', 't1', 'approve', 1), ev('b', 't1', 'reject', 1)];
+  assert.equal(semanticConflicts([...base, ev('r', 't1', 'approve', 1, { resolves: ['evt-b'] })]).length, 1, 'naming only the reject resolves nothing');
+  assert.equal(semanticConflicts([...base, ev('r', 't1', 'reject', 1, { resolves: ['evt-a'] })]).length, 1, 'naming only the approve resolves nothing');
+  assert.equal(semanticConflicts([...base, ev('r', 't1', 'approve', 1, { resolves: ['evt-a', 'evt-b'] })]).length, 0, 'naming both resolves it');
+  const s = open('p-sides');
+  putTask(s, 'task-1');
+  const a = putAppr(s, 'a', 'task-1', 'approve');
+  const b = putAppr(s, 'b', 'task-1', 'reject');
+  assert.throws(() => putAppr(s, 'r', 'task-1', 'approve', { resolves: [b.id] }), (e) => e.code === 'invalid', 'one-sided, refused at write time');
+  assert.equal(semanticOf(s).length, 1);
+  assert.ok(putAppr(s, 'r', 'task-1', 'approve', { resolves: [a.id, b.id] }), 'both sides is accepted');
+  assert.equal(semanticOf(s).length, 0);
+  s.close();
+});
+
+test('SO-F-02 AC03: a resolves entry must be an approval event of the same task, and a resolving approval carries a decision', () => {
+  const s = open('p-valid');
+  putTask(s, 'task-1');
+  const a = putAppr(s, 'a', 'task-1', 'approve');
+  const b = putAppr(s, 'b', 'task-1', 'reject');
+  for (const [name, resolves] of [['an id no event has', [a.id, 'evt_nope']], ['an approval id, not an event id', ['a', 'b']], ['an empty list', []]]) {
+    assert.throws(() => putAppr(s, 'r', 'task-1', 'approve', { resolves }), (e) => e.code === 'invalid' && /resolves/.test(e.message), name);
+  }
+  assert.throws(() => s.append({ type: 'approval.upserted', entity: { kind: 'approval', id: 'r', data: { task_id: 'task-1', resolves: [a.id, b.id] } } }), (e) => e.code === 'invalid' && /decision/.test(e.message));
+  const t = s.append({ type: 'task.upserted', entity: { kind: 'task', id: 'task-1', data: { title: 'again' } } });
+  assert.throws(() => putAppr(s, 'r', 'task-1', 'approve', { resolves: [a.id, t.id] }), (e) => e.code === 'invalid', 'a task event is no approval event');
+  s.close();
+});
+
+test('SO-F-02 AC03: approvals are keyed by event, so two writes with one id, one approving and one rejecting, are a conflict', () => {
+  const s = open('p-sameid');
+  putTask(s, 'task-1');
+  putAppr(s, 'appr-1', 'task-1', 'approve');
+  putAppr(s, 'appr-1', 'task-1', 'reject');
+  const [c] = semanticOf(s);
+  assert.ok(c, 'the conflict is not hidden by the shared id');
+  assert.equal(c.events.length, 2);
+  assert.deepEqual(c.decisions.slice().sort(), ['approve', 'reject']);
+  s.close();
+});
+
+test('SO-F-02 AC03: a conflict never writes CONFLICTED into the stored task, and a terminal task is not revived', () => {
+  const s = open('p-term');
+  putTask(s, 'task-1', 'CANCELLED');
+  putAppr(s, 'a', 'task-1', 'approve');
+  putAppr(s, 'b', 'task-1', 'reject');
+  assert.equal(s.snapshot('task')['task-1'].status, 'CANCELLED', 'a cancelled task stays cancelled');
+  s.close();
+  const s2 = open('p-spread');
+  putTask(s2, 'task-1');
+  const a = putAppr(s2, 'a', 'task-1', 'approve');
+  const b = putAppr(s2, 'b', 'task-1', 'reject');
+  // what the coordinator does: read the task, spread it, write it back
+  s2.append({ type: 'task.upserted', entity: { kind: 'task', id: 'task-1', data: { ...s2.snapshot('task')['task-1'], note: 'touched' } } });
+  const stored = readLog(s2.dir).filter((r) => r.entity?.kind === 'task').map((r) => r.entity.data);
+  for (const d of stored) {
+    assert.notEqual(d.status, 'CONFLICTED', 'no stored task is CONFLICTED');
+    assert.equal(d.conflict, undefined, 'no conflict record is stored on a task');
+    assert.equal(d.prior_status, undefined);
+  }
+  putAppr(s2, 'r', 'task-1', 'approve', { resolves: [a.id, b.id] });
+  assert.equal(s2.snapshot('task')['task-1'].status, 'PROPOSED');
+  s2.close();
+  const s3 = new ProjectStore(s2.root, { id: 'p-spread' }).open();
+  assert.equal(s3.snapshot('task')['task-1'].status, 'PROPOSED', 'the task is not left CONFLICTED across a reopen');
+  s3.close();
+});
+
+test('SO-F-02 AC03: replay checks an approval that arrived by convergence, and reports one it cannot use', () => {
+  const s = open('p-replay');
+  putTask(s, 'task-1');
+  putAppr(s, 'a', 'task-1', 'approve');
+  s.close();
+  injectApproval(s, s.dir, 'b', { task_id: 'task-1', decision: 'maybe' });
+  const s2 = new ProjectStore(s.root, { id: 'p-replay' }).open();
+  assert.ok(s2.stats().recovered.some((m) => /maybe/.test(m) && /approval/.test(m)), 'the decision it cannot use is reported, not silently ignored');
+  assert.equal(semanticOf(s2).length, 0, 'it is not a decision');
+  assert.deepEqual(s2.snapshot('approval').b, { task_id: 'task-1', decision: 'maybe' }, 'and it stays in the log as it arrived');
+  s2.close();
+});
+
+test('SO-F-02 AC03: replay ignores a resolution from another task that arrived by convergence', () => {
+  const s = open('p-replay2');
+  putTask(s, 'task-1'); putTask(s, 'task-2');
+  const a = putAppr(s, 'a', 'task-1', 'approve');
+  const b = putAppr(s, 'b', 'task-1', 'reject');
+  s.close();
+  injectApproval(s, s.dir, 'r', { task_id: 'task-2', decision: 'approve', resolves: [a.id, b.id] });
+  const s2 = new ProjectStore(s.root, { id: 'p-replay2' }).open();
+  assert.equal(semanticOf(s2).length, 1, 'task-1 is still in conflict');
+  assert.ok(s2.stats().recovered.some((m) => /resolves/.test(m)), 'the resolution that was ignored is reported');
+  s2.close();
 });
