@@ -10,6 +10,7 @@ import { readJson, writeJson, now, randomToken, exists } from './util.mjs';
 import { findSecrets, redactSecrets } from './secrets.mjs';
 import { formatHlc, parseHlc, recordHash } from './oplog.mjs';
 import { EXECUTION_EVENT_KINDS, validateExecutionEvent } from './evidence.mjs';
+import { validateLink } from './relationships.mjs';
 
 // The current schema version. A store at an older version is migrated forward on open; a store at a
 // newer version is refused (this Memev does not know its layout) and nothing is written.
@@ -28,6 +29,10 @@ const KINDS = {
   session: { file: 'sessions.json', prefix: 'sess', required: ['project_id'] },
   approval: { file: 'approvals.json', prefix: 'appr', required: ['task_id'] },
   event: { file: null, prefix: 'evt', required: ['type'] },
+  // the relationship model (docs/schemas/relationships-v1.json): added in place, with no second store
+  milestone: { file: 'milestones.json', prefix: 'mile', required: ['title'] },
+  deliverable: { file: 'deliverables.json', prefix: 'deliv', required: ['title'] },
+  work_package: { file: 'work-packages.json', prefix: 'wp', required: ['title'] },
 };
 
 export class ProjectStoreError extends Error {
@@ -54,7 +59,7 @@ export class ProjectStore {
     this.dir = path.join(this.root, STATE, 'projects', this.id);
     this._open = false;
     this._lockDepth = 0;
-    this.seq = 0; this.generation = 0; this.entities = new Map(); this.eventKeys = new Map(); this.usedIds = new Set(); this.recovered = []; this.clock = { ms: 0, c: 0 };
+    this.seq = 0; this.generation = 0; this.entities = new Map(); this.eventKeys = new Map(); this.usedIds = new Set(); this.recovered = []; this.clock = { ms: 0, c: 0 }; this.sources = new Map();
   }
 
   get eventsPath() { return path.join(this.dir, 'events.jsonl'); }
@@ -104,7 +109,7 @@ export class ProjectStore {
   // fragment: it is truncated and reported. A line that does not parse in the middle of the file is
   // torn or edited: it is skipped and reported, and every valid record after it is kept.
   _replay() {
-    this.seq = 0; this.generation = 0; this.entities = new Map(); this.eventKeys = new Map(); this.usedIds = new Set(); this.recovered = []; this.clock = { ms: 0, c: 0 };
+    this.seq = 0; this.generation = 0; this.entities = new Map(); this.eventKeys = new Map(); this.usedIds = new Set(); this.recovered = []; this.clock = { ms: 0, c: 0 }; this.sources = new Map();
     if (!exists(this.eventsPath)) return;
     let content = fs.readFileSync(this.eventsPath, 'utf8');
     if (content.length && !content.endsWith('\n')) {
@@ -131,6 +136,7 @@ export class ProjectStore {
       const { kind, id, data } = rec.entity;
       if (!this.entities.has(kind)) this.entities.set(kind, new Map());
       this.entities.get(kind).set(id, data);
+      if (id) this.sources.set(`${kind}:${id}`, { id: rec.id, ts: rec.ts, seq: rec.seq });
       if (id) this.usedIds.add(id);
     }
     this.generation = Math.max(this.generation, (rec.gen ?? 0) + 1);
@@ -203,6 +209,10 @@ export class ProjectStore {
       const v = validateExecutionEvent(data);
       if (!v.ok) throw new ProjectStoreError('invalid', `missing required field: ${v.reason}`);
     }
+    if (ent.kind === 'event' && data.type === 'relationship.linked') {
+      const v = validateLink(data);
+      if (!v.ok) throw new ProjectStoreError('invalid', `invalid link: ${v.reason}`);
+    }
     const id = ent.id || this._newId(ent.kind);
     return { kind: ent.kind, id, data };
   }
@@ -266,6 +276,11 @@ export class ProjectStore {
     }
     return { dropped };
   }
+
+  // The event record an entity's current value comes from: its id, time and sequence number, or null.
+  sourceOf(kind, id) { return this.sources.get(`${kind}:${id}`) ?? null; }
+  // Whether an event record with this id is in the log.
+  hasRecord(id) { return typeof id === 'string' && id.startsWith('evt_') && this.usedIds.has(id); }
 
   // The current entities of a kind, as a plain object.
   snapshot(kind) { return Object.fromEntries(this.entities.get(kind)?.entries() ?? []); }

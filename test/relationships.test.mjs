@@ -41,6 +41,8 @@ function graph() {
   L('milestone-to-deliverable', ref('milestone', 'M2'), ref('deliverable', 'D2'));
   L('deliverable-to-work-package', ref('deliverable', 'D2'), ref('work_package', 'W2'));
   L('work-package-to-task', ref('work_package', 'W2'), ref('task', 'T4'));
+  L('blocker-to-work', ref('blocker', 'B1'), ref('task', 'T3'));
+  L('permission-to-resource', ref('permission', 'PM1'), ref('resource', 'RS1'));
   return { dir, store };
 }
 const keyOf = (d) => `${d.kind}:${d.id}`;
