@@ -225,3 +225,9 @@ round was committed. No signed file was edited and the earlier versions stay, li
 | [SO-F-10](scope-one/specs/SO-F-10.json) | [`k-so-f-10-federated-comput-46e7e6`](signed/k-so-f-10-federated-comput-46e7e6.json) | 2 | [`k-so-f-10-federated-comput-be4e45`](signed/k-so-f-10-federated-comput-be4e45.json) |
 | [SO-F-12](scope-one/specs/SO-F-12.json) | [`k-so-f-12-replication-unit-156f69`](signed/k-so-f-12-replication-unit-156f69.json) | 2 | [`k-so-f-12-replication-unit-3feee3`](signed/k-so-f-12-replication-unit-3feee3.json) |
 | [SO-F-13](scope-one/specs/SO-F-13.json) | [`k-so-f-13-cross-functional-8c65b0`](signed/k-so-f-13-cross-functional-8c65b0.json) | 2 | [`k-so-f-13-cross-functional-c6f060`](signed/k-so-f-13-cross-functional-c6f060.json) |
+
+`SO-F-03.2` supersedes the signed `SO-F-03` (owner delegation, 1 November 2026): it adds PG-04.1 as a predecessor and names the operation envelope files in its scope, and keeps every criterion. It has an interim red-team record under `scope-one/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1 of its own contract. The signed `SO-F-03` contracts are unchanged and the manifest records `superseded_by` on `SO-F-03`.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [SO-F-03.2](scope-one/specs/SO-F-03.2.json) | [`k-so-f-03-2-contribution-s-bc1be8`](signed/k-so-f-03-2-contribution-s-bc1be8.json) | Contribution signature and two-step admission, built after the operation envelope; supersedes SO-F-03 | SO-F-01, SO-F-02, PG-04.1 |
