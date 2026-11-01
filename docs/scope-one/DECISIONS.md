@@ -124,8 +124,9 @@ These are decided, in the owner's words of that day. Cite them as "owner decisio
 - Review: while the reviewer is out, the author acts as interim reviewer with one interim key
   (docs/CONTRACTS.md, "The interim reviewer"). What it signs says so and waits for an independent re-review.
 
-These close the owner decisions the addendum review asked for first (topology, provider neutrality, tier set). They
-do not accept the addendum's other recommendations; those still need explicit acceptance one by one.
+These close the owner decisions the [addendum](ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md) review asked for first
+(topology, provider neutrality, tier set). They do not accept the addendum's other recommendations; those still need
+explicit acceptance one by one.
 
 ## Decisions taken under owner delegation
 

@@ -1,0 +1,77 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PG-20.1",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "f15223b607df9f47a8d7423fd8d083cd018012e4835805e1e4190e9605f15b2d",
+      "base_commit": "90e3fe29bb3f256fe7f82d32b17a48633afca25b",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "1a129a5d71412a1a07720633fc9d5a46755bdcd5cf6fef9805851cb8af4cff57"
+          },
+          {
+            "path": "docs/CONTRACTS.md",
+            "sha256": "039e907629abec2bfd64d7a8c94a9228bf5ad66b2a3429cf83e1d61f4bb90b18"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "the verifier this spec changes (the scope criterion, SR-0.03.3 T2, pull request #347) is not on main: src/engine/contracts.mjs has no scope code and test/contracts-scope*.test.mjs do not exist, so every criterion of this spec is red and the \"tests unchanged\" criterion cannot pass until #347 merges",
+          "disposition": "rejected",
+          "reason": "the request says in terms that the contract starts once #347 merges and depends on SR-0.03.3; the red-green tests are red at the base by construction, as for every spec with a predecessor, and the criteria say what must be true after the build, not before"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "src/engine/contracts.mjs is in the scope and will be changed by #347, so this record becomes stale for the gate when #347 merges and the spec is judged at a later head",
+          "disposition": "rejected",
+          "reason": "that is the staleness tripwire working as designed, and the spec is signed now, so the signed contract is judged at its signing commit; if the contract is rebuilt after #347 the independent re-review reads the verifier then"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "AC02 lists the negative note names but not a sibling version of the same contract (changelog.d/SO-F-03.1.md for SO-F-03.2), and for a three-part id such as SR-0.03.3 the base id SR-0.03 may be the note of a different contract, which the rule would also allow",
+          "disposition": "rejected",
+          "reason": "the rule in the requirement allows only <id>.md and the id without its last .N, as the changelog README names notes; a sibling-version case is one more fixture line for the author of the test, and the widening is by one file name of a contract that does not exist yet; neither lets the verdict of any other path change"
+        },
+        {
+          "n": 4,
+          "severity": "low",
+          "how": "AC04 (docs/CONTRACTS.md matches scope.*changelog.d/<id>.md.*version suffix, flag s) is satisfied by any three words in that order and AC02 and AC03 pass on the unchanged code once the file exists, so only AC01 is red against the base",
+          "disposition": "rejected",
+          "reason": "AC02 and AC03 are guards that nothing else widens; the red-green type needs the test file, which is absent at the base, so each is red there too; AC01 is the behaviour; the docs criterion is a documentation check and the stop rules forbid weakening any test"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the signer, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of PG-20.1, a new programme spec added by pull request #363, made against the #363 branch at 90e3fe29bb3f. It has 1 task and 8 criteria. Checks run: the spec hash equals the hash the owner delegation gave (f15223b607df); the manifest kind is feature and each implement task has a mandatory test_red_green criterion that runs its own test file; every task drafts through makeTask; every command parses with sh -n; no criterion statement repeats within a task; every grep pattern compiles and is within 200 characters; every depends_on is a row of the Scope One or programme manifest (or, for PG-05.2, a vault contract cited by id that PG-05.1 cites too: WO-05-B); the leak scan is clean; the three criteria AC01 to AC03 are specific (a fixture contract, named allowed paths and eight named paths that must still fail); the scope names no file the work does not need beyond test/helpers/**; I read the scope verifier of #347 and it treats docs/MODULES.md and changelog.d/<SR id>.md only, so the rule this spec adds is not there yet. I did not run any named test (its file does not exist yet), I did not run #347's tests, and I did not review the rule's implementation, which does not exist. Four findings (one medium, three low), none blocks signing. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ODZjNjA2NWVjMDg3NzNlM2E0OTkwZGQzZDFkZTg2NDRiZDhmYTkyMWE1NTkxMjEwMjRhOWVhMGJiZjE4YjUwOQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "HTUIPsOOHBYALnOh+gDE7NZi6UG64bZuRC2aXiF9djsfTbFbdNK3/OyGh7plyL1SWPpQ3XRfSwkP0KmsvYoYAw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "Y2MxMmFmOWQ2OTc0MTVkYWRmNWE2ODcxYTUwMzA4MjE3MGEzYzJlMjk3YTc0YzBkZDk2MjIwNzc1ZGUyNjg1Mg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "u1oauZ1TSSBFxzBSqED4GRnb3Y4zqKfoMb4d7KrPaGNBtEzTnsZciRqbF1taL2ik16ShB5/DrYS0ospoRtCxBw=="
+          }
+        ]
+      }
+    }
+  ]
+}

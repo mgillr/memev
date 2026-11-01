@@ -1,0 +1,188 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "WP15-03",
+      "title": "Counsel review of the combined distribution against the BSL use restriction recorded",
+      "phase": "verify",
+      "depends_on": [],
+      "requirements": [
+        "MV-LIC-03: A software licensing lawyer reviews the combined distribution against the BSL restriction on standalone merge products or services. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:89; evidence docs/scope-one/programme/DECOMPOSITION.md:120; baseline 8.6)"
+      ],
+      "description": "Repo: memev-ops. Owner action; the task holds the written result only. Related SR-3.05 and SR-3.06. The owner supplies the lawyer's written result; this task records it and nothing is written as counsel's view that counsel has not given. The record has five sections: Question put to counsel, Documents reviewed, Reviewer, Outcome and Changes required, and writes no patent number. It does not change LICENSE, PATENTS or NOTICE.",
+      "scope": {
+        "allow": [
+          "contracts/COUNSEL-REVIEW.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP15-03-AC01",
+          "mandatory": true,
+          "statement": "The record has its five sections",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"Question put to counsel\" \"Documents reviewed\" \"Reviewer\" \"Outcome\" \"Changes required\"; do grep -qi \"^## $n\" contracts/COUNSEL-REVIEW.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP15-03-AC02",
+          "mandatory": true,
+          "statement": "The question names the BSL restriction on standalone merge products or services",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/COUNSEL-REVIEW.md",
+            "pattern": "^## Question put to counsel(?:(?!^## )[\\s\\S])*standalone merge",
+            "flags": "im"
+          }
+        },
+        {
+          "id": "WP15-03-AC03",
+          "mandatory": true,
+          "statement": "Documents reviewed lists LICENSE, PATENTS, NOTICE and docs/LICENSING-NOTICE.md as list items",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in LICENSE PATENTS NOTICE LICENSING-NOTICE.md; do grep -Eq \"^- .*$n\" contracts/COUNSEL-REVIEW.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP15-03-AC04",
+          "mandatory": true,
+          "statement": "The reviewer section gives the review date",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/COUNSEL-REVIEW.md",
+            "pattern": "^## Reviewer(?:(?!^## )[\\s\\S])*Reviewed on 20\\d\\d-\\d\\d-\\d\\d",
+            "flags": "im"
+          }
+        },
+        {
+          "id": "WP15-03-AC05",
+          "mandatory": true,
+          "statement": "The outcome is exactly one of approved, approved with changes or not approved",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/COUNSEL-REVIEW.md",
+            "pattern": "^## Outcome\\s+(approved with changes|approved|not approved)\\b",
+            "flags": "im"
+          }
+        },
+        {
+          "id": "WP15-03-AC06",
+          "mandatory": true,
+          "statement": "The record states the change date reviewed",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/COUNSEL-REVIEW.md",
+            "pattern": "2028-03-29",
+            "flags": "i"
+          }
+        },
+        {
+          "id": "WP15-03-AC07",
+          "mandatory": true,
+          "statement": "The record writes no patent number",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eqi 'US ?[0-9]{1,2}[, ]?[0-9]{3}[, ]?[0-9]{3}|WO ?[0-9]{4}/[0-9]+|EP ?[0-9]{6,7}' contracts/COUNSEL-REVIEW.md",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP15-03-AC08",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP15-03-AC09",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ],
+  "id": "k-pg-15-1-licensing-bounda-48851a",
+  "title": "PG-15.1 Licensing boundary (memev-ops)",
+  "workdir": null,
+  "created": "2026-11-01T01:10:42.827Z",
+  "version": 1,
+  "request": "Programme contract for work package WP15 in memev-ops: Licensing boundary. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP15.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP15-02. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.13: WP15 holds the licence boundary; SO-2.13 is the service boundary only and takes no licence term. Signed vault contract WO-05-E (cited by id only): the signed licence boundary text guard; this spec holds only the counsel review record (WP15-03).  Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "provenance": {
+    "spec_sha256": "1cd255593cbcb1b3a2218f577af92c98fb2bea7e083657fbad4cd82e30629d12",
+    "record": "contracts/programme/redteam/PG-15.1.json",
+    "review": "interim solo review by the signer, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}

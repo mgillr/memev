@@ -1,0 +1,172 @@
+{
+  "title": "PG-09.1 Identity, admission and ACFA boundary (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract for work package WP09 in memev: Identity, admission and ACFA boundary. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP09.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP04-02, WP06-02. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.12: WP09-02 (the contribution-admission boundary) is a prerequisite of federated computation and is not repeated there. Signed vault contract MEM-145, MEM-146 and MEM-147 (cited by id only): foundation: human binding of agent roles; WP09-01 reuses it. Signed vault contract WO-05-D (cited by id only): the external trust service specification; the adapters of WP09-02 and WP09-03 sit on its boundary and this spec does not specify the service. Build layer (lead workstream decision under owner delegation, 1 Nov 2026): the unsigned fold (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-13, cited by id only) is the build layer, and it overlaps this spec at SO-F-01, SO-F-08. This spec will cite those ids and keep only what the fold does not cover; trim pending fold PR (the final fold ids come in the lead's separate pull request, branch contracts/scope-one-fold-build-layer). Nothing is trimmed yet. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "WP09-01",
+      "title": "Signed node and agent identity with scoped delegation, revocation and admission, on top of the sibling identity project and agentid-bind",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "MV-TRU-01: Signed identity, scoped delegation, revocation and admission for contributing nodes and agents (P1). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:50; evidence docs/scope-one/programme/DECOMPOSITION.md:93; baseline 8.5)",
+        "MV-FED-05: Node identity, organisation membership, permission boundaries and sovereignty policies exist per site. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:64; evidence docs/scope-one/programme/DECOMPOSITION.md:104; baseline 8.5) Scope here: node identity per site. Membership, permission boundaries and sovereignty policy are WP13-03 (PG-13.1)."
+      ],
+      "description": "Repo: memev. Owns node and agent identity for every node, including a site node (this task and WP13-03 were one duplicate; WP13-03 now reuses this). Reuse the existing identity code (agentid-bind.mjs, devices.mjs); no second key scheme. Foundation, cited by id: MEM-145, MEM-146 and MEM-147 (human binding of agent roles).",
+      "scope": [
+        "src/engine/agentid-bind.mjs",
+        "src/engine/devices.mjs",
+        "src/engine/admission.mjs",
+        "test/admission.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "admission tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/admission.test.mjs",
+            "cmd": "node --test test/admission.test.mjs"
+          }
+        },
+        {
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP09-02",
+      "title": "ACFA-RS adapter boundary: numeric contributions only, agreed contributor set, Krum n>=2f+3 and Bulyan n>=4f+3 enforced, trusted-identity pinned verification",
+      "phase": "implement",
+      "depends_on": [
+        "WP09-01"
+      ],
+      "requirements": [
+        "MV-TRU-04: ACFA-RS is used only for compatible numeric contributions with an agreed contributor set; the Krum n>=2f+3 and Bulyan n>=4f+3 assumptions are enforced; verification is pinned to trusted identities and policy; never for text memories or averaged confidences. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:53; evidence docs/scope-one/programme/DECOMPOSITION.md:96; baseline 8.5)",
+        "MV-TRU-05: Service contracts exist for ACFA-RS and E4 as adapter boundaries beside the merge boundary, with no product names in the open core. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:54; evidence docs/scope-one/programme/DECOMPOSITION.md:97; baseline 8.5)"
+      ],
+      "description": "Repo: memev. Boundary only; no ACFA code in the core; refuses text memories and confidence averages. Any E4 trust criterion carries this caveat: 4 tests in crdt-merge security/tests/test_byzantine_fault_injection.py already fail on main and need triage before an E4 contract is signed; this task does not depend on or include any unpushed crdt-merge commit.",
+      "scope": [
+        "docs/EXTENSION-POINTS.md",
+        "src/engine/acfa-boundary.mjs",
+        "test/acfa-boundary.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "boundary tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/acfa-boundary.test.mjs",
+            "cmd": "node --test test/acfa-boundary.test.mjs"
+          }
+        },
+        {
+          "statement": "licence boundary test green",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/licence-boundary.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP09-03",
+      "title": "Equivocation and suspicious-contribution handler: evidence goes to Memev authority and exclusion policy",
+      "phase": "implement",
+      "depends_on": [
+        "WP09-01"
+      ],
+      "requirements": [
+        "MV-TRU-07: Equivocation and suspicious contributions are detected and handed to Memev authority and exclusion policy. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:56; evidence docs/scope-one/programme/DECOMPOSITION.md:99; baseline 8.5)",
+        "Equivocation and admission invariants: the key is convicted, not the message; the trust anchor comes from outside the artefact; duplicates are removed on semantic identity, not signature bytes; an identity with two entries in one round is excluded entirely at admission; validity is evaluated at read time; trust signals track conduct, not distance from consensus (source: converge src/receipts.py and tests/test_receipts.py, described only, itself a port of the acfa-rs accountability core; repository analysis of 1 Nov 2026, section 3.4 item C2)"
+      ],
+      "description": "Repo: memev. The invariants are written as fresh tests in test/exclusion.test.mjs. The converge pattern is cited and described only: converge is BUSL-1.1 and no code is copied (counsel review is WP15-03). Any E4 trust criterion carries this caveat: 4 tests in crdt-merge security/tests/test_byzantine_fault_injection.py already fail on main and need triage before an E4 contract is signed; this task does not depend on or include any unpushed crdt-merge commit.",
+      "scope": [
+        "src/engine/exclusion.mjs",
+        "test/exclusion.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "exclusion tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/exclusion.test.mjs",
+            "cmd": "node --test test/exclusion.test.mjs"
+          }
+        },
+        {
+          "statement": "The six named invariant tests are present",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"equivocation: the key is convicted, not the message\" \"equivocation: the trust anchor comes from outside the artefact\" \"equivocation: duplicates are removed on semantic identity, not signature bytes\" \"equivocation: an identity with two entries in one round is excluded entirely at admission\" \"equivocation: validity is evaluated at read time\" \"equivocation: trust signals track conduct, not distance from consensus\"; do grep -qF \"$n\" test/exclusion.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The named invariant tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^equivocation:' test/exclusion.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}

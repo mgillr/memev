@@ -1,0 +1,159 @@
+{
+  "title": "PG-12.1 Multi-node gossip transport (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract for work package WP12 in memev: Multi-node gossip transport. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP12.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP04-02, WP05-03, WP09-01. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.12: WP12-01 to WP12-03 (transport) are prerequisites of federated computation and are not repeated there.  Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "WP12-01",
+      "title": "Transport adapter interface (send state, receive state, digests) with an in-memory implementation",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "MV-INT-06: Real multi-node gossip transport with reconnect and partition recovery (P1). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:45; evidence docs/scope-one/programme/DECOMPOSITION.md:91; baseline 8.5)",
+        "Idempotent digest and delta anti-entropy is the transport-independent conformance test: the digest is the hash of the sorted ids, deltas are exchanged both ways, and a repeated round or a partition leaves the same state; the in-memory adapter passes it first (source: converge src/network.py and tests/test_network.py, described only; repository analysis of 1 Nov 2026, section 3.4 item C5)"
+      ],
+      "description": "Repo: memev. Keeps the gossip boundary: engine supplies state and digests, Memev supplies transport and lifecycle. Must not become a standalone merge service (BSL restriction; OQ-10). The conformance test is written fresh. The converge pattern is cited and described only: converge is BUSL-1.1 and no code is copied (counsel review is WP15-03).",
+      "scope": [
+        "src/engine/transport.mjs",
+        "test/transport.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "transport tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/transport.test.mjs",
+            "cmd": "node --test test/transport.test.mjs"
+          }
+        },
+        {
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The five anti-entropy conformance tests are present",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"anti-entropy: the digest is the hash of the sorted ids\" \"anti-entropy: deltas are exchanged both ways\" \"anti-entropy: repeating a round changes nothing\" \"anti-entropy: a partition heals to the same state\" \"anti-entropy: the in-memory adapter passes the conformance test\"; do grep -qF \"$n\" test/transport.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The anti-entropy conformance tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^anti-entropy:' test/transport.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP12-02",
+      "title": "Relay-backed transport: reconnect, backoff, partition recovery",
+      "phase": "implement",
+      "depends_on": [
+        "WP12-01"
+      ],
+      "requirements": [
+        "MV-INT-06: Real multi-node gossip transport with reconnect and partition recovery (P1). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:45; evidence docs/scope-one/programme/DECOMPOSITION.md:91; baseline 8.5)"
+      ],
+      "description": "Repo: memev. Reuses the existing relay.",
+      "scope": [
+        "src/cli/relay.mjs",
+        "src/engine/transport.mjs",
+        "test/transport-relay.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "relay transport tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/transport-relay.test.mjs",
+            "cmd": "node --test test/transport-relay.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP12-03",
+      "title": "Three-node local harness: three vaults with separate identities exchange envelopes through the transport",
+      "phase": "implement",
+      "depends_on": [
+        "WP12-02"
+      ],
+      "requirements": [
+        "MV-INT-06: Real multi-node gossip transport with reconnect and partition recovery (P1). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:45; evidence docs/scope-one/programme/DECOMPOSITION.md:91; baseline 8.5)"
+      ],
+      "description": "Repo: memev. The three-node local harness is the fixture that WP14-01 (PG-14.1) runs; this task builds the harness and its envelope-exchange test only. The federated prototype (requirement MV-DEM-01) is owned by WP14-01, so the two are no longer duplicate work.",
+      "scope": [
+        "scripts/federation-harness.mjs",
+        "test/federation-harness.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "harness test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-harness.test.mjs",
+            "cmd": "node --test test/federation-harness.test.mjs"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}

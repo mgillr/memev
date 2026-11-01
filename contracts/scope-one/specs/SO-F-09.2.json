@@ -1,0 +1,213 @@
+{
+  "title": "SO-F-09.2 Finding model for organisational intelligence: a finding is a graph claim capped at theory by evidence, promoted to fact only by a person or a verification, with dismissal, correction and adjudication events and no disclosure beyond the reader's permissions",
+  "project": "memev",
+  "workdir": null,
+  "request": "Version 2 of this spec, which supersedes SO-F-09 (signed as contract k-so-f-09-finding-model-fo-cbe213, version 2, which superseded the first signed version; the SO-F-09 spec file is unchanged and stays on record, and the manifest and RECONCILIATION mark it superseded by this spec). Reason: owner delegation, 1 Nov 2026: the lead accepted four definitions that the text of SO-F-09 leaves open (a stub session; who may write a verification record; where the 'by' field comes from; how withholding works) and they are written into the contract and pinned with criteria; the scope adds only src/engine/identity.mjs, which definition 3 needs; docs/MODULES.md and changelog.d/SO-F-09.md are already in the signed scope and are not added again. Accepted definitions: (1) A stub session is an agent subject or a raw status op: neither can promote a finding to fact, by a logged status change, an adjudication, a verification or evidence. (2) A verification record may be written by a person, operator or service subject; it takes effect only when its result is a pass, and a record from an agent or with a failed result is kept and changes nothing. (3) The 'by' field of an event is set from the resolved credential (SO-F-01), never from caller input: through the credential-bound entry point a caller-supplied 'by' is ignored, so a forged by of person:x on an adjudication or service:x on a verification makes no finding a fact, and an agent credential in the personal scope resolves to an agent subject, not to person:owner. (4) Withholding is strict: if any source of a finding is withheld from the reader, the whole statement is withheld, with the reasons and corrections in its history and every entity or owner drawn from a withheld source, and an entity or owner with no source (source null) is withheld from every partial view; the reader sees only how many sources are withheld. Provisional: who may adjudicate (a person), who may verify (a person, operator or service), who may dismiss (a person or an operator subject only, by the safe default of ADR 5 that what is ungated stays denied; an agent or a service subject cannot dismiss) and the two adjudication outcomes, confirm and reject, are provisional until the permission matrix (ADR 5, open, in docs/scope-one/DECISIONS.md) and the decision and blocker workflow (SO-A-05) are decided; they are kept in one table so that deciding them changes one place. Pull request #362 builds this contract (head fe3d7f3, stacked on #349). Every requirement, criterion and scope entry of SO-F-09 is kept. Build layer of the Scope One programme, adapted from the unsigned fold of 30 Oct 2026 (fold id SO-F-09) and validated against memev main at d1c65ef. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository; they are cited by id only. Implements the design records SO-2.04 (Cross-project intelligence: evidence-backed discovery across otherwise independent work); SO-2.01 (Organisational knowledge model: relationships between people, teams, projects, decisions, artefacts and evidence) (contracts/scope-one/specs). The decision record cites this contract by id and keeps only the gaps this one does not cover. Memev contracts that land first: SO-F-01, SO-F-02. Page: docs/ORGANISATIONAL-INTELLIGENCE.md comes from the federation architecture documentation (PR #223, branch docs/federation-architecture, not on main); until that merges, the first contract to need a page creates it with its Status section, labelled planned or architectural target, and the later ones extend it. Source in the fold: #222 section 13.6 (evidence-led and cautious; dismissal and correction) and #223 ORGANISATIONAL-INTELLIGENCE.md (evidence and authority). Settled decisions this contract follows (owner decision 31 Oct 2026, docs/scope-one/DECISIONS.md): topology is local-first and the cloud is only a relay and a backup; every supported provider stands on equal footing and no work or tier depends on one; crdt-merge is reached only through the provider boundary of src/engine/merge.mjs (docs/EXTENSION-POINTS.md) and this contract adds no merge engine to the core; tiers follow docs/PRICING.md (Free core, Personal for up to 3 computers with no per-computer add-on, higher tiers by contacting us) with no Personal trial; the git backup keeps running every few minutes (sync.interval_min). Memory authority: ADR 7 (memory and project-state authority) is proposed in PR #325 and is not decided here; this contract cites it and the local-first decision, and keeps one store under the vault with no second database. Provenance: adapted from the unsigned fold of 30 Oct 2026. Changes: (1) converted from the vault task format to the memev spec format (named tests run as red-green checks on the own test file of the contract; inline regular expression flags became the flags key; hygiene and decision verifiers became commands or doc checks). (2) removed fold-only fields and the owner-decision marker field, reworded the stop rule that named a patent, and made the text pass the leak scan. (3) The fold said the graph holds claims with status fact, theory and conjecture; src/engine/graph.mjs has five (fact, theory, conjecture, contested, refuted). The cap applies to promotion to fact; contested and refuted stand as the graph derives them. (4) Boundary with PG-10.1 WP10-01 and WP10-02 (knowledge status lattice and status fields): the lattice of a fact is owned there. This contract defines only what a finding is and its cap, and maps the cap into the lattice (at most corroborated) once it lands.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Finding model for organisational intelligence: a finding is a graph claim capped at theory by evidence, promoted to fact only by a person or a verification, with dismissal, correction and adjudication",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a finding is a graph claim with links to its source events and versions, the affected entities and owners, the scope and time context and a confidence",
+        "dismissal, correction and adjudication are events",
+        "a finding never discloses a record its reader has no permission for in the source's scope (SO-F-01)",
+        "docs/ORGANISATIONAL-INTELLIGENCE.md defines the finding as a capped claim and the three events",
+        "definition: a stub session is an agent subject or a raw status op, and cannot promote a finding to fact (source: owner delegation, 1 Nov 2026)",
+        "definition: a verification record may be written by a person, operator or service subject, and takes effect only as a pass (source: owner delegation, 1 Nov 2026)",
+        "definition: 'by' is set from the resolved credential (SO-F-01), never from caller input; src/engine/graph.mjs has one credential-bound entry point, Graph.bindFindingEvent(resolved, type, data), that takes the result of resolveActor and sets by from its subject, and src/engine/identity.mjs has resolveActor, which resolves a personal-scope credential that names an agent to an agent subject owned by person:owner (through resolveBinding), never to person:owner; resolveRequest is unchanged (source: owner delegation, 1 Nov 2026; SO-F-01)",
+        "definition: withholding is strict: if any source of a finding is withheld, the whole statement is withheld, and an entity or owner with source null is hidden from every partial view (source: owner delegation, 1 Nov 2026)",
+        "provisional: who may adjudicate, verify and dismiss, and the confirm and reject outcomes, are held in one frozen table, FINDING_AUTHORITY, in src/engine/graph.mjs and are provisional until ADR 5 (permission matrix) and SO-A-05 (decision workflow) are decided (source: docs/scope-one/DECISIONS.md ADR 5; WBS SO-A-05; owner delegation, 1 Nov 2026)"
+      ],
+      "description": "The intelligence layer should not become an unbounded inference engine. The graph (src/engine/graph.mjs) already holds claims with status (fact, theory, conjecture, contested, refuted) and provenance, promoted and demoted as evidence arrives. A finding is such a claim with source event links, affected entities, scope and time context and confidence, whose evidence-derived status is capped at theory; fact needs a person's event or a verification record; ordinary claims keep today's rule. Conflict detection, precision and recall and decision routing are SO-F-13. Definitions accepted 1 Nov 2026: (1) A stub session is an agent subject or a raw status op: neither can promote a finding to fact, by a logged status change, an adjudication, a verification or evidence. (2) A verification record may be written by a person, operator or service subject; it takes effect only when its result is a pass, and a record from an agent or with a failed result is kept and changes nothing. (3) The 'by' field of an event is set from the resolved credential (SO-F-01), never from caller input: through the credential-bound entry point a caller-supplied 'by' is ignored, so a forged by of person:x on an adjudication or service:x on a verification makes no finding a fact, and an agent credential in the personal scope resolves to an agent subject, not to person:owner. (4) Withholding is strict: if any source of a finding is withheld from the reader, the whole statement is withheld, with the reasons and corrections in its history and every entity or owner drawn from a withheld source, and an entity or owner with no source (source null) is withheld from every partial view; the reader sees only how many sources are withheld. Provisional: who may adjudicate (a person), who may verify (a person, operator or service), who may dismiss (a person or an operator subject only, by the safe default of ADR 5 that what is ungated stays denied; an agent or a service subject cannot dismiss) and the two adjudication outcomes, confirm and reject, are provisional until the permission matrix (ADR 5, open, in docs/scope-one/DECISIONS.md) and the decision and blocker workflow (SO-A-05) are decided; they are kept in one table so that deciding them changes one place.",
+      "scope": [
+        "changelog.d/SO-F-09.md",
+        "docs/DESIGN.md",
+        "docs/MODULES.md",
+        "docs/ORGANISATIONAL-INTELLIGENCE.md",
+        "docs/README.md",
+        "src/engine/graph.mjs",
+        "src/engine/project-store.mjs",
+        "test/findings.test.mjs",
+        "test/helpers/**",
+        "src/engine/identity.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "a finding is a graph claim with links to its source events and versions, the affected entities and owners, the scope and time context and a confidence; its evidence-derived status is capped at theory; fact needs a person's event or a verification record; ordinary claims keep the promotion rule of src/engine/graph.mjs; the test attempts promotion of a finding by evidence alone and by a stub session and asserts theory both times",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/findings.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-09 AC01:' test/findings.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-09 AC01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "dismissal, correction and adjudication are events; a dismissed finding does not recur for the same sources and versions, and a corrected one carries the correction in its history",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/findings.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-09 AC02:' test/findings.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-09 AC02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "a finding never discloses a record its reader has no permission for in the source's scope (SO-F-01): the test seeds a finding with one restricted source and asserts the finding shown to a subject without permission names neither the record nor its content",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/findings.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-09 AC03:' test/findings.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-09 AC03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "docs/ORGANISATIONAL-INTELLIGENCE.md defines the finding as a capped claim and the three events",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/ORGANISATIONAL-INTELLIGENCE.md",
+            "pattern": "finding.*theory.*dismiss",
+            "flags": "s"
+          }
+        },
+        {
+          "statement": "definition 1: the test that a stub session, an agent subject or a raw status op, cannot promote a finding by status op, adjudication, verification or evidence runs and passes by this name",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/findings.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-09 AC01: a stub session cannot promote' test/findings.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-F-09 AC01: a stub session cannot promote' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "definition 2: the test that a passing verification record, and a person's adjudication, promote a finding to fact runs and passes by this name; a failed or agent record changes nothing",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/findings.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-09 AC01: a person.s adjudication or a passing verification' test/findings.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-F-09 AC01: a person.s adjudication or a passing verification' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "definition 3: through Graph.bindFindingEvent, with a resolved agent credential, an adjudication carrying a forged by of person:x leaves the finding at theory with no decision, and the history entry names the agent subject the credential resolved to, not person:x; the test fails on the current code, where the entry point does not exist, and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/findings.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-09.2 D3a:' test/findings.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-F-09.2 D3a:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "definition 3: through Graph.bindFindingEvent, with a resolved agent credential, a verification of result pass carrying a forged by of service:x, and one carrying a forged by of person:x, leave the finding at theory with no decision; a caller-supplied by is dropped from the logged data in every case, and a credential that did not resolve (ok false) records nothing",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/findings.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-09.2 D3b:' test/findings.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-F-09.2 D3b:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "definition 3: resolveActor resolves a personal-scope credential that names an agent to an agent subject whose id is agent:<role> and whose owner is person:owner, built through resolveBinding, never to person:owner; a credential with an identity scope of personal that names the person subject resolves to a person subject; resolveRequest returns what it returned before for every credential (the tests of SO-F-01 pass unchanged)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/findings.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-09.2 D3c:' test/findings.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-F-09.2 D3c:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "definition 3, positive control: through Graph.bindFindingEvent a person credential's confirming adjudication makes the finding a fact, and a service credential's passing verification does too, with by set from the credential",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/findings.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-09.2 D3d:' test/findings.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-F-09.2 D3d:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "definition 4: the test that a finding with one restricted source, shown to a subject without permission, names neither the record nor its content, and withholds the statement, runs and passes by this name",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/findings.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-09 AC03: a finding shown to a subject without permission' test/findings.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-F-09 AC03: a finding shown to a subject without permission' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "definition 4: a finding with an entity and an owner whose source is null, and one source the reader cannot read, shows neither of them to that reader in viewFinding or listFindings, while a reader who can read every source sees both; an entity or owner tied to a readable source is still shown",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/findings.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-09.2 D4:' test/findings.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-F-09.2 D4:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "provisional: the rules for who may adjudicate (a person), verify (a person, operator or service) and dismiss (a person or an operator subject only) are one frozen table, FINDING_AUTHORITY, exported from src/engine/graph.mjs with the outcomes confirm and reject, and each of adjudicate, verify and dismiss reads its rule from that table; the test checks the contents, with dismiss allowing person and operator only, and that the table cannot be changed",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/findings.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-09.2 D5:' test/findings.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-F-09.2 D5:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "dismissal is limited to person and operator subjects: a dismissal by an agent subject, and one by a service subject, is recorded as not effective and changes nothing, the finding is not dismissed, it stays in the default listing, and a new finding on the same sources and versions can still be raised (admitFinding is ok); a dismissal by a person subject and one by an operator subject each take effect, and after either the same sources and versions cannot be raised again; the test fails on the current code, where any subject can dismiss, and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/findings.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-09.2 D6:' test/findings.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-F-09.2 D6:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "docs/ORGANISATIONAL-INTELLIGENCE.md says that who may adjudicate, verify and dismiss, and the confirm and reject outcomes, are provisional until ADR 5 and SO-A-05 are decided",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/ORGANISATIONAL-INTELLIGENCE.md",
+            "pattern": "provisional.*ADR 5.*SO-A-05",
+            "flags": "s"
+          }
+        },
+        {
+          "statement": "definition 3: docs/ORGANISATIONAL-INTELLIGENCE.md says the 'by' field is set from the resolved credential, no module outside src/engine/graph.mjs names claim.finding, admitFinding, bindFindingEvent or FINDING_EVENTS, and the tests of SO-F-01 in test/identity.test.mjs pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -Eq 'sets it from the resolved credential' docs/ORGANISATIONAL-INTELLIGENCE.md && test -z \"$(grep -rlE 'claim\\.finding|admitFinding|bindFindingEvent|FINDING_EVENTS' src bin | grep -v '^src/engine/graph.mjs$')\" && node --test test/identity.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The full test suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "The leak scan passes on files and every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Every changed file is inside this contract's scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "Stop and post BLOCKED when a criterion cannot pass without weakening a test, skipping a test or relaxing an assertion.",
+        "Stop and ask when the work would name a client product, a person, a server or a seat in repository text; the client names live in docs/CLIENTS.md only.",
+        "Stop when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would move convergence logic into the core, vendor the engine, or add a merge engine beside the provider boundary of src/engine/merge.mjs.",
+        "Stop when the work would implement a federation, replication, trust, admission or computation feature beyond the specification, schema, validator and conformance test the contract names; the product keeps the planned label on it.",
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

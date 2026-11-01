@@ -1,0 +1,417 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "The vault gives each project Coordinator the bus, so every transition is posted",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "the Coordinator that vault.coordinator(projectId) builds is constructed with the vault's own bus (src/engine/bus.mjs), so transitions of a project reach the operator seat and the seat of the task's assignee; this closes the follow-up 'Give the Coordinator the bus' (source: SO-08-B AC04, pull request #361; docs/scope-one/RECONCILIATION.md, Open follow-ups)",
+        "a bus that is down or refuses a message never blocks or undoes a transition, as the Coordinator already guarantees (source: SO-08-B AC04)",
+        "SO-1.01 requirement 3 (test 'SO-1.01 req 3' in test/project-wiring.test.mjs): only the vault, the coordinator and the project store reach the store; a module outside them gets project data only from a vault method (source: contracts/scope-one/specs/SO-1.01-canonical-execution-integration.json; owner delegation, 1 Nov 2026)"
+      ],
+      "description": "Repo: memev. SO-08-B (pull request #361) adds the bus option to the Coordinator, but src/engine/vault.mjs builds it as new Coordinator(this.projectStore(id), { lifecycle: true }) with no bus, so no production transition is ever posted. This task passes the vault's bus there and does nothing else. The seat names of vault claims (name/client is not a bus seat name) stay an open follow-up: transitions reach the operator seat, and the assignee seat only when the assignee is a seat.",
+      "scope": {
+        "allow": [
+          "src/engine/vault.mjs",
+          "test/project-callers-bus.test.mjs",
+          "test/helpers/**",
+          "docs/MODULES.md",
+          "changelog.d/SO-W-08C.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "with a real Vault in a temporary directory, planning a task and claiming it through the vault (vault.tasksPlan, vault.tasksClaim) posts one message of type transition to the operator seat on vault.bus, with the body {project, task, from, to, correlation} and nothing else; the test fails on the current code, where no message is posted, and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-callers-bus.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T1 AC01:' test/project-callers-bus.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T1 AC01:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "a vault bus whose post throws, and one that refuses the message, leave the transition applied and the call's result unchanged, and the store holds the new state",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-callers-bus.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T1 AC02:' test/project-callers-bus.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T1 AC02:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "the Coordinator of every project the vault builds holds the vault's one bus object: two projects of one vault post to the same bus, and no project builds a bus of its own",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-callers-bus.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T1 AC03:' test/project-callers-bus.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T1 AC03:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "SO-1.01 requirement 3 is unchanged: test/project-wiring.test.mjs does not differ from origin/main and passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "git diff --exit-code origin/main -- test/project-wiring.test.mjs && node --test test/project-wiring.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "Every changed file is inside this contract's scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "Stop and post BLOCKED when a criterion cannot pass without weakening a test, skipping a test or relaxing an assertion.",
+        "Stop and ask when the work would name a client product, a person, a server or a seat in repository text; the client names live in docs/CLIENTS.md only.",
+        "Stop when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would move convergence logic into the core, vendor the engine, or add a merge engine beside the provider boundary of src/engine/merge.mjs.",
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "recover has a production caller: a vault method and an operator tool on the MCP server",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "recover(taskId) has a production caller: the vault method vault.tasksRecover(identity, { project, task }) calls it, and the MCP tool memev_task_recover calls the vault method; it is an operator action, local only and a write tool, like memev_task_verify (source: SO-08-B AC01; docs/scope-one/RECONCILIATION.md, Open follow-ups)",
+        "the reassignment after recovery is reached the same way: vault.tasksReassign keeps its meaning, and a reassignment of a task that has lost its owner is refused until recover has recorded an inspection (source: SO-08-B AC01)",
+        "src/server/mcp.mjs names no store and no Coordinator: it calls the vault method only (source: SO-1.01 requirement 3)",
+        "SR-1.15: no code without a caller; recover is reachable from a production entry point, shown by a test that goes through the MCP tool (source: docs/scope-one/WBS.md leaf 2.2.15)"
+      ],
+      "description": "Repo: memev. Coordinator.recover (SO-08-B, pull request #361) has no caller outside tests. The vault is the one place that may reach the Coordinator, so this task adds one vault method and one MCP tool over it. The tool needs a token that may write and runs only on the local server, as memev_task_verify does. test/mcp-hints.test.mjs lists the tools and is changed only to add the new tool name.",
+      "scope": {
+        "allow": [
+          "src/engine/vault.mjs",
+          "src/server/mcp.mjs",
+          "test/project-callers-recover.test.mjs",
+          "test/mcp-hints.test.mjs",
+          "test/helpers/**",
+          "docs/MODULES.md",
+          "docs/PROJECTS.md",
+          "changelog.d/SO-W-08C.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T2-AC01",
+          "mandatory": true,
+          "statement": "a task whose lease lapsed (BLOCKED, owner lost) is recovered by calling the MCP tool memev_task_recover through the real MCP handler against a real Vault: the result carries the inspection and a plan of resume, reassign or ask_user, and an inspection record is written to the store; the test fails on the current code, where the tool does not exist, and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-callers-recover.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T2 AC01:' test/project-callers-recover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T2 AC01:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "id": "T2-AC02",
+          "mandatory": true,
+          "statement": "the tool refuses a task whose lease is live (LEASE_LIVE), a task that has not lost its owner (NOT_RECOVERABLE) and an unknown task, and changes nothing; a read-only token cannot call it and a remote caller cannot call it",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-callers-recover.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T2 AC02:' test/project-callers-recover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T2 AC02:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "id": "T2-AC03",
+          "mandatory": true,
+          "statement": "a reassignment of the recovered task after the inspection succeeds, and a reassignment before it is refused with NOT_INSPECTED",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-callers-recover.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T2 AC03:' test/project-callers-recover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T2 AC03:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "id": "T2-AC04",
+          "mandatory": true,
+          "statement": "caller reachability (SR-1.15): recover is called from src/engine/vault.mjs and that vault method from src/server/mcp.mjs, and test/dead-code.test.mjs, which SR-1.15 builds, passes once it exists",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -Eq '\\.recover\\(' src/engine/vault.mjs && grep -Eq 'tasksRecover\\(' src/server/mcp.mjs && ! grep -Eq 'ProjectStore|projectStore\\(|coordinator\\(|new Coordinator' src/server/mcp.mjs && { [ ! -e test/dead-code.test.mjs ] || node --test test/dead-code.test.mjs; }",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T2-AC05",
+          "mandatory": true,
+          "statement": "the tool list test passes with the new tool named: node --test test/mcp-hints.test.mjs test/project-wiring.test.mjs",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/mcp-hints.test.mjs test/project-wiring.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T2-AC06",
+          "mandatory": true,
+          "statement": "Every changed file is inside this contract's scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "Stop and post BLOCKED when a criterion cannot pass without weakening a test, skipping a test or relaxing an assertion.",
+        "Stop and ask when the work would name a client product, a person, a server or a seat in repository text; the client names live in docs/CLIENTS.md only.",
+        "Stop when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would move convergence logic into the core, vendor the engine, or add a merge engine beside the provider boundary of src/engine/merge.mjs.",
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "reconstruct, eligibilityPass and applyBusMessage have a production caller: the daemon start and a bus request poll, both through the vault",
+      "phase": "implement",
+      "depends_on": [
+        "T1",
+        "T2"
+      ],
+      "requirements": [
+        "a vault method vault.tasksStart() runs reconstruct(project) for every project that has a store and then eligibilityPass(project) for each, with no send port, so it offers and dispatches nothing until an adapter exists (SO-05-B); expired leases are marked on start and the pass skips a task with a live lease and every task of a paused project (source: SO-08-B AC02)",
+        "the daemon (src/server/main.mjs) calls vault.tasksStart() once after the vault opens and before it serves requests that claim tasks, and nothing in the daemon names a store or a Coordinator (source: SO-1.01 requirement 3)",
+        "a vault method vault.tasksApplyRequests() reads the bus messages of type task that the operator seat posted with a body {request: cancel, pause or resume, project, task, reason} and applies each through applyBusMessage once; the message id is the id of the message on the bus (its device file and seq), so a message read twice, by this process or another, changes the project once; a message from a seat that is not the operator, with a bad body or with no reason on a cancel is ignored and changes nothing (source: SO-08-B AC05; docs/BUS.md, Project messages)",
+        "the daemon calls vault.tasksApplyRequests() every vault.config.projects.poll_ms milliseconds (default 5000, 0 turns it off), with an unref'd timer that stops on shutdown, and a failure of one pass is logged and never ends the daemon (source: src/server/main.mjs, the existing flush timer)",
+        "SR-1.15: no code without a caller; reconstruct, eligibilityPass and applyBusMessage are each reachable from the daemon, shown by tests that start the daemon (source: docs/scope-one/WBS.md leaf 2.2.15)"
+      ],
+      "description": "Repo: memev. Coordinator.reconstruct, eligibilityPass and applyBusMessage (SO-08-B, pull request #361) have no caller outside tests, so a daemon restart reconstructs nothing and a cancel, pause or resume posted on the bus is never read. The daemon is the production entry that runs at start and keeps running, and the vault is the one place that may reach the Coordinator, so the daemon calls two vault methods. The carrier of a request on the bus is the existing message type task with a JSON body from the operator seat; no new message type is added. Dispatching an offered task to an adapter, and the capability record (SO-05-B), are not part of this task.",
+      "scope": {
+        "allow": [
+          "src/engine/vault.mjs",
+          "src/server/main.mjs",
+          "test/project-callers-start.test.mjs",
+          "test/helpers/**",
+          "docs/MODULES.md",
+          "docs/PROJECTS.md",
+          "docs/BUS.md",
+          "changelog.d/SO-W-08C.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T3-AC01",
+          "mandatory": true,
+          "statement": "a vault root holds a project with a task whose lease expired while no daemon ran; starting the real daemon (src/server/main.mjs as a child process) leaves that task BLOCKED with the reason owner lost and a task under a live lease untouched, and nothing dispatched; the test fails on the current code, where the task is still IN_PROGRESS after the start, and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-callers-start.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T3 AC01:' test/project-callers-start.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T3 AC01:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "id": "T3-AC02",
+          "mandatory": true,
+          "statement": "after a restart a paused project is still paused and offers no task, and a project with an eligible task and no live lease offers it once and sends nothing",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-callers-start.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T3 AC02:' test/project-callers-start.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T3 AC02:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "id": "T3-AC03",
+          "mandatory": true,
+          "statement": "the operator seat posts a pause request for a project on the bus, and within the poll time the project is paused in the store; the same message read again by a second daemon pass changes nothing and adds no second event; the test fails on the current code, where no request is read, and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-callers-start.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T3 AC03:' test/project-callers-start.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T3 AC03:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "id": "T3-AC04",
+          "mandatory": true,
+          "statement": "a cancel request without a reason, a request from a seat that is not the operator, a body that is not JSON, an unknown request and a request naming no project each change nothing and stop no later request",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-callers-start.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T3 AC04:' test/project-callers-start.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T3 AC04:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "id": "T3-AC05",
+          "mandatory": true,
+          "statement": "with projects.poll_ms set to 0 no request is read; a pass that throws is logged and the daemon keeps serving; the timer does not keep the process alive after shutdown",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-callers-start.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T3 AC05:' test/project-callers-start.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T3 AC05:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "id": "T3-AC06",
+          "mandatory": true,
+          "statement": "caller reachability (SR-1.15): reconstruct, eligibilityPass and applyBusMessage are each called from src/engine/vault.mjs, the vault methods tasksStart and tasksApplyRequests are each called from src/server/main.mjs, that file names no store or Coordinator, and test/dead-code.test.mjs, which SR-1.15 builds, passes once it exists",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -Eq '\\.reconstruct\\(' src/engine/vault.mjs && grep -Eq '\\.eligibilityPass\\(' src/engine/vault.mjs && grep -Eq '\\.applyBusMessage\\(' src/engine/vault.mjs && grep -Eq 'tasksStart\\(' src/server/main.mjs && grep -Eq 'tasksApplyRequests\\(' src/server/main.mjs && ! grep -Eq 'ProjectStore|projectStore\\(|coordinator\\(|new Coordinator' src/server/main.mjs && { [ ! -e test/dead-code.test.mjs ] || node --test test/dead-code.test.mjs; }",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T3-AC07",
+          "mandatory": true,
+          "statement": "docs/BUS.md says how a request is posted on the bus: under the Project messages heading, a message of type `task` from the operator seat whose JSON body asks for cancel, pause or resume",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/BUS.md",
+            "pattern": "## [^\\n]*Project messages.*type `task`.*operator seat.*JSON",
+            "flags": "s"
+          }
+        },
+        {
+          "id": "T3-AC08",
+          "mandatory": true,
+          "statement": "docs/PROJECTS.md documents projects.poll_ms, its default of 5000 and that 0 turns the poll off",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/PROJECTS.md",
+            "pattern": "projects\\.poll_ms.*5000.*0",
+            "flags": "s"
+          }
+        },
+        {
+          "id": "T3-AC09",
+          "mandatory": true,
+          "statement": "The full test suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "id": "T3-AC10",
+          "mandatory": true,
+          "statement": "The leak scan passes on files and every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T3-AC11",
+          "mandatory": true,
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "id": "T3-AC12",
+          "mandatory": true,
+          "statement": "Every changed file is inside this contract's scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "Stop and post BLOCKED when a criterion cannot pass without weakening a test, skipping a test or relaxing an assertion.",
+        "Stop and ask when the work would name a client product, a person, a server or a seat in repository text; the client names live in docs/CLIENTS.md only.",
+        "Stop when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would move convergence logic into the core, vendor the engine, or add a merge engine beside the provider boundary of src/engine/merge.mjs.",
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-so-w-08c-production-call-efbd86",
+  "title": "SO-W-08C Production callers for recovery and control, and the bus for the Coordinator",
+  "workdir": null,
+  "created": "2026-11-01T04:19:00.011Z",
+  "version": 1,
+  "request": "Production callers for the recovery and control functions of SO-08-B, and the bus for the Coordinator. Proposed and unsigned; the signer signs it after the red-team gate. Maps to PG-08.1, task WP08-02, as SO-W-08B does. Id: SO-W-08C, not SO-08-C, because the gate reduces a file name such as SO-08-C.json to the id SO-08, which it would share with SO-W-08B. Why: pull request #361 builds recover, reconstruct, eligibilityPass and applyBusMessage and the Coordinator's bus option, and its own notes say none has a production caller and the vault does not give the Coordinator the bus (docs/scope-one/RECONCILIATION.md, Open follow-ups: 'Production caller for recovery and reconstruction' and 'Give the Coordinator the bus'). By SR-1.15 (no code without a caller) code without a caller is to be wired or removed. Where the callers live: SO-1.01 requirement 3 allows only the vault, the coordinator and the project store to reach the store, so the callers are vault methods; the MCP server calls a vault method for recover (T2), and the daemon, which runs at start and keeps running, calls the vault at start and on a timer (T3). The vault builds the Coordinator with its bus (T1). Checked: no existing spec covers it (a search of contracts/ and docs/ for these four functions finds only the register). It stays inside the same boundary as SO-08-B: no new bus message type, no dispatch to an adapter (SO-05-B), no second store. Still open and not covered: the capability record (waits on SO-05-B) and the bus seat names for vault claims (name/client is not a seat name). Depends on contracts: SO-W-08B (the repository text of the signed vault contract SO-08-B, recovery and control; pull request #361, a draft stacked on #350) and pull request #350 (its base): this contract starts once #361 merges, because recover, reconstruct, eligibilityPass and applyBusMessage and the Coordinator's bus option exist only there; SO-1.01 (the one store authority) and SO-A-03. Owner decisions of 31 Oct 2026 apply: local-first topology, the cloud only a relay and a backup; every supported provider on equal footing; crdt-merge reached only through the provider boundary of src/engine/merge.mjs; no second database for project state.",
+  "provenance": {
+    "spec_sha256": "dfa057c3f65bd0fa27d6076fe68c1d03b09f7b78060e474dce1ca307034f7973",
+    "record": "contracts/scope-one/redteam/SO-W-08C.json",
+    "review": "interim solo review by the signer, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}
