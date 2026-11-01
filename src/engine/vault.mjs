@@ -602,7 +602,7 @@ export class Vault extends EventEmitter {
     if (!meta && !fs.existsSync(file)) return null;
     const version = meta?.schema_version ?? SCHEMA_VERSION;
     if (version > SCHEMA_VERSION) throw new VaultError('future_schema', `refusing to open: schema version ${version} is newer than this Memev knows (${SCHEMA_VERSION})`);
-    if (version < SCHEMA_VERSION) throw new VaultError('needs_migration', `schema version ${version} is older than ${SCHEMA_VERSION}: the project store migrates it on its next open, and this reader writes nothing, so it cannot read it yet`);
+    if (version < SCHEMA_VERSION) throw new VaultError('needs_migration', `schema version ${version} is older than ${SCHEMA_VERSION}: any daemon command that opens the store migrates it, and this reader writes nothing, so it cannot read it until then`);
     const entities = new Map();
     const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
     for (const line of text.slice(0, text.lastIndexOf('\n') + 1).split('\n')) {
