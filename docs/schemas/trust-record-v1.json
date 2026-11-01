@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Memev trust record, version 1",
-  "description": "A grant (who trusts which subject, for which purposes, in which scope, between which times) and a revocation (which grant is withdrawn, by whom, from when, and why). PROVISIONAL: the choices come from ADR 8 in docs/scope-one/DECISIONS.md, which is proposed, and a change is a new schema version, not an edit of memev-trust/1. Trust is an eligibility input only: a record never grants a permission, a membership or a read, and a personal scope is never shared. The validator and the evaluation are src/engine/federation/trust-record.mjs; the module has no production caller yet.",
+  "description": "A grant (who trusts which subject, for which purposes, in which scope, between which times) and a revocation (which grant is withdrawn, by whom, from when, and why). PROVISIONAL: the choices come from ADR 8 in docs/scope-one/DECISIONS.md, which is proposed, and a change is a new schema version, not an edit of memev-trust/1. Trust is an eligibility input only: a record never grants a permission, a membership or a read, and a personal scope is never shared. Unauthenticated: the subject and the issuer of every record are unauthenticated strings, so the caller must evaluate over its own log, the one it already trusts as it trusts its operation log, with a resolved actor (never a name a caller supplies) and a credential-resolved subject, as the actor resolution paragraph of docs/scope-one/design/trust-governance.md says. Fail closed: a record of kind revocation that fails the validator and names a grant denies that grant and every grant delegated from it; canonically equal grants count once and different grants with one id deny; times are real calendar times with a zone. The validator and the evaluation are src/engine/federation/trust-record.mjs; the module has no production caller yet.",
   "oneOf": [
     {
       "$ref": "#/$defs/grant"
@@ -37,17 +37,17 @@
           "pattern": "^[A-Za-z0-9._@+-]+$"
         },
         "subject": {
-          "description": "The subject trusted.",
+          "description": "The subject trusted. The subject and the issuer of a record are unauthenticated strings: nothing in a record proves who wrote it or who the subject is. The caller evaluates over its own log, with a credential-resolved subject.",
           "type": "string",
           "pattern": "^(person|agent|device|node|operator|service):[A-Za-z0-9._@+-]+$"
         },
         "issuer": {
-          "description": "The subject that grants the trust: a root the evaluation is given, or the holder of a live grant that delegates.",
+          "description": "The subject that grants the trust: a root the evaluation is given, or the holder of a live grant that delegates. The subject and the issuer of a record are unauthenticated strings: nothing in a record proves who wrote it or who the subject is. The caller evaluates over its own log, with a resolved actor.",
           "type": "string",
           "pattern": "^(person|agent|device|node|operator|service):[A-Za-z0-9._@+-]+$"
         },
         "scope": {
-          "description": "One scope. A personal scope is never shared, so it is not a choice here.",
+          "description": "One scope. A personal scope is never shared, so it is not a choice here. A grant names a scope by its type and id alone.",
           "type": "object",
           "required": [
             "type",
@@ -72,7 +72,8 @@
             },
             "parent": {
               "type": "string",
-              "pattern": "^[A-Za-z0-9._@+-]+$"
+              "pattern": "^[A-Za-z0-9._@+-]+$",
+              "description": "Accepted by the validator and ignored by the evaluation: a grant never reaches a parent or a child scope, and two scopes are the same when their type and id are the same."
             }
           }
         },
@@ -89,10 +90,11 @@
         },
         "start": {
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "description": "A real calendar date and time with a zone: a day the month has, an hour of 23 or less. Nothing rolls over."
         },
         "expires": {
-          "description": "Required, and after the start.",
+          "description": "Required, and after the start. A real calendar date and time with a zone.",
           "type": "string",
           "format": "date-time"
         },
@@ -130,7 +132,7 @@
       }
     },
     "revocation": {
-      "description": "Takes effect from its time. It is applied only when its issuer is the issuer of the grant or a root the caller passes, and it makes every grant delegated from the revoked one ineligible. PROVISIONAL: who may revoke is a part of question 6 in ADR 8, which is proposed; this adds no role-by-action matrix.",
+      "description": "Takes effect from its time. It is applied only when its issuer is the issuer of the grant or a root the caller passes, and it makes every grant delegated from the revoked one ineligible. A record of kind revocation that fails this schema and names a grant is not ignored: it denies that grant and every grant delegated from it, at any time (deny.bad_revocation). PROVISIONAL: who may revoke is a part of question 6 in ADR 8, which is proposed; this adds no role-by-action matrix.",
       "type": "object",
       "required": [
         "schema",
@@ -160,11 +162,13 @@
         },
         "issuer": {
           "type": "string",
-          "pattern": "^(person|agent|device|node|operator|service):[A-Za-z0-9._@+-]+$"
+          "pattern": "^(person|agent|device|node|operator|service):[A-Za-z0-9._@+-]+$",
+          "description": "The subject that withdraws the grant. The subject and the issuer of a record are unauthenticated strings: nothing in a record proves who wrote it or who the subject is. The caller evaluates over its own log, with a resolved actor."
         },
         "time": {
           "type": "string",
-          "format": "date-time"
+          "format": "date-time",
+          "description": "A real calendar date and time with a zone."
         },
         "reason": {
           "enum": [
