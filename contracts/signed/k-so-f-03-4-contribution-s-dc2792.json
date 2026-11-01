@@ -1,0 +1,345 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Contribution signature and two-step admission: a signed, scoped, classified contribution built on the operation envelope, admission into the node's own operation log, replay refused across restarts, a",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a contribution is an operation envelope (PG-04.1) that carries subject, scope, a classification string whose values the classification schema of",
+        "admission is two steps before append",
+        "a valid signature with a subject that lacks authority for the scope is rejected",
+        "a replayed contribution is refused after the vault is closed and reopened, and a role-binding signature presented as a contribution signature is",
+        "no module under src/engine/federation imports child_process, node",
+        "docs/FEDERATION.md carries a section Contribution and admission naming the contribution schema and the two-step admission, labelled planned",
+        "the contribution schema exists",
+        "the replay mark is kept per sender and scope, highWater(sender, scope) takes a scope that defaults to the scope the Admission holds, the scope of a stored record is the scope of its stored envelope, a stored record with no usable scope or sequence moves no mark, and the key is a structured pair, never a plain join",
+        "an Admission reads the log again, from the record after the last one it read and only when the log has moved, before the replay check and in highWater; an append of its own moves the cursor only when its seq is the last seq read plus 1, and otherwise the next read starts at the last seq read plus 1; so no two Admissions over one log admit one sequence, whichever was made first, and whatever either appended in between",
+        "a message replayed into a different scope is refused at the signature step, because the scope is inside the signed bytes, and the same message again in its own scope is a replay",
+        "the reason of external_failed is a fixed text that holds none of the message of the throw, and the text that said per sender (docs/FEDERATION.md, docs/schemas/contribution-v1.json, src/engine/federation/contribution.mjs, src/engine/federation/admission.mjs, docs/OPERATION-ENVELOPE.md) says per sender and scope"
+      ],
+      "description": "State may cross a boundary only as a contribution the receiving node can verify and judge. This contract defines the signature and admission block of the operation envelope of PG-04.1 and the node's own admission: verify the signature (the role key of MEM-145 through the same ssh-keygen path, offline), check authority and policy for the scope and classification, then append; a failed step records a rejected event in the vault's operation log through the OpLog API and appends nothing of the payload. Replay is refused through a sequence per sender and scope whose high-water mark is persisted through the operation log, so it survives a restart (the restart rule of SR-1.03), and every Admission reads the log again when it has moved, from the record after the last one it read, so that no two Admissions over one log admit one sequence. A signature proves a key signed; authority is a separate check. The external admission service of SO-F-08 runs before this step when configured. The classification field's values are constrained later by the classification schema of SO-F-05.",
+      "scope": {
+        "allow": [
+          "changelog.d/SO-F-03.md",
+          "docs/FEDERATION.md",
+          "docs/MODULES.md",
+          "docs/README.md",
+          "docs/schemas/contribution-v1.json",
+          "src/engine/agentid-bind.mjs",
+          "src/engine/federation/**",
+          "test/federation-admission.test.mjs",
+          "test/helpers/**",
+          "docs/OPERATION-ENVELOPE.md",
+          "src/engine/envelope.mjs",
+          "test/envelope.test.mjs",
+          "README.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "a contribution is an operation envelope (PG-04.1) that carries subject, scope, a classification string whose values the classification schema of SO-F-05 constrains later, schema version, causal context, provenance, payload hash, a per-sender sequence and a signature made with the role key of MEM-145 through the same ssh-keygen path, in a namespace distinct from the role-binding namespace, and verified offline; the schema docs/schemas/contribution-v1.json defines only the signature and admission block, not a second envelope; the validator accepts the fixtures and refuses a missing field",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03 AC02:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03 AC02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "admission is two steps before append: signature verification, then authority and policy for the scope and classification; a replayed envelope (sequence not above the high-water mark of its sender in its scope: the mark is kept per sender and scope, persisted through the operation log and rebuilt on open, and the log is read again from the record after the last one read when it has moved, so a restart does not forget it and a second Admission over the same log does not miss what the first admitted) and a failure at either step record a rejected event in the vault's operation log through the OpLog API (src/engine/oplog.mjs), no new store, and append nothing of the payload; this is the node's own admission, run after the external admission service of SO-F-08 when that is configured; this criterion supersedes criterion 2 of SO-F-03.3, whose statement said the per-sender high-water mark",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03 AC03:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03 AC03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "a valid signature with a subject that lacks authority for the scope is rejected: the test signs with a real key and the wrong scope and asserts rejection, proving that a signature is not authority",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03 AC04:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03 AC04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "a replayed contribution is refused after the vault is closed and reopened, and a role-binding signature presented as a contribution signature is rejected",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03 AC12:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03 AC12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "no module under src/engine/federation imports child_process, node:net, node:http, node:https or node:dgram: the test scans the files read-only",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03 AC13:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03 AC13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "the replay mark is kept per sender and scope, the same whichever Admission was made first: with an Admission for scope A and one for scope B over one log (the subject is a member of both), after sequence 2 of a sender is admitted in scope A, highWater(sender, A) is 2 and highWater(sender, B) is 0 for an Admission for B made before it was admitted and for one made after, and highWater(sender) with no scope is that of the scope the Admission holds; sequence 1 of the same sender signed for scope B is admitted, as a new message and not a replay of sequence 2 in scope A, and is then a replay for both Admissions for B; sequence 1 in scope A is a replay; another sender and another node keep their own marks; the test fails by assertion on the base",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03.4 AC14:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03.4 AC14:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "a message replayed into a different scope is refused, beside the same-scope replay: an envelope admitted in scope A by the Admission for A, and then the Admission for B made over the same log, with the envelope copied with its scope changed to B and its content hash rebuilt so that only the signature stands in the way, is refused by the Admission for B at step signature with the code bad_signature and signature_valid false; the test first asserts that contributionMessage of the copy differs from that of the original, which is the check that the scope is inside the signed bytes; the original sent again to the Admission for A is refused at step replay with the code replay; the refused copy moves no mark and appends no federation.admitted; sequence 2 signed by the same sender for scope B is a new message and is admitted (this last step is what is red on the base, where the mark is per sender; the two refusals already hold there, because the scope is signed, and are pinned so that they stay); the test signs with a real key through the real signing path; the test fails by assertion on the base",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03.4 AC15:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03.4 AC15:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "an Admission reads what another Admission over the same log appended, so none admits a sequence twice, whichever was made first: two Admissions for the same scope built by new Admission over one log, no set and no other help; after the first admits sequence 7, the second refuses sequences 3 and 7 with the code replay and admits sequence 8, and the first then refuses sequence 8; both read highWater 8; an Admission made after the records reads the same mark as one made before; the log holds one federation.admitted record for each of the two sequences admitted; the test fails by assertion on the base",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03.4 AC16:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03.4 AC16:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "the log is read again incrementally: through a log wrapper that counts iterate calls and their fromSeq and exposes the seq of the log, an Admission made over a log that holds records reads from record 1 once; its own admitted, replayed and malformed attempts append the very next record after the last one it read (its seq is the last seq read plus 1) and cause no further read, as do its highWater reads; after another Admission appends, the next highWater or admit reads once with fromSeq equal to the last seq the Admission knew plus 1, and further calls read nothing while the log has not moved; over a wrapper with no seq property every highWater reads, from the record after the last one read, and returns the same marks; the test fails by assertion on the base",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03.4 AC17:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03.4 AC17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "the scope of a stored record is the scope of its stored envelope, and a stored record with none moves no mark: records appended straight to the log, an admitted one for scope B with sequence 7, one whose envelope has no scope, one whose sequence is not an integer and a federation.rejected one, give an Admission for scope A a mark of 0 for the sender in scope A and 7 in scope B and throw nothing; two senders and scopes whose parts a plain join would run together (the sender n with a scope id s|team|u, and the sender n|team|s with a scope id u, both of type team) keep their own marks; the test fails by assertion on the base",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03.4 AC18:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03.4 AC18:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC11",
+          "mandatory": true,
+          "statement": "an own append moves the cursor only when its seq is the last seq read plus 1; otherwise the next read starts at the last seq read plus 1: two Admissions X and Y for one scope over one log (neither knows the other); Y admits sequence 70; X, which has not read since, refuses a malformed envelope at step format, which appends after the record Y appended, and then sequence 70 is sent to X: X refuses it at step replay with the code replay, its highWater is 70, the read it makes starts at 1 (the last seq X had read, none, plus 1), and the log holds the federation.admitted record of sequence 70 exactly once; the same steps with an envelope whose signature does not verify, refused at step signature in place of the malformed one; both over a log that has a seq and over a log that has none; a cursor that moves to every own append passes the other criteria of this contract and fails this one; the test fails by assertion on the base",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03.4 AC19:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03.4 AC19:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC12",
+          "mandatory": true,
+          "statement": "the reason of external_failed is fixed: with an external hook given to the Admission that throws an Error, a string, an object with a message, null and undefined in turn, the result is ok false at step external with the code external_failed and signature_valid false, its reason is one non-empty text of at most 160 characters, the same for every thing thrown, neither the result nor any record of the log holds the message of the throw or a marker in the payload, and the log holds one federation.rejected record and nothing else; the test at test/federation-admission.test.mjs:320 (which asserts ok, step and code only) is not edited and stays green; the test fails by assertion on the base",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03.4 AC20:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03.4 AC20:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC13",
+          "mandatory": true,
+          "statement": "docs/FEDERATION.md carries a section Contribution and admission naming the contribution schema and the two-step admission, labelled planned",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/FEDERATION.md",
+            "pattern": "## Contribution and admission[\\s\\S]*contribution-v1\\.json[\\s\\S]*two-step admission[\\s\\S]*planned"
+          }
+        },
+        {
+          "id": "T1-AC14",
+          "mandatory": true,
+          "statement": "the contribution schema exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/schemas/contribution-v1.json"
+          }
+        },
+        {
+          "id": "T1-AC15",
+          "mandatory": true,
+          "statement": "docs/FEDERATION.md states, in one paragraph, that the replay mark is held per sender and scope and that an Admission reads the log again, from the record after the last one it read, when the log has moved",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/FEDERATION.md",
+            "pattern": "per sender and scope.*(reads|read) the log again.*after the last one",
+            "flags": "i"
+          }
+        },
+        {
+          "id": "T1-AC16",
+          "mandatory": true,
+          "statement": "no line of the five files says per sender any more; the command checks every line of each file, not only the places named here: docs/FEDERATION.md (the field table row of sequence, 'The per-sender sequence', and the paragraph after the two steps, 'the high-water mark of the sender'), docs/schemas/contribution-v1.json (the description of sequence), src/engine/federation/contribution.mjs (the head comment, 'the per-sender sequence'), src/engine/federation/admission.mjs (the head comment: 'mark of that sender' and 'each sender is kept') and docs/OPERATION-ENVELOPE.md, which has two bullets with the stale text, both cited by their text because their lines move with other pull requests: the bullet 'SO-F-03 adds the signature and admission block, the per-sender sequence and the rejected event' in What other contracts add, and the bullet 'Contributions.' of the status section that pull request #381 adds ('the subject, the scope, the per-sender sequence, the payload hash and the signature'), which is on main only once #381 lands; both are reworded here whichever pull request lands first, and the other bullet of #381 is not touched. No line of the five files may hold per-sender, 'mark of the sender', 'mark of that sender', 'mark of each sender' or 'each sender is kept' (case ignored); the replacement wording must not match it, so it reads 'per sender and scope' or 'mark of a sender and scope' and never 'mark of the sender and scope', which the pattern would catch; the command exits 0 on the replacement wording and exits 1 on the base and when any one of the stale lines is put back",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -nEi 'per-sender|mark of (the|that|each) sender|each sender is kept' docs/FEDERATION.md docs/schemas/contribution-v1.json src/engine/federation/contribution.mjs src/engine/federation/admission.mjs docs/OPERATION-ENVELOPE.md",
+            "expect_exit": 0,
+            "timeout_s": 30
+          }
+        },
+        {
+          "id": "T1-AC17",
+          "mandatory": true,
+          "statement": "each of the five files says the new rule: docs/FEDERATION.md, docs/schemas/contribution-v1.json, src/engine/federation/contribution.mjs, src/engine/federation/admission.mjs and docs/OPERATION-ENVELOPE.md each holds the phrase sender and scope, so the stale text is replaced and not merely deleted; the command exits 0 when all five do, and it exits 1 on the base; the edits are to comments and prose only, and the scope criterion holds them to the files of the scope",
+          "verifier": {
+            "type": "command",
+            "cmd": "for f in docs/FEDERATION.md docs/schemas/contribution-v1.json src/engine/federation/contribution.mjs src/engine/federation/admission.mjs docs/OPERATION-ENVELOPE.md; do grep -Fq 'sender and scope' $f || exit 1; done",
+            "expect_exit": 0,
+            "timeout_s": 30
+          }
+        },
+        {
+          "id": "T1-AC18",
+          "mandatory": true,
+          "statement": "The full test suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "id": "T1-AC19",
+          "mandatory": true,
+          "statement": "The leak scan passes on files and every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T1-AC20",
+          "mandatory": true,
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "id": "T1-AC21",
+          "mandatory": true,
+          "statement": "Every changed file is inside this contract's scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "Stop and post BLOCKED when a criterion cannot pass without weakening a test, skipping a test or relaxing an assertion.",
+        "Stop and ask when the work would name a client product, a person, a server or a seat in repository text; the client names live in docs/CLIENTS.md only.",
+        "Stop when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would move convergence logic into the core, vendor the engine, or add a merge engine beside the provider boundary of src/engine/merge.mjs.",
+        "Stop when the work would implement a federation, replication, trust, admission or computation feature beyond the specification, schema, validator and conformance test the contract names; the product keeps the planned label on it.",
+        "Stop and ask when the signed text of a contribution no longer covers extension.contribution.scope (contributionMessage of src/engine/federation/contribution.mjs, or the envelope, changed so that the scope is outside the signed bytes), or when the work would change either to make a test pass, beyond the comment at the head of contribution.mjs: a mark per sender and scope is safe only while the scope is signed.",
+        "Stop and ask when the work would change the constructor or its options, a step or the order of the steps, a code, an event type or the stored record of the Admission (the reason of external_failed apart), make Admission.admit asynchronous, or edit a test of SO-F-03 or SO-F-04 to make the change pass.",
+        "Stop and ask when the work would read the log other than through the iterate of the OpLog API, keep the mark anywhere but in memory rebuilt from the log, add a store, a file or an event type, or add a second guard in the constructor: the test AC04 of SO-F-03 builds a second Admission for a held scope and must keep passing.",
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-so-f-03-4-contribution-s-dc2792",
+  "title": "SO-F-03.4 Contribution signature and two-step admission: a signed, scoped, classified contribution built on the operation envelope, admission into the node's own operation log, replay refused across restarts, and authority checked apart from the signature",
+  "workdir": null,
+  "created": "2026-11-01T07:56:05.911Z",
+  "version": 1,
+  "request": "Version 4 of this spec, which supersedes SO-F-03.3 (signed as contract k-so-f-03-3-contribution-s-0bb27e, built in pull request #358; the SO-F-03.3 spec file is unchanged and stays on record, and the manifest and RECONCILIATION mark it superseded by this spec). Unsigned: a delta proposed for red-team review in pull request #374. Reason: the red-team review of pull request #374 and the owner decision of 1 Nov 2026 that the replay sequence is per sender and scope, one Admission per scope. SO-F-03.3 keeps the high-water mark per sender across all scopes, in memory, read from the log once when the Admission is made and never again. Two things follow, both read and run in a scratch script outside the repository at 042d727: (1) a second Admission over the same log, even a bare new Admission(...) that nothing else knows of, has a stale mark and admits a sequence that another Admission has already admitted, so the log holds it twice; (2) with one Admission per scope over one log, whether a sequence is a replay depends on when each Admission was made, live and after a restart. Changes from SO-F-03.3: (1) the mark is kept per sender and scope; highWater(sender, scope) takes the scope, which defaults to the scope the Admission holds, so every existing call highWater(sender) keeps its meaning; the scope of a stored record is the scope in its stored envelope (rec.data.envelope.extension.contribution.scope), and a stored record that has no usable scope or no usable sequence moves no mark and throws nothing; the key is a structured pair of the sender and the scope and never a plain join of its parts, so two pairs whose joined text would be equal keep their own marks. (2) The Admission reads the log again, incrementally: before the replay check and in highWater it reads with the log's own iterate({ fromSeq }) from the record after the last one it has read, and it does not read at all when the seq of the log has not moved; an append of its own moves the cursor to that record only when its seq is the last seq read plus 1, the very next record, and otherwise the cursor stays where it was and the next read starts at the last seq read plus 1, so that a record another Admission appended in between is still read (a cursor that jumped to every own append would skip it and admit a sequence twice); a log with no numeric seq is read from the record after the last one read each time. That closes both the second Admission over the same log, bare or not, and the order dependence, at the root. (3) Two criteria pin the scope: a message replayed into a different scope is refused (its scope is inside the signed bytes, so the Admission of the other scope refuses it at the signature step), beside the check that the same message again in its own scope is a replay. (4) The reason of the code external_failed, which a hook that throws gets, is fixed text and no longer repeats the message of the throw, which can carry text of the payload; the code, the step and the event are unchanged, and the test at test/federation-admission.test.mjs:320 asserts only ok, step and code, so it stays green. (5) The text that still says per sender is brought in line: docs/FEDERATION.md (the field table row of the sequence and the paragraph after the two steps), docs/schemas/contribution-v1.json (the description of sequence), the head comment of src/engine/federation/contribution.mjs, the head comment of src/engine/federation/admission.mjs and docs/OPERATION-ENVELOPE.md (every line that says it: the SO-F-03 bullet of What other contracts add and, once pull request #381 lands, its Contributions. bullet), by edits to comments and prose only; a command criterion fails on any of the stale phrases and requires the new one in each file. Criterion 2 of SO-F-03.3 (its statement says the per-sender high-water mark) is superseded by the criterion that takes its place here, at the same position and with the same named test; every other criterion of SO-F-03.3 is carried with its statement verbatim…",
+  "provenance": {
+    "spec_sha256": "c7cdd62216353da2254cc06b3af1c57486d0126c81afdea20cbe3db6839a962d",
+    "record": "contracts/scope-one/redteam/SO-F-03.4.json",
+    "review": "interim solo review by the signer, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local",
+  "base": {
+    "sha": "2f24e942e2b80649487829ed021c1f0b78b6bccb",
+    "recorded_at": "2026-11-01T07:56:05.927Z"
+  }
+}

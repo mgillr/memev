@@ -814,7 +814,7 @@
    "criteria": 21,
    "spec": "specs/SO-F-03.4.json",
    "adapted_from": "fold of 30 Oct 2026",
-   "status": "proposed and unsigned; no red-team record; a spec delta for red-team review in pull request #374, with the red-team review of 1 Nov 2026 (rounds 1 and 2) folded in",
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); supersedes SO-F-03.3; the review of 1 Nov 2026 (rounds 1 and 2, confirmed at 81f61e3) was folded in",
    "supersedes": "SO-F-03.3",
    "supersedes_signed_contract": "k-so-f-03-3-contribution-s-0bb27e (the spec file contracts/scope-one/specs/SO-F-03.3.json is unchanged)",
    "supersedes_reason": "owner decision, 1 Nov 2026, and the red-team review of pull request #374: the replay sequence is per sender and scope, one Admission per scope. SO-F-03.3 keeps the high-water mark per sender across all scopes, in memory, read from the log once, so a second Admission over one log, bare or not, admits a sequence twice, and with one Admission per scope the answer depends on the order the Admissions were made in. SO-F-03.4 keys the mark by sender and scope (the scope is inside the signed bytes: contributionMessage, src/engine/federation/contribution.mjs line 67), makes each Admission read the log again from the record after the last one it read when the log has moved, supersedes criterion 2 of SO-F-03.3 by name (its statement said per sender), carries every other criterion verbatim with its command unpiped, and adds ten criteria (seven tests, SO-F-03.4 AC14 to AC20, and three on the text), including that an own append moves the cursor only to the very next record and that the reason of external_failed is fixed, and brings the text that said per sender in line in five files (docs/FEDERATION.md, docs/schemas/contribution-v1.json, src/engine/federation/contribution.mjs, src/engine/federation/admission.mjs, docs/OPERATION-ENVELOPE.md); the SO-F-03 tests, including the one at test/federation-admission.test.mjs:320, stay green and are not edited, and the scope is unchanged"
@@ -854,7 +854,7 @@
    "criteria": 13,
    "spec": "specs/SO-F-04A.json",
    "adapted_from": "none; written from the open follow-up rows of pull request #368",
-   "status": "proposed and unsigned; no red-team record; a spec delta for red-team review, with the owner decisions of 1 Nov 2026 and the red-team review (rounds 1 and 2) folded in"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); the owner decisions of 1 Nov 2026 and the review of 1 Nov 2026 (rounds 1 and 2) were folded in"
   },
   {
    "id": "SO-F-04B",
@@ -871,7 +871,7 @@
    "criteria": 15,
    "spec": "specs/SO-F-04B.json",
    "adapted_from": "none; written from the open follow-up rows of pull request #368",
-   "status": "proposed and unsigned; no red-team record; a spec delta for red-team review, with the owner decisions of 1 Nov 2026 and the red-team review (rounds 1 and 2) folded in"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); the owner decisions of 1 Nov 2026 and the review of 1 Nov 2026 (rounds 1 and 2) were folded in"
   },
   {
    "id": "SO-F-05",
