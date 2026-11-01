@@ -5,7 +5,7 @@
       "id": "WP13-01",
       "title": "Sharing classes enforced at the publish boundary: shared (approved state, decisions, handoffs, signed contributions, authorised knowledge) versus local-only (raw data, private memory, credentials, restricted documents)",
       "phase": "implement",
-      "owner": "lane-fed",
+      "owner": "area-fed",
       "depends_on": [
         "WP09-01",
         "WP10-01",
@@ -69,7 +69,7 @@
       "id": "WP13-02",
       "title": "Disclosure policy document: minimisation, secure aggregation, differential privacy per data class; states that redaction is not those guarantees",
       "phase": "design",
-      "owner": "lane-fed",
+      "owner": "area-fed",
       "depends_on": [
         "WP13-01"
       ],
@@ -128,7 +128,7 @@
       "id": "WP13-03",
       "title": "Site node identity, organisation membership and sovereignty policy per site",
       "phase": "implement",
-      "owner": "lane-fed",
+      "owner": "area-fed",
       "depends_on": [
         "WP09-01"
       ],
@@ -179,7 +179,7 @@
       "id": "WP13-04",
       "title": "Offline operation and reconcile on reconnect: a node keeps local authority during a partition and reconciles through acceptance",
       "phase": "implement",
-      "owner": "lane-fed",
+      "owner": "area-fed",
       "depends_on": [
         "WP13-03",
         "WP06-03",
@@ -230,7 +230,7 @@
       "id": "WP13-05",
       "title": "Intra- and inter-organisation trust: cross-organisation identity and trust-domain boundaries",
       "phase": "design",
-      "owner": "lane-fed",
+      "owner": "area-fed",
       "depends_on": [
         "WP13-03",
         "WP09-02"

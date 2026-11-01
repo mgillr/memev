@@ -19,10 +19,37 @@
       ],
       "criteria": [
         {
-          "statement": "doc exists",
+          "statement": "The three products appear in the adoption order: Operating Environment, Federation, Network",
           "verifier": {
-            "type": "file_exists",
-            "path": "docs/PORTFOLIO.md"
+            "type": "grep",
+            "file": "docs/PORTFOLIO.md",
+            "pattern": "^## Memev Operating Environment[\\s\\S]*^## Memev Federation[\\s\\S]*^## Memev Network",
+            "flags": "m"
+          }
+        },
+        {
+          "statement": "The page states the three entry stages of MV-PRD-08",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"stage 1\" \"stage 2\" \"stage 3\"; do grep -qi \"$n\" docs/PORTFOLIO.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The Federation section says federation is planned, not available",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/PORTFOLIO.md",
+            "pattern": "^## Memev Federation(?:(?!^## )[\\s\\S])*planned, not available",
+            "flags": "im"
+          }
+        },
+        {
+          "statement": "The page names no Federated tier (the owner decision of 31 Oct 2026)",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eqi 'Federated tier' docs/PORTFOLIO.md",
+            "expect_exit": 0
           }
         },
         {
@@ -58,19 +85,29 @@
       ],
       "criteria": [
         {
-          "statement": "blueprint exists",
+          "statement": "The blueprint has the ten sections of MV-PRD-06 and MV-PRD-07",
           "verifier": {
-            "type": "file_exists",
-            "path": "docs/BLUEPRINT.md"
+            "type": "command",
+            "cmd": "for n in \"Target architecture\" \"Repository mapping\" \"Missing capabilities\" \"Interfaces\" \"Licensing boundaries\" \"Build sequence\" \"Positioning\" \"First wedge\" \"Ecosystem route\" \"Integration audit\"; do grep -qi \"^## $n\" docs/BLUEPRINT.md || exit 1; done",
+            "expect_exit": 0
           }
         },
         {
-          "statement": "blueprint lists missing capabilities",
+          "statement": "The licensing boundaries section states the call-out boundary and that crdt-merge is never vendored",
           "verifier": {
             "type": "grep",
             "file": "docs/BLUEPRINT.md",
-            "pattern": "missing capabilities",
-            "flags": "i"
+            "pattern": "^## Licensing boundaries(?:(?!^## )[\\s\\S])*call-out(?:(?!^## )[\\s\\S])*never vendored",
+            "flags": "im"
+          }
+        },
+        {
+          "statement": "The integration audit covers memev, crdt-merge and converge",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/BLUEPRINT.md",
+            "pattern": "^## Integration audit(?:(?!^## )[\\s\\S])*crdt-merge(?:(?!^## )[\\s\\S])*converge",
+            "flags": "im"
           }
         },
         {

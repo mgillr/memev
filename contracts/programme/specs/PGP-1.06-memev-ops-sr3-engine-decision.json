@@ -48,6 +48,58 @@
           }
         },
         {
+          "statement": "Exactly SR-3.01 and SR-3.03 carry a superseded status in the manifest",
+          "verifier": {
+            "type": "command",
+            "cmd": "node -e 'const m=JSON.parse(require(\"fs\").readFileSync(\"contracts/seed-readiness/manifest.json\",\"utf8\"));const s=m.contracts.filter(c=>/^superseded/.test(c.status||\"\")).map(c=>c.id).sort().join();process.exit(s===\"SR-3.01,SR-3.03\"?0:1)'",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Each superseded entry gives a reason that cites ADR 6",
+          "verifier": {
+            "type": "command",
+            "cmd": "node -e 'const m=JSON.parse(require(\"fs\").readFileSync(\"contracts/seed-readiness/manifest.json\",\"utf8\"));const b=m.contracts.filter(c=>/^superseded/.test(c.status||\"\")&&!/ADR 6/.test(c.superseded_reason||\"\"));process.exit(b.length?1:0)'",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "SR-3.01 states the call-out approach",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/seed-readiness/specs/SR-3.01-engine-decision-what-merges-a.json",
+            "pattern": "call-out",
+            "flags": "i"
+          }
+        },
+        {
+          "statement": "SR-3.03 states the call-out approach",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/seed-readiness/specs/SR-3.03-the-text-merge-engine-built.json",
+            "pattern": "call-out",
+            "flags": "i"
+          }
+        },
+        {
+          "statement": "The dependency table marks SR-3.01 superseded",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/DEPENDENCIES.md",
+            "pattern": "^\\| SR-3\\.01 \\|[^\\n]*superseded 31 Oct 2026",
+            "flags": "m"
+          }
+        },
+        {
+          "statement": "The dependency table marks SR-3.03 superseded",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/DEPENDENCIES.md",
+            "pattern": "^\\| SR-3\\.03 \\|[^\\n]*superseded 31 Oct 2026",
+            "flags": "m"
+          }
+        },
+        {
           "statement": "Changes stay in scope",
           "verifier": {
             "type": "scope"
@@ -95,6 +147,38 @@
             "type": "grep",
             "file": "contracts/seed-readiness/specs/SR-3.05-one-licence-for-the-engine.json",
             "pattern": "2028-03-29"
+          }
+        },
+        {
+          "statement": "The spec cites the signed vault contract WO-05-E by id",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/seed-readiness/specs/SR-3.05-one-licence-for-the-engine.json",
+            "pattern": "WO-05-E"
+          }
+        },
+        {
+          "statement": "The spec names all four licences: the Apache-2.0 core, BSL for crdt-merge, ACFA-RS and the commercial federated services",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"Apache-2.0\" \"BSL\" \"ACFA-RS\" \"federated services\"; do grep -q \"$n\" contracts/seed-readiness/specs/SR-3.05-one-licence-for-the-engine.json || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The spec still checks the notice section that states the licences once",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/seed-readiness/specs/SR-3.05-one-licence-for-the-engine.json",
+            "pattern": "Licences, stated once"
+          }
+        },
+        {
+          "statement": "The manifest row of SR-3.05 names ACFA-RS",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/seed-readiness/manifest.json",
+            "pattern": "\"id\": \"SR-3.05\"[^}]*ACFA-RS"
           }
         },
         {

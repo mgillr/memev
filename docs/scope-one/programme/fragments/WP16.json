@@ -57,7 +57,7 @@
       "id": "WP16-02",
       "title": "Converge README: remove the claim that Mem0 'gave up' on conflict resolution; keep the technical distinction",
       "phase": "implement",
-      "owner": "lane-product",
+      "owner": "area-product",
       "depends_on": [],
       "requirements": [
         "MV-PRD-01"
@@ -116,7 +116,7 @@
       "id": "WP16-03",
       "title": "Public README, tier pages and site describe the real ambition without claiming planned federation (supersedes the wording in PR #224)",
       "phase": "implement",
-      "owner": "lane-product",
+      "owner": "area-product",
       "depends_on": [
         "WP16-01"
       ],
@@ -180,7 +180,7 @@
       "id": "WP16-04",
       "title": "Deployment model scales by topology and trust boundary, not by computer count, documented",
       "phase": "design",
-      "owner": "lane-product",
+      "owner": "area-product",
       "depends_on": [
         "WP16-01"
       ],
@@ -229,7 +229,7 @@
       "id": "WP16-05",
       "title": "Portfolio sequence: Operating Environment, Federation, Network",
       "phase": "design",
-      "owner": "lane-product",
+      "owner": "area-product",
       "depends_on": [
         "WP16-01"
       ],
@@ -278,7 +278,7 @@
       "id": "WP16-06",
       "title": "Infrastructure Strategy and Architecture Blueprint: target architecture, repository mapping, missing capabilities, interfaces, licensing boundaries, build sequence, first wedge",
       "phase": "design",
-      "owner": "lane-product",
+      "owner": "area-product",
       "depends_on": [
         "WP05-03",
         "WP17-02"
@@ -339,7 +339,7 @@
       "id": "WP16-07",
       "title": "Commercial value tracks nodes, trust domains, governance and managed services: pricing dimensions documented",
       "phase": "design",
-      "owner": "lane-product",
+      "owner": "area-product",
       "depends_on": [
         "WP16-01"
       ],

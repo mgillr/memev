@@ -5,7 +5,7 @@
       "id": "WP11-01",
       "title": "Stage 1 recall: phrase matching, alias expansion, exact id lookup, temporal filters",
       "phase": "implement",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP17-04"
       ],
@@ -67,7 +67,7 @@
       "id": "WP11-02",
       "title": "Stage 1 recall: reciprocal rank fusion, decision and accepted-fact boost, superseded and contested handling",
       "phase": "implement",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP11-01"
       ],
@@ -128,7 +128,7 @@
       "id": "WP11-03",
       "title": "Stage 2 recall: graph-aware retrieval (decisions, amendments, dependent tasks, evidence, contracts, supersessions)",
       "phase": "implement",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP11-02"
       ],
@@ -190,7 +190,7 @@
       "id": "WP11-04",
       "title": "Stage 4 recall: trust-aware ranking by knowledge status",
       "phase": "implement",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP11-03",
         "WP10-02"
@@ -252,7 +252,7 @@
       "id": "WP11-05",
       "title": "Stage 3 (local semantic retrieval) is delivered by the existing contract SR-2.01; this task only checks the interface",
       "phase": "verify",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP11-02"
       ],
@@ -300,7 +300,7 @@
       "id": "WP11-06",
       "title": "get and recall stay separate operations (regression guard)",
       "phase": "verify",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP11-01"
       ],

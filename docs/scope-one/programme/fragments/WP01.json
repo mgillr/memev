@@ -5,7 +5,7 @@
       "id": "WP01-01",
       "title": "ORSet.remove keeps observed-remove information; a stale replica cannot resurrect a removed element",
       "phase": "implement",
-      "owner": "lane-engine",
+      "owner": "area-engine",
       "depends_on": [],
       "requirements": [
         "MV-CRDT-01"
@@ -64,7 +64,7 @@
       "id": "WP01-02",
       "title": "LWWMap.get and LWWMap.value agree after merging an older delete with a newer write",
       "phase": "implement",
-      "owner": "lane-engine",
+      "owner": "area-engine",
       "depends_on": [],
       "requirements": [
         "MV-CRDT-02"
@@ -123,7 +123,7 @@
       "id": "WP01-03",
       "title": "Fact conflict policy made explicit: AgentState resolves by (timestamp, node id), ContextMerge by max confidence; document and test which wins",
       "phase": "implement",
-      "owner": "lane-engine",
+      "owner": "area-engine",
       "depends_on": [
         "WP01-01"
       ],
@@ -183,7 +183,7 @@
       "id": "WP01-04",
       "title": "TrustAgentState delete is a replicated tombstone and its merge is causal observed-remove",
       "phase": "implement",
-      "owner": "lane-engine",
+      "owner": "area-engine",
       "depends_on": [
         "WP01-01"
       ],
@@ -244,7 +244,7 @@
       "id": "WP01-05",
       "title": "Operation and contribution tags are globally unique; equal-timestamp LWW/FWW ties are order independent",
       "phase": "implement",
-      "owner": "lane-engine",
+      "owner": "area-engine",
       "depends_on": [
         "WP01-01"
       ],
@@ -352,7 +352,7 @@
       "id": "WP01-07",
       "title": "Gossip boundary note: the engine supplies state and digests; the caller supplies transport, scheduling, lifecycle",
       "phase": "design",
-      "owner": "lane-engine",
+      "owner": "area-engine",
       "depends_on": [
         "WP01-01"
       ],

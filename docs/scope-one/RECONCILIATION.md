@@ -2,7 +2,7 @@
 
 Part of the [documentation index](../README.md). Related: [DECISIONS.md](DECISIONS.md), [INVENTORY.md](INVENTORY.md), [programme decomposition](programme/README.md).
 
-Dated 31 October 2026, against main at `4823064`, which includes the Scope One work breakdown (`WBS.md` in `docs/scope-one`, with `SO-1.01` to `SO-1.11` and its test `wbs.test.mjs`) from pull request #324. This page refers to that work breakdown and to `SO-1.02` (the reconciliation contract) instead of restating them; leaf numbers below are the numbers in `WBS.md`. It does not edit `WBS.md`, any `SO-1.x` contract, any signature or any red-team record: those are owned by the lead workstream.
+Dated 31 October 2026, against main at `4823064`, which includes the Scope One work breakdown (`WBS.md` in `docs/scope-one`, with `SO-1.01` to `SO-1.11` and its test `wbs.test.mjs`) from pull request #324. This page refers to that work breakdown and to `SO-1.02` (the reconciliation contract) instead of restating them; leaf numbers below are the numbers in `WBS.md`. It does not edit `WBS.md`, any `SO-1.x` contract, any signature or any red-team record: those are owned by the signing process and the Scope One record, not by this page.
 
 ## Headline
 
@@ -45,36 +45,36 @@ A task takes the strongest class of the requirements it serves: conflicting, the
 
 ## Claim register
 
-Who writes which task, so that two workstreams do not write the same one. Owners are workstreams. A status is as of the date above.
+Who writes which task, so that two authors do not write the same one. Claims are anonymous ids: Claim A is the Scope One baseline and the signing of contracts, Claim B the programme specs and their work pull requests, Claim C the crdt-merge conformance work and the Scope One decision records, Claim D the seed-readiness and quality-loop follow-ups. A status is as of the date above.
 
-| Task id | Owner workstream | Branch or pull request | Status |
+| Task id | Claim | Branch or pull request | Status |
 | --- | --- | --- | --- |
-| Scope One `WBS.md`, `wbs.test.mjs` | Lead | memev #324, branch `wbs` | merged |
-| `SO-1.01` to `SO-1.11` contracts | Lead | memev #324 | merged, signed |
-| Contract signing and re-signing (all repositories) | Lead | `scripts/gate/redteam-gate.mjs` in memev; #319 to #323 merged | in progress |
-| Red-team records | Lead | `contracts/**/redteam/` | in progress |
-| `WP01-01` to `WP01-05` (crdt-merge correctness) | Programme | crdt-merge, branch `fix/crdt-correctness-four-bugs` #180 | in progress |
-| `WP07-01` to `WP07-04`, `WP15-01` (memev wiring, single-authority guard and licence guard; implements `SO-1.01`) | Programme | memev, branch `feat/wire-project-engine` #326 | in progress |
-| `WP17-05`, `WP16-03` and `WP15-02` for memev (this reconciliation, tiers, README, decisions) | Programme | memev, branch `docs/engine-decision-tiers-reconcile` #325 | open |
-| `WP16-02` (converge README) | Programme | converge, branch `docs/fair-mem0-comparison` #1 | open |
-| `WP16-03` (site plans) | Programme | memev-site, branch `fix/plans-match-tier-decision` #1 | open |
-| `WP05-02`, `WP15-02` for memev-ops (SR-3.01 and SR-3.03 superseded, SR-3.05) | Programme | memev-ops, branch `docs/engine-decision-sr3` #13 | open |
-| Programme contract specs (`contracts/programme`, one per work package and one per work pull request) | Programme | memev, same branch as the row above #325 | open, unsigned; signing by the Lead |
-| Baseline 8.1 (dashboard and command centre, lead-agent single authority, release and installation readiness, failure-path suite, ADR 4 and ADR 5 drafts) | Lead | `SO-1.x` contracts and `WBS.md` | agreed split |
-| Baseline 8.2 (intake to end-to-end demo, extending `SO-1.x`), with `WP08-01` to `WP08-03` | Lead | `SO-1.02` (`WP08-01`, `WP17-01`, `WP17-02`), `SO-1.04` (`WP08-02`), `SO-1.10` and `SO-1.11` (`WP08-03`) | agreed split; `PG-08.1` (programme) holds the build gaps of `WP08-02` and `WP08-03` only, trim pending fold PR |
-| Baseline 8.3 (organisational intelligence, WBS 5.3.x and 4.3.2), with `WP08-04` | Lead (baseline scope); Dev 2 workstream (decision records `SO-2.01` to `SO-2.06`, branches `feat/so-2-0X-<slug>`, active) | `SO-2.01` to `SO-2.06` | agreed split; no programme spec |
-| Baseline 8.4 except A2A, SDK and payments (WBS 5.4.4 to 5.4.8 and the non-GitHub parts of 5.4.6), 5.5.11 federated computation, 5.6.5 commercial integration services | Lead | `SO-2.07` to `SO-2.13` | agreed split |
-| Baseline 8.6 personal multi-device, business deployment, enterprise deployment, public distribution and external security assurance, with `WP16-04` | Lead | `SO-2.14` and `WBS.md` | agreed split; no programme spec |
-| `WP11-01` to `WP11-06`, `WP17-03`, `WP17-04`, `WP17-06` | Lead | `SO-1.02` and `WBS.md` | no programme spec |
-| Baseline 8.4 A2A (`WP18-01`), SDK and framework adapter (`WP18-02`), payments (`WP18-04`); 8.5 (`WP01` to `WP06`, `WP09`, `WP10`, `WP12` to `WP14`); 8.6 licensing (`WP15`), tiers and claims (`WP16`), conformance tests (`WP18-03`) | Programme | `contracts/programme` | specs proposed, work unclaimed; except the rows below for `PG-02.1`, `PG-03.1` to `PG-03.3` and `PG-12.1` |
-| `PG-02.1` (CRDT conformance gate; `WP02-01` to `WP02-04`) | Dev 2 workstream | crdt-merge, branch `feat/pg-02-1-crdt-conformance-gate` | queued after `SO-2.01` to `SO-2.06` |
-| `PG-03.1` (vectors, crdt-merge), `PG-03.2` (crdt-merge-ts), `PG-03.3` (crdt-merge-rs); one pull request per package | Dev 2 workstream | branches `feat/pg-03-1-*`, `feat/pg-03-2-*`, `feat/pg-03-3-*` | queued after `SO-2.01` to `SO-2.06` |
+| Scope One `WBS.md`, `wbs.test.mjs` | Claim A | memev #324, branch `wbs` | merged |
+| `SO-1.01` to `SO-1.11` contracts | Claim A | memev #324 | merged, signed |
+| Contract signing and re-signing (all repositories) | Claim A | `scripts/gate/redteam-gate.mjs` in memev; #319 to #323 merged | in progress |
+| Red-team records | Claim A | `contracts/**/redteam/` | in progress |
+| `WP01-01` to `WP01-05` (crdt-merge correctness) | Claim B | crdt-merge, branch `fix/crdt-correctness-four-bugs` #180 | in progress |
+| `WP07-01` to `WP07-04`, `WP15-01` (memev wiring, single-authority guard and licence guard; implements `SO-1.01`) | Claim B | memev, branch `feat/wire-project-engine` #326 | in progress |
+| `WP17-05`, `WP16-03` and `WP15-02` for memev (this reconciliation, tiers, README, decisions) | Claim B | memev, branch `docs/engine-decision-tiers-reconcile` #325 | open |
+| `WP16-02` (converge README) | Claim B | converge, branch `docs/fair-mem0-comparison` #1 | open |
+| `WP16-03` (site plans) | Claim B | memev-site, branch `fix/plans-match-tier-decision` #1 | open |
+| `WP05-02`, `WP15-02` for memev-ops (SR-3.01 and SR-3.03 superseded, SR-3.05) | Claim B | memev-ops, branch `docs/engine-decision-sr3` #13 | open |
+| Programme contract specs (`contracts/programme`, one per work package and one per work pull request) | Claim B | memev, same branch as the row above #325 | open, unsigned; signing under Claim A |
+| Baseline 8.1 (dashboard and command centre, lead-agent single authority, release and installation readiness, failure-path suite, ADR 4 and ADR 5 drafts) | Claim A | `SO-1.x` contracts and `WBS.md` | agreed split |
+| Baseline 8.2 (intake to end-to-end demo, extending `SO-1.x`), with `WP08-01` to `WP08-03` | Claim A | `SO-1.02` (`WP08-01`, `WP17-01`, `WP17-02`), `SO-1.04` (`WP08-02`), `SO-1.10` and `SO-1.11` (`WP08-03`) | agreed split; `PG-08.1` (programme) holds the build gaps of `WP08-02` and `WP08-03` only, trim pending fold PR |
+| Baseline 8.3 (organisational intelligence, WBS 5.3.x and 4.3.2), with `WP08-04` | Claim A (baseline scope); Claim C (decision records `SO-2.01` to `SO-2.06`, branches `feat/so-2-0X-<slug>`, active) | `SO-2.01` to `SO-2.06` | agreed split; no programme spec |
+| Baseline 8.4 except A2A, SDK and payments (WBS 5.4.4 to 5.4.8 and the non-GitHub parts of 5.4.6), 5.5.11 federated computation, 5.6.5 commercial integration services | Claim A | `SO-2.07` to `SO-2.13` | agreed split |
+| Baseline 8.6 personal multi-device, business deployment, enterprise deployment, public distribution and external security assurance, with `WP16-04` | Claim A | `SO-2.14` and `WBS.md` | agreed split; no programme spec |
+| `WP11-01` to `WP11-06`, `WP17-03`, `WP17-04`, `WP17-06` | Claim A | `SO-1.02` and `WBS.md` | no programme spec |
+| Baseline 8.4 A2A (`WP18-01`), SDK and framework adapter (`WP18-02`), payments (`WP18-04`); 8.5 (`WP01` to `WP06`, `WP09`, `WP10`, `WP12` to `WP14`); 8.6 licensing (`WP15`), tiers and claims (`WP16`), conformance tests (`WP18-03`) | Claim B | `contracts/programme` | specs proposed, work unclaimed; except the rows below for `PG-02.1`, `PG-03.1` to `PG-03.3` and `PG-12.1` |
+| `PG-02.1` (CRDT conformance gate; `WP02-01` to `WP02-04`) | Claim C | crdt-merge, branch `feat/pg-02-1-crdt-conformance-gate` | queued after `SO-2.01` to `SO-2.06` |
+| `PG-03.1` (vectors, crdt-merge), `PG-03.2` (crdt-merge-ts), `PG-03.3` (crdt-merge-rs); one pull request per package | Claim C | branches `feat/pg-03-1-*`, `feat/pg-03-2-*`, `feat/pg-03-3-*` | queued after `SO-2.01` to `SO-2.06` |
 | `PG-12.1` (multi-node gossip transport; `WP12-01` to `WP12-03`) | unclaimed | none | open, unclaimed |
-| Which layer to build against: the unsigned fold or the programme specs `PG-04.1`, `PG-05.1`, `PG-08.1`, `PG-09.1`, `PG-09.2`, `PG-13.1`, `PG-14.1` | lead workstream | decided: the unsigned fold is the build layer (lead workstream decision under owner delegation, 1 Nov 2026) | trim pending fold PR |
+| Which layer to build against: the unsigned fold or the programme specs `PG-04.1`, `PG-05.1`, `PG-08.1`, `PG-09.1`, `PG-09.2`, `PG-13.1`, `PG-14.1` | Owner (delegated) | decided: the unsigned fold is the build layer (owner delegation, 1 Nov 2026) | trim pending fold PR |
 | Upgrade, rollback, backup and restore, and uninstall (work breakdown 5.1.3, requirements 70 and 96) | signed vault contract `SO-R-C` | cited by id, no programme task | covered by the vault contract |
 | `SR-6.03` installers and public release | signed vault contracts `WO-02-A` and `MEM-015` | cited by id, no programme task | covered by the vault contracts |
-| `SR-0.03` tasks 1, 3 and 4 (one pull request) | Dev 3 workstream | branch `feat/sr-0-03-tasks-1-3-4` | active |
-| `QL-1.01` task 2 (the red-team gate, linked to #314) | Dev 3 workstream | branch `feat/ql-1-01-task-2` | queued after `SR-0.03` |
+| `SR-0.03` tasks 1, 3 and 4 (one pull request) | Claim D | branch `feat/sr-0-03-tasks-1-3-4` | active |
+| `QL-1.01` task 2 (the red-team gate, linked to #314) | Claim D | branch `feat/ql-1-01-task-2` | queued after `SR-0.03` |
 | Every other `WP*` task (the work itself) | unclaimed | none | not started |
 
 ## Signed vault contracts, cited by id
@@ -106,7 +106,7 @@ The owner vault holds signed contracts that already cover some programme work. T
 
 | Decision | Question | Overlaps | Status |
 | --- | --- | --- | --- |
-| Layer to build against | The unsigned fold (`SO-A-01` to `SO-A-12`, `SO-R-E`, `SO-F-01` to `SO-F-13`, cited by id only) or the programme specs | `PG-04.1`: `SO-F-03`; `PG-05.1`: `SO-F-02`, `SO-F-06`; `PG-08.1`: `SO-A-03`, `SO-A-10`; `PG-09.1`: `SO-F-01`, `SO-F-08`; `PG-09.2`: `SO-F-01`, `SO-F-08`; `PG-13.1`: `SO-F-04`, `SO-F-05`, `SO-F-07`, `SO-F-12`, `SO-F-13`; `PG-14.1`: `SO-F-13` | DECIDED: the unsigned fold is the build layer (lead workstream decision under owner delegation, 1 Nov 2026). The programme specs will cite the fold ids and keep only what the fold does not cover; trim pending fold PR (the final fold ids come in the lead's separate pull request). Nothing is trimmed yet. |
+| Layer to build against | The unsigned fold (`SO-A-01` to `SO-A-12`, `SO-R-E`, `SO-F-01` to `SO-F-13`, cited by id only) or the programme specs | `PG-04.1`: `SO-F-03`; `PG-05.1`: `SO-F-02`, `SO-F-06`; `PG-08.1`: `SO-A-03`, `SO-A-10`; `PG-09.1`: `SO-F-01`, `SO-F-08`; `PG-09.2`: `SO-F-01`, `SO-F-08`; `PG-13.1`: `SO-F-04`, `SO-F-05`, `SO-F-07`, `SO-F-12`, `SO-F-13`; `PG-14.1`: `SO-F-13` | DECIDED: the unsigned fold is the build layer (owner delegation, 1 Nov 2026). The programme specs will cite the fold ids and keep only what the fold does not cover; trim pending fold PR (the final fold ids come in the lead's separate pull request). Nothing is trimmed yet. |
 | Memory and project-state authority | Is the vault the only authority (local-first, no second database)? | all `SO-1.x`, `SO-2.x` and programme specs | PROPOSED, pending owner confirmation: recorded as ADR 7 in [DECISIONS.md](DECISIONS.md); the owner decision of 31 Oct 2026 (local-first, the cloud only a relay and a backup) is the only part decided |
 
 ## Requirement register

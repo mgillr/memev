@@ -5,7 +5,7 @@
       "id": "WP04-01",
       "title": "Envelope specification: fields, versioning, deterministic serialisation, hash rules",
       "phase": "design",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP17-03"
       ],
@@ -64,7 +64,7 @@
       "id": "WP04-02",
       "title": "Envelope module: build, canonical-serialise, hash and validate an envelope",
       "phase": "implement",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP04-01"
       ],
@@ -125,7 +125,7 @@
       "id": "WP04-03",
       "title": "Adapters: the oplog record, the bus message and project-store events convert to and from the envelope without loss",
       "phase": "implement",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP04-02"
       ],
@@ -186,7 +186,7 @@
       "id": "WP04-04",
       "title": "Envelope is reachable from the real write path (oplog append), not only from tests",
       "phase": "implement",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP04-03"
       ],

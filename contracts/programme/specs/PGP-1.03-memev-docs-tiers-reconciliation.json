@@ -136,7 +136,8 @@
           "verifier": {
             "type": "grep",
             "file": "README.md",
-            "pattern": "^## Plans and roadmap"
+            "pattern": "^## Plans and roadmap",
+            "flags": "m"
           }
         },
         {
@@ -144,7 +145,8 @@
           "verifier": {
             "type": "grep",
             "file": "README.md",
-            "pattern": "^## Licensing"
+            "pattern": "^## Licensing",
+            "flags": "m"
           }
         },
         {
@@ -190,7 +192,7 @@
       ],
       "requirements": [
         "docs/scope-one/INVENTORY.md lists the open pull requests as they are on GitHub, keeps the MEM-067 cancelled row, and no longer says 27 open draft pull requests (source: gh pr list of memev, 31 Oct 2026)",
-        "docs/scope-one/RECONCILIATION.md maps every programme requirement against docs/scope-one/WBS.md as same, missing or conflicting, with a claim register naming each workstream (source: owner request of 31 Oct 2026)",
+        "docs/scope-one/RECONCILIATION.md maps every programme requirement against docs/scope-one/WBS.md as same, missing or conflicting, with a claim register naming each claim (source: owner request of 31 Oct 2026)",
         "SO-1.02 requirement 1: \"Reconcile every Scope One branch and open PR against current `main` before commissioning overlapping work.\"; SO-1.02 requirement 2: \"Give each canonical requirement one owner, one implementation path, explicit dependencies and acceptance tests.\" (source: contract SO-1.02 T1; this task consumes the work breakdown and the reconciliation of SO-1.02 and claims no ownership of docs/scope-one/WBS.md)"
       ],
       "description": "The headline counts are generated from the requirement mapping.",
@@ -214,7 +216,8 @@
           "verifier": {
             "type": "grep",
             "file": "docs/scope-one/RECONCILIATION.md",
-            "pattern": "^## Claim register"
+            "pattern": "^## Claim register",
+            "flags": "m"
           }
         },
         {
@@ -222,7 +225,8 @@
           "verifier": {
             "type": "grep",
             "file": "docs/scope-one/RECONCILIATION.md",
-            "pattern": "^## Headline"
+            "pattern": "^## Headline",
+            "flags": "m"
           }
         },
         {

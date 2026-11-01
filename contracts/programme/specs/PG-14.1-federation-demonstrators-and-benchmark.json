@@ -2,7 +2,7 @@
   "title": "PG-14.1 Federation demonstrators and benchmark (memev)",
   "project": "memev",
   "workdir": null,
-  "request": "Programme contract for work package WP14 in memev: Federation demonstrators and benchmark. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP14.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP03-02, WP08-04, WP09-03, WP10-03, WP12-03, WP13-04. Depends on contracts: SO-2.04, SO-2.05, SO-2.06, PG-12.1. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.04 and SO-2.05: WP14-04 names the demonstrators and depends on these design records for the organisational-intelligence demonstrator; it defines no organisational-knowledge model and builds no discovery logic. Boundary with SO-2.06: the acceptance tests of the organisational-intelligence demonstrator are defined there, not in WP14-04. Build layer (lead workstream decision under owner delegation, 1 Nov 2026): the unsigned fold (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-13, cited by id only) is the build layer, and it overlaps this spec at SO-F-13. This spec will cite those ids and keep only what the fold does not cover; trim pending fold PR (the final fold ids come in the lead's separate pull request, branch contracts/scope-one-fold-build-layer). Nothing is trimmed yet. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "request": "Programme contract for work package WP14 in memev: Federation demonstrators and benchmark. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP14.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP03-02, WP08-04, WP09-03, WP10-03, WP12-03, WP13-04. Depends on contracts: SO-2.04, SO-2.05, SO-2.06, PG-12.1. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.04 and SO-2.05: WP14-04 names the demonstrators and depends on these design records for the organisational-intelligence demonstrator; it defines no organisational-knowledge model and builds no discovery logic. Boundary with SO-2.06: the acceptance tests of the organisational-intelligence demonstrator are defined there, not in WP14-04. Build layer (owner delegation, 1 Nov 2026): the unsigned fold (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-13, cited by id only) is the build layer, and it overlaps this spec at SO-F-13. This spec will cite those ids and keep only what the fold does not cover; trim pending fold PR (the final fold ids come in a separate pull request, branch contracts/scope-one-fold-build-layer). Nothing is trimmed yet. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
   "tasks": [
     {
       "id": "WP14-01",
@@ -19,7 +19,15 @@
       ],
       "criteria": [
         {
-          "statement": "demo test fails before, passes after",
+          "statement": "The demo runs the WP12-03 harness rather than building its own",
+          "verifier": {
+            "type": "grep",
+            "file": "scripts/demo-federation.mjs",
+            "pattern": "federation-harness"
+          }
+        },
+        {
+          "statement": "The demo federation tests are red on the base and green after",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/demo-federation.test.mjs",
@@ -27,11 +35,27 @@
           }
         },
         {
-          "statement": "The demo runs the WP12-03 harness rather than building its own",
+          "statement": "The 4 named tests are present: three nodes start with separate identities; concurrent agents on different nodes write during a partition; after the partition heals all three nodes hold the same state hash; the outcome verifies from its receipt on every node",
           "verifier": {
-            "type": "grep",
-            "file": "scripts/demo-federation.mjs",
-            "pattern": "federation-harness"
+            "type": "command",
+            "cmd": "for n in \"demo federation: three nodes start with separate identities\" \"demo federation: concurrent agents on different nodes write during a partition\" \"demo federation: after the partition heals all three nodes hold the same state hash\" \"demo federation: the outcome verifies from its receipt on every node\"; do grep -qF \"$n\" test/demo-federation.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The named demo federation tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^demo federation:' test/demo-federation.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The demo opens no listener of its own: transport belongs to the WP12-03 harness",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f scripts/demo-federation.mjs && ! grep -Eq \"createServer|\\.listen\\(\" scripts/demo-federation.mjs",
+            "expect_exit": 0
           }
         },
         {
@@ -68,11 +92,27 @@
       ],
       "criteria": [
         {
-          "statement": "workflow test fails before, passes after",
+          "statement": "The demo workflow tests are red on the base and green after",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/demo-workflow.test.mjs",
             "cmd": "node --test test/demo-workflow.test.mjs"
+          }
+        },
+        {
+          "statement": "The 4 named tests are present: a fact written on node A is replicated to B and C; B and C evaluate the fact independently and record their evaluation; independent work on C cites the fact and its evaluation; the outcome is accepted only with a passing verify receipt",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"demo workflow: a fact written on node A is replicated to B and C\" \"demo workflow: B and C evaluate the fact independently and record their evaluation\" \"demo workflow: independent work on C cites the fact and its evaluation\" \"demo workflow: the outcome is accepted only with a passing verify receipt\"; do grep -qF \"$n\" test/demo-workflow.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The named demo workflow tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^demo workflow:' test/demo-workflow.test.mjs",
+            "expect_exit": 0
           }
         },
         {
@@ -109,11 +149,27 @@
       ],
       "criteria": [
         {
-          "statement": "adversary test fails before, passes after",
+          "statement": "The demo adversary tests are red on the base and green after",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/demo-adversary.test.mjs",
             "cmd": "node --test test/demo-adversary.test.mjs"
+          }
+        },
+        {
+          "statement": "The 3 named tests are present: an adversarial node submits a conflicting contribution; the adversarial node is excluded and the exclusion carries evidence; the honest nodes still converge to one state hash after the exclusion",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"demo adversary: an adversarial node submits a conflicting contribution\" \"demo adversary: the adversarial node is excluded and the exclusion carries evidence\" \"demo adversary: the honest nodes still converge to one state hash after the exclusion\"; do grep -qF \"$n\" test/demo-adversary.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The named demo adversary tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^demo adversary:' test/demo-adversary.test.mjs",
+            "expect_exit": 0
           }
         },
         {
@@ -179,6 +235,40 @@
           }
         },
         {
+          "statement": "The page has one section for each of the three demonstrators",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"Autonomous project delivery\" \"Organisational intelligence\" \"Independent-site federation\"; do grep -qi \"^## $n\" docs/DEMONSTRATORS.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Each of the three sections states its acceptance on a line starting \"Acceptance:\"",
+          "verifier": {
+            "type": "command",
+            "cmd": "test \"$(grep -c \"^Acceptance:\" docs/DEMONSTRATORS.md)\" -eq 3",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The organisational intelligence section says it is accepted by SO-2.06",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/DEMONSTRATORS.md",
+            "pattern": "^## Organisational intelligence(?:(?!^## )[\\s\\S])*SO-2\\.06",
+            "flags": "im"
+          }
+        },
+        {
+          "statement": "The independent-site federation section says federation is planned",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/DEMONSTRATORS.md",
+            "pattern": "^## Independent-site federation(?:(?!^## )[\\s\\S])*planned",
+            "flags": "im"
+          }
+        },
+        {
           "statement": "Changes stay in scope",
           "verifier": {
             "type": "scope"
@@ -209,23 +299,40 @@
       "description": "Repo: memev. Numbers published with method; no claim without a measured value.",
       "scope": [
         "scripts/bench/federation.mjs",
-        "docs/BENCH-FEDERATION.md"
+        "docs/BENCH-FEDERATION.md",
+        "test/bench-federation.test.mjs"
       ],
       "criteria": [
         {
-          "statement": "bench script exists",
+          "statement": "The federation bench tests are red on the base and green after",
           "verifier": {
-            "type": "file_exists",
-            "path": "scripts/bench/federation.mjs"
+            "type": "test_red_green",
+            "test_file": "test/bench-federation.test.mjs",
+            "cmd": "node --test test/bench-federation.test.mjs"
           }
         },
         {
-          "statement": "The benchmark page states its method",
+          "statement": "The 3 named tests are present: every published number comes from a measured run and names its method; a failure scenario that was not run is reported as not run, never as zero; the report states the node count, the failure injected, the hardware and the seed",
           "verifier": {
-            "type": "grep",
-            "file": "docs/BENCH-FEDERATION.md",
-            "pattern": "method",
-            "flags": "i"
+            "type": "command",
+            "cmd": "for n in \"federation bench: every published number comes from a measured run and names its method\" \"federation bench: a failure scenario that was not run is reported as not run, never as zero\" \"federation bench: the report states the node count, the failure injected, the hardware and the seed\"; do grep -qF \"$n\" test/bench-federation.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The named federation bench tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^federation bench:' test/bench-federation.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The page has the sections Method, Failure scenarios, Results and Hardware, as docs/BENCH.md has its own method sections",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"Method\" \"Failure scenarios\" \"Results\" \"Hardware\"; do grep -qi \"^## $n\" docs/BENCH-FEDERATION.md || exit 1; done",
+            "expect_exit": 0
           }
         },
         {

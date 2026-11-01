@@ -5,7 +5,7 @@
       "id": "WP08-01",
       "title": "Refresh the Scope One requirement register (98 SO-REQ) against current main and publish the fresh counts",
       "phase": "plan",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP17-01"
       ],
@@ -56,7 +56,7 @@
       "id": "WP08-02",
       "title": "Provider-neutral execution adapter contract: discovery, session lifecycle, dispatch, checkpoint, progress, cancellation, recovery",
       "phase": "implement",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP07-03"
       ],
@@ -116,7 +116,7 @@
       "id": "WP08-03",
       "title": "Lifecycle test: intake, spec with approvals, contract and work packages, execution, verification, delivery with evidence",
       "phase": "implement",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP07-03",
         "WP10-03"
@@ -167,7 +167,7 @@
       "id": "WP08-04",
       "title": "Organisational intelligence prototype: evidence-linked cross-project dependency and conflict detection; both original plans preserved until an authorised change",
       "phase": "implement",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP10-02",
         "WP11-03"

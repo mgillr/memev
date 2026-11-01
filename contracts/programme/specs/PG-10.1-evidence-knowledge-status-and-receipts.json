@@ -19,19 +19,45 @@
       ],
       "criteria": [
         {
-          "statement": "doc exists",
+          "statement": "The page has one heading for each of the seven statuses of MV-TRU-03",
           "verifier": {
-            "type": "file_exists",
-            "path": "docs/KNOWLEDGE-STATUS.md"
+            "type": "command",
+            "cmd": "for n in \"own observation\" \"single-source claim\" \"corroborated claim\" \"verified result\" \"approved decision\" \"disputed contribution\" \"superseded fact\"; do grep -qi \"^### $n\" docs/KNOWLEDGE-STATUS.md || exit 1; done",
+            "expect_exit": 0
           }
         },
         {
-          "statement": "doc says repetition does not raise a disputed claim",
+          "statement": "The page has a transitions section",
           "verifier": {
             "type": "grep",
             "file": "docs/KNOWLEDGE-STATUS.md",
-            "pattern": "repetition",
+            "pattern": "^## Transitions",
+            "flags": "m"
+          }
+        },
+        {
+          "statement": "A sentence says repetition does not raise a disputed claim",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/KNOWLEDGE-STATUS.md",
+            "pattern": "repetition[^\\n]{0,160}disputed",
             "flags": "i"
+          }
+        },
+        {
+          "statement": "The page states the six distinctions of MV-ARCH-08",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"replicated is not verified\" \"signed is not true\" \"converged is not completed\" \"admitted is not correct\" \"trust is not access control\" \"payment receipt is not proof of delivery\"; do grep -qi \"$n\" docs/KNOWLEDGE-STATUS.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The page has no heading on retention, deletion or invalidation, which are SO-2.03",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eqi '^#+ .*(retention|deletion|invalidation)' docs/KNOWLEDGE-STATUS.md",
+            "expect_exit": 0
           }
         },
         {
@@ -71,7 +97,16 @@
       ],
       "criteria": [
         {
-          "statement": "status tests fail before, pass after",
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The knowledge status tests are red on the base and green after",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/knowledge-status.test.mjs",
@@ -79,12 +114,19 @@
           }
         },
         {
-          "statement": "suite green",
+          "statement": "The 4 named tests are present: a note carries a status and an origin that survive a reload; repetition by many agents does not raise a disputed claim; a single-source claim becomes corroborated only with an independent second source; a transition the table does not allow is refused",
           "verifier": {
             "type": "command",
-            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
-            "expect_exit": 0,
-            "timeout_s": 1800
+            "cmd": "for n in \"knowledge status: a note carries a status and an origin that survive a reload\" \"knowledge status: repetition by many agents does not raise a disputed claim\" \"knowledge status: a single-source claim becomes corroborated only with an independent second source\" \"knowledge status: a transition the table does not allow is refused\"; do grep -qF \"$n\" test/knowledge-status.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The named knowledge status tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^knowledge status:' test/knowledge-status.test.mjs",
+            "expect_exit": 0
           }
         },
         {
@@ -123,7 +165,16 @@
       ],
       "criteria": [
         {
-          "statement": "receipt-link tests fail before, pass after",
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The work receipt tests are red on the base and green after",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/work-receipt.test.mjs",
@@ -131,12 +182,27 @@
           }
         },
         {
-          "statement": "suite green",
+          "statement": "The 4 named tests are present: accepted work links to a receipt entry that names the contract, the task and the scope version; the linked receipt verifies from the vault alone, without the project store; a receipt entry altered after the link fails verification; work with no passing verify has no receipt link and is not marked accepted",
           "verifier": {
             "type": "command",
-            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
-            "expect_exit": 0,
-            "timeout_s": 1800
+            "cmd": "for n in \"work receipt: accepted work links to a receipt entry that names the contract, the task and the scope version\" \"work receipt: the linked receipt verifies from the vault alone, without the project store\" \"work receipt: a receipt entry altered after the link fails verification\" \"work receipt: work with no passing verify has no receipt link and is not marked accepted\"; do grep -qF \"$n\" test/work-receipt.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The named work receipt tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^work receipt:' test/work-receipt.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The project store adds no signing scheme: it links to the existing contract receipt and signature check",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f src/engine/project-store.mjs && ! grep -Eq \"generateKeyPair|dsseSign|createSign\" src/engine/project-store.mjs",
+            "expect_exit": 0
           }
         },
         {
@@ -174,11 +240,27 @@
       ],
       "criteria": [
         {
-          "statement": "as-of tests fail before, pass after",
+          "statement": "The as-of tests are red on the base and green after",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/as-of-query.test.mjs",
             "cmd": "node --test test/as-of-query.test.mjs"
+          }
+        },
+        {
+          "statement": "The 4 named tests are present: the answer is the version that was authoritative at the time of the work; an amendment made after the work does not change the answer; a time before the first version returns nothing, not the first version; a superseded decision is still answerable for the period it was authoritative",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"as-of: the answer is the version that was authoritative at the time of the work\" \"as-of: an amendment made after the work does not change the answer\" \"as-of: a time before the first version returns nothing, not the first version\" \"as-of: a superseded decision is still answerable for the period it was authoritative\"; do grep -qF \"$n\" test/as-of-query.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The named as-of tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^as-of:' test/as-of-query.test.mjs",
+            "expect_exit": 0
           }
         },
         {
