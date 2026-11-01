@@ -248,6 +248,7 @@ test('T1-c24: the lease is renewed from a worker thread: a main thread stuck for
   assert.equal(a.ok, true, 'the next append succeeds');
   assert.ok(readLock(lock).token, 'and the lock still carries its token');
   assert.ok(fs.readFileSync(lock).equals(bytes0));
+  assert.equal((await h.send({ cmd: 'close' })).ok, true);
   await h.stop();
   assert.ok(!fs.existsSync(path.join(dir, 'LOCK')), 'a clean close releases the lock');
 });
