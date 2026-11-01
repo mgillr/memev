@@ -929,7 +929,7 @@
    "adapted_from": "unsigned fold of 30 Oct 2026",
    "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026",
    "superseded_by": "SO-F-09.2",
-   "superseded_reason": "owner delegation, 1 Nov 2026: the lead accepted four definitions the SO-F-09 text leaves open (a stub session is an agent subject or a raw status op; a verification record may be written by a person, operator or service; 'by' is set from the resolved credential; withholding is strict: if any source is withheld the whole statement is) and SO-F-09.2 writes them in and pins them with four criteria; the scope is unchanged, because the signed scope already lists changelog.d/SO-F-09.md and docs/MODULES.md"
+   "superseded_reason": "owner delegation, 1 Nov 2026: the lead accepted four definitions the SO-F-09 text leaves open (a stub session is an agent subject or a raw status op; a verification record may be written by a person, operator or service; 'by' is set from the resolved credential, so a caller-supplied by is ignored and an agent in the personal scope resolves to an agent subject; withholding is strict, and an entity or owner with no source is hidden from a partial view) and SO-F-09.2 writes them in and pins them with criteria, marks who may adjudicate, verify and dismiss and the confirm and reject outcomes as provisional until ADR 5 and SO-A-05; the scope adds only src/engine/identity.mjs, because the signed scope already lists changelog.d/SO-F-09.md and docs/MODULES.md"
   },
   {
    "id": "SO-F-09.2",
@@ -946,13 +946,13 @@
     "SO-2.01"
    ],
    "tasks": 1,
-   "criteria": 12,
+   "criteria": 19,
    "spec": "specs/SO-F-09.2.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
    "status": "proposed and unsigned; no red-team record",
    "supersedes": "SO-F-09",
    "supersedes_signed_contract": "k-so-f-09-finding-model-fo-cbe213 (version 2; the spec file contracts/scope-one/specs/SO-F-09.json is unchanged)",
-   "supersedes_reason": "owner delegation, 1 Nov 2026: the lead accepted four definitions the SO-F-09 text leaves open (a stub session is an agent subject or a raw status op; a verification record may be written by a person, operator or service; 'by' is set from the resolved credential; withholding is strict: if any source is withheld the whole statement is) and SO-F-09.2 writes them in and pins them with four criteria; the scope is unchanged, because the signed scope already lists changelog.d/SO-F-09.md and docs/MODULES.md"
+   "supersedes_reason": "owner delegation, 1 Nov 2026: the lead accepted four definitions the SO-F-09 text leaves open (a stub session is an agent subject or a raw status op; a verification record may be written by a person, operator or service; 'by' is set from the resolved credential, so a caller-supplied by is ignored and an agent in the personal scope resolves to an agent subject; withholding is strict, and an entity or owner with no source is hidden from a partial view) and SO-F-09.2 writes them in and pins them with criteria, marks who may adjudicate, verify and dismiss and the confirm and reject outcomes as provisional until ADR 5 and SO-A-05; the scope adds only src/engine/identity.mjs, because the signed scope already lists changelog.d/SO-F-09.md and docs/MODULES.md"
   },
   {
    "id": "SO-F-13",
