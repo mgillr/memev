@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema": "memev-membership/1",
+  "title": "Federation relationship",
+  "description": "An explicit relationship between two parties: who, which scope, for what purpose, until when, revocable how, under which policy version. A party is a node and the scope it holds; a personal scope or vault is never a party and never the scope a relationship covers. One party proposes and the other accepts; a record without both acceptances is not established. Validated by validateRelationship in src/engine/federation/membership.mjs; docs/FEDERATION.md describes it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "parties", "scope", "purpose", "expires", "revocation", "policy_version"],
+  "$defs": {
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "enum": ["team", "department", "project", "programme", "portfolio", "site", "organisation"], "description": "The scope types of the identity model other than personal." },
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9._@+-]+$" }
+      }
+    }
+  },
+  "properties": {
+    "schema": { "const": "memev-membership/1" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+    "parties": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "The proposer first. The two nodes differ.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["node", "scope", "accepted_at"],
+        "properties": {
+          "node": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,128}$" },
+          "scope": { "$ref": "#/$defs/scope" },
+          "accepted_at": { "type": ["string", "null"], "format": "date-time", "description": "When the party accepted, or null while it has not." }
+        }
+      }
+    },
+    "scope": { "$ref": "#/$defs/scope" },
+    "purpose": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "expires": { "type": "string", "format": "date-time", "description": "After every acceptance." },
+    "revocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by", "revoked_at", "revoked_by"],
+      "properties": {
+        "by": { "enum": ["either_party", "proposer"], "description": "Who may revoke." },
+        "revoked_at": { "type": ["string", "null"], "format": "date-time" },
+        "revoked_by": { "type": ["string", "null"], "description": "The node that revoked; one of the two parties." }
+      }
+    },
+    "policy_version": { "type": "string", "minLength": 1, "maxLength": 64, "description": "The version of the policy document both parties accepted." }
+  }
+}
