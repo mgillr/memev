@@ -1,0 +1,167 @@
+{
+  "title": "SR-W-03A A red run whose TAP header was cut off is red only when an assertion is visible (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract SR-W-03A in memev: a red run whose TAP header was cut off is judged on its assertion (work package WP22-01). It is additive to the signed SR-0.03.3 and does not supersede it: no criterion of SR-0.03.3 changes, and the one file it changes is src/engine/contracts.mjs, which the scope of T3 of SR-0.03.3 already names. Proposed and unsigned; the signer signs it after the red-team gate. The id is in the style of SO-W-08B: its second part starts with a letter, so the redteam gate's specIdOf reads the whole name and the contract has its own record path; the work package number 22 is not in docs/scope-one/programme/fragments. Why: the red stage of Vault.contractVerify calls notAnAssertion (src/engine/contracts.mjs, about lines 160 to 167 at the base), which returns null when the output has no 'TAP version' line. A criterion command that cuts the output with a tail or a head removes that line, so its red run counts as red even when it was a load error. SR-0.03.3 says a load error or a type error is BLOCKED (T3 criteria 3, 7 and 10) and that the red half must fail on an assertion (T3 criterion 13). A read-only replay of every red run of the signed criteria at main commit 5903c27 found 54 criteria whose red output had no header and whose exit was not 0: 45 load errors, 1 failure that was not an assertion, 3 silent runs and 5 genuine assertion failures. What changes (every other path of contractVerify stays as it is): (1) output with a 'TAP version' line is judged as today. (2) Output with no such line whose body is TAP-shaped (a line 1..N, a line '# tests N', '# pass N' or '# fail N', or a line 'ok N - ' or 'not ok N - ', each possibly indented) counts as red only when code: 'ERR_ASSERTION' or name: 'AssertionError' is visible in it, and is otherwise BLOCKED with a detail that says the TAP output has no header and shows no failing assertion, so the failure cannot be judged. (3) Output with no such line that is not TAP-shaped (pytest, cargo, jest, plain shell, nothing at all) is judged exactly as today. Boundaries: (a) the literal rule 'no header means BLOCKED' is not asked for: it broke test/contracts-worktree-concurrent.test.mjs and test/contracts-worktree-lifecycle.test.mjs, whose red commands are plain shell, and 17 signed pytest, cargo and jest criteria. (b) A red run that prints nothing is not made BLOCKED here: a rule keyed to the text of the command (node --test) also catches the red command of those two tests, which ends in node --test {test} after a silent exit, and 3 signed criteria of QL-1.01 (T2 criteria 11 to 13); it is an open follow-up in docs/scope-one/RECONCILIATION.md. (c) Recording a base at signing is the separate contract QL-W-01A. (d) Removing the tail from the commands of existing specs belongs to each spec's author. Base revision: ba24c82e16c91f5962f20d49b396d46054a505da, the memev main commit that merged pull request #358; it is the commit the red runs of this contract are judged at, and the signer drafts with --workdir at the checkout top level and --base this commit (criterion 10 pins it). No production caller beyond verify itself: this is engine code that Vault.contractVerify already calls; no export is added. The tests reach the evaluator only through Vault.contractVerify; if an export is added anyway, the test imports it with import() inside the test body, so a missing export fails on an assertion and not at load. Depends on contracts: SR-0.03.3 (signed). Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository; tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier. Nothing in this contract decides ADR 3, ADR 5, ADR 7 or SO-A-05.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "A red run whose TAP header was cut off is red only when an assertion is visible, and every other kind of output is judged as before",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "notAnAssertion(out) keeps its result for any output that has a line starting TAP version: a visible code: 'ERR_ASSERTION' or name: 'AssertionError' is red, a load error (ERR_MODULE_NOT_FOUND, SyntaxError, Cannot find module, does not provide an export named) is BLOCKED as 'load error', any other named error before an assertion is BLOCKED naming it (source: src/engine/contracts.mjs, notAnAssertion at the base)",
+        "for output with no TAP version line whose body is TAP-shaped (a line matching 1..N, a line '# tests N', '# pass N' or '# fail N', or a line 'ok N - ' or 'not ok N - ', each possibly indented), notAnAssertion returns null (red) only when code: 'ERR_ASSERTION' or name: 'AssertionError' is visible, and otherwise returns a reason saying that the TAP output has no header and shows no failing assertion, so the failure cannot be judged; verify then gives BLOCKED with the detail 'the red run did not fail on an assertion (<reason>); red exit N, green exit M, base <sha>' (source: SR-0.03.3 T3 criteria 3, 7, 10 and 13)",
+        "for output with no TAP version line that is not TAP-shaped (the output of pytest, cargo, jest, a plain shell command, or nothing), notAnAssertion returns null exactly as at the base, so such a red run is judged by its exit code alone as before",
+        "nothing else changes: the exit, timeout, size and exit-127 handling of the red and green runs, the green stage, passingLine, runCriterion and the NODE_OPTIONS handling, the scope and metric verifiers, and the output of the red-team gate; no export is added",
+        "the new test file reaches the engine only through Vault.contractVerify, and each red-green criterion of this task runs only its own subtest, whose name starts with T1-cNN: (NN is the criterion's position in this task, so T1-c01: for the first) (source: the convention of SR-0.03.3 T1 requirement 8)"
+      ],
+      "description": "Repo: memev. Depends on nothing that is not on main: SR-0.03.3 is signed and its red-green verifier is in src/engine/contracts.mjs at the base. A change of the red stage of the evaluator only; it adds no export and no caller. The fixtures are plain git repositories built by test/helpers/redgreen.mjs; the cut-header cases use a criterion command that drops the first line of a node --test TAP run, and the body-shape cases use a command that prints a canned output committed at the base and exits 1, and prints a passing line once the head's marker file exists.",
+      "scope": [
+        "src/engine/contracts.mjs",
+        "test/contracts-cut-header.test.mjs",
+        "changelog.d/SR-W-03A.md"
+      ],
+      "criteria": [
+        {
+          "statement": "A TAP run whose header was cut (a command that keeps its exit code and drops the first line) is BLOCKED, with a detail that says the red run did not fail on an assertion and that the TAP output has no header, when the base run failed on a missing module and when it failed on a syntax error; the same cut run is PASS with the detail 'red exit 1, green exit 0, base <sha>' when it failed on an assertion. The test fails before the change (the load-error cases are PASS) on an assertion, not on a load error, and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-cut-header.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/contracts-cut-header.test.mjs"
+          }
+        },
+        {
+          "statement": "Output with no header and a TAP body is BLOCKED (same detail) when it holds only a plan (1..1), only count lines (# tests 1, # pass 0, # fail 1), only a not ok line, or only an indented not ok line, and is PASS when the same body also shows code: 'ERR_ASSERTION' or name: 'AssertionError'; a tail that cut off the assertion as well, leaving only the count lines, is BLOCKED. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-cut-header.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c02:' test/contracts-cut-header.test.mjs"
+          }
+        },
+        {
+          "statement": "Output that is not TAP is judged as before: a pytest-like, a cargo-like, a jest-like and a plain shell red output, with text and with none, each give PASS with the detail 'red exit 1, green exit 0, base <sha>'; and a TAP run that kept its header is unchanged (a load error is BLOCKED with 'load error', an assertion is PASS). This holds before and after the change",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/contracts-cut-header.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "test/contracts-worktree-concurrent.test.mjs and test/contracts-worktree-lifecycle.test.mjs, whose red commands are plain shell, stay green",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/contracts-worktree-concurrent.test.mjs test/contracts-worktree-lifecycle.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The red-green, scope, base and gate tests of the evaluator stay green",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/contracts-redgreen.test.mjs test/contracts-redgreen-spurious.test.mjs test/contracts-redgreen-wrongred.test.mjs test/contracts-redgreen-wrongred2.test.mjs test/contracts-redgreen-green.test.mjs test/contracts-redgreen-paths.test.mjs test/contracts-base.test.mjs test/contracts-base-legacy.test.mjs test/contracts-gates.test.mjs test/redteam-gate.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "The gate --report is byte-identical with and without the change: run on the same contracts tree, once with src, scripts and vendor as they are and once with them restored from the base, the two outputs do not differ",
+          "verifier": {
+            "type": "command",
+            "cmd": "h=$(mktemp -d) && b=$(mktemp -d) && git worktree add -q --detach \"$h\" HEAD && git worktree add -q --detach \"$b\" HEAD && git -C \"$b\" checkout -q \"$MEMEV_CONTRACT_BASE\" -- src scripts vendor && (cd \"$h\" && node scripts/gate/redteam-gate.mjs --report > \"$h.out\" 2>&1); (cd \"$b\" && node scripts/gate/redteam-gate.mjs --report > \"$b.out\" 2>&1); diff \"$h.out\" \"$b.out\"; rc=$?; git worktree remove --force \"$h\"; git worktree remove --force \"$b\"; exit $rc",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "One full run of test/contracts-cut-header.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03) with nothing skipped and nothing todo, and prints its whole output.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/contracts-cut-header.test.mjs > \"$f\" 2>&1; rc=$?; cat \"$f\"; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c01:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c02:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c03:' \"$f\"",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "src/engine/contracts.mjs says in a comment that output with no header is judged on a visible assertion when its body is TAP-shaped",
+          "verifier": {
+            "type": "grep",
+            "file": "src/engine/contracts.mjs",
+            "pattern": "no header|header was cut|cut off"
+          }
+        },
+        {
+          "statement": "The change adds no export and touches no other file of src, scripts or vendor, and the test file has no static import of the engine",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git diff \"$MEMEV_CONTRACT_BASE\" HEAD -- src/engine/contracts.mjs | grep -E '^\\+export ')\" && test -z \"$(git diff --name-only \"$MEMEV_CONTRACT_BASE\" HEAD -- src scripts vendor | grep -vx src/engine/contracts.mjs)\" && ! grep -Eq \"^import .*src/engine\" test/contracts-cut-header.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "This contract is drafted with the memev checkout as its workdir and a pinned base. The workdir is the checkout top level (git rev-parse --show-toplevel equals the working directory). The base is ba24c82e16c91f5962f20d49b396d46054a505da, the memev main commit that merged pull request #358 (SO-F-03), the commit the red runs are judged at.",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$MEMEV_CONTRACT_BASE\" = ba24c82e16c91f5962f20d49b396d46054a505da ] && [ \"$(git rev-parse --show-toplevel)\" = \"$(pwd -P)\" ]",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The leak scan passes on files",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The leak scan passes on every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing.",
+        "Anything outside the requirements of this task is not built, not stubbed and not defaulted in code; if the work seems to need it, stop and report what it needs.",
+        "A test_red_green command of this contract prints its whole output: it is never piped through tail or head, and never captures its output without printing it."
+      ]
+    }
+  ]
+}
