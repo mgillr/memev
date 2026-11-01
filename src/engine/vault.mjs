@@ -579,6 +579,16 @@ export class Vault extends EventEmitter {
     return this.coordinator(id).status(id, { history });
   }
 
+  /** A read-only view of one project for `memev work impact`: a frozen object whose only function reads a kind of record and returns
+   *  a copy. It carries no write method and does not hand out the store. Null for a project with no store. */
+  tasksReader(identity, project) {
+    this._need(identity, 'read', null);
+    const id = this._projectId(project);
+    if (!fs.existsSync(path.join(this.root, STATE, 'projects', id, 'events.jsonl'))) return null;
+    const st = this.projectStore(id);
+    return Object.freeze({ snapshot: (kind) => structuredClone(st.snapshot(kind)) });
+  }
+
   /** Record one turn of a session (continuous recording). */
   journal(identity, { session, client = null, role = 'user', text, project = null }) {
     if (!this.config.journal?.enabled) return { skipped: true };
