@@ -22,10 +22,14 @@
 // its scope and time context and a confidence (see docs/ORGANISATIONAL-INTELLIGENCE.md). Evidence alone
 // takes it no further than theory; fact needs a person's adjudication or a passing verification record.
 // Raising, dismissing, correcting, adjudicating and verifying a finding are operations in the same log.
-// A reader is shown a finding only as far as the scope of each source lets them read it.
+// A reader is shown a finding only as far as the scope of each source lets them read, and a partial view withholds
+// everything drawn from the whole of the sources (the statement, id, status, confidence, context).
+// Who acted comes from a credential: Graph.readerFor resolves one (identity.mjs) into a reader that only this module can
+// make, and bindFinding and bindEvent set `by` from it and ignore any value the caller passes. The log is replayed as
+// written, so a record that did not come through them is as trusted as the log file itself.
 import { slug, truncate } from './util.mjs';
 import { sections, own } from './index.mjs';
-import { SUBJECT_TYPES, validateScope, authorizeScope } from './identity.mjs';
+import { SUBJECT_TYPES, OWNER_SUBJECT, validateScope, authorizeScope, resolveRequest, resolveBinding } from './identity.mjs';
 
 const noisyOr = (xs) => 1 - xs.reduce((p, x) => p * (1 - Math.max(0, Math.min(1, x))), 1);
 export const FINDING_EVENTS = Object.freeze(['claim.finding.dismiss', 'claim.finding.correct', 'claim.finding.adjudicate', 'claim.finding.verify']);
@@ -36,7 +40,13 @@ const subjectType = (id) => (typeof id === 'string' && SUBJECT_RE.test(id) ? id.
 const isTime = (t) => typeof t === 'string' && /^\d{4}-\d\d-\d\d/.test(t) && !Number.isNaN(Date.parse(t));
 const isText = (t, max) => typeof t === 'string' && t.length > 0 && t.length <= max;
 const CORRECTABLE = ['subject', 'predicate', 'object', 'confidence', 'context', 'entities', 'owners'];
+// Provisional (ADR 5, the permission matrix, is open): who may adjudicate, verify, correct and dismiss is what is written here and
+// nothing more. An adjudication counts from a person, a verification from a person, an operator or a service (the service and
+// operator subjects cannot be issued yet), and a dismissal or a correction from any subject. The confirm and reject outcomes
+// are provisional too: they stand in for the seven decision states of SO-A-05 and SO-1.08, which are not in code yet.
 const VERIFIER_TYPES = ['person', 'operator', 'service'];
+// the readers this module has made: a reader is a credential resolved here, never an object a caller built
+const READERS = new WeakSet();
 export const EDGE_TYPES = ['related', 'causes', 'depends_on', 'contradicts', 'derived_from', 'part_of', 'supersedes'];
 
 /** Entities named in a section: [[wikilinks]], Project: lines, #tags, `code names`, Capitalised Multi Words. */
@@ -133,10 +143,14 @@ export class Graph {
     const out = { status, support: Number(sup.toFixed(3)), opposition: Number(opp.toFixed(3)), speculation: Number(spec.toFixed(3)), sources };
     if (!c.finding) return out;
     // a finding: evidence alone stops at theory; a person's confirmation or a passing verification makes it a fact,
-    // a person's rejection refutes it, and the latest effective decision stands
+    // a person's rejection refutes it, and the latest effective decision stands. A verification never replaces a person's
+    // decision (_decide). A decision stands over the evidence, and says so in `overridden` when the evidence pointed the
+    // other way (provisional until the knowledge status lattice of PG-10.1 lands): a confirmation over contested or
+    // refuted evidence, or a rejection over evidence strong enough for a fact.
     const decision = c.finding.decision;
     if (decision?.outcome === 'confirm') out.status = 'fact';
     else if (decision?.outcome === 'reject') out.status = 'refuted';
+    if ((decision?.outcome === 'confirm' && (status === 'contested' || status === 'refuted')) || (decision?.outcome === 'reject' && status === 'fact')) out.overridden = status;
     out.capped = !decision && status === 'fact';
     if (out.capped) out.status = 'theory';
     return out;
@@ -185,16 +199,26 @@ export class Graph {
     return Graph._findingParts({ entities: [], owners: [], ...d }, errs, ['subject', 'predicate', 'object', 'confidence', 'context', 'entities', 'owners']);
   }
 
-  /** The key two findings share when they rest on the same sources at the same versions. */
-  static findingKey(sources) { return [...new Set((sources || []).map((s) => `${s.event}@${s.version}`))].sort().join('|'); }
+  /**
+   * The key two findings share when they rest on the same sources at the same versions in the same scopes: the finding's scope,
+   * and for each source its scope (the finding's own when it names none), event and version, as a set.
+   */
+  static findingKey(sources, scope) {
+    const at = (x) => (x && typeof x.type === 'string' && typeof x.id === 'string' ? `${x.type}:${x.id}` : '');
+    return JSON.stringify([at(scope), [...new Set((sources || []).map((s) => `${at(s.scope ?? scope)}/${s.event}@${s.version}`))].sort()]);
+  }
 
-  /** Whether a finding may be raised: its shape, a free id, and no dismissed finding on the same sources and versions. */
+  /**
+   * Whether a finding may be raised: its shape, a free id, and no dismissed finding on the same sources and versions in the same
+   * scope. A dismissal is permanent for that key and any subject can make one (provisional, ADR 5): only a new version of a source,
+   * another source or another scope raises it again. The refusal says that a dismissal exists and not which finding it was.
+   */
   admitFinding(d) {
     const errors = Graph.validateFinding(d);
     if (errors.length) return { ok: false, code: 'invalid', errors };
     if (this.claims.has(d.id)) return { ok: false, code: 'exists', errors: [`${d.id} is already a claim`] };
-    const key = Graph.findingKey(d.sources);
-    for (const c of this.claims.values()) if (c.finding?.dismissed && c.finding.key === key) return { ok: false, code: 'dismissed', of: c.id, errors: ['a finding on these sources and versions was dismissed'] };
+    const key = Graph.findingKey(d.sources, d.scope);
+    for (const c of this.claims.values()) if (c.finding?.dismissed && c.finding.key === key) return { ok: false, code: 'dismissed', errors: ['a finding on these sources and versions was dismissed in this scope'] };
     return { ok: true };
   }
 
@@ -205,7 +229,7 @@ export class Graph {
     const c = {
       id: d.id, subject: d.subject, predicate: d.predicate, object: d.object ?? null, evidence: [], status: null, history: [], created: rec.ts, seq: rec.seq,
       finding: {
-        key: Graph.findingKey(d.sources),
+        key: Graph.findingKey(d.sources, d.scope),
         sources: d.sources.map((s) => ({ event: s.event, version: s.version, scope: s.scope ? { type: s.scope.type, id: s.scope.id } : { ...scope }, path: s.path ?? null, excerpt: s.excerpt ?? null })),
         entities: d.entities.map((e) => ({ id: e.id, source: e.source ?? null })),
         owners: d.owners.map((o) => ({ subject: o.subject, source: o.source ?? null })),
@@ -234,6 +258,7 @@ export class Graph {
     if (type === 'claim.finding.verify') {
       const r = d.record;
       if (!r || r.kind !== 'outcome.verified' || typeof r.event !== 'string' || !EVENT_ID.test(r.event) || !['pass', 'fail'].includes(r.result)) errors.push('record must be an outcome.verified record naming its event and a pass or fail result');
+      else if (this.claims.get(d.id)?.finding && !this.claims.get(d.id).finding.sources.some((s) => s.event === r.event)) errors.push('record.event must be one of the source events the finding rests on');
     }
     if (type === 'claim.finding.correct') {
       const ch = d.changes;
@@ -272,7 +297,8 @@ export class Graph {
       if (entry.effective) f.decision = { kind: 'adjudicate', outcome: d.outcome, by: d.by, seq: rec.seq };
     } else {
       entry.record = { kind: d.record.kind, event: d.record.event, result: d.record.result };
-      entry.effective = d.record.result === 'pass' && VERIFIER_TYPES.includes(subjectType(d.by));
+      // a verification is recorded but never replaces a person's standing decision: only a person can change that
+      entry.effective = d.record.result === 'pass' && VERIFIER_TYPES.includes(subjectType(d.by)) && f.decision?.kind !== 'adjudicate';
       if (entry.effective) f.decision = { kind: 'verify', outcome: 'confirm', by: d.by, seq: rec.seq };
     }
     f.history.push(entry);
@@ -280,37 +306,110 @@ export class Graph {
   }
 
   /**
-   * One finding as `reader` may see it, or null when the reader's scope does not reach the finding's scope (or the id names no finding).
-   * `reader` is what resolveRequest returns. A source is shown only when the reader may read its scope; when any source is withheld the
-   * statement, the correction text and every entity or owner drawn from a withheld source are withheld too, and only a count remains.
+   * Resolve a credential into a reader, and a reader only comes from here: viewFinding, listFindings, bindFinding and bindEvent refuse any
+   * other object. `identity` is what tokens.verify returned for a request that is already verified, and `binding` is a role binding
+   * that agentid-bind.mjs verified ({ role, principal, key }, with `scope` for the scope it was issued for). Both go through
+   * resolveRequest or resolveBinding (identity.mjs), and `target` holds the credential's scope against the scope it reaches for.
+   * resolveRequest maps every token with no identity scope to the owner subject, an agent's included, so a token of that kind does not
+   * become a person here: it is the agent subject named by the token, which an adjudication from does nothing. A person subject comes only
+   * from an organisational credential that names one. Returns the reader, or { ok: false, code, reason }.
+   */
+  static readerFor({ identity, binding, scope, target } = {}) {
+    if ((identity === undefined) === (binding === undefined)) return { ok: false, code: 'no_identity', reason: 'give a verified token identity or a verified role binding, one of them' };
+    let r; let subject;
+    if (binding !== undefined) {
+      r = resolveBinding(binding, { ...(scope ? { scope } : {}), ...(target !== undefined ? { target } : {}) });
+      if (!r.ok) return r;
+      subject = r.subject;
+    } else {
+      r = resolveRequest(identity, { target });
+      if (!r.ok) return r;
+      subject = r.subject;
+      const named = identity.identity_scope;
+      if (named === undefined || named === null || named.type === 'personal') {
+        const id = `agent:${identity.agent ?? ''}`;
+        if (!subjectType(id)) return { ok: false, code: 'no_subject', reason: 'a personal-scope credential acts as the agent it names, and this one names none' };
+        subject = { id, type: 'agent', owner: OWNER_SUBJECT.id };
+      }
+    }
+    const reader = Object.freeze({ ok: true, subject: Object.freeze({ ...subject }), scope: Object.freeze({ ...r.scope }), credential: r.credential ?? null });
+    READERS.add(reader);
+    return reader;
+  }
+
+  /**
+   * The operation that raises a finding, for a writer to append: `by` is the reader's subject and any `by` in `fields` is replaced. The
+   * reader's scope must be the finding's scope. The scopes of the sources are what the raiser declares, and they are held against a reader
+   * only when it is shown. Returns { ok: true, type, data } or { ok: false, code, errors }.
+   */
+  bindFinding(reader, fields) {
+    if (!READERS.has(reader)) return { ok: false, code: 'no_credential', errors: ['a finding is raised with a reader made by Graph.readerFor'] };
+    const d = { ...(fields && typeof fields === 'object' ? fields : {}), by: reader.subject.id };
+    if (!validateScope(d.scope).length && !authorizeScope(reader.scope, d.scope).ok) return { ok: false, code: 'scope_mismatch', errors: ['the credential does not reach the scope of this finding'] };
+    const r = this.admitFinding(d);
+    return r.ok ? { ok: true, type: 'claim.finding', data: d } : r;
+  }
+
+  /**
+   * The operation that dismisses, corrects, adjudicates or verifies a finding, for a writer to append: `by` is the reader's subject and any
+   * `by` in `fields` is replaced. A finding the credential does not reach is reported as not found, the same as a missing one.
+   * Returns { ok: true, type, data } or { ok: false, code, errors }.
+   */
+  bindEvent(reader, type, fields) {
+    if (!READERS.has(reader)) return { ok: false, code: 'no_credential', errors: ['a finding event is made with a reader made by Graph.readerFor'] };
+    const d = { ...(fields && typeof fields === 'object' ? fields : {}), by: reader.subject.id };
+    const c = typeof d.id === 'string' ? this.claims.get(d.id) : null;
+    if (c?.finding && !authorizeScope(reader.scope, c.finding.scope).ok) return { ok: false, code: 'not_found', errors: [`no finding ${d.id.slice(0, 64)}`] };
+    const r = this.checkFindingEvent(type, d);
+    return r.ok ? { ok: true, type, data: d } : r;
+  }
+
+  /**
+   * One finding as `reader` may see it, or null when the reader is not one made by readerFor, its scope does not reach the finding's scope,
+   * or the id names no finding. A source is shown only when the reader may read its scope. When every source is readable the view is whole.
+   * When any is withheld it is a partial view and fails closed: the id (which the raiser chose and may describe the statement), the
+   * statement, status, capped and overridden flags, confidence, time context and dismissed flag are all null, and the history keeps only the
+   * kind and time of each entry. What is left is the finding's scope, the readable sources, how many are withheld, and the entities and
+   * owners drawn from readable sources. An entity or owner tied to the finding as a whole (no source) counts as drawn from all of them.
    */
   viewFinding(id, reader) {
     const c = this.claims.get(id);
-    if (!c?.finding || !reader || reader.ok !== true || !authorizeScope(reader.scope, c.finding.scope).ok) return null;
+    if (!c?.finding || !READERS.has(reader) || !authorizeScope(reader.scope, c.finding.scope).ok) return null;
     const f = c.finding;
     const readable = f.sources.map((s) => authorizeScope(reader.scope, s.scope).ok);
     const full = readable.every(Boolean);
     const shown = (src) => (src === null ? full : readable[src]);
-    const a = Graph.assess(c);
-    return {
-      id: c.id, status: a.status, capped: a.capped, confidence: f.confidence, scope: { ...f.scope }, context: { ...f.context }, dismissed: !!f.dismissed,
-      withheld: !full,
-      statement: full ? { subject: c.subject, predicate: c.predicate, object: c.object } : null,
+    const common = {
+      scope: { ...f.scope },
       sources: f.sources.filter((_, i) => readable[i]).map((s) => ({ event: s.event, version: s.version, scope: { ...s.scope }, path: s.path, excerpt: s.excerpt })),
       hidden_sources: readable.filter((r) => !r).length,
       entities: f.entities.filter((e) => shown(e.source)).map((e) => ({ id: e.id })),
       owners: f.owners.filter((o) => shown(o.source)).map((o) => ({ subject: o.subject })),
-      history: f.history.map((h) => (full ? JSON.parse(JSON.stringify(h)) : { kind: h.kind, by: h.by, seq: h.seq, ts: h.ts, effective: h.effective })),
+    };
+    if (!full) {
+      return { id: null, status: null, capped: null, overridden: null, confidence: null, context: null, dismissed: null, withheld: true, statement: null, ...common, history: f.history.map((h) => ({ kind: h.kind, seq: h.seq, ts: h.ts })) };
+    }
+    const a = Graph.assess(c);
+    return {
+      id: c.id, status: a.status, capped: a.capped, overridden: a.overridden ?? null, confidence: f.confidence, context: { ...f.context }, dismissed: !!f.dismissed,
+      withheld: false, statement: { subject: c.subject, predicate: c.predicate, object: c.object }, ...common,
+      history: f.history.map((h) => JSON.parse(JSON.stringify(h))),
     };
   }
 
-  /** The findings `reader` may reach, oldest first, each as viewFinding shows it. Dismissed findings are left out unless asked for. */
+  /**
+   * The findings `reader` may reach, oldest first, each as viewFinding shows it. Dismissed findings are left out unless asked for, and
+   * `status` selects findings by status; both apply only to whole views, because a partial view does not show a status or a dismissal
+   * and a filter would give them away. A partial view is therefore listed whatever the filter.
+   */
   listFindings(reader, { includeDismissed = false, status = null } = {}) {
     const out = [];
     for (const c of this.claims.values()) {
-      if (!c.finding || (c.finding.dismissed && !includeDismissed) || (status && c.status !== status)) continue;
+      if (!c.finding) continue;
       const v = this.viewFinding(c.id, reader);
-      if (v) out.push(v);
+      if (!v) continue;
+      if (!v.withheld && ((c.finding.dismissed && !includeDismissed) || (status && c.status !== status))) continue;
+      out.push(v);
     }
     return out;
   }

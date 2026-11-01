@@ -5,7 +5,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as graphModule from '../src/engine/graph.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
 import { resolveRequest } from '../src/engine/identity.mjs';
+import { PKG } from './helpers/tmp.mjs';
 
 const { Graph } = graphModule;
 const FINDING_EVENTS = graphModule.FINDING_EVENTS || [];
@@ -96,12 +99,12 @@ test('SO-F-09 AC01: a stub session cannot promote a finding by status op, adjudi
   assert.equal(g.claims.get('f_one').status, 'theory');
   // the session adjudicates and verifies under its own agent subject
   g.applyOp(op('claim.finding.adjudicate', { id: 'f_one', by: SESSION, outcome: 'confirm', why: 'looks right' }));
-  g.applyOp(op('claim.finding.verify', { id: 'f_one', by: SESSION, record: { kind: 'outcome.verified', event: 'evt-900', result: 'pass' } }));
+  g.applyOp(op('claim.finding.verify', { id: 'f_one', by: SESSION, record: { kind: 'outcome.verified', event: 'evt-101', result: 'pass' } }));
   assert.equal(status(g, 'f_one'), 'theory');
   const hist = g.claims.get('f_one').finding.history;
   assert.deepEqual(hist.map((h) => [h.kind, h.effective]), [['adjudicate', false], ['verify', false]], 'both are recorded and neither takes effect');
   // a verification that did not pass is not a verification
-  g.applyOp(op('claim.finding.verify', { id: 'f_one', by: VERIFIER, record: { kind: 'outcome.verified', event: 'evt-901', result: 'fail' } }));
+  g.applyOp(op('claim.finding.verify', { id: 'f_one', by: VERIFIER, record: { kind: 'outcome.verified', event: 'evt-101', result: 'fail' } }));
   assert.equal(status(g, 'f_one'), 'theory');
 });
 
@@ -113,7 +116,7 @@ test('SO-F-09 AC01: a person\'s adjudication or a passing verification record pr
   assert.equal(g.claims.get('f_one').status, 'fact');
   assert.equal(g.claims.get('f_one').history.at(-1).to, 'fact');
   const h = make({ id: 'f_two' });
-  h.applyOp(op('claim.finding.verify', { id: 'f_two', by: VERIFIER, record: { kind: 'outcome.verified', event: 'evt-902', result: 'pass' } }));
+  h.applyOp(op('claim.finding.verify', { id: 'f_two', by: VERIFIER, record: { kind: 'outcome.verified', event: 'evt-101', result: 'pass' } }));
   assert.equal(status(h, 'f_two'), 'fact');
   const r = make({ id: 'f_three' });
   r.applyOp(op('claim.finding.adjudicate', { id: 'f_three', by: PERSON, outcome: 'reject', why: 'not so' }));
@@ -170,7 +173,7 @@ test('SO-F-09 AC02: a dismissed finding does not recur for the same sources and 
   const r = g.admitFinding(same);
   assert.equal(r.ok, false);
   assert.equal(r.code, 'dismissed');
-  assert.equal(r.of, 'f_one');
+  assert.ok(!('of' in r));
   g.applyOp(op('claim.finding', same));
   assert.equal(g.claims.has('f_again'), false, 'the graph does not take it back in on replay either');
   // the source set is compared as a set
@@ -211,7 +214,7 @@ test('SO-F-09 AC02: a dismissed finding is out of the default listing and stays 
   const g = make();
   g.applyOp(op('claim.finding', finding({ id: 'f_keep', sources: [{ event: 'evt-200', version: 1, scope: TEAM_A }] })));
   g.applyOp(op('claim.finding.dismiss', { id: 'f_one', by: PERSON, why: 'noise' }));
-  const reader = { ok: true, subject: { id: PERSON, type: 'person' }, scope: TEAM_A };
+  const reader = readerFor(TEAM_A);
   assert.deepEqual(g.listFindings(reader).map((f) => f.id), ['f_keep']);
   assert.deepEqual(g.listFindings(reader, { includeDismissed: true }).map((f) => f.id).sort(), ['f_keep', 'f_one']);
   assert.ok(g.claims.has('f_one'));
@@ -229,7 +232,9 @@ const mixed = (over = {}) => make({
   owners: [{ subject: 'person:lead', source: 0 }, { subject: 'person:hr-head', source: 1 }],
   ...over,
 });
-const readerFor = (scope) => ({ ok: true, subject: { id: 'person:reader', type: 'person' }, scope });
+// a reader is a credential resolved by the graph: an organisational token that names its subject, held against the scope it reaches for
+const tokenFor = (scope, subject = { id: 'person:reader', type: 'person', owner: 'person:reader' }) => ({ id: 'tok1', agent: 'reader-app', identity_scope: scope, subject });
+const readerFor = (scope) => Graph.readerFor({ identity: tokenFor(scope), target: scope });
 
 test('SO-F-09 AC03: a finding shown to a subject without permission names neither the record nor its content', () => {
   const g = mixed();
@@ -267,7 +272,8 @@ test('SO-F-09 AC03: a listing leaves out findings in scopes the reader cannot re
   const g = mixed();
   g.applyOp(op('claim.finding', finding({ id: 'f_b', scope: TEAM_B, sources: [{ event: 'evt-b1', version: 1, scope: TEAM_B }], subject: `b ${MARK}` })));
   const list = g.listFindings(readerFor(TEAM_A));
-  assert.deepEqual(list.map((f) => f.id), ['f_one']);
+  assert.equal(list.length, 1, 'the finding in team B is not there, and not counted');
+  assert.equal(list[0].withheld, true);
   assert.ok(!JSON.stringify(list).includes('evt-secret-77') && !JSON.stringify(list).includes(MARK));
   assert.deepEqual(g.listFindings(readerFor({ type: 'team', id: 'team-c' })), []);
   assert.deepEqual(g.listFindings(null), []);
@@ -275,13 +281,14 @@ test('SO-F-09 AC03: a listing leaves out findings in scopes the reader cannot re
 
 test('SO-F-09 AC03: the reader comes from the identity model, and a reader from another scope is held out', () => {
   const g = mixed();
-  const identity = (scope) => ({ id: 'tok1', identity_scope: scope, subject: { id: 'person:reader', type: 'person', owner: 'person:reader' } });
-  const asA = resolveRequest(identity(TEAM_A), { target: TEAM_A });
+  const identity = tokenFor;
+  const asA = Graph.readerFor({ identity: identity(TEAM_A), target: TEAM_A });
   assert.equal(asA.ok, true);
+  assert.equal(g.viewFinding('f_one', resolveRequest(identity(TEAM_A), { target: TEAM_A })), null, 'what resolveRequest returns is a plain object, not a reader');
   const v = g.viewFinding('f_one', asA);
   assert.equal(v.withheld, true);
   assert.ok(!JSON.stringify(v).includes('evt-secret-77'));
-  const asB = resolveRequest(identity(TEAM_B), { target: TEAM_B });
+  const asB = Graph.readerFor({ identity: identity(TEAM_B), target: TEAM_B });
   assert.equal(asB.ok, true);
   assert.equal(g.viewFinding('f_one', asB), null, 'the finding scope is team A, so a team B reader does not reach it');
 });
@@ -392,4 +399,131 @@ test('SO-F-09 AC02: a dismissal holds only in the scope it was made in, and the 
   assert.ok(g.claims.has('f_b'), 'and replay takes it in');
   g.applyOp(op('claim.finding.dismiss', { id: 'f_b', by: PERSON }));
   assert.equal(g.admitFinding(finding({ id: 'f_b2', scope: TEAM_B, sources: [{ event: 'evt-101', version: 3, scope: TEAM_B }] })).code, 'dismissed', 'each scope has its own dismissal');
+});
+
+// ---- the credential-bound entry points -------------------------------------------------------------
+const PERSON_TOKEN = (scope, id = 'person:lead') => tokenFor(scope, { id, type: 'person', owner: id });
+const bound = (g, reader, type, fields) => { const r = g.bindEvent(reader, type, fields); if (r.ok) g.applyOp(op(r.type, r.data)); return r; };
+
+test('SO-F-09 AC01: a reader is a credential resolved by the graph, an agent token is not a person, and a role binding is an agent', () => {
+  const org = Graph.readerFor({ identity: PERSON_TOKEN(TEAM_A), target: TEAM_A });
+  assert.equal(org.ok, true);
+  assert.equal(org.subject.id, 'person:lead');
+  assert.deepEqual(org.scope, TEAM_A);
+  assert.ok(Object.isFrozen(org) && Object.isFrozen(org.subject) && Object.isFrozen(org.scope));
+  // a token with no identity scope resolves to the owner person in resolveRequest, agents included; here it is the agent it names
+  const personal = Graph.readerFor({ identity: { id: 'tok2', agent: 'claude-session' } });
+  assert.equal(resolveRequest({ id: 'tok2', agent: 'claude-session' }).subject.id, 'person:owner', 'the identity model maps it to the owner');
+  assert.equal(personal.subject.id, 'agent:claude-session');
+  assert.equal(personal.subject.type, 'agent');
+  assert.equal(Graph.readerFor({ identity: { id: 'tok3', agent: 'a b' } }).ok, false, 'an agent name that makes no subject id is refused');
+  const bind = Graph.readerFor({ binding: { role: 'reviewer', principal: 'lead' }, scope: TEAM_A, target: TEAM_A });
+  assert.equal(bind.ok, true);
+  assert.equal(bind.subject.id, 'agent:reviewer');
+  assert.equal(bind.subject.owner, 'person:lead');
+  assert.deepEqual(bind.scope, TEAM_A);
+  // one or the other, a scope mismatch and a revoked subject are refused with the identity model's code
+  assert.equal(Graph.readerFor({}).ok, false);
+  assert.equal(Graph.readerFor({ identity: PERSON_TOKEN(TEAM_A), binding: { role: 'r', principal: 'p' } }).ok, false);
+  assert.equal(Graph.readerFor({ identity: PERSON_TOKEN(TEAM_A), target: TEAM_B }).code, 'scope_mismatch');
+  assert.equal(Graph.readerFor({ binding: { role: 'reviewer', principal: 'lead' }, scope: TEAM_A, target: TEAM_B }).code, 'scope_mismatch');
+  assert.equal(Graph.readerFor({ identity: { ...PERSON_TOKEN(TEAM_A), subject: { id: 'person:lead', type: 'person', owner: 'person:lead', revoked_at: '2020-01-01T00:00:00Z' } } }).code, 'revoked');
+});
+
+test('SO-F-09 AC01: bindEvent takes by from the credential and ignores the caller\'s, so a forged person or service does not make a fact', () => {
+  const g = make();
+  const agent = Graph.readerFor({ identity: { id: 'tok2', agent: 'stub-session', identity_scope: TEAM_A, subject: { id: 'agent:stub-session', type: 'agent', owner: 'person:lead', role: 'worker' } }, target: TEAM_A });
+  const adj = bound(g, agent, 'claim.finding.adjudicate', { id: 'f_one', by: 'person:forged', outcome: 'confirm', why: 'trust me' });
+  assert.equal(adj.ok, true);
+  assert.equal(adj.data.by, 'agent:stub-session', 'the forged person is replaced');
+  assert.equal(status(g, 'f_one'), 'conjecture');
+  const ver = bound(g, agent, 'claim.finding.verify', { id: 'f_one', by: 'service:fake', record: { kind: 'outcome.verified', event: 'evt-101', result: 'pass' } });
+  assert.equal(ver.data.by, 'agent:stub-session');
+  assert.equal(status(g, 'f_one'), 'conjecture', 'an agent\'s verification does nothing');
+  assert.deepEqual(g.claims.get('f_one').finding.history.map((h) => [h.kind, h.by, h.effective]), [['adjudicate', 'agent:stub-session', false], ['verify', 'agent:stub-session', false]]);
+  // the same call under a person credential is the real thing
+  const lead = Graph.readerFor({ identity: PERSON_TOKEN(TEAM_A), target: TEAM_A });
+  bound(g, lead, 'claim.finding.adjudicate', { id: 'f_one', by: 'agent:someone-else', outcome: 'confirm' });
+  assert.equal(g.claims.get('f_one').finding.history.at(-1).by, 'person:lead');
+  assert.equal(status(g, 'f_one'), 'fact');
+  // a personal-scope token is an agent too, never the owner person
+  const h = make({ id: 'f_two', scope: { type: 'personal', id: 'personal' }, sources: [{ event: 'evt-101', version: 3, scope: { type: 'personal', id: 'personal' } }] });
+  const tok = Graph.readerFor({ identity: { id: 'tok9', agent: 'editor' } });
+  bound(h, tok, 'claim.finding.adjudicate', { id: 'f_two', by: 'person:owner', outcome: 'confirm' });
+  assert.equal(h.claims.get('f_two').finding.history[0].by, 'agent:editor');
+  assert.equal(status(h, 'f_two'), 'conjecture');
+});
+
+test('SO-F-09 AC01: bindEvent checks the finding exists in a scope the credential reaches, and a verification names a source event', () => {
+  const g = make();
+  const lead = Graph.readerFor({ identity: PERSON_TOKEN(TEAM_A), target: TEAM_A });
+  const other = Graph.readerFor({ identity: PERSON_TOKEN(TEAM_B), target: TEAM_B });
+  const missing = g.bindEvent(lead, 'claim.finding.dismiss', { id: 'f_none' });
+  const forbidden = g.bindEvent(other, 'claim.finding.dismiss', { id: 'f_one' });
+  assert.equal(missing.code, 'not_found');
+  assert.equal(forbidden.code, 'not_found', 'a finding in a scope the credential does not reach looks like a missing one');
+  assert.equal(g.bindEvent(other, 'claim.finding.adjudicate', { id: 'f_one', outcome: 'confirm' }).code, 'not_found');
+  assert.equal(g.bindEvent(lead, 'claim.finding.verify', { id: 'f_one', record: { kind: 'outcome.verified', event: 'evt-nope', result: 'pass' } }).code, 'invalid');
+  assert.equal(g.bindEvent(lead, 'claim.finding.verify', { id: 'f_one', record: { kind: 'outcome.verified', event: 'evt-101', result: 'pass' } }).ok, true);
+  assert.equal(g.bindEvent(lead, 'claim.finding.adjudicate', { id: 'f_one', outcome: 'maybe' }).code, 'invalid');
+  assert.equal(g.bindEvent(lead, 'claim.finding.shrug', { id: 'f_one' }).code, 'invalid');
+  for (const bad of [null, {}, { ok: true, subject: { id: 'person:owner', type: 'person' }, scope: TEAM_A }, resolveRequest(tokenFor(TEAM_A), { target: TEAM_A })]) {
+    assert.equal(g.bindEvent(bad, 'claim.finding.dismiss', { id: 'f_one' }).code, 'no_credential');
+    assert.equal(g.bindFinding(bad, finding({ id: 'f_x' })).code, 'no_credential');
+  }
+  assert.equal(g.claims.get('f_one').finding.history.length, 0, 'nothing was applied');
+});
+
+test('SO-F-09 AC01: bindFinding takes the raiser from the credential, holds it to the finding\'s scope and still applies the dismissal rule', () => {
+  const g = new Graph();
+  const lead = Graph.readerFor({ identity: PERSON_TOKEN(TEAM_A), target: TEAM_A });
+  const r = g.bindFinding(lead, finding({ by: 'person:forged' }));
+  assert.equal(r.ok, true);
+  assert.equal(r.type, 'claim.finding');
+  assert.equal(r.data.by, 'person:lead');
+  g.applyOp(op(r.type, r.data));
+  assert.equal(g.claims.get('f_one').finding.raised_by, 'person:lead');
+  assert.equal(g.bindFinding(lead, finding({ id: 'f_b', scope: TEAM_B })).code, 'scope_mismatch', 'a team A credential does not raise a finding in team B');
+  assert.equal(g.bindFinding(lead, finding({ id: 'f_one' })).code, 'exists');
+  assert.equal(g.bindFinding(lead, finding({ id: 'f_bad', confidence: 3 })).code, 'invalid');
+  bound(g, lead, 'claim.finding.dismiss', { id: 'f_one' });
+  assert.equal(g.bindFinding(lead, finding({ id: 'f_again' })).code, 'dismissed');
+});
+
+test('SO-F-09 AC03: a status filter and the dismissed filter of a listing do not give away what a partial view withholds', () => {
+  const g = mixed();
+  g.applyOp(op('claim.finding', finding({ id: 'f_keep', sources: [{ event: 'evt-200', version: 1, scope: TEAM_A }] })));
+  for (const s of ['a', 'b']) evidence(g, 'f_one', 'support', 0.8, s);
+  g.applyOp(op('claim.finding.adjudicate', { id: 'f_one', by: PERSON, outcome: 'confirm' }));
+  g.applyOp(op('claim.finding.dismiss', { id: 'f_one', by: PERSON }));
+  const reader = readerFor(TEAM_A);
+  const sizes = (o) => g.listFindings(reader, o).length;
+  assert.equal(sizes({}), 2, 'the withheld one is listed, whether or not it was dismissed');
+  assert.equal(sizes({ includeDismissed: true }), 2);
+  assert.equal(sizes({ status: 'fact' }), 1, 'only the withheld one is left: a fact would show as one');
+  assert.equal(sizes({ status: 'refuted' }), 1, 'and it is there for every other status too');
+  assert.equal(g.listFindings(reader, { status: 'refuted' })[0].withheld, true);
+});
+
+test('SO-F-09 AC04: the page says who counts is a credential, what is unbuilt, and what is provisional', () => {
+  const page = fs.readFileSync(path.join(PKG, 'docs', 'ORGANISATIONAL-INTELLIGENCE.md'), 'utf8');
+  const log = fs.readFileSync(path.join(PKG, 'changelog.d', 'SO-F-09.md'), 'utf8');
+  for (const re of [
+    /Graph\.readerFor/, /bindEvent/, /bindFinding/, /ignore any `by`/, /unbuilt/i,
+    /as trusted as the log/, /does not authenticate a credential/,
+    /ADR 5/, /SO-A-05/, /provisional/i, /dismiss/, /permanent/, /opposition/, /overridden/,
+  ]) assert.match(page, re);
+  assert.ok(!/never from what a session says about itself/.test(page), 'the sentence that contradicted the `by` paragraph is gone');
+  assert.match(log, /Graph\.readerFor/);
+  assert.match(log, /provisional/i);
+});
+
+test('SO-F-09 AC02: the finding\'s own scope is part of the dismissal key, apart from the scopes of its sources', () => {
+  const g = make();
+  g.applyOp(op('claim.finding.dismiss', { id: 'f_one', by: PERSON }));
+  const src = [{ event: 'evt-101', version: 3, scope: TEAM_A }];
+  assert.equal(g.admitFinding(finding({ id: 'f_a2', sources: src })).code, 'dismissed');
+  assert.equal(g.admitFinding(finding({ id: 'f_b2', scope: TEAM_B, sources: src })).ok, true, 'the same sources raised in another finding scope');
+  assert.notEqual(Graph.findingKey(src, TEAM_A), Graph.findingKey(src, TEAM_B));
+  assert.equal(Graph.findingKey(src, TEAM_A), Graph.findingKey([{ event: 'evt-101', version: 3 }], TEAM_A), 'a source with no scope has the finding\'s');
 });

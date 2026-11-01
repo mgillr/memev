@@ -6,7 +6,7 @@ How a shared workspace can notice something across otherwise independent work wi
 
 ## Status
 
-Planned. The finding model is built and tested as a data model on the memory graph: raising, dismissing, correcting, adjudicating and verifying a finding are graph operations, and a reader sees a finding only as far as their scope allows. Nothing raises a finding yet. No code watches work across projects, detects a conflict or a link, ranks findings or routes a decision; that detection, with its precision and recall, is the next contract (SO-F-13) and stays an architectural target until it lands. The product does not offer this layer today, and the names and shapes here may change before it does.
+Planned. The finding model is built and tested as a data model on the memory graph: raising, dismissing, correcting, adjudicating and verifying a finding are graph operations, a reader sees a finding only as far as their scope allows, and `Graph.readerFor`, `bindFinding` and `bindEvent` make the operations from a credential. Nothing raises a finding yet, and nothing calls those entry points: the vault does not write finding operations, so the step that makes `by` trustworthy in a running product is unbuilt (see "Who counts"). No code watches work across projects, detects a conflict or a link, ranks findings or routes a decision; that detection, with its precision and recall, is the next contract (SO-F-13) and stays an architectural target until it lands. The product does not offer this layer today, and the names and shapes here may change before it does.
 
 ## What a finding is
 
@@ -25,32 +25,44 @@ For an ordinary claim, support of 0.85 or more from at least two independent sou
 
 For a finding, evidence alone stops at theory, however strong and however many the sources. A finding is a fact only when a person has confirmed it (an adjudication) or a verification record has passed. Contested and refuted stand as the graph derives them from the evidence, because the cap guards the step to fact and nothing else. The same evidence on an ordinary claim and on a finding therefore gives fact and theory.
 
-Who counts is decided from the event itself, never from what a session says about itself:
+Who counts is decided from the subject named in the event, and that subject is meant to come from a credential, not from what a session says about itself:
 
 - an adjudication takes effect only from a person subject (SO-F-01). The same event from an agent, a device, a node, an operator or a service is recorded and does nothing;
-- a verification record names an `outcome.verified` event and a result. It takes effect only when the result is a pass and it comes from a person, operator or service subject. A failed result, or one from an agent, is recorded and does nothing;
+- a verification record names an `outcome.verified` event and a result. It must name one of the source events the finding rests on, or it is refused and nothing is recorded. It takes effect only when the result is a pass, it comes from a person, operator or service subject, and no person's decision stands (below). A failed result, or one from an agent, is recorded and does nothing;
 - a status change written straight to the log does not set a finding's status. It is derived, so the log cannot be used to skip the cap;
-- the latest effective decision stands: a person's rejection makes the finding refuted, and a later confirmation makes it a fact.
+- the latest effective decision stands, with one rule: a verification never replaces a person's decision. After a person's rejection a passing verification from a service is recorded and does nothing, and the finding stays refuted. Only a person can change a person's decision, so a later confirmation makes it a fact;
+- a decision stands over the evidence. A person's confirmation makes the finding a fact even when the evidence against it is strong (opposition of 0.99, say), and a rejection makes it refuted even when the evidence is strong enough for a fact. The status then says it overrode the evidence: `overridden` holds the status the evidence implied (refuted, contested or fact). This is provisional until the knowledge status lattice of PG-10.1 lands, where such a case may need its own state.
 
-The `by` field of an event names the subject that acted. The graph does not authenticate it; whatever writes the event sets it from the resolved credential (SO-F-01), and until a writer does, nothing in the product writes these events.
+**Where `by` comes from.** `Graph.readerFor` resolves a credential into a reader: `{ identity }` is what `tokens.verify` returned for a request that is already verified, and `{ binding }` is a role binding that `agentid-bind.mjs` verified. Both go through the identity model (`resolveRequest`, `resolveBinding`). The reader is a frozen object that only this module makes; the graph refuses any other object, however it is shaped, so `{ ok: true, scope }` built by hand shows nothing and decides nothing. `bindFinding(reader, fields)` and `bindEvent(reader, type, fields)` build the operation a writer appends and set `by` to the reader's subject. They ignore any `by` in `fields`, and they refuse a credential that does not reach the finding's scope (a finding it cannot reach is reported as not found, the same as a missing one). A token with no identity scope is not a person: `resolveRequest` maps it, an agent's included, to the owner subject, so here it is the agent subject the token names, and its adjudications are recorded and do nothing. A person subject comes only from an organisational credential that names one. A role binding is an agent subject owned by the person who vouched for it, so its decisions do nothing as well.
+
+**What is unbuilt.** The graph does not authenticate a credential: it trusts that the token or binding it is given was verified by the boundary that received it. The log is replayed as it was written, so a record that did not come through `bindFinding` or `bindEvent` carries whatever `by` its writer set, and is as trusted as the log file. Nothing in the product writes these operations yet and the vault's own claim calls do not route through the entry points; when a writer does, it must call them, and until it does the guarantee holds only for callers that use them. A source event named in a finding is the raiser's claim and is not looked up in the log.
 
 ## The three events
 
 Each is an append-only operation in the same log as claims, named for what it does. Nothing is deleted; each leaves an entry in the finding's own history with who acted, when, an optional reason and whether it took effect.
 
-- **Dismissal** (`claim.finding.dismiss`). A person or any subject says a finding is not wanted. A dismissed finding leaves the default listing and stays in the record. A finding raised later on the same set of sources at the same versions is not taken in again, in any order of the sources. A new version of a source, a different source, or an extra source is new evidence and may raise a finding again.
+- **Dismissal** (`claim.finding.dismiss`). Any subject says a finding is not wanted (provisional, see below). A dismissed finding leaves the default listing and stays in the record. A finding raised later on the same set of sources at the same versions, in the same scope, is not taken in again, in any order of the sources, and nothing undoes a dismissal. A new version of a source, a different source, an extra source or another scope is new evidence and may raise a finding again. The refusal says that a dismissal exists and does not name the finding that was dismissed.
 - **Correction** (`claim.finding.correct`). Changes the statement (subject, predicate, object), the confidence, the time context, or the entities and owners. The history entry holds each changed field with its old and new value. Sources and scope are provenance and cannot be corrected: a finding on other sources is a new finding.
 - **Adjudication** (`claim.finding.adjudicate`). A decision, confirm or reject, with a reason. It sets the status as described under the cap when a person makes it.
 
 Verification (`claim.finding.verify`) is a separate record, not one of the three. It is how a passing verification record reaches a finding without a person.
 
+## What is provisional
+
+These are placeholders until the decisions that own them land, and they may change with them:
+
+- **Who may adjudicate, verify, correct and dismiss.** What is written under "Who counts" is all there is: an adjudication counts from a person, a verification from a person, an operator or a service, and a dismissal or a correction from any subject. The role by action matrix is ADR 5, which is open, and this page does not pre-empt it. Note that the service and operator subjects cannot be issued yet, so today a passing verification can only come from a person. A dismissal from any subject is permanent for its sources, versions and scope, so one careless dismissal blocks the finding until a source changes; that is the reason to settle ADR 5 before anything raises findings.
+- **The confirm and reject outcomes.** They stand in for the seven decision states of the decision queue (SO-A-05, SO-1.08), which are not in code yet. When they land, adjudication moves onto them.
+- **A decision over the evidence** (`overridden`), as above, until the knowledge status lattice of PG-10.1.
+
 ## What a reader sees
 
 A finding never discloses a record its reader has no permission for. Permission is the scope rule of SO-F-01: a reader's scope reads a source only when it is that source's scope.
 
-- A reader whose scope does not reach the finding's scope gets nothing: not the finding, and not a hint that one exists. A missing finding and a forbidden one look the same.
-- A reader who may read every source sees the statement, the sources with their versions and paths, and the full history.
-- A reader who may read only some sources sees those sources, how many are withheld, and the status and confidence. The statement, the reasons and corrections in the history, and every entity or owner drawn from a withheld source are withheld with them, because the statement is drawn from all of the sources together.
+- A reader whose scope does not reach the finding's scope gets nothing: not the finding, and not a hint that one exists. A missing finding and a forbidden one look the same. A reader is a credential resolved by `Graph.readerFor`; any other object gets nothing.
+- A reader who may read every source sees the finding whole: its id, the statement, the sources with their versions and paths, the status (and `capped` and `overridden`), the confidence, the time context, whether it was dismissed, and the full history.
+- A reader who may read only some sources gets a partial view, and it fails closed. It shows the finding's scope, those sources, how many are withheld, and the entities and owners drawn from them. Everything drawn from the whole of the sources is withheld, because the status, the confidence and the id (which the raiser chose, and may have named after the statement) say as much as the statement does: the id, statement, status, `capped`, `overridden`, confidence, time context and dismissed flag are all null, and the history keeps only the kind and time of each entry, not who acted, whether it took effect, the outcome, the reason or the correction. An entity or owner tied to the finding as a whole, with no source, counts as drawn from all of them, so it is shown only in a whole view.
+- A listing applies its status filter and its dismissed filter to whole views only, because a partial view shows neither. A partial view is listed whatever the filter says, so a filter cannot be used to find out what it withholds. A partial view has no id, so a reader who needs the finding's id asks a reader that may read every source.
 
 This is a view over the graph. The ordinary claim listing and provenance calls of the vault do not know about it and are not changed here, so nothing may raise a finding through them until they route through this view.
 
