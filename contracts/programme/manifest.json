@@ -40,6 +40,12 @@
       "superseded_by": "PG-03.5"
     },
     {
+      "id": "PG-03.5",
+      "manifest": "this manifest (contracts/programme/specs; the file is unchanged, specSha256 8b748b0e38f3efe054c03a600845d83746e5874c87a384711356ec96746ebd56)",
+      "reason": "PG-03.5 hard-pins crdt-merge commit b92d0ef in tests/vectors/SOURCE while crdt-merge main is now aab0099 with byte-identical protocol vectors; PG-03.6 pins aab0099 and checks the vector bytes",
+      "superseded_by": "PG-03.6"
+    },
+    {
       "id": "SR-0.03",
       "manifest": "memev contracts/seed-readiness/manifest.json (not modified; its spec file and the signed contract k-sr-0-03-verify-runs-ever-2259f2, version 2, are unchanged)",
       "reason": "owner delegation, 1 Nov 2026: version 3 pins a current base and the workdir, names in the scope of T3 every file of pull request #336, and states that verify returns BLOCKED for the scope criterion until T2 lands",
@@ -516,6 +522,7 @@
     },
     {
       "id": "PG-03.4",
+      "kind": "evidence",
       "type": "programme work package",
       "area": "PG-03",
       "title": "Cross-language protocol vectors (crdt-merge-ts)",
@@ -530,9 +537,9 @@
         "PG-03.1"
       ],
       "tasks": 3,
-      "criteria": 28,
+      "criteria": 29,
       "spec": "specs/PG-03.4-cross-language-protocol-vectors.json",
-      "status": "proposed: unsigned, signs after a clean red-team round",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
       "supersedes": "PG-03.2",
       "supersedes_reason": "the signed PG-03.2 cannot be met as scoped because the TypeScript edition lacks the features its vectors need (ORSet tombstones and element_types, and AgentState); the signer decided to supersede it with a contract that builds them"
     },
@@ -578,9 +585,12 @@
       "tasks": 3,
       "criteria": 26,
       "spec": "specs/PG-03.5-cross-language-protocol-vectors.json",
-      "status": "proposed: unsigned, signs after a clean red-team round",
+      "status": "unsigned spec (specSha256 8b748b0e38f3efe054c03a600845d83746e5874c87a384711356ec96746ebd56, in signing when superseded); superseded by PG-03.6 on 1 Nov 2026 (owner delegation); this spec file is unchanged and stays on record",
       "supersedes": "PG-03.3",
-      "supersedes_reason": "the signed PG-03.3 cannot be met as scoped because the Rust edition lacks the features its vectors need (an ORSet type key, optional tombstones on read, the canonical sort, LWWMap, AgentState, and node_id on LWWRegister); the signer decided to supersede it with a contract that builds them"
+      "supersedes_reason": "the signed PG-03.3 cannot be met as scoped because the Rust edition lacks the features its vectors need (an ORSet type key, optional tombstones on read, the canonical sort, LWWMap, AgentState, and node_id on LWWRegister); the signer decided to supersede it with a contract that builds them",
+      "superseded_by": "PG-03.6",
+      "superseded_reason": "PG-03.5 hard-pins crdt-merge commit b92d0ef in tests/vectors/SOURCE while crdt-merge main is now aab0099 with byte-identical protocol vectors, so an edition pinned at aab0099 would fail it; PG-03.6 pins aab0099 and checks the vector bytes",
+      "build_layer": "superseded by PG-03.6; the file is not edited"
     },
     {
       "id": "PG-03.3",
@@ -1221,14 +1231,37 @@
       "repo": "memev",
       "supersedes": "SR-0.03",
       "supersedes_signed_contract": "k-sr-0-03-verify-runs-ever-2259f2 (version 2; the spec file contracts/seed-readiness/specs/SR-0.03-verify-runs-every-verifier-type.json is unchanged)",
-      "supersedes_reason": "owner delegation, 1 Nov 2026: pin a current base and the workdir (base pending), name in the scope of T3 every file of pull request #336, and state that verify returns BLOCKED for the scope criterion of T1, T3 and T4 until T2 lands; no scope beyond those files",
+      "supersedes_reason": "owner delegation, 1 Nov 2026: pin a current base and the workdir (base 3989c80), name in the scope of T3 every file of pull request #336, add changelog.d/SR-0.03.md and docs/MODULES.md (also touched by pull request #347) to the scope of T2, and state that verify returns BLOCKED for the scope criterion of T1, T3 and T4 until T2 lands; no scope beyond those files, and no criterion changes",
       "related_pull_request": "#336",
       "depends_on": [],
       "tasks": 5,
       "criteria": 51,
       "spec": "specs/SR-0.03.3-verify-runs-every-verifier-type.json",
-      "base": "PENDING: the memev main commit after the README re-sign fix lands; the placeholder is the 40-zero sha on T1 criterion 7 of the spec",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "base": "3989c80bea615381947758e0ab1d28dfe18f115b (the memev main commit that merged pull request #343, which carried the README re-sign fix; owner delegation, 1 Nov 2026); pinned on T1 criterion 7 of the spec",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+    },
+    {
+      "id": "PG-03.6",
+      "type": "programme work package",
+      "area": "PG-03",
+      "title": "Cross-language protocol vectors (crdt-merge-rs)",
+      "repo": "crdt-merge-rs",
+      "programme_tasks": "WP03-03-A, WP03-03-B, WP03-03",
+      "requirements": [
+        "MV-DEM-06"
+      ],
+      "cross_references": [],
+      "vault_contracts": [],
+      "depends_on": [
+        "PG-03.1"
+      ],
+      "tasks": 3,
+      "criteria": 27,
+      "spec": "specs/PG-03.6-cross-language-protocol-vectors.json",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
+      "supersedes": "PG-03.5",
+      "supersedes_reason": "owner delegation, 1 Nov 2026: pin crdt-merge main aab0099 (b92d0ef is an ancestor with byte-identical vectors) and check the three vector files by blob hash; everything else of PG-03.5 is kept",
+      "kind": "evidence"
     }
   ],
   "mapping": [
@@ -1313,8 +1346,8 @@
     {
       "task": "WP03-03",
       "title": "Rust edition reads and re-emits every vector byte-identically",
-      "contract": "PG-03.5",
-      "note": "specified in this set (PG-03.5 supersedes the signed PG-03.3)"
+      "contract": "PG-03.6",
+      "note": "specified in this set (PG-03.6 supersedes PG-03.5, which superseded the signed PG-03.3)"
     },
     {
       "task": "WP04-01",
