@@ -100,6 +100,7 @@ The record a builder takes over with: what exists, what is missing, and the orde
 | [scope-one/REQUIREMENTS.md](scope-one/REQUIREMENTS.md) | the full requirement register, one row per requirement |
 | [scope-one/TRACEABILITY.md](scope-one/TRACEABILITY.md) | each requirement traced to code, contract, dependency and test |
 | [scope-one/INVENTORY.md](scope-one/INVENTORY.md) | every branch, contract and source, with status and disposition |
+| [scope-one/design/artefact-history-and-previews.md](scope-one/design/artefact-history-and-previews.md) | SO-1.09 design record: artefact history, comparison and previews, and what is open |
 | [scope-one/BASELINE.md](scope-one/BASELINE.md) | the commit, working tree and test run the record is taken from |
 | [scope-one/DEPENDENCIES.md](scope-one/DEPENDENCIES.md) | the build-order edges between contracts |
 | [scope-one/DECISIONS.md](scope-one/DECISIONS.md) | the open ADRs, the decided ones (engine boundary, tiers) and the questions only the owner can answer |
