@@ -50,8 +50,9 @@ flowchart LR
   connectors and GitHub backup require a network. Adding a second computer to the vault needs a
   licence: the vault refuses it with "This vault is licensed for 1 computer". Cloud AI apps through
   the secure link are not computers and are not refused.
-- Switching computers goes through your own GitHub backup: once `memev github setup` has run on the
-  old computer, `memev init` on the new one offers to join that backup.
+- Switching computers can use your own GitHub backup: after `memev github setup` on the old
+  computer, `memev init` on the new one offers to join that backup. Backup is optional, not
+  pre-enabled.
 - Git sync is single-writer backup, not a way to edit on two computers at once. If a second computer
   also pushes the same vault, `memev doctor` shows a warning that concurrent edits can conflict.
   Nothing is blocked. A merge that conflicts is left as it is and reported by `memev doctor`. Edit on
