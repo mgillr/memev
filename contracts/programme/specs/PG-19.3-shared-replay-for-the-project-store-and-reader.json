@@ -306,7 +306,7 @@
           }
         },
         {
-          "statement": "the reader's replay is the shared function: vault.mjs imports from ./project-replay.mjs, the body of Vault#tasksReader calls replayLog with truncate false and schemaVerdict with migrate false, and holds no JSON.parse, no split of the log text, no test of a refused record, and none of ProjectStore, projectStore, new ProjectStore or .open(",
+          "statement": "the reader's replay is the shared function: vault.mjs imports from ./project-replay.mjs, the body of Vault#tasksReader calls replayLog with truncate false and schemaVerdict with migrate false, and holds no JSON.parse, no split of the log text, no test of a refused record, and none of ProjectStore, projectStore, new ProjectStore or .open(; in that body the read of meta.json comes before the read of the log in source order, so that the reader never sees a half-done migration; each source assertion first asserts that the method was found",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/project-replay.test.mjs",
