@@ -1361,3 +1361,196 @@ test('T1-c55: a citation of QL-0.02:2.1 is refused when that record\'s round 2 i
   refused(folded((r) => { delete r.rounds[0].closing; }), 'added_verbatim', 'the receiving round\'s amendments with no closing envelope');
   refused(folded((r) => { r.rounds[0].amendments[0].to = 'b refuses an import cycle'; r.rounds[0].amendments.push({ task: 'T1', field: 'statement', from: 'x', to: 'y' }); }), 'added_verbatim', 'the receiving round\'s amendments edited after closing');
 });
+
+// ---- QL-1.01 T2: the gate in the suite, in the docs and in the engine's verify ----
+
+const REAL_GATE = await import('../src/engine/redteam-gate.mjs');
+const specFiles = () => REAL_GATE.DEFAULT_SPEC_DIRS.reduce((n, d) => { try { return n + fs.readdirSync(path.join(ROOT, d)).filter((f) => f.endsWith('.json')).length; } catch { return n; } }, 0);
+const reportOf = (s) => gate({ cwd: s.dir, report: true, reviewerKeys: KEYS });
+const failLines = (r) => r.lines.filter((l) => l.startsWith('FAIL:'));
+
+test('T2-c01: the suite runs --report over this repository: a signed contract whose spec has no SIGNABLE record fails it, a spec with no record does not', () => {
+  const real = gate({ cwd: ROOT, report: true });
+  assert.equal(real.exit, 0, `--report over the repository:\n${failLines(real).join('\n')}`);
+  assert.equal(real.errors.length, 0);
+  // a pull request that touches only contracts/ must run this suite, so the paths filters of both triggers name contracts/**
+  const ci = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
+  const onPr = ci.slice(ci.indexOf('\n  pull_request:'), ci.indexOf('\n  push:'));
+  const onPush = ci.slice(ci.indexOf('\n  push:'), ci.indexOf('\n  push:') + ci.slice(ci.indexOf('\n  push:')).search(/\n(?!  )\S|\njobs:/));
+  assert.match(onPr, /- 'contracts\/\*\*'/, 'the pull_request paths filter names contracts/**');
+  assert.match(onPush, /- 'contracts\/\*\*'/, 'the push paths filter names contracts/**');
+  const spec = oneTask();
+  const make = () => sc({ snapshots: [spec, spec], rounds: plainRounds() });
+  const good = make(); signContract(good.dir, spec); good.commit('sign');
+  assert.equal(reportOf(good).exit, 0, reportOf(good).lines.join('\n'));
+  // a signed contract whose spec's record is NOT SIGNABLE fails the report
+  const notSignable = make(); signContract(notSignable.dir, spec); MUTATE.last_clean(notSignable); notSignable.commit('record broken');
+  const rn = reportOf(notSignable);
+  assert.notEqual(rn.exit, 0, rn.lines.join('\n'));
+  assert.match(failLines(rn).join('\n'), /the spec is NOT SIGNABLE/);
+  // a signed contract whose spec has no record at all fails it too
+  const noRecord = make(); signContract(noRecord.dir, spec); fs.rmSync(noRecord.recordFile); noRecord.commit('record removed');
+  const rr = reportOf(noRecord);
+  assert.notEqual(rr.exit, 0);
+  assert.match(failLines(rr).join('\n'), /the spec is NO RECORD/);
+  // a spec with no record and no contract is reported, not failed
+  const bare = make(); fs.rmSync(bare.recordFile); bare.commit('record removed');
+  const rb = reportOf(bare);
+  assert.equal(rb.exit, 0, rb.lines.join('\n'));
+  assert.match(rb.lines.join('\n'), /NO RECORD/);
+  // and a record that is malformed fails it
+  const bad = make(); fs.writeFileSync(bad.recordFile, '{ not json'); bad.commit('record broken');
+  assert.notEqual(reportOf(bad).exit, 0);
+});
+
+test('T2-c03: --report links a signed contract to its spec by title or by the tasks makeTask drafts from it, and judges the record and the tasks; it counts the specs it examined and says so when the directories are missing', () => {
+  const spec = oneTask();
+  const make = () => sc({ snapshots: [spec, spec], rounds: plainRounds() });
+  const byTitle = make(); signContract(byTitle.dir, spec, { tasks: [] }); byTitle.commit('sign');
+  const rt = reportOf(byTitle);
+  assert.notEqual(rt.exit, 0, 'linked by title, tasks differ');
+  assert.match(failLines(rt).join('\n'), /not the tasks drafted from the spec/);
+  const byTasks = make(); signContract(byTasks.dir, spec, { title: 'Another title entirely' }); byTasks.commit('sign');
+  assert.equal(reportOf(byTasks).exit, 0, 'linked by its drafted tasks');
+  const noRec = make(); signContract(noRec.dir, spec, { title: 'Another title entirely' }); MUTATE.last_clean(noRec); noRec.commit('record broken');
+  assert.notEqual(reportOf(noRec).exit, 0, 'linked by tasks, record not SIGNABLE');
+  const changed = make();
+  const tasks = drafted(spec); tasks[0].criteria[0].verifier.cmd = 'node --test test/a.test.mjs --changed';
+  signContract(changed.dir, spec, { tasks }); changed.commit('sign');
+  const rc = reportOf(changed);
+  assert.notEqual(rc.exit, 0, 'one criterion cmd changed');
+  assert.match(failLines(rc).join('\n'), /not the tasks drafted from the spec/);
+  const ok = make(); signContract(ok.dir, spec); ok.commit('sign');
+  assert.equal(reportOf(ok).exit, 0, 'SIGNABLE record and matching tasks');
+  // the count the gate prints is the number of spec files in its default directories
+  const real = gate({ cwd: ROOT, report: true });
+  const counted = /^examined (\d+) specs /m.exec(real.lines.join('\n'));
+  assert.ok(counted, real.lines.slice(-3).join('\n'));
+  assert.equal(Number(counted[1]), specFiles());
+  assert.ok(specFiles() > 0);
+  // with the directories missing it says so instead of printing a bare exit 0
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'redteam-empty-')); made.push(empty); git(empty, ['init', '-q']);
+  const re = gate({ cwd: empty, report: true });
+  assert.equal(re.exit, 0);
+  assert.match(re.lines.join('\n'), /no specs found under contracts\/seed-readiness\/specs\//);
+});
+
+const DOC_SECTION = () => {
+  const text = fs.readFileSync(path.join(ROOT, 'docs', 'CONTRACTS.md'), 'utf8');
+  const start = text.indexOf('## No contract is signed without a clean red-team record');
+  assert.ok(start >= 0, 'docs/CONTRACTS.md has the section');
+  const rest = text.slice(start + 3);
+  const end = rest.indexOf('\n## ');
+  return rest.slice(0, end < 0 ? undefined : end);
+};
+
+test('T2-c04: the one-line runbook in docs/CONTRACTS.md runs the gate, then memev contract new, then memev contract sign with the id the draft printed; a NOT SIGNABLE spec never reaches memev', () => {
+  const section = DOC_SECTION();
+  assert.ok(section.includes('contracts/<area>/redteam/<id>.json'), 'the record path');
+  assert.match(section, /sorted keys, no whitespace/);
+  assert.match(section, /`workdir` null/);
+  const fences = [...section.matchAll(/```sh\n([\s\S]*?)```/g)];
+  assert.equal(fences.length, 1, 'one fenced block');
+  const lines = fences[0][1].split('\n').filter((l) => l.trim());
+  assert.equal(lines.length, 1, 'the block holds a single line');
+  const run = (dir) => {
+    const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'redteam-bin-')); made.push(bin);
+    const log = path.join(bin, 'calls.log');
+    fs.writeFileSync(path.join(bin, 'memev'), `#!/bin/sh\necho "$*" >> '${log}'\nif [ "$1 $2" = "contract new" ]; then printf '{\\n "id": "k-stub-123456",\\n "path": "contracts/drafts/k-stub-123456.json"\\n}\\n'; fi\n`, { mode: 0o755 });
+    fs.mkdirSync(path.join(dir, 'scripts', 'gate'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'scripts', 'gate', 'redteam-gate.mjs'), `import { main } from ${JSON.stringify(GATE)};\nprocess.exitCode = main(process.argv.slice(2));\n`);
+    const line = lines[0].replace('contracts/<area>/specs/<id>-<name>.json', SPEC);
+    const r = spawnSync('sh', ['-c', line], { cwd: dir, env: { ...GIT_ENV, PATH: `${bin}${path.delimiter}${process.env.PATH}` }, encoding: 'utf8' });
+    return { r, calls: fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n') : [] };
+  };
+  const refused = run(fr(path.join(CASES, 'ok')));
+  assert.notEqual(refused.r.status, 0, 'the spec is NOT SIGNABLE');
+  assert.deepEqual(refused.calls, [], `memev was never called: ${refused.r.stdout}`);
+  const base = fr(BASE);
+  const proceeds = run(base);
+  assert.equal(proceeds.r.status, 0, proceeds.r.stdout + proceeds.r.stderr);
+  assert.equal(proceeds.calls.length, 2, proceeds.calls.join(' | '));
+  assert.ok(proceeds.calls[0].startsWith(`contract new ${SPEC}`), proceeds.calls[0]);
+  assert.equal(proceeds.calls[1], 'contract sign k-stub-123456');
+});
+
+/**
+ * A repository whose spec (docs kind, so no red-green criterion is asked of it) has a record that ends with a stop decision, with
+ * an implementation round after it when `impl` is given. Returns the scenario, the vault and the id of a contract signed from the spec.
+ */
+async function stopFixture({ impl = null } = {}) {
+  const spec = oneTask({ criteria: [{ statement: 'a exists', verifier: { type: 'file_exists', path: 'src/a.mjs' } }] });
+  const open = { verdict: 'findings', answers: [{ n: 1, severity: 'high', how: 'a gap', disposition: 'rejected', reason: 'the file is one line' }] };
+  const s = sc({ snapshots: [spec, spec, spec], rounds: [open, open, open], manifest: { kind: 'docs' } });
+  const key = contractKey(s.dir);
+  s.stopKey = key;
+  s.mutate((r) => { r.stop = stopDecision(r, s.disk(), key.privateKey); });
+  s.commit('the stop decision and its key');
+  const { v } = newVault({ git: false, reviewerKeys: KEYS, stopKeys: [key.publicKey] });
+  made.push(v.root);
+  const d = v.contractDraft(OWNER, { title: spec.title, workdir: s.dir, tasks: spec.tasks, spec: s.abs(SPEC) });
+  v.contractSign(OWNER, { id: d.id });
+  if (impl) {
+    const head = s.git(['rev-parse', 'HEAD']);
+    s.mutate((r) => { r.rounds.push({ round: 4, kind: 'implementation', spec_sha256: specHash(spec), base_commit: head, inputs: { scopes: [], files: [] }, verdict: 'clean', answers: [], ...impl.round }); }, { sign: impl.sign !== false });
+    s.commit('the implementation round');
+  }
+  return { s, v, id: d.id, spec, closed: () => fs.existsSync(path.join(v.root, 'contracts', 'closed', `${d.id}.json`)) };
+}
+const verified = async (f) => f.v.contractVerify(OWNER, { id: f.id });
+
+test('T2-c09: verify is BLOCKED naming the implementation round for a spec whose record ends with a stop decision, until a clean signed implementation round reviewed the commit being verified; a high answer, an unsigned round and a later in-scope commit keep it BLOCKED', async () => {
+  const none = await stopFixture();
+  const r0 = await verified(none);
+  assert.equal(r0.verdict, 'BLOCKED', JSON.stringify(r0));
+  assert.match(r0.detail, /implementation round/);
+  assert.equal(none.closed(), false);
+  const high = await stopFixture({ impl: { round: { answers: [{ n: 1, severity: 'high', how: 'a bug', disposition: 'added', criterion: { task: 'T1', statement: 'x', verifier: { type: 'scope' } } }] } } });
+  const rh = await verified(high);
+  assert.equal(rh.verdict, 'BLOCKED', JSON.stringify(rh));
+  assert.match(rh.detail, /implementation round 4 is not clean/);
+  const unsigned = await stopFixture({ impl: { round: {}, sign: false } });
+  const ru = await verified(unsigned);
+  assert.equal(ru.verdict, 'BLOCKED', JSON.stringify(ru));
+  const clean = await stopFixture({ impl: { round: {} } });
+  const rc = await verified(clean);
+  assert.equal(rc.verdict, 'PASS', JSON.stringify(rc));
+  assert.equal(clean.closed(), true);
+  // one more commit that changes a file in the task's scope: the implementation round reviewed the earlier file
+  const later = await stopFixture({ impl: { round: {} } });
+  fs.writeFileSync(later.s.abs('src/a.mjs'), 'export const a = 2;\n'); later.s.commit('change a');
+  const rl = await verified(later);
+  assert.equal(rl.verdict, 'BLOCKED', JSON.stringify(rl));
+  assert.match(rl.detail, /implementation round 4/);
+  assert.match(rl.detail, /head_stale_src/);
+  assert.equal(later.closed(), false);
+});
+
+test('T2-c12: verify stays BLOCKED while an in-scope file differs from the implementation round\'s reviewed commit, committed or not, and an untracked file the scope matches counts; reverting restores PASS', async () => {
+  const f = await stopFixture({ impl: { round: {} } });
+  const a = f.s.abs('src/a.mjs');
+  const keep = fs.readFileSync(a, 'utf8');
+  fs.writeFileSync(a, `${keep}export const extra = 1;\n`);
+  const edited = await verified(f);
+  assert.equal(edited.verdict, 'BLOCKED', JSON.stringify(edited));
+  assert.match(edited.detail, /implementation round/);
+  assert.match(edited.detail, /head_stale_src/);
+  assert.equal(f.closed(), false);
+  fs.writeFileSync(a, keep);
+  const fresh = f.s.abs('test/a.test.mjs');
+  fs.mkdirSync(path.dirname(fresh), { recursive: true });
+  fs.writeFileSync(fresh, '// a new test\n');
+  const added = await verified(f);
+  assert.equal(added.verdict, 'BLOCKED', JSON.stringify(added));
+  assert.match(added.detail, /implementation round/);
+  assert.match(added.detail, /head_stale_src/);
+  assert.match(added.detail, /test\/a\.test\.mjs/);
+  assert.equal(f.closed(), false);
+  fs.rmSync(fresh);
+  const back = await verified(f);
+  assert.equal(back.verdict, 'PASS', JSON.stringify(back));
+  assert.equal(f.closed(), true);
+  // a file outside the task's scope changing does not matter
+  fs.writeFileSync(f.s.abs('notes.txt'), 'x\n');
+  assert.equal((await verified(f)).verdict, 'PASS');
+});

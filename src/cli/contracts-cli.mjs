@@ -82,7 +82,7 @@ export async function command(cmd, pos, flags, { root, env }) {
     console.log(`Installed ${f}: pushes from ${wd} wait for its open contracts to verify. Remove the file to undo.`);
     return 0;
   }
-  if (sub === 'new') { const spec = JSON.parse(fs.readFileSync(pos[1], 'utf8')); return call('memev_contract_draft', spec); }
+  if (sub === 'new') { const spec = JSON.parse(fs.readFileSync(pos[1], 'utf8')); return call('memev_contract_draft', { ...spec, spec: path.resolve(String(pos[1])) }); }
   if (sub === 'sign') return call('memev_contract_sign', { id: pos[1] });
   if (sub === 'approve') return callAdmin('memev_contract_approve', { id: pos[1] });
   if (sub === 'verify') return call('memev_contract_verify', { id: pos[1] });

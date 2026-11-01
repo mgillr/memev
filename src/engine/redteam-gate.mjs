@@ -1249,3 +1249,150 @@ function cleanCommit(root, r) {
   }
   return null;
 }
+
+// ---- what the engine's draft, sign and verify paths use (QL-1.01 task 2) ----
+
+/** The top of the git work tree that holds `dir`, or null when it is not in one. */
+export function repoRoot(dir) {
+  try { if (!fs.statSync(dir).isDirectory()) return null; } catch { return null; }
+  const r = git(dir, ['rev-parse', '--show-toplevel']);
+  if (!r.ok || !r.out) return null;
+  try { return fs.realpathSync(r.out); } catch { return null; }
+}
+
+/**
+ * Whether a repository holds red-team records: a file under contracts/<area>/redteam/ in its working tree, or one its history
+ * ever held (so removing the folder, from the working tree or in a later commit, does not switch the rule off).
+ */
+export function holdsRecords(root) {
+  let areas = [];
+  try { areas = fs.readdirSync(path.join(root, 'contracts'), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); } catch { /* none */ }
+  for (const a of areas) {
+    try { if (fs.readdirSync(path.join(root, 'contracts', a, 'redteam')).some((n) => n.endsWith('.json'))) return true; } catch { /* none */ }
+  }
+  if (!isRepo(root)) return false;
+  const r = git(root, ['log', '--all', '--format=%H', '-n', '1', '--', ':(glob)contracts/*/redteam/*']);
+  return r.ok && r.out.length > 0;
+}
+
+/**
+ * Whether red-team records apply to this draft or sign, and where they are read from. The vault's settings are contracts.redteam_required
+ * (on: always) and contracts.redteam_root (an absolute repository path); without the latter the repository is the one holding the
+ * spec, else the one holding the workdir. A repository that holds records requires them whatever the setting says.
+ */
+export function redteamPolicy({ config = {}, spec = null, workdir = null } = {}) {
+  const c = config?.contracts || {};
+  const on = !!c.redteam_required;
+  let root = null;
+  if (typeof c.redteam_root === 'string' && path.isAbsolute(c.redteam_root)) { try { root = fs.realpathSync(c.redteam_root); } catch { root = null; } }
+  if (!root && spec) root = repoRoot(path.dirname(path.resolve(String(spec))));
+  if (!root && workdir) root = repoRoot(path.resolve(String(workdir)));
+  return { on, root, required: on || (root ? holdsRecords(root) : false) };
+}
+
+/** The specs a draft or a verify can come from: the gate's default directories and every other contracts/<area>/specs/ folder. */
+function repoSpecs(cwd) {
+  const found = defaultSpecs(cwd);
+  let areas = [];
+  try { areas = fs.readdirSync(path.join(cwd, 'contracts'), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort(); } catch { /* none */ }
+  for (const a of areas) {
+    const d = `contracts/${a}/specs`;
+    if (DEFAULT_SPEC_DIRS.includes(d)) continue;
+    let names = [];
+    try { names = fs.readdirSync(path.join(cwd, d), { withFileTypes: true }).filter((e) => e.isFile() && e.name.endsWith('.json')).map((e) => e.name).sort(); } catch { /* none */ }
+    for (const n of names) found.push(`${d}/${n}`);
+  }
+  return found;
+}
+
+const readSpecObj = (file) => { try { const o = JSON.parse(fs.readFileSync(file, 'utf8')); return isObj(o) && Array.isArray(o.tasks) ? o : null; } catch { return null; } };
+const draftedCanon = (obj) => { try { return canonical(draftTasks(obj)); } catch { return null; } };
+
+/**
+ * The judgement a draft or sign needs: when records apply, the spec the draft comes from (named by `spec`, else the one holding
+ * provenance.spec_sha256, else the ones sharing its title or its tasks) must be SIGNABLE, now, and the draft's tasks must be the
+ * tasks drafted from it. Returns { required: false } when no record applies, else { required: true, ok, reason, provenance }.
+ */
+export function redteamCheck({ config = {}, spec = null, workdir = null, title = null, tasks = [], provenance = null, reviewerKeys, stopKeys } = {}) {
+  const pol = redteamPolicy({ config, spec, workdir });
+  if (!pol.required) return { required: false };
+  const refuse = (reason) => ({ required: true, ok: false, reason: `red-team gate: ${reason}` });
+  const cwd = pol.root || (spec ? path.dirname(path.resolve(String(spec))) : null);
+  if (!cwd) return refuse('red-team records are required, but there is no repository to read them from (set contracts.redteam_root)');
+  const want = (() => { try { return canonical(tasks); } catch { return null; } })();
+  let found = [];
+  if (spec) found = [path.resolve(String(spec))];
+  else {
+    const all = repoSpecs(cwd).map((s) => path.join(cwd, s));
+    const sha = provenance?.spec_sha256;
+    if (typeof sha === 'string' && sha) {
+      found = all.filter((f) => { const o = readSpecObj(f); return o && specSha256(o) === sha; });
+      if (!found.length) return refuse(`no spec in ${cwd} has the hash ${sha.slice(0, 12)} the draft names, so there is no record for it (the spec changed, or it is not in this repository)`);
+    } else {
+      found = all.filter((f) => { const o = readSpecObj(f); return o && ((typeof title === 'string' && o.title === title) || draftedCanon(o) === want); });
+      if (!found.length) return refuse(`NO RECORD: no spec in ${cwd} has this title or these tasks, so no red-team record backs the draft`);
+    }
+  }
+  let prov = null;
+  for (const f of found) {
+    const obj = readSpecObj(f);
+    const r = evaluate({ spec: f, cwd, reviewerKeys, stopKeys });
+    if (!r.status.startsWith('SIGNABLE')) return refuse(`${r.spec} is ${r.status}${r.reasons.length ? `: ${r.reasons.join('; ')}` : ''}`);
+    if (!obj || draftedCanon(obj) !== want) return refuse(`${r.spec}: the draft's tasks are not the tasks drafted from the spec`);
+    prov ||= { spec_sha256: r.signable_sha256, spec: r.spec };
+  }
+  return { required: true, ok: true, root: cwd, provenance: prov };
+}
+
+/**
+ * The in-scope files that differ between commit `from` and the working tree: committed changes, uncommitted edits and untracked files
+ * the spec's task scopes match. Returns null when git cannot tell.
+ */
+export function inScopeDrift({ cwd, spec, from }) {
+  const root = path.resolve(cwd);
+  const obj = isObj(spec) ? spec : readSpecObj(path.resolve(root, String(spec)));
+  const d = git(root, ['diff', '--name-only', '--no-renames', '--relative', from]);
+  const u = git(root, ['ls-files', '--others', '--exclude-standard']);
+  if (!obj || !d.ok || !u.ok) return null;
+  const globs = arr(obj.tasks).flatMap(scopeOf);
+  const files = [...(d.out ? d.out.split('\n') : []), ...(u.out ? u.out.split('\n') : [])].filter((f) => f && !f.startsWith('contracts/signed/') && !f.startsWith('contracts/keys/'));
+  return [...new Set(files.filter((f) => matchAny(f, globs)))];
+}
+
+/**
+ * Verify's extra rule: a contract whose spec's record ends with a stop decision is BLOCKED until the record also holds an
+ * implementation round that is clean and whose reviewed commit has the same in-scope files as the working tree. Returns null
+ * (nothing to say) or { detail }.
+ */
+export function stopBlocks({ config = {}, workdir = null, title = null, tasks = [], provenance = null, reviewerKeys, stopKeys } = {}) {
+  const pol = redteamPolicy({ config, workdir });
+  if (!pol.required || !pol.root) return null;
+  const cwd = pol.root;
+  const want = (() => { try { return canonical(tasks); } catch { return null; } })();
+  const sha = provenance?.spec_sha256;
+  for (const s of repoSpecs(cwd)) {
+    const f = path.join(cwd, s);
+    const obj = readSpecObj(f);
+    if (!obj) continue;
+    const linked = sha ? specSha256(obj) === sha : (typeof title === 'string' && obj.title === title) || draftedCanon(obj) === want;
+    if (!linked) continue;
+    const rr = readStrict(locate(f).record);
+    if (!rr.ok || !isObj(rr.value?.stop)) continue;
+    const r = evaluate({ spec: f, cwd, reviewerKeys, stopKeys });
+    const impl = r.implementation;
+    const why = [];
+    if (!impl) why.push('the record holds no implementation round after the stop decision');
+    else if (!impl.clean) why.push(`implementation round ${impl.round} is not clean: ${impl.reasons.join('; ')}`);
+    else {
+      const drift = isSha(impl.base_commit) ? inScopeDrift({ cwd, spec: obj, from: impl.base_commit }) : null;
+      if (drift === null) why.push(`implementation round ${impl.round}: head_stale_src: the files changed since its reviewed commit cannot be listed`);
+      else if (drift.length) why.push(`implementation round ${impl.round}: head_stale_src: ${drift.slice(0, 5).join(', ')}${drift.length > 5 ? ` and ${drift.length - 5} more` : ''}, in the task's scope, differ from the commit the implementation round reviewed (${impl.base_commit.slice(0, 12)})`);
+    }
+    if (!why.length) {
+      const hard = r.reasons.filter((x) => !x.startsWith('head_stale_src:'));
+      if (hard.length) why.push(`the record is ${r.status}: ${hard.join('; ')}`);
+    }
+    if (why.length) return { detail: `the record of ${r.spec} ends with a stop decision, so verify needs a clean implementation round: ${why.join('; ')}` };
+  }
+  return null;
+}

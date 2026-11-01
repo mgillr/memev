@@ -11,6 +11,7 @@ import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { configDir, randomToken, slug, now, readJson, writePrivate, exists, truncate, run as spawn } from './util.mjs';
 import { git } from './git.mjs';
+import { redteamCheck, stopBlocks } from './redteam-gate.mjs';
 import * as A from '../../vendor/attest/contract.mjs';
 import { decompose as attestDecompose } from '../../vendor/attest/decompose.mjs';
 import { sign as dsseSign, verify as dsseVerify, keyId, generateKeyPair, canonicalHash } from '../../vendor/attest/signature.mjs';
@@ -120,14 +121,35 @@ function signingKey(dir) {
 export function attach(Vault) {
   const P = Vault.prototype;
 
-  P.contractDraft = function (identity, { title, project = null, workdir = null, tasks = [], supersedes = null, client = null, request = null, provenance = null, version = null }) {
+  /** The red-team judgement of a draft (see redteamCheck); throws a refusal that names the gate. The reviewer and stop keys are the Vault constructor's options, never the environment or the vault config. */
+  P._redteam = function ({ spec = null, c }) {
+    const r = redteamCheck({ config: this.config, spec, workdir: c.workdir, title: c.title, tasks: c.tasks, provenance: c.provenance, reviewerKeys: this.opts.reviewerKeys, stopKeys: this.opts.stopKeys });
+    if (r.required && !r.ok) throw new ContractError('red_team', r.reason);
+    return r;
+  };
+  /** The drafts this vault checked at the gate, by id, with the hash of the bytes it wrote: a later change to one is refused at sign. */
+  const draftsFile = (v) => path.join(v.state, 'redteam-drafts.json');
+  P._redteamKnown = function (id) { return readJson(draftsFile(this), {})[id] || null; };
+  P._redteamRemember = function (id, body) {
+    const all = readJson(draftsFile(this), {});
+    all[id] = crypto.createHash('sha256').update(body).digest('hex');
+    writePrivate(draftsFile(this), `${JSON.stringify(all, null, 1)}\n`);
+  };
+
+  P.contractDraft = function (identity, { title, project = null, workdir = null, tasks = [], supersedes = null, client = null, request = null, provenance = null, version = null, spec = null }) {
     if (!title) throw new ContractError('bad_request', 'a contract needs a title');
     if (!Array.isArray(tasks) || !tasks.length) throw new ContractError('bad_request', 'a contract needs at least one task');
     const id = `k-${slug(title, 24)}-${randomToken(3)}`;
     const c = { ...A.skeleton(project || 'memev'), id, title, workdir, created: now(), version: version || 1, ...(supersedes ? { supersedes } : {}), ...(request ? { request: truncate(String(request), 4000) } : {}), ...(provenance ? { provenance } : {}), tasks: tasks.map((t, i) => A.makeTask({ id: t.id || `T${i + 1}`, title: t.title, phase: t.phase || 'implement', depends_on: t.depends_on || [], requirements: t.requirements || [], description: t.description || '', scope: t.scope || ['**'], criteria: t.criteria || [], stop_rules: t.stop_rules || [] })) };
     const errs = A.validate(c);
     if (errs.length) throw new ContractError('invalid', `the contract is not valid: ${errs.slice(0, 5).join('; ')}`);
-    this.write(identity, { path: `contracts/drafts/${id}.json`, body: `${JSON.stringify(c, null, 2)}\n`, client });
+    // the red-team gate, before anything is written: wherever the repository holds red-team records (or contracts.redteam_required is on)
+    // the spec this draft comes from must be SIGNABLE now and the draft must be the tasks drafted from it. Local and tunnel callers alike.
+    const gated = this._redteam({ spec, c });
+    if (gated.required) c.provenance = { ...(c.provenance || {}), ...gated.provenance };
+    const body = `${JSON.stringify(c, null, 2)}\n`;
+    this.write(identity, { path: `contracts/drafts/${id}.json`, body, client });
+    if (gated.required) this._redteamRemember(id, body);
     return { id, path: `contracts/drafts/${id}.json`, tasks: c.tasks.length };
   };
 
@@ -140,6 +162,12 @@ export function attach(Vault) {
     const errs = A.validate(c); if (errs.length) throw new ContractError('invalid', errs.join('; '));
     // a draft is a note any contracts/** token can write, so the check contractDraft makes is made again here (issue 257)
     if (!Array.isArray(c.tasks) || !c.tasks.length) throw new ContractError('bad_request', 'a contract needs at least one task');
+    // the red-team record is checked again here, on the draft as it stands: a draft is a note any contracts/** token can write, and the
+    // spec or the code under review may have changed since the draft was made
+    const known = this._redteamKnown(id);
+    if (known && known !== crypto.createHash('sha256').update(draft).digest('hex')) throw new ContractError('red_team', 'red-team gate: the draft was changed after it was checked; draft it again');
+    const gated = this._redteam({ c });
+    if (gated.required && !gated.provenance) throw new ContractError('red_team', 'red-team gate: no record backs this draft');
     const key = signingKey(this.opts.keyDir || path.join(configDir(), 'keys'));
     const origin = local ? 'local' : 'remote';
     c.origin = origin;
@@ -226,6 +254,9 @@ export function attach(Vault) {
     const inVault = !local || origin === 'remote';
     // the same callers supply grep patterns: past the budget their remaining grep criteria fail unchecked
     let grepLeft = inVault ? GREP_VERIFY_BUDGET_MS : Infinity;
+    // a spec whose record ends with a stop decision is verified only after a clean implementation round (QL-1.01 task 2)
+    const blocked = stopBlocks({ config: this.config, workdir: wd, title: c.title, tasks: c.tasks, provenance: c.provenance, reviewerKeys: this.opts.reviewerKeys, stopKeys: this.opts.stopKeys });
+    if (blocked) return { id, ok: false, verdict: 'BLOCKED', signature: s.detail, detail: blocked.detail, tasks: [] };
     const run = (crit) => {
       const v = crit.verifier;
       if (v.type === 'command') {
