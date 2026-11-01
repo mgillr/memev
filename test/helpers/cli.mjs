@@ -93,3 +93,10 @@ export function pollUntil(step, ok, { timeoutMs = 20000, intervalMs = 500 } = {}
   while (!ok(r) && Date.now() < end) { sleepSync(intervalMs); r = step(); }
   return r;
 }
+
+/** Run a hook through the sandbox, and while it prints its not-reachable notice (the daemon did not answer inside the hook's own
+ *  timeout on a slow machine; the hook still exits 0) ask again, up to timeoutMs. args are the arguments of sb.hook.
+ *  Returns the last result either way. */
+export function hookUntil(sb, args, { timeoutMs = 30000, intervalMs = 500 } = {}) {
+  return pollUntil(() => sb.hook(...args), (r) => !/Memev is not reachable|Memev could not start/.test(r.out), { timeoutMs, intervalMs });
+}
