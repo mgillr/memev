@@ -38,13 +38,13 @@ AI work is spread across tools, sessions, computers and people. Decisions become
 
 Memev is operating infrastructure for human and AI work. It connects people, agents and tools to shared project state, coordination, governed execution, contracts, evidence and verification. Its local vault preserves the knowledge and provenance that work depends on; the communications bus supports coordination; and the project and contract layers distinguish assignment, execution, verification and acceptance. It works alongside the AI tools and systems people already use rather than replacing them.
 
-Three ideas run through everything:
+Three capabilities define the product:
 
-- **Shared, durable memory.** Decisions, constraints and prior work live in a vault on your own computer, written to a checksummed log first and kept in git. Any connected app can recall them. A new session starts from a resume card instead of from nothing.
-- **Merging that does not need a judge.** When several computers or agents change the same state, the convergence engine crdt-merge combines the copies with deterministic rules. The result does not depend on the order the changes arrive in, it works offline, deletes are explicit, and no language model is asked to decide what to keep. This is the direction for Memev state, and it is partly built: see [Plans and roadmap](#plans-and-roadmap) for what runs today.
-- **Work that is checked.** A work contract states the task, the deliverables, the acceptance criteria and the stop conditions. Memev keeps the outcome of the checks next to the work, so a task being assigned is not mistaken for a task being proven.
+- **Shared project state and provenance.** Decisions, constraints, obligations and work records live in a local vault, written through a checksummed log and kept in git. Connected tools can work from the same authorised context, while the underlying records remain inspectable and under the operator's control.
+- **Coordination across tools and agents.** The communications bus provides named seats, presence, messages and task hand-offs between connected AI applications. It transports coordination; it does not become the authority for project state or contractual acceptance.
+- **Governed execution and evidence.** Work contracts define obligations and acceptance criteria. The ProjectStore and Coordinator track task state, claims, leases, dispatch and recovery. A report of completion is not verification: evidence must be bound to the relevant scope and artifact before work can become verified.
 
-Federation, where independent sites each keep their own records and still reconcile, is the roadmap, not something Memev ships today. The decisions behind the plans are recorded in [docs/scope-one/DECISIONS.md](docs/scope-one/DECISIONS.md), and how the plans line up with the work breakdown is in [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md).
+Deterministic multi-writer convergence is a separate provider boundary, not a claim that the free single-computer core supports concurrent editing. The CRDT-Merge engine and its commercial boundary are described in [Convergence](docs/CONVERGENCE.md). Multi-computer editing and operational federation are not part of this Free Core preview. The decisions behind the wider roadmap are recorded in [docs/scope-one/DECISIONS.md](docs/scope-one/DECISIONS.md), with delivery reconciliation in [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md).
 
 ## Who it is for
 
