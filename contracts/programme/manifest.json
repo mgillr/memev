@@ -1495,7 +1495,7 @@
         },
         {
           "contract": "QL-W-01A",
-          "boundary": "QL-W-01A (pull request #380, unsigned) refuses new signings that have no base and leaves contractVerify unchanged; QL-W-01B changes contractVerify, adds contractAttestBase and one export, and touches no function that QL-W-01A touches; a verify of a contract with no attestation behaves as QL-W-01A requirement 4 says"
+          "boundary": "QL-W-01A (signed; merged in pull request #380) refuses new signings that have no base and leaves contractVerify unchanged; QL-W-01B changes contractVerify, adds contractAttestBase and one export, and touches no function that QL-W-01A touches; a verify of a contract with no attestation behaves as QL-W-01A requirement 4 says"
         }
       ],
       "vault_contracts": [],
@@ -1507,7 +1507,7 @@
       "tasks": 1,
       "criteria": 28,
       "spec": "specs/QL-W-01B.json",
-      "base": "54a98028ca455d82c64c3a07f3b813eff8263a26 (the memev main commit that merged pull request #379, SR-W-03A)",
+      "base": "2686be2edeba642a0c1d2d3f3b0b58d0c255ee3c (the memev main commit that merged pull request #380, QL-W-01A)",
       "status": "proposed, unsigned; adds no attestation record and changes no signed body"
     },
     {
