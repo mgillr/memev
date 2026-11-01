@@ -1,7 +1,6 @@
 name: Free Core feedback
 description: Share usability feedback or a successful test result from the invited preview.
 title: "[Free Core feedback] "
-labels: ["free-core-preview", "feedback"]
 body:
   - type: markdown
     attributes:
