@@ -1,16 +1,158 @@
 // SPDX-License-Identifier: Apache-2.0
 // The relationship model of a project, over the one project store. Milestones, deliverables and work packages are store
 // entities; the links between scope, milestones, plans, tasks, artifacts, checks, evidence, blockers and permissions are
-// events with stable ids, validated against docs/schemas/relationships-v1.json. A change to a requirement or a scope version
+// events with stable ids, validated against the schema of docs/schemas/relationships-v1.json. A change to a requirement or a scope version
 // marks every dependent plan, task, artifact, approval and evidence record stale with its reason; a marker clears only by a new
 // verification or an explicit re-acceptance. Every projection says which event it comes from and how fresh it is, and a value it
 // cannot confirm reads "not confirmed", never a guess. Progress is derived from the links and the verified tasks under them: a
 // percentage a session reports is not an input.
 // The store is passed in (withWrite, append, snapshot, sourceOf, hasRecord): this module opens no store of its own.
-import fs from 'node:fs';
 import { sha256 } from './util.mjs';
 
-export const SCHEMA = JSON.parse(fs.readFileSync(new URL('../../docs/schemas/relationships-v1.json', import.meta.url), 'utf8'));
+// The schema of docs/schemas/relationships-v1.json, held here as well because the installed runtime has no docs folder; a test
+// holds the two equal.
+export const SCHEMA = {
+  "$comment": "The relationship model of a project: three entity kinds beside the store's own, and eleven link types stored as events. Read by src/engine/relationships.mjs and by the project store.",
+  "version": 1,
+  "entity_kinds": {
+    "milestone": {
+      "required": [
+        "title"
+      ]
+    },
+    "deliverable": {
+      "required": [
+        "title"
+      ]
+    },
+    "work_package": {
+      "required": [
+        "title"
+      ]
+    }
+  },
+  "link_event": {
+    "type": "relationship.linked",
+    "required": [
+      "id",
+      "link_type",
+      "from",
+      "to"
+    ],
+    "endpoint": {
+      "required": [
+        "kind",
+        "id"
+      ]
+    }
+  },
+  "link_types": {
+    "scope-to-milestone": {
+      "from": [
+        "scope",
+        "requirement"
+      ],
+      "to": [
+        "milestone"
+      ]
+    },
+    "milestone-to-plan": {
+      "from": [
+        "milestone"
+      ],
+      "to": [
+        "plan"
+      ]
+    },
+    "milestone-to-deliverable": {
+      "from": [
+        "milestone"
+      ],
+      "to": [
+        "deliverable"
+      ]
+    },
+    "deliverable-to-work-package": {
+      "from": [
+        "deliverable"
+      ],
+      "to": [
+        "work_package"
+      ]
+    },
+    "work-package-to-task": {
+      "from": [
+        "work_package"
+      ],
+      "to": [
+        "task"
+      ]
+    },
+    "task-to-dependency": {
+      "from": [
+        "task"
+      ],
+      "to": [
+        "task"
+      ]
+    },
+    "task-to-artifact": {
+      "from": [
+        "task"
+      ],
+      "to": [
+        "artifact"
+      ]
+    },
+    "task-to-check": {
+      "from": [
+        "task"
+      ],
+      "to": [
+        "check"
+      ]
+    },
+    "task-to-evidence": {
+      "from": [
+        "task"
+      ],
+      "to": [
+        "evidence"
+      ]
+    },
+    "blocker-to-work": {
+      "from": [
+        "blocker"
+      ],
+      "to": [
+        "task",
+        "work_package"
+      ]
+    },
+    "permission-to-resource": {
+      "from": [
+        "permission"
+      ],
+      "to": [
+        "resource"
+      ]
+    }
+  },
+  "stale_marker": {
+    "type": "stale.marked",
+    "targets": [
+      "plan",
+      "task",
+      "artifact",
+      "approval",
+      "evidence"
+    ],
+    "cleared_by": [
+      "verification",
+      "re-acceptance"
+    ]
+  }
+};
 export const LINK_TYPES = Object.freeze(Object.keys(SCHEMA.link_types));
 export const NOT_CONFIRMED = 'not confirmed';
 const ENTITY_KINDS = Object.keys(SCHEMA.entity_kinds);

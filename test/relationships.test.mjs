@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ProjectStore } from '../src/engine/project-store.mjs';
-import { LINK_TYPES, validateLink, addEntity, link, changeSource, impact, staleOf, clearStale, project, confirmProjection, progress } from '../src/engine/relationships.mjs';
+import { SCHEMA, LINK_TYPES, validateLink, addEntity, link, changeSource, impact, staleOf, clearStale, project, confirmProjection, progress } from '../src/engine/relationships.mjs';
 import { runWork } from '../src/cli/work.mjs';
 import { tmpdir, cleanup, PKG } from './helpers/tmp.mjs';
 after(cleanup);
@@ -49,6 +49,7 @@ const keyOf = (d) => `${d.kind}:${d.id}`;
 
 test('SO-A-04 AC01: the schema file lists the eleven link types and the store validates milestone, deliverable and work package entities', () => {
   const schema = JSON.parse(fs.readFileSync(path.join(PKG, 'docs/schemas/relationships-v1.json'), 'utf8'));
+  assert.deepEqual(schema, SCHEMA, 'the schema in the code is the schema in the file');
   assert.deepEqual(Object.keys(schema.link_types), TYPES);
   assert.deepEqual([...LINK_TYPES], TYPES);
   for (const t of TYPES) { assert.ok(schema.link_types[t].from.length && schema.link_types[t].to.length, t); }
