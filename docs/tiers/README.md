@@ -121,10 +121,11 @@ copied outside Memev.
 | Connectors that bring CRM, ticketing and chat data into the vault | planned | AI apps can use those vendors' own MCP servers next to Memev today |
 | High-availability servers, air-gapped package | planned | |
 | SIEM and audit export, retention rules, legal hold | planned | |
-| Project state machine | planned | the code is present in `src/engine/project-state.mjs` and nothing imports it yet ([PROJECTS.md](../PROJECTS.md)) |
+| ProjectStore, task state machine and Coordinator | built | local project records, legal task transitions, claims, leases, dispatch control, recovery and evidence-bound verification ([PROJECTS.md](../PROJECTS.md)); broader workspace UI and external integrations are still in progress |
 | Federation of independently operated site nodes | planned | Corporate, and a Business licence whose services list includes the multi-site federation design ([services.md](services.md)); the company vault is the one-node case and the first release ([FEDERATION.md](../FEDERATION.md)) |
 | Federated computation across sites | planned | Corporate, and a Business licence whose services list includes the multi-site federation design; workload-specific algorithms, the engine converges supported state only ([FEDERATED-COMPUTATION.md](../FEDERATED-COMPUTATION.md)) |
-| The trust service and the admission service | planned | two adapter boundaries beside the merge boundary, named generically until they are published ([EXTENSION-POINTS.md](../EXTENSION-POINTS.md)) |
+| Local federation foundations: signed contribution validation, admission, relationship records and policy evaluation | built | local primitives only; not an operational multi-node service ([FEDERATION.md](../FEDERATION.md)) |
+| External trust and admission service integrations | planned | adapter boundaries beside the merge boundary, named generically until they are published ([EXTENSION-POINTS.md](../EXTENSION-POINTS.md)) |
 
 Nothing on these pages is sold before it is built. A planned part goes into an offer only with a
 delivery date.
