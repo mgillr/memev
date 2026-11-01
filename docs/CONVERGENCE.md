@@ -57,3 +57,6 @@ a random id ([METRICS.md](METRICS.md)).
 
 This page states no merge strategy names, benchmark figures or release dates for the engine, because
 none are published for Memev. A page for any of them is written when the feature ships.
+
+What should happen to each entity type when two computers write it at once is set out in
+[MERGE-SEMANTICS.md](MERGE-SEMANTICS.md). That page names no engine strategy either.
