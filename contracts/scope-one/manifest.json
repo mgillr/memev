@@ -611,6 +611,24 @@
    "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
+   "id": "SO-08-B",
+   "area": "SO-08",
+   "title": "Recovery and control: disconnect recovery, restart reconstruction, pause, resume and cancel through memev work, transitions on the existing bus, idempotent bus delivery and memev work status",
+   "repo": "memev",
+   "closes": "Repository text of the acceptance criteria of the signed vault contract SO-08-B (cited by id), restated from the vault set-work bundle in the memev spec format; unsigned, it does not replace or amend the vault contract",
+   "depends_on": [
+    "SO-1.01",
+    "SO-A-03"
+   ],
+   "implements": [],
+   "programme_task": "WP08-02 (PG-08.1)",
+   "tasks": 1,
+   "criteria": 11,
+   "spec": "specs/SO-08-B.json",
+   "adapted_from": "vault set-work bundle",
+   "status": "proposed and unsigned; no red-team record"
+  },
+  {
    "id": "SO-R-E",
    "area": "SO-R",
    "title": "Publish the versioned container image by a maintainer-run script after the Docker smoke passes: the registry account read from the environment or the origin remote, image name memev, tags the version and the sha, a published-image smoke, and the owner's go for the first public image",
@@ -659,7 +677,31 @@
    "criteria": 8,
    "spec": "specs/SO-F-02.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026",
+   "superseded_by": "SO-F-02.2",
+   "superseded_reason": "owner delegation, 1 Nov 2026: SO-F-02.2 keeps T1 as it is and adds T2, so that the coordinator's read side reads store.view('task') and a task with unresolved approve and reject approvals cannot be claimed"
+  },
+  {
+   "id": "SO-F-02.2",
+   "area": "SO-F",
+   "title": "Canonical project schema, version 1, with authority and merge classes: every entity type declares its owner authority, scope version and merge class, and two incompatible approvals derive to a semantic conflict, never to an applied state",
+   "repo": "memev",
+   "closes": "Build layer of the design records SO-1.07, SO-2.01: the fold contract SO-F-02 adapted to memev main, as the fold of 30 Oct 2026 left it unsignable; T2 consumes the conflict view in the coordinator (follow-up to pull request #354)",
+   "depends_on": [
+    "SO-F-01",
+    "SO-1.01"
+   ],
+   "implements": [
+    "SO-1.07",
+    "SO-2.01"
+   ],
+   "tasks": 2,
+   "criteria": 16,
+   "spec": "specs/SO-F-02.2.json",
+   "adapted_from": "fold of 30 Oct 2026",
+   "status": "proposed and unsigned; no red-team record",
+   "supersedes": "SO-F-02",
+   "supersedes_signed_contract": "k-so-f-02-canonical-projec-38d008 (the spec file contracts/scope-one/specs/SO-F-02.json is unchanged)"
   },
   {
    "id": "SO-F-03",

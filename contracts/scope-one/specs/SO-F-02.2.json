@@ -1,0 +1,202 @@
+{
+  "title": "SO-F-02.2 Canonical project schema, version 1, with authority and merge classes: every entity type declares its owner authority, scope version and merge class, and two incompatible approvals derive to a semantic conflict, never to an applied state",
+  "project": "memev",
+  "workdir": null,
+  "request": "Version 2 of this spec, which supersedes SO-F-02 (signed as contract k-so-f-02-canonical-projec-38d008; the SO-F-02 spec file is unchanged and stays on record, and the manifest and RECONCILIATION mark it superseded by this spec). Decided under owner delegation, 1 Nov 2026. Changes from SO-F-02: T1 is kept as it is, with every requirement, criterion and scope entry, and a task T2 is added. The pull request that builds T1 is #354: its design text (docs/PROJECTS.md, the semantic conflict rule) says that the conflict is surfaced and not enforced, because the coordinator reads snapshot() and nothing in src/ calls view('task') or conflicts(), so a task with an unresolved approve and reject can still be claimed. T2 closes that gap: the read side of the coordinator in src/engine/coordinator.mjs (claim, the eligibility check, status and the task listing around _tasksOf) reads store.view('task') and refuses to claim a task that the view shows as CONFLICTED; its writes keep using snapshot(), so a conflicted task is never written back as CONFLICTED. T2 starts once #354 merges, because view('task') and conflicts() exist only there. Build layer of the Scope One programme, adapted from the fold of 30 Oct 2026 (fold id SO-F-02) and validated against memev main at d1c65ef. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository; they are cited by id only. Implements the design records SO-1.07 (Relationship model: explicit relations between project items, and change propagation that marks affected work stale); SO-2.01 (Organisational knowledge model: relationships between people, teams, projects, decisions, artefacts and evidence) (contracts/scope-one/specs). The decision record cites this contract by id and keeps only the gaps this one does not cover. Builds on signed vault contracts: SO-04-A\u2020, SO-07-A\u2020, WO-05-A\u2020. Memev contracts that land first: SO-F-01, SO-1.01. Source in the fold: #222 section 13.7 (convergence of state is not proof of truth; the event, receipt and evidence model) and #223 ARCHITECTURAL-INTERDEPENDENCIES.md (structured state convergence requires canonical schemas, ownership and conflict policy). Settled decisions this contract follows (owner decision 31 Oct 2026, docs/scope-one/DECISIONS.md): topology is local-first and the cloud is only a relay and a backup; every supported provider stands on equal footing and no work or tier depends on one; crdt-merge is reached only through the provider boundary of src/engine/merge.mjs (docs/EXTENSION-POINTS.md) and this contract adds no merge engine to the core; tiers follow docs/PRICING.md (Free core, Personal for up to 3 computers with no per-computer add-on, higher tiers by contacting us) with no Personal trial; the git backup keeps running every few minutes (sync.interval_min). Memory authority: ADR 7 (memory and project-state authority) is proposed in PR #325 and is not decided here; this contract cites it and the local-first decision, and keeps one store under the vault with no second database. Provenance: adapted from the fold of 30 Oct 2026. Changes: (1) converted from the vault task format to the memev spec format (named tests run as red-green checks on the own test file of the contract; inline regular expression flags became the flags key; hygiene and decision verifiers became commands or doc checks). (2) removed fold-only fields and the owner-decision marker field, reworded the stop rule that named a patent, and made the text pass the leak scan. (3) Prerequisite SO-1.01 added: the state machine and store are now wired, so the semantic-conflict rule acts on the real transition table. (4) Boundary with PG-05.1 WP05-01 (merge-semantics table by object class, docs/MERGE-SEMANTICS.md): the vocabulary of semantics is owned there. This contract owns the declaration on every entity type, the store refusing an entity without one, and the semantic-conflict rule. The four class names in the schema must equal the semantics column of that table; neither contract redefines the other.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Canonical project schema, version 1, with authority and merge classes: every entity type declares its owner authority, scope version and merge class, and two incompatible approvals derive to a semanti",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "every entity type in docs/schemas/project-v1.json declares an authority owner, a scope version field and a merge class from last-writer, set-union,",
+        "a derived state outside the transition table (two incompatible approval events on different versions, which SO-04-A AC06 does not catch) is a",
+        "the project schema exists",
+        "docs/PROJECTS.md documents the merge classes and the semantic-conflict rule in plain words"
+      ],
+      "description": "The convergence engine merges one note against a base today. Before it can touch projects, tasks, decisions or evidence, every entity type needs a declared merge class (last-writer, set union, append-only, human resolution) and an authority owner. The re-derivation of state from events is SO-07-A AC03 and the version conflict is SO-04-A AC06; this contract adds the schema and the semantic part those do not catch. The core applies no merge class itself: the free path keeps both versions and the engine contract is SO-F-06 (the provider boundary of src/engine/merge.mjs, ADR 6).",
+      "scope": [
+        "changelog.d/SO-F-02.md",
+        "docs/MODULES.md",
+        "docs/PROJECTS.md",
+        "docs/schemas/project-v1.json",
+        "src/engine/project-state.mjs",
+        "src/engine/project-store.mjs",
+        "test/helpers/**",
+        "test/project-schema.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "every entity type in docs/schemas/project-v1.json declares an authority owner, a scope version field and a merge class from last-writer, set-union, append-only or human-resolution; the store refuses an entity without a merge class; migrations carry the schema version (SO-07-A); the core applies no merge class itself and the free path keeps both versions (the engine contract is SO-F-06)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-schema.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-02 AC02:' test/project-schema.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-02 AC02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "a derived state outside the transition table (two incompatible approval events on different versions, which SO-04-A AC06 does not catch) is a semantic conflict: the SO-07-A AC03 derivation produces CONFLICTED with a conflict record naming both events and neither approval is applied; the test converges two incompatible approval events and asserts the record and that both inputs stay intact",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-schema.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-02 AC03:' test/project-schema.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-02 AC03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "the project schema exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/schemas/project-v1.json"
+          }
+        },
+        {
+          "statement": "docs/PROJECTS.md documents the merge classes and the semantic-conflict rule in plain words",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/PROJECTS.md",
+            "pattern": "merge class"
+          }
+        },
+        {
+          "statement": "The full test suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "The leak scan passes on files and every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Every changed file is inside this contract's scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "Stop and post BLOCKED when a criterion cannot pass without weakening a test, skipping a test or relaxing an assertion.",
+        "Stop and ask when the work would name a client product, a person, a server or a seat in repository text; the client names live in docs/CLIENTS.md only.",
+        "Stop when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would move convergence logic into the core, vendor the engine, or add a merge engine beside the provider boundary of src/engine/merge.mjs.",
+        "Stop when the work would implement a federation, replication, trust, admission or computation feature beyond the specification, schema, validator and conformance test the contract names; the product keeps the planned label on it.",
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "The coordinator reads the conflict: claim, eligibility and status read store.view('task'), and a task with unresolved approve and reject approvals cannot be claimed",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "the read side of the coordinator in src/engine/coordinator.mjs (claim, the eligibility check, status and the task listing around _tasksOf) reads store.view('task'), so a task that the view shows as CONFLICTED is not eligible and cannot be claimed (source: docs/PROJECTS.md, the semantic conflict rule of pull request #354, the wiring that follows)",
+        "the writes of the coordinator keep using snapshot(), so a conflicted task is never written back as CONFLICTED and the stored status stays the one the task had (source: docs/PROJECTS.md, the semantic conflict rule of pull request #354)",
+        "no change to the store, the schema or the conflict derivation: those are T1 and pull request #354; this task only consumes them (source: owner delegation, 1 Nov 2026)"
+      ],
+      "description": "Repo: memev. Starts once pull request #354 (T1) merges: store.view('task') and store.conflicts() exist only there. A task with unresolved approve and reject approvals shows as CONFLICTED in the view while its stored status is unchanged. Today the coordinator reads snapshot() everywhere, so such a task can be claimed. This task changes only the read side (claim, the eligibility check, status and the listing around _tasksOf) to read the view; every write still reads and writes through snapshot(). The coordinator unit tests run over a store double: the double gains a view method that returns the snapshot, so they stay as they are. SO-A-01, SO-A-03 and PGP-1.02 also list src/engine/coordinator.mjs in their scope: land this change after those that are open, or merge main into this branch first.",
+      "scope": [
+        "src/engine/coordinator.mjs",
+        "test/coordinator-conflict.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "a task with unresolved approve and reject approvals (CONFLICTED in store.view('task'), stored status unchanged) cannot be claimed: claim refuses it, eligible does not list it and status reports it as conflicted; the test builds the two approvals on a real store, fails on the current code, where claim succeeds, and passes after the change",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/coordinator-conflict.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-02.2 T2 AC01:' test/coordinator-conflict.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-F-02.2 T2 AC01:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "after a person settles the conflict with an approval whose resolves lists both events, the same task can be claimed again, and no write of the coordinator stores CONFLICTED as the status of a task (the stored status is read back through snapshot())",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/coordinator-conflict.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-02.2 T2 AC02:' test/coordinator-conflict.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-F-02.2 T2 AC02:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "the coordinator's read side reads the view: claim, the eligibility check and status in src/engine/coordinator.mjs name view('task')",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$(grep -c \"view('task')\" src/engine/coordinator.mjs)\" -ge 3 ]",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "the coordinator unit tests and the wired-path tests pass unchanged: node --test test/coordinator.test.mjs test/project-wiring.test.mjs test/project-wiring-remaining.test.mjs test/task-verify-from-contract.test.mjs (none is in this task's scope)",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/coordinator.test.mjs test/project-wiring.test.mjs test/project-wiring-remaining.test.mjs test/task-verify-from-contract.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The full test suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "The leak scan passes on files and every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Every changed file is inside this contract's scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "Stop and post BLOCKED when a criterion cannot pass without weakening a test, skipping a test or relaxing an assertion.",
+        "Stop and ask when the work would name a client product, a person, a server or a seat in repository text; the client names live in docs/CLIENTS.md only.",
+        "Stop when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would move convergence logic into the core, vendor the engine, or add a merge engine beside the provider boundary of src/engine/merge.mjs.",
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

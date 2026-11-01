@@ -74,6 +74,11 @@ Who writes which task, so that two authors do not write the same one. Claims are
 | `PG-03.1` (vectors, crdt-merge); one pull request | Claim C | branch `feat/pg-03-1-*` | queued after `SO-2.01` to `SO-2.06` |
 | `PG-03.4` (crdt-merge-ts; supersedes the signed `PG-03.2`) and `PG-03.6` (crdt-merge-rs; supersedes `PG-03.5`, which superseded the signed `PG-03.3`); one pull request per package; depend on `PG-03.1` | Claim C | branches `feat/pg-03-4-*`, `feat/pg-03-5-*` (the branch name of the crdt-merge-rs pull request is unchanged) | active |
 | `SO-F-01` (identity and scopes model, version 1; a signed fold contract of pull request #341) | Claim C | branch `feat/so-f-01-identity-and-scopes` | claimed |
+| `WP04-03` (adapters: the oplog record, the bus message and the project-store events convert to and from the envelope; in `PG-04.2`) | unclaimed | none | open, unclaimed |
+| `WP04-04` (op-log wiring: the envelope reachable from the oplog append path, `src/engine/oplog.mjs`; in `PG-04.2`) | unclaimed | none | open, unclaimed |
+| `PG-04.1` (signed as `k-pg-04-1-canonical-operat-b77c7c`; files unchanged) | superseded | none | superseded by `PG-04.2` (owner delegation, 1 Nov 2026; reason: pull request #357 must map src/engine/envelope.mjs into `docs/MODULES.md`, which `PG-04.1` does not list in the scope of `WP04-02`; `PG-04.2` adds that one path and changes nothing else); the manifest records `superseded_by`; `WP04-01` and `WP04-02` are built in pull request #357 and are not in this register |
+| `SO-F-02` (signed as `k-so-f-02-canonical-projec-38d008`; files unchanged) | superseded | none | superseded by `SO-F-02.2` (owner delegation, 1 Nov 2026; reason: it keeps T1 and adds T2, the coordinator reading `store.view('task')`); the manifest records `superseded_by` and `supersedes`; no claim on `SO-F-02` was in the register, so none moved |
+| `SO-F-02.2` task T2 (the coordinator's read side reads `store.view('task')`, so a task with unresolved approve and reject approvals cannot be claimed; follow-up to pull request #354, which builds T1) | Claim C | none yet; starts once pull request #354 merges | claimed |
 | `SO-A-03` (the four execution event kinds; a signed fold contract of pull request #341) | Claim E | branch `feat/so-a-03-*` (none pushed yet) | claimed |
 | `SO-A-04` (relationship model and change propagation; a signed fold contract of pull request #341) | Claim E | branch `feat/so-a-04-*` (none pushed yet) | claimed |
 | `PG-03.2` and `PG-03.3` (signed; files unchanged) | superseded | none | superseded by `PG-03.4` and, through `PG-03.5`, `PG-03.6` (signer's decision, 1 Nov 2026; reason: the editions lack the features the vectors need, so the signed scope cannot be met); the manifest records `superseded_by` |
@@ -131,7 +136,7 @@ The fold is the build layer ([WBS.md](WBS.md) section 9.2 on its branch lists th
 
 | Task | Spec | Fold contract | Owned by the fold, not restated | Kept here | Disposition |
 | --- | --- | --- | --- | --- | --- |
-| `WP04-01` to `WP04-04` | `PG-04.1` | `SO-F-03`, `SO-F-12` | the signature and admission block, the per-sender sequence, the rejected event, scope and classification on the envelope | the one envelope, with an optional extension block that the hash covers | trimmed: cited, envelope kept |
+| `WP04-01` to `WP04-04` | `PG-04.2` (supersedes the signed `PG-04.1`) | `SO-F-03`, `SO-F-12` | the signature and admission block, the per-sender sequence, the rejected event, scope and classification on the envelope | the one envelope, with an optional extension block that the hash covers | trimmed: cited, envelope kept |
 | `WP05-01` | `PG-05.1` | `SO-F-02` | the merge class on each entity type and its enforcement in the store | the semantics table and its rationale; class names equal those of `SO-F-02` | trimmed |
 | `WP05-04`, `WP05-06` | `PG-05.1` | `SO-F-06` | validation of engine input and output at `src/engine/merge.mjs`; refusal of malformed output and forbidden transitions | the state map; one real-engine round trip | trimmed |
 | `WP08-02` | `PG-08.1` | `SO-A-03` | the four execution event kinds | the adapter contract module and its conformance suite | trimmed |
@@ -244,6 +249,7 @@ One row per requirement of [programme/REQUIREMENTS.md](programme/REQUIREMENTS.md
 | Follow-up | Where | Detail | Status |
 | --- | --- | --- | --- |
 | `LWWRegister` merge with equal timestamp and equal `node_id` | the crdt-merge reference first, then the TypeScript and Rust editions (`PG-03.4`, `PG-03.6`) | The Python reference keeps self and the Rust edition keeps other, so merge is not commutative in that case. The case is excluded from the vectors and must not be asserted. A higher timestamp wins, and on equal timestamps the greater `node_id` wins, in all editions. Fix the reference first; the editions follow (owner delegation, 1 Nov 2026) | open |
+| Raise the daemon start wait | src/cli/daemon.mjs (SR-1.01, SR-1.24) | waitMs 6000 too short for cold starts on Windows runners; candidate for next SR-1 revision; test-side retry in #352/#359 meanwhile | open |
 
 
 ## Programme tasks by work package

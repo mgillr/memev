@@ -60,6 +60,12 @@
       "id": "PI-05",
       "manifest": "branch dev-integration-specs of memev (not modified)",
       "reason": "owner engine decision 31 Oct 2026; recorded as superseded in docs/scope-one/DECISIONS.md"
+    },
+    {
+      "id": "PG-04.1",
+      "manifest": "this manifest (contracts/programme/specs, signed as k-pg-04-1-canonical-operat-b77c7c; the file is unchanged)",
+      "reason": "owner delegation, 1 Nov 2026: pull request #357 must map src/engine/envelope.mjs into docs/MODULES.md, so docs/MODULES.md is added to the scope of WP04-02; no other scope entry, requirement or criterion changes",
+      "superseded_by": "PG-04.2"
     }
   ],
   "resolved_without_contract": [
@@ -163,7 +169,7 @@
       "decided_by": "owner delegation, 1 Nov 2026",
       "decision": "the fold is the build layer; the programme specs cite the fold ids per task and keep only what the fold does not cover",
       "overlaps": {
-        "PG-04.1": [
+        "PG-04.2": [
           "SO-F-03",
           "SO-F-12"
         ],
@@ -202,7 +208,7 @@
         ]
       },
       "by_task": {
-        "PG-04.1": {
+        "PG-04.2": {
           "WP04-01": [
             "SO-F-03",
             "SO-F-12"
@@ -664,6 +670,57 @@
       "criteria": 24,
       "spec": "specs/PG-04.1-canonical-operation-envelope.json",
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+    },
+    {
+      "id": "PG-04.2",
+      "type": "programme work package",
+      "area": "PG-04",
+      "title": "Canonical operation envelope (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP04-01, WP04-02, WP04-03, WP04-04",
+      "requirements": [
+        "MV-INT-02",
+        "MV-INT-03"
+      ],
+      "cross_references": [
+        {
+          "contract": "SO-1.04 and SO-1.01",
+          "boundary": "WP04 depends on both: the envelope carries the four-way event distinction of SO-1.04 requirement 3 and does not define the adapter contract (SO-1.04 requirement 1) or own the store or coordinator (SO-1.01)"
+        },
+        {
+          "contract": "SO-2.07 to SO-2.11",
+          "boundary": "their adapter layers must use canonical operation contracts: the WP04 envelope is that contract, and these specs do not define any adapter for those systems"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "the fold (SO-F-03, SO-F-12) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP04-01": [
+          "SO-F-03",
+          "SO-F-12"
+        ],
+        "WP04-02": [
+          "SO-F-03"
+        ],
+        "WP04-03": [
+          "SO-F-03",
+          "SO-F-12"
+        ],
+        "WP04-04": [
+          "SO-F-03",
+          "SO-F-12"
+        ]
+      },
+      "depends_on": [
+        "SO-1.01",
+        "SO-1.04"
+      ],
+      "tasks": 4,
+      "criteria": 24,
+      "spec": "specs/PG-04.2-canonical-operation-envelope.json",
+      "status": "proposed and unsigned; no red-team record",
+      "supersedes": "PG-04.1",
+      "supersedes_reason": "owner delegation, 1 Nov 2026: pull request #357 must map src/engine/envelope.mjs into docs/MODULES.md, so docs/MODULES.md is added to the scope of WP04-02; no other scope entry, requirement or criterion changes"
     },
     {
       "id": "PG-05.1",
@@ -1381,25 +1438,25 @@
     {
       "task": "WP04-01",
       "title": "Envelope specification: fields, versioning, deterministic serialisation, hash rules",
-      "contract": "PG-04.1",
+      "contract": "PG-04.2",
       "note": "specified in this set"
     },
     {
       "task": "WP04-02",
       "title": "Envelope module: build, canonical-serialise, hash and validate an envelope",
-      "contract": "PG-04.1",
+      "contract": "PG-04.2",
       "note": "specified in this set"
     },
     {
       "task": "WP04-03",
       "title": "Adapters: the oplog record, the bus message and project-store events convert to and from the envelope without loss",
-      "contract": "PG-04.1",
+      "contract": "PG-04.2",
       "note": "specified in this set"
     },
     {
       "task": "WP04-04",
       "title": "Envelope is reachable from the real write path (oplog append), not only from tests",
-      "contract": "PG-04.1",
+      "contract": "PG-04.2",
       "note": "specified in this set"
     },
     {
