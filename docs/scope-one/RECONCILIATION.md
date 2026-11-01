@@ -78,6 +78,8 @@ Who writes which task, so that two authors do not write the same one. Claims are
 | Upgrade, rollback, backup and restore, and uninstall (work breakdown 5.1.3, requirements 70 and 96) | signed vault contract `SO-R-C` | cited by id, no programme task | covered by the vault contract |
 | `SR-6.03` installers and public release | signed vault contracts `WO-02-A` and `MEM-015` | cited by id, no programme task | covered by the vault contracts |
 | `SR-0.03` tasks 1, 3 and 4 (one pull request) | Claim D | branch `feat/sr-0-03-tasks-1-3-4` | active |
+| `SR-0.03` task 2 (the scope verifier, 16 criteria) | Claim D | branch `feat/sr-0-03-task-2-scope-verifier`, stacked on #336 | claimed |
+| `SR-0.03` version 2 (signed as `k-sr-0-03-verify-runs-ever-2259f2`; files unchanged) | superseded | none | superseded by `SR-0.03.3` (version 3, in `contracts/programme/specs`; owner delegation, 1 Nov 2026); the spec pins a base that is still pending (the memev main commit after the README re-sign fix); the manifest records `superseded_by` |
 | `QL-1.01` task 2 (the red-team gate, linked to #314) | Claim D | branch `feat/ql-1-01-task-2` | queued after `SR-0.03` |
 | Every other `WP*` task (the work itself) | unclaimed | none | not started |
 
