@@ -9,10 +9,10 @@ time, and why. It is a table and its rationale. Merge semantics are chosen per e
 
 ## What this page is and is not
 
-- The vault is the only authority, and Memev is local first. Free users keep one computer at a time and lose nothing: when
+- Memev is local first (decided 31 Oct 2026). Whether the vault is the only authority is ADR 7, proposed. Free users keep one computer at a time and lose nothing: when
   two versions compete, the free path keeps both ([CONVERGENCE.md](CONVERGENCE.md)). The table says what a merge, when one is
   allowed to run, should do. It does not make a merge run.
-- The nine entity types, the owner of each and the four class names are those of SO-F-02 (#354, final head 438887a).
+- The nine entity types, the owner of each and the four class names are those of SO-F-02 (#354, at 9955a0d).
   SO-F-02 declares the owner and the class on each entity type and holds them in the project store.
   This page declares nothing and enforces nothing. It cites SO-F-02, it owns the rationale, and its names must stay equal to
   those of SO-F-02.
@@ -29,9 +29,13 @@ The four classes mean:
   and not a clock reading. A tie that the log cannot order is broken by the merge provider, not by the core.
 - `set-union`: the elements of every write stand.
 - `append-only`: nothing is replaced, every write is kept.
-- `human-resolution`: competing writes are surfaced and a person settles them. They are never silently merged.
+- `human-resolution`: competing writes go to a person, who settles them. They are never silently merged. Only approvals are
+  surfaced today, and the table says where a type is not surfaced yet.
 
 No type uses `set-union` yet. The class is there for the types that come later.
+
+Only approvals are surfaced today. Every other class is declared and recorded, and nothing applies or surfaces it. That is the work
+of SO-F-06.
 
 The case where the engine meets two writes to a LWWRegister with an equal timestamp is an open follow-up on the engine side.
 Until it is settled, nothing here relies on how that tie falls, and this page defines no tie-break.
@@ -42,14 +46,14 @@ and it is not the permission matrix of ADR 5, which is still open. Neither is de
 
 | Entity type | Owner | Merge class | Status | Rationale |
 | --- | --- | --- | --- | --- |
-| `project` | `person` | `last-writer` | declared | A project has one current name and description, and the newest in log order is the one people expect. `scope_version` is the exception: it is monotonic, so the highest value stands and the newest write never does. Enforcing that is SO-F-06's. |
-| `task` | `person` | `human-resolution` | declared | Two different moves of one task made at once are surfaced, because taking the newest could revive a finished or cancelled task or skip a required step. The version check of the state machine in [PROJECTS.md](PROJECTS.md) is what catches two updates of one task today. |
+| `project` | `person` | `last-writer` | declared, not surfaced yet | A project has one current name and description, and the newest in log order is the one people expect. `scope_version` is the exception: it is monotonic, so the highest value stands and the newest write never does. No contract enforces this yet. |
+| `task` | `person` | `human-resolution` | declared, not surfaced yet | Two different moves of one task made at once should go to a person, because taking the newest could revive a finished or cancelled task or skip a required step. A competing task write is not surfaced yet. The version check of the state machine in [PROJECTS.md](PROJECTS.md) is what catches two updates of one task today. |
 | `lease` | `service` | `human-resolution` | PROVISIONAL: class and owner | The class waits on ADR 3. The safe default is one active writer with contending writes queued, not merged, and none of the four classes is a queue. A lease is not `last-writer`, because the newest write would pre-empt the holder. The coordinator already refuses a second claim on a live lease. `human-resolution` is the nearest class, since a competing lease write is never settled by the newest one. The owner waits on a model that can issue a `service` subject. |
-| `attempt` | `agent` | `append-only` | declared | An attempt is a record of work that happened. Records are kept and never replaced, so an attempt is neither lost nor folded into another because two computers saw it. |
+| `attempt` | `agent` | `append-only` | declared, not surfaced yet | An attempt is a record of work that happened. Records are kept and never replaced, so an attempt is neither lost nor folded into another because two computers saw it. |
 | `evidence` | `service` | `append-only` | PROVISIONAL: owner | Evidence is kept as written, and a later record never overwrites an earlier one. The owner is declared as `service`, and no `service` subject can be issued yet, so the declaration stays until the model issues one. |
-| `conflict` | `person` | `human-resolution` | declared | A conflict is the record that competing writes were surfaced. Two records of one conflict are not merged into one, and a person settles it. |
-| `session` | `device` | `last-writer` | declared | A session is the current state of one device. It has one current value, and the newest in log order is the one that stands. |
-| `approval` | `person` | `human-resolution` | declared | Approvals are never silently merged. Each approval is its own record. Incompatible decisions on one task, for example an approve and a reject, are surfaced, neither is applied, and a person settles it. A later approval does not overwrite an earlier one. |
+| `conflict` | `person` | `human-resolution` | declared, not surfaced yet | A conflict is the record that competing writes were found. Two records of one conflict are not merged into one, and a person settles it. The one conflict record derived today is for approvals. It is read through the store and not written to the log, and a conflict of any other type is not surfaced yet. |
+| `session` | `device` | `last-writer` | declared, not surfaced yet | A session is the current state of one device. It has one current value, and the newest in log order is the one that stands. |
+| `approval` | `person` | `human-resolution` | declared, surfaced: the approve and reject set is PROVISIONAL (SO-A-05) | Approvals are never silently merged. Each approval write is its own event. Incompatible decisions on one task, for example an approve and a reject, are surfaced, neither is applied, and a person settles it. On the same approval id, a later write replaces the stored entity and both events stay in the log. The set of decisions, approve and reject, is PROVISIONAL against SO-A-05: it is a closed pair that stands in for the seven decision states of the decision queue, which are not in code yet. |
 | `event` | `service` | `append-only` | PROVISIONAL: owner | The event log only grows. Every event is kept and none is replaced. The owner is declared as `service`, and no `service` subject can be issued yet. |
 
 ### The scope version moves only forward
@@ -57,7 +61,7 @@ and it is not the permission matrix of ADR 5, which is still open. Neither is de
 `scope_version` is monotonic. A write that carries a lower value than the one already recorded must not stand as the newest
 write: the highest value stands, and the newest write never does when it would roll the scope back. The scope version rises only
 through an amendment, so it is outside the `last-writer` rule that `project` follows. It is the same field on every entity
-type. SO-F-06 enforces it, and this page only states it.
+type. No contract enforces this yet, and this page only states it.
 
 ### The lease is provisional
 
@@ -85,8 +89,8 @@ sits. It declares no class: where SO-F-02 has no entity type for an object class
 | task ownership | `lease`, `human-resolution` and PROVISIONAL, pending ADR 3. |
 | task state | `task`, `human-resolution`. |
 | contracts | Not an entity type of the project store. Contracts are never silently merged: a signed contract is not changed, and an amendment is a new version. |
-| approvals | `approval`, `human-resolution`. Approvals are never silently merged. |
-| external actions | No entity type of its own in SO-F-02 yet. |
+| approvals | `approval`, `human-resolution`. Approvals are never silently merged. The set of decisions, approve and reject, is PROVISIONAL against SO-A-05. |
+| external actions | No entity type of its own in SO-F-02 yet. Today an external action is recorded as an `attempt` entry with `kind: 'external'`, so it is append-only (the `external` method of `src/engine/coordinator.mjs`). Dedup by key is the coordinator's job, not a merge class's. |
 
 When SO-F-02 adds an entity type for an object class that has none, its owner and class are declared there first, and this
 page then gives its row and rationale.
@@ -98,8 +102,9 @@ The engine has no three-way text merge. The call-out boundary sends it one JSON 
 lines of a note to a set, hands that to the engine, and maps the merged state back to text. The shim lives outside the Memev
 core: in memev-ops, or on the crdt-merge side. The core holds only the representation (`src/engine/state-map.mjs`): a note as a
 set of lines with their order, and the state of an agent as one field per key, each mapped back without loss. The core has no
-text merge of its own, and the round trip through the real engine is tested once, with a shim supplied from outside the
-repository (`test/engine-roundtrip.test.mjs`, skipped and reported as not run when none is set).
+text merge of its own, and the round trip through the real engine is tested once, through `commandProvider` and a shim supplied from
+outside the repository, until the WO-05-B client lands in #201 (`test/engine-roundtrip.test.mjs`, skipped and reported as not run
+when none is set).
 
 ## Where each part is owned
 
