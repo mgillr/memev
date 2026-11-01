@@ -133,3 +133,13 @@ export const bootMs = () => Date.now() - os.uptime() * 1000;
 export const isLocked = (e, pid) => !!e && (e.name === 'VaultLocked' || e.code === 'VaultLocked') && (pid === undefined || String(e.message).includes(String(pid)));
 export function seqs(v) { return [...v.log.iterate()].map((r) => r.seq); }
 export const consecutive = (a) => a.every((s, i) => s === i + 1);
+/** Replace LOCK the way a recoverer would: write a lock with another token to a temp file and rename it over LOCK. Returns its bytes. */
+export function stealLock(lock) {
+  const o = { ...readLock(lock), token: crypto.randomBytes(16).toString('hex') };
+  const tmp = `${lock}.thief`;
+  writeLock(tmp, o);
+  fs.renameSync(tmp, lock);
+  return fs.readFileSync(lock);
+}
+/** bytes(dir) without the LOCK file. */
+export const bytesNoLock = (dir) => { const b = bytes(dir); delete b.LOCK; return b; };

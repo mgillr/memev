@@ -9,7 +9,7 @@ import { execFileSync } from 'node:child_process';
 import * as OPLOG from '../src/engine/oplog.mjs';
 import { Vault } from '../src/engine/vault.mjs';
 import { cleanup, tmpdir } from './helpers/tmp.mjs';
-import { OWNER, killAll, makeVault, openVault, Child, holder, tryOpen, tree, bytes, files, STATE_FILES, isLocked, seqs, consecutive } from './helpers/oplog-lock.mjs';
+import { OWNER, killAll, sleep, stealLock, bytesNoLock, readLock, makeVault, openVault, Child, holder, tryOpen, tree, bytes, files, STATE_FILES, isLocked, seqs, consecutive } from './helpers/oplog-lock.mjs';
 
 after(() => { killAll(); cleanup(); });
 const ID = ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', '-c', 'commit.gpgsign=false'];
@@ -177,4 +177,109 @@ test('T1-readonly: a read-only open of a vault with a torn tail reads it as abse
   const w = openVault(root);
   assert.equal(fs.readFileSync(seg, 'utf8').endsWith('"torn":'), false, 'a writable open still truncates it');
   w.close();
+});
+
+// ---- the lease: renewed from a worker thread, checked before every write, never taken back by a holder that lost it
+
+/** A holder (with a fast lease) whose lock another opener has since replaced, and what its folder held at that moment. */
+async function lostHolder(spec = {}, env = {}) {
+  const v = makeVault(spec.notes === undefined ? {} : { notes: spec.notes });
+  const h = await holder(v.root, { ...spec }, { MEMEV_LOCK_RENEW_MS: '200', ...env });
+  if (spec.appends) await h.next((e) => e.event === 'appended');
+  return { ...v, h };
+}
+
+test('T1-c09: a holder that lost its lock fails closed on append, snapshot and close, and neither renews nor deletes the new lock', async () => {
+  const { dir, lock, h } = await lostHolder();
+  const before = bytesNoLock(dir);
+  const stolen = stealLock(lock);
+  const m0 = fs.statSync(lock).mtimeMs;
+  const a = await h.send({ cmd: 'append' });
+  assert.equal(a.ok, false); assert.equal(a.name, 'VaultLocked'); assert.equal(a.from, 'append');
+  const s = await h.send({ cmd: 'snapshot' });
+  assert.equal(s.name, 'VaultLocked', 'snapshot refuses too');
+  await h.send({ cmd: 'close' });
+  assert.deepEqual(bytesNoLock(dir), before, 'every segment, manifest.json and snapshot.json is byte-identical');
+  assert.ok(fs.readFileSync(lock).equals(stolen), 'LOCK still holds the other opener\'s bytes');
+  await sleep(1000);
+  assert.equal(fs.statSync(lock).mtimeMs, m0, 'the lost holder does not renew a lock that is not its own');
+  await h.stop();
+  assert.ok(fs.readFileSync(lock).equals(stolen), 'and its exit does not delete it');
+});
+
+test('T1-c20: compact on a lost holder throws VaultLocked and moves nothing', async () => {
+  const { dir, lock, h } = await lostHolder({ segmentBytes: 512, appends: 8, notes: 0 });
+  const sealed = fs.readdirSync(dir).filter((f) => /^seg-\d+\.jsonl$/.test(f)).length;
+  assert.ok(sealed >= 3, `at least two segments are sealed (${sealed} segment files)`);
+  const names = fs.readdirSync(dir).sort(), before = bytesNoLock(dir);
+  const stolen = stealLock(lock);
+  const r = await h.send({ cmd: 'compact' });
+  assert.equal(r.ok, false); assert.equal(r.name, 'VaultLocked');
+  assert.equal(fs.existsSync(path.join(dir, 'archive')), false, 'no archive/ folder');
+  assert.deepEqual(fs.readdirSync(dir).sort(), names, 'no new seg-* file');
+  assert.deepEqual(bytesNoLock(dir), before);
+  assert.ok(fs.readFileSync(lock).equals(stolen));
+  await h.stop();
+});
+
+test('T1-c23: the lost holder\'s vault.close() writes no index, graph, device or devices file and makes no commit', async () => {
+  const { root, dir, lock } = makeVault({ git: true });
+  const h = await holder(root, { git: true, commitDelayMs: 600000 }, { MEMEV_LOCK_RENEW_MS: '200' });
+  assert.equal((await h.send({ cmd: 'append' })).ok, true, 'a note is written and its commit is pending');
+  const state = files(root, STATE_FILES), head = git(root, 'rev-parse', 'HEAD');
+  stealLock(lock);
+  const r = await h.send({ cmd: 'close' });
+  assert.equal(r.name, 'VaultLocked', 'close fails closed');
+  assert.deepEqual(files(root, STATE_FILES), state, 'index.jsonl, graph.json, device.json and devices.json are byte-identical');
+  assert.equal(git(root, 'rev-parse', 'HEAD'), head, 'no commit');
+  assert.ok(Object.keys(bytes(dir)).includes('LOCK'));
+  await h.stop();
+});
+
+test('T1-c24: the lease is renewed from a worker thread: a main thread stuck for 2 s keeps its lock', async () => {
+  const { dir, lock, h } = await lostHolder({}, { MEMEV_LOCK_RENEW_MS: '500' });
+  const bytes0 = fs.readFileSync(lock), seen = new Set([fs.statSync(lock).mtimeMs]);
+  const busy = h.send({ cmd: 'busy', ms: 2000 });
+  for (let i = 0; i < 18; i++) { await sleep(100); seen.add(fs.statSync(lock).mtimeMs); }
+  await busy;
+  assert.ok(seen.size >= 3, `the lock's mtime advanced at least twice during the loop: ${[...seen].length - 1} advances`);
+  assert.ok(fs.readFileSync(lock).equals(bytes0), 'its bytes never change');
+  const a = await h.send({ cmd: 'append' });
+  assert.equal(a.ok, true, 'the next append succeeds');
+  assert.ok(readLock(lock).token, 'and the lock still carries its token');
+  assert.ok(fs.readFileSync(lock).equals(bytes0));
+  await h.stop();
+  assert.ok(!fs.existsSync(path.join(dir, 'LOCK')), 'a clean close releases the lock');
+});
+
+test('T1-lease: the default interval is 15 s, so a lock is not renewed within a second or two', async () => {
+  const v = makeVault();
+  const h = await holder(v.root);
+  const m0 = fs.statSync(v.lock).mtimeMs;
+  await sleep(1500);
+  assert.equal(fs.statSync(v.lock).mtimeMs, m0);
+  await h.stop();
+});
+
+test('T1-guards: append, snapshot, roll, archive, the manifest write and close each check the lock first', () => {
+  const calls = {
+    append: (l) => l.append({ type: 'put', path: 'n', data: { content: 'x', ch: 'x' } }),
+    snapshot: (l) => l.snapshot(),
+    roll: (l) => l.roll(),
+    archiveSealed: (l) => l.archiveSealed(),
+    _saveManifest: (l) => l._saveManifest(),
+    close: (l) => l.close(),
+  };
+  for (const [name, call] of Object.entries(calls)) {
+    const dir = path.join(tmpdir('oplock-'), 'oplog');
+    const log = new OPLOG.OpLog(dir, { segmentBytes: 256, fsync: false }).open();
+    for (let i = 0; i < 4; i++) log.append({ type: 'put', path: `n${i}`, data: { content: 'x'.repeat(200), ch: 'x' } });
+    const lock = path.join(dir, 'LOCK');
+    const stolen = stealLock(lock), before = bytes(dir), names = fs.readdirSync(dir).sort();
+    assert.equal(log.holds(), false);
+    assert.throws(() => call(log), (e) => e.name === 'VaultLocked' && e instanceof OPLOG.VaultLocked, `${name} throws VaultLocked`);
+    assert.deepEqual(bytes(dir), before, `${name} changed nothing`);
+    assert.deepEqual(fs.readdirSync(dir).sort(), names, `${name} added no file`);
+    assert.ok(fs.readFileSync(lock).equals(stolen), `${name} left the other lock alone`);
+  }
 });

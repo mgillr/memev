@@ -23,7 +23,7 @@ let vault = null, log;
 try {
   if (spec.kind === 'oplog') log = new OpLog(spec.dir ?? path.join(spec.root, '.memev', 'oplog'), { fsync: false, segmentBytes: spec.segmentBytes, readOnly: !!spec.readOnly }).open();
   else {
-    vault = new Vault(spec.root, { git: spec.git === true, fsync: false, segmentBytes: spec.segmentBytes, readOnly: !!spec.readOnly, keyDir: path.join(spec.root, '..', 'keys') }).open();
+    vault = new Vault(spec.root, { git: spec.git === true, fsync: false, segmentBytes: spec.segmentBytes, commitDelayMs: spec.commitDelayMs, readOnly: !!spec.readOnly, keyDir: path.join(spec.root, '..', 'keys') }).open();
     log = vault.log;
   }
 } catch (e) { emit(fail(e, 'open')); process.exit(0); }
