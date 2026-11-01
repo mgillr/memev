@@ -7,9 +7,10 @@ import path from 'node:path';
 import os from 'node:os';
 import readline from 'node:readline/promises';
 import { spawnSync } from 'node:child_process';
-import { readJson, writeJson, exists, sha256, configDir, homeDir, now, run } from '../engine/util.mjs';
+import { readJson, writeJson, exists, sha256, configDir, homeDir, now, run, machineBootId, pidNamespace, processStart } from '../engine/util.mjs';
 import { redactSecrets, findSecrets } from '../engine/secrets.mjs';
 import { VERSION, isVault } from '../engine/vault.mjs';
+import { VaultLocked } from '../engine/oplog.mjs';
 import { PKG, daemonInfo, pidAlive, config, out, clientsFile, tokenExpiryWarnings } from './common.mjs';
 import { EXPIRY_WARNING_DAYS } from '../engine/tokens.mjs';
 import { licensingStatus, licencePhrase, pendingMergeCopies, registry } from './licensing.mjs';
@@ -310,6 +311,47 @@ function backupVaultId(url) {
   return r.ok ? id(r.stdout) : null;
 }
 
+/**
+ * The vault lock (.memev/oplog/LOCK) as the doctor reports it: read from the file, never taken. Held by the daemon is fine; held by
+ * anything else fails the run with the holder's pid, host and age; a lock whose holder is gone is stale and recoverable (the next
+ * writable open takes it over). Same rules as the lock's own judge (src/engine/oplog.mjs): on this host, boot, machine and pid
+ * namespace the pid decides; on another host or boot, or with no readable holder, the age does.
+ */
+export function lockCheck(root, { daemonPid = null } = {}) {
+  const file = path.join(root, '.memev', 'oplog', 'LOCK');
+  let st; let bytes;
+  try { st = fs.statSync(file); bytes = fs.readFileSync(file, 'utf8'); } catch { return C('lock', 'vault lock', 'ok', 'not held'); }
+  let o = null; try { o = JSON.parse(bytes); } catch { /* not a lock */ }
+  const age = Math.max(0, Math.round((Date.now() - st.mtimeMs) / 1000));
+  const named = o && Number.isInteger(o.pid) && o.pid > 0;
+  if (named && daemonPid && o.pid === daemonPid) return C('lock', 'vault lock', 'ok', `held by the daemon (pid ${o.pid}), age ${age}s`);
+  const here = named && o.host === os.hostname() && Math.abs(Number(o.boot) - (Date.now() - os.uptime() * 1000)) <= 120000 && (o.machine ?? null) === machineBootId() && (o.ns ?? null) === pidNamespace();
+  let stale;
+  if (!named) stale = age > 60;
+  else if (!here) stale = age > 90;
+  else if (o.pid === process.pid || !pidAlive(o.pid)) stale = true;
+  else { const start = processStart(o.pid); stale = start !== null && typeof o.start === 'number' && Math.abs(start - o.start) > 2000; }
+  const who = named ? `pid ${o.pid} on ${o.host ?? 'an unknown host'}` : 'no readable holder';
+  if (stale) return C('lock', 'vault lock', 'warn', `stale: held by ${who}, which is gone, age ${age}s; recoverable: the next start or writable open takes it over, and the file can be removed by hand once that process is gone`);
+  return C('lock', 'vault lock', 'fail', `held by ${who}, age ${age}s; only that process may write the vault: stop it (memev stop for the daemon) before anything else writes`);
+}
+
+/** Run `fn` on a writable vault that is opened for it and closed after: a repair that writes the log takes the lock for its own length. */
+function repair(root, fn) {
+  return async () => {
+    const { Vault } = await import('../engine/vault.mjs');
+    let v;
+    try { v = new Vault(root, { git: false }).open(); }
+    catch (e) {
+      if (!(e instanceof VaultLocked)) throw e;
+      const d = daemonInfo(root);
+      if (d && e.pid === d.pid && pidAlive(d.pid)) return;   // the daemon holds the vault now (a fix before this one started it) and took the changes in when it opened
+      throw new Error(`needs the vault to itself, and ${e.pid ? `pid ${e.pid}` : 'another process'} holds it (VaultLocked): stop it, then run memev doctor --fix again`);
+    }
+    try { fn(v); } finally { v.close(); }
+  };
+}
+
 export async function allChecks({ root, env }) {
   const r = [];
   const info = daemonInfo(root);
@@ -318,8 +360,11 @@ export async function allChecks({ root, env }) {
   const why = up ? null : await whyNotRunning(root); // for example another program on its port
   r.push(C('daemon', 'daemon running', up ? 'ok' : 'fail', up ? `pid ${info.pid}, port ${info.port}` : why || 'not running', up ? null : { desc: 'start it', destructive: false, run: () => startDaemon(root, { quiet: true }) }));
   r.push(...await twoVaultChecks(root));
+  if (isVault(root)) r.push(lockCheck(root, { daemonPid: up ? info.pid : null }));
+  // the checks only read: the vault is opened read-only, which takes no lock and writes nothing, so a held lock never stops them
+  // and a stopped vault is never changed by being looked at. A repair that writes the log opens the vault itself (repair()).
   let vault = null;
-  if (!up && isVault(root)) { const { Vault } = await import('../engine/vault.mjs'); try { vault = new Vault(root, { git: false }).open(); } catch (e) { r.push(C('open', 'vault opens', 'fail', e.message)); } }
+  if (!up && isVault(root)) { const { Vault } = await import('../engine/vault.mjs'); try { vault = new Vault(root, { git: false, readOnly: true }).open(); } catch (e) { r.push(C('open', 'vault opens', 'fail', e.message)); } }
   if (up) {
     const restart = async () => { const d = await import('./daemon.mjs'); await d.stopDaemon(root); await d.startDaemon(root, { quiet: true }); };
     try {
@@ -329,7 +374,13 @@ export async function allChecks({ root, env }) {
       r.push(...live.filter((c) => ['oplog', 'index', 'drift', 'secrets', 'bus'].includes(c.id)).map((c) => ({ ...c, fix: c.fix ? { desc: `${c.fix} (restarts Memev)`, destructive: false, run: restart } : null })));
     } catch (e) { r.push(C('mcp', 'MCP answers', 'fail', e.message)); }
     r.push(...fileChecks({ root, env, vault: null }));
-  } else r.push(...fileChecks({ root, env, vault }));
+  } else {
+    r.push(...fileChecks({ root, env, vault }));
+    for (const c of r) {
+      if (c.id === 'index' && c.fix) c.fix.run = repair(root, (v) => v.reindexAll());
+      if (c.id === 'drift' && c.fix) c.fix.run = repair(root, (v) => { for (const [p] of v.log.heads) v.syncFromDisk(p, 'doctor'); });
+    }
+  }
   if (vault) vault.close();
   // the reachability probe only runs for a GitHub ssh backup, so a local or HTTPS remote never touches the network here
   const remoteR = run('git', ['remote'], { cwd: root });

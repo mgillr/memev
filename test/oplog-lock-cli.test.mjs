@@ -271,3 +271,14 @@ t('stopDaemon leaves the daemon.lock of a live daemon that has not written daemo
   await stopDaemon(sb.root);
   assert.equal(fs.existsSync(lockFile), false, 'a dead pid\'s daemon.lock is removed');
 });
+
+t('doctor --fix with no daemon and no holder imports the note edited on disk and the log verifies', () => {
+  const sb = box();
+  seed(sb);
+  fs.appendFileSync(notePath(sb), 'edited on disk\n');
+  const r = sb.run(['doctor', '--fix']);
+  assert.doesNotMatch(both(r), /could not fix/, both(r));
+  const after = JSON.parse(sb.run(['doctor', '--json']).out);
+  assert.equal(after.find((c) => c.id === 'drift').status, 'ok');
+  assert.equal(verify(sb).ok, true);
+});
