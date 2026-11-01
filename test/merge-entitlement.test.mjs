@@ -11,7 +11,7 @@ import { newVault, cleanup, tmpdir, PKG } from './helpers/tmp.mjs';
 import { syncOnce, readConflicts } from '../src/cli/sync.mjs';
 import { git } from '../src/engine/git.mjs';
 import { signLicense } from '../src/engine/license.mjs';
-import { resolveMerge } from '../src/engine/merge.mjs';
+import { resolveMerge, engineAllowed } from '../src/engine/merge.mjs';
 
 after(cleanup);
 
@@ -54,12 +54,12 @@ function noteConflict() {
   return { v, root, other, note };
 }
 
-// A test signing key and the licences it signs. The trial field is carried on the signed object.
+// A test signing key and the licences it signs. A trial carries trial and an org id on the signed object.
 const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
 const keys = { t1: publicKey.export({ type: 'spki', format: 'der' }).toString('base64') };
 const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
 function trialLicence(exp) {
-  return signLicense({ v: 1, lid: 'lic_trial01', tier: 'business', services: ['merge'], seats: 2, connectors: 0, iat: '2026-10-01', exp, grace_days: 14, trial: true }, pem, 't1');
+  return signLicense({ v: 1, lid: 'lic_trial01', tier: 'business', services: ['merge'], seats: 2, connectors: 0, iat: '2026-10-01', exp, grace_days: 14, trial: true, org: 'org_merge0001' }, pem, 't1');
 }
 
 // A stand-in for the merge engine: it records what it is given and returns a fixed merged text.
@@ -197,4 +197,17 @@ test('MEM-131 AC07: the logged fallback line and the changelog note pass the hou
   // the changelog note
   const note = fs.readFileSync(path.join(PKG, 'changelog.d', 'MEM-131.md'), 'utf8');
   check(note, 'changelog note');
+});
+
+test('T1-c40: the merge gate allows a paid licence in its window and in grace, and a trial only in its window', () => {
+  const paidLic = (exp) => signLicense({ v: 1, lid: 'lic_paid0001', tier: 'business', services: ['merge'], seats: 2, iat: '2026-10-01', exp, grace_days: 14 }, pem, 't1');
+  const noMerge = signLicense({ v: 1, lid: 'lic_nomerge1', tier: 'business', services: ['sync'], seats: 2, iat: '2026-10-01', exp: '2027-11-15', grace_days: 14 }, pem, 't1');
+  assert.equal(typeof engineAllowed, 'function', 'engineAllowed exists');
+  assert.equal(engineAllowed(paidLic('2027-11-15'), { now: NOW, keys }), true, 'paid, in its window');
+  assert.equal(engineAllowed(paidLic('2026-10-25'), { now: NOW, keys }), true, 'paid, in grace');
+  assert.equal(engineAllowed(paidLic('2026-10-05'), { now: NOW, keys }), false, 'paid, past grace');
+  assert.equal(engineAllowed(trialLicence('2027-11-15'), { now: NOW, keys }), true, 'a trial in its window');
+  assert.equal(engineAllowed(trialLicence('2026-10-25'), { now: NOW, keys }), false, 'the same trial in grace');
+  assert.equal(engineAllowed(noMerge, { now: NOW, keys }), false, 'a licence without the merge service');
+  assert.equal(engineAllowed(null, { now: NOW, keys }), false, 'no licence');
 });
