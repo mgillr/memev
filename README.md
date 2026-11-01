@@ -6,8 +6,8 @@
 
 <h1>Memev</h1>
 
-<p><strong>One shared, durable memory for the people, computers and AI agents working on a project.</strong><br>
-Context that survives every session, coordination between agents, and work that is checked against what was asked.</p>
+<p><strong>Operating infrastructure for human and AI work.</strong><br>
+Shared project state, coordination, governed execution and evidence-based verification.</p>
 
 <p>
 <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue">
@@ -22,6 +22,7 @@ Context that survives every session, coordination between agents, and work that 
 
 <p>
 <a href="docs/QUICKSTART.md">Quickstart</a> &middot;
+<a href="docs/FREE-CORE-PREVIEW.md">Free Core Preview</a> &middot;
 <a href="docs/README.md">Documentation</a> &middot;
 <a href="docs/ARCHITECTURE.md">Architecture</a> &middot;
 <a href="docs/tiers/README.md">Tiers</a> &middot;
@@ -33,9 +34,9 @@ Context that survives every session, coordination between agents, and work that 
 
 ## What Memev is, and why it matters
 
-AI work is spread across tools, sessions, computers and people, and each one starts from a blank page. A decision made in one app is unknown to the next. Two agents edit the same thing and one silently loses. A task is reported done and nobody can say what was checked.
+AI work is spread across tools, sessions, computers and people. Decisions become detached from execution, agents operate without shared authority, and reported completion is too easily mistaken for accepted work.
 
-Memev is the shared layer underneath. It keeps project knowledge as plain Markdown that you own, makes the relevant part of it available to every connected tool, lets those tools coordinate through a communications bus, and records what a piece of work had to deliver and what was checked. It works with the AI tools you already use, over MCP, and it does not replace them.
+Memev is operating infrastructure for human and AI work. It connects people, agents and tools to shared project state, coordination, governed execution, contracts, evidence and verification. Its local vault preserves the knowledge and provenance that work depends on; the communications bus supports coordination; and the project and contract layers distinguish assignment, execution, verification and acceptance. It works alongside the AI tools and systems people already use rather than replacing them.
 
 Three ideas run through everything:
 
