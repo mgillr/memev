@@ -1,0 +1,242 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP10-01",
+      "title": "Knowledge status lattice: own observation, single-source claim, corroborated, verified, approved decision, disputed, superseded; transition rules",
+      "phase": "design",
+      "owner": "area-trust",
+      "depends_on": [
+        "WP04-01"
+      ],
+      "requirements": [
+        "MV-ARCH-08",
+        "MV-TRU-03"
+      ],
+      "description": "Repo: memev. Records the distinctions (replicated is not verified; signed is not true; converged is not completed; trust is not access control; payment receipt is not delivery).",
+      "scope": {
+        "allow": [
+          "docs/KNOWLEDGE-STATUS.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP10-01-AC01",
+          "mandatory": true,
+          "statement": "doc exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/KNOWLEDGE-STATUS.md"
+          }
+        },
+        {
+          "id": "WP10-01-AC02",
+          "mandatory": true,
+          "statement": "doc says repetition does not raise a disputed claim",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/KNOWLEDGE-STATUS.md",
+            "pattern": "(?i)repetition",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP10-01-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP10-01-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP10-02",
+      "title": "Status and origin fields on notes and facts; repetition by many agents never raises a disputed claim",
+      "phase": "implement",
+      "owner": "area-trust",
+      "depends_on": [
+        "WP10-01"
+      ],
+      "requirements": [
+        "MV-TRU-03"
+      ],
+      "description": "Repo: memev.",
+      "scope": {
+        "allow": [
+          "src/engine/vault.mjs",
+          "src/engine/graph.mjs",
+          "src/engine/knowledge-status.mjs",
+          "test/knowledge-status.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP10-02-AC01",
+          "mandatory": true,
+          "statement": "status tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/knowledge-status.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP10-02-AC02",
+          "mandatory": true,
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP10-02-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP10-02-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP10-03",
+      "title": "Link accepted work to an independently verifiable receipt",
+      "phase": "implement",
+      "owner": "area-trust",
+      "depends_on": [
+        "WP10-01",
+        "WP07-02"
+      ],
+      "requirements": [
+        "MV-TRU-02"
+      ],
+      "description": "Repo: memev. Uses the existing contracts/receipts shape; no new signing scheme.",
+      "scope": {
+        "allow": [
+          "src/engine/contracts.mjs",
+          "src/engine/project-store.mjs",
+          "test/work-receipt.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP10-03-AC01",
+          "mandatory": true,
+          "statement": "receipt-link tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/work-receipt.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP10-03-AC02",
+          "mandatory": true,
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP10-03-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP10-03-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP10-04",
+      "title": "As-of query: which version of a spec or decision was authoritative when an agent did a piece of work",
+      "phase": "implement",
+      "owner": "area-trust",
+      "depends_on": [
+        "WP10-02",
+        "WP07-02"
+      ],
+      "requirements": [
+        "MV-TRU-06"
+      ],
+      "description": "Repo: memev.",
+      "scope": {
+        "allow": [
+          "src/engine/project-store.mjs",
+          "test/as-of-query.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP10-04-AC01",
+          "mandatory": true,
+          "statement": "as-of tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/as-of-query.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP10-04-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP10-04-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}

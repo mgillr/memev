@@ -1,6 +1,6 @@
 # The paid core: the crdt-merge convergence engine
 
-Part of the [Memev documentation](README.md). Up: the [README](../README.md#the-paid-core-crdt-merge). Related:
+Part of the [Memev documentation](README.md). Up: the [README](../README.md#licensing). Related:
 [ARCHITECTURE.md](ARCHITECTURE.md), [PRICING.md](PRICING.md), [tiers/](tiers/README.md),
 [LICENSING-NOTICE.md](LICENSING-NOTICE.md).
 
@@ -14,7 +14,7 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md#the-
 - **It powers the paid features.** crdt-merge is what merges edits when several computers change a
   vault at the same time, and what brings a company vault into one state:
   - **Personal with more computers:** automatic merge across several computers at once.
-  - **Business and Corporate:** vault convergence for a team or company (both coming).
+  - **Contact-us tiers (Business and Corporate):** vault convergence for a team or company (planned).
 
 Today the engine is not built into any released Memev. The paid features that depend on it are
 planned and are not sold until they are built ([tiers/README.md](tiers/README.md#what-is-built-and-what-is-planned)).

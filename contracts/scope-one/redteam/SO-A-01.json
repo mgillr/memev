@@ -77,6 +77,60 @@
           }
         ]
       }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "e127b0a351c2a5647fbb490ae32a1f909b00845789c92005de3ac525f78748bd",
+      "base_commit": "6be36f807b2251accfd48262f94eddfcd845c98e",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/cli/main.mjs",
+            "sha256": "0915c5b38d2b7530cb4a07fa7715e6f73fffebd2646a959348eeddfa1b5c52ef"
+          },
+          {
+            "path": "src/engine/coordinator.mjs",
+            "sha256": "540783ec1d0352ff77f17b77852fa2d2bff9ca8f8488b35de046d7c4f3498fa5"
+          },
+          {
+            "path": "src/engine/project-state.mjs",
+            "sha256": "27d8fcb296415dd6b22439d4d60c68fa4fcb0a2af93d53db981206347ef5920d"
+          },
+          {
+            "path": "src/engine/project-store.mjs",
+            "sha256": "b015593048bc7c1d8ef6e633797c49bbfb91aacb4635b2a27cc6e0e57a03e7f3"
+          },
+          {
+            "path": "src/server/mcp.mjs",
+            "sha256": "6ca42da348ad8bde83317f20b78f7c629cc4727dbf3ded6db85f1d6753f4c54c"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Re-review of the same spec, unchanged (same spec hash as round 1), made against main at 6be36f807b22. Since the merge of #341 (cdab1ab) the only file of this spec's scope that changed is docs/README.md, and every listed input under src/ has the same hash at main as at cdab1ab. Why: docs/README.md is in this spec's scope and gained index rows after round 1 was read at fff993f5e244 (rows for the SO-2.02 to SO-2.06 decision records, from #329 and #330 before the signing merge #341, and from #333, #337 and #338 after it). Checks run, and the only checks made: the diff of docs/README.md from fff993f5e244 to 6be36f807b22 adds only index rows that link design records under docs/scope-one/design/ and removes or rewords nothing; no criterion, requirement or stop rule of this spec reads those rows or any row they sit beside (the one README criterion is a grep for a link this spec itself adds, and it is still red on main as it should be); the spec on disk equals the round 1 snapshot byte for byte; the listed inputs under src/ are unchanged; the leak scan is clean. All passed. I did not re-run any named test (its file does not exist yet) and I did not re-read the vault contracts the request names. The answers of round 1 stand with their dispositions. Nothing high, nothing new.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NWI2YjhiYmZlNjg0NDQ4ZjE4YWZlNzYxZTUxZGI5NWJmMzllZGYzMmRlMjQxZjg0ZjgyMWEyNTMxZjljOWQ2Yg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "YKEvneXHyEN0ETVCBU12W/ugFyaQLvCrhE/9k2uvo0OjpYh58qXmnM0IJITd4n71PNz9+TgHm1iE7a7KAopLCg=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ODk2MzgzMzZhYzkzNDkyZTVhNDRiYjA4NTM2NDFkNmY1NTkyMGZhZjBmM2I0MjA3NTRkNGViOWIwMTg0NTZhZQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "KxmELQFo4+YYtwf7iWPeNaaG/ZKdSRGef7DzoNBaLG0f/WiwMP03L9zgBKGJOp7fVsh8rzK03wvBWtGshq10Cg=="
+          }
+        ]
+      }
     }
   ]
 }

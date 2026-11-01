@@ -608,13 +608,15 @@
       "id": "SR-3.01",
       "gap": "G30",
       "area": "SR-3",
-      "title": "Engine decision: what merges a note, where it lives, how it is licensed",
+      "title": "Engine decision, superseded: the engine stays in its own repository and is reached by call-out",
       "repo": "memev",
-      "closes": "crdt-merge is presented as the paid core but merges tensors and records, not Markdown; the engine has no design",
+      "closes": "Closes G30 as superseded by the owner decision of 31 Oct 2026: crdt-merge stays in its own repository and is reached only across the call-out boundary; the memev-merge engine is not built",
       "depends_on": [],
       "tasks": 1,
-      "criteria": 5,
-      "spec": "specs/SR-3.01-engine-decision-what-merges-a.json"
+      "criteria": 6,
+      "spec": "specs/SR-3.01-engine-decision-what-merges-a.json",
+      "status": "superseded 31 Oct 2026",
+      "superseded_reason": "Owner engine decision 31 Oct 2026 (memev docs/scope-one/DECISIONS.md, ADR 6): the engine is not vendored or re-implemented, so the memev-merge decision record is replaced by the call-out record this spec now asks for. Not signed; not to be re-signed in its earlier form."
     },
     {
       "id": "SR-3.02",
@@ -649,12 +651,12 @@
       "id": "SR-3.05",
       "gap": "G34",
       "area": "SR-3",
-      "title": "One licence for the engine, stated once",
+      "title": "The licences, stated once: Apache-2.0 core, BSL-1.1 crdt-merge, ACFA-RS own licence, commercial federated services",
       "repo": "memev",
-      "closes": "The engine licence is stated three ways (BSL 1.1, FSL-1.1-ALv2, draft BUSL-1.1 with licensor to be confirmed)",
+      "closes": "The engine licence is stated three ways (BSL 1.1, FSL-1.1-ALv2, draft BUSL-1.1 with licensor to be confirmed); amended 31 Oct 2026 to state all four licences once",
       "depends_on": [],
       "tasks": 1,
-      "criteria": 3,
+      "criteria": 8,
       "spec": "specs/SR-3.05-one-licence-for-the-engine.json"
     },
     {
