@@ -4,6 +4,8 @@
 // and runs the real engine; the merged note comes back and both computers end up with it. The shim and the engine live
 // outside this repository. Point MEMEV_ENGINE_SHIM at the shim (a program that reads one JSON line {a, b, base} on its
 // standard input and prints one JSON line {text} or {refuse:true}). Without it the test is skipped and reported as not run.
+// The provider is built with commandProvider from src/engine/merge.mjs. This test does not exercise the WO-05-B client: that
+// work (#201) is still open, so until it lands the shim stands in for the client. When it lands, swap the provider here.
 // The test checks only the round trip. What the boundary does with an unusable answer is tested elsewhere.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
