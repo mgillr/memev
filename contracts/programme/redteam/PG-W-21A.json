@@ -1,0 +1,77 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PG-W-21A",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "9168aaed3375715c8f084fce14e8677350fc70bbcd96fdad274d1d269f408237",
+      "base_commit": "307a200d0a57bbe31a36f1522f3438f3f3d263fc",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/identity.mjs",
+            "sha256": "fa18ed5c972253cca830843a0c3db13a8416d2a2cb844598aeeb9f8d964bc918"
+          },
+          {
+            "path": "docs/scope-one/design/trust-governance.md",
+            "sha256": "f5bc106736fb2fbe0c99c44d822dcfcc1a03deaf150c161d6ec951bc6189d8c9"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "signing PG-W-21A builds a library whose shape already answers three questions that ADR 8 (proposed) leaves to the owner: question 7 (two purposes, contribute and verify, option A), question 9 (delegation to a stated depth that only narrows, option B) and, through the revocation rule, a part of question 6 (the issuer of a grant or a root may revoke)",
+          "disposition": "rejected",
+          "reason": "the spec marks every one of them PROVISIONAL with the source ADR 8, makes the root a parameter with no default, says that changing the format is a new schema version and not an edit of memev-trust/1, gives the module no production caller, and the design page states that PG-W-21A depends on none of the ten questions; the choices are the options the ADR itself proposes (7A, 9B), and the consequence of an owner answer that differs is a new version of a library nothing calls"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "the purity criteria are greps and can be passed without purity: I tried stubs against the two command criteria and a bare specifier (import from 'fs') and a second import on the same line as the identity import pass both, node:os, performance.now(), Math.random() and process.hrtime() are not named, and a dynamic import of node:fs is stopped only by the second criterion; and the import criterion fails a multi-line named import (false red)",
+          "disposition": "rejected",
+          "reason": "the behaviour is carried by AC05 (frozen inputs, equal result on a second call, deny.bad_request without at instead of reading the clock), the scope is a single file that a reviewer reads, and a false red is reported under the stop rules; the module is read-only by design and has no caller"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "the delegation criteria leave some cases to the implementer: a child whose issuer is not the subject of its named parent, a child that names a missing parent, a cycle or a self-parent, a child that starts before its parent, and a grant with no delegation block (is that depth 0?); and AC02 and AC03 ask for a rule id without fixing any, so a test may assert any string",
+          "disposition": "rejected",
+          "reason": "strictly decreasing depth makes a cycle or a self-parent impossible for an honoured chain, the requirement says a holder of a live delegating grant is the only non-root issuer (AC02 tests an issuer with none), and a parent must be live for the child to be eligible; the open cases are conservative under deny by default; only deny.bad_request has a fixed id, which is all the contract can pin without inventing a catalogue"
+        },
+        {
+          "n": 4,
+          "severity": "low",
+          "how": "test/helpers/** is in the scope although the work needs no new helper, and docs/MODULES.md is in the scope because the generated graph changes when a module is added",
+          "disposition": "rejected",
+          "reason": "the helpers entry is the one every programme task carries; I added stubs for the module, the schema, the note, the test and the regenerated MODULES.md to a scratch checkout of this branch: docs/MODULES.md, changelog.d/PG-W-21A.md, the schema, the module and the test were the only files changed, every one inside the scope (matchAny), docs-module-map, docs-links and the leak scan passed, and the changelog test passed once the note had its heading"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the signer, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of PG-W-21A, the trust record v1, its validator and schema and a pure eligibility evaluation (WP21-01 only, 15 criteria), made against the #371 branch at 307a200d0a57 (main 1c8184e is an ancestor). The spec hash equals the hash given (9168aaed3375). What I checked, as asked. Dependencies: the manifest row depends_on is exactly SO-F-01, the task depends_on is empty, the request names SO-F-01 as the one contract and names PG-W-21B only as a later, unsigned consumer. Imports: the spec allows src/engine/identity.mjs only (criterion 8 checks every import line, criterion 9 the clock, file, network and process names); identity.mjs is on main with validateScope, SUBJECT_TYPES and SCOPE_TYPES at the lines the spec cites (13-14, 66-75). Open pull requests and owner questions: the spec text contains no pull request number and no owner question; ADR 8 is cited as the provisional source of the record format (requirement 1, and criterion 7 greps the module for ADR 8 and PROVISIONAL), in the request as the place where the definition is proposed, and once as the sign-off that PG-W-21B waits for; ADR 3, ADR 5, ADR 7 and SO-A-05 are named only as not decided here. The change note changelog.d/PG-W-21A.md and docs/MODULES.md are in the scope. Red-green: AC01 to AC06 are test_red_green criteria that run test/trust-record.test.mjs by test name (^PG-W-21A ACn:), require ok for the named test and no not ok, so they are red before the module and the test exist (node --test on a missing file exits non-zero) and cannot pass on zero matches. They cover each behaviour asked for: deny by default (AC02: no records, no roots, issuer not a root and no delegating grant, wrong purpose, another scope of the same type, before start, at expiry, a subject with no grant whatever its type, invalid request, plus a positive control), no score (the result is { eligible, rule, reason, chain } and a grant has no numeric field, the validator refuses an unknown field in AC01), delegation only narrows (AC03: wider purposes, another scope, later expiry, depth equal or above, depth 0 cannot delegate, a narrowing child is eligible with both ids in the chain) and revocation as of a time with cascade (AC04: before and at the revocation, parent revoked makes the child ineligible, child revoked leaves the parent, a revocation by a non-issuer non-root is not applied), purity (AC05) and schema parity (AC06). I ran the five static criteria against a stub in a scratch checkout (grep, imports, clock: pass; AC01 with a stub test: pass) and read the requirements against the criteria one by one. PG-W-21B was not reviewed for signing and is not signed: its manifest status reads \"NOT TO BE SIGNED until the owner signs off ADR 8\", its title says it is not to be signed before ADR 8 is signed off, its spec says so in the request and in a task, it has no record, and its hash matches 9c92f605. Checks run: the manifest kind is feature; the one implement task has mandatory red-green criteria that run its own test file; the task drafts through makeTask; every command parses with sh -n; no statement repeats; every grep pattern compiles and is within 200 characters; the leak scan is clean; specIdOf and locate give PG-W-21A its own record path (contracts/programme/redteam/PG-W-21A.json) and no other of the 93 programme and Scope One specs shares one. I did not run npm test. Commits of the branch are all by the repository owner's noreply address, with no AI marker and no em-dash. One medium and three low findings, none blocks signing. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NmY4N2FiYzdiYWJmMTQwMzU4MzFiNWI4ODhkMDIzMTAwODIxNzJkZTgzMzY0M2NhYjJmNDI1MzRlMmU3OTFiYw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "a8RCjhWKSp5D9GjNGVATQldjv1VAWkcSXDdqT06vOdFtZ6O2TsfmK1mMUMCT3sjmz8CDsn1HdsQvN9KfzhnrBg=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OWZlNGQ4NTM0NDYzZmQ0ZDVlMzE4NmM5MGI4MGEwZTBkYTVhYWYwYWQxZTM0MWVhYWRjMzhiNjQ1NGE3OTQxMA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "pJee9O3ZqJw4QL5QTvzP+cwi9H1DawETb5MQsOSHSiI3dOJsDaNiSrnydo4mBDjoy4OiNFTkkkBfzS+JXgH4Bw=="
+          }
+        ]
+      }
+    }
+  ]
+}

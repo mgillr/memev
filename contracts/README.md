@@ -189,6 +189,12 @@ Sixth pass, 1 November 2026 (pull request #363, second signing pass). `PG-04.2` 
 | [PG-04.2](programme/specs/PG-04.2-canonical-operation-envelope.json) | [`k-pg-04-2-canonical-operat-9d598a`](signed/k-pg-04-2-canonical-operat-9d598a.json) | Canonical operation envelope (memev), supersedes PG-04.1 | SO-1.01, SO-1.04 |
 | [PG-19.2](programme/specs/PG-19.2-memev-work-command-wired-to-runwork.json) | [`k-pg-19-2-memev-work-comma-6c8a9e`](signed/k-pg-19-2-memev-work-comma-6c8a9e.json) | memev work command wired to runWork with a production openStore (memev), supersedes PG-19.1 | SO-1.01, SO-A-03 |
 
+Seventh pass, 1 November 2026 (pull request #371, trust governance). `PG-W-21A` is the trust record v1, its validator and schema and a pure eligibility evaluation (work package WP21-01). It has an interim red-team record under `programme/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1. The record format it builds is provisional (ADR 8 is proposed). `PG-W-21B` is not signed and has no record: it waits for the owner to sign off ADR 8.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [PG-W-21A](programme/specs/PG-W-21A.json) | [`k-pg-w-21a-trust-record-v1-ac28ab`](signed/k-pg-w-21a-trust-record-v1-ac28ab.json) | Trust record v1, its validator and schema, and a pure eligibility evaluation (memev) | SO-F-01 |
+
 ## Scope One build layer, 1 November 2026
 
 `scope-one/` also holds the build layer: 25 contracts adapted from the unsigned fold of 30 October 2026 (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-10, SO-F-12 and SO-F-13). They build what the design records SO-1.x and SO-2.x decide, and each cites the record it builds and the signed vault contracts it rests on, by id only. I validated each against main and the programme specs of PR #325, and changed the text where main or an owner decision of 31 October 2026 disagreed with it; every spec lists its changes in its request as adapted from the unsigned fold. SO-F-11 is dropped, with the reason in section 9.3 of [docs/scope-one/WBS.md](../docs/scope-one/WBS.md). Each has an interim red-team record (an interim solo review by the author, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`). The spec file is named by the id alone, because the gate reads the id from the file name and an id with a letter segment has no number to stop at.

@@ -76,6 +76,7 @@ Daily
   memev import list                list previous imports
   memev import undo [IMPORT-ID]    remove a previous import and its notes
   memev checkpoint --project P [--task T] [--done a,b] [--doing x] [--next c,d]
+  memev work status <project>  |  memev work pause|resume <project>  |  memev work cancel <project> <task> --reason <why>   a project's work, with --json
   memev claims [--status fact]  |  memev contract status|from-request|new|sign|approve|verify|list|amend|decompose|hook
   memev verify [id]  |  memev gate [--workdir DIR]   check signed contracts on this machine (never CI)
   memev token issue|list|revoke|rotate
@@ -332,6 +333,21 @@ async function run(argv, env) {
         if (flags.aider) { const { aiderHandoff } = await import('./clients.mjs'); const h = aiderHandoff({ env, cardText }); out.ok(`Aider: resume card written to ${h.conventions} and added to the read list in ${h.conf}`); }
       }
       return 0;
+    }
+    case 'work': {
+      // status, pause, resume and cancel of a project go through the running daemon's own tools; the CLI opens no project store itself
+      const verbs = ['status', 'pause', 'resume', 'cancel'];
+      if (!verbs.includes(pos[0])) { console.error('usage: memev work status <project> | pause <project> | resume <project> | cancel <project> <task> --reason <why>  (add --json for data)'); return 2; }
+      need(); if (!(await ensureDaemon(root, { quiet: true }))) throw new Error('the daemon is not running');
+      const { runWork } = await import('./work.mjs');
+      const call = async (name, args) => {
+        const token = pos[0] === 'status' || name === 'memev_project_status' ? clientToken(root, 'cli') : adminToken(root);
+        const r = await fetchOut(`http://127.0.0.1:${daemonInfo(root).port}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) });
+        const j = await r.json();
+        if (j.error || j.result?.isError) throw new Error(j.result?.content?.[0]?.text || j.error?.message || `${name} failed`);
+        return j.result.structuredContent;
+      };
+      return runWork(pos, flags, { root, call });
     }
     case 'claims': {
       need(); const { Vault } = await import('../engine/vault.mjs');

@@ -6,6 +6,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { truncate } from './util.mjs';
 import { readLines } from './oplog.mjs';
+// The operation envelope builder, exported with the engine's entry module. The op log reaches it on every append (oplog.mjs).
+export { buildEnvelope } from './envelope.mjs';
 
 const STOP = new Set('a an and are as at be but by for from has have i if in into is it its of on or our so that the their them then there these they this to was we were what when where which who will with you your not no do does did can could should would just also than too very about after before over under more most some such only own same each other any all both few'.split(' '));
 // Scripts written without spaces between words. A run of these is indexed as single characters and
