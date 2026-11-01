@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { sandbox } from './helpers/cli.mjs';
+import { sandbox, initWithRetry } from './helpers/cli.mjs';
 import { cleanup } from './helpers/tmp.mjs';
 
 after(() => cleanup());
@@ -35,7 +35,7 @@ test('MEM-006 AC03: doctor --fix re-runs the health check and reports a fix as d
   const sb = sandbox();
   let holder = null;
   try {
-    assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
+    assert.equal(initWithRetry(sb, ['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
     assert.equal(sb.run(['stop']).code, 0);
     const port = JSON.parse(fs.readFileSync(path.join(sb.root, '.memev', 'config.json'), 'utf8')).port;
     holder = await hold(port);

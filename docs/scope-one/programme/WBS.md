@@ -13,7 +13,7 @@ Critical path (11 tasks): WP17-01 -> WP17-03 -> WP04-01 -> WP05-01 -> WP05-03 ->
 - WP01-03 [new gap] Fact conflict policy made explicit: AgentState resolves by (timestamp, node id), ContextMerge by max confidence; document and test which wins | repo crdt-merge | after: WP01-01 | owner: area-engine | serves: MV-CRDT-03
 - WP01-04 [new gap] TrustAgentState delete is a replicated tombstone and its merge is causal observed-remove | repo crdt-merge | after: WP01-01 | owner: area-engine | serves: MV-CRDT-04
 - WP01-05 [new gap] Operation and contribution tags are globally unique; equal-timestamp LWW/FWW ties are order independent | repo crdt-merge | after: WP01-01 | owner: area-engine | serves: MV-CRDT-06
-- WP01-06 [in an open PR] Land crdt-merge PR #179 (strict Ed25519 verification, no HMAC fallback keyed by the public key) after review | repo crdt-merge | after: none | owner: owner | serves: MV-CRDT-07
+- WP01-06 [done in main] Land crdt-merge PR #179 (strict Ed25519 verification, no HMAC fallback keyed by the public key) after review | repo crdt-merge | after: none | owner: owner | serves: MV-CRDT-07
 - WP01-07 [planned (docs only)] Gossip boundary note: the engine supplies state and digests; the caller supplies transport, scheduling, lifecycle | repo crdt-merge | after: WP01-01 | owner: area-engine | serves: MV-CRDT-05
 
 ## WP02 CRDT conformance gate (history-based, CI) (area engine)
