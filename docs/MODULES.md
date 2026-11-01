@@ -2,7 +2,7 @@
 
 Part of the [Memev documentation](README.md). Written by `node scripts/docs/module-graph.mjs` from the real imports in `bin/` and `src/`; do not edit it by hand. `node scripts/docs/module-graph.mjs --check` (and `test/docs-module-map.test.mjs`) fail when it is out of date. How the parts fit at a higher level: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-74 modules and 278 import edges (72 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
+75 modules and 283 import edges (72 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
 
 ## Layers
 
@@ -80,6 +80,7 @@ flowchart LR
     src_engine_devices["devices.mjs"]
     src_engine_diff["diff.mjs"]
     src_engine_entitlements["entitlements.mjs"]
+    src_engine_envelope_adapters["envelope-adapters.mjs"]
     src_engine_envelope["envelope.mjs"]
     src_engine_git["git.mjs"]
     src_engine_graph["graph.mjs"]
@@ -334,6 +335,8 @@ flowchart LR
   src_engine_devices --> src_engine_entitlements
   src_engine_devices --> src_engine_git
   src_engine_devices --> src_engine_util
+  src_engine_envelope_adapters --> src_engine_envelope
+  src_engine_envelope_adapters --> src_engine_util
   src_engine_git --> src_engine_util
   src_engine_graph --> src_engine_index
   src_engine_graph --> src_engine_util
@@ -348,6 +351,7 @@ flowchart LR
   src_engine_importers_exports --> src_engine_secrets
   src_engine_importers_exports --> src_engine_zip
   src_engine_importers_project --> src_engine_secrets
+  src_engine_index --> src_engine_envelope
   src_engine_index --> src_engine_oplog
   src_engine_index --> src_engine_util
   src_engine_jsonc --> vendor_jsonc
@@ -355,6 +359,8 @@ flowchart LR
   src_engine_merge --> src_engine_license
   src_engine_milestones --> src_engine_oplog
   src_engine_milestones --> src_engine_util
+  src_engine_oplog --> src_engine_envelope_adapters
+  src_engine_oplog --> src_engine_envelope
   src_engine_oplog --> src_engine_util
   src_engine_project_store --> src_engine_oplog
   src_engine_project_store --> src_engine_secrets
@@ -450,21 +456,22 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 | `src/engine/devices.mjs` | The device registry: every computer and client that uses this vault, each with its own credential | `engine/entitlements.mjs`, `engine/git.mjs`, `engine/util.mjs` | `cli/bus-cli.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/remote.mjs`, `cli/sync.mjs`, `engine/agentid-bind.mjs`, `engine/vault.mjs`, `server/http.mjs` |
 | `src/engine/diff.mjs` | A lossless line splice: the smallest single replaced range between two texts (common prefix and suffix kept) | none | `engine/vault.mjs` |
 | `src/engine/entitlements.mjs` | What each tier includes, and the one thing a licence limits: how many computers may use a vault | none | `cli/agentid.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/tunnel.mjs`, `cli/upgrade.mjs`, `engine/devices.mjs`, `server/http.mjs`, `services/providers.mjs` |
-| `src/engine/envelope.mjs` | The canonical operation envelope, version 1: one record shape that is built, written in one canonical form, hashed and checked | none | none |
+| `src/engine/envelope-adapters.mjs` | Adapters between the three record shapes the engine writes today and the canonical operation envelope (version 1): the op-log record... | `engine/envelope.mjs`, `engine/util.mjs` | `engine/oplog.mjs` |
+| `src/engine/envelope.mjs` | The canonical operation envelope, version 1: one record shape that is built, written in one canonical form, hashed and checked | none | `engine/envelope-adapters.mjs`, `engine/index.mjs`, `engine/oplog.mjs` |
 | `src/engine/git.mjs` | Git as the durable, human-readable history | `engine/util.mjs` | `cli/bus-cli.mjs`, `cli/github.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/onboarding.mjs`, `cli/sync.mjs`, `engine/contracts.mjs`, `engine/devices.mjs`, `engine/vault.mjs`, `services/providers.mjs` |
 | `src/engine/graph.mjs` | The memory graph: what is connected to what, how sure the vault is of each claim, and where each memory came from and was used | `engine/index.mjs`, `engine/util.mjs` | `engine/vault.mjs` |
 | `src/engine/importers/ai-history.mjs` | Find AI history files already on the machine: Claude Code and Cursor memory files, CLAUDE.md and similar rule files | `engine/secrets.mjs` | `engine/importers/core.mjs` |
 | `src/engine/importers/core.mjs` | Import orchestration: scan sources, filter secrets, write notes, dedup, list, undo | `cli/common.mjs`, `cli/daemon.mjs`, `engine/importers/ai-history.mjs`, `engine/importers/exports.mjs`, `engine/importers/project.mjs`, `engine/util.mjs`, `engine/vault.mjs` | `cli/import.mjs` |
 | `src/engine/importers/exports.mjs` | Read ChatGPT and Claude chat export zips: find conversations.json and extract readable text | `engine/secrets.mjs`, `engine/zip.mjs` | `engine/importers/core.mjs` |
 | `src/engine/importers/project.mjs` | Scan a project folder for importable content: README, docs markdown, notes, and git log subjects | `engine/secrets.mjs` | `engine/importers/core.mjs` |
-| `src/engine/index.mjs` | The recall index: BM25 over note sections (a section = a heading and the text under it) | `engine/oplog.mjs`, `engine/util.mjs` | `engine/graph.mjs`, `engine/quality.mjs`, `engine/vault.mjs` |
+| `src/engine/index.mjs` | The recall index: BM25 over note sections (a section = a heading and the text under it) | `engine/envelope.mjs`, `engine/oplog.mjs`, `engine/util.mjs` | `engine/graph.mjs`, `engine/quality.mjs`, `engine/vault.mjs` |
 | `src/engine/jsonc.mjs` | Settings files that hold comments or trailing commas (JSONC: VS Code, Zed, often Gemini CLI) | `vendor/jsonc` | `cli/clients.mjs` |
 | `src/engine/license.mjs` | Offline licence files | `engine/util.mjs` | `cli/agentid.mjs`, `cli/doctor.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/relay.mjs`, `cli/sync.mjs`, `cli/tunnel.mjs`, `engine/merge.mjs`, `server/http.mjs` |
 | `src/engine/merge.mjs` | The engine call gate | `engine/license.mjs` | `cli/sync.mjs` |
 | `src/engine/milestones.mjs` | Activation milestones, worked out on this computer from what the vault already keeps: its operation log, the comms bus and the invites file | `engine/oplog.mjs`, `engine/util.mjs` | `cli/onboarding.mjs` |
 | `src/engine/mutation-gate.mjs` | The mutation gate breaks each line a change added or edited, one mutant at a time, and fails when the tests still pass | none | none |
 | `src/engine/net.mjs` | Every request Memev makes goes through fetchOut, except a hook process's calls to the daemon on this computer, which use node:http (cli/common.mjs) | none | `cli/common.mjs`, `cli/doctor.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/mcp-stdio.mjs`, `cli/onboarding.mjs`, `cli/remote.mjs`, `cli/tunnel.mjs` |
-| `src/engine/oplog.mjs` | The operation log: append-only, segmented, snapshotted, streamed | `engine/util.mjs` | `cli/transcript.mjs`, `engine/index.mjs`, `engine/milestones.mjs`, `engine/project-store.mjs`, `engine/vault.mjs` |
+| `src/engine/oplog.mjs` | The operation log: append-only, segmented, snapshotted, streamed | `engine/envelope-adapters.mjs`, `engine/envelope.mjs`, `engine/util.mjs` | `cli/transcript.mjs`, `engine/index.mjs`, `engine/milestones.mjs`, `engine/project-store.mjs`, `engine/vault.mjs` |
 | `src/engine/project-state.mjs` | The project and task state machine: the eleven task states, the seven derived project statuses, one transition table, and the invariants of the... | none | `engine/coordinator.mjs` |
 | `src/engine/project-store.mjs` | The project store: one canonical project state per project, under the vault's .memev directory | `engine/oplog.mjs`, `engine/secrets.mjs`, `engine/util.mjs` | `engine/vault.mjs` |
 | `src/engine/quality.mjs` | The write gate for memories | `engine/index.mjs` | `engine/vault.mjs` |
@@ -474,7 +481,7 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 | `src/engine/tokens.mjs` | Capability tokens: mv_<id>_<secret> | `engine/util.mjs` | `cli/common.mjs`, `cli/doctor.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/tunnel.mjs`, `engine/bus.mjs`, `engine/card.mjs`, `engine/vault.mjs` |
 | `src/engine/tournament.mjs` | Tournaments: when there are competing answers (designs, explanations, hypotheses), sessions record head-to-head judgements and Elo ratings sort them | none | `engine/vault.mjs` |
 | `src/engine/tuning.mjs` | Recall tuning from use | `engine/util.mjs` | `cli/sync.mjs`, `engine/vault.mjs` |
-| `src/engine/util.mjs` | Small shared helpers: hashing, atomic files, private files, time, paths | none | `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/common.mjs`, `cli/deployment.mjs`, `cli/doctor.mjs`, `cli/github.mjs`, `cli/hooks.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/onboarding.mjs`, `cli/pathsetup.mjs`, `cli/preflight.mjs`, `cli/ready.mjs`, `cli/relay.mjs`, `cli/remote.mjs`, `cli/runner.mjs`, `cli/service.mjs`, `cli/sync.mjs`, `cli/tunnel.mjs`, `cli/update.mjs`, `engine/agentid-bind.mjs`, `engine/bus.mjs`, `engine/card.mjs`, `engine/contracts.mjs`, `engine/coordinator.mjs`, `engine/devices.mjs`, `engine/git.mjs`, `engine/graph.mjs`, `engine/importers/core.mjs`, `engine/index.mjs`, `engine/license.mjs`, `engine/milestones.mjs`, `engine/oplog.mjs`, `engine/project-store.mjs`, `engine/tokens.mjs`, `engine/tuning.mjs`, `engine/vault.mjs`, `server/http.mjs`, `server/main.mjs`, `server/oauth.mjs` |
+| `src/engine/util.mjs` | Small shared helpers: hashing, atomic files, private files, time, paths | none | `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/common.mjs`, `cli/deployment.mjs`, `cli/doctor.mjs`, `cli/github.mjs`, `cli/hooks.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/onboarding.mjs`, `cli/pathsetup.mjs`, `cli/preflight.mjs`, `cli/ready.mjs`, `cli/relay.mjs`, `cli/remote.mjs`, `cli/runner.mjs`, `cli/service.mjs`, `cli/sync.mjs`, `cli/tunnel.mjs`, `cli/update.mjs`, `engine/agentid-bind.mjs`, `engine/bus.mjs`, `engine/card.mjs`, `engine/contracts.mjs`, `engine/coordinator.mjs`, `engine/devices.mjs`, `engine/envelope-adapters.mjs`, `engine/git.mjs`, `engine/graph.mjs`, `engine/importers/core.mjs`, `engine/index.mjs`, `engine/license.mjs`, `engine/milestones.mjs`, `engine/oplog.mjs`, `engine/project-store.mjs`, `engine/tokens.mjs`, `engine/tuning.mjs`, `engine/vault.mjs`, `server/http.mjs`, `server/main.mjs`, `server/oauth.mjs` |
 | `src/engine/vault-marker.mjs` | Whether a folder is a Memev vault, without loading the vault engine | none | `cli/hooks.mjs`, `engine/vault.mjs` |
 | `src/engine/vault.mjs` | The vault: Markdown notes you own, in git, with an append-only operation log as the write-ahead log, a recall index over sections and a memory graph | `engine/bus.mjs`, `engine/contracts.mjs`, `engine/coordinator.mjs`, `engine/devices.mjs`, `engine/diff.mjs`, `engine/git.mjs`, `engine/graph.mjs`, `engine/index.mjs`, `engine/oplog.mjs`, `engine/project-store.mjs`, `engine/quality.mjs`, `engine/secrets.mjs`, `engine/tokens.mjs`, `engine/tournament.mjs`, `engine/tuning.mjs`, `engine/util.mjs`, `engine/vault-marker.mjs` | `cli/agentid.mjs`, `cli/bus-cli.mjs`, `cli/clients.mjs`, `cli/compact.mjs`, `cli/doctor.mjs`, `cli/import.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/ready.mjs`, `cli/runner.mjs`, `cli/update.mjs`, `engine/importers/core.mjs`, `server/http.mjs`, `server/main.mjs`, `server/mcp.mjs` |
 | `src/engine/zip.mjs` | A minimal ZIP reader for chat export files: stored and DEFLATE entries, no zip64, no encryption | none | `engine/importers/exports.mjs` |
