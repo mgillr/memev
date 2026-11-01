@@ -1376,6 +1376,37 @@
       "kind": "feature"
     },
     {
+      "id": "PG-19.3",
+      "type": "programme work package",
+      "area": "PG-19",
+      "title": "Shared pure replay of a project's event log for the project store and the read-only reader (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP19-04, WP19-05 (a gap found at the review of pull request #365; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "PG-19.2",
+          "boundary": "it owns the facade of Vault#tasksReader, src/cli/work-store.mjs and the e2e test; PG-19.3 changes none of them and moves only the replay inside the reader and the store onto one function; PG-19.2 is not superseded"
+        },
+        {
+          "contract": "SO-1.01",
+          "boundary": "requirement 3 stands: only the vault, the coordinator and the project store name the store; PG-19.3 adds a module with no import and no store handle"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "PG-19.2 (signed) defines the reader; this spec adds only src/engine/project-replay.mjs, the two callers and the tests",
+      "depends_on": [
+        "PG-19.2",
+        "SO-1.01",
+        "SO-F-02"
+      ],
+      "tasks": 2,
+      "criteria": 58,
+      "spec": "specs/PG-19.3-shared-replay-for-the-project-store-and-reader.json",
+      "status": "proposed and unsigned; no red-team record; the spec is open as pull request #383 and is to be signed on base 4db3030 or later",
+      "kind": "feature"
+    },
+    {
       "id": "PG-20.1",
       "type": "programme work package",
       "area": "PG-20",
@@ -1398,6 +1429,32 @@
       "spec": "specs/PG-20.1-scope-verifier-allows-own-change-note.json",
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
       "kind": "feature"
+    },
+    {
+      "id": "QL-W-01A",
+      "kind": "feature",
+      "type": "programme work package",
+      "area": "QL-W",
+      "title": "Signing refuses a contract with a test_red_green criterion when no base revision can be recorded (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP23-01 (builds on the base recording of the signed SR-0.03.3 T1; proposed 1 Nov 2026; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "SR-0.03.3",
+          "boundary": "T1 of the signed contract records a base at signing when a base is named or the workdir is a git checkout, and verify is BLOCKED without one; QL-W-01A adds only the refusal at signing for a contract with a test_red_green criterion, and changes neither verify nor any signed body"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "SR-0.03.3 T1 (base recorded at signing) is the build layer, cited by id; this spec changes only contractSign in src/engine/contracts.mjs and the Base revision section of docs/CONTRACTS.md",
+      "depends_on": [
+        "SR-0.03.3"
+      ],
+      "tasks": 1,
+      "criteria": 18,
+      "spec": "specs/QL-W-01A.json",
+      "base": "ba24c82e16c91f5962f20d49b396d46054a505da (the memev main commit that merged pull request #358, SO-F-03)",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); builds on the signed SR-0.03.3 and changes no signed body"
     },
     {
       "id": "PG-18.1",
@@ -2098,9 +2155,27 @@
       "note": "specified in this set"
     },
     {
+      "task": "WP19-04",
+      "title": "One pure shared replay of a project's event log in src/engine/project-replay.mjs, with no import",
+      "contract": "PG-19.3",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP19-05",
+      "title": "The project store and the read-only reader both replay through the shared function and agree on one fixed log",
+      "contract": "PG-19.3",
+      "note": "specified in this set"
+    },
+    {
       "task": "WP20-01",
       "title": "The scope verifier allows a spec's own change note: changelog.d/<id>.md and its base id, and nothing else beyond what it allows today",
       "contract": "PG-20.1",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP23-01",
+      "title": "Signing refuses a contract with a test_red_green criterion when no base revision can be recorded, and a spec names its base revision",
+      "contract": "QL-W-01A",
       "note": "specified in this set"
     },
     {

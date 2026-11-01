@@ -201,6 +201,12 @@ Eighth pass, 1 November 2026 (pull request #379, the red stage of the evaluator)
 |---|---|---|---|
 | [SR-W-03A](programme/specs/SR-W-03A.json) | [`k-sr-w-03a-a-red-run-whose-c9fa9d`](signed/k-sr-w-03a-a-red-run-whose-c9fa9d.json) | A red run whose TAP header was cut off is red only when an assertion is visible (memev) | SR-0.03.3 |
 
+Ninth pass, 1 November 2026 (pull request #380, the base at signing). `QL-W-01A` is additive to the signed `SR-0.03.3` and supersedes nothing: signing refuses a contract with a `test_red_green` criterion when no base revision can be recorded. It has an interim red-team record under `programme/redteam/` (an interim solo review, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1, with the base `ba24c82e16c91f5962f20d49b396d46054a505da` recorded.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [QL-W-01A](programme/specs/QL-W-01A.json) | [`k-ql-w-01a-signing-refuses-031b6b`](signed/k-ql-w-01a-signing-refuses-031b6b.json) | Signing refuses a contract with a test_red_green criterion when no base revision can be recorded (memev) | SR-0.03.3 |
+
 ## Scope One build layer, 1 November 2026
 
 `scope-one/` also holds the build layer: 25 contracts adapted from the unsigned fold of 30 October 2026 (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-10, SO-F-12 and SO-F-13). They build what the design records SO-1.x and SO-2.x decide, and each cites the record it builds and the signed vault contracts it rests on, by id only. I validated each against main and the programme specs of PR #325, and changed the text where main or an owner decision of 31 October 2026 disagreed with it; every spec lists its changes in its request as adapted from the unsigned fold. SO-F-11 is dropped, with the reason in section 9.3 of [docs/scope-one/WBS.md](../docs/scope-one/WBS.md). Each has an interim red-team record (an interim solo review by the author, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`). The spec file is named by the id alone, because the gate reads the id from the file name and an id with a letter segment has no number to stop at.

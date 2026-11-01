@@ -1,0 +1,48 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "QL-W-01A",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "d0b311284c81339da86f8c3512a865fe9aa6a18d75390cfb2cb0535dbfa33a31",
+      "base_commit": "ba24c82e16c91f5962f20d49b396d46054a505da",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "fef5139ba1222068699f08e3d2d75a5fda18bdad8c75181ca007bded9edc84ee"
+          },
+          {
+            "path": "docs/CONTRACTS.md",
+            "sha256": "9e7892016901fd569d4783cf28c700467766d2eed2e55ea458568e748407981d"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM RECORD, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), so this record is signed with the interim reviewer key on the owner's standing decision, and the contract it makes signable waits for an independent re-review. The review was a red-team read of pull request #380 at head 259460e (spec hash d0b311284c81; the spec bytes are the ones of the first head 5fd78d2), made before this record. It read the whole spec. One finding was raised and is closed in this head: the manifest row of PG-19.3 stated 47 criteria and the spec of PG-19.3 has 58 (the head 259460e corrects it, and the register rows that name the merge of pull request #365).\nWhat the review ran: every red-green command was run at the pinned base ba24c82 in a scratch worktree, holding a test file written for the four labelled subtests and, for the green half, a refusal in contractSign placed before the key is read. Red: T1-c01 and T1-c02 each fail on code: 'ERR_ASSERTION' at the base (not a load error, ENOENT or TypeError); T1-c03 and T1-c04 pass at the base and with the change, as the spec says. Green: all four pass with the change, and they still pass beside the change of SR-W-03A. The whole suite was run at the base and with the change on this box and the two runs fail the same tests (the failures are the box's OpenSSH older than 8.0), so the refusal breaks no existing test. Criteria 6, 7, 11 and 12 hold on the scratch commit; the six test files of criterion 5 pass except one test (memev contract new refusing a malformed base) that fails the same way at the base on this box, with or without the change; the manifest row states 18 criteria and the spec has 18, no command pipes through tail or head, every command parses with sh -n, the grep patterns do not match the base, and the six base test files of criterion 5 exist at the base. The gate --report on main merged with the pull request shows 0 NOT SIGNABLE and only QL-W-01A as NO RECORD; the history leak scan is clean.\nNon-blocking notes for the builder: (1) criterion 7 and the scope criterion hold only on a branch that starts at ba24c82 and has not merged main when verify runs, because main has moved on; (2) the request counts 138 signed bodies with no base, which was true at the base; main now holds 142, three of them with a base; (3) the manifest row of PG-19.3 names a spec that is not on main until pull request #383 merges; (4) criterion 6 leaves two output files in the temporary directory; (5) the refusal must come before signingKey, which writes a key when none exists, or a refused sign writes a key. No finding is open.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NzM0NmZlNDE0NmYxOTAyZDg5Y2NhYjNjY2Q3OWUyMWQ1ZDgzYzY0MzBlMjI4OTExNjI1ZTAwZWIxMmU4MWExMg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "EvTE8QAZ4Q3ro2ZJNVY5gD/4aY7WTzq9BytR44Fn+picbSPhq/cyp/gcAwC+QYMBZf7NUPY1pJP/e/+Idz//AA=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MWI2MWY4MzlmYTNkMmI5MTllNGYxMjBjNzU2NDE2NDA5NjcyMjc5Y2NmYTg3YWZkODMzMDQ3NmFhMGQ3OThmNQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "88m1Ks43vCpy8fQ5Q6g6bztJvJFAUyij2OHkdf+iaKJgUrS5vtpn9MjatuFFLZ49O3TQofzRHrbccVUC9ChXBA=="
+          }
+        ]
+      }
+    }
+  ]
+}
