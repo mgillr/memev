@@ -32,9 +32,13 @@ flowchart LR
 - Hooks in Claude Code, Codex and Gemini CLI, session-start hooks in Cursor, instructions in the
   other apps
 - The quality check, review inbox, audit and `memev why`
-- Signed contracts with local checks
-- The comms bus: every AI app on your computer gets a seat, and you can coordinate them from one
-  session ([BUS.md](../BUS.md))
+- Work contracts that define obligations and acceptance criteria, with local checks and retained
+  verification evidence
+- The local ProjectStore and Coordinator: durable project records, task lifecycle, claims, leases,
+  dispatch and recovery. A completion report is not automatically verification or acceptance
+  ([PROJECTS.md](../PROJECTS.md))
+- The comms bus: every connected AI app on your computer gets a seat, and you can coordinate them
+  from one session ([BUS.md](../BUS.md))
 - `memev doctor`
 - Several cloud AI apps side by side through the secure link, such as Claude and ChatGPT, next to
   your local coding tools over MCP (up to 5 connectors counted; nothing is refused)
