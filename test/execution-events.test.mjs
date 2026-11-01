@@ -7,8 +7,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Coordinator } from '../src/engine/coordinator.mjs';
 import { ProjectStore } from '../src/engine/project-store.mjs';
-import { transition, TASK_STATES as S } from '../src/engine/project-state.mjs';
-import { EXECUTION_EVENT_KINDS, validateExecutionEvent, executionStage, observedUnderLease } from '../src/engine/evidence.mjs';
+import { TASK_STATES as S } from '../src/engine/project-state.mjs';
+import { EXECUTION_EVENT_KINDS, validateExecutionEvent, executionStage, observedUnderLease, requireObserved } from '../src/engine/evidence.mjs';
 import { runWork, workStatus, renderWorkStatus } from '../src/cli/work.mjs';
 import { handle } from '../src/server/mcp.mjs';
 import { newVault, tmpdir, cleanup, OWNER, PKG } from './helpers/tmp.mjs';
@@ -61,18 +61,17 @@ test('SO-A-03 AC01: a history with dispatch.accepted and no execution.observed l
   assert.equal(st.accepted.length, 1);
   assert.equal(st.observed.length, 0);
   assert.equal(observedUnderLease(events, { taskId: 'A', leaseId: lease.id, generation: lease.generation }), null);
-  // the state machine refuses the move without an observed execution, with a reason that says so
-  const view = { id: 'A', state: S.IN_PROGRESS, scopeVersion: 1, criteria: [], dependsOn: [] };
-  const ctx = { actor: 'agent-1', time: 1, reason: 'work reported', correlationId: 'c' };
-  const refused = transition(view, S.VERIFYING, ctx);
+  // the guard refuses the move without an observed execution, and says so
+  const ref = { taskId: 'A', leaseId: lease.id, generation: lease.generation };
+  const refused = requireObserved(events, ref);
   assert.equal(refused.ok, false);
   assert.equal(refused.code, 'NOT_OBSERVED');
-  assert.equal(refused.task.state, S.IN_PROGRESS);
-  // an observed event of another lease does not count
-  const other = { kind: 'execution.observed', taskId: 'A', leaseId: 'lease_other', generation: 9 };
-  assert.equal(transition(view, S.VERIFYING, { ...ctx, leaseId: lease.id, observed: other }).code, 'NOT_OBSERVED');
-  const mine = { kind: 'execution.observed', taskId: 'A', leaseId: lease.id, generation: lease.generation };
-  assert.equal(transition(view, S.VERIFYING, { ...ctx, leaseId: lease.id, observed: mine }).ok, true);
+  // an observed event of another lease or generation does not count
+  const other = { type: 'execution.observed', task_id: 'A', lease_id: 'lease_other', generation: 9, resource: 'r', time: 1, payload_hash: 'h' };
+  assert.equal(requireObserved([...events, other], ref).code, 'NOT_OBSERVED');
+  const stale = { ...other, lease_id: lease.id, generation: lease.generation - 1 };
+  assert.equal(requireObserved([...events, stale], ref).code, 'NOT_OBSERVED');
+  assert.equal(requireObserved([...events, { ...other, lease_id: lease.id, generation: lease.generation }], ref).ok, true);
 });
 
 test('SO-A-03 AC01: dispatch records requested then accepted, an observation is recorded under the lease, and a report then moves the task to VERIFYING', () => {
@@ -132,6 +131,7 @@ test('SO-A-03 AC01: without the lifecycle the coordinator records no execution e
   assert.equal(state(store, 'A'), 'DONE');
 });
 
+const CLI = { agent: 'cli', scopes: ['read'], paths: ['**'] };
 const call = async (v, name, args) => {
   const r = await handle(v, { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, { identity: OWNER, client: 'test', session: 's', local: true });
   return r.result.structuredContent;
@@ -169,7 +169,7 @@ test('SO-A-03 AC02: a report of work in progress never counts an observed task a
   await call(v, 'memev_task_plan', { project: 'shop', tasks: [{ id: 'A', title: 'build the cart', artifacts: ['src/cart.js'], criteria: [{ id: 'c1', mandatory: true }], artifact_hash: 'h1' }] });
   const claim = await call(v, 'memev_task_claim', { project: 'shop', task: 'A', ttl_s: 60 });
   await call(v, 'memev_task_report', { project: 'shop', lease: claim.lease.id, output: 'done, trust me', artifacts: ['src/cart.js'] });
-  const before = workStatus(v.coordinator('shop'), 'shop');
+  const before = workStatus(v.tasksStatus(CLI, 'shop', { history: true }));
   assert.equal(before.tasks.A.stage, 'observed');
   assert.equal(before.tasks.A.state, 'VERIFYING');
   assert.equal(before.done, 0, 'an observed task is not done');
@@ -177,7 +177,7 @@ test('SO-A-03 AC02: a report of work in progress never counts an observed task a
   assert.match(renderWorkStatus(before), /done 0 of 1/);
   const ok = await call(v, 'memev_task_verify', { project: 'shop', task: 'A', evidence: [{ criterion: 'c1', scope_version: 1, artifact_hash: 'h1' }] });
   assert.equal(ok.ok, true);
-  const after1 = workStatus(v.coordinator('shop'), 'shop');
+  const after1 = workStatus(v.tasksStatus(CLI, 'shop', { history: true }));
   assert.equal(after1.tasks.A.stage, 'verified');
   assert.equal(after1.done, 1);
   assert.match(renderWorkStatus(after1), /done 1 of 1/);
@@ -202,5 +202,5 @@ test('SO-A-03 AC02: a project that does not exist exits 1 with one line, and the
 test('SO-A-03 AC02: the new files are inside the contract scope and add no import cycle through the store', () => {
   const src = (f) => fs.readFileSync(path.join(PKG, f), 'utf8');
   assert.doesNotMatch(src('src/engine/evidence.mjs'), /from '\.\/(project-store|project-state|coordinator|vault)\.mjs'/);
-  assert.doesNotMatch(src('src/cli/work.mjs'), /engine\/(coordinator|project-store|project-state)\.mjs/);
+  assert.doesNotMatch(src('src/cli/work.mjs'), /ProjectStore|projectStore\(|\bcoordinator\(|new Coordinator|engine\/(coordinator|project-store|project-state)\.mjs/);
 });

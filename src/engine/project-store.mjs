@@ -9,6 +9,7 @@ import path from 'node:path';
 import { readJson, writeJson, now, randomToken, exists } from './util.mjs';
 import { findSecrets, redactSecrets } from './secrets.mjs';
 import { formatHlc, parseHlc, recordHash } from './oplog.mjs';
+import { EXECUTION_EVENT_KINDS, validateExecutionEvent } from './evidence.mjs';
 
 // The current schema version. A store at an older version is migrated forward on open; a store at a
 // newer version is refused (this Memev does not know its layout) and nothing is written.
@@ -196,6 +197,11 @@ export class ProjectStore {
       if (data[f] === undefined || data[f] === null || data[f] === '') {
         throw new ProjectStoreError('invalid', `missing required field: ${f}`);
       }
+    }
+    // an execution event (requested, accepted, observed, verified) carries its resource, time and payload hash
+    if (ent.kind === 'event' && EXECUTION_EVENT_KINDS.includes(data.type)) {
+      const v = validateExecutionEvent(data);
+      if (!v.ok) throw new ProjectStoreError('invalid', `missing required field: ${v.reason}`);
     }
     const id = ent.id || this._newId(ent.kind);
     return { kind: ent.kind, id, data };
