@@ -103,22 +103,70 @@ current code already uses, so no contract is blocked on a guess.
 
 ### ADR 8: trust governance in the federated model
 
-- Status: proposed (pending owner decision)
+- Status: decided (owner decision 1 Nov 2026)
 - Decision owner: owner
-- Proposal: trust governance is a set of local, revocable eligibility records about who or what (person, operator, agent,
-  service, device, node, site) may contribute or verify in which scope. Trust is read only as an eligibility input of the
-  admission path: it can refuse or add a verification requirement and never grants access, and a subject with no record is not
-  eligible. Records live in the node's operation log, with no second store, and a revocation asks for review of what the
-  subject already contributed and changes nothing silently. Every product choice in it is provisional. The full proposal, with
-  the ten open questions for the owner (trust root model, federation across organisations, the default for a new device,
-  revocation propagation, tier placement, who may grant and revoke, purposes, effect on admitted history, delegation, and the
-  role of the external trust service), is in [design/trust-governance.md](design/trust-governance.md).
-- Sources: addendum lines 331 to 347 and 381 to 383 ([ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md](ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md));
-  [FEDERATION.md](../FEDERATION.md); [PAID-TRUST.md](../PAID-TRUST.md); the signed contract SO-F-08, whose code is not on main.
-- Rationale for leaving it proposed: the repository defines the admission side and no definition of trust governance, and the
-  owner has not answered the questions that shape it. The topology of work breakdown row 1.3.6 stays open.
-- Safe default: local records only, deny by default, no record crosses a node, and the trust service stays an unspecified
-  adapter boundary beside the merge boundary (ADR 6, `docs/EXTENSION-POINTS.md`). Nothing in the code changes.
+- Decision: trust governance is a set of local, signed, revocable eligibility records about who or what (person, operator,
+  agent, service, device, node, site) may contribute or verify in which scope. Trust is read only as an eligibility input of
+  the admission path: it can refuse or add a verification requirement and never grants access, and a subject with no record
+  is not eligible. Records live in the node's operation log, with no second store. The owner answered the ten questions of
+  [design/trust-governance.md](design/trust-governance.md) as follows.
+  1. Trust root (question 1): each site is its own root, with an optional organisation key for Business and Corporate.
+  2. Across organisations (question 2): only through a two-party contract that both parties sign, that is scoped, expires
+     and can be revoked. There is no transitive trust.
+  3. New device (question 3): the owner's own new device gets low trust, which one tap from an already trusted device
+     raises. Without that tap it gets none.
+  4. Revocation across nodes (question 4): a revocation is pushed at once, and each contract has a freshness window (24 hours
+     by default). A node refuses new contributions from a side that has been silent for longer than the window, and keeps
+     its local work.
+  5. Tier placement (question 5): local trust is free. Multi-site and cross-organisation trust are in the contact-us tiers.
+  6. Who may grant and revoke (question 6): only a person or an operator subject. Agents propose and a person approves,
+     and each grant or revocation is signed and logged.
+  7. Purposes (question 7): contribute and verify, plus a required-verification level that a grant can raise.
+  8. Admitted history (question 8): earlier work is kept and marked as coming from a revoked source, by an overlay. It is
+     re-verified only when the cause is a compromise.
+  9. Delegation (question 9): none in release 1. The record format reserves one level of delegation that can only narrow.
+  10. External trust service (question 10): optional, and evidence only, for Business and Corporate.
+- Clarifications the owner adopted:
+  1. The new-device rule (3) means that a new device gets no trust record in a personal scope. Low trust means
+     contribute-only at required verification 1, in the owner's organisation scopes only, and never above the owner.
+  2. The one tap is the person's signed act, and it records the approving device. Lost-device recovery has two paths: the
+     owner's recovery key, or a new grant by an operator.
+  3. The organisation key is an optional co-root held by an operator subject. Each site accepts it through its own signed,
+     expiring record and can drop it alone.
+  4. Roots are records with validity windows, and a succession record moves a root to its successor.
+  5. The proposal step goes through SO-A-05, which is not decided. The table of who may write trust (GRANT_AUTHORITY)
+     stays provisional under ADR 5.
+  6. A contract carries both signatures, a freshness field, and binds the sending node.
+  7. Freshness is measured on the local clock from signed peer messages. A contribution refused for staleness is queued, and
+     it is evaluated at the time it is admitted.
+  8. Delegation is reserved in the format only. The writer and the evaluator ignore it in release 1, and a grant that comes
+     from a contract is never a parent.
+  9. The marking is a derived overlay per operation id. A revoked subject's verifications stop counting. The reasons left
+     and error are defined by the spec that builds the overlay.
+  10. An external trust service supplies references on a grant, attached when a person approves it and never per
+      contribution. The merge-time check of [PAID-TRUST.md](../PAID-TRUST.md) stays separate from these references.
+  11. Question 5 is enforced through the services list of the licence. A licence that lapses never invalidates trust that
+      already exists.
+  12. The tiers are named Business and Corporate in every document, and the stale citations and the statements that
+      PG-W-21A is unsigned are corrected.
+- Relay and regional nodes hold no trust: a relay only forwards, and a regional node only caches or forwards. Revocation
+  notices are signed by their issuer and can be forwarded by any node, so a forwarder is never trusted for their content.
+- Sources: the questions and options in [design/trust-governance.md](design/trust-governance.md); the addendum, section 13.7
+  and the acceptance tests of section 13.9 ([ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md](ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md));
+  [FEDERATION.md](../FEDERATION.md); [PAID-TRUST.md](../PAID-TRUST.md); the signed contract SO-F-08.
+- Reasons: each site stays able to work alone, so local-first holds, and nothing is shared by default. The only things that
+  cross a boundary are a contract that two parties signed and a notice that its issuer signed, so no party gains authority
+  by being forwarded or by being a neighbour of a trusted party. A person stays accountable for every grant.
+- Still open, and not settled by this record: ADR 3 (lease semantics), ADR 5 (permission matrix) and ADR 7 (memory and
+  project-state authority) stay as they are, SO-A-05 (the decision and blocker workflow) is not decided, and the topology of
+  work breakdown row 1.3.6 stays open. The table of who may write trust is provisional until ADR 5 and SO-A-05 are decided,
+  and deciding them changes that table and nothing else.
+- Build: the decision is built by a set of specs, all proposed and unsigned unless the register in
+  [RECONCILIATION.md](RECONCILIATION.md) says otherwise. PG-W-21A is signed (`k-pg-w-21a-trust-record-v1-ac28ab`) and its build
+  is in review as pull request #378. PG-W-21A.2 supersedes it with the signature block, the verification level, the roots and
+  the reserved delegation, and PG-W-21B is amended before it is signed.
+- Safe default: deny by default and local records only, as before. Nothing in the code changes by this record, so until a
+  contract lands a behaviour, that behaviour is not available.
 
 ### Tiers (decided, owner decision 31 Oct 2026)
 

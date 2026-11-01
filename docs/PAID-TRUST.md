@@ -49,6 +49,14 @@ A refusal would follow the merge contract in [PAID-CONVERGENCE.md](PAID-CONVERGE
 note version is not written, the other version is kept whole in a conflict copy, and `memev doctor`
 reports the conflict. No version is lost or overwritten.
 
+## How it relates to trust governance in the core
+
+The core has its own trust governance, decided in ADR 8 ([DECISIONS.md](scope-one/DECISIONS.md), [the definition](scope-one/design/trust-governance.md)): local, signed, revocable records of who may contribute or verify in which scope, held in the node's operation log. It is separate from this page, and the two are kept apart on purpose.
+
+- The check on merged note versions described above is a merge-time check. It runs on the engine's side of the boundary, over the two versions the engine is joining, and it is not part of ADR 8.
+- An outside trust service is optional, and its answers are evidence only. It can supply references that a person attaches to a grant when the person approves the grant, in Business and Corporate. A reference is never attached to a single contribution, never grants anything, and is never required: the core works without it, and a missing service is reported as a degraded capability and refuses nothing that the local records allow.
+- The core still sends the engine only the two note versions and their base, and no trust record or reference crosses the boundary.
+
 ## What is not said here
 
 This page states no key formats, no signature schemes and no release dates for the trust service,
