@@ -15,6 +15,8 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md#lice
   vault at the same time, and what brings a company vault into one state:
   - **Personal with more computers:** automatic merge across several computers at once.
   - **Contact-us tiers (Business and Corporate):** vault convergence for a team or company (planned).
+  - **Several sites (planned):** convergence of authorised state between independently operated
+    site nodes, under the engine's contract ([FEDERATION.md](FEDERATION.md)).
 
 Today the engine is not built into any released Memev. The paid features that depend on it are
 planned and are not sold until they are built ([tiers/README.md](tiers/README.md#what-is-built-and-what-is-planned)).
@@ -53,7 +55,26 @@ server: no notes, no file names, no vault id, and no machine name. The one other
 anonymous milestone report, which is off unless you turn it on and holds only milestone names, days and
 a random id ([METRICS.md](METRICS.md)).
 
+## The research behind the engine, and the planned extension to several sites
+
+The engine's research basis is described in the paper *Conflict-Free Replicated Data Types for
+Neural Network Model Merging: A Two-Layer Architecture* (arXiv:2605.19373), which addresses
+neural-network model merging. It is a specific implementation and architecture, not a claim on the
+general CRDT idea. The licence facts above do not change with it: crdt-merge stays in its own
+repository under the Business Source License 1.1 (BSL 1.1), Memev (Apache-2.0) uses it only through
+its call-out boundary, it is never vendored, and only licence information passes between an install
+and our side.
+
+What Memev calls today is narrower than that research: the boundary in
+[EXTENSION-POINTS.md](EXTENSION-POINTS.md) hands the engine two versions of one note and their
+common base. Converging structured project, programme or organisational state, and converging
+authorised state between independently operated sites, is planned and not built. It needs separate
+schemas, authority rules and conformance tests before any page describes it as available
+([FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md)).
+
 ## What is not said here
 
 This page states no merge strategy names, benchmark figures or release dates for the engine, because
 none are published for Memev. A page for any of them is written when the feature ships.
+
+[MERGE-SEMANTICS.md](MERGE-SEMANTICS.md)

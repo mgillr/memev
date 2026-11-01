@@ -54,6 +54,21 @@ The free behaviour is the default and never changes:
 Removing a registered engine returns the install to this behaviour. No version is lost or
 overwritten: both are kept byte for byte, and the conflict copy is listed until it is resolved.
 
+## How this boundary fits the planned federation
+
+This boundary is the note-conflict integration that exists today. It is not a federation
+interface, and nothing on the federation pages is built. The planned federation of independently
+operated site nodes needs separately versioned interfaces for node identity, membership, policy
+evaluation, authorised state exchange and remote execution, and two further adapter boundaries
+beside this one, both planned and both named generically until they are published:
+
+- **The trust service:** trust governance between participants, operators, devices and services.
+- **The admission service:** accountable admission of contributions and the evidence for them.
+
+Those interfaces keep the local permission checks in force exactly as they are: a successful merge
+grants no authority, and a remote request is not an approval. See [FEDERATION.md](FEDERATION.md)
+and [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).
+
 ## Where the boundary is called
 
 The sync path calls the boundary when it resolves a conflicted note after a git merge
