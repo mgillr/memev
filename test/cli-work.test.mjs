@@ -330,6 +330,23 @@ test('PG-19.2 WP19-03 AC06: a project with meta.json and no event log gives an e
   for (const kind of allKinds(store)) { assert.deepEqual(reader.snapshot(kind), store.snapshot(kind), `${kind} agrees`); assert.deepEqual(reader.snapshot(kind), {}); }
 });
 
+test('PG-19.2 WP19-03 AC06: a project at an older schema version, which the store would migrate by writing, is refused by the reader and left as it is', () => {
+  const { root, v } = newVault();
+  v.projectStore('p').append({ type: 'task.upserted', entity: { kind: 'task', id: 'T1', data: { title: 't', project: 'p', status: 'READY' } } });
+  v.close();
+  const dir = path.join(root, '.memev', 'projects', 'p');
+  fs.rmSync(eventsOf(root));
+  const snap = JSON.parse(fs.readFileSync(path.join(dir, 'tasks.json'), 'utf8'));
+  assert.ok(snap.entities.T1, 'a v1 project keeps its records in snapshots');
+  fs.writeFileSync(path.join(dir, 'meta.json'), JSON.stringify({ schema_version: 1, project_id: 'p', created: new Date().toISOString() }));
+  const store = storeOn(copyProject(root));
+  assert.ok(store.snapshot('task').T1, 'the store migrates the snapshot into its log');
+  const before = fs.readdirSync(dir).sort().join();
+  assert.throws(() => new Vault(root, { git: false }).tasksReader(READER, 'p'), (e) => e.code === 'needs_migration' && /older/.test(e.message), 'the reader does not return an empty view of a project that has records');
+  assert.equal(fs.readdirSync(dir).sort().join(), before, 'and writes nothing');
+  assert.equal(fs.existsSync(eventsOf(root)), false, 'it does not migrate');
+});
+
 test('WP19-01 AC05: the port goes through the vault method tasksReader and nothing else', () => {
   assert.match(read(PORT), /tasksReader/);
   assert.doesNotMatch(read(PORT) + MAIN(), /ProjectStore|projectStore|project-store|[Cc]oordinator/);
