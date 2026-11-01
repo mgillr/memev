@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { handle } from './mcp.mjs';
 import { OAuthStore, OAuthError, consentPage } from './oauth.mjs';
+import { resolveRequest, vaultScope } from '../engine/identity.mjs';
 import { VaultError, VERSION, RECALL_OFFSET_MAX } from '../engine/vault.mjs';
 import { timingSafeEqualHex, sha256, now, slug } from '../engine/util.mjs';
 import { renderCard, renderRecall, PROTOCOL } from '../engine/card.mjs';
@@ -229,6 +230,9 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       }
       const identity = vault.tokens.verify(token) || (token ? oauth.verify(token) : null);
       if (!identity) return send(401, { error: 'unauthorized', error_description: 'a valid bearer token is required' }, { 'www-authenticate': 'Bearer' });
+      // SO-F-01: every authenticated request resolves to a subject and a scope, and the scope is held against this vault's own
+      const resolved = resolveRequest(identity, { target: vaultScope(vault.config) });
+      if (!resolved.ok) return send(403, { error: resolved.code, error_description: resolved.reason });
       if (!local) {
         if (!identity.remote) return send(403, { error: 'local_token', error_description: 'this token is for this machine only; for a cloud AI app use the connector URL from memev cloud url, and add another computer with memev devices enroll' });
         // Each remote client has its own credential (its token, registered as a device). The old
@@ -274,7 +278,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       // that computer's apps, so there the header picks which of them is calling.
       const client = String(local ? identity.agent : req.headers['x-memev-client'] || identity.agent).slice(0, 40);
       const session = req.headers['x-memev-session'] ? String(req.headers['x-memev-session']).slice(0, 64) : null;
-      const ctx = { identity, client, session, local, device: dev, cli: local && client === 'cli' };
+      const ctx = { identity, client, session, local, device: dev, cli: local && client === 'cli', subject: resolved.subject, scope: resolved.scope };
 
       if (route === '/mcp') {
         if (req.method !== 'POST') return send(405, { error: 'method_not_allowed' }, { allow: 'POST' });

@@ -75,7 +75,7 @@ Decided by the sources:
 - Where enforcement lives today: in the vault, which every HTTP route and MCP tool calls with the caller's identity (`src/server/http.mjs:289-325`; `src/server/mcp.mjs:130-147`). There is no user interface layer that filters. The graph view is the one place where enforcement is a parameter that a caller can omit (requirement 2).
 - What is least privilege today: a remote computer's token and a cloud connector token are limited to `memory/**`, `work/**`, `contracts/**` and `bus/**` (`src/engine/devices.mjs:85`; `src/server/oauth.mjs:16-17`). The threat model lists path and scope limits for a leaked token (`docs/THREAT-MODEL.md:13`).
 - What is not deny by default today: a token issued without paths gets `**` (`src/engine/tokens.mjs:32`), an enrolled local client gets `**` (`src/engine/devices.mjs:85`), and the admin token minted at vault creation has the admin scope with no expiry (`src/engine/vault.mjs:825`). An identity with the admin scope passes every scope check, and the path check still applies (`src/engine/tokens.mjs:104-106`).
-- Federation: no federation code is on main (search of `src/`). The federation architecture (#224, draft) is in scope by owner direction, 1 Nov 2026 (`docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md:5`).
+- Federation: no federation code is on main (search of `src/`). The federation architecture (#224, merged 1 Nov 2026) is in scope by owner direction, 1 Nov 2026 (`docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md:5`).
 
 Open, needs owner decision:
 

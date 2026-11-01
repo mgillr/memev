@@ -1,0 +1,78 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SO-F-03.3",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "4208fd54217fa76af59e7933609621cf4f6dcaef8ba14bd5fca0d4ed430ee2ca",
+      "base_commit": "90e3fe29bb3f256fe7f82d32b17a48633afca25b",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/agentid-bind.mjs",
+            "sha256": "ca2599b6e72edf680192a8c393d898fd2253ed5635a10d28d1403feefc42e9ff"
+          },
+          {
+            "path": "src/engine/devices.mjs",
+            "sha256": "37391e4cd0f4e5a1f52eab59d5081c0731da925d24e938f0ab990862ec09d21f"
+          },
+          {
+            "path": "src/engine/oplog.mjs",
+            "sha256": "35a8cfc7b849a274e356cc96e362ce627f2ec20d83108407d87251b28a230465"
+          },
+          {
+            "path": "README.md",
+            "sha256": "b2ec5ce73f811dddc60e9ecc42bd252997df9058ce6b5ee1a6428d96013d137b"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "low",
+          "how": "T1 lists README.md as a whole file, so any edit of the README is in scope, not only the one line that replaces the stale pull request #224 sentence",
+          "disposition": "rejected",
+          "reason": "the scope grammar has no line-level entry; the file is already listed beside docs/README.md and the work is one line; the leak scan and the docs test cover the README content; unchanged criteria of SO-F-03.2 judge the rest"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "the scope is wide for one task (13 entries, including docs/OPERATION-ENVELOPE.md, src/engine/envelope.mjs and test/envelope.test.mjs, which PG-04.1 builds) and a build can touch the envelope files without a criterion of this spec saying so",
+          "disposition": "rejected",
+          "reason": "inherited unchanged from the signed SO-F-03.2, where it was reviewed as a deliberate staleness tripwire (a change to the envelope files after review forces a re-review); this supersession adds only README.md"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "the red-green criteria run test/federation-admission.test.mjs, which needs ssh-keygen on the path, so a machine without it reports red and cannot tell a missing tool from a failing test",
+          "disposition": "rejected",
+          "reason": "that is the existing test of SO-F-03, unchanged; the criteria are byte-identical to SO-F-03.2 and the test passes where ssh-keygen exists"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the signer, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of SO-F-03.3, which supersedes the signed SO-F-03.2 (k-so-f-03-2-contribution-s-bc1be8), made against the #363 branch at 90e3fe29bb3f. It has 1 task and 11 criteria. Checks run: the spec hash equals the hash the owner delegation gave (4208fd54217f); the SO-F-03.2 spec file is byte-unchanged against main; the criteria, requirements and stop rules of T1 equal those of SO-F-03.2 byte for byte, its scope keeps every SO-F-03.2 entry in order and adds only README.md, and no other task field differs; the manifest kind is feature and each implement task has a mandatory test_red_green criterion that runs its own test file; every task drafts through makeTask; every command parses with sh -n; no criterion statement repeats within a task; every grep pattern compiles and is within 200 characters; every depends_on is a row of the Scope One or programme manifest (or, for PG-05.2, a vault contract cited by id that PG-05.1 cites too: WO-05-B); the leak scan is clean. I also read the implementing pull request #358 at 7bc87da: commit cfcc2db changes README.md by one line (the stale pull request #224 sentence), as the request says, and I ran the static criteria and the 18 tests of test/federation-admission.test.mjs against that head with ssh-keygen on the path (18 pass). The other files of #358 that are outside this scope belong to SO-F-01 and come from the stacked branches, and are judged by their own contracts. I did not run npm test. Three low findings, none blocks signing. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MjNkOWE2Y2JjMWEwZjk3MzJiNmFlY2VhOTQxNGZhZDMxMDAxZTc1MjA1MzljYTBhYTkyNjJhN2Q4MzBjN2I3NA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "ELGr9IcxCI+Z/6uFLw9YCQP4WY8IQbyfBsZ2C2aY7UDMQUTrDO6BHmx+YX6Kfz14HFLPVSvGc+g3JkxwJ6seAw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZjdjZjcwY2MxZTljZDNmODJmYzU2OTkzODA5YjllN2EyMDA3MDQ2OGZhOTg3MmM2OWJjYzgxNTk0ZDJmMzJmNA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "XJQd+RQJLpPULISWVM9KT2xAVXlUw4uKoXBqgYlgj/ucwLqxcLWm5ut4xVXtihcpg6gVVOUyYkshgiUW5L+wAA=="
+          }
+        ]
+      }
+    }
+  ]
+}
