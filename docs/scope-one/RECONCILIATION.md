@@ -69,8 +69,8 @@ Who writes which task, so that two authors do not write the same one. Claims are
 | Baseline 8.4 A2A (`WP18-01`), SDK and framework adapter (`WP18-02`), payments (`WP18-04`); 8.5 (`WP01` to `WP06`, `WP09`, `WP10`, `WP12` to `WP14`); 8.6 licensing (`WP15`), tiers and claims (`WP16`), conformance tests (`WP18-03`) | Claim B | `contracts/programme` | specs proposed, work unclaimed; except the rows below for `PG-02.1`, `PG-03.1`, `PG-03.4`, `PG-03.5`, `PG-06.2` and `PG-12.2` |
 | `PG-02.1` (CRDT conformance gate; `WP02-01` to `WP02-04`) | Claim C | crdt-merge, branch `feat/pg-02-1-crdt-conformance-gate` | queued after `SO-2.01` to `SO-2.06` |
 | `PG-05.1` (merge semantics: docs/MERGE-SEMANTICS.md, not yet written; trimmed `WP05-01` to `WP05-04` and `WP05-06`; `WP05-05` stays with `WO-05-B`, draft pull request #201) | Claim D | branch `feat/pg-05-1-merge-semantics` | claimed |
-| `SO-08-B` (recovery and control, `WP08-02`; a signed vault contract, cited by id) | Claim E | branch `feat/so-08-b-*` (none pushed yet) | claimed |
-| `PG-19.1` (the work command wired to `runWork` in `src/cli/main.mjs`, with a production `openStore` port; `WP19-01`, `WP19-02`; not `SO-08-B`) | unclaimed | none | proposed, unsigned; decided under owner delegation, 1 Nov 2026 |
+| `SO-08-B` (recovery and control, `WP08-02`; a signed vault contract, cited by id; repository text in `SO-08-B`) | Claim E | branch `feat/recovery-and-control`, pull request #361 (draft), stacked on #350 | claimed |
+| `PG-19.1` (the work command wired to `runWork` in `src/cli/main.mjs`, with a production `openStore` port; `WP19-01`, `WP19-02`; not `SO-08-B`) | Claim E | none yet; stacked on pull request #361 and reusing its `work` case in `src/cli/main.mjs` | claimed; signed 1 Nov 2026 |
 | `PG-03.1` (vectors, crdt-merge); one pull request | Claim C | branch `feat/pg-03-1-*` | queued after `SO-2.01` to `SO-2.06` |
 | `PG-03.4` (crdt-merge-ts; supersedes the signed `PG-03.2`) and `PG-03.6` (crdt-merge-rs; supersedes `PG-03.5`, which superseded the signed `PG-03.3`); one pull request per package; depend on `PG-03.1` | Claim C | branches `feat/pg-03-4-*`, `feat/pg-03-5-*` (the branch name of the crdt-merge-rs pull request is unchanged) | active |
 | `SO-F-01` (identity and scopes model, version 1; a signed fold contract of pull request #341) | Claim C | branch `feat/so-f-01-identity-and-scopes` | claimed |
@@ -250,6 +250,10 @@ One row per requirement of [programme/REQUIREMENTS.md](programme/REQUIREMENTS.md
 | --- | --- | --- | --- |
 | `LWWRegister` merge with equal timestamp and equal `node_id` | the crdt-merge reference first, then the TypeScript and Rust editions (`PG-03.4`, `PG-03.6`) | The Python reference keeps self and the Rust edition keeps other, so merge is not commutative in that case. The case is excluded from the vectors and must not be asserted. A higher timestamp wins, and on equal timestamps the greater `node_id` wins, in all editions. Fix the reference first; the editions follow (owner delegation, 1 Nov 2026) | open |
 | Raise the daemon start wait | src/cli/daemon.mjs (SR-1.01, SR-1.24) | waitMs 6000 too short for cold starts on Windows runners; candidate for next SR-1 revision; test-side retry in #352/#359 meanwhile | open |
+| Production caller for recovery and reconstruction | src/engine/coordinator.mjs (SO-08-B, pull request #361) | recover, reconstruct, eligibilityPass and applyBusMessage have no production caller; they need vault, mcp or daemon wiring | open |
+| Give the Coordinator the bus | src/engine/vault.mjs (SO-08-B, pull request #361) | The Coordinator isn't given the bus in vault.mjs, so transitions are posted only where a bus is passed in | open |
+| Capability record | the adapter capability record (SO-05-B; SO-08-B AC03) | The capability record waits on SO-05-B: pause reports requested for tasks in flight, unsupported only when a capability port is passed in, and nothing reports confirmed | open |
+| Bus seat names for vault claims | src/engine/vault.mjs and src/engine/bus.mjs (SO-08-B, pull request #361) | Vault claims hold name/client, which isn't a bus seat name, so transitions only reach the operator | open |
 
 
 ## Programme tasks by work package
