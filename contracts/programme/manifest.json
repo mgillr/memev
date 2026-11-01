@@ -16,6 +16,18 @@
       "pull_request": "memev-ops #13"
     },
     {
+      "id": "PG-06.1",
+      "manifest": "this manifest (contracts/programme/specs, signed; the file is unchanged)",
+      "reason": "the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer; the signer decided to supersede the signed version",
+      "superseded_by": "PG-06.2"
+    },
+    {
+      "id": "PG-12.1",
+      "manifest": "this manifest (contracts/programme/specs, signed; the file is unchanged)",
+      "reason": "the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer; the signer decided to supersede the signed version",
+      "superseded_by": "PG-12.2"
+    },
+    {
       "id": "PI-04",
       "manifest": "branch dev-integration-specs of memev (not modified)",
       "reason": "owner engine decision 31 Oct 2026: the Apache-2.0 core vendors nothing from crdt-merge; recorded as superseded in docs/scope-one/DECISIONS.md"
@@ -155,6 +167,14 @@
         ],
         "PG-14.1": [
           "SO-F-13"
+        ],
+        "PG-06.2": [
+          "SO-A-03",
+          "SO-F-12"
+        ],
+        "PG-12.2": [
+          "SO-F-07",
+          "SO-F-12"
         ]
       },
       "by_task": {
@@ -233,10 +253,8 @@
           "WP14-04": [
             "SO-F-13"
           ]
-        }
-      },
-      "signed_overlaps_not_edited": {
-        "PG-06.1": {
+        },
+        "PG-06.2": {
           "WP06-01": [
             "SO-A-03"
           ],
@@ -247,7 +265,26 @@
             "SO-F-12"
           ]
         },
-        "PG-12.1": {
+        "PG-12.2": {
+          "WP12-01": [
+            "SO-F-07",
+            "SO-F-12"
+          ]
+        }
+      },
+      "superseded_signed": {
+        "PG-06.1 by PG-06.2": {
+          "WP06-01": [
+            "SO-A-03"
+          ],
+          "WP06-02": [
+            "SO-F-12"
+          ],
+          "WP06-03": [
+            "SO-F-12"
+          ]
+        },
+        "PG-12.1 by PG-12.2": {
           "WP12-01": [
             "SO-F-07",
             "SO-F-12"
@@ -262,7 +299,7 @@
           "SO-R-E"
         ]
       },
-      "trim": "done: each overlapping task cites its fold id and keeps only the gaps; PG-06.1 and PG-12.1 are signed and overlap the fold, so they are not edited and need the signer's decision"
+      "trim": "done: each overlapping task cites its fold id and keeps only the gaps; PG-06.1 and PG-12.1 were signed and overlap the fold, so they are not edited; the signer superseded them with PG-06.2 and PG-12.2, which cite the fold ids and keep only the gaps (1 Nov 2026)"
     },
     {
       "id": "ADR-7",
@@ -596,6 +633,42 @@
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
     {
+      "id": "PG-06.2",
+      "type": "programme work package",
+      "area": "PG-06",
+      "title": "Replication separate from acceptance (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP06-01, WP06-02, WP06-03",
+      "requirements": [
+        "MV-ARCH-06",
+        "MV-ARCH-07"
+      ],
+      "cross_references": [],
+      "vault_contracts": [],
+      "build_layer": "the fold (SO-A-03, SO-F-12) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP06-01": [
+          "SO-A-03"
+        ],
+        "WP06-02": [
+          "SO-F-12"
+        ],
+        "WP06-03": [
+          "SO-F-12"
+        ]
+      },
+      "depends_on": [
+        "PG-04.1",
+        "PGP-1.02"
+      ],
+      "tasks": 3,
+      "criteria": 24,
+      "spec": "specs/PG-06.2-replication-separate-from-acceptance.json",
+      "status": "proposed: unsigned, signs after a clean red-team round",
+      "supersedes": "PG-06.1",
+      "supersedes_reason": "the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer; the signer decided to supersede the signed version"
+    },
+    {
       "id": "PG-06.1",
       "type": "programme work package",
       "area": "PG-06",
@@ -615,8 +688,10 @@
       "tasks": 3,
       "criteria": 17,
       "spec": "specs/PG-06.1-replication-separate-from-acceptance.json",
-      "status": "proposed: unsigned, signs after a clean red-team round",
-      "build_layer": "signed, overlaps the fold (WP06-01: SO-A-03; WP06-02: SO-F-12; WP06-03: SO-F-12); not edited here; needs the signer's decision",
+      "status": "signed (signing pull request #340); superseded by PG-06.2 on the signer's decision of 1 Nov 2026; this spec file is unchanged and stays on record",
+      "superseded_by": "PG-06.2",
+      "superseded_reason": "the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer; the signer decided to supersede the signed version",
+      "build_layer": "superseded by PG-06.2; it overlapped the fold (WP06-01: SO-A-03; WP06-02: SO-F-12; WP06-03: SO-F-12) and was not edited; PG-06.2 carries the fold ids and keeps only the gaps",
       "fold_tasks": {
         "WP06-01": [
           "SO-A-03"
@@ -717,7 +792,7 @@
       },
       "depends_on": [
         "PG-04.1",
-        "PG-06.1"
+        "PG-06.2"
       ],
       "tasks": 3,
       "criteria": 19,
@@ -779,7 +854,7 @@
       },
       "depends_on": [
         "PG-04.1",
-        "PG-06.1",
+        "PG-06.2",
         "PGP-1.02",
         "SO-2.03"
       ],
@@ -787,6 +862,42 @@
       "criteria": 28,
       "spec": "specs/PG-10.1-evidence-knowledge-status-and-receipts.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
+    },
+    {
+      "id": "PG-12.2",
+      "type": "programme work package",
+      "area": "PG-12",
+      "title": "Multi-node gossip transport (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP12-01, WP12-02, WP12-03",
+      "requirements": [
+        "MV-INT-06"
+      ],
+      "cross_references": [
+        {
+          "contract": "SO-2.12",
+          "boundary": "WP12-01 to WP12-03 (transport) are prerequisites of federated computation and are not repeated there"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "the fold (SO-F-07, SO-F-12) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP12-01": [
+          "SO-F-07",
+          "SO-F-12"
+        ]
+      },
+      "depends_on": [
+        "PG-04.1",
+        "PG-05.1",
+        "PG-09.1"
+      ],
+      "tasks": 3,
+      "criteria": 15,
+      "spec": "specs/PG-12.2-multi-node-gossip-transport.json",
+      "status": "proposed: unsigned, signs after a clean red-team round",
+      "supersedes": "PG-12.1",
+      "supersedes_reason": "the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer; the signer decided to supersede the signed version"
     },
     {
       "id": "PG-12.1",
@@ -813,8 +924,10 @@
       "tasks": 3,
       "criteria": 12,
       "spec": "specs/PG-12.1-multi-node-gossip-transport.json",
-      "status": "proposed: unsigned, signs after a clean red-team round",
-      "build_layer": "signed, overlaps the fold (WP12-01: SO-F-07, SO-F-12); not edited here; needs the signer's decision",
+      "status": "signed (signing pull request #340); superseded by PG-12.2 on the signer's decision of 1 Nov 2026; this spec file is unchanged and stays on record",
+      "superseded_by": "PG-12.2",
+      "superseded_reason": "the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer; the signer decided to supersede the signed version",
+      "build_layer": "superseded by PG-12.2; it overlapped the fold (WP12-01: SO-F-07, SO-F-12) and was not edited; PG-12.2 carries the fold ids and keeps only the gaps",
       "fold_tasks": {
         "WP12-01": [
           "SO-F-07",
@@ -871,10 +984,10 @@
       },
       "depends_on": [
         "PG-04.1",
-        "PG-06.1",
+        "PG-06.2",
         "PG-09.1",
         "PG-10.1",
-        "PG-12.1",
+        "PG-12.2",
         "SO-2.02"
       ],
       "tasks": 5,
@@ -917,7 +1030,7 @@
         "PG-03.2",
         "PG-09.1",
         "PG-10.1",
-        "PG-12.1",
+        "PG-12.2",
         "PG-13.1",
         "SO-2.04",
         "SO-2.05",
@@ -1177,20 +1290,20 @@
     {
       "task": "WP06-01",
       "title": "Acceptance state model: received, replicated, evaluated, accepted, rejected, superseded; transitions and who may make them",
-      "contract": "PG-06.1",
-      "note": "specified in this set"
+      "contract": "PG-06.2",
+      "note": "specified in this set (PG-06.2 supersedes the signed PG-06.1)"
     },
     {
       "task": "WP06-02",
       "title": "Acceptance evaluator implementing the seven questions (authorised, invariant, superseded dependency, auto-accept, verification, offline, global authority)",
-      "contract": "PG-06.1",
-      "note": "specified in this set"
+      "contract": "PG-06.2",
+      "note": "specified in this set (PG-06.2 supersedes the signed PG-06.1)"
     },
     {
       "task": "WP06-03",
       "title": "Acceptance is on the default path: a replicated operation does not change authoritative state until accepted",
-      "contract": "PG-06.1",
-      "note": "specified in this set"
+      "contract": "PG-06.2",
+      "note": "specified in this set (PG-06.2 supersedes the signed PG-06.1)"
     },
     {
       "task": "WP07-01",
@@ -1331,20 +1444,20 @@
     {
       "task": "WP12-01",
       "title": "Transport adapter interface (send state, receive state, digests) with an in-memory implementation",
-      "contract": "PG-12.1",
-      "note": "specified in this set"
+      "contract": "PG-12.2",
+      "note": "specified in this set (PG-12.2 supersedes the signed PG-12.1)"
     },
     {
       "task": "WP12-02",
       "title": "Relay-backed transport: reconnect, backoff, partition recovery",
-      "contract": "PG-12.1",
-      "note": "specified in this set"
+      "contract": "PG-12.2",
+      "note": "specified in this set (PG-12.2 supersedes the signed PG-12.1)"
     },
     {
       "task": "WP12-03",
       "title": "Three-node local harness: three vaults with separate identities exchange envelopes through the transport",
-      "contract": "PG-12.1",
-      "note": "specified in this set"
+      "contract": "PG-12.2",
+      "note": "specified in this set (PG-12.2 supersedes the signed PG-12.1)"
     },
     {
       "task": "WP13-01",
