@@ -70,6 +70,7 @@ Who writes which task, so that two authors do not write the same one. Claims are
 | `PG-02.1` (CRDT conformance gate; `WP02-01` to `WP02-04`) | Claim C | crdt-merge, branch `feat/pg-02-1-crdt-conformance-gate` | queued after `SO-2.01` to `SO-2.06` |
 | `PG-03.1` (vectors, crdt-merge); one pull request | Claim C | branch `feat/pg-03-1-*` | queued after `SO-2.01` to `SO-2.06` |
 | `PG-03.4` (crdt-merge-ts; supersedes the signed `PG-03.2`) and `PG-03.5` (crdt-merge-rs; supersedes the signed `PG-03.3`); one pull request per package; depend on `PG-03.1` | Claim C | branches `feat/pg-03-4-*`, `feat/pg-03-5-*` | active |
+| `SO-F-01` (identity and scopes model, version 1; a signed fold contract of pull request #341) | Claim C | branch `feat/so-f-01-identity-and-scopes` | claimed |
 | `PG-03.2` and `PG-03.3` (signed; files unchanged) | superseded | none | superseded by `PG-03.4` and `PG-03.5` (signer's decision, 1 Nov 2026; reason: the editions lack the features the vectors need, so the signed scope cannot be met); the manifest records `superseded_by` |
 | `PG-12.2` (multi-node gossip transport; `WP12-01` to `WP12-03`; supersedes the signed `PG-12.1`) | unclaimed | none | open, unclaimed |
 | `PG-06.2` (replication separate from acceptance; `WP06-01` to `WP06-03`; supersedes the signed `PG-06.1`) | unclaimed | none | open, unclaimed |
