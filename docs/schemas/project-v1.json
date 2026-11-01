@@ -1,0 +1,244 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "One file, two parts, because SO-F-02 names this file for both. The schema is the keys $schema, type, required, properties and $defs. The declarations are the keys schema, store_schema_version and entities, which are an instance of that schema: this file validates against itself. SO-F-06 derives its schemas from the declarations.",
+  "title": "Memev canonical project schema, version 1",
+  "description": "The entity types of the project store, each with its declared owner (a subject type of the identity model), the field that carries its scope version, and its merge class. The owner is a declaration: it is not enforced here, it is not the memory authority of ADR 7 (proposed) and it is not the permission matrix of ADR 5 (open). The core records the class and applies none; the free path keeps both versions of a competing write. Only approvals are surfaced as a conflict today; applying the other classes is SO-F-06, except the monotonic scope_version, which no contract enforces yet. Two approvals on one task that say incompatible things derive to a semantic conflict. See docs/PROJECTS.md. The store is src/engine/project-store.mjs.",
+  "type": "object",
+  "required": [
+    "schema",
+    "store_schema_version",
+    "entities"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "memev-project/1"
+    },
+    "store_schema_version": {
+      "const": 2
+    },
+    "entities": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/entityDeclaration"
+      }
+    },
+    "$schema": true,
+    "$comment": true,
+    "title": true,
+    "description": true,
+    "type": true,
+    "required": true,
+    "additionalProperties": true,
+    "properties": true,
+    "$defs": true
+  },
+  "$defs": {
+    "mergeClass": {
+      "description": "last-writer: the newest write in log order stands; a tie is broken by the merge provider, not here; project scope_version is the exception: scope_version is monotonic, the highest value stands. No contract enforces this yet. set-union: the elements of every write stand. append-only: nothing is replaced. human-resolution: competing writes are surfaced and a person settles them; never silently merged.",
+      "enum": [
+        "last-writer",
+        "set-union",
+        "append-only",
+        "human-resolution"
+      ]
+    },
+    "authority": {
+      "description": "A subject type of the identity model (docs/schemas/identity-v1.json). A declaration of the owner type, not an enforcement. The service subject cannot be issued yet.",
+      "enum": [
+        "person",
+        "agent",
+        "device",
+        "node",
+        "operator",
+        "service"
+      ]
+    },
+    "entityDeclaration": {
+      "type": "object",
+      "required": [
+        "authority",
+        "scope_version_field",
+        "merge_class"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "authority": {
+          "$ref": "#/$defs/authority"
+        },
+        "scope_version_field": {
+          "type": "string",
+          "pattern": "^[a-z_]+$",
+          "description": "The field of the entity that carries its scope version, when it has one: a positive whole number. It is the same field for every type today, so it names a convention more than it distinguishes types."
+        },
+        "merge_class": {
+          "$ref": "#/$defs/mergeClass"
+        },
+        "file": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The snapshot file under .memev/projects/<id>/. null: the type lives only in the log."
+        },
+        "id_prefix": {
+          "type": "string"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "provisional": {
+          "type": "object",
+          "description": "Declared fields that wait on a decision, with the reason.",
+          "propertyNames": {
+            "enum": [
+              "authority",
+              "merge_class"
+            ]
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "description": "The data of an approval. Each write is its own event. Two approval events on one task with different decisions are a semantic conflict. resolves lists the approval events of the same task that a person settles, and must name an approve and a reject.",
+      "required": [
+        "task_id"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string"
+        },
+        "decision": {
+          "enum": [
+            "approve",
+            "reject"
+          ],
+          "description": "Provisional: the closed pair of values the store knows today. It pre-empts the seven decision states of SO-A-05 and SO-1.08, which replace it when they exist."
+        },
+        "task_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "resolves": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string"
+          },
+          "description": "Event ids, not approval ids."
+        }
+      }
+    }
+  },
+  "schema": "memev-project/1",
+  "store_schema_version": 2,
+  "entities": {
+    "project": {
+      "authority": "person",
+      "scope_version_field": "scope_version",
+      "merge_class": "last-writer",
+      "file": "project.json",
+      "id_prefix": "proj",
+      "required": [
+        "name"
+      ]
+    },
+    "task": {
+      "authority": "person",
+      "scope_version_field": "scope_version",
+      "merge_class": "human-resolution",
+      "file": "tasks.json",
+      "id_prefix": "task",
+      "required": [
+        "title"
+      ]
+    },
+    "lease": {
+      "authority": "service",
+      "scope_version_field": "scope_version",
+      "merge_class": "human-resolution",
+      "file": "leases.json",
+      "id_prefix": "lease",
+      "required": [
+        "task_id"
+      ],
+      "provisional": {
+        "authority": "no service subject can be issued yet (docs/IDENTITY-AND-SCOPES.md), so no one can hold this ownership",
+        "merge_class": "ADR 3 (lease semantics) is open; its safe default is one active writer with contending writes queued, not merged, and no class here is a queue. human-resolution is the closest: a competing lease write is never settled by the newest one"
+      }
+    },
+    "attempt": {
+      "authority": "agent",
+      "scope_version_field": "scope_version",
+      "merge_class": "append-only",
+      "file": "attempts.json",
+      "id_prefix": "att",
+      "required": [
+        "task_id"
+      ]
+    },
+    "evidence": {
+      "authority": "service",
+      "scope_version_field": "scope_version",
+      "merge_class": "append-only",
+      "file": "evidence.json",
+      "id_prefix": "ev",
+      "required": [
+        "task_id"
+      ],
+      "provisional": {
+        "authority": "no service subject can be issued yet (docs/IDENTITY-AND-SCOPES.md), so no one can hold this ownership"
+      }
+    },
+    "conflict": {
+      "authority": "person",
+      "scope_version_field": "scope_version",
+      "merge_class": "human-resolution",
+      "file": "conflicts.json",
+      "id_prefix": "conf",
+      "required": [
+        "task_id"
+      ]
+    },
+    "session": {
+      "authority": "device",
+      "scope_version_field": "scope_version",
+      "merge_class": "last-writer",
+      "file": "sessions.json",
+      "id_prefix": "sess",
+      "required": [
+        "project_id"
+      ]
+    },
+    "approval": {
+      "authority": "person",
+      "scope_version_field": "scope_version",
+      "merge_class": "human-resolution",
+      "file": "approvals.json",
+      "id_prefix": "appr",
+      "required": [
+        "task_id"
+      ]
+    },
+    "event": {
+      "authority": "service",
+      "scope_version_field": "scope_version",
+      "merge_class": "append-only",
+      "file": null,
+      "id_prefix": "evt",
+      "required": [
+        "type"
+      ],
+      "provisional": {
+        "authority": "no service subject can be issued yet (docs/IDENTITY-AND-SCOPES.md), so no one can hold this ownership"
+      }
+    }
+  }
+}
