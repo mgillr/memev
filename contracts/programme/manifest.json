@@ -830,7 +830,7 @@
       "tasks": 4,
       "criteria": 22,
       "spec": "specs/PG-05.2-engine-integration-merge-semantics-mapping-bound.json",
-      "status": "proposed and unsigned; no red-team record",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
       "supersedes": "PG-05.1",
       "supersedes_signed_contract": "k-pg-05-1-engine-integrati-8d9e24 (the spec file contracts/programme/specs/PG-05.1-engine-integration-merge-semantics-mapping-bound.json is unchanged)",
       "supersedes_reason": "owner delegation, 1 Nov 2026: pull request #364 changes docs/CONVERGENCE.md (a link to docs/MERGE-SEMANTICS.md only), docs/MODULES.md (generated; src/engine/state-map.mjs is a new module) and changelog.d/PG-05.1.md, which PG-05.1 does not list in a scope; PG-05.2 adds docs/CONVERGENCE.md to the scope of WP05-01 and docs/MODULES.md and changelog.d/PG-05.1.md to the scope of WP05-04, and changes no criterion",
@@ -1390,7 +1390,7 @@
       "tasks": 1,
       "criteria": 8,
       "spec": "specs/PG-20.1-scope-verifier-allows-own-change-note.json",
-      "status": "proposed and unsigned; no red-team record",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
       "kind": "feature"
     },
     {
