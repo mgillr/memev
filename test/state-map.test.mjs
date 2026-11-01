@@ -177,6 +177,26 @@ test('merge semantics table: the class on each type and its enforcement belong t
   assert.match(text, /438887a/);
 });
 
+test('merge semantics table: the nine object classes of MV-ARCH-05 are named, each placed on an entity type or said to have none', () => {
+  const text = doc();
+  const lower = text.toLowerCase();
+  const names = ['observations', 'metadata', 'membership', 'counters', 'task ownership', 'task state', 'contracts', 'approvals', 'external action'];
+  for (const n of names) assert.ok(lower.includes(n), n);
+  const at = text.indexOf('## The object classes');
+  assert.ok(at > 0, 'a section for the object classes');
+  const section = text.slice(at, text.indexOf('\n## ', at + 5) > 0 ? text.indexOf('\n## ', at + 5) : undefined);
+  for (const n of names) assert.ok(section.toLowerCase().includes(n), `${n} is in that section`);
+  // the section places an object class only where SO-F-02 has a type for it, and declares no class of its own
+  assert.match(section, /declares no class/i);
+  assert.match(section, /no entity type/i);
+  const row = (n) => section.split('\n').find((l) => l.toLowerCase().startsWith(`| ${n} `)) || '';
+  assert.match(row('task ownership'), /`lease`/);
+  assert.match(row('task state'), /`task`/);
+  assert.match(row('approvals'), /`approval`/);
+  assert.match(row('metadata'), /`project`/);
+  assert.match(row('contracts'), /never silently merged/i);
+});
+
 test('merge semantics table: it says the engine has no three-way text merge and a provider shim outside the core maps a note to structured state', () => {
   const text = doc();
   for (const n of ['provider shim', 'three-way text merge', 'structured state', 'outside']) assert.ok(text.toLowerCase().includes(n), n);
