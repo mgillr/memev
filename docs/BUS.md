@@ -68,10 +68,23 @@ shows up as unread, in its place by time.
 
 A message has a `seq` (its place in that order), `ts`, `from`, `to` (a seat, `all` or `operator`),
 `type`, `ref` (the message it answers) and `body`. The types are hello, status, task, claim,
-restate, review, verdict, question, answer, finding, push, ack and hold.
+restate, review, verdict, question, answer, finding, push, ack, hold and transition.
 
 Messages that look like a credential (API keys, tokens, private keys, a password written out) are refused.
 Keep a body under 4,000 characters and link a note for anything longer.
+
+## Project messages
+
+When a task of a project changes state, the project coordinator posts one message of type `transition` to the operator seat
+and one to the seat of the task's assignee (the holder, or whoever last held it), so a connected app sees progress between its
+turns. A transition carries ids and states only: the body is `{project, task, from, to, correlation}` and nothing else, and it is checked for
+credentials like any message. A task nobody is assigned to yet sends the operator message only.
+
+The bus is transport, not the store. The project store is the truth: deleting the bus files loses no project state, and the
+store reconstructs it. A bus that is down never blocks a transition; the message is simply not sent.
+
+A request that arrives on the bus (cancel, pause or resume of a project or task) is applied once. The coordinator records the
+message id in the same turn as the change, so a message delivered twice changes the project once.
 
 ## The operator
 

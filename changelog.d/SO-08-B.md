@@ -1,0 +1,3 @@
+### Added
+
+- Recovery and control of project work. After a session stops heart-beating the coordinator can inspect what it left, record the inspection and plan a resume, a reassignment or a question to the user, and a reassignment waits for that record. A start rebuilds leases, tasks in flight, pending approvals and the pause flag from the store, marks lapsed leases, and dispatches nothing until an eligibility pass runs. `memev work pause`, `resume`, `cancel` and `status` are commands, each with `--json`. Every transition is posted on the bus to the operator and the assignee as ids and states only, and a bus message processed twice changes the project once.
