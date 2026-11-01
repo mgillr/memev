@@ -396,7 +396,7 @@
    "criteria": 10,
    "spec": "specs/SO-A-01.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-A-02",
@@ -414,7 +414,7 @@
    "criteria": 9,
    "spec": "specs/SO-A-02.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-A-03",
@@ -432,7 +432,7 @@
    "criteria": 8,
    "spec": "specs/SO-A-03.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-A-04",
@@ -450,7 +450,7 @@
    "criteria": 10,
    "spec": "specs/SO-A-04.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-A-05",
@@ -469,7 +469,7 @@
    "criteria": 11,
    "spec": "specs/SO-A-05.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-A-06",
@@ -488,7 +488,7 @@
    "criteria": 10,
    "spec": "specs/SO-A-06.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-A-07",
@@ -506,7 +506,7 @@
    "criteria": 10,
    "spec": "specs/SO-A-07.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-A-08",
@@ -529,7 +529,7 @@
    "criteria": 11,
    "spec": "specs/SO-A-08.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-A-09",
@@ -548,7 +548,7 @@
    "criteria": 11,
    "spec": "specs/SO-A-09.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-A-12",
@@ -568,7 +568,7 @@
    "criteria": 9,
    "spec": "specs/SO-A-12.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-A-10",
@@ -592,7 +592,7 @@
    "criteria": 9,
    "spec": "specs/SO-A-10.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-A-11",
@@ -608,7 +608,7 @@
    "criteria": 6,
    "spec": "specs/SO-A-11.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-R-E",
@@ -622,7 +622,7 @@
    "criteria": 8,
    "spec": "specs/SO-R-E.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-F-01",
@@ -639,7 +639,7 @@
    "criteria": 12,
    "spec": "specs/SO-F-01.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-F-02",
@@ -659,7 +659,7 @@
    "criteria": 8,
    "spec": "specs/SO-F-02.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-F-03",
@@ -679,7 +679,7 @@
    "criteria": 11,
    "spec": "specs/SO-F-03.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-F-04",
@@ -699,7 +699,7 @@
    "criteria": 10,
    "spec": "specs/SO-F-04.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-F-05",
@@ -719,7 +719,7 @@
    "criteria": 8,
    "spec": "specs/SO-F-05.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-F-12",
@@ -738,7 +738,7 @@
    "criteria": 10,
    "spec": "specs/SO-F-12.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-F-06",
@@ -757,7 +757,7 @@
    "criteria": 10,
    "spec": "specs/SO-F-06.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-F-07",
@@ -777,7 +777,7 @@
    "criteria": 9,
    "spec": "specs/SO-F-07.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-F-08",
@@ -795,7 +795,7 @@
    "criteria": 9,
    "spec": "specs/SO-F-08.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-F-09",
@@ -815,7 +815,7 @@
    "criteria": 8,
    "spec": "specs/SO-F-09.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-F-13",
@@ -835,7 +835,7 @@
    "criteria": 7,
    "spec": "specs/SO-F-13.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
    "id": "SO-F-10",
@@ -854,7 +854,7 @@
    "criteria": 10,
    "spec": "specs/SO-F-10.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   }
  ]
 }
