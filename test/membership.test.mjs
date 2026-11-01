@@ -311,6 +311,29 @@ test('SO-F-04 AC04: after revocation every contribution is refused, a queued one
   assert.equal(admitted(b.log).length, 2);
 });
 
+test('SO-F-04 AC04: two books over one log see each other: a revocation through one is refused by the gate on the other', () => {
+  needs('membership', 'policy', 'helpers', 'admission');
+  const { a, b } = twoNodes();
+  const bookA = new M.RelationshipBook({ log: b.log });
+  const bookB = new M.RelationshipBook({ log: b.log });
+  const gateB = P.relationshipGate({ book: bookB, policy: POLICY, now: () => b.now });
+  const env = (seq) => contribute(a.key, { node: 'node-a', seq, scope: SHARED });
+  assert.equal(bookA.add(REL()).ok, true);
+  assert.equal(bookB.get('rel-1')?.id, 'rel-1', 'a record added through one book is seen by the other');
+  assert.equal(bookB.add(REL()).code, 'exists', 'and is not added twice to the log');
+  assert.equal(gateB(env(1)).ok, true);
+  b.now = T2;
+  assert.equal(bookA.revoke('rel-1', { by: 'node-a', at: T2 }).ok, true);
+  const g = gateB(env(2));
+  assert.equal(g.ok, false, 'the gate on the other book refuses after the revocation');
+  assert.equal(g.code, 'deny.revoked');
+  assert.equal(bookB.revoke('rel-1', { by: 'node-b', at: T2 + 1000 }).code, 'already_revoked');
+  assert.equal(bookB.list().length, 1);
+  const third = new M.RelationshipBook({ log: b.log });
+  assert.equal(third.get('rel-1').revocation.revoked_by, 'node-a');
+  assert.equal([...b.log.iterate()].filter((r) => r.type === 'federation.relationship.revoked').length, 1);
+});
+
 test('SO-F-04 AC04: the relationship and policy modules open no connection and start no process', () => {
   needs('membership', 'policy', 'helpers', 'admission');
   for (const f of ['membership.mjs', 'policy.mjs']) {
