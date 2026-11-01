@@ -1,0 +1,347 @@
+{
+  "title": "PG-W-21B Trust book, eligibility gate and audit events for federated trust governance, not to be signed before ADR 8 is signed off (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract PG-W-21B in memev: the trust book over the operation log, the eligibility gate for the Admission external hook, the composition of checks there, and the audit events (work packages WP21-02 and WP21-03). NOT TO BE SIGNED until the owner signs off ADR 8 (docs/scope-one/DECISIONS.md, full text in docs/scope-one/design/trust-governance.md, status proposed, every product choice in it provisional). Unsigned; the signer signs it only after that sign-off and after the red-team gate. The id is in the style of SO-W-08B: its second part starts with a letter, so the redteam gate's specIdOf reads the whole name and the contract has its own record path distinct from PG-W-21A. Why: work breakdown rows 4.3.7 and 4.3.8 are blocked in part because trust governance has no definition in this repository; this contract builds the part of ADR 8 that sits on the Admission and the actor, after PG-W-21A has built the record and the evaluation. Boundaries: (1) the admission service and the admission adapter are SO-F-03.3 and SO-F-08 and are not repeated; this contract adds one check for the external hook and a rule for composing checks there. (2) The relationship and policy evaluation is SO-F-04; a relationship is the edge between two nodes, a trust record says which subjects behind an edge are eligible for what. (3) Admission of nodes and agents to a site (WP09-01 of PG-09.1) and exclusion on equivocation (WP09-03) are not repeated; this contract refuses nothing they accept and excludes nothing. (4) The trust adapter boundary is WP09-02 of PG-09.1 and the trust service specification is the signed vault contract WO-05-D, cited by id; this contract does not specify the service and names no product. (5) The finding model is SO-F-09.2 and the actor resolution is resolveActor of SO-F-09.2; this contract reads the actor and changes no finding code. (6) Cross-organisation trust is WP13-05 of PG-13.1 and stays deferred. (7) crdt-merge stays in its own repository behind the call-out boundary (ADR 6, decided); nothing here touches it. (8) Finding operations replayed from the log still trust the by field until the first finding writer goes through Graph.bindFindingEvent (pull request #362); that is an open follow-up in docs/scope-one/RECONCILIATION.md that blocks that writer, it is not closed here, and the trust book reads only resolved actors on its write path. Deferred: every requirement marked DEFERRED waits for an owner answer named in the ADR: the trust root (question 1), cross-organisation trust (2), the default for a new device (3), revocation across nodes (4), any tier gate (5), the final rule for who may grant (6), further purposes (7), the effect on admitted history (8), delegation in the first release (9) and the external trust service (10). The topology of work breakdown row 1.3.6 stays OPEN and is an input to none of this. No production caller: the modules are libraries with tests; the Admission they plug into has no production caller on main until it is wired, so wiring the book and the composed gate into the vault is one follow-up after questions 1 and 4 are answered, recorded as deferred in WP21-03; this is the position SR-1.15 asks to be stated, not a waiver of it. Order: starts after the owner signs off ADR 8 and PG-W-21A is merged; WP21-02 then starts once pull request #362 merges (isResolvedActor); WP21-03 starts once pull requests #358 and #362 merge (the Admission and the actor). Depends on contracts: PG-W-21A, SO-F-01, SO-F-03.3, SO-F-04, SO-F-08, SO-F-09.2. Owner decisions of 31 Oct 2026 apply: crdt-merge is reached only across the WO-05-A call-out boundary; tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier. Nothing in this contract decides ADR 3, ADR 5, ADR 7 or SO-A-05, and it adds no role-by-action matrix.",
+  "tasks": [
+    {
+      "id": "WP21-02",
+      "title": "The trust book over the operation log: grants and revocations written only with a resolved actor, authority held in one provisional table, events as the only store, and a frozen read-only reader",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a TrustBook is made over the vault's operation log (append and iterate, the shape the Admission of SO-F-03.3 takes), with the roots as a parameter; it appends one trust.granted or trust.revoked event for each accepted record and rebuilds its state from those events when it is made, so a restart gives the same decisions and there is no store but the log (source: the Admission of SO-F-03.3, pull request #358 at 7bc87da, admission.mjs lines 11 to 13 and 44; docs/scope-one/DECISIONS.md:93-95, ADR 7, proposed)",
+        "a grant or a revocation is written only with a resolved actor: the object isResolvedActor of src/engine/identity.mjs recognises, as SO-F-09.2 resolves it (pull request #362 at c85d4c5). An object of the same shape that resolveActor did not make is refused. The issuer is the actor's subject id, never a field of the payload: a record naming another issuer is refused (source: SO-F-09.2 criterion on a forged by)",
+        "who may write trust is one frozen table, GRANT_AUTHORITY, of subject types, and it is PROVISIONAL: a person or an operator subject, and no agent, service, device or node, until the permission matrix (ADR 5, open) and the decision workflow (SO-A-05) are decided; deciding them changes this table and nothing else (source: SO-F-09.2, the same provisional rule for dismissal; docs/scope-one/DECISIONS.md:59-67)",
+        "an event holds the validated record and nothing else: evidence is references only, within the limits of WP21-01; the book never copies content of a contribution into an event",
+        "reader() returns a frozen object with one member, eligible(request), that answers from the book's current state at a time the caller gives and returns a copy; the reader has no grant, revoke or log member and cannot reach the log or the book (source: the read-only reader of PG-19.2, Vault#tasksReader; addendum line 341)",
+        "DEFERRED (ADR 8 question 6, who may grant and revoke): the final rule; this task ships the provisional table only",
+        "DEFERRED (ADR 8 questions 1, 2 and 4, the trust root, trust across organisations and revocation across nodes): a record from another node is not read, applied or sent; this task has no import or export of records"
+      ],
+      "description": "Repo: memev. NOT TO BE SIGNED until the owner signs off ADR 8. Starts once PG-W-21A is merged and pull request #362 (SO-F-09.2) merges, because isResolvedActor exists only there. Builds on WP21-01 of PG-W-21A, which must be merged first. The book is a library: it has no production caller in this task. Like the Admission, the book trusts its own log when it rebuilds from it; the open follow-up 'Finding ops replay trusts the by field' in docs/scope-one/RECONCILIATION.md is the same limit for finding operations and is not closed here. Its test makes the log with the vault's OpLog and resolves actors with resolveActor, and does not mock either.",
+      "scope": [
+        "src/engine/federation/trust-book.mjs",
+        "test/trust-book.test.mjs",
+        "changelog.d/PG-W-21B.md",
+        "docs/MODULES.md",
+        "docs/scope-one/design/trust-governance.md",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "a grant written with a plain object shaped like an actor is refused with code not_resolved_actor and appends nothing; the same grant written with an actor that resolveActor made, of a person subject, appends one trust.granted event; the test fails before the book exists and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-book.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21B AC01:' test/trust-book.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21B AC01:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "a record whose issuer differs from the actor's subject id is refused with code issuer_mismatch and appends nothing, for a grant and for a revocation",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-book.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21B AC02:' test/trust-book.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21B AC02:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "GRANT_AUTHORITY is a frozen table read from the module by the test: an actor of each type it lists writes a grant, and an actor of each other type (agent, service, device, node) is refused with code no_authority and appends nothing; changing the table changes the verdict and nothing else",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-book.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21B AC03:' test/trust-book.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21B AC03:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "each event is trust.granted or trust.revoked, holds the validated record and no other field, and a grant with the maximum evidence references holds those references and no content; a revocation by a subject that is not the grant's issuer or a root is refused and appends nothing",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-book.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21B AC04:' test/trust-book.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21B AC04:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "a second TrustBook made over the same log gives the same decision as the first for the same request and time, after a restart; the only call the book makes on the log is append and iterate, checked with a log that records its calls; and the book makes no other file write",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-book.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21B AC05:' test/trust-book.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21B AC05:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "the reader is frozen and its only own key is eligible; a result it returns can be changed without changing the next answer; and it offers no way to grant, revoke or reach the log",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-book.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21B AC06:' test/trust-book.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21B AC06:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "the module names the owner questions it defers, by number, and GRANT_AUTHORITY is marked provisional",
+          "verifier": {
+            "type": "grep",
+            "file": "src/engine/federation/trust-book.mjs",
+            "pattern": "DEFERRED.*question"
+          }
+        },
+        {
+          "statement": "the module imports only the trust record module, src/engine/identity.mjs and nothing that reads a file or a network: every import line of src/engine/federation/trust-book.mjs names ./trust-record.mjs or ../identity.mjs",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$(grep -E '^import ' src/engine/federation/trust-book.mjs | wc -l)\" -ge 1 ] && ! grep -E '^import ' src/engine/federation/trust-book.mjs | grep -Ev \"trust-record\\.mjs|identity\\.mjs\"",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "the module has no file, network or process call: src/engine/federation/trust-book.mjs has no node:fs, node:net, node:http, node:child_process or fetch",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eq 'node:fs|node:net|node:http|node:child_process|fetch\\(' src/engine/federation/trust-book.mjs",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The leak scan passes on files",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The leak scan passes on every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing.",
+        "A requirement marked DEFERRED is not built, not stubbed and not defaulted in code: it waits for the owner answer named in docs/scope-one/design/trust-governance.md.",
+        "This contract is not to be signed, and no task of it starts, before the owner has signed off ADR 8 (docs/scope-one/DECISIONS.md) and PG-W-21A is merged."
+      ]
+    },
+    {
+      "id": "WP21-03",
+      "title": "Admission, findings and actors meet the trust book: an eligibility gate for the Admission external hook, one composition rule for checks on that hook, revalidation requests after a revocation, and boundary tests",
+      "phase": "implement",
+      "depends_on": [
+        "WP21-02"
+      ],
+      "requirements": [
+        "eligibilityGate({ reader, now }) returns a function of an envelope that the Admission external option accepts: { ok: true } or { ok: false, code, reason }, where code is the trust rule id. It asks reader.eligible for the purpose contribute, for the subject and the scope of the contribution. A refusal is a federation.rejected event with step external and no payload; a pass skips no later step, so signature, authority and replay still run (source: SO-F-08, trust read only as an eligibility input; Admission of SO-F-03.3, admission.mjs lines 4 to 9 and 95 to 108)",
+        "composeExternal(...checks) returns one function of the same shape: the checks run in the order given, the first refusal is the answer and later checks are not called, a check that throws is a refusal with a code of its own, and an empty list passes everything and leaves the Admission events as they are without it (source: the open follow-up 'Two users of the Admission external hook' in docs/scope-one/RECONCILIATION.md; SO-F-04 relationshipGate, pull request #368 at 8d3bbbc, policy.mjs lines 107 to 115)",
+        "work queued before a revocation and offered after it is refused, because the gate asks at the time of admission (source: docs/FEDERATION.md:251)",
+        "after a revocation, revalidationRequests({ subject, scope, since }) appends one trust.revalidation_requested event for each contribution the node admitted for that subject in that scope since the time, naming its operation id, sender, sequence, subject and scope; a second run appends none; it changes, reverses and quarantines nothing and does nothing for any other subject (source: addendum line 381, affected contributions identified for review and revalidation; docs/scope-one/design/trust-governance.md)",
+        "the boundaries: trust never grants (a subject with a live contribute grant and no membership is refused at the authority step, and a revoked or expired subject is refused whatever the book says); a personal scope is never shared; the trust modules import nothing from src/engine/merge.mjs and no crdt-merge package, send nothing across the call-out boundary, and leave src/engine/merge.mjs and src/cli/sync.mjs unchanged; with no gate configured, or an empty composition, Admission behaves as before; with a reader that throws, the gate refuses and the event says why (source: ADR 6, decided; docs/PAID-TRUST.md:38-40; docs/FEDERATION.md:147-151, :258-259; addendum lines 343 and 382)",
+        "the finding path reads trust through the same reader.eligible with the purpose verify; this task changes no finding code",
+        "DEFERRED (ADR 8 question 8, the effect of a revocation on admitted history): anything beyond a revalidation request, such as marking, hiding or quarantining a contribution",
+        "DEFERRED (ADR 8 questions 5 and 10, the tier and the external trust service): any tier or licence gate, and any call to the external trust service",
+        "DEFERRED (SO-F-09.2 and ADR 5, who may verify and dismiss): the call from the finding code to the reader; it waits for the permission matrix and the decision workflow, both open",
+        "DEFERRED (production wiring): constructing the book in the vault and giving the composed gate to the production Admission; this contract has no production caller by design, as the Admission it plugs into has none on main until it is wired, and the wiring is one follow-up after the owner answers questions 1 and 4"
+      ],
+      "description": "Repo: memev. NOT TO BE SIGNED until the owner signs off ADR 8. Starts once pull requests #358 (SO-F-03.3, the Admission) and #362 (SO-F-09.2, the actor) merge, and builds on WP21-02 and on PG-W-21A. Its tests build an Admission over a real operation log and a real identity document, as the admission tests of SO-F-03.3 do, and carry each envelope to it themselves; no network route is added. The gate and the composition are plain functions of an envelope; the revalidation request is an event, not an action on the contribution.",
+      "scope": [
+        "src/engine/federation/trust-gate.mjs",
+        "test/trust-gate.test.mjs",
+        "docs/FEDERATION.md",
+        "changelog.d/PG-W-21B.md",
+        "docs/MODULES.md",
+        "docs/scope-one/design/trust-governance.md",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "with eligibilityGate as the external option of an Admission, a contribution from a subject with a live root-issued grant, a membership and a good signature is admitted; the same contribution after the grant is revoked is refused with a federation.rejected event of step external whose code is the trust rule id and which holds no payload, and nothing is appended to the admitted stream; the test fails before the gate exists and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21B AC07:' test/trust-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21B AC07:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "a contribution built and held before a revocation and offered to the Admission after it is refused with the revoked rule, and one built after a new grant is admitted",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21B AC08:' test/trust-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21B AC08:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "trust never grants: a subject with a live contribute grant and no membership in the scope is refused at the authority step with code no_authority; a subject whose identity is revoked is refused with subject_revoked whatever the book holds; a contribution into a personal scope is refused; and the reader and the gate expose no read of any scope",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21B AC09:' test/trust-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21B AC09:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "composeExternal runs checks in the order given, returns the first refusal and does not call a later check, turns a throw into a refusal with a code of its own, and with an empty list gives an Admission whose events equal those of an Admission with no external option, event for event",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21B AC10:' test/trust-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21B AC10:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "a stand-in check of the same shape as relationshipGate composes with eligibilityGate in either order and the refusal is the first in the order given, so two checks on the one external hook need no change to Admission",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21B AC11:' test/trust-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21B AC11:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "after a revocation, revalidationRequests appends exactly one trust.revalidation_requested event per contribution admitted for the subject in the scope since the time, each naming its operation id, sender, sequence, subject and scope; a second run appends none; the admitted events are unchanged; nothing is appended for another subject or another scope",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21B AC12:' test/trust-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21B AC12:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "with a reader that throws, the gate refuses the contribution with a code of its own and the federation.rejected event says the trust check failed; with no external option the Admission admits as before",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21B AC13:' test/trust-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21B AC13:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "the three trust modules import nothing from the merge module or any crdt-merge package, and no envelope the gate reads or any event it writes is passed to a function of src/engine/merge.mjs; a source scan finds no such import or call",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21B AC14:' test/trust-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21B AC14:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "src/engine/merge.mjs and src/cli/sync.mjs are unchanged: neither differs from origin/main",
+          "verifier": {
+            "type": "command",
+            "cmd": "git diff --exit-code origin/main -- src/engine/merge.mjs src/cli/sync.mjs",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "docs/FEDERATION.md labels trust records as provisional and planned, and names the decision record",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/FEDERATION.md",
+            "pattern": "[Tt]rust records.*(provisional|planned)|(provisional|planned).*[Tt]rust records",
+            "flags": "s"
+          }
+        },
+        {
+          "statement": "the gate module imports only the trust modules and nothing that reads a file or a network: every import line of src/engine/federation/trust-gate.mjs names ./trust-book.mjs or ./trust-record.mjs",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$(grep -E '^import ' src/engine/federation/trust-gate.mjs | wc -l)\" -ge 1 ] && ! grep -E '^import ' src/engine/federation/trust-gate.mjs | grep -Ev \"trust-book\\.mjs|trust-record\\.mjs\"",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "the module names the owner questions it defers, by number",
+          "verifier": {
+            "type": "grep",
+            "file": "src/engine/federation/trust-gate.mjs",
+            "pattern": "DEFERRED.*question"
+          }
+        },
+        {
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The leak scan passes on files",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The leak scan passes on every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing.",
+        "A requirement marked DEFERRED is not built, not stubbed and not defaulted in code: it waits for the owner answer named in docs/scope-one/design/trust-governance.md.",
+        "This contract is not to be signed, and no task of it starts, before the owner has signed off ADR 8 (docs/scope-one/DECISIONS.md) and PG-W-21A is merged."
+      ]
+    }
+  ]
+}
