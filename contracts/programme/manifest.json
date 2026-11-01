@@ -522,6 +522,7 @@
     },
     {
       "id": "PG-03.4",
+      "kind": "evidence",
       "type": "programme work package",
       "area": "PG-03",
       "title": "Cross-language protocol vectors (crdt-merge-ts)",
@@ -1259,7 +1260,8 @@
       "spec": "specs/PG-03.6-cross-language-protocol-vectors.json",
       "status": "proposed: unsigned, signs after a clean red-team round",
       "supersedes": "PG-03.5",
-      "supersedes_reason": "owner delegation, 1 Nov 2026: pin crdt-merge main aab0099 (b92d0ef is an ancestor with byte-identical vectors) and check the three vector files by blob hash; everything else of PG-03.5 is kept"
+      "supersedes_reason": "owner delegation, 1 Nov 2026: pin crdt-merge main aab0099 (b92d0ef is an ancestor with byte-identical vectors) and check the three vector files by blob hash; everything else of PG-03.5 is kept",
+      "kind": "evidence"
     }
   ],
   "mapping": [
