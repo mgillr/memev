@@ -6,7 +6,15 @@ One record shape for an operation, written the same way on every device, so that
 
 ## Status
 
-Version 1 is specified and the module is built. Nothing writes it yet: the op log, the bus and the project store still write their own records. Converting those three shapes to and from the envelope, and making the op-log append path build one, are separate work that comes after this page and its module. Until then the envelope is a contract with a module and tests, and no running code path depends on it. Two things are named here and defined elsewhere: [what other contracts add](#what-other-contracts-add), and the planned conversions.
+Version 1 is specified, the module is built, and the op log reaches it. This is what the code does today:
+
+- **The module.** `src/engine/envelope.mjs` builds, validates, encodes and decodes envelopes, compares two of them in the order described below, and checks the merge contract hash.
+- **The adapters.** `src/engine/envelope-adapters.mjs` converts each of the three record shapes in [why one envelope](#why-one-envelope) to an envelope and back without loss: `oplogRecordToEnvelope`, `busMessageToEnvelope` and `projectEventToEnvelope`, and `envelopeToOplogRecord`, `envelopeToBusMessage` and `envelopeToProjectEvent`. The text of the source record is carried unchanged in `payload.record_text`, beside `payload.shape`, so the record that comes back has the same bytes. The envelope `type` is the source type under the prefix `oplog.`, `bus.` or `store.`. The adapters add no extension block, no authorisation evidence and no contract reference, and every record they write has the status `none`, because the shape of a record is not evidence. An envelope that holds more than the record it carries is refused on the way back, as `lossy_conversion`, and is never converted with a loss.
+- **The op-log write path.** After `OpLog.append` has written a record, it builds the envelope of that record with `oplogRecordToEnvelope`, under the merge contract the log was opened with (the `mergeContract` option; by default the one the adapters export as `LOCAL_MERGE_CONTRACT`: the strategy `oplog-order`, the mapping version `oplog-1` and an empty policy). `Vault.open` in `src/engine/vault.mjs` opens its op log with `deviceId` and no `mergeContract` or `envelopes` option, so it gets the defaults and a write through the vault builds one too. The envelope is held in memory only, as `lastEnvelope`, for the latest append. Nothing of it is written to the log, the record on disk is unchanged, and no other code in `src` reads it. A record that cannot be an envelope is still written, because the log is the authority: `lastEnvelope` is then `null`, `envelopeFailures` counts it and `lastEnvelopeError` holds the message. The option `envelopes: false` turns the build off. The engine's entry module, `src/engine/index.mjs`, exports `buildEnvelope`. `test/envelope-wired.test.mjs` pins that an append and a write through the vault build an envelope that converts back to the record, that the record on disk is unchanged and no segment, snapshot or manifest file holds an envelope, that a reopened log has no `lastEnvelope`, that the `mergeContract` option and `envelopes: false` work, and that a record that cannot be an envelope is still written and counted. It does not pin that no other code in `src` reads `lastEnvelope`.
+- **Contributions.** `src/engine/federation/contribution.mjs` builds envelopes whose extension block carries `extension.contribution` (the schema, the subject, the scope, the classification, the provenance, the per-sender sequence, the payload hash and the signature), with `signContribution` and `validateContribution`. It does not use the adapters, and the op log does not build its envelope this way.
+- **What does not use it.** The bus (`src/engine/bus.mjs`) and the project store (`src/engine/project-store.mjs`) do not call their adapters when they write: they still write their own record shapes. The op-log write path does not store its envelope. The only code that stores one is SO-F-03 admission (`src/engine/federation/admission.mjs`): `Admission` appends `federation.admitted` with the contribution envelope in `data.envelope`; it is built, but not yet called from the engine. Nothing in the engine sends an envelope to another device, orders records by envelope, or calls `checkMergeContract` or `requireMergeContract` outside the tests. The three shapes have no common stored form yet.
+
+Two things are named here and defined elsewhere: [what other contracts add](#what-other-contracts-add), and what is [left open](#what-is-left-open).
 
 ## Why one envelope
 
@@ -102,10 +110,10 @@ Both extend this envelope. Neither defines another.
 
 ## What is left open
 
-- Conversion of the op-log record, the bus message and the project-store event to and from the envelope without loss: planned (the adapters).
-- Making the op-log append path build an envelope, so that the code is reachable from the real write path: planned.
-- The authorisation evidence is a list of references. What a reference points at, and how it is checked, belongs to the contract that checks it.
-- The `type` values other than the four of the dispatch history are not enumerated here.
+- The bus and the project store write their own records and do not build an envelope. Their adapters exist and are tested, and nothing on their write paths calls them.
+- The envelope the op log builds on each append is held in memory only. The op-log write path does not store it; the only code that stores an envelope is SO-F-03 admission, built but not yet called from the engine. Sending it to another device, and merging or ordering by it, are not done, and no real code path compares merge contract hashes between devices yet. The merge itself stays behind the provider boundary of `src/engine/merge.mjs`.
+- The authorisation evidence is a list of references. What a reference points at, and how it is checked, belongs to the contract that checks it. The adapters write an empty list.
+- The `type` values other than the four of the dispatch history are not enumerated here. The adapters write the source type under the prefix of its shape.
 
 ## Change log
 
