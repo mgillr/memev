@@ -8,8 +8,8 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Re
 > on the next ones.
 
 The Business trial is a time-limited entitlement to run the Business tier: one company vault that
-all members' work data syncs into, and one AI provider for the organisation. The trial is free: it
-costs nothing, and it is not a discount on a later subscription.
+all members' work data syncs into, with members using the AI providers and tools the organisation's
+policy allows. The trial is free: it costs nothing, and it is not a discount on a later subscription.
 
 ## Length and size
 
@@ -85,4 +85,6 @@ export. The trial licence and its extension are planned.
 Planned, as on the [tiers pages](tiers/README.md): the company vault, the admin console, the
 company server, sign-in, departments and roles, labels and the egress log, the automatic merge by
 the convergence engine, and both delivery paths of the trial itself. A planned part goes into an
-offer only with a delivery date.
+offer only with a delivery date. The trial is the one-node case: a Business with several sites is
+planned work through the multi-site federation design in [tiers/services.md](tiers/services.md),
+outside the trial ([FEDERATION.md](FEDERATION.md)).
