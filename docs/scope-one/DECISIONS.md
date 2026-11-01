@@ -101,6 +101,25 @@ current code already uses, so no contract is blocked on a guess.
 - Safe default: keep the code as it is: one store under the vault, no second database, and the engine behind the
   call-out boundary (ADR 6, SO-1.01).
 
+### ADR 8: trust governance in the federated model
+
+- Status: proposed (pending owner decision)
+- Decision owner: owner
+- Proposal: trust governance is a set of local, revocable eligibility records about who or what (person, operator, agent,
+  service, device, node, site) may contribute or verify in which scope. Trust is read only as an eligibility input of the
+  admission path: it can refuse or add a verification requirement and never grants access, and a subject with no record is not
+  eligible. Records live in the node's operation log, with no second store, and a revocation asks for review of what the
+  subject already contributed and changes nothing silently. Every product choice in it is provisional. The full proposal, with
+  the ten open questions for the owner (trust root model, federation across organisations, the default for a new device,
+  revocation propagation, tier placement, who may grant and revoke, purposes, effect on admitted history, delegation, and the
+  role of the external trust service), is in [design/trust-governance.md](design/trust-governance.md).
+- Sources: addendum lines 331 to 347 and 381 to 383 ([ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md](ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md));
+  [FEDERATION.md](../FEDERATION.md); [PAID-TRUST.md](../PAID-TRUST.md); the signed contract SO-F-08, whose code is not on main.
+- Rationale for leaving it proposed: the repository defines the admission side and no definition of trust governance, and the
+  owner has not answered the questions that shape it. The topology of work breakdown row 1.3.6 stays open.
+- Safe default: local records only, deny by default, no record crosses a node, and the trust service stays an unspecified
+  adapter boundary beside the merge boundary (ADR 6, `docs/EXTENSION-POINTS.md`). Nothing in the code changes.
+
 ### Tiers (decided, owner decision 31 Oct 2026)
 
 The free core, Personal at $12/month or $120/year for up to 3 computers, and contact us for
