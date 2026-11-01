@@ -1,0 +1,67 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SO-F-03.2",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "032f9f414dec81f10e906a99f3d9f805ea0a13acfed595609c6e53236bb2ef4e",
+      "base_commit": "b62e61ae737cdabd88ba32a8ee158b0705e19d45",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/agentid-bind.mjs",
+            "sha256": "ca2599b6e72edf680192a8c393d898fd2253ed5635a10d28d1403feefc42e9ff"
+          },
+          {
+            "path": "src/engine/devices.mjs",
+            "sha256": "37391e4cd0f4e5a1f52eab59d5081c0731da925d24e938f0ab990862ec09d21f"
+          },
+          {
+            "path": "src/engine/oplog.mjs",
+            "sha256": "35a8cfc7b849a274e356cc96e362ce627f2ec20d83108407d87251b28a230465"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "low",
+          "how": "the three scope entries added (docs/OPERATION-ENVELOPE.md, src/engine/envelope.mjs, test/envelope.test.mjs) name files that do not exist on main yet, so a scope check over them finds nothing today",
+          "disposition": "rejected",
+          "reason": "they are specified and built by PG-04.1 WP04-01 and WP04-02, which are built first by the owner delegation of 1 Nov 2026; the request says they may not exist until those land, scope entries are not required to exist, and the point of naming them is that a change to them after this review makes this spec stale and forces a re-review, which is intended"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "the title, the request and the test names still carry the SO-F-03 identity, so two specs of the build layer share test names while both are on disk",
+          "disposition": "rejected",
+          "reason": "SO-F-03 is superseded by this spec in the manifest and in RECONCILIATION and is not built or judged separately; the criteria are identical by design (checked byte for byte against SO-F-03), and the test file named is the same one file, written once by whoever builds this spec"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the signer, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of SO-F-03.2, which supersedes SO-F-03 (signed as k-so-f-03-contribution-sig-2ba083, version 2), made against main at b62e61ae737c. It has 1 task and 11 criteria. Checks run, and the only checks made: the spec hash equals the hash the owner delegation gave (032f9f414dec); the manifest kind is feature; the criteria of every task equal those of SO-F-03 byte for byte (true); the scope of the task keeps every SO-F-03 entry in order and adds only docs/OPERATION-ENVELOPE.md, src/engine/envelope.mjs, test/envelope.test.mjs; the title and the request differ from SO-F-03 and no other field does; the task drafts through makeTask; every command parses with sh -n; no criterion statement repeats within a task; every grep pattern compiles and is within 200 characters; every depends_on is a row of the Scope One or the programme manifest (it adds PG-04.1, a programme row); the manifest records superseded_by on SO-F-03 and supersedes on this spec; the three input files under src/ are listed with their hashes at the reviewed commit, the same three as the SO-F-03 round; the leak scan is clean. All passed. I did not run any named test (its file does not exist yet), I did not re-read the vault contracts the request names, and I did not re-read PG-04.1 beyond its id. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZDBiYTVjMTNlZWZiMjk4ZTg4ZTE0Y2E1NTU5ZWQxODFiMWUwNGRlMGQ2YWFjZTVlOGIyYmNlYmVmMzc2M2RiNg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "VdvEE+EbDGe0z39sCFrbyqS9JSFNdA5+myK3KPOhxrkHMDzvSWDO69vR1aZ6pFp/kk7YMiTe+UMe9oTDICIDBg=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "M2MyYzVkNWEwMGUyMzAxNjM0MWFlMTIxMmE3ZGFhN2E3Mzc2OTc0MWI2NjUyOTY3ZTAyNzFiZTMzMzA5MWQ5Mg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "kY59gPh/pyXAx/mZyvv/U4vGcT7StVJthAcyrc/d6hFRJ/vkLYtwTwTR6K4Oo2FH6Q3zLBw8Bh+MpV0NhFGSCA=="
+          }
+        ]
+      }
+    }
+  ]
+}
