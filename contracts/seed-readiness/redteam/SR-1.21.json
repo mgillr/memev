@@ -1,0 +1,82 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SR-1.21",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "d2ff411701094e9cd03cbc187e4c4abe8e214602cb2258ad190e7c1e99070e9f",
+      "base_commit": "4282ba7d1f0e0db2c4f0335bfd949bfcbbbe7f1b",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/DESIGN.md",
+            "sha256": "40e636929bc32f53435b1f6e05bdaa1973c6144e029a684173e77540b660af94"
+          },
+          {
+            "path": "docs/MODULES.md",
+            "sha256": "1bc02214fea53351ee60db81e1b94dd269a7a6fbab9240cf2f37bf4225981f6a"
+          },
+          {
+            "path": "docs/THREAT-MODEL.md",
+            "sha256": "30f110242ab3e959b267da7a5506467de4840282e62b6749ff83d496c1077cf5"
+          },
+          {
+            "path": "docs/TROUBLESHOOTING.md",
+            "sha256": "996e0eb377399842e0582b08df4aaa84b265fe0b81a6c04f772284a24ddc360b"
+          },
+          {
+            "path": "src/cli/doctor.mjs",
+            "sha256": "c71aa7f868aa2199c4fde3c71948876aeb1e03cc08aab9f9d61da4c13f48d7c2"
+          },
+          {
+            "path": "src/cli/main.mjs",
+            "sha256": "0915c5b38d2b7530cb4a07fa7715e6f73fffebd2646a959348eeddfa1b5c52ef"
+          },
+          {
+            "path": "src/cli/sync.mjs",
+            "sha256": "a6ae2416d7339d4b2e20d3459b2842e4383ff26cb0f6f9bc8210f4c776f0a9b1"
+          },
+          {
+            "path": "src/engine/card.mjs",
+            "sha256": "3be6d94098095ceb060d65df636c6857a6a6bf4d3fa12a846cc5e6c4b0237616"
+          },
+          {
+            "path": "src/engine/diff.mjs",
+            "sha256": "be211bdccb23015c0ebb9715f1c77e74be5bc43b54b4891b0eee87491ba2edfc"
+          },
+          {
+            "path": "src/engine/oplog.mjs",
+            "sha256": "35a8cfc7b849a274e356cc96e362ce627f2ec20d83108407d87251b28a230465"
+          },
+          {
+            "path": "src/engine/vault.mjs",
+            "sha256": "63db6108e1838433b79bdd0fc725684e3ab79e92ba5d097d2545bc758bc4ad28"
+          },
+          {
+            "path": "src/server/http.mjs",
+            "sha256": "bdc46b5ad8592c9bad976d3ac92196a5b57ab53ad14b205e0e9042e1a0886a35"
+          },
+          {
+            "path": "src/server/mcp.mjs",
+            "sha256": "9520ce2641d39c737bb99cc6be3fedccd1efa71e556e678933947a77d6b59b71"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Re-sign review of the spec as it stands on main at 4282ba7d1f0e, for a contract signed before the red-team gate. It has 1 task(s) and 41 criteria. Mechanical checks run on every criterion, and these are the only checks made: each task drafts through makeTask; each command, metric and red-green cmd parses with sh -n; each red-green cmd names its test_file and that file is in the task's scope; no criterion statement is repeated within a task except as answer 1 records; every contract this spec depends on, in its manifest row, is a manifest row. They found nothing. I did not re-run the three rounds that were made off this repository before the first signing, and I did not run the checks the criteria name, because their code is not built yet. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NTg5ZWNhODViNDY0NmM2OGYyYzYwNjM3MjMwNDMyZTdhMGE4YzFlN2U0ZGYxNDY2NjBhMmZkYTZmZjhlZmQ1OA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "dkrga5GNAeaaEB88daW9Eaa8vW+PsoYF7lv9qnVpoYflDejJdmb3hkjd5szSAg3J5x1m47dNG/PnlaGeQRQ3DA=="
+          }
+        ]
+      }
+    }
+  ]
+}

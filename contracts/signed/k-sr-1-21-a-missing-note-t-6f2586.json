@@ -1,0 +1,553 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Unrebuildable notes are counted and surfaced",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "recover() records every path it cannot rebuild with the reason (content hash mismatch, record unreadable) instead of continuing silently",
+        "status() reports unrecoverable with the paths, and memev doctor has an oplog check that fails naming them",
+        "DESIGN.md and THREAT-MODEL.md say what is rebuilt and what is reported",
+        "an unrebuildable path is detected at open and before every later write to it (append, remember, checkpoint, journal, sync after a pull), so a later write never logs the loss as an external delete; the doctor's drift fix never deletes or overwrites such a path",
+        "the finding is shown where people look: the human memev status line and the session card name the count and point at memev doctor, and the CLI doctor shows the check with the daemon up or down",
+        "status() and the MCP status and doctor tools list an unrecoverable path only to a token whose path scope covers it; other callers see the count",
+        "when the vault has a git backup, the doctor names the last backup commit that held the lost path as the recovery source",
+        "a write, append, remember, checkpoint, journal turn or sync to an unrebuildable path is refused with a VaultError whose code is unrecoverable and whose message points at memev doctor; nothing is logged for it, whether the file is missing, incomplete or unreadable",
+        "the doctor names, as the recovery source, the newest backup commit that still holds the path (the deletion commit never), reading git directly when the daemon is down; with no backup, memev doctor --resolve <path> ends the report only after a confirmation, by logging a delete of the path with the reason",
+        "the unrecoverable list is computed at each open from the log and the disk, plus the paths a damaged line was found to break: when open() meets a line it cannot apply, it records that path and the reason in .memev/unrecoverable.json (never in the log), so the report survives the next snapshot; a path leaves the list once its file holds the bytes its head expects or --resolve ends it; a healthy note whose file is removed is rebuilt from the log at open, as before; a path that compact() archived is never reported",
+        "status(), memev_status, memev_doctor, memev_session_start and POST /v1/session-start name an unrecoverable path only to a token whose path scope covers it; other callers, remote connectors included, see the count",
+        "the rendered session card text, the MCP text, memev card and plain memev status carry the count and 'memev doctor' in their first lines, so the card's 6000-character cut never drops them",
+        "the oplog check lists unrecoverable paths whether or not verify() is ok",
+        "a record that parses as JSON but cannot be applied (data null, a splice whose ins is not an array, a put whose content is not a string, a line that is not an object) is treated as unreadable; Vault.open() never throws because of one path",
+        "iterate() reports a line it cannot parse with its segment and offset, and materialize attributes it to the path whose chain it breaks, so each path gets its own reason",
+        "a present file whose bytes equal any state of the note that verifies (the head after any record whose hash checks, the named backup commit's copy included) clears the report and is imported as one outside edit; a present file that is a strict prefix of the last verified content, or of the content the log holds even when it fails its hash, is incomplete and kept as it is; any other present file is an outside edit and is imported",
+        "docs/TROUBLESHOOTING.md's oplog row names the note-cannot-be-rebuilt failure and its recovery from the named backup commit",
+        "memev doctor --resolve <path> asks for confirmation on a terminal and needs --yes otherwise; it refuses a path that is not unrecoverable or skipped, acts by the path's state (for an unrecoverable path it ends the report as requirement 9 says; for a path SR-1.26 skips it moves the note as SR-1.26 says), and goes through the daemon when it is running",
+        "the oplog check's detail, verify() errors included, names a path only to a token whose path scope covers it; other callers see counts",
+        "the unrecoverable refusal runs after the caller's access check, so a caller without access to the path gets the access refusal, never 'unrecoverable'",
+        "the git-pull loop in src/cli/sync.mjs catches the unrecoverable refusal per path, keeps the path reported and goes on; the pull still commits and pushes the other paths",
+        "every caller of status() passes the caller's identity, src/server/http.mjs included, so requirement 11's scope rule holds on every route"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "src/engine/vault.mjs",
+          "src/cli/doctor.mjs",
+          "docs/DESIGN.md",
+          "docs/THREAT-MODEL.md",
+          "test/recover-unrebuildable.test.mjs",
+          "test/helpers/recover-*.mjs",
+          "src/cli/main.mjs",
+          "src/engine/card.mjs",
+          "src/server/http.mjs",
+          "src/server/mcp.mjs",
+          "docs/MODULES.md",
+          "changelog.d/SR-1.21.md",
+          "src/engine/oplog.mjs",
+          "docs/TROUBLESHOOTING.md",
+          "src/engine/diff.mjs",
+          "src/cli/sync.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "A note whose logged content was altered with its record hash recomputed and whose file was removed is listed by status() as unrecoverable and fails the doctor's oplog check",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "node --test test/recover-unrebuildable.test.mjs"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "The design page states the reported case",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/DESIGN.md",
+            "pattern": "cannot be rebuilt"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/recover-unrebuildable.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/recover-unrebuildable.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/recover-unrebuildable.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "Set up the unrebuildable missing note and reopen. Then call v.append(OWNER,{path:p,text:'x'}). The call is refused with a VaultError, or no record of type 'delete' with agent 'external' is appended for p. After close() and a second open, status().unrecoverable still names p.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='write to an unrebuildable note' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^write to an unrebuildable note$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "With the unrebuildable missing note in place and no daemon, run every non-ok check's fix.run() from fileChecks({root,vault}) (the 'drift' check is the doctor --fix path). Then close, reopen and call fileChecks again. The 'oplog' check still fails naming p, and the log has no record of type 'delete' for p.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='doctor fix keeps the report' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^doctor fix keeps the report$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "In a sandbox() vault (test/helpers/cli.mjs), make a note unrebuildable (tamper its last put record's content, recompute rec.hash, remove the file). Run 'memev doctor --json' with the daemon stopped, then again after 'memev start'. Each run exits 1 and its JSON has exactly one check with id 'oplog', whose status is 'fail' and whose detail names p.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='memev doctor CLI' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^memev doctor CLI$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "(Needs src/cli/main.mjs added to scope.) In a sandbox() vault with an unrebuildable note and the daemon running, plain 'memev status' (no --json) prints a line naming p as not rebuildable, and memev_session_start's card data carries the unrecoverable paths.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='status text names it' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^status text names it$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC11",
+          "mandatory": true,
+          "statement": "Write p with a single put, close (the snapshot covers it), replace that record's line with unparseable bytes (keeping the newline), remove the file and reopen. status().unrecoverable has an entry {path:p, reason:'record unreadable'}, and p is not in status() recovered.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='record unreadable' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^record unreadable$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC12",
+          "mandatory": true,
+          "statement": "Two cases with the same tampered log. (a) Keep the first 5 bytes of the file: p is listed with a reason that says the file is incomplete, and the file's bytes are unchanged. (b) Replace the file with different, complete text: p is not listed as missing or unrebuildable, and the hand edit is imported as an external put.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='present file' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^present file$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC13",
+          "mandatory": true,
+          "statement": "After reopening on the unrebuildable missing note, notes/x.md still does not exist and the log has no new record for p. With a present but unreadable file (chmod 000, skipped on win32 or as root), open() does not throw, the file's bytes and mode are unchanged, and p is listed with reason 'file unreadable'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='never overwrites' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^never overwrites$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC14",
+          "mandatory": true,
+          "statement": "In the fixture, assert v.log.verify().ok === true after reopening, so the oplog check's failure can only come from the new detection, and assert that the check's detail contains both p and 'content hash mismatch'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='verify stays ok' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^verify stays ok$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC15",
+          "mandatory": true,
+          "statement": "Close and reopen the unrebuildable vault twice: p is listed both times and log.seq does not grow between the two opens. With a vault already open, corrupt the record and remove the file, then call fileChecks({root,vault:v}): the 'oplog' check fails naming p without a restart.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='survives restarts' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^survives restarts$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC16",
+          "mandatory": true,
+          "statement": "(Needs src/server/http.mjs and src/server/mcp.mjs added to scope.) A token limited to paths ['projects/a/**'] calling GET /v1/status or memev_status on a vault where notes/x.md cannot be rebuilt gets a count but no path outside projects/a/.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='path-limited token' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^path-limited token$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC17",
+          "mandatory": true,
+          "statement": "MEMEV_CONTRACT_BASE is set, and the mutation run kills at least one mutant in src/engine/vault.mjs and one in src/cli/doctor.mjs with none surviving. The 'killed' key name must be checked against the QL-1.02 output, which does not exist at this commit.",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -n \"$MEMEV_CONTRACT_BASE\" && node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/recover-unrebuildable.test.mjs\" --json | node -e \"const r=JSON.parse(require('fs').readFileSync(0,'utf8'));process.exit(r.survived===0&&(r.killed||0)>0?0:1)\"",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "T1-AC18",
+          "mandatory": true,
+          "statement": "THREAT-MODEL.md's disk-corruption row says that a note the log cannot rebuild is reported by memev status and memev doctor.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/THREAT-MODEL.md",
+            "pattern": "cannot be rebuilt[^|]*(memev doctor|memev status)"
+          }
+        },
+        {
+          "id": "T1-AC19",
+          "mandatory": true,
+          "statement": "For the 5-byte-prefix fixture and the chmod-000 fixture (the latter skipped on win32 or as root): v.append(OWNER,{path:p,text:'x'}), v.write(OWNER,{path:p,body:'y'}) and every non-ok fix.run() from fileChecks either throw a VaultError or append no record for p of type 'delete' and no 'put' with data.external. The file's bytes and mode are unchanged, and after close and reopen open() does not throw and status().unrecoverable still lists p with its original reason.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='incomplete or unreadable file then write' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^incomplete or unreadable file then write$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC20",
+          "mandatory": true,
+          "statement": "On the missing-file fixture, v.write(OWNER,{path:p,body:'new'}) and v.syncFromDisk(p,'git-pull') each either throw a VaultError or append no record of type 'delete' (any agent) and no external put for p. After close and reopen, status().unrecoverable still lists p.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='every write path' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^every write path$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC21",
+          "mandatory": true,
+          "statement": "With notes/x.md unrebuildable, a token limited to ['projects/a/**'] and a remote connector token (clientToken remote) call GET /v1/status, memev_status, memev_doctor, memev_session_start (data and text) and POST /v1/session-start (card and text). No response body contains 'x.md'; the status and doctor responses carry an unrecoverable count of 1, and the doctor's oplog check is 'fail'. With the owner token, every one of these names p.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='no path leaks' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^no path leaks$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC22",
+          "mandatory": true,
+          "statement": "With the unrebuildable note and a card padded past 6000 characters (40 long entries in memory/decisions plus a matching task): the content[0].text of memev_session_start, the .text of POST /v1/session-start and the output of `memev card` each contain the count 1 and 'memev doctor'. Plain `memev status` prints a line with the count and 'memev doctor'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='card text names it' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^card text names it$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC23",
+          "mandatory": true,
+          "statement": "After p is reported, write its original bytes back (the hash matches the head's ch) and reopen: status().unrecoverable is empty, fileChecks' oplog check is 'ok', and `memev doctor --json` shows oplog 'ok' with the daemon down and up. In a vault where compact() archived a journal (journal.retention_days 0), status().unrecoverable is empty after reopen and work/sessions/<file> is not recreated.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='resolved note is cleared' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^resolved note is cleared$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC24",
+          "mandatory": true,
+          "statement": "In a sandbox vault with a bare local remote: write p, flush and push (commit C1 holds p), make p unrebuildable, then commit and push the deletion. `memev doctor --json` with the daemon down and up shows an oplog detail containing C1's short hash and not the deletion commit's, and `git show C1:p` equals the original bytes. A vault with no remote names no commit.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='names the backup commit' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^names the backup commit$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC25",
+          "mandatory": true,
+          "statement": "With p's content altered WITHOUT recomputing rec.hash and three other records altered the same way (so verify reports at least 3 errors), and separately with p's line made unparseable, the file removed: fileChecks' oplog detail and `memev doctor --json` with the daemon down both name p with its reason.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='doctor names p when verify fails' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^doctor names p when verify fails$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC26",
+          "mandatory": true,
+          "statement": "(a) Single put, close, rewrite the line as valid JSON with data:null and the hash recomputed, remove the file, reopen: open() does not throw and p is listed with reason 'record unreadable'. (b) Put v1, close, append A, restore the pre-append snapshot.json (a crash), corrupt A's line, remove the file, reopen: status().unrecoverable is not empty, p is not in recovered, and notes/x.md is not recreated with v1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='malformed or unsnapshotted record' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^malformed or unsnapshotted record$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC27",
+          "mandatory": true,
+          "statement": "p1 has its content tampered with the hash recomputed; p2 has a put then an append, and the append's line is unparseable (the snapshot covers both); both files are removed. status().unrecoverable is exactly [{path:p1,reason:'content hash mismatch'},{path:p2,reason:'record unreadable'}].",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='two lost notes' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^two lost notes$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC28",
+          "mandatory": true,
+          "statement": "With the same tampered log: (c) keep the file's first line including its '\\n': p is listed with an 'incomplete' reason, the bytes are unchanged and no external put is appended. (d) Replace the file with a shorter hand edit that starts with the same first line and then differs: p is not listed and the edit is imported as an external put.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='line-boundary truncation' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^line-boundary truncation$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC29",
+          "mandatory": true,
+          "statement": "(Needs docs/TROUBLESHOOTING.md and src/engine/oplog.mjs added to scope.) The oplog troubleshooting row names the note-cannot-be-rebuilt failure and the recovery from the backup commit",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/TROUBLESHOOTING.md",
+            "pattern": "\\| `oplog` \\|[^\\n]*cannot be rebuilt"
+          }
+        },
+        {
+          "id": "T1-AC30",
+          "mandatory": true,
+          "statement": "Test 'resolve asks first', in a sandbox() vault with no remote and the 5-byte-prefix fixture for notes/x.md plus a healthy notes/ok.md: (1) daemon down, `memev doctor --resolve notes/x.md` with stdin not a TTY and no --yes exits non-zero, log.seq is unchanged and status().unrecoverable still lists p after reopen; (2) `memev doctor --resolve notes/ok.md --yes` is refused, ok.md bytes unchanged, no record appended; (3) `memev doctor --resolve notes/x.md --yes` appends exactly one record for p, of type 'delete' with a non-empty data.reason, the 5 bytes on disk are unchanged, and after reopen p is not listed; (4) the same with the daemon running: after memev stop, v.log.verify().ok is true and the seq values in the log are strictly increasing with no duplicate; (5) DELETE /v1/notes/notes/x.md with the owner token on the prefix fixture returns error 'unrecoverable' and the bytes stay.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='resolve asks first' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'resolve asks first' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^resolve asks first$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC31",
+          "mandatory": true,
+          "statement": "Test 'no path leaks when verify fails': notes/x.md gets a put, an append and a second append; the first append's line is replaced by unparseable bytes (newline kept) and the file is removed, so verify() reports a chain break on notes/x.md. A token limited to ['projects/a/**'] and clientToken(root,'x',{remote:true}) call memev_doctor, memev_status, GET /v1/status and memev_session_start: no response body contains 'x.md', the oplog check is 'fail' and the unrecoverable count is 1. With the owner token, the memev_doctor oplog detail names notes/x.md.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='no path leaks when verify fails' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'no path leaks when verify fails' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^no path leaks when verify fails$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC32",
+          "mandatory": true,
+          "statement": "Test 'refused with unrecoverable': for each of the missing, 5-byte-prefix and chmod-000 fixtures (the last skipped on win32 or as root), each of v.write, v.append, v.remember (p is that kind's month file), v.checkpoint (p is work/active/<slug>.md), v.journal (p is the session file) and v.syncFromDisk(p,'git-pull') throws an error that is instanceof VaultError with e.code === 'unrecoverable' and /memev doctor/ in e.message; v.log.seq and the segment's byte length are identical before and after each call; PUT and PATCH /v1/notes/<p> with the owner token return a body whose error is 'unrecoverable'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='refused with unrecoverable' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'refused with unrecoverable' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^refused with unrecoverable$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC33",
+          "mandatory": true,
+          "statement": "Test 'unsnapshotted record stays reported': in fixture (b), with a healthy notes/q.md written before v1 whose file is also removed: after the first reopen, close and reopen twice more; each time status().unrecoverable lists notes/x.md, notes/x.md does not exist, notes/x.md is not in v.recovered and log.seq equals its value after the first reopen. The owner must state in the spec what happens to notes/q.md in this vault (rebuilt byte for byte, or listed with a stated reason) and the test asserts that outcome.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='unsnapshotted record stays reported' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'unsnapshotted record stays reported' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^unsnapshotted record stays reported$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC34",
+          "mandatory": true,
+          "statement": "Test 'pull with a lost note': sandbox vault with a bare remote; notes/x.md is unrebuildable with its deletion committed and pushed; a second clone writes the first 5 bytes of the original x back, edits notes/y.md, commits and pushes; syncOnce(vault,{root}) returns with error null and pushed true, notes/y.md has a new 'put' with data.external and client 'git-pull', no record is appended for notes/x.md and status().unrecoverable still lists it. Separately, with x unrebuildable and notes/y.md hand-edited, running the drift fix.run() imports y as an external put.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='pull with a lost note' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'pull with a lost note' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^pull with a lost note$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC35",
+          "mandatory": true,
+          "statement": "Test 'open never throws': with a healthy notes/ok.md alongside, for each of (i) splice ins:null, (ii) splice ins:5, (iii) put content:42, (iv) put content:{} (hash recomputed each time, snapshot covering), (v) p's line replaced by 'null', (vi) a line '42' in the replayed tail after restoring the earlier snapshot, and (vii) an intact log with p's file chmod 000 (skipped on win32 or as root): Vault.open() does not throw, Number.isInteger(v.log.seq), v.log.verify() returns, fileChecks' oplog check is produced, status().unrecoverable lists p with 'record unreadable' ((vii): 'file unreadable', bytes and mode unchanged), and notes/ok.md is not listed.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='open never throws' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'open never throws' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^open never throws$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC36",
+          "mandatory": true,
+          "statement": "Test 'card warning comes first': in the padded fixture, renderCard(card,{maxChars:1e9}).length > 6000 is asserted (add a session journal with 6 long turns and long active-project checkpoints if the decisions alone fall short); renderCard(card,{maxChars:200}) contains 'memev doctor' and the count; and in renderCard(card), in memev_session_start content[0].text after the protocol text, in POST /v1/session-start .text and in `memev card` stdout, the first line containing 'memev doctor' is within the first 3 lines of the card.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='card warning comes first' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'card warning comes first' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^card warning comes first$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC37",
+          "mandatory": true,
+          "statement": "Test 'names the newest backup commit': bare remote; C1 writes notes/x.md as v1, C2 changes it to v2, C3 changes only notes/other.md; push; make x unrebuildable WITHOUT committing the deletion. For `memev doctor --json` with the daemon down and up, the oplog detail contains a short hash H for which `git show H:notes/x.md` prints exactly v2, and does not contain C1's short hash.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='names the newest backup commit' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'names the newest backup commit' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^names the newest backup commit$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC38",
+          "mandatory": true,
+          "statement": "Test 'loss while open is refused': open v, write notes/x.md, then without closing tamper its record (hash recomputed) and remove the file; v.append(OWNER,{path:'notes/x.md',text:'x'}) throws a VaultError with code 'unrecoverable', v.log.seq is unchanged, no record of type 'delete' exists for p, and after close and reopen status().unrecoverable lists p.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='loss while open is refused' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'loss while open is refused' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^loss while open is refused$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC39",
+          "mandatory": true,
+          "statement": "Test 'backup restore clears': notes/x.md gets a put v0 (committed and pushed as C1), an append a1 (not pushed) and an append a2 whose line is made unparseable; the file is removed; the doctor names C1; the bytes of `git show C1:notes/x.md` are written into place and the vault reopened: status().unrecoverable is empty, the restored bytes are recorded as one external put, and v.append to notes/x.md succeeds. (If the owner decides otherwise, the spec must say what ends the report after the documented recovery and the test asserts that.)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='backup restore clears' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'backup restore clears' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^backup restore clears$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC40",
+          "mandatory": true,
+          "statement": "Test 'doctor with the daemon up': in each 'daemon up' run the test asserts `memev start` exited 0 and the doctor JSON has a check with id 'daemon' and status 'ok' before reading the oplog check; with that, the oplog check's detail names notes/x.md.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/recover-unrebuildable.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='doctor with the daemon up' test/recover-unrebuildable.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - ' | grep -F 'doctor with the daemon up' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^doctor with the daemon up$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC41",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-sr-1-21-a-missing-note-t-6f2586",
+  "title": "SR-1.21 A missing note the log cannot rebuild is reported, never silent",
+  "workdir": null,
+  "created": "2026-10-31T21:43:48.187Z",
+  "version": 2,
+  "supersedes": "k-sr-1-21-a-missing-note-t-77741b",
+  "request": "Closes G86: recover() skips a path whose logged content no longer matches its recorded hash with a bare continue (src/engine/vault.mjs:118); the note stays missing while verify() is ok, status().recovered is 0 and every doctor check passes, against DESIGN.md and THREAT-MODEL.md which say a missing file is rebuilt. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence). Repository: memev. Depends on contracts: SR-1.01, QL-1.02. Sensitive path (the oplog): the QL-1.03 checklist applies before merge.",
+  "provenance": {
+    "spec_sha256": "d2ff411701094e9cd03cbc187e4c4abe8e214602cb2258ad190e7c1e99070e9f",
+    "record": "contracts/seed-readiness/redteam/SR-1.21.json",
+    "review": "interim solo review by the author, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}

@@ -1,0 +1,199 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "Default agent suitability analysis: During scope analysis and planning, Memev should assess each work package and task against the capabilities required to complete it, then evaluate the connected agents and execution resources against those requirements. Consider demonstrated capability and relevant context, supported tools, permissions, reliability, availability, workload and applicable cost/latency constraints.",
+        "Optional user-directed assignment and control: The user must nevertheless be able to influence or override the default through the persistent lead-agent prompt, in ordinary language. For example: \"Use the review model for the architecture review\", \"Keep all code changes on my local machine\", \"Give this task to the agent I connected for testing\", or \"I want to handle this task myself.\" The lead agent should interpret the instruction, identify the affected work, assess feasibility and policy implications, and update the proposed plan or assignment preference. It should confirm material consequences where appropriate and explain when a request cannot be honoured; it must not silently ignore the instruction or imply that an unavailable or unsuitable resource can perform the work.",
+        "State-machine enforcement: User preferences and overrides are inputs to the canonical project policy/plan, not direct mutations of execution state. The state machine and coordinator remain authoritative for validating permissions, dependencies, resource eligibility, claims, dispatch, reassignment and recovery. A user preference cannot override access controls, safety policy, required approvals or valid task transitions.",
+        "Progressive control: The default experience should require no agent-management knowledge. Users who want more control can specify preferred agents, tools, machines, constraints or human ownership at project, workstream or individual-task level through the same lead-agent interaction area. Memev should make the effective preference visible and editable without turning routine orchestration into a mandatory configuration workflow."
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "docs/scope-one/design/lead-assignment-preference.md",
+          "docs/README.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "The decision record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/design/lead-assignment-preference.md"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "The record decides requirement 1: Default agent suitability analysis: During scope analysis and planning, Memev should assess each work package and task against the capabilities required to...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/lead-assignment-preference.md",
+            "pattern": "^## Requirement 1:"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "The record decides requirement 2: Optional user-directed assignment and control: The user must nevertheless be able to influence or override the default through the persistent lead-agent...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/lead-assignment-preference.md",
+            "pattern": "^## Requirement 2:"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "The record decides requirement 3: State-machine enforcement: User preferences and overrides are inputs to the canonical project policy/plan, not direct mutations of execution state. The...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/lead-assignment-preference.md",
+            "pattern": "^## Requirement 3:"
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "The record decides requirement 4: Progressive control: The default experience should require no agent-management knowledge. Users who want more control can specify preferred agents, tools,...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/lead-assignment-preference.md",
+            "pattern": "^## Requirement 4:"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "The record names the suitability analysis",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/lead-assignment-preference.md",
+            "pattern": "^Suitability analysis:"
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "The record names the preference record",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/lead-assignment-preference.md",
+            "pattern": "^Preference record:"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "The decision record passes the leak scan",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "The documentation links and up-links stay valid",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-links.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-so-1-03-lead-assignment-2ba274",
+  "title": "SO-1.03 Lead assignment: a default suitability analysis and an in-language user preference",
+  "workdir": null,
+  "created": "2026-10-31T22:00:26.937Z",
+  "version": 1,
+  "request": "Closes G-SO-03 (addendum 2, review row 2). Source: the Scope One addendum (PR #222, docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md at head a1757a0) and its review table (issuecomment-6534383323); owner request of 31 Oct 2026 that every aspect be decomposed in the WBS and built into contracts (t531u). The addendum names recommendations that become contracts on acceptance; this contract is the design-record stage, so it asks for the decision record and builds nothing. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository. Depends on contracts: SO-L-A, SO-08-A.",
+  "provenance": {
+    "spec_sha256": "13b2637f5e20ca0b5f51f468010ad779e9b91551da8f1841902a677fb7b2c54e",
+    "record": "contracts/scope-one/redteam/SO-1.03.json",
+    "review": "interim solo review by the author, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}

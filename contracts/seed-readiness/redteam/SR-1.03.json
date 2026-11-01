@@ -1,0 +1,38 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SR-1.03",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "5783cc3af93b05659f3d2d9e5bc422674c48ce16fdfc350a0915abd83ac430f4",
+      "base_commit": "4282ba7d1f0e0db2c4f0335bfd949bfcbbbe7f1b",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/devices.mjs",
+            "sha256": "37391e4cd0f4e5a1f52eab59d5081c0731da925d24e938f0ab990862ec09d21f"
+          },
+          {
+            "path": "src/server/http.mjs",
+            "sha256": "bdc46b5ad8592c9bad976d3ac92196a5b57ab53ad14b205e0e9042e1a0886a35"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Re-sign review of the spec as it stands on main at 4282ba7d1f0e, for a contract signed before the red-team gate. It has 1 task(s) and 35 criteria. Mechanical checks run on every criterion, and these are the only checks made: each task drafts through makeTask; each command, metric and red-green cmd parses with sh -n; each red-green cmd names its test_file and that file is in the task's scope; no criterion statement is repeated within a task except as answer 1 records; every contract this spec depends on, in its manifest row, is a manifest row. They found nothing. I did not re-run the three rounds that were made off this repository before the first signing, and I did not run the checks the criteria name, because their code is not built yet. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "Y2U1NWEwMDBhNjcxNmYxNTUwODZmOGVhZWZjYzM2M2E3YmI5ZDE5Y2M4YjI4ODFhMzM2ZjE3M2Y4YTgyNDY3MQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "43LCwiQ0RFssABS+AAwawhdNBL4vGTtlNuV27LJXCSp5L6ItxRN5HjO2rvoueYo36CgorRITnDxsKuQbUF+ZDA=="
+          }
+        ]
+      }
+    }
+  ]
+}

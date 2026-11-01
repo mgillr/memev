@@ -1,0 +1,85 @@
+{
+  "title": "SO-A-11 Baseline reconciliation: a register check over the takeover record with implemented, merged, integrated and verified kept apart and twins closed explicitly",
+  "project": "memev",
+  "workdir": null,
+  "request": "Build layer of the Scope One programme, adapted from the unsigned fold of 30 Oct 2026 (fold id SO-A-11) and validated against memev main at d1c65ef. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository; they are cited by id only. Implements the design record SO-1.02 (Reconciliation: one work breakdown that accounts for every requirement, contract, pull request and branch) (contracts/scope-one/specs). The decision record cites this contract by id and keeps only the gaps this one does not cover. Builds on signed vault contracts: SO-T-A†, WO-05-A†, WO-05-B†. Source in the fold: #222 recommendation 1 (one trustworthy baseline; separate implemented, merged, integrated, verified; close twins) and recommendation 10 (document the engine relationship). Settled decisions this contract follows (owner decision 31 Oct 2026, docs/scope-one/DECISIONS.md): topology is local-first and the cloud is only a relay and a backup; every supported provider stands on equal footing and no work or tier depends on one; crdt-merge is reached only through the provider boundary of src/engine/merge.mjs (docs/EXTENSION-POINTS.md) and this contract adds no merge engine to the core; tiers follow docs/PRICING.md (Free core, Personal for up to 3 computers with no per-computer add-on, higher tiers by contacting us) with no Personal trial; the git backup keeps running every few minutes (sync.interval_min). Memory authority: ADR 7 (memory and project-state authority) is proposed in PR #325 and is not decided here; this contract cites it and the local-first decision, and keeps one store under the vault with no second database. Provenance: adapted from the unsigned fold of 30 Oct 2026. Changes: (1) converted from the vault task format to the memev spec format (named tests run as red-green checks on the own test file of the contract; inline regular expression flags became the flags key; hygiene and decision verifiers became commands or doc checks). (2) removed fold-only fields and the owner-decision marker field, reworded the stop rule that named a patent, and made the text pass the leak scan. (3) AC01 cited a counts section of docs/scope-one/BASELINE.md that does not exist; the check compares against the status counts of the WBS requirement lens. (4) AC03 (the engine relationship section of docs/CONVERGENCE.md) is dropped: it duplicates PGP-1.03 and ADR 6 in PR #325. The contract keeps the register check only, and its scope no longer includes docs/scope-one/** or docs/CONVERGENCE.md. (5) Boundary: PGP-1.03 task 4 writes the reconciliation pages by hand; this contract adds the script that checks them.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Baseline reconciliation: a register check over the takeover record with implemented, merged, integrated and verified kept apart and twins closed explicitly",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "node scripts/register-check.mjs reads docs/scope-one/REQUIREMENTS.md and INVENTORY.md, the local git history of origin/main and a pull-request list",
+        "the check fails on two open inventory rows whose overlaps column names each other while neither carries SUPERSEDE, MERGE or CANCEL_WITH_APPROVAL"
+      ],
+      "description": "The addendum (recommendation 1) found the takeover inventory drifting from the repository and asked for one trustworthy baseline, explicit closure of twin contracts,. The register check reads the takeover record pages of SO-T-A under docs/scope-one and the local git history; a pull-request list is given as a file written outside the script, so the test runs with no network.",
+      "scope": [
+        "changelog.d/SO-A-11.md",
+        "scripts/register-check.mjs",
+        "test/fixtures/register/**",
+        "test/helpers/**",
+        "test/register-check.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "node scripts/register-check.mjs reads docs/scope-one/REQUIREMENTS.md and INVENTORY.md, the local git history of origin/main and a pull-request list given with --prs <file> (written by the GitHub CLI outside the script); it prints per requirement four separate columns implemented, merged, integrated and verified, derived from the INVENTORY status vocabulary of SO-T-A AC03 plus origin/main ancestry (integrated: every contract covering the requirement is merged at one sha), and exits 1 when a count differs from the status counts of the requirement lens of docs/scope-one/WBS.md; the test seeds a drift in fixtures with no network",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/register-check.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-A-11 AC01:' test/register-check.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-A-11 AC01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "the check fails on two open inventory rows whose overlaps column names each other while neither carries SUPERSEDE, MERGE or CANCEL_WITH_APPROVAL (SO-T-A AC03), and on two open rows with identical requirement sets; legitimate multi-contract requirements pass",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/register-check.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-A-11 AC02:' test/register-check.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-A-11 AC02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The full test suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "The leak scan passes on files and every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Every changed file is inside this contract's scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "Stop and post BLOCKED when a criterion cannot pass without weakening a test, skipping a test or relaxing an assertion.",
+        "Stop and ask when the work would name a client product, a person, a server or a seat in repository text; the client names live in docs/CLIENTS.md only.",
+        "Stop when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would move convergence logic into the core, vendor the engine, or add a merge engine beside the provider boundary of src/engine/merge.mjs.",
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

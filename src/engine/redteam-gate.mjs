@@ -22,11 +22,16 @@ export const RULES = Object.freeze(['schema', 'spec_id', 'rounds_contiguous', 'l
 
 /**
  * The reviewer public keys the gate accepts on a round, a closing envelope or nothing else. Key id
- * 1f6b4e7c00729bc7 (keyId() of vendor/attest/signature.mjs). Its private half is held by the reviewer
+ * 1f6b4e7c00729bc7 (keyId() of vendor/attest/signature.mjs), then the interim key below it. Its private half is held by the reviewer
  * and is never in this repository. A key under contracts/keys/ is refused here even if listed.
  */
 export const REVIEWER_KEYS = Object.freeze([
   '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAkYrfYi60t6caY9cmv/YvyKldeg4Ten4AKI7Q7Q/mwG4=\n-----END PUBLIC KEY-----\n',
+  // INTERIM, key id ba7f5a5b8f8aa026, added on the owner's decision of 31 October 2026 while the reviewer above is out. A round or
+  // note it signs is an interim solo review by the author of the change, pending independent re-review, and says so in its
+  // text. It is held here and not under contracts/keys/, because the gate refuses a key listed there as a reviewer key. Remove it
+  // once an independent reviewer has re-reviewed what it signed.
+  '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEACcqZzomBqwsUyN7MmB0182wH+1Ap+3aDHNk/rqLOfuc=\n-----END PUBLIC KEY-----\n',
 ]);
 
 /**
@@ -47,7 +52,7 @@ export const GRANDFATHERED = Object.freeze([
   'ef3125bf97ed5b6d0fccf31824a4069c752030549f2cd7e42403872ca0c03fad', // contracts/signed/k-memory-quality-multiling-4468b8.json
 ]);
 
-export const DEFAULT_SPEC_DIRS = Object.freeze(['contracts/seed-readiness/specs', 'contracts/quality-loop/specs']);
+export const DEFAULT_SPEC_DIRS = Object.freeze(['contracts/seed-readiness/specs', 'contracts/quality-loop/specs', 'contracts/scope-one/specs']);
 
 // Fields the builder writes after the reviewer answered. A round's own signature leaves them out; the next
 // round's signature (which covers the previous round in full) or the closing envelope covers them.

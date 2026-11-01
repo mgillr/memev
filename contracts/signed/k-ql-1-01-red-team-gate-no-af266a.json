@@ -1,0 +1,910 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "The gate script and its refusal rules",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "scripts/gate/redteam-gate.mjs takes spec paths (default: every file under contracts/seed-readiness/specs/ and contracts/quality-loop/specs/) and prints one line per spec: SIGNABLE, NOT SIGNABLE: <reasons>, or NO RECORD; exit 0 only when every named spec is SIGNABLE; --report mode exits 0 unless a record is malformed, a hash mismatch is claimed clean, or a signed contract under contracts/signed/ has a spec without a SIGNABLE record",
+        "the record is contracts/<area>/redteam/<id>.json with schema memev-redteam/1, each round of kind spec (the default) or implementation, and snapshots <id>.r<n>.spec.json beside it; spec_sha256 is sha256 of the spec as canonical JSON (sorted keys, no whitespace, workdir null)",
+        "SIGNABLE requires all of: record parses with the schema and the spec id; rounds numbered 1..n without gaps; the last round has verdict clean and holds no answer of severity high (medium and low answers may remain, each with its disposition), or the record ends with a valid stop decision; its spec_sha256 equals the spec on disk; every answer in every round has disposition added or rejected; every added answer's criterion, or its folded_as when the builder records one (the criterion the answer became, as task, statement and verifier), is present verbatim in the spec on disk, and a folded_as never names a criterion already verbatim in that round's own snapshot; every rejected answer has a non-empty reason; the sequence of snapshots never weakens (no task or criterion removed, no requirement reworded, no criterion statement or verifier key changed, no metric loosened, no scope glob added or broadened) except as requirement 6 accepts; every implement task has at least one test_red_green criterion unless the spec's manifest row declares kind docs or evidence; every input file of the clean round whose blob at HEAD differs is reported, and under src/ it is NOT SIGNABLE",
+        "node 23 compatible, no dependencies, first lines carry // gate-version: 1 and the SPDX header",
+        "each round is a DSSE envelope signed by a reviewer key that is not a contract-signing key (not under contracts/keys/); the gate holds the reviewer public keys it accepts and refuses an unsigned round, a round signed by another key, and any edit to an earlier round, snapshot or disposition after a later round was signed. Honest limit, stated in docs/CONTRACTS.md: while the builder and reviewer run as one user on one machine the reviewer key is readable by both, so the signature makes tampering visible in history but is not separation; separation comes from a reviewer key the owner holds off the build machine or from the second human of SR-9.05",
+        "a change between snapshots to a requirement's text, a criterion's statement or any key of a criterion's verifier is accepted only when the round's amendments list records it as {task, field, from, to, answer}, where answer is a citation as requirement 11 allows of an answer or note that the change carries out (a cited answer concerns the changed requirement or criterion: it is an answer of the same task and, for a criterion, its criterion has the statement the changed one had before the change; a note point or a reviewer note is judged by its own text), and the next round judges whether it weakens; a glob added to a scope is accepted only when every path it newly admits at the reviewed commit is read by a cited added answer of the previous round, so '**', 'src/**' or 'test/**' backed by one reading answer is refused, or when the entry {task, field: 'scope', to, reviewer_note} cites a reviewer note whose text quotes the glob verbatim and lists each path it admits at the reviewed commit, and otherwise the added paths are listed one by one; a criterion, requirement or stop rule removed is accepted only when the amendments list records it as {task, field, from, to: null, answer} whose cited text quotes the removed text verbatim and names it contradictory or impossible, not negated, or when a move entry carries it to a spec where it is verbatim, or when it cites a reviewer note whose text quotes the removed text verbatim and names where it is carried (an added answer whose criterion holds it, or another spec's items), and the next round judges whether it weakens; the never-weakens check accepts exactly these and nothing else",
+        "staleness is judged at the signing commit for a contract already signed, and at HEAD for a spec not yet signed, so a signed contract's own landed work never makes it stale",
+        "the check is engine code that ships with memev: src/engine/redteam-gate.mjs exports evaluate({spec, cwd, reviewerKeys, stopKeys}), RULES, REVIEWER_KEYS, STOP_KEYS and GRANDFATHERED, and scripts/gate/redteam-gate.mjs is a thin command-line wrapper over it, so the copies other repositories receive and the engine's own draft and sign paths run the same code",
+        "the committed base fixture is signed once with the real reviewer key, whose private key is never committed; every other fixture is signed with the test key under test/fixtures/redteam/ and reaches the gate only through an injected reviewerKeys argument",
+        "a round's signature covers its answers and its spec snapshot; that round's dispositions and amendments, written after the reviewer answered, are covered by the next round's signature, and the last round's own dispositions and amendments are covered by a closing envelope that a reviewer key signs over canonical({spec id, last round number, its dispositions and amendments}), or, at the stop, by the stop decision",
+        "a citation in an amendments list is one of: an answer of the previous round, as answer '<round>.<n>'; a numbered point of that round's notes, as note '<round>.<point>'; an answer of an implementation round recorded after the previous spec round and before the round whose amendments cite it (or before the stop, for a stop's amendments), as answer '<round>.<n>'; an answer of another spec's record, as answer '<spec>:<round>.<n>', the spec id resolved through the manifest to a record under contracts/, never through a path, and the cited round verified as that record's own rounds are, signed by a reviewer key with its chain intact; or an entry of the record's reviewer_notes list, as reviewer_note <n>, where each entry is {n, text, sig} and sig is a DSSE envelope by a key in REVIEWER_KEYS over {spec_id, n, text}; so every citation rests on a reviewer key's signature",
+        "a record may end with a stop decision only after three rounds of which none is clean: a DSSE envelope, under a payload type of its own and never the contract payload type, signed by a key in STOP_KEYS, the stop-decision public keys the gate holds in code as it holds REVIEWER_KEYS, none of them a key the engine's own signing generates (evaluate takes stopKeys for tests), over canonical({spec id, spec_sha256 of the spec on disk, decider, date, decision: sign or split, open: every answer of every round whose disposition is not added, as round and number, dispositions: the sha256 of canonical(every round's dispositions and amendments)}), an object holding exactly spec_id, spec_sha256, decider, date, decision, open, dispositions and, when present, amendments; the gate then prints SIGNABLE AT STOP (<n> open items) and --report lists the open items; a stop decision after fewer than three rounds, signed by any other key, over another spec hash, or whose open list leaves out an answer that is not added, is refused with stop_decision; the stop decision may carry an amendments list, which its signature covers, and the change from the last spec round's snapshot to the spec on disk is judged under requirement 6 with that list, its citations naming the last spec round as the previous round",
+        "RULES holds last_high (an answer of severity high in the last round) in place of the empty-round code, and adds stop_decision; docs/CONTRACTS.md states the stopping rule (clean: no high answer, every answer dispositioned), the stop decision and the implementation round of task T2",
+        "a round of kind implementation follows every rule a spec round follows (numbered after the rounds before it, signed by a reviewer key, every answer dispositioned, clean only when it holds no high answer, dispositions covered by a closing envelope) and names its reviewed commit; it judges the code at that commit against the signed contract and never changes whether the spec is SIGNABLE",
+        "an answer of a task that moved to another spec at a split, or an answer folded alone into another spec's task while its own task stays, is recorded as added and judged against the receiving spec: the round's amendments list records the move as {kind: move, task, to_spec, to_task, answer}, one entry for each answer that moved alone; the answer's folded_as then names {spec, task, statement, verifier}; the gate resolves the spec id through the manifest to a spec under contracts/, never through a path the record gives, requires the criterion verbatim there at gating time, and follows the From/To chain of that spec's amendments across the move; a task moved whole is accepted only when each of its requirements, criteria and stop rules is verbatim in the receiving task, following that spec's own amendments",
+        "every round's signature is verified when judging SIGNABLE, rounds after the last spec round included, and a round whose kind, or whose reviewer part (the round without sig, closing and the builder's fields disposition, reason, folded_as, amendments and folded), differs from the version that first committed it is refused with review_sig",
+        "--report judges a signed contract against the commit that added the round its record's verdict rests on now (the clean round the record ends with, or its stop decision), never an older commit whose version of the record held a clean round on the same hash",
+        "--report lists a signed contract that a later signed contract supersedes (version N+1 whose supersedes names it) as superseded; only the last version of each chain must equal the spec's drafted tasks and the hash its record makes signable",
+        "a stop decision is accepted only when its key's .pub under contracts/keys/ is committed at the commit being judged (HEAD for a spec not yet signed, the signing commit for one that is signed); a key present only in the working tree never signs a stop",
+        "the history check of requirement 16 holds when every changed round and the closing envelope are validly re-signed, with the reviewer key or any other: it compares each round with the version that first committed it, not only signatures",
+        "a test_red_green counts toward red_green_required only when its cmd runs the test file under a test runner (node --test, or the {test} placeholder), never when it only names the file (test -f, cat, grep, true)",
+        "no file git lists holds the private half of a key in REVIEWER_KEYS in any encoding: a PEM block, a 64-hex seed, a base64 or base64url seed such as a JWK d, or bare base64 PKCS#8",
+        "each red-green criterion of this task that runs test/redteam-gate.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "scripts/gate/redteam-gate.mjs",
+          "test/redteam-gate.test.mjs",
+          "test/fixtures/redteam/**",
+          "src/engine/redteam-gate.mjs",
+          "docs/CONTRACTS.md",
+          "docs/MODULES.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "Each refusal rule is exercised by a fixture that is SIGNABLE until exactly one field is broken, and the broken fixture is refused with that rule's reason",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "A spec edited after its clean round is NOT SIGNABLE until a new clean round",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c02:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "A clean last round holding an answer of severity high (added, rejected or pending) is refused with last_high, and a round with answers left pending is refused; a clean last round holding one medium answer rejected with a reason and two low answers, one added (its criterion present verbatim) and one rejected with a reason, with a valid closing envelope, is SIGNABLE",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "The gate script carries its version line",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -qE '^// gate-version: 1$' scripts/gate/redteam-gate.mjs",
+            "timeout_s": 30
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "For every refused fixture and for a spec with no record, spawning `node scripts/gate/redteam-gate.mjs <spec>` (no --report) exits non-zero. Running `sh -c 'node scripts/gate/redteam-gate.mjs <spec> && echo PROCEED'` prints no PROCEED. For the SIGNABLE base fixture the exit is 0 and PROCEED is printed. Naming two specs where only one is SIGNABLE also exits non-zero.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "The test pins one fixture spec's spec_sha256 to a literal hex constant. It also asserts the gate's hash equals canonicalHash({...spec, workdir: null}) from vendor/attest/signature.mjs, imported independently of the script. Changing only tasks[0].criteria[0].verifier.cmd, only a scope glob, or only interior whitespace in a statement makes the fixture NOT SIGNABLE with a hash-mismatch reason. Reordering keys or reformatting whitespace between tokens keeps it SIGNABLE. If record.spec_file names a different file whose hash matches the round, but the spec path passed on the command line differs, the result is NOT SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "Each of the following is applied as the only change between snapshot r1 and r2, with r2 a clean round whose hash matches the spec on disk: a grep pattern changed, a grep file changed, a test_red_green test_file changed, expect_exit changed or removed, mandatory:false added, a statement rewritten, a stop_rule removed, a requirement removed, a depends_on entry removed, or workdir set to a non-null path. Each is NOT SIGNABLE with a weakening reason naming the task and criterion statement. Swapping two criteria within a task is not reported as a removal.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c07:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "Refused: a record where any round's snapshot is missing. Refused: a record where a snapshot's canonical hash differs from its round's spec_sha256. Each gets a reason naming the round. The case where r1.spec.json is overwritten with the current spec, so that a real weakening would disappear, is refused.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "Each of these two-round records is NOT SIGNABLE with a reason naming round 1 and the answer number: round 2 clean with empty answers and a matching hash, while round 1 has one answer that is (a) pending, (b) missing its disposition, (c) rejected with reason '   ', or (d) added with no criterion object. The same record with round 1 fully dispositioned is SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c09:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "A command change between r1 and r2 is SIGNABLE only when round 2's amendments list has an entry with the same task, the same criterion statement, from equal to the r1 cmd and to equal to the r2 cmd. Refused cases: an amendment naming a different criterion, an amendment whose to differs from the r2 cmd, one amendment covering two changed commands, and an amendments list in a round other than the one whose snapshot holds the change.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c10:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC11",
+          "mandatory": true,
+          "statement": "In a temporary git repository: a clean round lists src/a.mjs with the sha256 of its first committed version, and a second commit changes it. The result is NOT SIGNABLE naming src/a.mjs, even after the working-tree copy is restored to the first version. The same holds when the path is written ./src/a.mjs, and when src/a.mjs is deleted at HEAD. A changed docs/x.md input is reported but stays SIGNABLE. A record whose clean round has inputs.files: [] while the spec's scope names a src/ path is refused.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c11:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC12",
+          "mandatory": true,
+          "statement": "The gate exports RULES, an array of reason codes. The test asserts it equals this literal list: schema, spec_id, rounds_contiguous, last_clean, last_high, hash, dispositions_all_rounds, added_verbatim, rejected_reason, never_weakens, red_green_required, head_stale_src, review_sig, stop_decision. The test asserts the base fixture is SIGNABLE. For every code there is a one-field mutation of that base that is refused with exactly that code and no other. The red_green_required fixture is refused when the manifest row is missing or says kind feature, and is SIGNABLE only when the manifest row says docs or evidence. A kind field inside the spec alone does not exempt it.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c12:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC13",
+          "mandatory": true,
+          "statement": "An answer with disposition added is refused when the spec on disk has a criterion with the same task, statement and verifier type but whose verifier is not deep-equal, under canonical JSON, to the answer's proposed verifier. The cases are: a different cmd, a different test_file, and a different grep pattern. An exact deep-equal match is SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c13:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC14",
+          "mandatory": true,
+          "statement": "With no arguments, cwd set to a temporary tree that has one NOT SIGNABLE spec only under contracts/quality-loop/specs/, the gate prints that spec's line and exits non-zero. It does the same with the spec only under contracts/seed-readiness/specs/. Given a nonexistent spec path, or no specs found by default, it exits non-zero with a message saying so.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c14:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c14:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC15",
+          "mandatory": true,
+          "statement": "Independent of the test file's content: copy the committed base fixture test/fixtures/redteam/base/ (spec contracts/quality-loop/specs/QL-0.01.json, record contracts/quality-loop/redteam/QL-0.01.json) into a fresh temporary git repository for each case, committed the two-step way the reviewed-commit criterion states (the fixture's build.sh: the tree the reviewer read, then the record), and run the real gate there, capturing stdout and stderr. Base: exit 0. One statement edited: non-zero, and the output names hash. Record deleted: non-zero, and NO RECORD is printed. Last round given one answer of severity high: non-zero. Last round's spec_sha256 replaced: non-zero. A gate that always exits 0, or always refuses, fails this check.",
+          "verifier": {
+            "type": "command",
+            "cmd": "R=$PWD; G=$R/scripts/gate/redteam-gate.mjs; S=contracts/quality-loop/specs/QL-0.01.json; F=contracts/quality-loop/redteam/QL-0.01.json; fresh(){ T=$(mktemp -d) && cp -R $R/test/fixtures/redteam/base/. $T && cd $T && git init -q && sh build.sh || exit 8; }; mut(){ node -e 'const fs=require(\"fs\"),[f,js]=process.argv.slice(1),o=JSON.parse(fs.readFileSync(f,\"utf8\"));new Function(\"o\",js)(o);fs.writeFileSync(f,JSON.stringify(o))' \"$1\" \"$2\" || exit 9; }; fresh; node $G $S || exit 1; fresh; mut $S 'o.tasks[0].criteria[0].statement+=\" x\"'; node $G $S >o.txt 2>&1 && exit 2; grep -q hash o.txt || exit 3; fresh; rm $F || exit 9; node $G $S >o.txt 2>&1 && exit 4; grep -q 'NO RECORD' o.txt || exit 5; fresh; mut $F 'o.rounds[o.rounds.length-1].answers=[{n:1,disposition:\"rejected\",reason:\"x\"}]'; node $G $S && exit 6; fresh; mut $F 'o.rounds[o.rounds.length-1].spec_sha256=\"0\".repeat(64)'; node $G $S && exit 7; exit 0",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "id": "T1-AC16",
+          "mandatory": true,
+          "statement": "Each round carries sig, a DSSE envelope from vendor/attest/signature.mjs sign() over canonical({...round without sig, snapshot_sha256, previous round in full with its dispositions and amendments}). The signing key's keyid must be in the gate's REVIEWER_KEYS and must not be a key under contracts/keys/. Refused with review_sig: (a) a single clean round with no sig; (b) a round signed by the contract-signing key; (c) r1.spec.json and rounds[0].spec_sha256 rewritten together after r2 was signed; (d) a round-1 disposition or a round-2 amendment edited after the next round was signed. A correctly signed chain, made with test keys under test/fixtures/redteam/, is SIGNABLE when the test public key is injected through evaluate's reviewerKeys.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c16:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c16:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC17",
+          "mandatory": true,
+          "statement": "A fixture whose spec on disk differs from the clean round's snapshot only by workdir '/tmp/elsewhere' is NOT SIGNABLE with never_weakens naming workdir, although canonicalHash({...spec, workdir:null}) still equals the round's spec_sha256. The same spec with workdir null is SIGNABLE. (A workdir the operator needs belongs on the runbook command line, not in the spec.)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c17:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c17:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC18",
+          "mandatory": true,
+          "statement": "Each is the only change between snapshot r1 and r2, with r2 clean and matching the disk, and each is NOT SIGNABLE with never_weakens naming the task (and the criterion, where there is one): scope glob broadened to '**'; scope glob added; verifier type test_red_green to command with the same cmd; metric value 0.9 to 0.5 under '>='; metric op '<' to '<='; metric key changed; task T2 deleted; the last criterion of T1 deleted; test_red_green cmd changed with no amendment; timeout_s 300 to 3000; grep flags 'i' added; phase implement to verify; a requirement reworded.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c18:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c18:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC19",
+          "mandatory": true,
+          "statement": "An added answer whose matching spec criterion carries mandatory:false, or any key other than statement, verifier, id and mandatory:true, is refused with added_verbatim. Any criterion that first appears in a snapshot with mandatory:false is refused with never_weakens. The same criterion without the extra key, or with mandatory:true, is SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c19:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c19:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC20",
+          "mandatory": true,
+          "statement": "red_green_required is evaluated on the tasks as makeTask/contractDraft would draft them, and counts only mandatory test_red_green criteria. The clean round records manifest_kind, which must equal the manifest row when the gate runs. Refused with red_green_required: (a) a task with no phase key and only grep criteria; (b) a task whose only test_red_green has mandatory:false; (c) a clean round recorded with manifest_kind feature while the manifest row now says docs. The same spec with one mandatory test_red_green per task is SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c20:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c20:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC21",
+          "mandatory": true,
+          "statement": "The clean round names the reviewed commit. In a temporary git repository with the spec's scope ['src/**', 'scripts/x.mjs'] and inputs.files ['src/a.mjs'], a second commit makes the pre-sign gate run refuse with head_stale_src when (1) src/b.mjs, unlisted but in scope, changed; (2) src/new.mjs was added; (3) scripts/x.mjs, in scope but outside src/, changed. A change only to docs/x.md, outside the scope, stays SIGNABLE and is reported. This applies to the plain (pre-sign) run only; for an already-signed contract, --report evaluates staleness at the signing commit.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c21:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c21:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC22",
+          "mandatory": true,
+          "statement": "In a temporary tree, --report exits non-zero and names the file when contracts/signed/k-xyz-abc123.json matches no spec by title or drafted tasks and its canonicalHash is not in the gate's GRANDFATHERED list. A copy of the real contracts/signed/k-memory-quality-multiling-4468b8.json in a temporary tree with both spec directories empty exits 0 (its hash is in GRANDFATHERED); the same copy with one character of its title changed exits non-zero as an orphan. --report also exits non-zero on a record that is not JSON, and on a record whose last round is clean but whose hash does not match.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c22:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c22:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC23",
+          "mandatory": true,
+          "statement": "In a temporary git repository: a clean round lists src/x.mjs; contracts/signed/k-xyz-abc123.json (tasks equal to makeTask of the spec) is added and committed; a later commit changes src/x.mjs. --report exits 0, because for a signed contract it evaluates head_stale_src at the commit that added contracts/signed/<id>.json (git log --diff-filter=A). The plain run on the spec is still NOT SIGNABLE with head_stale_src. If src/x.mjs changed before the signing commit, --report exits non-zero.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c23:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c23:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC24",
+          "mandatory": true,
+          "statement": "An added answer whose criterion names test_file test/new.test.mjs outside its task's scope is SIGNABLE when the next snapshot adds exactly that path (no glob) to the scope and that round's amendments list holds {task, scope_add: 'test/new.test.mjs', answer: '<round>.<n>'}. The same scope addition without that entry, or adding 'test/**' instead, is refused with never_weakens.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c24:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c24:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC25",
+          "mandatory": true,
+          "statement": "A spec or snapshot whose raw text has a duplicate key at any depth (a verifier with cmd twice) is NOT SIGNABLE with schema, although its parsed canonical hash equals the round's spec_sha256.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c25:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c25:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC26",
+          "mandatory": true,
+          "statement": "Independent of the test file. The gate exports evaluate({spec, cwd, reviewerKeys}), which returns {status, reasons} and is the same code the CLI runs. For every code in RULES there is a committed case tree test/fixtures/redteam/cases/<code>/, signed with the fixture test key test/fixtures/redteam/reviewer.pub (for head_stale_src, a build.sh makes the commits), plus a SIGNABLE tree cases/ok/. The case directories other than ok/ equal RULES. Each case is copied into a fresh git repository and committed, and the run asserts the working tree is clean. evaluate, given the fixture public key in-process, must then return status NOT SIGNABLE with reasons containing that code, and SIGNABLE for ok/.",
+          "verifier": {
+            "type": "command",
+            "cmd": "R=$PWD; G=$R/scripts/gate/redteam-gate.mjs; S=contracts/quality-loop/specs/QL-0.01.json; C=$R/test/fixtures/redteam/cases; K=$R/test/fixtures/redteam/reviewer.pub; codes=$(node --input-type=module -e \"const m=await import('file://$G'); console.log(m.RULES.join(' '))\") || exit 9; [ -n \"$codes\" ] || exit 9; [ \"$(ls $C | grep -v '^ok$' | sort | tr '\\n' ' ')\" = \"$(printf '%s\\n' $codes | sort | tr '\\n' ' ')\" ] || exit 6; ev(){ node --input-type=module -e \"import fs from 'node:fs'; const g=await import('file://$G'); const r=await g.evaluate({spec:'$S', cwd:process.cwd(), reviewerKeys:[fs.readFileSync('$K','utf8')]}); console.log(r.status+' '+(r.reasons||[]).join(' '));\"; }; for c in ok $codes; do T=$(mktemp -d) && cp -R $C/$c/. $T && cd $T && git init -q || exit 8; if [ -f build.sh ]; then sh build.sh || exit 8; else git add -A && git -c user.name=t -c user.email=t@t.invalid commit -qm c || exit 8; fi; [ -z \"$(git status --porcelain)\" ] || exit 7; out=$(ev) || exit 9; if [ $c = ok ]; then [ \"$out\" = 'SIGNABLE ' ] || exit 1; else case \"$out\" in 'NOT SIGNABLE '*) ;; *) exit 3;; esac; echo \"$out\" | grep -qw \"$c\" || exit 4; fi; cd $R; done; exit 0",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T1-AC27",
+          "mandatory": true,
+          "statement": "The gate reports every failing rule, not just the first, so the RULES criterion's one-field fixtures must be signed again after their mutation. Independent of the test file: on the committed base fixture in a fresh git repository, committed the two-step way through the fixture's build.sh, each of these changes is committed alone, and the plain gate must exit non-zero and name review_sig. claim: the last round's sig bytes replaced by a fresh key's signature over the same payload, keyid kept. own: the same, with keyid set to the fresh key's id. zero: the sig replaced by 64 zero bytes. content: the last round given one answer, sig left as it was. The unmodified base exits 0.",
+          "verifier": {
+            "type": "command",
+            "cmd": "R=$PWD; G=$R/scripts/gate/redteam-gate.mjs; S=contracts/quality-loop/specs/QL-0.01.json; F=contracts/quality-loop/redteam/QL-0.01.json; for m in claim own zero content; do T=$(mktemp -d) && cp -R $R/test/fixtures/redteam/base/. $T && cd $T && git init -q && sh build.sh || exit 8; node $G $S >/dev/null 2>&1 || exit 1; node --input-type=module -e \"import fs from 'node:fs'; import crypto from 'node:crypto'; import {pae,keyId,generateKeyPair} from 'file://$R/vendor/attest/signature.mjs'; const [f,m]=process.argv.slice(1); const o=JSON.parse(fs.readFileSync(f,'utf8')); const r=o.rounds[o.rounds.length-1]; const s=r.sig.signatures[0]; const kp=generateKeyPair(); if (m==='content') r.answers=[{n:1,disposition:'rejected',reason:'x'}]; else if (m==='zero') s.sig=Buffer.alloc(64).toString('base64'); else { s.sig=crypto.sign(null,pae(r.sig.payloadType,Buffer.from(r.sig.payload,'base64')),crypto.createPrivateKey(kp.privateKey)).toString('base64'); if (m==='own') s.keyid=keyId(kp.publicKey); } fs.writeFileSync(f,JSON.stringify(o));\" $F $m || exit 9; git -c user.name=t -c user.email=t@t.invalid commit -qam m || exit 8; node $G $S >$T.out 2>&1 && exit 2; grep -q review_sig $T.out || exit 3; cd $R; done; exit 0",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "id": "T1-AC28",
+          "mandatory": true,
+          "statement": "No private key committed or present in the worktree is trusted by the production gate. For every PEM private key in any file git lists, whether stored as a file or inside a JSON string, neither its keyid nor its public key appears in the gate's exported REVIEWER_KEYS. REVIEWER_KEYS is non-empty. Test keys reach the gate only through the reviewerKeys option of its exported evaluate function, never through an env var, a flag or the record.",
+          "verifier": {
+            "type": "command",
+            "cmd": "R=$PWD; node --input-type=module -e \"import fs from 'node:fs'; import crypto from 'node:crypto'; import {execFileSync} from 'node:child_process'; import {keyId} from 'file://$R/vendor/attest/signature.mjs'; const g=await import('file://$R/scripts/gate/redteam-gate.mjs'); const trusted=JSON.stringify(g.REVIEWER_KEYS||[]); if (trusted.length<4) process.exit(2); const N=String.fromCharCode(10), B=String.fromCharCode(92); let bad=0; for (const f of execFileSync('git',['ls-files','-co','--exclude-standard'],{cwd:'$R',encoding:'utf8'}).split(N).filter(Boolean)) { let t; try { t=fs.readFileSync('$R/'+f,'utf8').split(B+'n').join(N); } catch { continue; } for (const pem of t.match(/-----BEGIN [A-Z ]*PRIVATE KEY-----[^-]+-----END [A-Z ]*PRIVATE KEY-----/g) || []) { let pub; try { pub=crypto.createPublicKey(crypto.createPrivateKey(pem)).export({type:'spki',format:'pem'}); } catch { continue; } if (trusted.includes(keyId(pub)) || trusted.includes(pub.split(N)[1])) { console.log('trusted reviewer private key in '+f); bad=1; } } } process.exit(bad);\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "id": "T1-AC29",
+          "mandatory": true,
+          "statement": "In a temporary git repository, a clean round whose reviewed commit is absent from the repository, or present but not an ancestor of HEAD, is NOT SIGNABLE with head_stale_src even when every inputs.files blob matches HEAD. To keep the command criterion satisfiable, its fresh() first commits everything except the record with fixed GIT_AUTHOR_DATE and GIT_COMMITTER_DATE, giving a reproducible commit the base record names, and then commits the record.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c29:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c29:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC30",
+          "mandatory": true,
+          "statement": "--report exits non-zero for a non-grandfathered contracts/signed/<id>.json whose tasks equal the drafted tasks of a SIGNABLE spec when: (a) <id>.sig.json is missing or does not verify against contracts/keys/<keyid>.pub; (b) its provenance.spec_sha256 is missing or differs from the spec's last clean round spec_sha256; or (c) the commit that added it is not a descendant of the commit that added the clean round to the record. The same contract, signed by a test key placed under contracts/keys/, with matching provenance and added after the clean round, exits 0.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c30:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c30:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC31",
+          "mandatory": true,
+          "statement": "Each of the following is the only change between r1 and r2, with r2 clean and matching the disk, and is NOT SIGNABLE with never_weakens: expect_exit: 1 added to a command verifier that had none; must: 'absent' added to a grep verifier; cwd: '/tmp' added to a command verifier; a wiring verifier's symbol changed. A cmd amendment or a scope_add entry is refused when its answer names no answer of the previous round, or names an answer whose proposed criterion concerns a different criterion or reads no path under the added scope. The same entries citing the right answer are SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c31:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c31:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC32",
+          "mandatory": true,
+          "statement": "red_green_required counts a mandatory test_red_green only when its cmd runs its own test_file (the cmd contains the test_file path or the {test} placeholder). A task whose only test_red_green is {test_file:'test/a.test.mjs', cmd:'test -f src/a.mjs'}, or {test_file:'test/a.test.mjs', cmd:'node --test test/other.test.mjs'}, is refused with red_green_required. With cmd 'node --test test/a.test.mjs' it is SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c32:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c32:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC33",
+          "mandatory": true,
+          "statement": "In a temporary git repository, a record committed with rounds r1 (clean, spec v1) and r2 (one pending answer, spec v2), followed by a commit that removes r2 and restores spec v1, is NOT SIGNABLE with rounds_contiguous, because an earlier committed version of the record held more rounds than HEAD's. A snapshot <id>.r3.spec.json beside a two-round record is also refused.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c33:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c33:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC34",
+          "mandatory": true,
+          "statement": "The gate exports GRANDFATHERED, and it deep-equals a list holding exactly one entry: the canonicalHash of contracts/signed/k-memory-quality-multiling-4468b8.json.",
+          "verifier": {
+            "type": "command",
+            "cmd": "R=$PWD; node --input-type=module -e \"import fs from 'node:fs'; import {canonicalHash} from 'file://$R/vendor/attest/signature.mjs'; const g=await import('file://$R/scripts/gate/redteam-gate.mjs'); const h=canonicalHash(JSON.parse(fs.readFileSync('$R/contracts/signed/k-memory-quality-multiling-4468b8.json','utf8'))); process.exit(JSON.stringify(g.GRANDFATHERED)===JSON.stringify([h])?0:1);\"",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "T1-AC35",
+          "mandatory": true,
+          "statement": "T1-c35: A record with three rounds, none clean, ending with a stop decision signed by a contract-signing test key under contracts/keys/ over the spec on disk, whose open list names every answer that is not added, prints SIGNABLE AT STOP (n open items) with n that count, and --report lists each open item by round and number. Each of these is refused with stop_decision: the same decision after two rounds; signed by the reviewer key; with one answer that is not added left out of open; with a spec_sha256 other than the disk's; and the same record after a rejected answer's reason, or an amendment, is edited once the stop decision was signed.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c35:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c35:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC36",
+          "mandatory": true,
+          "statement": "T1-c36: A last round that holds a medium or low answer is refused with review_sig when its dispositions have no closing envelope, when the closing envelope is signed by a key that is not in REVIEWER_KEYS, or when a disposition is edited after the closing envelope was signed; the same round with a valid closing envelope is SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c36:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c36:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC37",
+          "mandatory": true,
+          "statement": "An added answer folded as another criterion is judged by its folded_as: with the proposal reworded and folded_as naming a criterion that is in the spec verbatim it is SIGNABLE; a folded_as naming a criterion the spec lacks, a folded_as with another verifier, or a folded_as given as a string is refused with added_verbatim, and a reworded proposal with no folded_as is refused with added_verbatim.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c37:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c37:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC38",
+          "mandatory": true,
+          "statement": "T1-c38: In a temporary git repository, a record is committed with r1 (clean, spec v1) and r2 (a spec round on v2 holding one pending answer, and in a second case one high answer). A later commit sets r2.kind to implementation without re-signing and restores spec v1. The result is NOT SIGNABLE with review_sig naming round 2. A round after the last spec round that is unsigned, or signed by a key outside reviewerKeys, is NOT SIGNABLE with review_sig. A correctly signed trailing implementation round holding a high answer leaves the spec SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c38:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c38:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC39",
+          "mandatory": true,
+          "statement": "T1-c39: In a temporary git repository, these are committed in turn: r1 clean on spec S; r2, a spec round on S with verdict findings and one high answer; contracts/signed/k-xyz-abc123.json drafted from S with provenance.spec_sha256 of S, signed by a key under contracts/keys/; r3 clean on S, whose base_commit is the reviewed commit. --report exits non-zero and says the contract was committed before the record's clean round. The same contract committed after r3 exits 0.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c39:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c39:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC40",
+          "mandatory": true,
+          "statement": "T1-c40: In a temporary git repository: spec S1 has a clean signed record; contract v1, drafted from S1 with provenance S1, is signed under contracts/keys/ and committed; S1 is amended to S2 through a new clean round; contract v2 (version 2, supersedes v1, tasks drafted from S2, provenance S2) is signed and committed after that round. --report exits 0 and reports v1 as superseded. The same tree without v2 exits non-zero because v1's tasks differ from the spec's drafted tasks.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c40:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c40:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC41",
+          "mandatory": true,
+          "statement": "An added answer whose folded_as names a criterion already verbatim in its round's own snapshot is refused with added_verbatim; the same answer folded as a criterion that is new in the spec since that snapshot is SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c41:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c41:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC42",
+          "mandatory": true,
+          "statement": "An added answer of a task that moved at a split, folded as {spec, task, statement, verifier}, is SIGNABLE when the round's amendments record the move to that spec and task, the manifest resolves the spec id to a file under contracts/ and the criterion is verbatim there, including after a From/To replacement in that spec; it is refused with added_verbatim when the move is not recorded, when the id does not resolve through the manifest, when the record gives a path instead of an id, and when the criterion is absent.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c42:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c42:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC43",
+          "mandatory": true,
+          "statement": "A record ending with a stop decision signed by a key whose .pub is under contracts/keys/ in the working tree but not committed is refused with stop_decision; with that .pub committed, the same record prints SIGNABLE AT STOP.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c43:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c43:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC44",
+          "mandatory": true,
+          "statement": "A record of three rounds, none clean, ending with a stop decision over a spec on disk that rewrites one criterion statement of the round 3 snapshot, is SIGNABLE AT STOP when the stop decision's amendments list records {task, field, from, to, answer} for it citing an added answer of round 3; it is refused with never_weakens when the entry is missing or cites an answer that is not added, and with stop_decision when the entry is edited after the stop was signed.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c44:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c44:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC45",
+          "mandatory": true,
+          "statement": "Between snapshots, a reworded requirement, a rewritten criterion statement and a changed timeout_s, expect_exit or test_file are each SIGNABLE with an amendments entry {task, field, from, to, answer} citing an answer or note point of the previous round, an answer of an implementation round recorded after it, or a reviewer note whose signature verifies under REVIEWER_KEYS; each is refused with never_weakens without the entry, with a from that is not the earlier text, with a citation of none of these, and with a reviewer note signed by a key outside REVIEWER_KEYS; a glob added to a scope is SIGNABLE when the entry cites an added answer of the previous round whose criterion reads a path under it and is refused with never_weakens otherwise.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c45:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c45:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC46",
+          "mandatory": true,
+          "statement": "Between snapshots, a removed criterion, a removed requirement and a removed stop rule are each SIGNABLE with an amendments entry {task, field, from, to: null, answer} whose citation quotes the removed text verbatim and, when it is an answer, a note point or '<spec>:<round>.<n>', names it contradictory or impossible (a reviewer note that quotes it and names where it is carried needs no such word, as T1-c53 states), and a removed criterion, requirement, stop rule or whole task is SIGNABLE with a move entry when it is verbatim in the receiving spec, following that spec's recorded replacements; each is refused with never_weakens without the entry, with a citation that does not quote it, with an answer or note point that does not name it contradictory or impossible, and with a move entry whose receiving spec lacks it.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c46:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c46:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC47",
+          "mandatory": true,
+          "statement": "An amendments entry citing answer '<spec>:<round>.<n>' is accepted when the manifest resolves the spec id to a record under contracts/ that holds that round and answer, and is refused with never_weakens when the id does not resolve through the manifest, when the citation gives a path instead of an id, and when that record has no such round or answer.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c47:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c47:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC48",
+          "mandatory": true,
+          "statement": "T1-c48: The gate exports STOP_KEYS, the stop-decision public keys it accepts (held in code like REVIEWER_KEYS, none of them a key the engine's signingKey generates); evaluate takes stopKeys for tests. A three-round unclean record whose stop is signed by a freshly generated key whose .pub is committed under contracts/keys/ (in the same commit as the stop, and separately in an earlier commit), or by the key a test Vault's contractSign used, is refused with stop_decision; the same stop signed by a key passed through stopKeys and committed under contracts/keys/ prints SIGNABLE AT STOP.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c48:' test/redteam-gate.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T1-c48:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c48:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC49",
+          "mandatory": true,
+          "statement": "T1-c49: In a temporary git repository a record whose clean last round r2 holds one high answer is committed; a later commit sets that answer's severity to medium and re-signs every round and the closing envelope with the same test reviewer key (second case: sets r2.kind to implementation, restores spec v1 and re-signs). Each is NOT SIGNABLE with review_sig naming round 2. The same edited record committed with no earlier version is SIGNABLE, so the refusal comes from history.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c49:' test/redteam-gate.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T1-c49:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c49:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC50",
+          "mandatory": true,
+          "statement": "T1-c50: A three-round unclean record whose stop is the body of a contract signed through v.contractSign of a test Vault (a memev_write draft carrying one valid task plus spec_id, spec_sha256, decider, date, decision, open and dispositions; that key's .pub committed under contracts/keys/) with the contract's .sig.json as sig is refused with stop_decision; the gate accepts a stop only when the signed object has exactly spec_id, spec_sha256, decider, date, decision, open, dispositions (and amendments when present) and its envelope's payloadType is the stop's own, not application/vnd.memev.contract-sha256.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c50:' test/redteam-gate.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T1-c50:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c50:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC51",
+          "mandatory": true,
+          "statement": "T1-c51: With an added round-1 answer whose criterion's test_file is test/new.test.mjs and a round-2 amendment {task:'T1', scope_add:<glob>, answer:'1.1'}, the globs '**', 'src/**' and 'test/**' (the reviewed tree also holding test/other.test.mjs) are refused with never_weakens, and so is '**' through a stop decision's amendments; 'test/new.test.mjs', or a glob whose newly admitted files at the reviewed commit are all read by cited added answers, is SIGNABLE. The glob 'test/**' recorded as {task:'T1', field:'scope', to:'test/**', reviewer_note:1}, with reviewer note 1 signed by a REVIEWER_KEYS key and its text quoting 'test/**', is SIGNABLE; the same entry is refused with never_weakens when the signed note's text does not contain 'test/**', when it cites a note point of round 1 instead, or when the note is signed by a key outside REVIEWER_KEYS.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c51:' test/redteam-gate.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T1-c51:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c51:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC52",
+          "mandatory": true,
+          "statement": "T1-c52: Between r1 and r2, 'the tests of a pass' with timeout_s 300 to 3000, and separately with its statement rewritten, each with {task:'T1', field, from, to, answer:'1.2'} where 1.2 is an added answer whose criterion is 'src/a.mjs exports a', is refused with never_weakens; citing an answer whose criterion has the same task and the statement before the change is SIGNABLE, whatever value it proposes. The same changes carried by a stop decision's amendments, citing an added round-3 answer about another criterion, are refused with never_weakens.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c52:' test/redteam-gate.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T1-c52:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c52:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC53",
+          "mandatory": true,
+          "statement": "T1-c53: Removing T2's criterion 'the lint passes' between r1 and r2 with {task:'T2', field:'criterion', from:<it>, to:null, note:'1.2'} is refused with never_weakens when note point 2 reads 'The grep of T1 is weak but not contradictory.' or 'b answers fast is impossible to measure', and is SIGNABLE when it reads \"'the lint passes' contradicts T2's scope\" (the removed statement quoted verbatim and named contradictory or impossible, not negated). The same removal citing {reviewer_note:1} is SIGNABLE when note 1 is signed by a REVIEWER_KEYS key and its text quotes 'the lint passes' verbatim and names the added answer that carries it, without calling it contradictory or impossible; it is refused with never_weakens when the signed note does not quote it, or when the note is signed by a key outside REVIEWER_KEYS.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c53:' test/redteam-gate.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T1-c53:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c53:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC54",
+          "mandatory": true,
+          "statement": "T1-c54: A task whose only mandatory test_red_green is {test_file:'test/a.test.mjs'} with cmd 'test -f test/a.test.mjs', 'cat test/a.test.mjs', 'grep -q T1 test/a.test.mjs' or 'true test/a.test.mjs' is refused with red_green_required; with 'node --test test/a.test.mjs' or 'node --test {test}' it is SIGNABLE.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c54:' test/redteam-gate.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T1-c54:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c54:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC55",
+          "mandatory": true,
+          "statement": "T1-c55: An amendments entry citing answer 'QL-0.02:2.1' is refused with never_weakens when QL-0.02's record has round 2 unsigned, signed by a key outside reviewerKeys, or with answer 1 edited after signing; it is SIGNABLE when that round's signature verifies and the chain to it is intact.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c55:' test/redteam-gate.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T1-c55:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T1-c55:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC56",
+          "mandatory": true,
+          "statement": "No 32-byte Ed25519 seed in any file git lists (as 64 hex digits, as 43 base64 or base64url characters such as a JWK d, or inside bare base64 PKCS#8 'MC4CAQAwBQYDK2VwBCIEI...') yields a public key whose keyid is in REVIEWER_KEYS.",
+          "verifier": {
+            "type": "command",
+            "cmd": "R=$PWD; node --input-type=module -e \"import fs from 'node:fs'; import crypto from 'node:crypto'; import {execFileSync} from 'node:child_process'; import {keyId} from 'file://$R/vendor/attest/signature.mjs'; const g=await import('file://$R/src/engine/redteam-gate.mjs'); const ids=new Set(g.REVIEWER_KEYS.map(keyId)); if (!ids.size) process.exit(2); const P=Buffer.from('302e020100300506032b657004220420','hex'); const id=(b)=>{ try { return keyId(crypto.createPublicKey(crypto.createPrivateKey({key:Buffer.concat([P,b]),format:'der',type:'pkcs8'})).export({type:'spki',format:'pem'})); } catch { return null; } }; const B64=new RegExp('[A-Za-z0-9+_/-]{43}','g'); const DER=new RegExp('MC4CAQAwBQYDK2VwBCIEI[A-Za-z0-9+/=]{40,48}','g'); let bad=0; for (const f of execFileSync('git',['ls-files','-co','--exclude-standard'],{cwd:'$R',encoding:'utf8'}).split(String.fromCharCode(10)).filter(Boolean)) { let t; try { t=fs.readFileSync('$R/'+f,'latin1'); } catch { continue; } const c=[]; for (const h of t.match(/[0-9a-fA-F]{64}/g)||[]) c.push(Buffer.from(h,'hex')); for (const s of t.match(B64)||[]) { const b=Buffer.from(s.split('-').join('+').split('_').join('/'),'base64'); if (b.length===32) c.push(b); } for (const s of t.match(DER)||[]) c.push(Buffer.from(s,'base64').subarray(16,48)); for (const b of c) if (ids.has(id(b))) { console.log('reviewer private key material in '+f); bad=1; } } process.exit(bad);\"",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T1-AC57",
+          "mandatory": true,
+          "statement": "One full run of test/redteam-gate.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03, T1-c05, T1-c06, T1-c07, T1-c08, T1-c09, T1-c10, T1-c11, T1-c12, T1-c13, T1-c14, T1-c16, T1-c17, T1-c18, T1-c19, T1-c20, T1-c21, T1-c22, T1-c23, T1-c24, T1-c25, T1-c29, T1-c30, T1-c31, T1-c32, T1-c33, T1-c35, T1-c36, T1-c37, T1-c38, T1-c39, T1-c40, T1-c41, T1-c42, T1-c43, T1-c44, T1-c45, T1-c46, T1-c47, T1-c48, T1-c49, T1-c50, T1-c51, T1-c52, T1-c53, T1-c54, T1-c55) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/redteam-gate.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c02:|^T1-c03:|^T1-c05:|^T1-c06:|^T1-c07:|^T1-c08:|^T1-c09:|^T1-c10:|^T1-c11:|^T1-c12:|^T1-c13:|^T1-c14:|^T1-c16:|^T1-c17:|^T1-c18:|^T1-c19:|^T1-c20:|^T1-c21:|^T1-c22:|^T1-c23:|^T1-c24:|^T1-c25:|^T1-c29:|^T1-c30:|^T1-c31:|^T1-c32:|^T1-c33:|^T1-c35:|^T1-c36:|^T1-c37:|^T1-c38:|^T1-c39:|^T1-c40:|^T1-c41:|^T1-c42:|^T1-c43:|^T1-c44:|^T1-c45:|^T1-c46:|^T1-c47:|^T1-c48:|^T1-c49:|^T1-c50:|^T1-c51:|^T1-c52:|^T1-c53:|^T1-c54:|^T1-c55:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC58",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Wired into the suite and documented",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "test/redteam-gate.test.mjs also runs the gate in --report mode over the repository's own spec directories, so npm test and CI fail on a malformed record or a signed contract without a SIGNABLE record, while NO RECORD is reported and not failed",
+        "docs/CONTRACTS.md gains a section that states the rule, the record path, the hash definition and the one-line runbook: gate, then memev contract new, then memev contract sign, in one command",
+        "memev contract new refuses a spec the gate reports NOT SIGNABLE or NO RECORD, naming the reasons, and memev contract sign and the MCP sign tool refuse a draft whose source spec hash has no clean signed record, wherever the repository holds red-team records or contracts.redteam_required is on; whether the gate script exists in the repository plays no part",
+        "memev_contract_draft, memev_contract_sign, memev_contract_from_request and memev_contract_amend call evaluate() before they write anything, for local callers and tunnel callers alike, wherever the repository holds red-team records or the vault setting contracts.redteam_required is on",
+        "memev contract verify returns BLOCKED, naming the implementation round, for a contract whose spec's record ends with a stop decision, until the record also holds a round of kind implementation that is clean in the sense of task T1 (no high answer, every answer dispositioned) and whose reviewed commit has the same in-scope files as the commit being verified (the head_stale_src rule)",
+        "--report over this repository itself exits 0: every contract signed before the gate is superseded by a version backed by its record, or is listed in GRANDFATHERED; a contract added without a SIGNABLE record makes it exit non-zero",
+        "the engine's draft and sign paths import evaluate from src/engine/redteam-gate.mjs and never depend on the repository's own gate script or on the working tree's records: a repository whose history ever held a contracts/*/redteam/ file holds records",
+        "verify stays BLOCKED while an in-scope file differs from the implementation round's reviewed commit, whether the difference is committed, an uncommitted edit or an untracked new file the task's scope matches",
+        "the engine takes test reviewer keys only from the Vault constructor's reviewerKeys option, never from an environment variable or the vault config, so a production daemon never accepts a test key",
+        "each red-green criterion of this task that runs test/redteam-gate.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c01: for the first), and the criterion runs only that subtest",
+        "each red-green criterion of this task that runs test/contracts.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c05: for the first), and the criterion runs only that subtest"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "test/redteam-gate.test.mjs",
+          "docs/CONTRACTS.md",
+          "src/cli/contracts-cli.mjs",
+          "src/engine/contracts.mjs",
+          "src/server/mcp.mjs",
+          "docs/MODULES.md",
+          "changelog.d/QL-1.01.md",
+          ".github/workflows/ci.yml",
+          "src/engine/redteam-gate.mjs",
+          "test/contracts.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T2-AC01",
+          "mandatory": true,
+          "statement": "A signed contract whose spec has no SIGNABLE record fails the suite's report run; a spec with no record does not",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c01:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC02",
+          "mandatory": true,
+          "statement": "The contracts page states the rule",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CONTRACTS.md",
+            "pattern": "No contract is signed without a clean red-team record"
+          }
+        },
+        {
+          "id": "T2-AC03",
+          "mandatory": true,
+          "statement": "In a temporary repository tree, --report exits non-zero when contracts/signed/k-xyz-abc123.json (a real engine-shaped id) is linked to a spec by title, or by the tasks makeTask would draft from it, and that spec has no SIGNABLE record. It also exits non-zero when the signed contract's tasks differ from the spec's drafted tasks (one criterion cmd changed), and exits 0 when the record is SIGNABLE and the tasks match. The run over the real repository asserts the number of specs it examined, printed by the gate, equals the number of files in the two default directories. When those directories are missing it prints that fact instead of a bare exit 0.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c03:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC04",
+          "mandatory": true,
+          "statement": "The test pulls the single runbook line out of the fenced block in docs/CONTRACTS.md's red-team section and runs it with sh. PATH holds a stub memev that logs its arguments and prints a draft JSON with an id. On a NOT SIGNABLE fixture spec the stub is never called. On a SIGNABLE fixture it is called with 'contract new <spec>' and then 'contract sign <the id the stub printed>', with no hand-typed id. The same section must contain contracts/<area>/redteam/<id>.json and the hash definition (sorted keys, no whitespace, workdir null).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c04:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC05",
+          "mandatory": true,
+          "statement": "Scope widened to src/cli/contracts-cli.mjs and test/contracts.test.mjs (an existing file, so the red half is real). For a spec inside a contracts/<area>/specs/ tree, `memev contract new <spec>` runs the gate first. When the gate says NOT SIGNABLE or NO RECORD, the command exits non-zero and no file appears under the vault's contracts/drafts/. When it says SIGNABLE, the draft is created and records provenance.spec_sha256. `memev contract sign <id>` refuses a draft carrying provenance.spec_sha256 whose tasks differ from makeTask applied to that spec.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c05:' test/contracts.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC06",
+          "mandatory": true,
+          "statement": "Set the vault, locally and not through the tunnel, to require red-team records for a repository root that holds scripts/gate/redteam-gate.mjs and a NOT SIGNABLE spec contracts/qa/specs/QA-1.json. None of the following then produces contracts/signed/<id>.json, and each fails with a refusal that names the gate: (a) handle() tools/call memev_contract_draft with the spec's title and tasks and no provenance, then memev_contract_sign with ctx.local true and again with ctx.local false; (b) v.contractFromRequest with the same tasks, then v.contractSign; (c) v.contractAmend of a signed contract with one criterion cmd changed, then sign; (d) `memev contract new` on a copy of the spec at a path outside the repository with cwd outside it, then `memev contract sign`. The SIGNABLE spec, drafted by `memev contract new` from its own tree, still signs.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c06:' test/contracts.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC07",
+          "mandatory": true,
+          "statement": "Sign re-checks the record. (a) A draft whose provenance.spec_sha256 is the hash of a NOT SIGNABLE spec, with tasks equal to makeTask of that spec, is refused by v.contractSign and by memev_contract_sign through handle(). (b) A draft created by `memev contract new` while SIGNABLE, followed by a commit that changes an in-scope src file, is refused at sign naming head_stale_src. (c) The same draft, rewritten through memev_write before sign (workdir changed, or provenance removed), is refused. (d) The draft's provenance.spec_sha256 is computed from the same bytes the gate judged. In every case no contracts/signed/<id>.json appears.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c07:' test/contracts.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC08",
+          "mandatory": true,
+          "statement": "Scope gains .github/workflows/ci.yml. The pull_request paths filter includes contracts/**, so a PR touching only contracts/ runs npm test and therefore the gate's --report run.",
+          "verifier": {
+            "type": "command",
+            "cmd": "awk '/^  pull_request:/{p=1;next} /^  push:/{p=0} p' .github/workflows/ci.yml | grep -q \"contracts/\\*\\*\"",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "T2-AC09",
+          "mandatory": true,
+          "statement": "T2-c09: In a temporary git repository with a spec whose record ends with a stop decision: memev contract verify of its signed contract returns BLOCKED naming the implementation round while the record has none; after a clean implementation round whose reviewed commit is HEAD is added and committed, verify returns PASS (every other criterion of the fixture contract passes); an implementation round that holds a high answer, or one that is unsigned, leaves verify BLOCKED instead; after one more commit that changes a file in the task's scope, verify is BLOCKED again because the implementation round reviewed earlier in-scope files.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c09:' test/redteam-gate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c09:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC10",
+          "mandatory": true,
+          "statement": "Over the repository itself `node scripts/gate/redteam-gate.mjs --report` exits 0 (every contract signed before the gate is listed in GRANDFATHERED, which replaces T1-c34's one-entry pin, or is superseded by a record-backed version); in a fresh git repository holding a copy of contracts/ plus contracts/signed/k-xyz-abc123.json (the QL-1.02 contract with a new id and title) it exits non-zero.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/gate/redteam-gate.mjs --report >/dev/null 2>&1 || exit 1; R=$PWD; T=$(mktemp -d) && cp -R contracts \"$T/\" && cd \"$T\" && git init -q && git add -A && git -c user.name=t -c user.email=t@t.invalid commit -qm base || exit 8; node -e 'const fs=require(\"fs\");const c=JSON.parse(fs.readFileSync(\"contracts/signed/k-ql-1-02-mutation-gate-th-956ebe.json\",\"utf8\"));c.id=\"k-xyz-abc123\";c.title+=\" (copy)\";fs.writeFileSync(\"contracts/signed/k-xyz-abc123.json\",JSON.stringify(c))' && git add -A && git -c user.name=t -c user.email=t@t.invalid commit -qm add || exit 8; node \"$R/scripts/gate/redteam-gate.mjs\" --report >/dev/null 2>&1 && exit 2; exit 0",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T2-AC11",
+          "mandatory": true,
+          "statement": "T2-c11: With contracts.redteam_required left off and a fixture repository whose committed record makes contracts/qa/specs/QA-1.json NOT SIGNABLE, each variant (scripts/gate/redteam-gate.mjs absent; replaced by a script that prints '<spec>: SIGNABLE' and exits 0; contracts/qa/redteam/ removed from the working tree only; removed in a later commit) makes `memev contract new contracts/qa/specs/QA-1.json` exit non-zero with no draft, and makes memev_contract_sign through handle() with ctx.local true and false, and v.contractSign, refuse a memev_write-written draft carrying the spec's title and drafted tasks, naming the gate reason; no contracts/signed/<id>.json appears. The engine imports evaluate from src/engine/redteam-gate.mjs and treats a repository whose history ever held a contracts/*/redteam/ file as holding records.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c11:' test/contracts.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T2-c11:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c11:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC12",
+          "mandatory": true,
+          "statement": "T2-c12: In the T2-c09 repository, after a clean signed implementation round whose reviewed commit is HEAD makes memev contract verify PASS, an uncommitted edit to an in-scope src file, and separately an untracked new file matching the task's scope, makes verify return BLOCKED naming the implementation round and head_stale_src and writes no contracts/closed/<id>.json; reverting the edit and removing the file restores PASS.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/redteam-gate.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c12:' test/redteam-gate.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T2-c12:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC13",
+          "mandatory": true,
+          "statement": "T2-c13: A record that is SIGNABLE only under a freshly generated test reviewer key is refused with review_sig by `memev contract new` (daemon started with that public key in every environment variable whose name contains REVIEWER or REDTEAM, and in the vault config under contracts.reviewer_keys and every other contracts.* key the code reads) and by v.contractSign of a Vault opened the same way; it signs only when the key is passed as the Vault constructor's reviewerKeys option.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c13:' test/contracts.test.mjs 2>&1); rc=$?; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -E '^[[:space:]]*ok [0-9]+ - T2-c13:' | grep -vqE '# (SKIP|TODO)' && printf '%s\\n' \"$out\" | awk -v pat='^T2-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC14",
+          "mandatory": true,
+          "statement": "One full run of test/redteam-gate.test.mjs passes every labelled subtest (T2-c01, T2-c03, T2-c04, T2-c09, T2-c12) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/redteam-gate.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c01:|^T2-c03:|^T2-c04:|^T2-c09:|^T2-c12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T2-AC15",
+          "mandatory": true,
+          "statement": "One full run of test/contracts.test.mjs passes every labelled subtest (T2-c05, T2-c06, T2-c07, T2-c11, T2-c13) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/contracts.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c05:|^T2-c06:|^T2-c07:|^T2-c11:|^T2-c13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T2-AC16",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-ql-1-01-red-team-gate-no-af266a",
+  "title": "QL-1.01 Red-team gate: no contract is signed without a clean record that matches its spec",
+  "workdir": null,
+  "created": "2026-10-31T21:43:49.008Z",
+  "version": 3,
+  "supersedes": "k-ql-1-01-red-team-gate-no-f0e136",
+  "request": "Closes quality-loop principle 1 (red-team each contract before signing) and the signing-time part of principle 2 (red-green primary, document-only checks never count toward done). A zero-dependency node script reads a contract spec and its red-team record and reports SIGNABLE, NOT SIGNABLE with reasons, or NO RECORD; a test proves every refusal rule; the seed-gate and the sign runbook call it. Repository: memev. Depends on contracts: SR-0.03.",
+  "provenance": {
+    "spec_sha256": "4eaddb2184bca84bed39eb6d59397028c477ec06f01e4e8433107a6c9b1e8d26",
+    "record": "contracts/quality-loop/redteam/QL-1.01.json",
+    "review": "interim solo review by the author, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}

@@ -1,0 +1,62 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "QL-1.04",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "d18efee006e79d135aa11f1e7cab6127e798b97069adf5404bdae7230d014399",
+      "base_commit": "4282ba7d1f0e0db2c4f0335bfd949bfcbbbe7f1b",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "test/helpers/cli.mjs",
+            "sha256": "4f9f3a86b82e0e8651060aab9c76248dedf509aee4b9d05e47a230f7502de753"
+          },
+          {
+            "path": "test/helpers/load-log.mjs",
+            "sha256": "a612825386485641a067859f0644bd0aaab2f9737aa7281ea7969bf02b152de4"
+          },
+          {
+            "path": "test/helpers/mutate-repo.mjs",
+            "sha256": "45cca1aa05b6ae76a5cc173f7f6a7dac171c5963c914caa265497add3b23f789"
+          },
+          {
+            "path": "test/helpers/proc.mjs",
+            "sha256": "057fc4219f8770a2b51f1aba396734b7013356028df9fec16c16f8f660301a63"
+          },
+          {
+            "path": "test/helpers/string-literals.mjs",
+            "sha256": "13b52fd0f09d65c245342c144bbabb21bc21d04c1e1f8223a7e9049e72a325c4"
+          },
+          {
+            "path": "test/helpers/tier-fixtures.mjs",
+            "sha256": "3af940f5e0db38105859067532ca8d040d02cac8dbc16a6d714a5b60ee1e3d95"
+          },
+          {
+            "path": "test/helpers/tmp.mjs",
+            "sha256": "6510edf94b4c411ab3caaa66976aee56c81df5e4cabc43620d157b10fef08ac5"
+          },
+          {
+            "path": "test/helpers/trial-constants.mjs",
+            "sha256": "05268a1009ea8f2a9aa257d9aff14a4737ffb8b645d30201bd0bf37953da16cf"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Re-sign review of the spec as it stands on main at 4282ba7d1f0e, for a contract signed before the red-team gate. It has 1 task(s) and 28 criteria. Mechanical checks run on every criterion, and these are the only checks made: each task drafts through makeTask; each command, metric and red-green cmd parses with sh -n; each red-green cmd names its test_file and that file is in the task's scope; no criterion statement is repeated within a task except as answer 1 records; every contract this spec depends on, in its manifest row, is a manifest row. They found nothing. I did not re-run the three rounds that were made off this repository before the first signing, and I did not run the checks the criteria name, because their code is not built yet. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MjMyNzY3MWFiNTAzNGU4ZmIxMTkzYjIyNTk2MGMyNzE2M2RjNWM2ODhkMDc4ZGUxZTJjMDg0NTc3OThiNzVkZg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "e34nnzMh5L6p0RafWeShUODs0eU2pKBvkcwlcSp0TZuOBSUfpZitOu2OQFx99SJeZ2jtW8sZ2DxKmmuJ45a8AA=="
+          }
+        ]
+      }
+    }
+  ]
+}
