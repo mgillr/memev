@@ -53,7 +53,7 @@ Who writes which task, so that two authors do not write the same one. Claims are
 | `SO-1.01` to `SO-1.11` contracts | Claim A | memev #324 | merged, signed |
 | Contract signing and re-signing (all repositories) | Claim A | `scripts/gate/redteam-gate.mjs` in memev; #319 to #323 merged | in progress |
 | Red-team records | Claim A | `contracts/**/redteam/` | in progress |
-| `WP01-01` to `WP01-05` (crdt-merge correctness) | Claim B | crdt-merge, branch `fix/crdt-correctness-four-bugs` #180 | in progress |
+| `WP01-01` to `WP01-05` (crdt-merge correctness) | Claim B | crdt-merge, branch `fix/crdt-correctness-four-bugs` #180 | merged to crdt-merge main through #181 as `252c93e6` (includes #179 and #180) |
 | `WP07-01` to `WP07-04`, `WP15-01` (memev wiring, single-authority guard and licence guard; implements `SO-1.01`) | Claim B | memev, branch `feat/wire-project-engine` #326 | in progress |
 | `WP17-05`, `WP16-03` and `WP15-02` for memev (this reconciliation, tiers, README, decisions) | Claim B | memev, branch `docs/engine-decision-tiers-reconcile` #325 | open |
 | `WP16-02` (converge README) | Claim B | converge, branch `docs/fair-mem0-comparison` #1 | open |

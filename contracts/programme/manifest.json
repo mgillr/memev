@@ -317,7 +317,7 @@
       "title": "crdt-merge: four correctness bugs fixed (ORSet resurrection, LWWMap get/value, TrustAgentState delete, tag collisions)",
       "repo": "crdt-merge",
       "branch": "fix/crdt-correctness-four-bugs",
-      "pull_request": "crdt-merge #180",
+      "pull_request": "crdt-merge #180 (merged to crdt-merge main through #181 as 252c93e6)",
       "programme_tasks": "WP01-01, WP01-02, WP01-04, WP01-05",
       "depends_on": [],
       "vault_contracts": [],
@@ -1175,7 +1175,7 @@
     },
     {
       "task": "WP01-06",
-      "title": "Land crdt-merge PR #179 (strict Ed25519 verification, no HMAC fallback keyed by the public key) after review",
+      "title": "Review crdt-merge PR #179 (strict Ed25519 verification, no HMAC fallback keyed by the public key); merged to crdt-merge main through #181 as 252c93e6",
       "contract": "PG-01.1",
       "note": "specified in this set"
     },

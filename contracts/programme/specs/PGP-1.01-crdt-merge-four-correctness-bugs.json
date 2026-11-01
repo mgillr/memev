@@ -2,7 +2,7 @@
   "title": "PGP-1.01 crdt-merge: four correctness bugs fixed (ORSet resurrection, LWWMap get/value, TrustAgentState delete, tag collisions)",
   "project": "memev",
   "workdir": null,
-  "request": "Per-pull-request contract for crdt-merge, branch fix/crdt-correctness-four-bugs (pull request #180, head 83cc699, checks green). crdt-merge is an external engine under its own licence; Memev reaches it only across the provider boundary and none of its code is part of Memev. Proposed and unsigned; the signer signs after the red-team gate. Repository: crdt-merge (paths below are relative to that repository). Covers programme tasks WP01-01, WP01-02, WP01-04 and WP01-05; WP01-03, WP01-06 and WP01-07 stay in PG-01.1. The fixes are additive on the wire and change no licence term, LICENSE or PATENTS file. Depends on contracts: none. ",
+  "request": "Per-pull-request contract for crdt-merge, branch fix/crdt-correctness-four-bugs (pull request #180, merged to crdt-merge main through pull request #181 as 252c93e6). crdt-merge is an external engine under its own licence; Memev reaches it only across the provider boundary and none of its code is part of Memev. Proposed and unsigned; the signer signs after the red-team gate. Repository: crdt-merge (paths below are relative to that repository). Covers programme tasks WP01-01, WP01-02, WP01-04 and WP01-05; WP01-03, WP01-06 and WP01-07 stay in PG-01.1. The fixes are additive on the wire and change no licence term, LICENSE or PATENTS file. Depends on contracts: none. ",
   "tasks": [
     {
       "id": "T1",
@@ -82,7 +82,7 @@
         "MV-CRDT-04: TrustAgentState delete is a replicated tombstone and its merge is observed-remove/causal; it is not called production-grade until then. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:27; baseline 8.5)",
         "Every put carries a unique tag; delete tombstones the tags it observed; merge_context unions tombstones; exact timestamp ties break on (peer_id, tag) so merge_context is commutative (source: crdt-merge CHANGELOG.md entry of this branch; tests/test_trust_agent_state_delete.py:34 and :44; programme task WP01-04)"
       ],
-      "description": "Regression file: tests/test_trust_agent_state_delete.py. Fixed in crdt_merge/e4/integration/agent_bridge.py; the API tables in docs/e4/E4-API-REFERENCE.md and docs/e4_integration.md state the new delete. This touches the E4 trust layer: 4 tests in crdt-merge security/tests/test_byzantine_fault_injection.py already fail on main and need triage before an E4 contract is signed; this contract does not depend on or include any unpushed crdt-merge commit.",
+      "description": "Regression file: tests/test_trust_agent_state_delete.py. Fixed in crdt_merge/e4/integration/agent_bridge.py; the API tables in docs/e4/E4-API-REFERENCE.md and docs/e4_integration.md state the new delete. This touches the E4 trust layer: The E4 trust triage is resolved: crdt-merge main 252c93e6 (pull request #181, which includes pull requests #179 and #180) fixed the fixtures of the 4 tests in security/tests/test_byzantine_fault_injection.py, verification stays fail-closed and security/ now runs in CI (source: crdt-merge pull request #181, merged to main as 252c93e6). This contract does not depend on or include any unpushed crdt-merge commit.",
       "scope": [
         "crdt_merge/e4/integration/agent_bridge.py",
         "tests/test_trust_agent_state_delete.py",
