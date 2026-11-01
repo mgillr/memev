@@ -105,6 +105,39 @@ A change of requirements is `memev_contract_amend`: a new draft with `version` N
 pointing at the old one. Once it is signed the old contract shows as superseded; it is never edited
 or deleted.
 
+## No contract is signed without a clean red-team record
+
+No contract is signed without a clean red-team record that matches its spec. The record of
+`contracts/<area>/specs/<id>-*.json` is `contracts/<area>/redteam/<id>.json`, and it must end clean (or with a signed stop
+decision) on the spec as it is now. The spec's hash is the sha256 of the spec as canonical JSON (sorted keys, no whitespace)
+with `workdir` null; a round and a signed contract's `provenance.spec_sha256` carry it.
+
+The runbook is one command: the gate, then `memev contract new`, then `memev contract sign` with the id the draft printed, so
+no id is typed by hand and nothing is drafted for a spec the gate refuses:
+
+```sh
+spec=contracts/<area>/specs/<id>-<name>.json; node scripts/gate/redteam-gate.mjs "$spec" && id=$(memev contract new "$spec" --workdir "$PWD" | sed -n 's/.*"id": *"\([^"]*\)".*/\1/p' | head -n 1) && memev contract sign "$id"
+```
+
+The engine enforces the same rule on its own, whether or not the gate script is in the repository. It applies wherever the
+repository holds red-team records (one in the working tree, or one its history ever held) and wherever the vault setting
+`contracts.redteam_required` is on; `contracts.redteam_root` names the repository to read them from, else it is the one holding
+the spec or the workdir.
+
+- `memev_contract_draft`, `memev_contract_from_request`, `memev_contract_amend` and `memev contract new` run the gate before they
+  write anything, for local and tunnel callers alike. A spec the gate reports NOT SIGNABLE or NO RECORD, a draft that no spec
+  backs, and a draft whose tasks are not the tasks drafted from its spec are refused with the gate's reasons. A draft made
+  from a spec records `provenance.spec_sha256`. Only a local caller may name the spec path.
+- `memev contract sign` and `memev_contract_sign` judge the draft again, on the spec and the code as they are at that moment, and
+  refuse a draft that was changed after the gate checked it.
+- `memev verify` returns BLOCKED for a contract whose spec's record ends with a stop decision until the record also holds a
+  clean implementation round whose reviewed commit has the same in-scope files as the working tree (committed, edited or new).
+- The reviewer keys the engine trusts are the built-in ones. A test passes its own only as the `reviewerKeys` option of the
+  Vault constructor, never through an environment variable or the vault settings.
+- `npm test` runs `node scripts/gate/redteam-gate.mjs --report` over this repository, and the pull request check runs for a change
+  under `contracts/`: a malformed record, or a signed contract without a SIGNABLE record, fails the suite, while a spec with no
+  record is reported and not failed.
+
 ## Red-team records
 
 Before a contract spec is signed, a reviewer attacks it in rounds, and the red-team gate checks the

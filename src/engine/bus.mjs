@@ -18,7 +18,7 @@ import { findSecrets } from './secrets.mjs';
 import { readJson, writeJson, now, linkedUnder } from './util.mjs';
 import { allowed } from './tokens.mjs';
 
-export const TYPES = ['hello', 'status', 'task', 'claim', 'restate', 'review', 'verdict', 'question', 'answer', 'finding', 'push', 'ack', 'hold'];
+export const TYPES = ['hello', 'status', 'task', 'claim', 'restate', 'review', 'verdict', 'question', 'answer', 'finding', 'push', 'ack', 'hold', 'transition'];
 export const BUS_DIR = 'bus';
 export const OPERATOR = 'operator';
 const MAX_BODY = 4000;
@@ -342,6 +342,22 @@ export class Bus {
     const msg = this._append(who, { to, type, body, ref: ref ? String(ref) : null, project: project || who.project || null, ...(release ? { release: true } : {}), ...(check ? { check: true } : {}) });
     this.pulse(ctx, { who });
     return msg;
+  }
+  /**
+   * A task changed state: the coordinator posts one message of type transition to the operator seat and one to the assignee's seat
+   * (when it has one). The body is ids and states only, and it is checked for secrets like any message. The bus carries it
+   * between turns; the project store stays the truth, so no state lives here.
+   */
+  postTransition({ project, task, from, to, correlation = null, assignee = null } = {}) {
+    const body = JSON.stringify({ project, task, from, to, correlation });
+    const secrets = findSecrets(body);
+    if (secrets.length) throw new BusError('secret', `refused: the message looks like it holds a credential (${secrets.join(', ')}). Never send keys or tokens over the bus`);
+    if (body.length > MAX_BODY) throw new BusError('too_large', `keep a message under ${MAX_BODY} characters`);
+    const device = this.devices.get(this.devices.hostId);
+    const who = { seat: `project@${this.machineName()}`, operator: false, device, project: project ?? null };
+    const rec = assignee && assignee !== OPERATOR ? this.seat(assignee) : null;
+    const to_ = [OPERATOR, ...(rec && !rec.removed ? [rec.seat] : [])];
+    return to_.map((t) => this._append(who, { to: t, type: 'transition', body, ref: null, project: project ?? null }));
   }
   _append(who, fields) {
     const file = `${who.device.id}.jsonl`;
