@@ -818,7 +818,7 @@
    "area": "SO-F",
    "title": "SO-F-04A Composition of the checks on the Admission external hook: one function of the hook's shape that runs the relationship check of SO-F-04 and any other check, a refusal beating a degraded answer, and nothing added to the steps or events of the Admission",
    "repo": "memev",
-   "closes": "Follow-up to SO-F-04, from the open row 'Two users of the Admission external hook' of docs/scope-one/RECONCILIATION.md (relationshipGate of SO-F-04, pull request #368, and SO-F-08, which has no code); additive, it supersedes nothing",
+   "closes": "Follow-up to SO-F-04, from the open row 'Two users of the Admission external hook' of docs/scope-one/RECONCILIATION.md (relationshipGate of SO-F-04, pull request #368, and SO-F-08, which has no code); additive, it supersedes nothing; it owns composeExternal, which PG-W-21B WP21-03 will cite",
    "depends_on": [
     "SO-F-04",
     "SO-F-03.3"
@@ -828,24 +828,24 @@
    "criteria": 10,
    "spec": "specs/SO-F-04A.json",
    "adapted_from": "none; written from the open follow-up rows of pull request #368",
-   "status": "proposed and unsigned; no red-team record; a spec delta for red-team review"
+   "status": "proposed and unsigned; no red-team record; a spec delta for red-team review, with the owner decisions of 1 Nov 2026 folded in"
   },
   {
    "id": "SO-F-04B",
    "area": "SO-F",
-   "title": "SO-F-04B One Admission per scope: an AdmissionSet that holds the Admissions of a node's scopes, refuses a second Admission for the same scope, routes a contribution to the Admission of its scope, and keeps the per-sender replay mark the same live as after a restart",
+   "title": "SO-F-04B One Admission per scope: an AdmissionSet that holds the Admissions of a node's scopes, refuses a second Admission for the same scope, routes a contribution to the Admission of its scope, and keeps the replay mark per sender and scope, the same live as after a restart",
    "repo": "memev",
-   "closes": "Follow-up to SO-F-04, from the open row 'One scope per Admission' of docs/scope-one/RECONCILIATION.md (Admission, SO-F-04, pull request #368); additive, it supersedes nothing and leaves a lone Admission unchanged",
+   "closes": "Follow-up to SO-F-04, from the open row 'One scope per Admission' of docs/scope-one/RECONCILIATION.md (Admission, SO-F-04, pull request #368); additive, it supersedes nothing and leaves a lone Admission, with its SO-F-03.3 per-sender mark, unchanged",
    "depends_on": [
     "SO-F-04",
     "SO-F-03.3"
    ],
    "implements": [],
    "tasks": 1,
-   "criteria": 10,
+   "criteria": 11,
    "spec": "specs/SO-F-04B.json",
    "adapted_from": "none; written from the open follow-up rows of pull request #368",
-   "status": "proposed and unsigned; no red-team record; a spec delta for red-team review"
+   "status": "proposed and unsigned; no red-team record; a spec delta for red-team review, with the owner decisions of 1 Nov 2026 folded in"
   },
   {
    "id": "SO-F-05",
