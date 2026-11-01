@@ -1,0 +1,228 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Recovery and control: disconnect recovery, restart reconstruction, pause, resume and cancel through memev work, transitions on the existing bus, idempotent bus delivery and memev work status",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "agent disconnect (F06): when a session stops heart-beating, recover(taskId) inspects the checkpoint, the lease, the changed artifacts and the outstanding side effects, writes an inspection record and returns a recovery plan (resume from checkpoint, reassign, or ask the user); reassignment happens only after the inspection is recorded, and no second dispatch of the task happens while the original lease is live",
+        "daemon restart (F15): leases, in-flight tasks, pending approvals and the pause flag reconstruct from the store on start; expired leases are detected and marked on start; nothing is re-dispatched until an eligibility pass runs, and that pass dispatches no task that has a live lease",
+        "memev work pause <project> stops new dispatch at once, asks the adapter for cooperative cancellation where the client supports it and prints per in-flight task requested, confirmed or unsupported (F10); memev work resume continues from the last checkpoint; memev work cancel records actor and reason and refuses without a reason; each has --json and exit codes 0, 1, 2",
+        "transitions travel on the existing bus: every transition posts one message of a typed kind to the assignee's seat and to the operator seat through src/engine/bus.mjs, carrying ids and states only (no secrets, checked); the bus is transport, not the store: deleting the bus files loses no project state and the store reconstructs it",
+        "duplicate bus delivery is idempotent at the coordinator (F12): the same bus message processed twice produces one transition and one event",
+        "memev work status <project> prints the project status, active tasks with owner and lease expiry, blocked items with reasons, pending approvals and stale evidence, each with a next action; --json carries the same fields; a project id that does not exist exits 1 with one line"
+      ],
+      "description": "Phase 2 of the handoff connects state transitions to the existing bus and demands that concurrency, duplicate-event, stale-result and recovery tests pass; step F of the user experience is pause, resume and change of direction with honest in-flight reporting. The handoff says to reuse the bus for communication and implement claims, leases and transition rules separately, which SO-08-A does; this contract adds the recovery procedures and the user's controls. The command noun is memev work, because memev project is already the memory project-mapping command (REV-023) and the two must not be confused: that is a listed contradiction. Pause stops dispatch and asks for cooperative cancellation through the adapter's capability record (SO-05-B); until that record exists the answer is unsupported, never confirmed. The bus carries typed transition messages so connected clients see progress between turns (MEM-060's waiting-for-next-turn model holds), and the bus files remain transport: the store is the truth. Tests in test/project-recovery.test.mjs kill a stub session mid-task, restart the daemon in the sandbox, and replay bus messages twice. src/engine/bus.mjs and src/cli/main.mjs are shared with many contracts: rebase onto them. Repository paths as built: src/cli/work.mjs and the dispatch in src/cli/main.mjs are those of SO-A-03 and PG-19.1; this contract adds the pause, resume, cancel and status behaviour and the recovery procedures.",
+      "scope": {
+        "allow": [
+          "changelog.d/SO-08-B.md",
+          "docs/BUS.md",
+          "docs/MODULES.md",
+          "docs/PROJECTS.md",
+          "src/cli/main.mjs",
+          "src/cli/work.mjs",
+          "src/engine/bus.mjs",
+          "src/engine/coordinator.mjs",
+          "test/helpers/**",
+          "test/project-recovery.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "agent disconnect (F06): when a session stops heart-beating, recover(taskId) inspects the checkpoint, the lease, the changed artifacts and the outstanding side effects, writes an inspection record and returns a recovery plan (resume from checkpoint, reassign, or ask the user); reassignment happens only after the inspection is recorded, and no second dispatch of the task happens while the original lease is live",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-recovery.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-B AC01:' test/project-recovery.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-08-B AC01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "daemon restart (F15): leases, in-flight tasks, pending approvals and the pause flag reconstruct from the store on start; expired leases are detected and marked on start; nothing is re-dispatched until an eligibility pass runs, and that pass dispatches no task that has a live lease",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-recovery.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-B AC02:' test/project-recovery.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-08-B AC02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "memev work pause <project> stops new dispatch at once, asks the adapter for cooperative cancellation where the client supports it and prints per in-flight task requested, confirmed or unsupported (F10); memev work resume continues from the last checkpoint; memev work cancel records actor and reason and refuses without a reason; each has --json and exit codes 0, 1, 2",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-recovery.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-B AC03:' test/project-recovery.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-08-B AC03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "transitions travel on the existing bus: every transition posts one message of a typed kind to the assignee's seat and to the operator seat through src/engine/bus.mjs, carrying ids and states only (no secrets, checked); the bus is transport, not the store: deleting the bus files loses no project state and the store reconstructs it",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-recovery.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-B AC04:' test/project-recovery.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-08-B AC04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "duplicate bus delivery is idempotent at the coordinator (F12): the same bus message processed twice produces one transition and one event",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-recovery.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-B AC05:' test/project-recovery.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-08-B AC05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "memev work status <project> prints the project status, active tasks with owner and lease expiry, blocked items with reasons, pending approvals and stale evidence, each with a next action; --json carries the same fields; a project id that does not exist exits 1 with one line",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/project-recovery.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-B AC06:' test/project-recovery.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-08-B AC06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "docs/BUS.md documents the project message kinds the coordinator posts, under a heading about project messages that also covers the transition kinds",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/BUS.md",
+            "pattern": "## [^\\n]*[Pp]roject message.*transition",
+            "flags": "s"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "The full test suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "The leak scan passes on files and every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "id": "T1-AC11",
+          "mandatory": true,
+          "statement": "Every changed file is inside this contract's scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "Stop and post BLOCKED when a criterion cannot pass without weakening a test, skipping a test or relaxing an assertion.",
+        "Stop and ask when the work would name a client product, a person, a server or a seat in repository text; the client names live in docs/CLIENTS.md only.",
+        "Stop when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would move convergence logic into the core, vendor the engine, or add a merge engine beside the provider boundary of src/engine/merge.mjs.",
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-so-w-08b-recovery-and-co-f2e9ed",
+  "title": "SO-W-08B Recovery and control: disconnect recovery, restart reconstruction, pause, resume and cancel through memev work, transitions on the existing bus, idempotent bus delivery and memev work status",
+  "workdir": null,
+  "created": "2026-11-01T04:18:59.999Z",
+  "version": 1,
+  "request": "Id: this spec is SO-W-08B, not SO-08-B, because the gate reduces a file name such as SO-08-B.json to the id SO-08 (specIdOf in src/engine/redteam-gate.mjs), which would make it share a record path with SO-W-08C; SO-08-B stays the id of the signed vault contract this text restates, and the test names below keep the SO-08-B AC prefix because the implementation (pull request #361) names its tests that way. Recovery and control: disconnect recovery, restart reconstruction, pause, resume and cancel through memev work, transitions on the existing bus, idempotent bus delivery and memev work status. Restated from the vault set-work bundle: SO-08-B is a signed vault contract, cited by id and signed in the owner's vault; its file, signature and seal are not in this repository and nothing of them is copied. This spec restates the acceptance criteria of that contract in the memev spec format so that the work can be reviewed and checked from this repository. It is unsigned, and it neither replaces nor amends the vault contract. It maps to PG-08.1, task WP08-02: the programme spec cites SO-08-B by id and this spec holds the repository text of its criteria. Provenance: the criteria come from the vault set-work bundle of the memev contract set (the task SO-08-B), read on the build machine; they are restated, not changed. Changes from the vault text: (1) converted from the vault task format to the memev spec format (the named tests run as red-green checks on the own test file of the contract; the inline regular expression flag became the flags key; the hygiene verifier became a command; the check on docs/BUS.md now needs a heading about project messages, so that it cannot pass before the work is done). (2) removed the task fields that only the vault uses (assignment, lease, status, signature and priority) and the references to documents outside this repository. (3) docs/MODULES.md and test/helpers/** are added to the scope, as in the sibling Scope One specs. The implementation is pull request #361 (a draft, stacked on #350). Its changes sit inside the scope of T1: src/cli/main.mjs carries the work case for status, pause, resume and cancel (AC03 and AC06), and docs/MODULES.md is the generated module graph that the docs test requires once main.mjs imports src/cli/work.mjs. The check on docs/BUS.md (AC07) is stricter than the vault text: it needs a heading about project messages, which the implementation has. The vault criterion that the work is merged to main is not restated here, as in the sibling Scope One specs. Depends on signed vault contracts: SO-08-A (claims, leases and transition rules; the coordinator), SO-05-B (the adapter capability record: until it exists, cancellation is reported as unsupported, never confirmed). Memev contracts that land first: SO-1.01, SO-A-03 (runWork and memev work status in src/cli/work.mjs) and PG-19.1 (the work command dispatched from src/cli/main.mjs with a production openStore). Source: the handoff failure tests F06, F10, F12 and F15 and Scope One acceptance 4, 8, 11 and 12 (cited by id). The command noun is memev work, because memev project is already the memory project-mapping command and the two must not be confused. Settled decisions this contract follows (owner decision 31 Oct 2026, docs/scope-one/DECISIONS.md): topology is local-first and the cloud is only a relay and a backup; every supported provider stands on equal footing and no work or tier depends on one; crdt-merge is reached only through the provider boundary of src/engine/merge.mjs (docs/EXTENSION-POINTS.md) and this contract adds no merge engine to the core; tiers follow docs/PRICING.md (Free core, Personal for up to 3 computers with no per-computer add-on, higher tiers by contacting us) with no Personal trial; the git backup keeps running every few minutes (sync.interval_min). Memory authority: ADR 7 (memory and project-state authority) is proposed in PR #325 and is not decided here; this contract cites it and the local-first decision, and…",
+  "provenance": {
+    "spec_sha256": "40e601158f986e35b9b8bf3b842044875e5f4214d283b239b986f3971ad9d82f",
+    "record": "contracts/scope-one/redteam/SO-W-08B.json",
+    "review": "interim solo review by the signer, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}
