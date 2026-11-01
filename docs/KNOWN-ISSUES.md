@@ -8,7 +8,7 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md).
 
 - The preview is for one person and one computer at a time. Do not mount one vault for concurrent writers on multiple computers or run multiple daemon instances against the same vault.
 - Multi-computer concurrent editing, hosted company vaults, team administration, SSO, Business and Corporate services are not included in this preview.
-- Federation is not an operational product capability. Signed contributions, local admission, relationship records and policy gates are foundations only; there is no complete inter-node transport or deployment.
+- Federation is not an operational product capability. Signed contributions, local admission, relationship records and policy gates are foundations only; there is no complete inter-node transport or deployment. The detailed [Federation](FEDERATION.md) page is an architectural design reference; use this status statement for what is actually available in this preview.
 - The paid convergence engine is a separate, licensed component. It is not included in Free Core and must not be assumed available because the client boundary exists in the repository.
 - ProjectStore, Coordinator and contract-verification capabilities exist in the local engine. The availability and maturity of user-facing project-management workflows depend on the exact build; do not assume every planned screen, integration or workflow is shipped.
 
