@@ -22,6 +22,7 @@ import { attach as attachContracts, installVaultHooks } from './contracts.mjs';
 import { assess, DEFAULT_GATE } from './quality.mjs';
 import { STATE, isVault } from './vault-marker.mjs';
 import { ProjectStore } from './project-store.mjs';
+import { SCHEMA_VERSION } from './project-store.mjs';
 import { Coordinator } from './coordinator.mjs';
 import { resolveRequest, vaultScope } from './identity.mjs';
 
@@ -583,17 +584,26 @@ export class Vault extends EventEmitter {
     return this.coordinator(id).status(id, { history });
   }
 
-  /** A read-only reader of one project for `memev work impact`: a frozen object whose one member, snapshot(kind), returns a copy of the
-   *  records of that kind. It needs a credential that may read, and is null for a project with no event log (none is created). It
-   *  reads the project's event log and applies each record as the project store does, and never opens that store: opening it
-   *  rewrites its snapshots and cuts a torn last line, which another process may be in the middle of writing. A line not yet
-   *  finished is skipped, never cut. The reader has no write method and does not hand out the store. */
+  /** A read-only reader of one project for `memev work impact`: a frozen object whose one member, snapshot(kind), is frozen too and
+   *  returns a copy of the records of that kind. It needs a credential that may read. It is null for a project that has neither
+   *  a meta.json nor an event log (none is created), and an empty reader for one that has a meta.json and no log. It refuses a
+   *  project whose meta.json carries a schema version above the supported one, as the project store does (future_schema).
+   *  It reads the event log and applies each record as the store's replay does (project-store.mjs _replay and _applyRecord): a
+   *  refused record or one with no entity is not applied, a later record of an id replaces the earlier one, a null record of an
+   *  id leaves the null, and a line that is not json is skipped. It never opens the store: opening it rewrites its snapshots and
+   *  cuts a torn last line, and another process may be in the middle of writing that line. A last line with no newline is not
+   *  applied, even when it is a whole record, because the store cuts it on its next open; the reader leaves it in the file for
+   *  the writer to finish. The reader has no write method and does not hand out the store. */
   tasksReader(identity, project) {
     this._need(identity, 'read', null);
-    const file = path.join(this.root, STATE, 'projects', this._projectId(project), 'events.jsonl');
-    if (!fs.existsSync(file)) return null;
+    const dir = path.join(this.root, STATE, 'projects', this._projectId(project));
+    const file = path.join(dir, 'events.jsonl'), meta = readJson(path.join(dir, 'meta.json'), null);
+    if (!meta && !fs.existsSync(file)) return null;
+    const version = meta?.schema_version ?? SCHEMA_VERSION;
+    if (version > SCHEMA_VERSION) throw new VaultError('future_schema', `refusing to open: schema version ${version} is newer than this Memev knows (${SCHEMA_VERSION})`);
     const entities = new Map();
-    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+    const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+    for (const line of text.slice(0, text.lastIndexOf('\n') + 1).split('\n')) {
       if (!line) continue;
       let rec; try { rec = JSON.parse(line); } catch { continue; }
       if (rec.refused || !rec.entity) continue;
@@ -601,7 +611,7 @@ export class Vault extends EventEmitter {
       if (!entities.has(kind)) entities.set(kind, new Map());
       entities.get(kind).set(id, data);
     }
-    return Object.freeze({ snapshot: (kind) => structuredClone(Object.fromEntries(entities.get(kind)?.entries() ?? [])) });
+    return Object.freeze({ snapshot: Object.freeze((kind) => structuredClone(Object.fromEntries(entities.get(kind)?.entries() ?? []))) });
   }
 
   /** Record one turn of a session (continuous recording). */
