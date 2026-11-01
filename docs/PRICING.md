@@ -3,6 +3,11 @@
 Part of the [Memev documentation](README.md). Up: the [README](../README.md). Down: [tiers/](tiers/README.md),
 [CHECKOUT.md](CHECKOUT.md), [REFERRAL.md](REFERRAL.md), [CONVERGENCE.md](CONVERGENCE.md).
 
+> **Tier decision (owner, 31 October 2026).** The tiers are the free core,
+> Personal at $12/month or $120/year for up to 3 computers, and contact us for anything above.
+> There is no Federated tier, and no per-computer price for Business or Corporate.
+> The free core is the trial. The record is [DECISIONS.md](scope-one/DECISIONS.md). Until the names in the app and the licence are changed, this page calls the free core Personal and the paid tier Personal with more computers.
+>
 > **DRAFT. Not an offer and not in force.** The list below is the current table (decided 28 October
 > 2026). The Memev core is free. Self-serve checkout is Personal only, through Stripe, in test mode
 > first. The checkout program reads product ids, prices and the computer cap from config. Business and
@@ -17,8 +22,8 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 | | Personal | Personal with more computers | Business | Corporate |
 |---|---|---|---|---|
 | Price | free | $12/month or $120/year | contact us | contact us |
-| People | 1 | 1, non-transferable | counted once per organisation | counted once per organisation |
-| Computers using one vault | 1 | up to 3 | counted once per organisation, by computer | counted once per organisation, by computer |
+| People | 1 | 1, non-transferable | contact us | contact us |
+| Computers using one vault | 1 | up to 3 | contact us | contact us |
 | Local AI apps on a computer | unlimited | unlimited | unlimited | unlimited |
 | Cloud AI connectors | 5 | 10 | based on your requirements | based on your requirements |
 | Trial | no Personal trial | no Personal trial | time-limited trial: 5 members and 10 computers, 14 days with one 14-day extension (planned), see [BUSINESS-TRIAL.md](BUSINESS-TRIAL.md) | sales-assisted pilot (planned) |
@@ -31,7 +36,7 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 | Hosted encrypted backup and a stable relay address | | planned | | planned, or self-hosted |
 | Member keys: one key per person, covering their computers | | | planned | planned |
 | One company vault that all members' work data syncs into, with an admin console that sees and searches it | | | planned | planned |
-| One AI provider per organisation, a cloud AI service or an on-premises LLM, over MCP | | | planned | planned |
+| Provider policy: restrict to one provider, egress rules | | | planned | planned |
 | Company server, departments and roles from an org chart | | | planned | planned |
 | Sign-in with Google Workspace or Microsoft Entra ID | | | planned | planned |
 | Rules for what reaches the AI provider, egress log | | | planned | planned |
@@ -50,13 +55,24 @@ company server runs on the company's own server. Sync, the relay, the company se
 labels and the egress log are planned, not built, and no date is given. See [tiers/](tiers/README.md)
 for how each tier is set up.
 
-**Business and Corporate connect to one AI provider** for the whole organisation, either one cloud AI
-service or an on-premises LLM. Business has one company vault; all members' work data syncs into it
-and the company can see and search everything in it. Members keep private work outside Memev.
-Corporate has one main corporate vault.
+**Every tier is provider-neutral.** Members use the AI providers and tools the organisation's policy
+allows, cloud AI services or an on-premises LLM; an organisation may restrict itself to one provider
+by policy, with egress rules and labels (planned). Business has one company vault; all members' work
+data syncs into it and the company can see and search everything in it. Members keep private work
+outside Memev. Corporate has one main corporate vault.
 
-**Licences count once per organisation, by person and by computer.** Today the vault counts
-computers only; counting people is planned with Business.
+**Several sites and federation (planned).** The architectural target is a federation of
+independently operated site nodes, each owning its node and its memory and converging authorised
+state through the convergence engine under its contract. The company vault above is the one-node
+case of that target, and it is what the first Business release ships. Federation across sites, and
+federated computation on top of it, are planned capabilities of Corporate, and of a Business
+licence whose services list includes the multi-site federation design
+([tiers/services.md](tiers/services.md)). They are not a tier, they have no column and no price cell in the table
+above, and they are not sold before they are built. See [tiers/README.md](tiers/README.md),
+[FEDERATION.md](FEDERATION.md) and [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).
+
+**Licences above Personal are agreed with you: contact us.** Today the vault counts computers only. There is no
+per-computer table for Business or Corporate.
 
 **Business trial (planned):** a time-limited trial, 5 members and 10 computers, 14 days with one
 14-day extension. Self-serve for an organisation that uses hosted AI providers, or a mix of hosted
@@ -68,7 +84,7 @@ air-gapped or led by compliance. The terms, the two paths and what happens at th
 lives in its own repository and is called by Memev as an external dependency. See
 [CONVERGENCE.md](CONVERGENCE.md).
 
-For Business and Corporate the number of computers comes from the licence you are issued.
+Above Personal, the terms of a licence are set in the agreement: contact us.
 
 **A computer** is a machine that runs its own copy of the vault, or whose AI apps reach a vault
 remotely (through a tunnel or relay). The vault's own computer is one of them. Each added computer
@@ -156,7 +172,7 @@ leaves no file, and the command prints why. After that the licence is checked of
 
 - **Personal:** one computer, no licence, no network needed.
 - **Personal with more computers:** as in the table, with the number of computers in the licence.
-- **Business and Corporate:** the number of computers in the licence, issued once per organisation.
+- **Above Personal:** terms set in the agreement with you: contact us.
 
 When a licence lapses, its grace period (14 days unless the licence says otherwise) keeps
 everything working, and computers can still be added. After the grace period no computer can be
@@ -167,5 +183,6 @@ licence restores the rest at once.
 ## Source licence
 
 The Memev core is **Apache-2.0** and stays that way. The convergence engine, crdt-merge, is a separate
-project in its own repository under its own licence, never vendored into Memev. See
+project in its own repository under its own licence, never vendored into Memev. Memev reaches it only across the external call-out boundary. There is no
+Federated tier: federation across sites is planned and is not available. See
 [LICENSING-NOTICE.md](LICENSING-NOTICE.md) and [CONVERGENCE.md](CONVERGENCE.md).

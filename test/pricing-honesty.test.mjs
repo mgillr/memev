@@ -23,7 +23,7 @@ const SELLS = {
   'Hosted encrypted backup and a stable relay address': ['Hosted encrypted backup', 'Hosted relay with a stable address'],
   'Member keys: one key per person, covering their computers': ['Member keys'],
   "One company vault that all members' work data syncs into, with an admin console that sees and searches it": ["One company vault that all members' work data syncs into", 'Company admin console'],
-  'One AI provider per organisation, a cloud AI service or an on-premises LLM, over MCP': ['One AI provider per organisation'],
+  'Provider policy: restrict to one provider, egress rules': ['Provider policy'],
   'Company server, departments and roles from an org chart': ['Company server with user accounts', 'Departments, roles and path grants from an org chart'],
   'Sign-in with Google Workspace or Microsoft Entra ID': ['Sign-in with Google Workspace or Microsoft Entra ID'],
   'Rules for what reaches the AI provider, egress log': ['Labels on notes and rules for what reaches the AI provider', 'Egress log of what reached the AI provider'],

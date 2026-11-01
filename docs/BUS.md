@@ -44,6 +44,12 @@ Who may join follows the licence. A computer joins when it is enrolled with its 
 it is removed (`memev devices remove <id>`) its seats show as removed and its requests are refused.
 A computer over the licensed count, or on a lapsed licence, can read the bus but not post.
 
+A colleague joins the same way, with an invite that carries their name: on the vault's computer,
+`memev invite --teammate <name>` (Team plan). Their computer is enrolled as `<name>-<machine>`, where
+`<machine>` is the short name their own computer reports, so their apps' seats read
+`<app>@<name>-<machine>` and the roster shows them under their name. Without the Team entitlement the
+command prints the plan line and no code.
+
 ## Where it lives
 
 The bus is files in your vault under `bus/`, so it goes wherever the vault goes: into your own
@@ -62,10 +68,23 @@ shows up as unread, in its place by time.
 
 A message has a `seq` (its place in that order), `ts`, `from`, `to` (a seat, `all` or `operator`),
 `type`, `ref` (the message it answers) and `body`. The types are hello, status, task, claim,
-restate, review, verdict, question, answer, finding, push, ack and hold.
+restate, review, verdict, question, answer, finding, push, ack, hold and transition.
 
 Messages that look like a credential (API keys, tokens, private keys, a password written out) are refused.
 Keep a body under 4,000 characters and link a note for anything longer.
+
+## Project messages
+
+When a task of a project changes state, the project coordinator posts one message of type `transition` to the operator seat
+and one to the seat of the task's assignee (the holder, or whoever last held it), so a connected app sees progress between its
+turns. A transition carries ids and states only: the body is `{project, task, from, to, correlation}` and nothing else, and it is checked for
+credentials like any message. A task nobody is assigned to yet sends the operator message only.
+
+The bus is transport, not the store. The project store is the truth: deleting the bus files loses no project state, and the
+store reconstructs it. A bus that is down never blocks a transition; the message is simply not sent.
+
+A request that arrives on the bus (cancel, pause or resume of a project or task) is applied once. The coordinator records the
+message id in the same turn as the change, so a message delivered twice changes the project once.
 
 ## The operator
 
@@ -146,6 +165,22 @@ yet, and **removed** when its computer was removed. `memev doctor` lists stale s
 An app only answers between turns, so a comms check mostly shows who is in a session right now.
 For an app or script that should stay reachable, run `memev bus watch <seat>`: it checks every few
 seconds, prints new messages and keeps the heartbeat going.
+
+## Reading the bus
+
+`bus_unread` shows a bounded view so a busy bus does not flood a turn. It shows at most eight of the
+newest unread messages that are not your go, and says how many were left out (`not_shown`). A body
+longer than 300 characters is cut with a marker; the full body is still on the bus, and `bus_since`
+reaches it by seq. A task or an operator hold is shown first, in full and never cut, outside the cap
+of eight: at most 50 in one call, oldest first, and the rest are counted in `not_shown` and come on
+the next call. What a capped call does not show stays unread: each later call again shows at most
+eight, the newest of what is left, and `bus_since` reaches any of it by seq. A message that arrives
+later with an older time than what your last call saw (written offline, for example) is shown on the
+next call, whatever the cap, so it is not buried under newer ones.
+
+`bus_tail` and `bus_since` show at most 50 messages and say how many more exist (`more`); ask for
+fewer with `n` or `limit`. The hook that puts new messages in front of a hooked app reads the whole
+bus, so it is not capped.
 
 ## Limits
 

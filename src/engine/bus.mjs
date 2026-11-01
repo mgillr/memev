@@ -15,10 +15,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { findSecrets } from './secrets.mjs';
-import { readJson, writeJson, now } from './util.mjs';
+import { readJson, writeJson, now, linkedUnder } from './util.mjs';
 import { allowed } from './tokens.mjs';
 
-export const TYPES = ['hello', 'status', 'task', 'claim', 'restate', 'review', 'verdict', 'question', 'answer', 'finding', 'push', 'ack', 'hold'];
+export const TYPES = ['hello', 'status', 'task', 'claim', 'restate', 'review', 'verdict', 'question', 'answer', 'finding', 'push', 'ack', 'hold', 'transition'];
 export const BUS_DIR = 'bus';
 export const OPERATOR = 'operator';
 const MAX_BODY = 4000;
@@ -26,6 +26,21 @@ export const LEAD_NEEDED = 'No lead AI is set for this vault. Ask the user which
 const SEAT_RE = /^[a-z0-9][a-z0-9._-]{0,40}@[a-z0-9][a-z0-9._-]{0,40}(\/[a-z0-9._-]{1,24})?$/;
 const REF_RE = /^[A-Za-z0-9._:-]{1,64}$/;
 const PULSE_COMMIT_MS = 5 * 60e3;
+// What a seat has read, per device counter: pulse.read[device] is the contiguous prefix, kept a plain number so older
+// code still reads it, and pulse.read_extra[device] lists the counters read beyond a gap, which older code ignores (it
+// shows those once more, which is harmless). hasRead is the one rule; the bus and memev bus hello both use it.
+const readPrefix = (read, device) => { const v = (read || {})[device]; return typeof v === 'number' ? v : 0; };
+const readState = (p) => ({ read: { ...(p?.read || {}) }, extra: { ...(p?.read_extra || {}) } });
+export function hasRead(pulse, m) {
+  return m.dseq <= readPrefix(pulse?.read, m.device) || (pulse?.read_extra?.[m.device] || []).includes(m.dseq);
+}
+
+export const UNREAD_VIEW = 8;   // default messages a capped bus_unread shows
+export const UNREAD_MAX = 50;   // stated maximum for the bus_unread limit
+export const BODY_CUT = 300;    // characters per message in the capped view
+export const CUT_MARK = '…';    // appended when a body is cut to fit the view
+export const TAIL_MAX = 50;     // stated maximum for bus_tail n
+export const SINCE_MAX = 50;    // stated maximum for bus_since limit
 
 export class BusError extends Error { constructor(code, message) { super(message); this.code = code; this.name = 'BusError'; } }
 
@@ -46,6 +61,9 @@ export class Bus {
 
   _p(...a) { return path.join(this.dir, ...a); }
   _rel(...a) { return [BUS_DIR, ...a].join('/'); }
+  /** The bus writes its own files with its own file calls, so it checks each one first: a symbolic link on the way from the
+   * vault root refuses the write, wherever the link came from (issue 256). */
+  _w(...abs) { for (const a of abs) if (linkedUnder(this.root, a)) throw new BusError('bad_path', `${path.relative(this.root, a).split(path.sep).join('/')} goes through a symbolic link; the bus does not follow links in the vault`); }
 
   /** Seed bus/ (the caller commits it) so the bus is part of the vault from the first commit: the layout, no operator yet, and this computer's own (empty) message file. */
   ensure(deviceId) {
@@ -54,6 +72,7 @@ export class Bus {
       ['operator.json', () => writeJson(this._p('operator.json'), { seat: null, set: null })],
       ...(deviceId ? [[`log/${deviceId}.jsonl`, () => fs.writeFileSync(this._p('log', `${deviceId}.jsonl`), '')]] : []),
     ];
+    this._w(this._p('config.json'), this._p('operator.json'), this._p('log'), ...(deviceId ? [this._p('log', `${deviceId}.jsonl`)] : []));
     fs.mkdirSync(this._p('log'), { recursive: true });
     const created = [];
     for (const [rel, make] of files) if (!fs.existsSync(this._p(...rel.split('/')))) { make(); created.push(this._rel(...rel.split('/'))); }
@@ -66,7 +85,7 @@ export class Bus {
     const host = this.devices.get(this.devices.hostId);
     return label(host?.label || 'this computer');
   }
-  /** The seat name for an app on a device: my-app@my-laptop, cursor@laptop, chatgpt@cloud. */
+  /** The seat name for an app on a device: my-app@my-laptop, cursor@laptop, chatgpt@cloud. A teammate's computer is enrolled as <name>-<machine>, so its seats read <app>@<name>-<machine>. */
   seatName(client, device) {
     if (!device || device.kind === 'host' || device.kind === 'local-client') return `${label(client)}@${this.machineName()}`;
     if (device.kind === 'cloud-connector') return `${label(device.label)}@cloud`;
@@ -117,6 +136,7 @@ export class Bus {
     if (cur && !cur.removed && device && cur.device !== device.id) throw new BusError('conflict', `seat ${name} belongs to another computer`);
     if (cur && !cur.removed) return cur;
     const rec = { seat: name, client: label(client), device: device.id, device_kind: device.kind, device_label: device.label, project: project || null, created: now(), joined: cur?.joined || null, removed: null };
+    this._w(this._p('seats', `${fileOf(name)}.json`));
     fs.mkdirSync(this._p('seats'), { recursive: true });
     writeJson(this._p('seats', `${fileOf(name)}.json`), rec); this.commit(this._rel('seats', `${fileOf(name)}.json`));
     return rec;
@@ -133,6 +153,7 @@ export class Bus {
     const from = rec.seat;
     rec.seat = newName;
     rec.renamed_from = [...new Set([...(rec.renamed_from || []), from])];
+    this._w(this._p('seats', `${fileOf(from)}.json`), this._p('seats', `${fileOf(newName)}.json`), this._p('pulse', `${fileOf(from)}.json`), this._p('pulse', `${fileOf(newName)}.json`), this._p('operator.json'));
     fs.mkdirSync(this._p('seats'), { recursive: true });
     const oldF = this._p('seats', `${fileOf(from)}.json`);
     const newF = this._p('seats', `${fileOf(newName)}.json`);
@@ -206,6 +227,7 @@ export class Bus {
   setOperator(seat, { by = 'terminal', answer = null } = {}) {
     const rec = seat ? this.seat(seat) : null;
     if (seat && (!rec || rec.removed)) throw new BusError('not_found', `no seat ${seat}; memev bus roster lists them`);
+    this._w(this._p('operator.json'));
     fs.mkdirSync(this.dir, { recursive: true });
     writeJson(this._p('operator.json'), { seat: seat || null, set: now(), by, ...(answer ? { user_answer: answer } : {}) }); this.commit(this._rel('operator.json'));
     return seat || null;
@@ -258,7 +280,9 @@ export class Bus {
     if (seat) {
       // the terminal on the vault's computer may act for any seat on that computer (memev bus watch)
       const rec = this.seat(seat);
-      const mine = ctx.cli && ctx.local ? (rec ? rec.device === computer.id : this._onHost(seat)) : rec ? rec.device === computer.id : seat.split('/')[0] === own;
+      // an app posts only as its own seat: a recorded seat must be on this computer and registered by this app, so a local
+      // app cannot speak as another app's seat, the lead's included (issue 263)
+      const mine = ctx.cli && ctx.local ? (rec ? rec.device === computer.id : this._onHost(seat)) : rec ? rec.device === computer.id && rec.client === label(ctx.client) : seat.split('/')[0] === own;
       if (!mine) throw new BusError('forbidden', `${seat} belongs to another app or computer; you can only post as your own seat (${own})`);
     }
     let rec = this.seat(name);
@@ -319,6 +343,22 @@ export class Bus {
     this.pulse(ctx, { who });
     return msg;
   }
+  /**
+   * A task changed state: the coordinator posts one message of type transition to the operator seat and one to the assignee's seat
+   * (when it has one). The body is ids and states only, and it is checked for secrets like any message. The bus carries it
+   * between turns; the project store stays the truth, so no state lives here.
+   */
+  postTransition({ project, task, from, to, correlation = null, assignee = null } = {}) {
+    const body = JSON.stringify({ project, task, from, to, correlation });
+    const secrets = findSecrets(body);
+    if (secrets.length) throw new BusError('secret', `refused: the message looks like it holds a credential (${secrets.join(', ')}). Never send keys or tokens over the bus`);
+    if (body.length > MAX_BODY) throw new BusError('too_large', `keep a message under ${MAX_BODY} characters`);
+    const device = this.devices.get(this.devices.hostId);
+    const who = { seat: `project@${this.machineName()}`, operator: false, device, project: project ?? null };
+    const rec = assignee && assignee !== OPERATOR ? this.seat(assignee) : null;
+    const to_ = [OPERATOR, ...(rec && !rec.removed ? [rec.seat] : [])];
+    return to_.map((t) => this._append(who, { to: t, type: 'transition', body, ref: null, project: project ?? null }));
+  }
   _append(who, fields) {
     const file = `${who.device.id}.jsonl`;
     const mine = this._readLog(file);
@@ -326,6 +366,7 @@ export class Bus {
     let ts = now(); if (last && ts <= last.ts) ts = new Date(Date.parse(last.ts) + 1).toISOString();
     const dseq = (last?.dseq || 0) + 1;
     const msg = { id: `${who.device.id.slice(4, 12)}-${dseq}`, dseq, ts, device: who.device.id, from: who.seat, operator: !!who.operator, ...fields };
+    this._w(this._p('log', file));
     fs.mkdirSync(this._p('log'), { recursive: true });
     fs.appendFileSync(this._p('log', file), `${JSON.stringify(msg)}\n`);
     this._last.set(file, msg);
@@ -335,45 +376,124 @@ export class Bus {
 
   since(ctx, { seq = 0, limit = 50, seat = null } = {}) {
     const who = this.resolve(ctx, { seat }); this.pulse(ctx, { who });
-    return this.all().filter((m) => m.seq > Number(seq || 0) && this._visible(who, m)).slice(0, Math.min(200, limit));
+    const lim = Math.min(Math.max(1, Math.floor(Number(limit)) || SINCE_MAX), SINCE_MAX);
+    const matched = this.all().filter((m) => m.seq > Number(seq || 0) && this._visible(who, m));
+    return { messages: matched.slice(0, lim), more: Math.max(0, matched.length - lim) };
   }
   tail(ctx, { n = 20, seat = null, type = null } = {}) {
     const who = this.resolve(ctx, { seat });
-    return this.all().filter((m) => this._visible(who, m) && (!type || m.type === type)).slice(-Math.min(200, n));
+    const lim = Math.min(Math.max(1, Math.floor(Number(n)) || 20), TAIL_MAX);
+    const matched = this.all().filter((m) => this._visible(who, m) && (!type || m.type === type));
+    return { messages: matched.slice(-lim), more: Math.max(0, matched.length - lim) };
   }
-  /** New messages for this seat; marks them read, counts as a heartbeat and answers comms checks. */
-  unread(ctx, { seat = null, peek = false } = {}) {
+  /** The read state for a device: the contiguous prefix from read and the counters read beyond a gap from read_extra. */
+  _readUpTo(st, device) {
+    return { upTo: readPrefix(st.read, device), extra: new Set(st.extra[device] || []) };
+  }
+  _storeRead(st, device, upTo, extra) {
+    const arr = [...extra].filter((d) => d > upTo).sort((a, b) => a - b);
+    if (upTo > 0) st.read[device] = upTo; else delete st.read[device];
+    if (arr.length) st.extra[device] = arr; else delete st.extra[device];
+  }
+  /** Has this seat seen this message yet (its read prefix or extras cover it)? */
+  _isRead(st, m) {
+    const { upTo, extra } = this._readUpTo(st, m.device);
+    return m.dseq <= upTo || extra.has(m.dseq);
+  }
+  /** Mark one message read, keeping the contiguous prefix and the extras. */
+  _markRead(st, m) {
+    const { upTo, extra } = this._readUpTo(st, m.device);
+    if (m.dseq <= upTo) return;
+    if (m.dseq === upTo + 1) {
+      let n = m.dseq;
+      while (extra.has(n + 1)) { extra.delete(n + 1); n += 1; }
+      this._storeRead(st, m.device, n, extra);
+    } else {
+      extra.add(m.dseq);
+      this._storeRead(st, m.device, upTo, extra);
+    }
+  }
+  /** Mark every message up to and including m read (the old all-at-once behaviour). */
+  _markAllRead(st, m) {
+    const { upTo, extra } = this._readUpTo(st, m.device);
+    const newUp = Math.max(upTo, m.dseq);
+    const rest = new Set([...extra].filter((d) => d > newUp));
+    this._storeRead(st, m.device, newUp, rest);
+  }
+  /** One message in the capped view: body cut to BODY_CUT unless it is a priority type. */
+  _view(m, { cut = true } = {}) {
+    const doCut = cut && m.body.length > BODY_CUT;
+    return { seq: m.seq, id: m.id, from: m.from, to: m.to, type: m.type, ref: m.ref, operator: m.operator, ts: m.ts, body: doCut ? m.body.slice(0, BODY_CUT) + CUT_MARK : m.body, cut: doCut };
+  }
+  /** New messages for this seat; counts as a heartbeat and answers comms checks.
+   * Capped (a limit, or the capped flag) it shows the priority messages (hold, task) in full, then
+   * any message that arrived later with an older time (never lost under the cap), then the last
+   * `limit` of the in-order rest cut to BODY_CUT; it marks only what it showed read and says how
+   * many it left. Uncapped it returns every fresh message and marks them all read, as the hook
+   * path does. */
+  unread(ctx, { seat = null, peek = false, limit = null, capped = false } = {}) {
     const who = this.resolve(ctx, { seat });
-    const p = this._pulse(who.seat); const read = p.read || {};
+    const p = this._pulse(who.seat); const st = readState(p);
     const all = this.all();
     const names = this._names(who.seat);
-    const fresh = all.filter((m) => m.dseq > (read[m.device] || 0) && this._toMe(who, m, names) && this._visible(who, m));
-    if (!peek) for (const m of all) if (this._toMe(who, m, names) || names.includes(m.from)) read[m.device] = Math.max(read[m.device] || 0, m.dseq);
-    this.pulse(ctx, { who, read: peek ? null : read });
+    const fresh = all.filter((m) => !this._isRead(st, m) && this._toMe(who, m, names) && this._visible(who, m));
+    const cap = capped || limit != null;
+    const isPriority = (m) => m.type === 'task' || (m.type === 'hold' && m.operator);
+    let shownMsgs = fresh; let notShown = 0;
+    if (cap) {
+      const lim = Math.min(Math.max(1, Math.floor(Number(limit)) || UNREAD_VIEW), UNREAD_MAX);
+      // priority messages come first, in full, oldest first, at most UNREAD_MAX of them; the rest stay unread and are counted
+      const allPriority = fresh.filter(isPriority);
+      const priority = allPriority.slice(0, UNREAD_MAX);
+      // I always show a message that arrived after this seat's last call but landed at or before
+      // what that call saw (written offline, for example), so it is not buried under newer ones. It
+      // is new if its device counter is above the highest that call saw from its device; what was
+      // already there and left unshown is not late, so the cap still applies to it on the next call.
+      const seen = p.seen_seq || 0; const seenDseq = p.seen_dseq || null;
+      const isLate = (m) => !!seenDseq && m.seq <= seen && m.dseq > (seenDseq[m.device] || 0);
+      const late = fresh.filter((m) => !isPriority(m) && isLate(m));
+      const rest = fresh.filter((m) => !isPriority(m) && !isLate(m));
+      shownMsgs = [...priority, ...[...late, ...rest.slice(-lim)].sort((a, b) => a.seq - b.seq)];
+      notShown = rest.length - rest.slice(-lim).length + (allPriority.length - priority.length);
+    }
+    if (!peek) {
+      if (cap) {
+        for (const m of shownMsgs) this._markRead(st, m);
+        for (const m of all) if (names.includes(m.from)) this._markRead(st, m);
+      } else {
+        for (const m of all) if (this._toMe(who, m, names) || names.includes(m.from)) this._markAllRead(st, m);
+      }
+    }
+    // what this call saw: the bus position and, per device, the highest counter
+    const frontier = all.length ? all[all.length - 1].seq : (p.seen_seq || 0);
+    const seenDseq = {}; for (const m of all) seenDseq[m.device] = Math.max(seenDseq[m.device] || 0, m.dseq);
+    this.pulse(ctx, { who, read: peek ? null : st.read, readExtra: peek ? null : st.extra, seen: peek ? null : frontier, seenDseq: peek ? null : seenDseq });
     const acked = [];
     if (!(who.operator && who.seat === OPERATOR)) {
       for (const m of fresh.filter((x) => x.check)) if (!all.some((a) => a.type === 'ack' && a.ref === m.id && names.includes(a.from))) {
         try { if (!ctx.identity?.read_only) { this._append(who, { to: m.from, type: 'ack', body: 'comms check: here', ref: m.id, project: null }); acked.push(m.id); } } catch {}
       }
     }
-    return { seat: who.seat, operator: who.operator, hold: this.holdOn(who.seat, all), messages: fresh, acked, ...(this.operator() ? {} : { lead_needed: LEAD_NEEDED }) };
+    const messages = cap ? shownMsgs.map((m) => this._view(m, { cut: !isPriority(m) })) : fresh;
+    return { seat: who.seat, operator: who.operator, hold: this.holdOn(who.seat, all), messages, ...(cap ? { not_shown: notShown } : {}), acked, ...(this.operator() ? {} : { lead_needed: LEAD_NEEDED }) };
   }
 
   // ---- pulse
   _pulse(seat) { return readJson(this._p('pulse', `${fileOf(seat)}.json`), { seat, read: {} }); }
   /** A heartbeat: the seat is here. The first one also joins the seat and says hello. */
-  pulse(ctx, { who = null, read = null, session = null, at = Date.now() } = {}) {
+  pulse(ctx, { who = null, read = null, readExtra = null, seen = null, seenDseq = null, session = null, at = Date.now() } = {}) {
     who ||= this.resolve(ctx);
     if (who.seat === OPERATOR) return null;
     const p = this._pulse(who.seat);
-    const rec = { seat: who.seat, device: who.device.id, last_seen: new Date(at).toISOString(), session: session || ctx.session || p.session || null, beats: (p.beats || 0) + 1, read: read || p.read || {} };
-    fs.mkdirSync(this._p('pulse'), { recursive: true });
+    const rec = { seat: who.seat, device: who.device.id, last_seen: new Date(at).toISOString(), session: session || ctx.session || p.session || null, beats: (p.beats || 0) + 1, read: read || p.read || {}, read_extra: readExtra || p.read_extra || {}, seen_seq: seen == null ? (p.seen_seq || 0) : seen, seen_dseq: seenDseq || p.seen_dseq || null };
     const f = `${fileOf(who.seat)}.json`;
+    this._w(this._p('pulse', f));
+    fs.mkdirSync(this._p('pulse'), { recursive: true });
     writeJson(this._p('pulse', f), rec);
     if (at - (this._pulseCommitted.get(f) || 0) > PULSE_COMMIT_MS) { this._pulseCommitted.set(f, at); this.commit(this._rel('pulse', f)); }
     const seatRec = this.seat(who.seat);
     if (seatRec && !seatRec.joined) {
-      seatRec.joined = rec.last_seen; writeJson(this._p('seats', f), seatRec); this.commit(this._rel('seats', f));
+      seatRec.joined = rec.last_seen; this._w(this._p('seats', f)); writeJson(this._p('seats', f), seatRec); this.commit(this._rel('seats', f));
       if (!ctx.identity?.read_only) this._append(who, { to: 'all', type: 'hello', body: `${who.seat} joined${who.operator ? ' (operator)' : ''}`, ref: null, project: null });
     }
     return rec;
@@ -397,11 +517,11 @@ export class Bus {
       else if (s.joined && p.last_seen) state = ago(p.last_seen, at) <= this.liveMin ? 'live' : 'stale';
       const claims = all.filter((m) => m.type === 'claim' && names.includes(m.from) && !all.some((v) => v.type === 'verdict' && v.ref === m.ref)).map((m) => m.ref);
       const status = all.filter((m) => m.type === 'status' && names.includes(m.from) && !m.check).at(-1);
-      return { seat: s.seat, client: s.client, device: s.device, device_label: dev?.label || s.device_label, device_kind: dev?.kind || s.device_kind, state, operator: op === s.seat, last_seen: p.last_seen || null, minutes_since: p.last_seen ? ago(p.last_seen, at) : null, last_message: last ? { seq: last.seq, type: last.type, ts: last.ts, body: last.body.slice(0, 120) } : null, hold: this.holdOn(s.seat, all), claims, status: status ? status.body.slice(0, 160) : null, project: s.project };
+      return { seat: s.seat, client: s.client, device: s.device, device_label: dev?.label || s.device_label, device_kind: dev?.kind || s.device_kind, teammate: dev?.teammate || null, state, operator: op === s.seat, last_seen: p.last_seen || null, minutes_since: p.last_seen ? ago(p.last_seen, at) : null, last_message: last ? { seq: last.seq, type: last.type, ts: last.ts, body: last.body.slice(0, 120) } : null, hold: this.holdOn(s.seat, all), claims, status: status ? status.body.slice(0, 160) : null, project: s.project };
     });
     // licensed computers with no app on the bus yet
     const seated = new Set(rows.map((r) => r.device));
-    for (const d of this.devices.list().filter((x) => x.kind === 'remote-computer' && !seated.has(x.id))) rows.push({ seat: null, client: null, device: d.id, device_label: d.label, device_kind: d.kind, state: d.status === 'active' ? 'never joined' : 'removed', operator: false, last_seen: null, minutes_since: null, last_message: null, hold: null, claims: [], status: null, project: null });
+    for (const d of this.devices.list().filter((x) => x.kind === 'remote-computer' && !seated.has(x.id))) rows.push({ seat: null, client: null, device: d.id, device_label: d.label, device_kind: d.kind, teammate: d.teammate || null, state: d.status === 'active' ? 'never joined' : 'removed', operator: false, last_seen: null, minutes_since: null, last_message: null, hold: null, claims: [], status: null, project: null });
     return { live_minutes: this.liveMin, operator: op, seats: rows, ...(op ? {} : { lead_needed: LEAD_NEEDED }) };
   }
   reasonFor(row) {
@@ -429,10 +549,10 @@ export class Bus {
     return { check: msg.id, seq: msg.seq, waited_ms: Date.now() - start, answered, missing };
   }
 
-  /** Has this seat not seen this message yet (its read pointer is still behind it)? */
+  /** Has this seat not seen this message yet (its read prefix or extras do not cover it)? */
   unreadFor(seat, m) {
     const p = this._pulse(seat);
-    return m.dseq > (p.read?.[m.device] || 0);
+    return !hasRead(p, m);
   }
   /** Tasks with who claimed them, the restatement, the latest status and the verdict. An unclaimed
    * task to a live seat that has not read it yet waits for that seat's next turn. */
@@ -465,6 +585,7 @@ export function markLeadAsked(root) {
   const f = path.join(root, BUS_DIR, 'operator.json');
   const op = readJson(f, null) || {};
   if (op.asked) return;
+  if (linkedUnder(root, f)) return; // never written through a link (issue 256); the mark only quiets the lead question
   fs.mkdirSync(path.dirname(f), { recursive: true });
   writeJson(f, { ...op, asked: now() });
 }

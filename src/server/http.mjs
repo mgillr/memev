@@ -20,7 +20,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { handle } from './mcp.mjs';
 import { OAuthStore, OAuthError, consentPage } from './oauth.mjs';
-import { VaultError, VERSION } from '../engine/vault.mjs';
+import { resolveRequest, vaultScope } from '../engine/identity.mjs';
+import { VaultError, VERSION, RECALL_OFFSET_MAX } from '../engine/vault.mjs';
 import { timingSafeEqualHex, sha256, now, slug } from '../engine/util.mjs';
 import { renderCard, renderRecall, PROTOCOL } from '../engine/card.mjs';
 
@@ -229,6 +230,9 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       }
       const identity = vault.tokens.verify(token) || (token ? oauth.verify(token) : null);
       if (!identity) return send(401, { error: 'unauthorized', error_description: 'a valid bearer token is required' }, { 'www-authenticate': 'Bearer' });
+      // SO-F-01: every authenticated request resolves to a subject and a scope, and the scope is held against this vault's own
+      const resolved = resolveRequest(identity, { target: vaultScope(vault.config) });
+      if (!resolved.ok) return send(403, { error: resolved.code, error_description: resolved.reason });
       if (!local) {
         if (!identity.remote) return send(403, { error: 'local_token', error_description: 'this token is for this machine only; for a cloud AI app use the connector URL from memev cloud url, and add another computer with memev devices enroll' });
         // Each remote client has its own credential (its token, registered as a device). The old
@@ -240,11 +244,14 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       vault.tokens.touch(identity.id);
       vault.devices.fresh();
       let dev = vault.devices.get(vault.devices.byToken.get(identity.id) || '');
+      // a record that a User-Agent switched to cloud-connector before issue 266 was fixed, for a token not made for a
+      // cloud app (migrate()'s note rule), goes back to remote-computer, so the upgrade closes the hole too
+      if (dev && dev.inferred && dev.kind === 'cloud-connector' && !/cloud connector|device cloud-connector/.test(identity.note || '')) dev = vault.devices.restoreSwitched(dev.id);
       let proof = null;
-      // The proof requirement is decided from the device kind as stored before observe() runs:
-      // observe() may reclassify an inferred record from the User-Agent, and that must not let a
-      // keyless computer through the gate. A token with no record yet is judged by its note, the
-      // same way observe() will store it.
+      // The proof requirement is decided from the device kind as stored, which only the person sets:
+      // observe() never changes it from the User-Agent (issue 266), so a keyless computer cannot get
+      // through the gate by naming a cloud app. A token with no record yet is judged by its note,
+      // the same way observe() will store it.
       const needsProof = !local && (dev ? dev.kind === 'remote-computer' : !/cloud connector/.test(identity.note || ''));
       if (needsProof) {
         if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) await getBody();
@@ -266,9 +273,12 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       if (!local && dev?.kind === 'cloud-connector' && computerSide({ userAgent: req.headers['user-agent'], memevClient: req.headers['x-memev-client'] })) {
         return send(403, { error: 'connector_on_computer', error_description: 'This connector URL is for a cloud AI app. To use this vault from another computer, enroll that computer with its own device key: memev devices keygen there, then memev devices enroll --kind remote-computer --pubkey <key> on the vault.' });
       }
-      const client = String(req.headers['x-memev-client'] || identity.agent).slice(0, 40);
+      // On this computer every app has its own token, so the token names the app; a header cannot make one app's token
+      // speak as another app or as the CLI (issues 248 and 263). A remote computer's one device token serves all of
+      // that computer's apps, so there the header picks which of them is calling.
+      const client = String(local ? identity.agent : req.headers['x-memev-client'] || identity.agent).slice(0, 40);
       const session = req.headers['x-memev-session'] ? String(req.headers['x-memev-session']).slice(0, 64) : null;
-      const ctx = { identity, client, session, local, device: dev, cli: local && client === 'cli' };
+      const ctx = { identity, client, session, local, device: dev, cli: local && client === 'cli', subject: resolved.subject, scope: resolved.scope };
 
       if (route === '/mcp') {
         if (req.method !== 'POST') return send(405, { error: 'method_not_allowed' }, { allow: 'POST' });
@@ -285,21 +295,26 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
           // The prompt hook gets the bar, leaves out what it already injected this session (body.exclude) and, unless
           // recall.hook_include_journals is on, past session journals and contract drafts. memev recall on the command
           // line is a search the person asked for and keeps recall.min_score only. memev_recall does not come here.
-          const auto = !ctx.cli, rc = vault.config.recall || {}, limit = body.limit || 4;
+          const auto = !ctx.cli, rc = vault.config.recall || {}, limit = body.limit == null ? 4 : Math.min(10, Math.max(1, Math.trunc(Number(body.limit)) || 1));
+          const offset = Math.max(0, Math.trunc(Number(body.offset)) || 0);
           const own = body.session ? `-${slug(String(body.session), 16)}.md` : null;
           const skip = new Set(auto ? [].concat(body.exclude || []).map(String) : []);
           const bar = auto ? hookMinScore(vault) : (rc.min_score ?? 1);
           // an item already given is left out, not replaced, so a prompt never brings in more than it would have
-          const hits = vault.recall(identity, { ...body, client, limit })
+          const recalled = vault.recall(identity, { ...body, client, limit, offset });
+          const total = recalled.total;
+          const hits = recalled
             .filter((h) => h.score >= bar && !skip.has(`${h.path}#${h.heading || ''}`) && !(auto && !rc.hook_include_journals && pastWork(h.path)) && !(own && h.path.startsWith('work/sessions/') && h.path.endsWith(own)));
-          return send(200, { hits, text: renderRecall(hits, { maxChars: rc.max_chars || 1500 }) });
+          const next = offset + limit < total && offset + limit <= RECALL_OFFSET_MAX ? offset + limit : null;
+          const text = renderRecall(hits, { maxChars: rc.max_chars || 1500 });
+          return send(200, { hits, total, offset, next, text });
         }
         if (route === '/v1/checkpoint') return send(200, vault.checkpoint(identity, { ...body, client }));
         if (route === '/v1/journal') return send(200, vault.journal(identity, { ...body, client }));
         if (route === '/v1/contract-gate') return send(200, { open: vault.contractGate(body.session) });
         if (route === '/v1/remember') return send(200, vault.remember(identity, { ...body, client }));
         if (route === '/v1/bus-pulse') { const u = vault.bus.unread(ctx, { peek: !!body.peek }); return send(200, { ...u, text: renderBus(u, { lead: !!body.lead }) }); }
-        if (route === '/v1/bus-register') { if (local) vault._seedBus(); const reg = []; for (const cl of [].concat(body.clients || [])) { try { reg.push(vault.bus.resolve({ ...ctx, client: String(cl).slice(0, 40), cli: false }).seat); } catch {} } if (local && body.operator && !vault.bus.operator()) try { vault.bus.setOperator(body.operator); } catch {} vault.commits.flush(); return send(200, { seats: reg, operator: vault.bus.operator() }); }
+        if (route === '/v1/bus-register') { if (local) vault._seedBus(); const reg = []; for (const cl of [].concat(body.clients || [])) { try { reg.push(vault.bus.resolve({ ...ctx, client: String(cl).slice(0, 40), cli: false }).seat); } catch {} } if (ctx.cli && body.operator && !vault.bus.operator()) try { vault.bus.setOperator(body.operator); } catch {} /* only the terminal picks the first lead (issue 248, the sibling route) */ vault.commits.flush(); return send(200, { seats: reg, operator: vault.bus.operator() }); }
         if (route === '/v1/bus-operator' && ctx.cli) { const seat = body.seat ? vault.bus.seatFor(body.seat) || body.seat : null; const op = vault.bus.setOperator(seat, { by: body.by || 'terminal' }); vault.commits.flush(); return send(200, { operator: op }); }
         if (route === '/v1/reload' && local && identity.scopes.includes('admin')) { vault.emit('reload'); return send(200, { ok: true }); }
       }

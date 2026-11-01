@@ -1,0 +1,1224 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "QL-1.01",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "801b014e9aa23377cd9a5690819d554d0f3f3667bebdf8536de3b112bdf3e5df",
+      "base_commit": "b76bcf89b769b7e985f2505336ff087bb44b4fa9",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": ".github/workflows/ci.yml",
+            "sha256": "fe31162c75d1daaf18b97666aa8edba503ca3f771273db60931ec619cd44cc40"
+          },
+          {
+            "path": "changelog.d/QL-1.01.md",
+            "sha256": "12fa79a4857256e21c18b03fa1a5a957472fdbe200f837328c783637a00413c8"
+          },
+          {
+            "path": "docs/CONTRACTS.md",
+            "sha256": "ed428b0d844d0cd3612966ae4144f737a7513d0cad96a91fc2dde9ba490acceb"
+          },
+          {
+            "path": "docs/MODULES.md",
+            "sha256": "1bc02214fea53351ee60db81e1b94dd269a7a6fbab9240cf2f37bf4225981f6a"
+          },
+          {
+            "path": "scripts/gate/redteam-gate.mjs",
+            "sha256": "14af02b379fd2960733a4deb0e25e1d5de0a6b04bc03243a0122992230f3266a"
+          },
+          {
+            "path": "src/cli/contracts-cli.mjs",
+            "sha256": "f44dfdc3f9551d5a74f2e64b53d044372746c6c12c0e5310b2b859a7e99059a2"
+          },
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "b5b7e0282a53460ad1098ebf2dfe0a83f01369a8e8233f83023e2d1947ad4663"
+          },
+          {
+            "path": "src/engine/redteam-gate.mjs",
+            "sha256": "3132c3afae1ee96593c9cbe17b169eed038b71e59735d9d1a6cdeb4b117c6036"
+          },
+          {
+            "path": "src/server/mcp.mjs",
+            "sha256": "9520ce2641d39c737bb99cc6be3fedccd1efa71e556e678933947a77d6b59b71"
+          },
+          {
+            "path": "test/contracts.test.mjs",
+            "sha256": "31290d31d99d5898c60ff0977112999c27812e08215d192a4c188af78dbde5fa"
+          },
+          {
+            "path": "test/fixtures/redteam/base/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/base/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/base/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "8d0f1be9ec9ca3fb267d277cd4404913589dbaa1ccb9bf5c36433d55aa1219f6"
+          },
+          {
+            "path": "test/fixtures/redteam/base/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/base/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/base/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/base/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/base/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/build-fixtures.mjs",
+            "sha256": "d4659fc3e8be47186cc1a9cb319d7d813a35f7e5a11863d18e954adadad69e83"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "e41c866e277f67a506c4def1c94dd14d63e3d528cabf9360721b8da212edd5b0"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "947128accd4c4bf54a47c3bc7fc74c60dabf69555fbd82604d90f02c6e3e11fd"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "079200071ec99c01b0d664927c6f28e02a296b7194b5737b0063a6d54a994420"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/build.sh",
+            "sha256": "47b539f5c4da03bb064dd24361a722e17e68ee98474e4ad8e0b1f4d7e11f863d"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "6bca53aad655bfbabdcc36a540272803aa839ac34efe57b6cf25a01fc6a138a3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "95df51a1c74fc1f5593e340e2afef55bea226db4559477af6f5e7524e76293ca"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "e9e34c18b367274993382c21a12fb7fd593a380601e4fd5d8234b088deb7dbef"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "c43d6bc06d1fb7372d389be0dfab6fb0ea360b9418f265282ef127e36ec63c5e"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "7d2cad66a7b1e517173171fa14e1eb0eef1bc7573cfad87b3ca9727a99dcce51"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "2a5c32090bd97672d00e3da440a70b51d813846f0ab226f81c08efbfd01faeb8"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "bad9c2ef5403d4e0fdc61623e1714c36bb8609da0ee3a53486b02e0a49c91335"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "20938af5855eba10f5808460c2ad1b356b1ea2c04d9bd4269da6d205a9cb536f"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "847bf12b0a9188ebbebcb402e4b3e29765a9dcb624ec81c6329ca281f9086f6f"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "8b71b5c8a7e77932258fa0b6d7c12fd1f6972fcfc50b6c23b9b6c5840c47c2c4"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "5cd310a49e768100e39b4ad079dac3a950c996da04091a53d29a4283458e05b2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "9c753e56ef71f95e9a6418460c44ae231322349990dc31fe5ff49d45fd09f0c0"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "8e8316747a57a2966fed6eda13cd71cf5f54a3376ddc871d2a7a98117a4f4077"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/lib.mjs",
+            "sha256": "5f6c06f47a27188754a2209beef1da68f962c5e1ae556836b6b26ba99807c0e8"
+          },
+          {
+            "path": "test/fixtures/redteam/reviewer.pub",
+            "sha256": "809c5e658010d31d213c197e71552abfe38c44fe1bae75237b9f5c5ba23f7f59"
+          },
+          {
+            "path": "test/redteam-gate.test.mjs",
+            "sha256": "2d9e5def16251e0d3a805d778ad8570ddca6db562c97d7669d5be8d6e819ef83"
+          }
+        ]
+      },
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Round 1 is the baseline: the spec as it stood on main at aa3af6c, before pull request 319. Earlier review rounds of this spec were made off this repository and are not reproduced here.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NGViNTBmODlhYzdmZTc1M2IxNWNmN2I5MGI5MGQxZDJiNDIxNTRmMmVhMDM2ZTEzZTY4YWFlMGE3MWE0MjAwNQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "P4bLA4tqadmdLOo+PHa4clqeTc6UiyNsS4sGme9vFx+DrV68I5bhHfaQVFyfZFjnh68l71xfrnJcawvq23L9Ag=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "4eaddb2184bca84bed39eb6d59397028c477ec06f01e4e8433107a6c9b1e8d26",
+      "base_commit": "b76bcf89b769b7e985f2505336ff087bb44b4fa9",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": ".github/workflows/ci.yml",
+            "sha256": "fe31162c75d1daaf18b97666aa8edba503ca3f771273db60931ec619cd44cc40"
+          },
+          {
+            "path": "changelog.d/QL-1.01.md",
+            "sha256": "12fa79a4857256e21c18b03fa1a5a957472fdbe200f837328c783637a00413c8"
+          },
+          {
+            "path": "docs/CONTRACTS.md",
+            "sha256": "ed428b0d844d0cd3612966ae4144f737a7513d0cad96a91fc2dde9ba490acceb"
+          },
+          {
+            "path": "docs/MODULES.md",
+            "sha256": "1bc02214fea53351ee60db81e1b94dd269a7a6fbab9240cf2f37bf4225981f6a"
+          },
+          {
+            "path": "scripts/gate/redteam-gate.mjs",
+            "sha256": "14af02b379fd2960733a4deb0e25e1d5de0a6b04bc03243a0122992230f3266a"
+          },
+          {
+            "path": "src/cli/contracts-cli.mjs",
+            "sha256": "f44dfdc3f9551d5a74f2e64b53d044372746c6c12c0e5310b2b859a7e99059a2"
+          },
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "b5b7e0282a53460ad1098ebf2dfe0a83f01369a8e8233f83023e2d1947ad4663"
+          },
+          {
+            "path": "src/engine/redteam-gate.mjs",
+            "sha256": "3132c3afae1ee96593c9cbe17b169eed038b71e59735d9d1a6cdeb4b117c6036"
+          },
+          {
+            "path": "src/server/mcp.mjs",
+            "sha256": "9520ce2641d39c737bb99cc6be3fedccd1efa71e556e678933947a77d6b59b71"
+          },
+          {
+            "path": "test/contracts.test.mjs",
+            "sha256": "31290d31d99d5898c60ff0977112999c27812e08215d192a4c188af78dbde5fa"
+          },
+          {
+            "path": "test/fixtures/redteam/base/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/base/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/base/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "8d0f1be9ec9ca3fb267d277cd4404913589dbaa1ccb9bf5c36433d55aa1219f6"
+          },
+          {
+            "path": "test/fixtures/redteam/base/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/base/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/base/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/base/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/base/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/build-fixtures.mjs",
+            "sha256": "d4659fc3e8be47186cc1a9cb319d7d813a35f7e5a11863d18e954adadad69e83"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "e41c866e277f67a506c4def1c94dd14d63e3d528cabf9360721b8da212edd5b0"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/added_verbatim/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "947128accd4c4bf54a47c3bc7fc74c60dabf69555fbd82604d90f02c6e3e11fd"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/dispositions_all_rounds/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "079200071ec99c01b0d664927c6f28e02a296b7194b5737b0063a6d54a994420"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/hash/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/build.sh",
+            "sha256": "47b539f5c4da03bb064dd24361a722e17e68ee98474e4ad8e0b1f4d7e11f863d"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "6bca53aad655bfbabdcc36a540272803aa839ac34efe57b6cf25a01fc6a138a3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/head_stale_src/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "95df51a1c74fc1f5593e340e2afef55bea226db4559477af6f5e7524e76293ca"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_clean/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "e9e34c18b367274993382c21a12fb7fd593a380601e4fd5d8234b088deb7dbef"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/last_high/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "c43d6bc06d1fb7372d389be0dfab6fb0ea360b9418f265282ef127e36ec63c5e"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "7d2cad66a7b1e517173171fa14e1eb0eef1bc7573cfad87b3ca9727a99dcce51"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/never_weakens/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "2a5c32090bd97672d00e3da440a70b51d813846f0ab226f81c08efbfd01faeb8"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/ok/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "bad9c2ef5403d4e0fdc61623e1714c36bb8609da0ee3a53486b02e0a49c91335"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/red_green_required/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "20938af5855eba10f5808460c2ad1b356b1ea2c04d9bd4269da6d205a9cb536f"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rejected_reason/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "847bf12b0a9188ebbebcb402e4b3e29765a9dcb624ec81c6329ca281f9086f6f"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/review_sig/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "8b71b5c8a7e77932258fa0b6d7c12fd1f6972fcfc50b6c23b9b6c5840c47c2c4"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/rounds_contiguous/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "5cd310a49e768100e39b4ad079dac3a950c996da04091a53d29a4283458e05b2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/schema/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "9c753e56ef71f95e9a6418460c44ae231322349990dc31fe5ff49d45fd09f0c0"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/spec_id/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/build.sh",
+            "sha256": "73b7c8740a43117f0f84ce5665d2cdc0879a2a868cf334b008d6198b1a8f0fc2"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/contracts/quality-loop/manifest.json",
+            "sha256": "2314fa50f19ebc94dae798f1e63dc4c0e58f34f4febfbd05391aee87ec9ba4b3"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/contracts/quality-loop/redteam/QL-0.01.json",
+            "sha256": "8e8316747a57a2966fed6eda13cd71cf5f54a3376ddc871d2a7a98117a4f4077"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/contracts/quality-loop/redteam/QL-0.01.r1.spec.json",
+            "sha256": "0563d9e690a09a85831cb2579c9b1131a1ad77597c342621c600f55c2ecba175"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/contracts/quality-loop/redteam/QL-0.01.r2.spec.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/contracts/quality-loop/specs/QL-0.01.json",
+            "sha256": "d920e78595e9a9a67c8826711945875b0e6c07ec881330171bcef8c6e49c2210"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "test/fixtures/redteam/cases/stop_decision/src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          },
+          {
+            "path": "test/fixtures/redteam/lib.mjs",
+            "sha256": "5f6c06f47a27188754a2209beef1da68f962c5e1ae556836b6b26ba99807c0e8"
+          },
+          {
+            "path": "test/fixtures/redteam/reviewer.pub",
+            "sha256": "809c5e658010d31d213c197e71552abfe38c44fe1bae75237b9f5c5ba23f7f59"
+          },
+          {
+            "path": "test/redteam-gate.test.mjs",
+            "sha256": "2d9e5def16251e0d3a805d778ad8570ddca6db562c97d7669d5be8d6e819ef83"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Round 2 reviews the spec as pull request 319 amends it, against the spec on main before it (round 1). The only change is one T1 criterion statement, cited as reviewer_note 17. Mechanical checks run on the amended spec: every task drafts through makeTask; every command, metric and red-green cmd parses with sh -n; every red-green cmd names its test_file in the task's scope. Nothing high.",
+      "amendments": [
+        {
+          "task": "T1",
+          "field": "statement",
+          "from": "Between snapshots, a removed criterion, a removed requirement and a removed stop rule are each SIGNABLE with an amendments entry {task, field, from, to: null, answer} whose citation, of any kind requirement 11 allows (an answer, a note point, a reviewer note or '<spec>:<round>.<n>'), quotes the removed text verbatim and names it contradictory or impossible, and a removed criterion, requirement, stop rule or whole task is SIGNABLE with a move entry when it is verbatim in the receiving spec, following that spec's recorded replacements; each is refused with never_weakens without the entry, with a citation that does not quote it or does not name it contradictory or impossible, and with a move entry whose receiving spec lacks it.",
+          "to": "Between snapshots, a removed criterion, a removed requirement and a removed stop rule are each SIGNABLE with an amendments entry {task, field, from, to: null, answer} whose citation quotes the removed text verbatim and, when it is an answer, a note point or '<spec>:<round>.<n>', names it contradictory or impossible (a reviewer note that quotes it and names where it is carried needs no such word, as T1-c53 states), and a removed criterion, requirement, stop rule or whole task is SIGNABLE with a move entry when it is verbatim in the receiving spec, following that spec's recorded replacements; each is refused with never_weakens without the entry, with a citation that does not quote it, with an answer or note point that does not name it contradictory or impossible, and with a move entry whose receiving spec lacks it.",
+          "reviewer_note": 17
+        }
+      ],
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OWFmOGQyMTRiYzk2YTI2NjNkODU4M2JmNzNjMzkwMDNjZmNkOGRmNmIzNTFkZTQxMDkxZjg0OGNiODcwNzcxMA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "es0YxEH5f2tFk+8tcFyK4aB5nr7vjUZKB7feF/7wkEsok65QymyoNxXzE1ilFo6cPa74pgt6r0SUmDVF+ipkDA=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MWUyZWNkOGExZjk3MTA4MmZmODFlNWEwN2MwYWVjMGE0ODAxZGZjNTIyZTE5MWI0ZDdlODFmOTg0ZmMxNTcyMQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "kKWuiJ/eyYNSjfd3dICvUNEMeeXzc5IXGl7hQfnJohr+YgL7TJr00gTKAJWrykvNQoSxr8GE3gLv6Cj/2uYuBA=="
+          }
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": [
+    {
+      "n": 17,
+      "text": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). I read the text of pull request 319 and the QL-1.01 spec. The criterion on removals and moves asked that a removal's citation of any kind, a reviewer note included, name the removed text contradictory or impossible. The spec's own requirement 6 already accepts a removal cited by a reviewer note whose text quotes the removed text verbatim and names where it is carried (the text is in task T1's requirements), and T1-c53 states it, so the criterion contradicted the requirement it tests. Checked by comparing the two snapshots: exactly one criterion statement of task T1 differs; its verifier is byte for byte unchanged; the new statement keeps the verbatim-quote demand for every citation kind and keeps the word contradictory or impossible for an answer, a note point and another spec's answer, and points to T1-c53 for the reviewer note path. No criterion, requirement or stop rule is removed. This aligns a statement with the requirement above it and does not weaken what the gate refuses. This is a solo review by the author and has not been independently checked.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NGY1MjdlNTBmZTRhMDY2YTM5NGFhOGI2MmU0OTllZjQyMGVmYzQwMjQyNTFiNWZkMzU4ODg1NjI3NWVkMTMxNg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "SQnZh2Q62SoPt4hdrLscPPKTktgZkwMzzuEQVMUTQvtj0AAFRSWVg7pHtryyPq1QkC9Pw8HGOUFFHhHDDdJKDA=="
+          }
+        ]
+      }
+    }
+  ]
+}

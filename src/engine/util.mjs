@@ -4,9 +4,23 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn as spawnChild, spawnSync } from 'node:child_process';
 
 export const sha256 = (data) => crypto.createHash('sha256').update(data).digest('hex');
+/** True when a symbolic link is on the way from `root` down to `abs` (the existing segments below root, `abs` included), or when
+ * `abs` is outside root. Engine code that writes the vault with its own file calls checks it first, so a link that arrived from
+ * disk or a synced backup never sends a write outside the vault (issue 256). */
+export function linkedUnder(root, abs) {
+  const rel = path.relative(root, abs);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) return true;
+  let cur = root;
+  for (const seg of rel.split(path.sep).filter(Boolean)) {
+    cur = path.join(cur, seg);
+    let st; try { st = fs.lstatSync(cur); } catch { return false; }
+    if (st.isSymbolicLink()) return true;
+  }
+  return false;
+}
 export const now = () => new Date().toISOString();
 export const stamp = (d = new Date()) => d.toISOString().slice(0, 16).replace('T', ' ') + 'Z';
 export const exists = (p) => { try { fs.accessSync(p); return true; } catch { return false; } };
@@ -19,6 +33,38 @@ export function run(cmd, args = [], opts = {}) {
   const r = spawnSync(cmd, args, { encoding: 'utf8', ...opts });
   if (r.error) return { ok: false, status: null, stdout: '', stderr: '', error: r.error.message };
   return { ok: r.status === 0, status: r.status, stdout: r.stdout || '', stderr: r.stderr || '', error: null };
+}
+
+/**
+ * Run a command without blocking this process, so a server keeps answering while it runs. Resolves (never rejects) to
+ * { ok, status, stdout, stderr, error, timedOut, tooLarge }. The command is its own process group: a timeout or more output
+ * than maxBuffer kills the whole group with SIGKILL, so a child it started does not outlive it.
+ */
+export function runAsync(cmd, args = [], { cwd, env, timeout = 0, maxBuffer = 1024 * 1024 } = {}) {
+  return new Promise((resolve) => {
+    let child; let done = false; let timer = null;
+    let stdout = ''; let stderr = ''; let size = 0; let timedOut = false; let tooLarge = false; let failed = null;
+    const finish = (status, signal) => {
+      if (done) return; done = true; clearTimeout(timer);
+      const error = failed || (timedOut ? `timed out after ${Math.round(timeout / 1000)} s` : tooLarge ? 'output too large' : signal ? `ended by ${signal}` : null);
+      resolve({ ok: status === 0 && !error, status: error ? null : status, stdout, stderr, error, timedOut, tooLarge });
+    };
+    const killGroup = () => { try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch { /* already gone */ } } };
+    try { child = spawnChild(cmd, args, { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] }); } catch (e) { return resolve({ ok: false, status: null, stdout: '', stderr: '', error: e.message, timedOut: false, tooLarge: false }); }
+    const take = (which) => (b) => {
+      if (done || tooLarge) return;
+      size += b.length;
+      if (size > maxBuffer) { tooLarge = true; killGroup(); return; }
+      if (which === 'out') stdout += b; else stderr += b;
+    };
+    child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
+    child.stdout.on('data', take('out')); child.stderr.on('data', take('err'));
+    child.on('error', (e) => { failed = e.message; finish(null, null); });
+    child.on('close', (status, signal) => finish(status, signal));
+    // a grandchild that escaped the group and holds the pipes open must not hold the result back
+    child.on('exit', (status, signal) => setTimeout(() => finish(status, signal), 2000).unref());
+    if (timeout > 0) timer = setTimeout(() => { timedOut = true; killGroup(); }, timeout);
+  });
 }
 
 export function readJson(file, fallback = null) {

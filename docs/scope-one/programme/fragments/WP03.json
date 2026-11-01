@@ -1,0 +1,160 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP03-01",
+      "title": "Shared serialisation test vectors (JSON) produced by the Python reference for ORSet, LWWMap, AgentState",
+      "phase": "implement",
+      "owner": "area-engine",
+      "depends_on": [
+        "WP02-02"
+      ],
+      "requirements": [
+        "MV-DEM-06"
+      ],
+      "description": "Repo: crdt-merge.",
+      "scope": {
+        "allow": [
+          "tests/vectors/**",
+          "tests/test_vectors_generate.py"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP03-01-AC01",
+          "mandatory": true,
+          "statement": "vector generator test passes",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/test_vectors_generate.py",
+            "cmd": "python -m pytest -x -q {test}"
+          }
+        },
+        {
+          "id": "WP03-01-AC02",
+          "mandatory": true,
+          "statement": "vector file exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "tests/vectors/orset.json"
+          }
+        },
+        {
+          "id": "WP03-01-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP03-01-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP03-02",
+      "title": "TypeScript edition reads and re-emits every vector byte-identically",
+      "phase": "verify",
+      "owner": "area-engine",
+      "depends_on": [
+        "WP03-01"
+      ],
+      "requirements": [
+        "MV-DEM-06"
+      ],
+      "description": "Repo: crdt-merge-ts. Vectors copied from crdt-merge at a pinned commit.",
+      "scope": {
+        "allow": [
+          "test/vectors.test.*"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP03-02-AC01",
+          "mandatory": true,
+          "statement": "vector test present",
+          "verifier": {
+            "type": "test_exists",
+            "test_file": "test/vectors.test.ts"
+          }
+        },
+        {
+          "id": "WP03-02-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP03-02-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP03-03",
+      "title": "Rust edition reads and re-emits every vector byte-identically",
+      "phase": "verify",
+      "owner": "area-engine",
+      "depends_on": [
+        "WP03-01"
+      ],
+      "requirements": [
+        "MV-DEM-06"
+      ],
+      "description": "Repo: crdt-merge-rs.",
+      "scope": {
+        "allow": [
+          "tests/vectors.rs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP03-03-AC01",
+          "mandatory": true,
+          "statement": "vector test present",
+          "verifier": {
+            "type": "test_exists",
+            "test_file": "tests/vectors.rs"
+          }
+        },
+        {
+          "id": "WP03-03-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP03-03-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}

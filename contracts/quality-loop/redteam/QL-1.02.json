@@ -1,0 +1,225 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "QL-1.02",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "604bd1d7542161eba89a7886222f5105951538a4f7b37fe2ac917143d7c82fe8",
+      "base_commit": "b76bcf89b769b7e985f2505336ff087bb44b4fa9",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "changelog.d/QL-1.02.md",
+            "sha256": "c92687e3a61dacaf7469cf8d609aa95b242af5296d7136e9a550c3a3f0af0a08"
+          },
+          {
+            "path": "docs/CONTRACTS.md",
+            "sha256": "ed428b0d844d0cd3612966ae4144f737a7513d0cad96a91fc2dde9ba490acceb"
+          },
+          {
+            "path": "docs/MODULES.md",
+            "sha256": "1bc02214fea53351ee60db81e1b94dd269a7a6fbab9240cf2f37bf4225981f6a"
+          },
+          {
+            "path": "scripts/gate/mutate.mjs",
+            "sha256": "52b884ec18ccb2017a5c65e096e14210484e9d2b4d3f3843f76b37ee82f20c65"
+          },
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "b5b7e0282a53460ad1098ebf2dfe0a83f01369a8e8233f83023e2d1947ad4663"
+          },
+          {
+            "path": "src/engine/mutation-gate.mjs",
+            "sha256": "b598d62a2bef82f7e0813ae6a3e0cafc7be7e69ad8b37c9a92dbe45600cf4fbc"
+          },
+          {
+            "path": "test/gate-mutate.test.mjs",
+            "sha256": "5d3123b5d1626a3bda0f92c2d582aec7ae28dd7e872ca3e2d27eb5506b46cd5f"
+          },
+          {
+            "path": "test/helpers/cli.mjs",
+            "sha256": "4f9f3a86b82e0e8651060aab9c76248dedf509aee4b9d05e47a230f7502de753"
+          },
+          {
+            "path": "test/helpers/load-log.mjs",
+            "sha256": "a612825386485641a067859f0644bd0aaab2f9737aa7281ea7969bf02b152de4"
+          },
+          {
+            "path": "test/helpers/mutate-repo.mjs",
+            "sha256": "45cca1aa05b6ae76a5cc173f7f6a7dac171c5963c914caa265497add3b23f789"
+          },
+          {
+            "path": "test/helpers/proc.mjs",
+            "sha256": "057fc4219f8770a2b51f1aba396734b7013356028df9fec16c16f8f660301a63"
+          },
+          {
+            "path": "test/helpers/string-literals.mjs",
+            "sha256": "13b52fd0f09d65c245342c144bbabb21bc21d04c1e1f8223a7e9049e72a325c4"
+          },
+          {
+            "path": "test/helpers/tier-fixtures.mjs",
+            "sha256": "3af940f5e0db38105859067532ca8d040d02cac8dbc16a6d714a5b60ee1e3d95"
+          },
+          {
+            "path": "test/helpers/tmp.mjs",
+            "sha256": "6510edf94b4c411ab3caaa66976aee56c81df5e4cabc43620d157b10fef08ac5"
+          },
+          {
+            "path": "test/helpers/trial-constants.mjs",
+            "sha256": "05268a1009ea8f2a9aa257d9aff14a4737ffb8b645d30201bd0bf37953da16cf"
+          }
+        ]
+      },
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Round 1 is the baseline: the spec as it stood on main at aa3af6c, before pull request 319. Earlier review rounds of this spec were made off this repository and are not reproduced here.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MTkzNDA2MWZkZWI2NmMyZWYzMDk3NDIyNmVlNzdhNjg1NTY5MzBiNGQ1MWYxZjJjOTIxMzE3MzMxNGVjYjM0OA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "l4qanyj6mPQbzzLSwVr5NW/E0RhjSuFOMd95X9AaicgDt+CMx+9bUTdBwsE+jr2IHqDrdiJQzhEm3y+pKLTTDw=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "b4a007b532f981b24d3bee5ffc53727dba9c119c2b5702975c7b3f4ca819b4e2",
+      "base_commit": "b76bcf89b769b7e985f2505336ff087bb44b4fa9",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "changelog.d/QL-1.02.md",
+            "sha256": "c92687e3a61dacaf7469cf8d609aa95b242af5296d7136e9a550c3a3f0af0a08"
+          },
+          {
+            "path": "docs/CONTRACTS.md",
+            "sha256": "ed428b0d844d0cd3612966ae4144f737a7513d0cad96a91fc2dde9ba490acceb"
+          },
+          {
+            "path": "docs/MODULES.md",
+            "sha256": "1bc02214fea53351ee60db81e1b94dd269a7a6fbab9240cf2f37bf4225981f6a"
+          },
+          {
+            "path": "scripts/gate/mutate.mjs",
+            "sha256": "52b884ec18ccb2017a5c65e096e14210484e9d2b4d3f3843f76b37ee82f20c65"
+          },
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "b5b7e0282a53460ad1098ebf2dfe0a83f01369a8e8233f83023e2d1947ad4663"
+          },
+          {
+            "path": "src/engine/mutation-gate.mjs",
+            "sha256": "b598d62a2bef82f7e0813ae6a3e0cafc7be7e69ad8b37c9a92dbe45600cf4fbc"
+          },
+          {
+            "path": "test/gate-mutate.test.mjs",
+            "sha256": "5d3123b5d1626a3bda0f92c2d582aec7ae28dd7e872ca3e2d27eb5506b46cd5f"
+          },
+          {
+            "path": "test/helpers/cli.mjs",
+            "sha256": "4f9f3a86b82e0e8651060aab9c76248dedf509aee4b9d05e47a230f7502de753"
+          },
+          {
+            "path": "test/helpers/load-log.mjs",
+            "sha256": "a612825386485641a067859f0644bd0aaab2f9737aa7281ea7969bf02b152de4"
+          },
+          {
+            "path": "test/helpers/mutate-repo.mjs",
+            "sha256": "45cca1aa05b6ae76a5cc173f7f6a7dac171c5963c914caa265497add3b23f789"
+          },
+          {
+            "path": "test/helpers/proc.mjs",
+            "sha256": "057fc4219f8770a2b51f1aba396734b7013356028df9fec16c16f8f660301a63"
+          },
+          {
+            "path": "test/helpers/string-literals.mjs",
+            "sha256": "13b52fd0f09d65c245342c144bbabb21bc21d04c1e1f8223a7e9049e72a325c4"
+          },
+          {
+            "path": "test/helpers/tier-fixtures.mjs",
+            "sha256": "3af940f5e0db38105859067532ca8d040d02cac8dbc16a6d714a5b60ee1e3d95"
+          },
+          {
+            "path": "test/helpers/tmp.mjs",
+            "sha256": "6510edf94b4c411ab3caaa66976aee56c81df5e4cabc43620d157b10fef08ac5"
+          },
+          {
+            "path": "test/helpers/trial-constants.mjs",
+            "sha256": "05268a1009ea8f2a9aa257d9aff14a4737ffb8b645d30201bd0bf37953da16cf"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Round 2 reviews the spec as pull request 319 amends it, against the spec on main before it (round 1). The only change is the cmd of three T2 metric criteria, cited as reviewer_note 7. Mechanical checks run on the amended spec: every task drafts through makeTask; every command, metric and red-green cmd parses with sh -n; every red-green cmd names its test_file in the task's scope. Nothing high.",
+      "amendments": [
+        {
+          "task": "T2",
+          "field": "verifier.cmd",
+          "statement": "T2's own change to src/engine/contracts.mjs and src/engine/mutation-lint.mjs is judged by the gate against the tests that exercise it: survived == 0, with companion metrics mutants > 0 and ignored == 0 on the same cmd.",
+          "from": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/gate-mutate-lint.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs\" --json",
+          "to": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/gate-mutate-lint.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs\" --scope src/engine/contracts.mjs --scope docs/CONTRACTS.md --scope test/gate-mutate-lint.test.mjs --scope 'test/helpers/**' --scope docs/MODULES.md --scope changelog.d/QL-1.02.md --scope src/engine/mutation-lint.mjs --json",
+          "reviewer_note": 7
+        },
+        {
+          "task": "T2",
+          "field": "verifier.cmd",
+          "statement": "T2's own change: the same gate run judged at least one mutant.",
+          "from": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/gate-mutate-lint.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs\" --json",
+          "to": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/gate-mutate-lint.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs\" --scope src/engine/contracts.mjs --scope docs/CONTRACTS.md --scope test/gate-mutate-lint.test.mjs --scope 'test/helpers/**' --scope docs/MODULES.md --scope changelog.d/QL-1.02.md --scope src/engine/mutation-lint.mjs --json",
+          "reviewer_note": 7
+        },
+        {
+          "task": "T2",
+          "field": "verifier.cmd",
+          "statement": "T2's own change: no changed line was ignored.",
+          "from": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/gate-mutate-lint.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs\" --json",
+          "to": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/gate-mutate-lint.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs\" --scope src/engine/contracts.mjs --scope docs/CONTRACTS.md --scope test/gate-mutate-lint.test.mjs --scope 'test/helpers/**' --scope docs/MODULES.md --scope changelog.d/QL-1.02.md --scope src/engine/mutation-lint.mjs --json",
+          "reviewer_note": 7
+        }
+      ],
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NmM3YzViOTYzODZhODkwNjJkNGNhNzFlYzFlNGVmOWZiYzY2YzM4ZTgwOGY0ZWI4NmI3MWYxMmI5ZDI0Y2FmOA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "JYdVRFe3Z//5ojTDProglg72uikoHfMa4W362ECdSoY7QJxjBenbkGXug8rVWzvz8aZlsyFK9Wa8IeN4oj9oAw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YTQ4NWNlYjMwYzU2NTg4MmVjZjRkMmU5MDg2Yjc5MTljYWY1Njc4OWZlYmIyNTIxZjk4OWZkZWQzYTc0ZTQ0Yg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "QwJGjWd5rwDkP+vfvO6DHS72YSRc80kkQpzLvOMUYvDwQhIIAIzEW595Wv6JNaxTMGoA+mVUx9Oec/A3fWJFAw=="
+          }
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": [
+    {
+      "n": 7,
+      "text": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). I read the text of pull request 319 and the QL-1.02 spec. The three metric criteria of task T2 (survived == 0, mutants > 0, ignored == 0) say they judge T2's own change to src/engine/contracts.mjs and src/engine/mutation-lint.mjs, but their cmd named no --scope, so a run from the contract's base also judged task 1's runner (src/engine/mutation-gate.mjs) against test files that never exercise it, and survived == 0 could not hold for a correct T2. T2's own requirement allows the canonical command with --scope and each of the task's scope globs before --json. Checked by comparing the two snapshots: exactly the three cmd fields differ; in each the new cmd is the old cmd with 7 --scope flags added before --json, and those flags are exactly T2's scope globs (src/engine/contracts.mjs, docs/CONTRACTS.md, test/gate-mutate-lint.test.mjs, test/helpers/**, docs/MODULES.md, changelog.d/QL-1.02.md, src/engine/mutation-lint.mjs), in the order of the scope list; statement, type, key, op, value and timeout_s are unchanged. This carries out a form the spec already allows and judges the same lines it names, so I do not read it as a loosened metric. This is a solo review by the author and has not been independently checked.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OWUwNzE0YTA2ZGNiZmM4MGI1NTg4MWNiZDBiZDFlNGM4ZDFiZGExYmQyNjMxNDkyNDg3ZjgyY2VlNjA2ZTQ5MA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "xzvomrRozBFg8lDsiJ4mPWhkzF7XAb/XPwWPv+bmUfjuilO63pBZwZ2NPBek+TNWZgIbzteThthKA2bSgYu+DA=="
+          }
+        ]
+      }
+    }
+  ]
+}

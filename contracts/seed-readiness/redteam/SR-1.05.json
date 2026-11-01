@@ -1,0 +1,84 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SR-1.05",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "a14dd052c3737c30004d85f7ece7488251cfafad5ac79b46ff8c6e6efbd1059e",
+      "base_commit": "4282ba7d1f0e0db2c4f0335bfd949bfcbbbe7f1b",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/CLOUD.md",
+            "sha256": "a2a666280b5d3427beae8797375872c0c6a2502307597622a0afad57f582aad8"
+          },
+          {
+            "path": "docs/MODULES.md",
+            "sha256": "1bc02214fea53351ee60db81e1b94dd269a7a6fbab9240cf2f37bf4225981f6a"
+          },
+          {
+            "path": "src/cli/tunnel.mjs",
+            "sha256": "757a81459299b72ae614b29a7b4baf9ce237602157df8b0819b21a1060906c7f"
+          },
+          {
+            "path": "src/server/http.mjs",
+            "sha256": "bdc46b5ad8592c9bad976d3ac92196a5b57ab53ad14b205e0e9042e1a0886a35"
+          },
+          {
+            "path": "src/server/main.mjs",
+            "sha256": "7fa8892a63b1c3447febd7736244fc6a013a51b0a50e658f3d8be76c6040c4d0"
+          },
+          {
+            "path": "test/connectors-unlimited.test.mjs",
+            "sha256": "e23463f4df151c3f315040d66f32e0905e542b8f46b344bf9627ed06b6ba9c62"
+          },
+          {
+            "path": "test/http.test.mjs",
+            "sha256": "a0be43cdf1e3aecf63f001779d88c5789fc32156e44dce1bcb351639fcb98ff4"
+          },
+          {
+            "path": "test/oauth.test.mjs",
+            "sha256": "442dce5878eac636497aa6912124b581953d4009fb73b6a3a599220bb4081e3e"
+          },
+          {
+            "path": "test/remote-proof-order.test.mjs",
+            "sha256": "bf3776a27a864bda621bb5843319bc550b784be6bedc63ae6617129e34f151c1"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "low",
+          "how": "task T1 holds 1 criterion statement(s) that appear more than once (2x \"Rewrite 'request path fills the exposed limiter' to agree wi\"), which makes a report that names a criterion by its statement ambiguous",
+          "disposition": "rejected",
+          "reason": "the repeated criteria are identical, which a change of this signed text would have to remove"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Re-sign review of the spec as it stands on main at 4282ba7d1f0e, for a contract signed before the red-team gate. It has 1 task(s) and 40 criteria. Mechanical checks run on every criterion, and these are the only checks made: each task drafts through makeTask; each command, metric and red-green cmd parses with sh -n; each red-green cmd names its test_file and that file is in the task's scope; no criterion statement is repeated within a task except as answer 1 records; every contract this spec depends on, in its manifest row, is a manifest row. They found one low finding, recorded as answer 1. I did not re-run the three rounds that were made off this repository before the first signing, and I did not run the checks the criteria name, because their code is not built yet. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YzI1YjBkOWVhZmM2ZDI0ZjljODBlYjgyYmM4OTYwMTA2M2JkZGM0NWRlMDdiNjFlNGQ4ZDMwMjAwMDQ1YzYxYw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "SJ8WOdR4eA8gr18v7NE86i4eqWQ7zYm21DVSNeqGyKxo8VsauEhZN11/IUSN1iTSrWSf0AQHRAxjJAUDdRT6Dg=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NjYyYTE3MDAxNTc5NWM0NDYxMmE2YjQzODg3MDhmMGMxYjRmZWE5ODdmMmMzZjY3Mjg0OWRjZGYwNGFlYzlkMQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "btnb2Ka7/7ZEr1NgekHRAVTUdslzpcmLW0DcZudzBPC4h8q6kWhytGRXHTSFLo9ZMSeJAC4e2BKyyrVNhkSQCQ=="
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -36,7 +36,9 @@ anything.
 
 **Graph.** Entities extracted from sections, co-occurrence, explicit edges (`memev_link`), and
 claims whose status (conjecture, theory, fact, contested, refuted) is recomputed from the weight of
-supporting and opposing evidence. Usage records say which memory each session used.
+supporting and opposing evidence. A finding is a claim that carries its sources and scope, and evidence alone
+stops it at theory ([ORGANISATIONAL-INTELLIGENCE.md](ORGANISATIONAL-INTELLIGENCE.md), planned). Usage records say which
+memory each session used.
 
 **Scale.** `scripts/growth-bench.mjs` simulates heavy use: 170 million tokens of sessions (99
 sessions, 8,096 turns, 25,862 logged operations) in 29 seconds, with the heap peaking at 160 MB

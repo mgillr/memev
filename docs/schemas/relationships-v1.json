@@ -1,0 +1,32 @@
+{
+  "$comment": "The relationship model of a project: three entity kinds beside the store's own, and eleven link types stored as events. Read by src/engine/relationships.mjs and by the project store.",
+  "version": 1,
+  "entity_kinds": {
+    "milestone": { "required": ["title"] },
+    "deliverable": { "required": ["title"] },
+    "work_package": { "required": ["title"] }
+  },
+  "link_event": {
+    "type": "relationship.linked",
+    "required": ["id", "link_type", "from", "to"],
+    "endpoint": { "required": ["kind", "id"] }
+  },
+  "link_types": {
+    "scope-to-milestone": { "from": ["scope", "requirement"], "to": ["milestone"] },
+    "milestone-to-plan": { "from": ["milestone"], "to": ["plan"] },
+    "milestone-to-deliverable": { "from": ["milestone"], "to": ["deliverable"] },
+    "deliverable-to-work-package": { "from": ["deliverable"], "to": ["work_package"] },
+    "work-package-to-task": { "from": ["work_package"], "to": ["task"] },
+    "task-to-dependency": { "from": ["task"], "to": ["task"] },
+    "task-to-artifact": { "from": ["task"], "to": ["artifact"] },
+    "task-to-check": { "from": ["task"], "to": ["check"] },
+    "task-to-evidence": { "from": ["task"], "to": ["evidence"] },
+    "blocker-to-work": { "from": ["blocker"], "to": ["task", "work_package"] },
+    "permission-to-resource": { "from": ["permission"], "to": ["resource"] }
+  },
+  "stale_marker": {
+    "type": "stale.marked",
+    "targets": ["plan", "task", "artifact", "approval", "evidence"],
+    "cleared_by": ["verification", "re-acceptance"]
+  }
+}

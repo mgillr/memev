@@ -1,0 +1,44 @@
+{
+  "title": "SR-6.04 Listed where people look for MCP servers",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G51: MCP and connector directory entries are drafts marked do not post. Repository: memev. Depends on contracts: SR-6.02.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Submissions accepted",
+      "phase": "release",
+      "depends_on": [],
+      "requirements": [
+        "submitted to the official MCP registry and at least two major directories; links recorded once live"
+      ],
+      "description": "",
+      "scope": [
+        "docs/directories/**",
+        "scripts/count-entries.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "Listed in at least 3 directories",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/count-entries.mjs docs/directories/listed.md --json",
+            "key": "entries",
+            "op": ">=",
+            "value": 3
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

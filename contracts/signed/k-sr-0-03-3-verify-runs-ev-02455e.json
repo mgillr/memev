@@ -1,0 +1,780 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Base revision recorded at signing",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "contractSign records base = { sha, recorded_at }: the spec's explicit base when it names one (requirement 2), else git rev-parse HEAD of the contract's workdir when the workdir is a git checkout, before the DSSE signature is made, so the signature covers it",
+        "memev contract new accepts an explicit base sha in the spec and refuses a value that is not 40 hex characters",
+        "a scope or test_red_green criterion of a contract without a recorded base returns BLOCKED with the detail no base revision recorded, never PASS",
+        "docs/CONTRACTS.md documents the base and where verify reads it",
+        "command, metric and red-green commands run with MEMEV_CONTRACT_BASE set to the recorded base sha in their environment, so a criterion can name the base (the mutation gate of QL-1.02 reads it)",
+        "the base is recorded only when a contract is signed on this machine; a remote-signed contract gets its base recorded at local approval (memev contract approve), from the workdir HEAD at that moment; contractSign never runs git for a remote caller",
+        "memev contract new refuses a spec whose workdir is null unless --workdir is given, and records the absolute real path (fs.realpathSync), so commands, base and scope never fall back to the vault root by accident",
+        "each red-green criterion of this task that runs test/contracts-base.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c08: for the first), and the criterion runs only that subtest"
+      ],
+      "description": "This task's scope criterion needs the scope verifier of T2: until T2 lands, verify returns BLOCKED for it, never PASS, and the task cannot reach PASS.",
+      "scope": {
+        "allow": [
+          "src/engine/contracts.mjs",
+          "src/cli/contracts-cli.mjs",
+          "docs/CONTRACTS.md",
+          "test/contracts-base.test.mjs",
+          "test/helpers/**",
+          "test/contracts-base-legacy.test.mjs",
+          "test/contracts-base-env.test.mjs",
+          "test/contracts-base-format.test.mjs",
+          "test/contracts-base-remote.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "Signing in a git workdir records the base sha and a signed contract without one gets BLOCKED on its scope criterion",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base.test.mjs",
+            "cmd": "node --test test/contracts-base.test.mjs"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "The contracts page documents the base revision",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CONTRACTS.md",
+            "pattern": "base revision"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "Setup: a git workdir with a committed out-of-scope change, and a legacy contract without a base, signed by the test with vendor/attest/signature.mjs and written directly to contracts/signed. That contract gets BLOCKED with a detail matching /no base revision recorded/ on both scope and test_red_green, and the red command's marker stays absent. For a normally signed contract, the signed contract JSON (whose canonical hash the DSSE payload carries) has base.sha equal to `git rev-parse HEAD` at signing, and editing base.sha in contracts/signed makes the signature check fail.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-legacy.test.mjs",
+            "cmd": "node --test test/contracts-base-legacy.test.mjs"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "A fixture is signed in a git workdir with one command, one metric and one test_red_green criterion. Each command appends `${MEMEV_CONTRACT_BASE-unset}` to a file outside the workdir. The file ends with four lines (command, metric, red, green), each equal to the signed base.sha (40 hex). For a legacy contract without a base, the command criterion writes 'unset' even when the daemon's environment has MEMEV_CONTRACT_BASE set.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-env.test.mjs",
+            "cmd": "node --test test/contracts-base-env.test.mjs"
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "contractDraft, and memev_contract_draft over MCP with both a local and a remote token, refuse base values '--output=x', 'HEAD', 'abc' and a 41-hex string, and no draft is written. A contract signed by the test with vendor/attest/signature.mjs and base '--output=<tmp>/pwned' gets BLOCKED on scope and test_red_green, and <tmp>/pwned does not exist. An explicit base that exists but is not an ancestor of HEAD gets BLOCKED 'base <sha> is not an ancestor of HEAD'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-format.test.mjs",
+            "cmd": "node --test test/contracts-base-format.test.mjs"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "A remote caller (local:false) drafts and signs a contract whose workdir is a git repository, with PATH arranged so that 'git' is a wrapper that writes a marker. The marker stays absent and the signed JSON has no base. After a local contractApprove, verify sets MEMEV_CONTRACT_BASE to the HEAD at approval time. Editing the recorded approval base on disk makes verify return the broken-signature result (or BLOCKED 'approval record changed') with no criterion run.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-remote.test.mjs",
+            "cmd": "node --test test/contracts-base-remote.test.mjs"
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "This contract is drafted with the memev checkout as its workdir and a pinned base. The workdir is the checkout top level (git rev-parse --show-toplevel equals the working directory). The base is 3989c80bea615381947758e0ab1d28dfe18f115b, the memev main commit that merged pull request #343, which carried the README re-sign fix (owner delegation, 1 Nov 2026).",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$MEMEV_CONTRACT_BASE\" = 3989c80bea615381947758e0ab1d28dfe18f115b ] && [ \"$(git rev-parse --show-toplevel)\" = \"$(pwd -P)\" ]",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "T1-c08: In a temporary git repository at commit H, a contract whose spec names the explicit base M, an earlier commit, records base.sha M when it is signed at H, and a contract whose spec names no base records H; in both cases the DSSE signature covers the recorded base.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/contracts-base.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "One full run of test/contracts-base.test.mjs passes every labelled subtest (T1-c08) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/contracts-base.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "Changes stay in scope (BLOCKED until T2, the scope verifier, lands)",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Scope verifier",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "a scope criterion lists the files changed between the recorded base and the working tree of the workdir (git diff --name-status with renames, plus untracked files not ignored) and matches each against the task's scope globs with the vendored matchAny",
+        "any changed file outside the globs is FAIL with the files named; no changed files or all inside is PASS with the count; a workdir that is not a git checkout is BLOCKED",
+        "the receipt path contracts/ inside the vault is never part of the comparison when the workdir is the vault itself",
+        "scope has one semantics. The range is the commits reachable from HEAD and not from the recorded base, and nothing else is excluded: a merge of main or a rebase onto a newer main brings main's commits into the range and needs an amendment with a new base (memev contract amend), and in the vault, where HEAD is main, the range runs from the recorded base to HEAD; no local branch, remote-tracking ref or fetched ref decides what is excluded, since a worker can move every one of them. A non-merge commit carrying exactly one trailer 'Contract-Task: <contract id> <task id>' of this contract is judged against that task's scope; a commit carrying no trailer (the vault's own memev: commits included) is judged against the union of the contract's task scopes; a commit naming more than one task, or a task of another contract, is FAIL naming the commit; a merge commit is judged on what it adds beyond its parents (its remerge diff) against the union. Uncommitted changes, untracked files (whatever the ignore rules outside tracked .gitignore files say) and files hidden by skip-worktree or assume-unchanged are judged against the union. Every FAIL names the out-of-scope path and the commit, or uncommitted",
+        "the change's own changelog note (changelog.d/<SR or contract id>.md) and files the repository's generators write (docs/MODULES.md, when the generator taken from the recorded base, run in a temporary worktree under the git hardening of requirement 7, reproduces it; the worker's copy of the generator never runs) count as in scope for the task whose commit writes them",
+        "scope, red-green and metric criteria inherit all three command gates (remote-signed without approval, exec_local_only for a remote caller, contracts.exec off) and the vault confinement that file criteria have for a remote caller or a remote-signed contract",
+        "git run by verify runs with core.fsmonitor unset, hooks off (core.hooksPath set to an empty folder), --no-ext-diff and --no-textconv, and no filter driver from .gitattributes; for a remote caller the scope detail names only paths inside the caller's path scope and counts the rest",
+        "each red-green criterion of this task that runs test/contracts-scope-history.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T2-c07: for the first), and the criterion runs only that subtest"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "src/engine/contracts.mjs",
+          "test/contracts-scope.test.mjs",
+          "test/helpers/**",
+          "test/contracts-scope-trailers.test.mjs",
+          "test/contracts-base-unknown.test.mjs",
+          "test/contracts-scope-cases.test.mjs",
+          "test/contracts-scope-tasks.test.mjs",
+          "test/contracts-scope-remote.test.mjs",
+          "test/contracts-scope-vault.test.mjs",
+          "test/contracts-scope-history.test.mjs",
+          "test/contracts-scope-gates.test.mjs",
+          "test/contracts-scope-nogit.test.mjs",
+          "test/contracts-scope-mainref.test.mjs",
+          "test/contracts-scope-hidden.test.mjs",
+          "test/contracts-scope-hardening.test.mjs",
+          "changelog.d/SR-0.03.md",
+          "docs/MODULES.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T2-AC01",
+          "mandatory": true,
+          "statement": "A seeded change outside the task's globs fails the scope criterion and a change inside passes it",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope.test.mjs",
+            "cmd": "node --test test/contracts-scope.test.mjs"
+          }
+        },
+        {
+          "id": "T2-AC02",
+          "mandatory": true,
+          "statement": "A workdir has an out-of-scope change. A contract whose base is a 40-hex sha absent from the repository, and one whose base commit was removed (reset --hard, reflog expire --all, gc --prune=now), both get BLOCKED on scope and on test_red_green with the detail 'base <sha> not found', and the red command's marker stays absent. `memev contract new` with a base of 'abc', or of 41 hex characters, is refused before any draft is written.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-unknown.test.mjs",
+            "cmd": "node --test test/contracts-base-unknown.test.mjs"
+          }
+        },
+        {
+          "id": "T2-AC03",
+          "mandatory": true,
+          "statement": "In a standalone git repository outside the vault, with scope ['src/a/**'], each of these is FAIL with the out-of-scope path named in the detail: a rename src/b/x.js -> src/a/x.js (the old path is named); a deletion of src/b/y.js; an untracked src/b/new.js; an untracked file excluded only by .git/info/exclude (ignore rules come only from .gitignore files tracked at the base); a tracked src/b/z.js modified after `git update-index --skip-worktree`; and a non-ASCII src/b/é.js. With the workdir set to the subdirectory src/a, a change to src/b/x.js elsewhere in the same repository is FAIL. A change only inside src/a is PASS with count 1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-cases.test.mjs",
+            "cmd": "node --test test/contracts-scope-cases.test.mjs"
+          }
+        },
+        {
+          "id": "T2-AC04",
+          "mandatory": true,
+          "statement": "Two-task fixture (T1 scope ['a.js'], T2 scope ['b.js']): a commit trailered 'Contract-Task: <id> T1' that changes b.js makes T1's scope criterion FAIL naming b.js and the commit, and T2's PASS; the same change in an untrailered commit is judged against the union, and both PASS.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-tasks.test.mjs",
+            "cmd": "node --test test/contracts-scope-tasks.test.mjs"
+          }
+        },
+        {
+          "id": "T2-AC05",
+          "mandatory": true,
+          "statement": "The workdir is a git repository outside the vault that holds an untracked file named leak-7f3a.txt. Three cases: a remote-signed contract (approved and unapproved), and a local-signed contract verified with local:false. In each, the scope criterion is BLOCKED with 'outside the vault'; a test_red_green criterion whose test_file exists there is BLOCKED the same way; and a metric whose output_file is '../x.json' or an absolute path is BLOCKED. Neither the verify result JSON nor contracts/receipts/<id>.md contains 'leak-7f3a'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-remote.test.mjs",
+            "cmd": "node --test test/contracts-scope-remote.test.mjs"
+          }
+        },
+        {
+          "id": "T2-AC06",
+          "mandatory": true,
+          "statement": "With a project repository (not the vault) that tracks contracts/signed/x.json as workdir, changing that file is FAIL naming it. With the vault root as workdir, given through a symlinked or /private/tmp-spelled path and with scope ['memory/**','work/**'], no contracts/ path written by sign or verify is listed, and an out-of-scope note at notes/out.md written by a separate vault write is FAIL naming it.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-vault.test.mjs",
+            "cmd": "node --test test/contracts-scope-vault.test.mjs"
+          }
+        },
+        {
+          "id": "T2-AC07",
+          "mandatory": true,
+          "statement": "Fixture with scope ['src/a/**'] and base B. (i) A merge commit (two parents) whose tree adds src/b/evil.js, which neither parent has: FAIL naming src/b/evil.js and the merge sha. (ii) One commit whose body has 'Contract-Task: <id> T1' and 'Contract-Task: <id> T2' in separate paragraphs (the squash shape) and changes src/b/x.js: FAIL with 'more than one task' or naming src/b/x.js, never PASS. (iii) A commit with no trailer that changes src/a/ok.js: PASS, judged against the union; one with no trailer that changes src/b/z.js: FAIL naming src/b/z.js and the commit.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-history.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c07:' test/contracts-scope-history.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC08",
+          "mandatory": true,
+          "statement": "Run the scope criterion in the three gate setups: remote-signed and unapproved; local-signed and verified with local:false and exec_local_only unset; contracts.exec:false. In each, the workdir is a git repository INSIDE the vault root that has core.fsmonitor set to a script writing marker-fsm, a .gitattributes filter whose clean command writes marker-filter, and a scripts/docs/module-graph.mjs that writes marker-gen. In every setup, scope is BLOCKED with exactly the command criterion's detail (contracts.mjs:225-227), all three markers stay absent, and the result JSON names no path from the repository.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-gates.test.mjs",
+            "cmd": "node --test test/contracts-scope-gates.test.mjs"
+          }
+        },
+        {
+          "id": "T2-AC09",
+          "mandatory": true,
+          "statement": "Sign in a git workdir, then add an out-of-scope file. Then (i) rename .git away, and (ii) put a 'git' first on the daemon's PATH that exits 128. In each case, scope is BLOCKED with a detail naming the git failure or 'not a git checkout', test_red_green is BLOCKED, and neither is ever PASS.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-nogit.test.mjs",
+            "cmd": "node --test test/contracts-scope-nogit.test.mjs"
+          }
+        },
+        {
+          "id": "T2-AC10",
+          "mandatory": true,
+          "statement": "Rewrite C2.7(iii) and C2.4 to the R2.4 rule, each case in its own fixture and its own verify. (1) An untrailered commit changing src/a/ok.js is PASS with count 1. (2) An untrailered commit changing src/b/z.js, a path outside every task, is FAIL naming src/b/z.js and the commit sha. (3) In the two-task fixture, a commit trailered 'Contract-Task: <id> T1' that changes b.js is FAIL for T1, naming b.js and the commit. (4) An uncommitted b.js edit with no trailered commits is PASS for both T1 and T2. Drop the per-task-window sentence.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-history.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T2-c10:' test/contracts-scope-history.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T2-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T2-AC11",
+          "mandatory": true,
+          "statement": "New test/contracts-scope-mainref.test.mjs (add to T2 scope). Base B is on main. (i) An out-of-scope src/b/x.js is committed on main itself, so HEAD == main. (ii) On a branch: out-of-scope commit X, then `git branch -f main HEAD`, then in-scope commit Y. (iii) The vault root is the workdir with scope ['memory/**']; notes/out.md is written by a vault write, and v.commits.flush() runs before verify. Each case is FAIL naming the path and its commit, never PASS. (iv) On a branch with out-of-scope commit X, `git update-ref refs/remotes/origin/main HEAD`, and separately a fetch from a local fake remote whose main is HEAD, before verify: FAIL naming X. The range is the recorded base to HEAD and nothing is excluded.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-mainref.test.mjs",
+            "cmd": "node --test test/contracts-scope-mainref.test.mjs"
+          }
+        },
+        {
+          "id": "T2-AC12",
+          "mandatory": true,
+          "statement": "New test/contracts-scope-hidden.test.mjs (add to T2 scope). Scope is ['src/a/**']. Each of these, in its own fixture, is FAIL naming the path: (a) tracked package.json edited after `git update-index --assume-unchanged package.json`; (b) an untracked src/b/.gitignore containing '*' plus an untracked src/b/new2.js; (c) an untracked src/b/x.tmp excluded only by a core.excludesFile set in .git/config.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-hidden.test.mjs",
+            "cmd": "node --test test/contracts-scope-hidden.test.mjs"
+          }
+        },
+        {
+          "id": "T2-AC13",
+          "mandatory": true,
+          "statement": "New test/contracts-scope-hardening.test.mjs (add to T2 scope). A local-signed contract is verified locally with contracts.exec on. The workdir has core.fsmonitor set to a script that writes marker-fsm, a .gitattributes filter whose clean command (in .git/config) writes marker-filter, a post-checkout hook that writes marker-hook, and a scripts/docs/module-graph.mjs changed after the base to write marker-gen; docs/MODULES.md is also changed. The task has one grep, one scope and one test_red_green criterion. Verify returns its verdicts and all four markers stay absent. The generator exception is decided without executing the workdir's copy of the script.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-hardening.test.mjs",
+            "cmd": "node --test test/contracts-scope-hardening.test.mjs"
+          }
+        },
+        {
+          "id": "T2-AC14",
+          "mandatory": true,
+          "statement": "One fixture repository, two tasks (T1 scope ['a.js'], T2 scope ['b.js']), union semantics: commit c1 changes a.js with trailer T1 and c2 changes b.js with trailer T2: T1 PASS and T2 PASS. c3 changes b.js with trailer T1: T1 FAIL naming b.js and c3. An untrailered commit changing a.js: PASS; an untrailered commit changing z.js (outside every task): FAIL naming z.js and the commit. An uncommitted edit to a.js: PASS; an uncommitted z.js: FAIL naming z.js and 'uncommitted'. A commit carrying two Contract-Task trailers: FAIL naming the commit. With the vault root as workdir, sign, verify and an in-scope memory/ write: scope PASS.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-scope-trailers.test.mjs",
+            "cmd": "node --test test/contracts-scope-trailers.test.mjs"
+          }
+        },
+        {
+          "id": "T2-AC15",
+          "mandatory": true,
+          "statement": "One full run of test/contracts-scope-history.test.mjs passes every labelled subtest (T2-c07, T2-c10) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/contracts-scope-history.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T2-c07:|^T2-c10:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T2-AC16",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Red-green verifier",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "a test_red_green criterion requires the test file to exist in the workdir, adds a detached temporary worktree of the recorded base, copies the test file and any support_files into it, runs the command with {test} substituted there (red) and in the workdir (green)",
+        "red exit 0 is FAIL (the test passes without the change and proves nothing); green non-zero is FAIL; exit 127 is BLOCKED (command not found); otherwise PASS, and the detail carries both exit codes and the base sha",
+        "the temporary worktree is removed in a finally block, and stale ones from an interrupted run are pruned before a new one is added",
+        "every gate that applies to a command criterion applies here: remote-signed without approval, exec_local_only and contracts.exec return the same BLOCKED details; the default timeout is 900 s and timeout_s overrides it",
+        "verify adds its temporary worktrees under its own prefix (memev-verify-<pid>-<random>) and prunes only stale ones with that prefix whose owning process is gone; it never removes a locked worktree, a worktree outside that prefix, or one it did not create",
+        "the red run copies the head's test-side files (the test file, its support_files, test/helpers/** and test/fixtures/**) into the base worktree, so the code under test is the only difference between the two runs",
+        "verify never runs a bare git worktree prune; it removes only worktrees it created, under its own prefix, with git worktree remove --force <path>",
+        "verify runs criterion commands asynchronously (spawn, not spawnSync), so the daemon keeps answering /healthz and other requests during a verify, and memev verify waits for the result beyond the CLI's 600 s request limit",
+        "a green run is made with the TAP reporter, and a run with no passing test line other than file lines is BLOCKED, since a name filter that matches nothing exits 0"
+      ],
+      "description": "This task's scope criterion needs the scope verifier of T2: until T2 lands, verify returns BLOCKED for it, never PASS, and the task cannot reach PASS.",
+      "scope": {
+        "allow": [
+          "src/engine/contracts.mjs",
+          "test/contracts-redgreen.test.mjs",
+          "test/helpers/**",
+          "src/engine/util.mjs",
+          "src/cli/contracts-cli.mjs",
+          "test/contracts-gates.test.mjs",
+          "test/contracts-redgreen-spurious.test.mjs",
+          "test/contracts-worktree-lifecycle.test.mjs",
+          "test/contracts-worktree-foreign.test.mjs",
+          "test/contracts-worktree-concurrent.test.mjs",
+          "test/contracts-redgreen-wrongred.test.mjs",
+          "test/contracts-redgreen-paths.test.mjs",
+          "test/contracts-redgreen-green.test.mjs",
+          "test/contracts-redgreen-wrongred2.test.mjs",
+          "test/contracts-worktree-prunable.test.mjs",
+          "test/contracts-verify-responsive.test.mjs",
+          "src/server/mcp.mjs",
+          "test/contracts.test.mjs",
+          "test/contracts-remote.test.mjs",
+          "test/contracts-closed-stopgap.test.mjs",
+          "test/remote-proof-order.test.mjs",
+          "test/mcp-contract-verify-async.test.mjs",
+          "test/contracts-base.test.mjs",
+          "test/contracts-base-legacy.test.mjs",
+          "test/contracts-base-env.test.mjs",
+          "test/contracts-base-format.test.mjs",
+          "test/contracts-base-remote.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T3-AC01",
+          "mandatory": true,
+          "statement": "A fixture whose test fails on the base and passes on the head gets PASS; one whose test passes on the base gets FAIL; a remote-signed unapproved contract gets BLOCKED; no worktree is left behind",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-redgreen.test.mjs",
+            "cmd": "node --test test/contracts-redgreen.test.mjs"
+          }
+        },
+        {
+          "id": "T3-AC02",
+          "mandatory": true,
+          "statement": "For both test_red_green and metric criteria, each of three setups returns BLOCKED with exactly the detail that the command criterion next to it gets (contracts.mjs:225-227). The setups are: remote-signed and unapproved; local-signed and verified with local:false and exec_local_only unset; contracts.exec:false. In every setup the criterion's command marker file stays absent, a post-checkout hook installed in the fixture repository leaves its marker absent, and `git worktree list --porcelain` shows only the main worktree before and after. (Add the file to T3 scope.)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-gates.test.mjs",
+            "cmd": "node --test test/contracts-gates.test.mjs"
+          }
+        },
+        {
+          "id": "T3-AC03",
+          "mandatory": true,
+          "statement": "Three fixtures in which the head test passes: (a) at base the copied test imports a helper that is absent at base and not listed in support_files; (b) at base the test sleeps past timeout_s:2; (c) at base the test prints 2 MiB and then fails. Each gets BLOCKED, not PASS, with a detail that names the cause (load error, timed out, output too large). A fourth fixture whose base run fails exactly one assertion gets PASS, and its detail reads 'red exit 1, green exit 0, base <sha>'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-redgreen-spurious.test.mjs",
+            "cmd": "node --test test/contracts-redgreen-spurious.test.mjs"
+          }
+        },
+        {
+          "id": "T3-AC04",
+          "mandatory": true,
+          "statement": "(a) A child process verifying a fixture whose red command sleeps 30 s is SIGKILLed after its worktree exists. The next verify leaves `git worktree list --porcelain` showing only the main worktree, and the killed run's directory is gone. (b) Two child processes verify fixtures in the same repository at the same time, with red commands that sleep 2 s and then run `test -f marker-from-base`. Both report red exit 1 and the verdicts the fixtures were designed for; neither reports status null or ENOENT. (c) The temporary worktree path is outside both the workdir and the vault root.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-worktree-lifecycle.test.mjs",
+            "cmd": "node --test test/contracts-worktree-lifecycle.test.mjs"
+          }
+        },
+        {
+          "id": "T3-AC05",
+          "mandatory": true,
+          "statement": "Before the run, the fixture repository gets two user worktrees: <tmpdir>/user-wt (a name that does not match the engine's prefix) holding an uncommitted keep.txt, and a second one locked with 'git worktree lock'. A stale engine worktree is left by SIGKILLing a verify. After the next verify, the stale engine worktree and its directory are gone; both user worktrees are still listed, keep.txt still holds its content, and the lock is still in place.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-worktree-foreign.test.mjs",
+            "cmd": "node --test test/contracts-worktree-foreign.test.mjs"
+          }
+        },
+        {
+          "id": "T3-AC06",
+          "mandatory": true,
+          "statement": "Two child processes verify fixtures in the same repository at the same time. marker-from-base is committed at the base and absent at head, and the red command is: sleep 2; test -f marker-from-base && test $(git rev-parse HEAD) = $MEMEV_CONTRACT_BASE && exit 3. Both runs report red exit 3, which shows each worktree survived the other process's prune and was at the base, and each detail names its own base sha.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-worktree-concurrent.test.mjs",
+            "cmd": "node --test test/contracts-worktree-concurrent.test.mjs"
+          }
+        },
+        {
+          "id": "T3-AC07",
+          "mandatory": true,
+          "statement": "Five fixtures in which the code under test is identical at base and head, so PASS is never correct: (1) the workdir is repo/pkg, a subdirectory; (2) the red command is a script added at head (exit 127); (3) the test imports a named export that was added at head to an existing helper; (4) the base run throws a TypeError before any assertion; (5) the test reads test/data.json, added at head and not in support_files. Each is FAIL ('red exit 0') or BLOCKED naming the cause, never PASS. With support_files: ['test/data.json'], case 5 becomes FAIL 'red exit 0'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-redgreen-wrongred.test.mjs",
+            "cmd": "node --test test/contracts-redgreen-wrongred.test.mjs"
+          }
+        },
+        {
+          "id": "T3-AC08",
+          "mandatory": true,
+          "statement": "A local-signed contract with test_file 'test/a $(touch pwned).test.mjs' (the file exists) and cmd 'node --test {test}': the marker 'pwned' stays absent, and the red and green runs each receive the path as a single argument. A remote-signed, approved contract (workdir inside the vault) with '../outside.txt' or an absolute path in support_files is BLOCKED with 'outside the vault', and no file is created outside the temporary worktree.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-redgreen-paths.test.mjs",
+            "cmd": "node --test test/contracts-redgreen-paths.test.mjs"
+          }
+        },
+        {
+          "id": "T3-AC09",
+          "mandatory": true,
+          "statement": "New test/contracts-redgreen-green.test.mjs (add to T3 scope). In every fixture the base run fails exactly one assertion. The head run (a) fails one assertion, (b) exits 127, or (c) sleeps past timeout_s:2. Expected: (a) FAIL with detail 'red exit 1, green exit 1, base <sha>'; (b) BLOCKED naming command not found; (c) FAIL or BLOCKED naming the timeout. None is ever PASS. A control fixture whose head run passes is PASS.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-redgreen-green.test.mjs",
+            "cmd": "node --test test/contracts-redgreen-green.test.mjs"
+          }
+        },
+        {
+          "id": "T3-AC10",
+          "mandatory": true,
+          "statement": "New test/contracts-redgreen-wrongred2.test.mjs (add to T3 scope). The code under test is identical at base and head. (a) The test imports a helper as a namespace and asserts typeof H.addedAtHead === 'function', where addedAtHead was added at head to an existing test/helpers file. (b) The test asserts that test/fixtures/new.json exists; that file was added at head and is not in support_files. Each is FAIL ('red exit 0') or BLOCKED, never PASS. For example, the red tree could take every file changed at head except those matched by the task's non-test scope globs.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-redgreen-wrongred2.test.mjs",
+            "cmd": "node --test test/contracts-redgreen-wrongred2.test.mjs"
+          }
+        },
+        {
+          "id": "T3-AC11",
+          "mandatory": true,
+          "statement": "New test/contracts-worktree-prunable.test.mjs (add to T3 scope). Set up a user worktree <tmpdir>/user-gone, unlocked and named outside the prefix, whose directory is moved away before verify, plus a stale engine worktree left by SIGKILLing a verify. After the next verify, the stale engine entry and its directory are gone, while .git/worktrees/user-gone still exists and `git worktree list --porcelain` still lists it as prunable.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-worktree-prunable.test.mjs",
+            "cmd": "node --test test/contracts-worktree-prunable.test.mjs"
+          }
+        },
+        {
+          "id": "T3-AC12",
+          "mandatory": true,
+          "statement": "New test/contracts-verify-responsive.test.mjs (add to T3 scope). A daemon verifies a fixture whose red and green commands each sleep 8 s. During the verify, GET /healthz and memev_contract_status on the same daemon both answer within 2 s, and `memev verify <id>` prints the PASS line with the behaviour and documents counts.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-verify-responsive.test.mjs",
+            "cmd": "node --test test/contracts-verify-responsive.test.mjs"
+          }
+        },
+        {
+          "id": "T3-AC13",
+          "mandatory": true,
+          "statement": "The red half of this task's own test runs without the engine: at the recorded base the copied test fails on an assertion, not on a load error",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ -n \"$MEMEV_CONTRACT_BASE\" ] && wt=$(mktemp -d) && git worktree add -q --detach \"$wt\" \"$MEMEV_CONTRACT_BASE\" && cp test/contracts-redgreen.test.mjs \"$wt/test/\" && (cd \"$wt\" && node --test --test-reporter=tap test/contracts-redgreen.test.mjs > \"$wt.out\" 2>&1); rc=$?; git worktree remove --force \"$wt\"; [ $rc -ne 0 ] && grep -q \"^not ok\" \"$wt.out\" && ! grep -q -E \"ERR_MODULE_NOT_FOUND|SyntaxError\" \"$wt.out\"",
+            "timeout_s": 900
+          }
+        },
+        {
+          "id": "T3-AC14",
+          "mandatory": true,
+          "statement": "Changes stay in scope (BLOCKED until T2, the scope verifier, lands)",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "Metric verifier",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "a metric criterion runs its command under the same gates as a command criterion, reads the last JSON object on stdout (or the file named by output_file), picks key as a dotted path and compares with op in <, <=, >, >= and == against value",
+        "no JSON, a missing key or a non-numeric value is FAIL with the detail; exit 127 is BLOCKED; a 1-minute load per CPU above the contract's defaults.max_load_per_cpu, when set, is BLOCKED as machine busy and the command is not run",
+        "the detail records the measured value, the threshold, the CPU count and the load, so a reading on other hardware is labelled",
+        "a metric command that exits non-zero, other than 127, is FAIL even when it prints a numeric value"
+      ],
+      "description": "This task's scope criterion needs the scope verifier of T2: until T2 lands, verify returns BLOCKED for it, never PASS, and the task cannot reach PASS.",
+      "scope": {
+        "allow": [
+          "src/engine/contracts.mjs",
+          "test/contracts-metric.test.mjs",
+          "test/helpers/**",
+          "test/contracts-metric-cases.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T4-AC01",
+          "mandatory": true,
+          "statement": "A bench stub whose value meets the threshold passes, one that misses fails with the measured value in the detail, and a busy-machine setting blocks without running the command",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-metric.test.mjs",
+            "cmd": "node --test test/contracts-metric.test.mjs"
+          }
+        },
+        {
+          "id": "T4-AC02",
+          "mandatory": true,
+          "statement": "Each of these is FAIL with the reason in the detail: (a) the command prints a passing JSON line and exits 1; (b) output_file already holds a passing value and the command writes nothing ('output_file not written by this run'); (c) pretty-printed output whose top-level p50 misses the threshold while its last one-line nested object has a passing p50, with the detail showing the top-level value; (d) value null, '' or true (non-numeric); (e) key 'constructor.length' (missing key). A passing case records the value, the threshold, the CPU count and the load in the detail.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-metric-cases.test.mjs",
+            "cmd": "node --test test/contracts-metric-cases.test.mjs"
+          }
+        },
+        {
+          "id": "T4-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope (BLOCKED until T2, the scope verifier, lands)",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T5",
+      "title": "Behaviour apart from documents in every report",
+      "phase": "implement",
+      "depends_on": [
+        "T2",
+        "T3",
+        "T4"
+      ],
+      "requirements": [
+        "the verify result, the receipt and the CLI line count behaviour criteria (command, test_red_green, metric, scope) apart from document checks (grep, file_exists, test_exists), printing behaviour n/m and documents n/m per task",
+        "ok still requires every mandatory criterion to PASS; a task whose only passing criteria are document checks is reported as documents only and never as done",
+        "docs/CONTRACTS.md states that document checks never count toward done on their own",
+        "a mandatory command counts as behaviour only when it runs something in the workdir; a shell builtin (true, :), an exit, a pipeline or compound whose last command is grep, test or [, and a sh -c wrapping one of those count as document checks"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "src/engine/contracts.mjs",
+          "src/cli/contracts-cli.mjs",
+          "docs/CONTRACTS.md",
+          "test/contracts-report.test.mjs",
+          "test/helpers/**",
+          "test/contracts-report-docsonly.test.mjs",
+          "test/contracts-report-disguised.test.mjs",
+          "test/contracts-report-disguised2.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T5-AC01",
+          "mandatory": true,
+          "statement": "A contract with one passing grep and one failing red-green test is reported documents only, not done",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-report.test.mjs",
+            "cmd": "node --test test/contracts-report.test.mjs"
+          }
+        },
+        {
+          "id": "T5-AC02",
+          "mandatory": true,
+          "statement": "The contracts page says document checks never count toward done on their own",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CONTRACTS.md",
+            "pattern": "never count toward done"
+          }
+        },
+        {
+          "id": "T5-AC03",
+          "mandatory": true,
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "T5-AC04",
+          "mandatory": true,
+          "statement": "Fixture task A has a passing grep and a passing scope criterion (no changed files) and nothing else. Fixture task B has a passing grep and a failing non-mandatory command. Each is reported 'documents only', with scope reported apart from the behaviour count. For both: result ok is false; contracts/closed/<id>.json does not exist; contractList state is 'open'; memev_contract_status shows the task as not PASS; the receipt line and the `memev verify` CLI line both contain 'behaviour 0/', 'documents 1/1' and 'documents only'; and the CLI exits 1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-report-docsonly.test.mjs",
+            "cmd": "node --test test/contracts-report-docsonly.test.mjs"
+          }
+        },
+        {
+          "id": "T5-AC05",
+          "mandatory": true,
+          "statement": "Three more fixture tasks. C: a passing grep plus a passing command 'grep -q x notes.md'. D: a passing grep plus a passing non-mandatory command 'true'. E: only a passing scope criterion, with no changes. For all three: ok is false, contracts/closed/<id>.json is absent, the CLI exits 1, and the CLI line says 'behaviour 0/' and 'documents only' (or 'no behaviour' for E). For C, the command is counted under documents because its cmd is a single grep, test or [ invocation.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-report-disguised.test.mjs",
+            "cmd": "node --test test/contracts-report-disguised.test.mjs"
+          }
+        },
+        {
+          "id": "T5-AC06",
+          "mandatory": true,
+          "statement": "Helper files that existed at the base are unchanged (new helper files are allowed).",
+          "verifier": {
+            "type": "command",
+            "cmd": "git diff --quiet \"$MEMEV_CONTRACT_BASE\" --diff-filter=MDR -- test/helpers/",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "T5-AC07",
+          "mandatory": true,
+          "statement": "New test/contracts-report-disguised2.test.mjs (add to T5 scope). Each task has a passing grep plus one mandatory passing command: 'true', ':', 'exit 0', 'cat notes.md | grep -q x', \"sh -c 'test -f notes.md'\", 'grep -q x notes.md && true'. Each is reported 'documents only', with ok false, contracts/closed/<id>.json absent and CLI exit 1. A control task whose command runs a real failing-then-passing node test is reported 'behaviour 1/1'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-report-disguised2.test.mjs",
+            "cmd": "node --test test/contracts-report-disguised2.test.mjs"
+          }
+        },
+        {
+          "id": "T5-AC08",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-sr-0-03-3-verify-runs-ev-02455e",
+  "title": "SR-0.03.3 Verify runs every verifier type the specs use: red-green tests, metrics and scope, behind the same local gates as commands",
+  "workdir": null,
+  "created": "2026-11-01T02:04:13.532Z",
+  "version": 1,
+  "request": "Version 3 of SR-0.03. It supersedes the signed version 2 (contract k-sr-0-03-verify-runs-ever-2259f2, which relates to pull request #336); the version 2 spec file is unchanged and stays on record. Decided under owner delegation, 1 Nov 2026, so that this contract (a) pins a base commit that is current (3989c80, the merge of pull request #343) and not the one of 30 October, (b) names every file that pull request #336 changes in the scope of T3, and adds changelog.d/SR-0.03.md and docs/MODULES.md (which pull request #347 also touches; docs/MODULES.md is generated by scripts/docs/module-graph.mjs and checked by a docs test) to the scope of T2, and (c) says in terms that verify returns BLOCKED for the scope criterion of T1, T3 and T4 until T2 lands. It adds no scope beyond those files and changes no criterion. Closes G85 (found 30 October 2026 while checking the WBS runbook against the code): memev verify runs only command, file_exists, test_exists and grep (src/engine/contracts.mjs:224-235); test_red_green, metric and scope criteria return BLOCKED as checked by a person or CI, so 213 of the 340 seed-readiness criteria (scope 118, test_red_green 64, metric 31) cannot PASS through the tool the WBS names, and no task of the 85 contracts can reach PASS because the attest lint requires a scope criterion per task. Repository: memev. Depends on contracts: none. Sequenced with SR-1.02: both change the command-execution path of contracts.mjs, so the local-approval gate of SR-1.02 covers the new verifiers (red-green and metric spawn commands exactly as command criteria do and inherit every gate: remote-signed needs approval, exec_local_only, contracts.exec). Security checklist for this change (who can call: any holder of a read token over MCP or the CLI, as for verify today; what runs: the contract's own commands in its workdir, and the red run in a detached temporary worktree of the recorded base; what survives a restart: the base sha inside the signed contract, and temporary worktrees are removed in a finally block and pruned at the next run; two processes: each verify creates its own temporary worktree under its own name, and the green run is the contract's own command as today). This contract is drafted by the engine its own T1 builds, with --workdir set to the memev checkout (the checkout top level, as git rev-parse --show-toplevel prints it) and the base given in the draft, so its scope and red-green criteria have a base. The base is 3989c80bea615381947758e0ab1d28dfe18f115b, the memev main commit that merged pull request #343, which carried the README re-sign fix (owner delegation, 1 Nov 2026).",
+  "provenance": {
+    "spec_sha256": "cabc32fd00dee79cff76f439005f8b6933301e4c3e1fcda8e26a80c5802c6c71",
+    "record": "contracts/programme/redteam/SR-0.03.3.json",
+    "review": "interim solo review by the signer, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}

@@ -1,0 +1,219 @@
+{
+  "title": "SR-1.10 A suite that is green on any machine",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G10: 12 tests need ssh-keygen, 8 need an authenticated gh and network, 3 fail when MEMEV_NO_SERVICE is set. Repository: memev. Depends on contracts: none.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Native OpenSSH keys and signatures",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "deploy keys are made with node:crypto in OpenSSH format",
+        "SSHSIG sign and verify are implemented in Node; ssh-keygen is not spawned",
+        "the native verify follows the allowed_signers rules of ssh-keygen -Y verify: one line whose principal pattern matches the principal and whose key is the signer's, '#' comments ignored, namespaces= and valid-before= honoured, and hash_alg limited to sha256 and sha512",
+        "agentid-bind.mjs signs, verifies and reads public keys in Node with no program on PATH, and no module under src/ runs ssh-keygen",
+        "a signature memev writes is byte-identical to what ssh-keygen -Y sign writes for the same key, namespace and message, so a third party's ssh-keygen -Y verify accepts it",
+        "the deploy key is written in openssh-key-v1 format, created at mode 0600 with no wider window, and never overwrites a key that exists",
+        "verify accepts the key types ssh-keygen accepts in bindings today (RSA with rsa-sha2-512, ECDSA P-256, Ed25519 and the security-key forms) and both hash algorithms; signing with a key the native signer cannot use fails with a named AgentBindError before anything is written",
+        "docs/MODULES.md is rewritten with node scripts/docs/module-graph.mjs, and docs/AGENT-IDENTITY.md and docs/THREAT-MODEL.md describe the native sign and verify",
+        "each red-green criterion of this task that runs test/sshsig.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c01: for the first), and the criterion runs only that subtest"
+      ],
+      "description": "",
+      "scope": [
+        "src/cli/github.mjs",
+        "src/engine/agentid-bind.mjs",
+        "src/engine/sshsig.mjs",
+        "test/sshsig.test.mjs",
+        "test/agentid-bind.test.mjs",
+        "test/agentid-cli.test.mjs",
+        "docs/MODULES.md",
+        "docs/AGENT-IDENTITY.md",
+        "docs/THREAT-MODEL.md"
+      ],
+      "criteria": [
+        {
+          "statement": "Signatures interoperate with ssh-keygen -Y verify fixtures",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/sshsig.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/sshsig.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "github.mjs no longer spawns ssh-keygen",
+          "verifier": {
+            "type": "command",
+            "cmd": "node -e \"process.exit(/ssh-keygen/.test(require('fs').readFileSync('src/cli/github.mjs','utf8'))?1:0)\""
+          }
+        },
+        {
+          "statement": "test/sshsig.test.mjs holds ssh-keygen-made fixtures inline (ed25519 keys A and B, signatures in namespace memev over one binding message). Through both the sshsig.mjs verify and verifyAgentBinding, it asserts: with allowed_signers 'alice A' and 'bob B', a signature by B is rejected as -I alice and accepted as -I bob; principal 'ali' does not match a line for 'alice'; a line '# alice A' does not authorise A; 'alice namespaces=\"git\" A' and 'alice valid-before=\"20200101\" A' reject; 'bob,alice A' accepts -I alice; a blob whose hash_alg is not sha256 or sha512 rejects; a namespace 'other' signature rejects.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/sshsig.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/sshsig.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The test is given, inline, an unencrypted ed25519 private key made by ssh-keygen and the armored output of `ssh-keygen -Y sign -n memev` with that key over a fixed binding message. The module's signer must produce exactly the same armored bytes (Ed25519 is deterministic, and ssh-keygen hashes with sha512 by default). The same message signed in namespace 'other' must give different bytes, equal to a second fixture.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/sshsig.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/sshsig.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A test in test/agentid-bind.test.mjs sets process.env.PATH to an empty directory. With an inline ed25519 fixture key, bindAgentRole and setupAgentRole then succeed, verifyAgentBinding returns 'bound' for the binding and 'invalid' for principal 'bob', and setupAgentRole with a second fixture key throws code 'conflict'. It is red at base for the right reason: base throws code 'openssh' (src/engine/agentid-bind.mjs:93-96) and returns 'unavailable' (:181).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/agentid-bind.test.mjs",
+            "cmd": "node --test test/agentid-bind.test.mjs"
+          }
+        },
+        {
+          "statement": "From an unencrypted ed25519 key made by ssh-keygen (inline fixture), take its seed, checkint and comment. Given those, the module's OpenSSH key writer must write the private key byte for byte equal to the fixture, and a .pub line equal to the fixture's .pub. A freshly made key must parse as openssh-key-v1 with cipher and kdf none, two equal checkints, a public blob equal to the .pub's, a 64-byte seed||pub private field whose seed reproduces the public key through node:crypto, padding 1,2,3..., and a .pub line of the form 'ssh-ed25519 <base64> <comment>'.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/sshsig.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/sshsig.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With inline ssh-keygen fixtures: verify accepts signatures made with rsa-sha2-512 (RSA 3072), ecdsa-sha2-nistp256 and ed25519 security keys (the sk- key type), and one made with -O hashalg=sha256. Signing with the RSA fixture gives exactly ssh-keygen's bytes (PKCS#1 v1.5 is deterministic). Signing with a passphrase-protected ed25519 fixture either succeeds, with the passphrase supplied through the module's prompt hook, and matches ssh-keygen's bytes, or throws an AgentBindError with a named code before anything is written. It never stores a signature that fails verification.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/sshsig.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c07:' test/sshsig.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The module-map guard and its generator are unchanged from the contract's base, and the guard passes against docs/MODULES.md as node scripts/docs/module-graph.mjs writes it.",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ -n \"$MEMEV_CONTRACT_BASE\" ] && git diff --quiet \"$MEMEV_CONTRACT_BASE\" -- test/docs-module-map.test.mjs scripts/docs/module-graph.mjs && node --test test/docs-module-map.test.mjs",
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "No module under src/ names ssh-keygen as a program to run",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -rnE \"['\\\"]ssh-keygen['\\\"]\" src",
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "One full run of test/sshsig.test.mjs passes every labelled subtest (T1-c01, T1-c03, T1-c04, T1-c06, T1-c07) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/sshsig.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c01:|^T1-c03:|^T1-c04:|^T1-c06:|^T1-c07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "No network or real gh in tests",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "tests that touch GitHub use the fake gh on PATH and a local bare remote",
+        "service tests set their own env",
+        "every test that runs git sets GIT_CONFIG_GLOBAL to a file of its own and GIT_CONFIG_NOSYSTEM=1, through one helper, so a person's url.insteadOf, signing or hook settings never reach a test",
+        "no test reaches a real gh, ssh, ssh-keygen or service manager, or the network: the suite passes with logging shims for them first on PATH and only loopback up",
+        "no test is deleted, renamed, skipped or marked todo to make the suite pass; the hermetic run reports fail 0, cancelled 0, todo 0 and only the skips that need MEMEV_CONTRACT_BASE",
+        "the one git helper also keeps system config away (GIT_CONFIG_NOSYSTEM=1), so a person's hooks path, signing and URL rewrites never reach a test, and the two file:// tests keep file:// remotes",
+        "each service test sets MEMEV_NO_SERVICE itself, or clears it and injects both the platform and the runner, so the suite passes whether or not the caller exports it and no test reaches a real service manager",
+        "test/helpers/no-network.mjs, loaded with node --import, makes every net, tls, dgram and dns connection attempt to anything but loopback throw, and sandbox() in test/helpers/cli.mjs passes the caller's NODE_OPTIONS through to the processes it starts"
+      ],
+      "description": "",
+      "scope": [
+        "test/**",
+        "test/helpers/no-network.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "The suite passes with no network, no ssh-keygen and a bare environment",
+          "verifier": {
+            "type": "command",
+            "cmd": "H=$(mktemp -d) && env -i PATH=/usr/bin:/bin:$(dirname $(command -v node)) HOME=$H MEMEV_NO_SERVICE=1 npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Shims for gh, ssh, ssh-keygen, launchctl, systemctl, loginctl and schtasks come first on PATH. Each appends its argv to a log and exits 127. The suite runs with a fresh HOME and NODE_OPTIONS loading test/helpers/no-network.mjs, which makes every net, tls, dgram and dns connection attempt to anything but loopback throw (a fixture test that opens a socket fails under it and passes without it); it passes, and the log stays empty.",
+          "verifier": {
+            "type": "command",
+            "cmd": "F=$(mktemp -d) && printf \"import test from 'node:test';\\nimport net from 'node:net';\\ntest('opens a socket', () => { const s = net.connect(9, '192.0.2.1'); s.on('error', () => {}); s.destroy(); });\\n\" > \"$F/sock.test.mjs\" && node --test \"$F/sock.test.mjs\" >/dev/null 2>&1 && ! NODE_OPTIONS=\"--import=$PWD/test/helpers/no-network.mjs\" node --test \"$F/sock.test.mjs\" >/dev/null 2>&1 && S=$(mktemp -d) && H=$(mktemp -d) && N=$(dirname $(command -v node)) && for b in gh ssh ssh-keygen launchctl systemctl loginctl schtasks; do printf '#!/bin/sh\\necho \"$0 $*\" >> %s/log\\nexit 127\\n' \"$S\" > \"$S/$b\" && chmod +x \"$S/$b\"; done && env -i PATH=\"$S:/usr/bin:/bin:$N\" HOME=\"$H\" MEMEV_NO_SERVICE=1 npm_config_update_notifier=false NODE_OPTIONS=\"--import=$PWD/test/helpers/no-network.mjs\" npm test && test ! -s \"$S/log\"",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "A hostile global and system config is planted: a file:// rewrite, commit and tag signing with gpg.program=false, and a core.hooksPath whose hooks log and fail. A pre-check first proves git can see the planted config. The suite passes with GIT_CONFIG_GLOBAL, XDG_CONFIG_HOME and GIT_CONFIG_NOSYSTEM unset in the caller and GIT_CONFIG_SYSTEM pointing at the hostile file; no planted hook ran; and both file:// tests still use file://.",
+          "verifier": {
+            "type": "command",
+            "cmd": "H=$(mktemp -d) && mkdir $H/hooks && printf '#!/bin/sh\\necho \"$0\" >> %s/hooklog\\nexit 1\\n' \"$H\" > $H/hooks/pre-commit && cp $H/hooks/pre-commit $H/hooks/pre-push && chmod +x $H/hooks/* && printf '[url \"ssh://example.invalid/\"]\\n\\tinsteadOf = file://\\n[commit]\\n\\tgpgsign = true\\n[tag]\\n\\tgpgsign = true\\n[gpg]\\n\\tprogram = false\\n[core]\\n\\thooksPath = %s/hooks\\n' \"$H\" > $H/.gitconfig && cp $H/.gitconfig $H/system && test \"$(env -u GIT_CONFIG_GLOBAL HOME=$H git config --global --get gpg.program)\" = false && env -u GIT_CONFIG_GLOBAL -u XDG_CONFIG_HOME -u GIT_CONFIG_NOSYSTEM GIT_CONFIG_SYSTEM=$H/system MEMEV_NO_SERVICE=1 HOME=$H npm test && test ! -e $H/hooklog && grep -q 'file://' test/backup-remote.test.mjs && grep -q 'file://' test/relay-fallback.test.mjs",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "With MEMEV_NO_SERVICE unset in the caller and logging shims for launchctl, systemctl, loginctl and schtasks first on PATH, the suite passes and no shim was reached. This proves each service test sets its own env, in both directions. Tests that bring their own fake service manager (test/service-sandbox.test.mjs:43) put it ahead of the shims.",
+          "verifier": {
+            "type": "command",
+            "cmd": "S=$(mktemp -d) && for b in launchctl systemctl loginctl schtasks; do printf '#!/bin/sh\\necho \"$0 $*\" >> %s/log\\nexit 127\\n' \"$S\" > \"$S/$b\" && chmod +x \"$S/$b\"; done && env -u MEMEV_NO_SERVICE PATH=\"$S:$PATH\" HOME=$(mktemp -d) npm test && test ! -s \"$S/log\"",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The suite passes with a git URL rewrite and commit signing set in the user's global git config",
+          "verifier": {
+            "type": "command",
+            "cmd": "H=$(mktemp -d) && printf \"[url \\\"ssh://example.invalid/\\\"]\\n\\tinsteadOf = file://\\n[commit]\\n\\tgpgsign = true\\n\" > $H/.gitconfig && MEMEV_NO_SERVICE=1 HOME=$H npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Every test( title in the test files at the contract's base (test/*.test.mjs, and test/docs/*.test.mjs once SR-1.33 has moved document checks there) is still present at head; this contract allows no title to be replaced. In the hermetic environment the TAP summary shows fail 0, cancelled 0, todo 0 and at most 2 skipped (the two MEMEV_CONTRACT_BASE skips at test/hooks-startup.test.mjs:100 and :114; counted statically).",
+          "verifier": {
+            "type": "command",
+            "timeout_s": 1800,
+            "cmd": "B=\"$MEMEV_CONTRACT_BASE\"; [ -n \"$B\" ] || { echo 'MEMEV_CONTRACT_BASE is not set'; exit 2; }; R='^test\\([^,]*'; t0=$(mktemp); t1=$(mktemp); tap=$(mktemp); for f in $(git ls-tree -r --name-only \"$B\" test/ | grep -E '^test/(docs/)?[^/]+[.]test[.]mjs$'); do git show \"$B:$f\" | grep -oE \"$R\"; done | sort -u > \"$t0\" && cat $(ls test/*.test.mjs test/docs/*.test.mjs 2>/dev/null) | grep -oE \"$R\" | sort -u > \"$t1\" && test -z \"$(comm -23 \"$t0\" \"$t1\")\" && env -i PATH=/usr/bin:/bin:$(dirname $(command -v node)) HOME=$(mktemp -d) MEMEV_NO_SERVICE=1 node --test --test-concurrency=4 --test-reporter=tap $(ls test/*.test.mjs test/docs/*.test.mjs 2>/dev/null) > \"$tap\"; grep -qx '# fail 0' \"$tap\" && grep -qx '# cancelled 0' \"$tap\" && grep -qx '# todo 0' \"$tap\" && grep -qE '^# skipped [0-2]$' \"$tap\""
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

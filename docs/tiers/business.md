@@ -21,8 +21,10 @@ Every member's computer runs Memev and the member's local AI tools, which reach 
 work data of all members syncs into **one company vault**. The company can see and search everything
 in it through the company admin console. Members keep private work outside Memev.
 
-The organisation connects to **one AI provider**: either one cloud AI service or an on-premises LLM.
-The connection is over MCP. It is one provider for the whole organisation, not one per member.
+Every tier is provider-neutral. Members use the AI providers and tools the organisation's policy
+allows, cloud AI services or an on-premises LLM, over MCP. An organisation may restrict itself to
+**one provider by policy**, with egress rules and labels (planned); the policy is the organisation's,
+not one choice per member.
 
 ```mermaid
 flowchart LR
@@ -45,7 +47,7 @@ flowchart LR
     end
     cv[("ONE company vault")]
     admin["Company admin console<br/>sees and searches everything"]
-    provider["ONE AI provider per organisation<br/>one cloud AI service<br/>OR an on-premises LLM"]
+    provider["AI providers the organisation's policy allows<br/>cloud AI services or an on-premises LLM<br/>(a one-provider policy: planned)"]
     engine["crdt-merge convergence engine and relay<br/>separate repository, external dependency<br/>(paid): merges edits"]
     lic["Licence server<br/>licence information only,<br/>no vault data"]
     ma & mb & mc -->|"work data syncs in"| cv
@@ -70,10 +72,14 @@ member does not want the company to see does not go through Memev on a work comp
 
 ### One AI provider
 
-| Choice | What it means |
+Memev does not choose a provider for the organisation. Members use the AI providers and tools the
+organisation's policy allows, over MCP, and an organisation may restrict itself to one provider by
+policy, with egress rules and labels (planned). The two common policies:
+
+| Policy | What it means |
 |---|---|
-| One cloud AI service | the organisation connects its hosted AI provider to the company vault over MCP; a self-serve trial is planned for this case |
-| An on-premises LLM | a model the organisation runs itself, connected the same way; air-gapped and compliance-led organisations choose this, and get a sales-assisted pilot |
+| Hosted AI providers allowed | members' AI apps call the hosted providers the policy allows, with the organisation's keys, next to the company vault over MCP; a self-serve trial is planned for this case |
+| Only an on-premises LLM | a model the organisation runs itself, and nothing else; air-gapped and compliance-led organisations choose this, and get a sales-assisted pilot |
 
 ### Personal vaults stay out
 
@@ -86,9 +92,19 @@ Someone who leaves the company loses all vault access. Their access ends, their 
 their devices are removed and the local cache on those devices is wiped. What they synced stays in
 the company vault. Memev cannot recall what the person already read or copied outside it.
 
+### Several sites (planned)
+
+The company vault above is one node, and the one-node case is what the first Business release
+ships. The architectural target behind it is a federation of independently operated site nodes,
+each owning its node and its memory and converging authorised state through the convergence
+engine under its contract. A Business with several sites can have that by agreement, as planned
+work; it is a planned capability, not a tier, and it is not sold before it is built. See
+[FEDERATION.md](../FEDERATION.md) and the
+[architecture chart](../ARCHITECTURE.md#several-sites-and-federation-planned).
+
 ### Licence and trial
 
-A licence counts once per organisation, by person and by computer. The Business trial is a
+The terms of a Business licence are agreed with you: contact us. The Business trial is a
 time-limited trial: 5 members and 10 computers, 14 days with one 14-day extension. It is self-serve
 when the organisation uses hosted AI providers, or a mix of hosted providers and local tools.
 Organisations that need an on-premises LLM, an air-gapped install or a compliance-led rollout get a
@@ -126,14 +142,14 @@ flowchart TB
     end
     idp["Google Workspace or<br/>Microsoft Entra ID<br/>(sign-in, planned)"]
     git[("Your company's<br/>GitHub organisation<br/>private backup")]
-    cloud["OR one cloud AI service<br/>instead of the on-premises LLM"]
+    cloud["OR the cloud AI services<br/>the policy allows"]
     tools["Company tools<br/>CRM, ticketing, Slack or Teams,<br/>Google Workspace or Microsoft 365,<br/>internal databases"]
 
     pcs <-->|"per-computer credential"| hub
     idp -->|"who is who, which groups"| hub
     hub -->|"push every few minutes"| git
-    hub <-->|"MCP, ONE provider"| model
-    hub <-.->|"MCP, ONE provider"| cloud
+    hub <-->|"MCP, by policy"| model
+    hub <-.->|"MCP, by policy"| cloud
     pcs <-->|"the vendors' own MCP servers"| tools
 ```
 
@@ -170,14 +186,14 @@ admin console and approvals need the company server.
 
 ### Sensitive work and the one AI provider
 
-Because the organisation connects to one AI provider, notes cannot be split between a cloud model for
-some people and a local model for others. An organisation whose notes must not reach a cloud AI
-service chooses an on-premises LLM as its one provider. Memev does not run models: it decides which
-notes the provider receives. Labels on notes and rules for what reaches the provider are planned.
+The provider policy is the organisation's (planned). An organisation whose notes must not reach a
+cloud AI service restricts itself by policy to an on-premises LLM, so that no member's app can send
+work notes to a cloud model. Memev does not run models: it decides which notes a provider receives.
+Labels on notes and rules for what reaches each provider are planned.
 
-If the provider is a cloud AI service, names, e-mail addresses and amounts can be replaced with
-placeholders first (planned), and every note returned to the provider is written to the egress log:
-which note, which person, when.
+Where the policy allows a cloud AI service, names, e-mail addresses and amounts can be replaced with
+placeholders first (planned), and every note returned to a provider is written to the egress log:
+which note, which person, which provider, when.
 
 ### Company tools
 
@@ -195,7 +211,7 @@ through an MCP server your team runs, with a read-only database user.
 | On-premises LLM, larger | one or two 48 GB GPUs (for example RTX 6000 Ada or L40S), 128 GB RAM. Runs 30B to 70B quantised models with vLLM for several people at once. | a server-class machine |
 | Backup | your company's GitHub organisation, or a git server on your network | existing |
 
-The two on-premises LLM rows apply only if the organisation chooses an on-premises LLM as its one AI provider. These are starting points. Test the model you choose with your own work before buying.
+The two on-premises LLM rows apply only if the organisation's policy includes an on-premises LLM. These are starting points. Test the model you choose with your own work before buying.
 
 ### Cost for this example (draft)
 
@@ -210,8 +226,9 @@ yours; see above.
 - One company vault that all members' work data syncs into, with company knowledge coming back down to
   members' apps (planned)
 - A company admin console that sees and searches everything in the company vault (planned)
-- One AI provider for the organisation, a cloud AI service or an on-premises LLM, connected over MCP
-  (planned)
+- Provider policy: members use the AI providers the organisation allows, cloud AI services or an
+  on-premises LLM over MCP, and the organisation may restrict itself to one provider, with egress
+  rules (planned)
 - Merging of members' edits by the paid crdt-merge convergence engine, which lives in its own
   repository and is called as an external dependency ([CONVERGENCE.md](../CONVERGENCE.md)) (planned)
 - Invites from an org admin into the company vault (planned)
@@ -226,14 +243,16 @@ yours; see above.
 
 ## Limits
 
-- A licence counts once per organisation, by person and by computer. The trial is 5 members and 10
+- The terms of a licence are agreed with you. The trial is 5 members and 10
   computers, 14 days with one 14-day extension. There is no public price: contact us. For identity
   sync, SIEM export, retention, legal hold or high availability, see [Corporate](corporate.md).
 - Every app on every enrolled computer gets a seat on the comms bus. IT or a team lead can run a
   comms check and hand out tasks from one session; a removed computer drops off the bus.
 - Each computer has its own device key, and IT frees a computer with `memev devices remove <id>`.
   Past the licensed count the vault refuses the next one.
-- One AI provider per organisation: one cloud AI service or one on-premises LLM, not both.
+- The provider policy is the organisation's: it may allow several AI providers or restrict itself to
+  one cloud AI service or one on-premises LLM (planned). Memev enforces the policy; it does not pick
+  the provider.
 - One company server. If it is down, each computer keeps working on its own notes and catches up
   after; a second server for failover is Corporate.
 - The company server decrypts notes to index them, so whoever runs it can read them. The company can
@@ -245,8 +264,8 @@ yours; see above.
 
 | Week | Remote setup |
 |---|---|
-| 1 | call to agree departments, roles, the one AI provider and what counts as restricted; check the server |
-| 2 | install the company server (and the on-premises LLM, if that is the chosen provider), connect sign-in and the GitHub organisation |
+| 1 | call to agree departments, roles, the provider policy and what counts as restricted; check the server |
+| 2 | install the company server (and the on-premises LLM, if the policy includes one), connect sign-in and the GitHub organisation |
 | 3 | install Memev on the computers (IT runs one command per machine, or pushes it with their usual tool), import the org chart |
 | 4 | check permissions with test accounts, hand over, one hour of training for staff |
 
@@ -260,8 +279,8 @@ fault and 3 business days for a question. Details in [services.md](services.md#r
 
 ## Sovereignty
 
-Notes stay on your server and computers, and in your git backup. With an on-premises LLM as the one
-provider, notes never leave your network. With a cloud AI service as the provider, what it receives
+Notes stay on your server and computers, and in your git backup. With a policy that allows only an
+on-premises LLM, notes never leave your network. Where the policy allows a cloud AI service, what it receives
 leaves your control once sent, even pseudonymised; the egress log tells you what went where, and it
 can't bring anything back. Only licence information passes between your install and ours, never vault
 data.

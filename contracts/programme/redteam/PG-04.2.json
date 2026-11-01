@@ -1,0 +1,74 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PG-04.2",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "0672d69d0b3024837f8800ca396bf03651a616328ad1eae64ad595357d78c2b0",
+      "base_commit": "713f5b7a925c83f6e16f7e1522ae88792ae925f2",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/oplog.mjs",
+            "sha256": "35a8cfc7b849a274e356cc96e362ce627f2ec20d83108407d87251b28a230465"
+          },
+          {
+            "path": "src/engine/index.mjs",
+            "sha256": "4fe2798c75ab648caecee244d6307bbb31253410bd8c81bab6c9d4379971d212"
+          },
+          {
+            "path": "docs/README.md",
+            "sha256": "641a179c595b73700a615ae842da6e07dd0bf7f4ba4671dcae2bd88e6df6ec9d"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "low",
+          "how": "the design-task criteria of WP04-01 are greps for words, so a document that names the fields without defining them passes; the module and adapter tasks check test names by grep -F plus a whole-file run",
+          "disposition": "rejected",
+          "reason": "the criteria are byte-identical to the signed PG-04.1, and the behaviour is carried by the mandatory red-green tests, which run their own file under a stop rule that forbids a skip"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "docs/MODULES.md is now in the scope of three tasks (WP04-02 to WP04-04), so any of them may change the generated graph",
+          "disposition": "rejected",
+          "reason": "it is a generated file that a docs test checks, each of the three tasks adds a module or an import, and pull requests #357 and #366 each change it; the scope verifier of #347 additionally accepts it only when the generator reproduces it"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "the name-pattern runs (--test-name-pattern with exit 0) would also pass on zero matching tests",
+          "disposition": "rejected",
+          "reason": "each is preceded by a grep -F that the test name is in the file, and the red-green criterion runs the whole file; unchanged from PG-04.1"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the signer, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of PG-04.2, which supersedes the signed PG-04.1 (k-pg-04-1-canonical-operat-b77c7c), made against the #363 branch at 713f5b7a925c (the second signing pass; the first pass of 1 Nov 2026 held this spec for the findings named below). It has 4 tasks and 24 criteria. The spec hash equals the hash the owner delegation gave (0672d69d0b30). Earlier finding, fixed: the first pass held PG-04.2 because pull request #357 must link docs/OPERATION-ENVELOPE.md from docs/README.md for the docs-links test and no task listed that path. WP04-01 now lists docs/README.md. I ran the grep, file_exists and command criteria of WP04-01 and WP04-02 against #357 at df7c932 (all pass) and the criteria of WP04-03 and WP04-04 against #366 at its head (all pass, including the red-green tests), and the changed files of each pull request, other than contracts, all fall inside the union of the task scopes of this spec (docs/README.md, docs/MODULES.md, docs/OPERATION-ENVELOPE.md, src/engine/envelope.mjs, envelope-adapters.mjs, index.mjs, oplog.mjs and the four tests). Checks run: the PG-04.1 spec file is byte-unchanged against main; every task keeps the criteria, requirements and stop rules of PG-04.1 byte for byte and the scope of each keeps PG-04.1's entries in order, adding only WP04-01:docs/README.md, WP04-02:docs/MODULES.md, WP04-03:docs/MODULES.md, WP04-04:docs/MODULES.md; PG-04.3 is dropped (no spec or manifest row names it); the manifest kind is feature and each implement task has a mandatory test_red_green criterion that runs its own test file; every task drafts through makeTask; every command parses with sh -n; no criterion statement repeats within a task; every grep pattern compiles and is within 200 characters; every depends_on is a row of the Scope One or programme manifest; the leak scan is clean; the specIdOf and locate of the gate give this spec its own record path and no other spec of the 154 shares one. I did not run npm test. Three low findings, none blocks signing. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OGU1NmEyOTBjNjYxMmE0MzAwMjQ0MmYzOGU2NWQzNTE3MDJhZTM2NzE2NTg2OTYxNTdlZWEyYjRlM2Q2OWQxZg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "YKs4AUB+BQ5EKmkKsq1cN/KWmmkPMlFViRXaJ3rkBrm18BQk8mMSd1y3kmYmowAQPrgjqEUjww+dBbs7LEkAAA=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NGUwY2NhM2U3ZDhmYzVhNDcxYThkYTllOWNlNTE0ZWUxZWY5NWE4MmUyN2JmNjQ0NDZjZjk3YjYzZWEzNWY3Zg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "RdoOlP2FY5uPtb0ZHNdKts+QgXJ/wYnLG0Pysa1hxcwlk+zW3cx+ghn8iNHZcFTgUMx29X39tXBAYKQUrxCfCA=="
+          }
+        ]
+      }
+    }
+  ]
+}

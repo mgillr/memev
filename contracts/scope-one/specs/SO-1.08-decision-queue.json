@@ -1,0 +1,135 @@
+{
+  "title": "SO-1.08 Decision queue: blockers and user decisions as one workflow with named states",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G-SO-08 (addendum 8, review row 8). Source: the Scope One addendum (PR #222, docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md at head a1757a0) and its review table (issuecomment-6534383323); owner request of 31 Oct 2026 that every aspect be decomposed in the WBS and built into contracts (t531u). The addendum names recommendations that become contracts on acceptance; this contract is the design-record stage, so it asks for the decision record and builds nothing. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository. Depends on contracts: SO-03-A, SO-C-C.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "Maintain a dedicated blocker/decision queue with severity or urgency, concise explanation, affected milestone/tasks, dependencies, options, recommended next step, decision owner and the consequence of waiting.",
+        "Distinguish a genuine blocker requiring user action from an agent's internal retry, transient failure or routine subtask.",
+        "Keep routine retries, agent replacement, provider failover, lease expiry and execution recovery inside Memev. Do not turn ordinary infrastructure events into customer decisions.",
+        "Give each human decision a clear state: raised, awaiting user, answered, approved, rejected, deferred or resolved. Preserve the decision and its rationale in project history.",
+        "Let the lead agent explain the issue in plain language, present viable options and identify what it recommends and why. It must not present its recommendation as the user's decision.",
+        "When a decision is made, update the canonical project record and recalculate affected dependencies, plans, task eligibility and verification freshness.",
+        "Never silently skip permissions, invent an approval, discard a blocker or continue a consequential action that requires human authorisation."
+      ],
+      "description": "",
+      "scope": [
+        "docs/scope-one/design/decision-queue.md",
+        "docs/README.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The decision record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/design/decision-queue.md"
+          }
+        },
+        {
+          "statement": "The record decides requirement 1: Maintain a dedicated blocker/decision queue with severity or urgency, concise explanation, affected milestone/tasks, dependencies, options, recommended next...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/decision-queue.md",
+            "pattern": "^## Requirement 1:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 2: Distinguish a genuine blocker requiring user action from an agent's internal retry, transient failure or routine subtask.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/decision-queue.md",
+            "pattern": "^## Requirement 2:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 3: Keep routine retries, agent replacement, provider failover, lease expiry and execution recovery inside Memev. Do not turn ordinary infrastructure events...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/decision-queue.md",
+            "pattern": "^## Requirement 3:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 4: Give each human decision a clear state: raised, awaiting user, answered, approved, rejected, deferred or resolved. Preserve the decision and its rationale...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/decision-queue.md",
+            "pattern": "^## Requirement 4:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 5: Let the lead agent explain the issue in plain language, present viable options and identify what it recommends and why. It must not present its...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/decision-queue.md",
+            "pattern": "^## Requirement 5:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 6: When a decision is made, update the canonical project record and recalculate affected dependencies, plans, task eligibility and verification freshness.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/decision-queue.md",
+            "pattern": "^## Requirement 6:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 7: Never silently skip permissions, invent an approval, discard a blocker or continue a consequential action that requires human authorisation.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/decision-queue.md",
+            "pattern": "^## Requirement 7:"
+          }
+        },
+        {
+          "statement": "The record names the queue states",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/decision-queue.md",
+            "pattern": "^Queue states:"
+          }
+        },
+        {
+          "statement": "The record names the queue fields",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/decision-queue.md",
+            "pattern": "^Queue fields:"
+          }
+        },
+        {
+          "statement": "The decision record passes the leak scan",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The documentation links and up-links stay valid",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-links.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

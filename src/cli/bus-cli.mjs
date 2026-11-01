@@ -7,7 +7,7 @@ import { isVault } from '../engine/vault.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { git } from '../engine/git.mjs';
-import { commsCheckView, commsCredentialFailure, fileOf, label } from '../engine/bus.mjs';
+import { commsCheckView, commsCredentialFailure, fileOf, hasRead, label } from '../engine/bus.mjs';
 import { readJson } from '../engine/util.mjs';
 
 // ---- setting the bus up: init, connect and the doctor share this
@@ -193,7 +193,7 @@ export async function command(cmd, pos, flags, { root, env }) {
     // On the vault's own computer the pulse file says exactly what the seat has read; from another
     // computer the roster's last heartbeat is the closest signal.
     const isRead = isVault(root)
-      ? () => (readJson(path.join(root, 'bus', 'pulse', `${fileOf(seat)}.json`), null)?.read || {})[m.device] >= m.dseq
+      ? () => hasRead(readJson(path.join(root, 'bus', 'pulse', `${fileOf(seat)}.json`), null), m)
       : async () => { const r = await call('bus_roster', {}); const row = (r.seats || []).find((s) => s.seat === seat); return !!row?.last_seen && row.last_seen >= m.ts; };
     const start = Date.now();
     for (;;) {

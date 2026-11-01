@@ -1,0 +1,10 @@
+{
+  "payloadType": "application/vnd.memev.contract-sha256",
+  "payload": "NDA5NjNhYTdmNjBhYzY5NTM4ZmFkMjA3Mzk3N2IyY2E3YmU1ODZhYThiOGIyNzlhN2Q2ZTE1NWYzYzM2N2IzMA==",
+  "signatures": [
+    {
+      "keyid": "45c92c2850024872",
+      "sig": "4YdCXfHKRfAl6CXkqwJQOBA5av4Gsjp/BfpJfBN8ubZafPuLB7fhve4asAdQrCbk20nz9/seYR2ycp9MUvC3DA=="
+    }
+  ]
+}

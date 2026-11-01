@@ -1,0 +1,150 @@
+{
+  "title": "SR-6.02 npx memev init works",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G49: Not on npm; the one-command install path is coming soon. Repository: memev. Depends on contracts: SR-6.01.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Publish 1.0",
+      "phase": "release",
+      "depends_on": [],
+      "requirements": [
+        "a tagged release on npm, published by the owner from the owner's terminal (never from CI) as the tarball the tag's release attaches, so its SHA-256 matches the release's; npx memev init passes on clean macOS, Linux and Windows",
+        "once the package is on npm, no page tells people not to run npx memev (README.md and docs/INSTALL-FOR-AI.md said so at be457db), and the install pages give npx memev init as a path",
+        "the clean-machine runs are recorded: docs/testing/npx-install.md names the image, the date, the command npx memev init and its exit code for macOS, Linux and Windows",
+        "npx --yes memev@<version> init --local-only --no-connect, taken from registry.npmjs.org, works from a clean HOME; the git tag v<version> is on HEAD's history, and the registry's version and latest dist-tag equal it",
+        "README.md, docs/QUICKSTART.md and docs/INSTALL-FOR-AI.md give npx memev init as a path, no line calls it unpublished or coming soon, and docs/testing/LAB-TEST-PLAN.md no longer tells testers the package is not ours",
+        "every npx memev init command docs/INSTALL-FOR-AI.md gives carries --no-connect, and the runbook's command-safety test (test/agent-runbook.test.mjs) covers npx commands",
+        "each recorded clean run names its system, the date, the command, the version and exit 0 on one line, and the version is 1.0 or later"
+      ],
+      "description": "",
+      "scope": [
+        "package.json",
+        "CHANGELOG.md",
+        "changelog.d/**",
+        "docs/RELEASING.md",
+        "README.md",
+        "docs/INSTALL-FOR-AI.md",
+        "docs/QUICKSTART.md",
+        "docs/testing/npx-install.md",
+        "test/agent-runbook.test.mjs",
+        "docs/testing/LAB-TEST-PLAN.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The package is on npm",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm view memev version"
+          }
+        },
+        {
+          "statement": "The tag matches the version",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/release-tag-check.mjs v$(node -p \"require('./package.json').version\")"
+          }
+        },
+        {
+          "statement": "The release is this repository's tagged version. The git tag v<package.json version> exists and is an ancestor of HEAD. npm view memev@<version> version prints that version, and npm's latest dist-tag is that version, both read from registry.npmjs.org.",
+          "verifier": {
+            "type": "command",
+            "cmd": "v=$(node -p 'require(\"./package.json\").version'); export npm_config_registry=https://registry.npmjs.org/; git rev-parse -q --verify \"refs/tags/v$v\" >/dev/null && git merge-base --is-ancestor \"v$v\" HEAD && [ \"$(npm view \"memev@$v\" version)\" = \"$v\" ] && [ \"$(npm view memev dist-tags.latest)\" = \"$v\" ]",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "README.md, docs/QUICKSTART.md and docs/INSTALL-FOR-AI.md each name npx memev init. No line on them that mentions npx memev calls it unpublished, coming soon, or not on the registry, or says not to look for it or run it. This is red at base: the loop passes, and the second grep finds README.md:108, docs/QUICKSTART.md:13 and docs/INSTALL-FOR-AI.md:25.",
+          "verifier": {
+            "type": "command",
+            "cmd": "for f in README.md docs/QUICKSTART.md docs/INSTALL-FOR-AI.md; do grep -q 'npx memev init' \"$f\" || exit 1; done; ! grep -h -i 'npx memev' README.md docs/QUICKSTART.md docs/INSTALL-FOR-AI.md | grep -i -E 'coming soon|not published|not on the npm registry|do not (look|run)|once memev is on'",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "For each of macOS, Linux and Windows, one line of docs/testing/npx-install.md names the OS, an ISO date, an npx memev init command, the package.json version and exit 0 together, and no recorded command is init --help or init -h.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=docs/testing/npx-install.md; v=$(node -p 'require(\"./package.json\").version'); test -f \"$f\" || exit 1; ! grep -q -e 'init --help' -e 'init -h' \"$f\" || exit 1; for os in macos linux windows; do grep -i \"$os\" \"$f\" | grep -E '20[0-9]{2}-[01][0-9]-[0-3][0-9]' | grep -E 'npx( --yes)? memev(@[0-9][^ ]*)? init' | grep -F \"$v\" | grep -qE 'exit( code)?:? 0([^0-9]|$)' || exit 1; done",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "The released version is 1.0 or later: the major version in package.json is at least 1. This is red at base, where it is 0.",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node -p 'JSON.stringify({major: Number(require(\"./package.json\").version.split(\".\")[0])})'",
+            "key": "major",
+            "op": ">=",
+            "value": 1
+          }
+        },
+        {
+          "statement": "No install page tells people not to run npx memev",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -rn -i 'do not run npx memev' README.md docs/INSTALL-FOR-AI.md docs/QUICKSTART.md",
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "The npx install record names a run on each of macOS, Linux and Windows with exit 0",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=docs/testing/npx-install.md; grep -qi 'macos' $f && grep -qi 'linux' $f && grep -qi 'windows' $f && [ $(grep -c 'npx memev init.*exit 0' $f) -ge 3 ]",
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "The registry package at this version installs from a clean HOME on the verifier's machine. npx --yes memev@<package.json version> init --local-only --no-connect exits 0 against registry.npmjs.org, creates the vault at $HOME/memev and copies the runtime to $HOME/.config/memev/runtime/<version>, then the daemon it started is stopped. This covers one OS only. The other two are the recorded runs of requirement 3.",
+          "verifier": {
+            "type": "command",
+            "cmd": "v=$(node -p 'require(\"./package.json\").version'); d=$(mktemp -d); cd \"$d\" || exit 1; env -i PATH=\"$PATH\" HOME=\"$d\" npm_config_cache=\"$d/.npm\" npm_config_registry=https://registry.npmjs.org/ MEMEV_NO_SERVICE=1 MEMEV_NO_TUNNEL=1 MEMEV_NO_DOWNLOAD=1 npx --yes \"memev@$v\" init --local-only --no-connect --port 47791 </dev/null; rc=$?; \"$d/.config/memev/bin/memev\" stop --root \"$d/memev\" >/dev/null 2>&1; [ \"$rc\" -eq 0 ] && [ -f \"$d/memev/.memev/config.json\" ] && [ -f \"$d/.config/memev/runtime/$v/bin/memev.mjs\" ]",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "docs/INSTALL-FOR-AI.md gives an npx memev init command with --no-connect, and every npx memev init command on it carries --no-connect. This is red at base, where line 25 has a bare `npx memev init`.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=docs/INSTALL-FOR-AI.md; grep -qE 'npx( --yes)? memev(@[^ ]+)? init[^`]*--no-connect' \"$f\" && ! grep -oE 'npx( --yes)? memev(@[^ ]+)? init[^`]*' \"$f\" | grep -v -e '--no-connect' | grep -q .",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "docs/testing/LAB-TEST-PLAN.md no longer calls npx memev coming soon or unavailable, and no longer says not to run it. It is red at base on line 78.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=docs/testing/LAB-TEST-PLAN.md; test -f \"$f\" && ! grep -i 'npx memev' \"$f\" | grep -i -E 'coming soon|not available|isn.t ours|don.t run'",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "The npm tarball is the release's own: the SHA-256 of memev@<package.json version> packed from registry.npmjs.org equals the .tgz.sha256 the tag's release attaches",
+          "verifier": {
+            "type": "command",
+            "cmd": "v=$(node -p 'require(\"./package.json\").version'); d=$(mktemp -d); (cd \"$d\" && npm_config_registry=https://registry.npmjs.org/ npm pack \"memev@$v\" >/dev/null 2>&1) || exit 1; gh release download \"v$v\" --pattern '*.tgz.sha256' --dir \"$d\" || exit 1; want=$(cat \"$d\"/*.tgz.sha256 | awk '{print $1}' | head -1); got=$(node -e 'const c=require(\"crypto\"),f=require(\"fs\");process.stdout.write(c.createHash(\"sha256\").update(f.readFileSync(process.argv[1])).digest(\"hex\"))' \"$d/memev-$v.tgz\"); [ -n \"$want\" ] && [ \"$want\" = \"$got\" ]",
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

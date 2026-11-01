@@ -55,6 +55,10 @@ export function lastListenError(root) {
 export async function whyNotRunning(root) {
   const info = daemonInfo(root);
   if (info && pidAlive(info.pid)) return `the daemon (pid ${info.pid}) is running on port ${info.port} but does not answer; run memev restart`;
+  // the daemon refuses to start on a config with a syntax error (server/main.mjs), every time, so say that and not only
+  // that it is not running
+  const cfgFile = path.join(root, '.memev', 'config.json');
+  try { JSON.parse(fs.readFileSync(cfgFile, 'utf8')); } catch (e) { if (e instanceof SyntaxError) return `${cfgFile} is not valid json, so the daemon refuses to start; fix the file and run memev start`; }
   const last = lastListenError(root);
   for (const port of new Set([Number(config(root).port) || 7787, last?.port].filter(Boolean))) {
     if (!(await portFree(port))) return `port ${port} is held by another program; run memev init --port ${await choosePort(root, port)}`;

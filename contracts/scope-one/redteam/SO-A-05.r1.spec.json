@@ -1,0 +1,137 @@
+{
+  "title": "SO-A-05 Decision and blocker queue as a workflow: seven states, severity and consequence of waiting, routine recoveries never become decisions, recommendations are never answers, answers recalculate dependents",
+  "project": "memev",
+  "workdir": null,
+  "request": "Build layer of the Scope One programme, adapted from the unsigned fold of 30 Oct 2026 (fold id SO-A-05) and validated against memev main at d1c65ef. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository; they are cited by id only. Implements the design record SO-1.08 (Decision queue: blockers and user decisions as one workflow with named states) (contracts/scope-one/specs). The decision record cites this contract by id and keeps only the gaps this one does not cover. Builds on signed vault contracts: SO-03-A†, SO-08-B†, SO-C-A†, SO-C-C†, SO-L-A†. Memev contracts that land first: SO-A-04, SO-1.01. Source in the fold: #222 recommendation 8 (blockers and user decisions as a first-class workflow). Settled decisions this contract follows (owner decision 31 Oct 2026, docs/scope-one/DECISIONS.md): topology is local-first and the cloud is only a relay and a backup; every supported provider stands on equal footing and no work or tier depends on one; crdt-merge is reached only through the provider boundary of src/engine/merge.mjs (docs/EXTENSION-POINTS.md) and this contract adds no merge engine to the core; tiers follow docs/PRICING.md (Free core, Personal for up to 3 computers with no per-computer add-on, higher tiers by contacting us) with no Personal trial; the git backup keeps running every few minutes (sync.interval_min). Memory authority: ADR 7 (memory and project-state authority) is proposed in PR #325 and is not decided here; this contract cites it and the local-first decision, and keeps one store under the vault with no second database. Provenance: adapted from the unsigned fold of 30 Oct 2026. Changes: (1) converted from the vault task format to the memev spec format (named tests run as red-green checks on the own test file of the contract; inline regular expression flags became the flags key; hygiene and decision verifiers became commands or doc checks). (2) removed fold-only fields and the owner-decision marker field, reworded the stop rule that named a patent, and made the text pass the leak scan. (3) Prerequisite SO-1.01 added. The seven decision states are a separate entity from TASK_STATES, which are unchanged. (4) The decision owner field names a subject, not a role matrix: the role-by-action matrix is ADR 5 (open) and is not decided here.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision and blocker queue as a workflow: seven states, severity and consequence of waiting, routine recoveries never become decisions, recommendations are never answers, answers recalculate dependent",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a decision entity, added to the SO-07-A AC06 validator list, has the states raised, awaiting user, answered, approved, rejected, deferred and",
+        "memev work decisions (SO-03-A AC04) gains severity, a plain explanation, the affected milestones and tasks, dependencies, options, the recommended",
+        "routine retries, provider failover, transient failures, and a lease expiry or reassignment that recover() (SO-08-B AC01) resolves by resume or",
+        "the lead agent's recommendation is stored in a recommendation field and no code path copies it into the answer",
+        "an answer updates the canonical record, recalculates affected dependencies, plan versions, task eligibility and verification freshness through the",
+        "docs/PROJECTS.md documents the seven states and the rule that routine recoveries are not decisions",
+        "no role-by-action matrix is added"
+      ],
+      "description": "The addendum (recommendation 8) treats blockers and user decisions as a first-class workflow with its own states and content, kept apart from routine retries, failover and the lease recoveries that recover() (SO-08-B AC01) resolves by itself. SO-03-A has gates and memev work decisions (AC02, AC04); SO-C-A AC04 serves /api/decisions; SO-C-C has the outstanding-work view; none has the decision entity with states. This contract adds it to the store's validator list and extends the command and the endpoint.",
+      "scope": [
+        "changelog.d/SO-A-05.md",
+        "docs/COMMAND-CENTRE.md",
+        "docs/MODULES.md",
+        "docs/PROJECTS.md",
+        "src/cli/work.mjs",
+        "src/engine/policy.mjs",
+        "src/engine/project-store.mjs",
+        "src/server/http.mjs",
+        "src/server/ui/**",
+        "test/decisions.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "a decision entity, added to the SO-07-A AC06 validator list, has the states raised, awaiting user, answered, approved, rejected, deferred and resolved, with a transition table enforced by the store; an invalid transition is refused and recorded",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/decisions.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-A-05 AC01:' test/decisions.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-A-05 AC01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "memev work decisions (SO-03-A AC04) gains severity, a plain explanation, the affected milestones and tasks, dependencies, options, the recommended option with its reason, the decision owner and the consequence of waiting, ordered by severity then age; /api/decisions (SO-C-A AC04) serves the same record",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/decisions.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-A-05 AC02:' test/decisions.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-A-05 AC02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "routine retries, provider failover, transient failures, and a lease expiry or reassignment that recover() (SO-08-B AC01) resolves by resume or reassign never create a decision; only a recovery plan of ask the user does; the test injects each and asserts the queue is unchanged while the event log records the event",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/decisions.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-A-05 AC03:' test/decisions.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-A-05 AC03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "the lead agent's recommendation is stored in a recommendation field and no code path copies it into the answer: the test answers a decision that carries a recommendation and asserts the answer field holds the user's choice; the user-only refusal itself is SO-03-A AC03",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/decisions.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-A-05 AC04:' test/decisions.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-A-05 AC04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "an answer updates the canonical record, recalculates affected dependencies, plan versions, task eligibility and verification freshness through the relationship model (SO-A-04), and is kept in history with its rationale",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/decisions.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-A-05 AC05:' test/decisions.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-A-05 AC05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "docs/PROJECTS.md documents the seven states and the rule that routine recoveries are not decisions",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/PROJECTS.md",
+            "pattern": "raised.*awaiting.*answered.*approved.*rejected.*deferred.*resolved"
+          }
+        },
+        {
+          "statement": "no role-by-action matrix is added: src/engine/policy.mjs gains no table mapping roles to actions (ADR 5 stays open)",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -nE 'roleActionMatrix|ROLE_ACTION|permission_matrix' src/engine/policy.mjs src/engine/project-store.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The full test suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "The leak scan passes on files and every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Every changed file is inside this contract's scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "Stop and post BLOCKED when a criterion cannot pass without weakening a test, skipping a test or relaxing an assertion.",
+        "Stop and ask when the work would name a client product, a person, a server or a seat in repository text; the client names live in docs/CLIENTS.md only.",
+        "Stop when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would move convergence logic into the core, vendor the engine, or add a merge engine beside the provider boundary of src/engine/merge.mjs.",
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,198 @@
+{
+  "title": "SO-1.05 Workspace: the eleven project views and the persistent lead-agent area",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G-SO-05 (addendum 5, review row 5; addendum sequencing 5 and 6, lines 423-424, put the relationship model first). Source: the Scope One addendum (PR #222, docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md at head a1757a0) and its review table (issuecomment-6534383323); owner request of 31 Oct 2026 that every aspect be decomposed in the WBS and built into contracts (t531u). The addendum names recommendations that become contracts on acceptance; this contract is the design-record stage, so it asks for the decision record and builds nothing. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository. Depends on contracts: SO-C-A, SO-C-B, SO-C-C, SO-05-C.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "Give the workspace a persistent interaction area for the lead agent.",
+        "Project brief / scope: objectives, boundaries, assumptions, exclusions, success criteria, stakeholders and approved changes.",
+        "Programme roadmap: high-level phases, milestones, dependencies, target dates where known, stage gates and delivery outlook.",
+        "Project / delivery plan: the integrated plan showing how scope, schedule, work packages, dependencies, risks, quality and delivery fit together.",
+        "Development plan: engineering workstreams, technical sequencing, environments, integration strategy, release stages and technical acceptance criteria.",
+        "Work breakdown structure: hierarchical deliverables, work packages, tasks, dependencies, acceptance criteria and status. Users should be able to move from a roadmap milestone to its constituent work packages and tasks and back. Internal task ownership and agent allocation remain Memev-managed.",
+        "System architecture: the whole-system design, major components, interfaces, trust boundaries and external dependencies.",
+        "Subsystem architecture: drill-down views for individual components, their internal structure, contracts and relationships.",
+        "Risks, assumptions, issues and dependencies: a PMO-style RAID view with impact, mitigation and status, linked to affected work.",
+        "Canvas / artefacts: generated and user-provided documents, specifications, reports, diagrams, flowcharts, research, code and application previews, with suitable viewers and previews.",
+        "Activity / project progress: human-readable updates on completed work, work in progress, milestones, outputs and meaningful changes. Do not make the ordinary customer interface a live agent-routing console or require the user to interpret engine activity.",
+        "Blockers / decisions: a dedicated, prominent queue of unresolved issues that genuinely require user input, approval or a decision.",
+        "Keep the lead-agent interaction area available across these views, with enough context to understand which project, plan, subsystem, task or artefact the user is discussing.",
+        "Make pause, resume, cancel, re-plan, approval and deliverable-acceptance semantics explicit and truthful. A user instruction that changes scope must go through the scope-change process, not silently mutate the approved plan."
+      ],
+      "description": "",
+      "scope": [
+        "docs/scope-one/design/workspace-views-and-lead-area.md",
+        "docs/README.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The decision record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/design/workspace-views-and-lead-area.md"
+          }
+        },
+        {
+          "statement": "The record decides requirement 1: Give the workspace a persistent interaction area for the lead agent.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^## Requirement 1:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 2: Project brief / scope: objectives, boundaries, assumptions, exclusions, success criteria, stakeholders and approved changes.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^## Requirement 2:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 3: Programme roadmap: high-level phases, milestones, dependencies, target dates where known, stage gates and delivery outlook.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^## Requirement 3:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 4: Project / delivery plan: the integrated plan showing how scope, schedule, work packages, dependencies, risks, quality and delivery fit together.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^## Requirement 4:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 5: Development plan: engineering workstreams, technical sequencing, environments, integration strategy, release stages and technical acceptance criteria.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^## Requirement 5:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 6: Work breakdown structure: hierarchical deliverables, work packages, tasks, dependencies, acceptance criteria and status. Users should be able to move from a...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^## Requirement 6:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 7: System architecture: the whole-system design, major components, interfaces, trust boundaries and external dependencies.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^## Requirement 7:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 8: Subsystem architecture: drill-down views for individual components, their internal structure, contracts and relationships.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^## Requirement 8:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 9: Risks, assumptions, issues and dependencies: a PMO-style RAID view with impact, mitigation and status, linked to affected work.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^## Requirement 9:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 10: Canvas / artefacts: generated and user-provided documents, specifications, reports, diagrams, flowcharts, research, code and application previews, with...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^## Requirement 10:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 11: Activity / project progress: human-readable updates on completed work, work in progress, milestones, outputs and meaningful changes. Do not make the...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^## Requirement 11:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 12: Blockers / decisions: a dedicated, prominent queue of unresolved issues that genuinely require user input, approval or a decision.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^## Requirement 12:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 13: Keep the lead-agent interaction area available across these views, with enough context to understand which project, plan, subsystem, task or artefact the...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^## Requirement 13:"
+          }
+        },
+        {
+          "statement": "The record decides requirement 14: Make pause, resume, cancel, re-plan, approval and deliverable-acceptance semantics explicit and truthful. A user instruction that changes scope must go...",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^## Requirement 14:"
+          }
+        },
+        {
+          "statement": "The record names the view list",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^View list:"
+          }
+        },
+        {
+          "statement": "The record names the lead area",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/workspace-views-and-lead-area.md",
+            "pattern": "^Lead area:"
+          }
+        },
+        {
+          "statement": "The decision record passes the leak scan",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The documentation links and up-links stay valid",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-links.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

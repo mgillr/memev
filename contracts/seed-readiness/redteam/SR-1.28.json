@@ -1,0 +1,110 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SR-1.28",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "9329a7b7ec890d9234fc538737d4bc3b5800270980f0ae1941e39401c3ab6a7b",
+      "base_commit": "4282ba7d1f0e0db2c4f0335bfd949bfcbbbe7f1b",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/BUS.md",
+            "sha256": "022c0721afc324d21ee5c97f3a2bde9d74efd1897e8ac784b56a92364d03cb83"
+          },
+          {
+            "path": "docs/MODULES.md",
+            "sha256": "1bc02214fea53351ee60db81e1b94dd269a7a6fbab9240cf2f37bf4225981f6a"
+          },
+          {
+            "path": "src/cli/bus-cli.mjs",
+            "sha256": "a4bca026ed24dd6c6423f8f65f04c99823627e28be3dc96e3133e8f9d496d365"
+          },
+          {
+            "path": "src/cli/common.mjs",
+            "sha256": "f9e8ebfd686baddbbf47498d9e94bac405f9a32af2fe3fb817c91dfa5be61095"
+          },
+          {
+            "path": "src/cli/doctor.mjs",
+            "sha256": "c71aa7f868aa2199c4fde3c71948876aeb1e03cc08aab9f9d61da4c13f48d7c2"
+          },
+          {
+            "path": "src/cli/hooks.mjs",
+            "sha256": "6870a173e4901cb695811f362047f0a275a0016ae389302c57381c588ecf7a82"
+          },
+          {
+            "path": "src/cli/main.mjs",
+            "sha256": "0915c5b38d2b7530cb4a07fa7715e6f73fffebd2646a959348eeddfa1b5c52ef"
+          },
+          {
+            "path": "src/cli/onboarding.mjs",
+            "sha256": "3c3a8494ec4bea3fb8e497f723b846f556b7ba887587269092994d21d085bf37"
+          },
+          {
+            "path": "src/cli/runner.mjs",
+            "sha256": "16b6e3f780760513dd4e42792ef7e1c3feb932727b59d97502e427bc985cdad8"
+          },
+          {
+            "path": "src/engine/bus.mjs",
+            "sha256": "2110ec795d0a62293227b728281193587b3fe9abd535cc7e24739efe1faf9c89"
+          },
+          {
+            "path": "src/engine/card.mjs",
+            "sha256": "3be6d94098095ceb060d65df636c6857a6a6bf4d3fa12a846cc5e6c4b0237616"
+          },
+          {
+            "path": "src/engine/devices.mjs",
+            "sha256": "37391e4cd0f4e5a1f52eab59d5081c0731da925d24e938f0ab990862ec09d21f"
+          },
+          {
+            "path": "src/engine/tokens.mjs",
+            "sha256": "19f9f7edc8c3001bc0ca0f87e918b9d6650753524b8ee3ce8c724d7ae744258e"
+          },
+          {
+            "path": "src/engine/vault.mjs",
+            "sha256": "63db6108e1838433b79bdd0fc725684e3ab79e92ba5d097d2545bc758bc4ad28"
+          },
+          {
+            "path": "src/server/http.mjs",
+            "sha256": "bdc46b5ad8592c9bad976d3ac92196a5b57ab53ad14b205e0e9042e1a0886a35"
+          },
+          {
+            "path": "src/server/mcp.mjs",
+            "sha256": "9520ce2641d39c737bb99cc6be3fedccd1efa71e556e678933947a77d6b59b71"
+          },
+          {
+            "path": "src/server/oauth.mjs",
+            "sha256": "bdf688db2459adefc06d970c6fa2ff0388a37e48d1ae85bbd0f0fc8536a6e1fc"
+          },
+          {
+            "path": "test/init-bus.test.mjs",
+            "sha256": "f0a193b2ead676b253be05f6b44f3ca798da10c90faba2a1b4546303f35ac524"
+          },
+          {
+            "path": "test/protocol-once.test.mjs",
+            "sha256": "fc1197cfc5a1b75dd5a00c51a2a2e5b342264a69806e9610d09d9c127ce88c11"
+          },
+          {
+            "path": "test/seat-names.test.mjs",
+            "sha256": "9c10377176300c6b91ce301af0f35858f8612a31329d6d37df79fae9a7a3c48a"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Re-sign review of the spec as it stands on main at 4282ba7d1f0e, for a contract signed before the red-team gate. It has 2 task(s) and 56 criteria. Mechanical checks run on every criterion, and these are the only checks made: each task drafts through makeTask; each command, metric and red-green cmd parses with sh -n; each red-green cmd names its test_file and that file is in the task's scope; no criterion statement is repeated within a task except as answer 1 records; every contract this spec depends on, in its manifest row, is a manifest row. They found nothing. I did not re-run the three rounds that were made off this repository before the first signing, and I did not run the checks the criteria name, because their code is not built yet. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZDUwMDZlOWMyODZkZjczYjM5YzY0MDUxMTZkNTlhMzg0YjdiNDliYzUyNzlkNjBjMDliM2U5NzgxMmRkNzQ5Yg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "yguqyMoQBWLxuSKfWlKqEJUW3MBElCpgz33dIqskiR+2rY6x6xBd+mNZx/emmYrSxUUMeDXer6QJDah42kGvBA=="
+          }
+        ]
+      }
+    }
+  ]
+}

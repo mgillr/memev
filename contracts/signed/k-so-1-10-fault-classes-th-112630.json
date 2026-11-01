@@ -1,0 +1,232 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "missing, corrupt or unreadable evidence;",
+        "permission denial and attempted access outside the approved workspace;",
+        "UI refresh, reconnection and restart while events are arriving, ensuring the workspace reconstructs the same authoritative state;",
+        "stale or out-of-order events, ensuring views do not regress or show a false current status;",
+        "revoked folder, GitHub or provider permissions while work is queued or executing;",
+        "provider failure during a task, ensuring safe internal retry, reassignment or escalation according to policy.",
+        "Recovery must preserve history and surface unresolved conflicts; it must not silently convert uncertainty into deletion, success or last-write-wins."
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "docs/scope-one/design/fault-classes-added-to-failure-suite.md",
+          "docs/README.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "The decision record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/design/fault-classes-added-to-failure-suite.md"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "The record decides requirement 1: missing, corrupt or unreadable evidence;",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/fault-classes-added-to-failure-suite.md",
+            "pattern": "^## Requirement 1:"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "The record decides requirement 2: permission denial and attempted access outside the approved workspace;",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/fault-classes-added-to-failure-suite.md",
+            "pattern": "^## Requirement 2:"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "The record decides requirement 3: UI refresh, reconnection and restart while events are arriving, ensuring the workspace reconstructs the same authoritative state;",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/fault-classes-added-to-failure-suite.md",
+            "pattern": "^## Requirement 3:"
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "The record decides requirement 4: stale or out-of-order events, ensuring views do not regress or show a false current status;",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/fault-classes-added-to-failure-suite.md",
+            "pattern": "^## Requirement 4:"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "The record decides requirement 5: revoked folder, GitHub or provider permissions while work is queued or executing;",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/fault-classes-added-to-failure-suite.md",
+            "pattern": "^## Requirement 5:"
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "The record decides requirement 6: provider failure during a task, ensuring safe internal retry, reassignment or escalation according to policy.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/fault-classes-added-to-failure-suite.md",
+            "pattern": "^## Requirement 6:"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "The record decides requirement 7: Recovery must preserve history and surface unresolved conflicts; it must not silently convert uncertainty into deletion, success or last-write-wins.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/fault-classes-added-to-failure-suite.md",
+            "pattern": "^## Requirement 7:"
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "The record names the fault class table",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/fault-classes-added-to-failure-suite.md",
+            "pattern": "^Fault class table:"
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "The record names the test names",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/fault-classes-added-to-failure-suite.md",
+            "pattern": "^Test names:"
+          }
+        },
+        {
+          "id": "T1-AC11",
+          "mandatory": true,
+          "statement": "The decision record passes the leak scan",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC12",
+          "mandatory": true,
+          "statement": "The documentation links and up-links stay valid",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-links.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC13",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-so-1-10-fault-classes-th-112630",
+  "title": "SO-1.10 Fault classes: the addendum classes that F01 to F20 do not name, added to the failure suite",
+  "workdir": null,
+  "created": "2026-10-31T22:00:27.147Z",
+  "version": 1,
+  "request": "Closes G-SO-10 (addendum 11, review row 11). Source: the Scope One addendum (PR #222, docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md at head a1757a0) and its review table (issuecomment-6534383323); owner request of 31 Oct 2026 that every aspect be decomposed in the WBS and built into contracts (t531u). The addendum names recommendations that become contracts on acceptance; this contract is the design-record stage, so it asks for the decision record and builds nothing. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository. Depends on contracts: SO-11-A, SO-09-A.",
+  "provenance": {
+    "spec_sha256": "3bc37c9f707a8f97a2ca479c27423734e66fe8128a4ddaadcaa8d2571a86b5ab",
+    "record": "contracts/scope-one/redteam/SO-1.10.json",
+    "review": "interim solo review by the author, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}
