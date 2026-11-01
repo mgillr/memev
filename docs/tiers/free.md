@@ -3,9 +3,13 @@
 Part of the [tiers pages](README.md). Up: the [README](../../README.md). Architecture chart:
 [ARCHITECTURE.md](../ARCHITECTURE.md#personal).
 
-For one person on one computer at a time. Complete, and never limited ([CHARTER.md](../../CHARTER.md)).
-Switch computers, lose nothing: your notes are backed up to your own GitHub, and a new computer can
-join that backup.
+For one person on one computer at a time. The Free Core is the complete local operating layer for
+human and AI work, not a memory-only trial: it provides durable project state, coordination across
+connected tools, work contracts and evidence-based verification. The vault is the local state
+substrate. It is complete, and never limited ([CHARTER.md](../../CHARTER.md)).
+
+GitHub backup is optional: it starts only after you run `memev github setup`. It is a single-writer
+backup path, not concurrent multi-computer synchronisation.
 
 ```mermaid
 flowchart LR
