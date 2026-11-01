@@ -2,9 +2,9 @@
 
 Part of the [Memev documentation](../README.md). Up: the [README](../../README.md). Related: [PROJECTS.md](../PROJECTS.md), [ARCHITECTURE.md](../ARCHITECTURE.md), [tiers](../tiers/README.md).
 
-**Status:** Proposal for independent review  
+**Status:** Proposal. Section 13, the federated architecture, is in scope by owner direction, 1 Nov 2026. Its build layer is the fold contracts SO-F-* in [contracts/scope-one/specs/](../../contracts/scope-one/specs/) and the SO-2.x decision records in [docs/scope-one/design/](design/). Being in scope does not mean built: implementation status stays separate from scope.  
 **Applies to:** Scope One  
-**Purpose:** Record additional concerns and recommendations for review by the owner and the two review seats. This addendum does not silently change the agreed Scope One requirements or authorise implementation. Recommendations become development decisions only after explicit consensus and acceptance.
+**Purpose:** Record additional concerns and recommendations for the owner. Apart from section 13, this addendum does not silently change the agreed Scope One requirements or authorise implementation. Those recommendations become development decisions only after explicit acceptance by the owner.
 
 ## Product outcome
 
@@ -160,7 +160,7 @@ A material scope change must invalidate affected approvals and verification evid
 - Support version history and comparison, and distinguish drafts, reviewed outputs and accepted deliverables.
 - Provide appropriate previews for supported formats, including documents, diagrams, flowcharts, code and web/application outputs.
 - Show verification evidence and outstanding limitations alongside the artefact. Do not imply that visual presence in the canvas means the output has passed acceptance.
-- Keep the underlying files in the user's chosen workspace or explicitly configured storage; the canvas should not create an opaque, proprietary copy as the only authoritative version.
+- Keep the underlying files in the user's chosen workspace or explicitly configured storage; the canvas should not create an opaque, non-portable copy as the only authoritative version.
 
 ### 10. Separate the core single-machine delivery path from optional commercial infrastructure
 
@@ -219,6 +219,8 @@ Repeat with different provider and machine configurations. Record which steps ar
 ### 13. Define the final-state architecture: shared organisational memory, cross-functional intelligence and federation
 
 **Product direction:** Memev must scale from a personal multi-agent work environment into the shared operational memory and coordination layer for an entire business, and ultimately a federation of businesses or enterprise units. It is not only a mechanism for completing isolated projects. It should allow people and agents working on different tasks, projects, programmes and business activities to contribute to, retrieve and reason over a coherent organisational body of knowledge, subject to explicit permissions and trust boundaries.
+
+Memev is local-first, and the cloud acts only as a relay and a backup ([DECISIONS.md](DECISIONS.md)).
 
 #### 13.1 Personal deployment: one person, one or several machines, many agents
 
@@ -308,17 +310,10 @@ These capabilities must be evidence-led and appropriately cautious:
 
 #### 13.6.1 Federated site memory and organisation-wide intelligence
 
-The intended Business and Enterprise topology is decentralised by site, not a single central company memory server.
+The intended Business and Enterprise topology is decentralised by site, not a single central company memory server: each site owns and operates its local memory, the federation makes authorised organisational state interoperable, and Memev provides organisation-wide intelligence across it. The topology is described once, in the federation architecture pages of the documentation: FEDERATION.md, with DATA-SOVEREIGNTY.md, ORGANISATIONAL-INTELLIGENCE.md, FEDERATED-COMPUTATION.md and ARCHITECTURAL-INTERDEPENDENCIES.md, all in the docs folder. Those pages are the single source for how sites converge state, how the admission and trust layers sit beside the convergence layer, and why no central memory server or coordinator is required. This section does not restate that model and keeps only the requirements those pages do not hold.
 
-For example, Building A may operate its own Memev server and canonical local memory for its battery engineering teams, repositories, plans, artefacts and operational activity. Building B may operate a separate Memev server and memory for its mechanical fitting teams and their work. Building C may do the same for its own people and activities. Each site remains an independently useful operational environment and retains local authority over its own records and workflows.
+The requirements on the intelligence fabric across sites:
 
-The sites participate in a governed federation:
-
-- Each site maintains and serves its own local Memev memory and project/operational state. Local users and agents interact with that site even when another site or the wider network is unavailable.
-- Site memories synchronise authorised, contractually defined state through CRDT-Merge so independently updated replicas converge under the engine's stated semantics. This is peer/site-to-peer federation; the target architecture must not require one central coordinator to sequence every ordinary update or act as the sole owner of organisational memory.
-- ACFA-RS is used for the accountable admission, reconciliation and reconstruction of signed contributions where its guarantees are required. It complements convergence; it is not a substitute for CRDT-Merge and should not be described as a general-purpose memory synchronisation engine.
-- E4 governs the relevant trust relationships and eligibility across participating people, agents, devices, services and sites. Trust governance does not replace identity, access policy or data classification.
-- Memev's intelligence fabric operates across the federated sites. It can discover and reason over the organisation's authorised work as a whole, while respecting each site's authority, sharing rules, confidentiality, jurisdiction and data-residency constraints.
 - The intelligence fabric must not assume that all raw records need to be copied into one central database. Depending on policy, it may use synchronised authorised state, federated queries, permitted derived insights or evidence references, while keeping restricted source data at its originating site.
 - Data sovereignty is a first-class design constraint across offices, countries and legal jurisdictions. Replication, query, processing, backup, retention, deletion and disaster-recovery placement must each follow applicable organisational policy and jurisdiction-specific rules. A record must not cross a border merely because the convergence layer can technically replicate it.
 - Separate source-data residency from continuity of authorised intelligence. Where policy permits, sites should replicate the minimum useful operational state, dependency metadata, approved decisions, evidence references and derived intelligence needed by other sites to continue their work. Where raw or sensitive source records must remain local, other sites may receive policy-approved summaries or references, or query the source site while it is available. Derived representations remain subject to classification, provenance, purpose limitation, revocation and re-evaluation.
@@ -327,27 +322,25 @@ The sites participate in a governed federation:
 - An employee can use their normal AI assistant at their own site and still receive relevant, evidence-linked understanding of work elsewhere in the organisation when the organisation's policy authorises that access. They should not have to know which building, server, repository or team holds the relevant information.
 - Sites must continue local operation during network partitions. Reconciliation after reconnection must preserve provenance, identify conflicts and respect authority and policy; convergence must never silently grant access or turn an unapproved proposal into an approved business decision.
 
-This is the intended operating model across the business: **each site owns and operates its local memory; the federation makes authorised organisational state interoperable; Memev provides organisation-wide intelligence across it.** There is no single central memory server or central coordinator on which every site depends.
-
 Concrete example: a battery engineer in Building A updates a Git-backed battery enclosure plan and records that the design is 67% complete, including dimensions, thermal limits, mounting positions, weight constraints and milestones. Independently, a mechanical fitting engineer in Building B asks their own AI assistant to prepare an installation plan. Memev's intelligence fabric detects that the proposed mounting arrangement may conflict with the battery enclosure dimensions. It links the relevant versions and evidence from both sites, identifies affected tasks, milestones, owners and possible downstream procurement, assembly or schedule impacts, states its confidence and uncertainty, and routes the finding to the appropriate people. It does not silently change either approved plan. The same mechanism applies across engineering, procurement, finance, sales, HR, operations, compliance and other business activities, not only formal projects.
 
 The acceptance target is not merely that one user can search another site's documents. It is that independently working people and teams can continue using their own environments while their authorised work contributes to a continuously updated organisation-wide model. Memev proactively evaluates how changes interact across sites and business functions, identifies previously undeclared relationships and conflicts, and helps the organisation coordinate a resolution without requiring employees to manually copy information into a central knowledge base.
 
 #### 13.7 The distributed systems research becomes core infrastructure at multi-system scale
 
-CRDT-Merge, ACFA-RS and E4 should be treated as complementary infrastructure for the Business and Enterprise deployment model, not as unrelated optional research demonstrations. Their importance increases as Memev moves from one person's local environment to independently operating devices, people, departments, offices and federated organisations.
+CRDT-Merge, the admission service and the trust service should be treated as complementary infrastructure for the Business and Enterprise deployment model, not as unrelated optional research demonstrations. The two services are named generically here, as in the SO-F-* contracts and the rest of the documentation. Their importance increases as Memev moves from one person's local environment to independently operating devices, people, departments, offices and federated organisations.
 
-- **CRDT-Merge, convergence of replicated work state:** the existing paid convergence engine is the convergence mechanism for supported distributed state. Its role should extend through a well-defined Memev integration contract from the initial supported conflict types to the structured project and organisational state required by the product: project and scope versions, requirements, plans, tasks and dependencies, assignments, execution attempts, artefact manifests, decisions, receipts and evidence references. Memev remains authoritative for project semantics, permissions, approvals and legal task transitions. CRDT-Merge does not decide whether work is correct, authorised or VERIFIED. Convergence of state is not proof of truth.
-- **ACFA-RS, accountable admission and reconciliation of contributions:** use it where independently operating nodes and operators submit signed structured contributions, verifier findings, test results, measurements, compliance evidence or competing claims. Its role is to provide accountable admission, equivocation evidence and deterministic reconstruction under its stated assumptions. It is not a generic natural-language voting system and does not turn admitted evidence into proof of correctness.
-- **E4, distributed trust and eligibility governance:** use it to govern the trust relationships and evidence associated with people, agents, devices, services and participating organisations. Trust must affect eligibility, permitted operations and verification requirements, with provenance and reviewable changes. Do not collapse trust into one self-asserted score or treat trust propagation as a substitute for access control, cryptographic verification or independent evidence.
+- **CRDT-Merge, convergence of replicated work state:** CRDT-Merge, the existing paid convergence engine, is the convergence mechanism for supported distributed state. It lives in its own repository under the Business Source License 1.1 (BSL 1.1), and Memev (Apache-2.0) uses it only through its call-out boundary. Its role should extend through a well-defined Memev integration contract from the initial supported conflict types to the structured project and organisational state required by the product: project and scope versions, requirements, plans, tasks and dependencies, assignments, execution attempts, artefact manifests, decisions, receipts and evidence references. Memev remains authoritative for project semantics, permissions, approvals and legal task transitions. CRDT-Merge does not decide whether work is correct, authorised or VERIFIED. Convergence of state is not proof of truth.
+- **Admission service, accountable admission and reconciliation of contributions:** use it where independently operating nodes and operators submit signed structured contributions, verifier findings, test results, measurements, compliance evidence or competing claims. Its role is to provide accountable admission, equivocation evidence and deterministic reconstruction under its stated assumptions. It is not a generic natural-language voting system and does not turn admitted evidence into proof of correctness.
+- **Trust service, distributed trust and eligibility governance:** use it to govern the trust relationships and evidence associated with people, agents, devices, services and participating organisations. Trust must affect eligibility, permitted operations and verification requirements, with provenance and reviewable changes. Do not collapse trust into one self-asserted score or treat trust propagation as a substitute for access control, cryptographic verification or independent evidence.
 
 The integration boundaries must remain explicit:
 - Memev owns project and organisational authority, canonical schemas, access policy, task lifecycle, approvals, verification semantics and user-facing decisions.
-- CRDT-Merge owns its defined convergence mechanics behind the paid service boundary.
-- ACFA-RS owns its defined accountable contribution-admission and reconstruction mechanisms where selected.
-- E4 owns its defined trust-governance mechanisms where selected.
+- CRDT-Merge owns its defined convergence mechanics behind the call-out boundary.
+- The admission service owns its defined accountable contribution-admission and reconstruction mechanisms where selected.
+- The trust service owns its defined trust-governance mechanisms where selected, and the admission path reads trust only as an eligibility input.
 - The event, receipt and evidence model links these systems without allowing one subsystem to claim guarantees that belong to another.
-- The system must remain useful locally and degrade safely if a paid or remote service is unavailable. It must not falsely claim distributed convergence, trust verification or evidence admission while those services are unavailable.
+- The system must remain useful locally and degrade safely if a paid, relay or remote service is unavailable. It must not falsely claim distributed convergence, trust verification or evidence admission while those services are unavailable.
 
 The Business tier should make multi-person, multi-device shared work state and organisational memory a first-class supported deployment, using the paid convergence integration where required. Enterprise should extend this into multi-office, multi-domain and international federation, with stronger trust, policy, sovereignty, audit and cross-boundary controls. Personal should remain approachable and local-first, supporting one person's agents and a small number of devices without forcing enterprise infrastructure onto an individual.
 
@@ -371,7 +364,7 @@ Extend the integration and adversarial test programme to cover:
 - One person using several different local and cloud agents on one computer, with shared context, consistent project state and no dependence on a single provider session.
 - One person moving between two or three computers, with offline work, reconnection, duplicate and reordered updates, and correct recovery of personal project state.
 - A representative small business with approximately ten people across different departments, each working on separate projects and activities, where authorised agents can discover relevant shared knowledge and identify a seeded cross-department conflict.
-- A decentralised multi-building business in which Buildings A, B and C each operate independent Memev servers and local memories, with no central coordinator; prove that authorised state converges across sites through the defined CRDT-Merge integration and that ACFA-RS provides accountable admission/reconstruction for selected signed contributions.
+- A decentralised multi-building business in which Buildings A, B and C each operate independent Memev servers and local memories, with no central coordinator; prove that authorised state converges across sites through the defined CRDT-Merge integration and that the admission service provides accountable admission and reconstruction for selected signed contributions.
 - A partition test in which each building continues local work independently, then reconnects; prove deterministic reconciliation, provenance preservation, duplicate/reordered update handling and no implicit expansion of permissions or approval authority.
 - The battery-engineering / mechanical-fitting scenario: a 67%-complete battery enclosure plan in Building A conflicts with a separately authored installation plan in Building B. Memev must discover the undeclared relationship, link both source versions, identify affected work and owners, explain uncertainty and possible downstream effects, and route the issue without silently changing either plan.
 - An employee using their ordinary AI assistant at one site receives relevant organisation-wide answers and proactive warnings based on authorised work at other sites, without needing to know where the source server or repository resides.
@@ -386,7 +379,7 @@ Extend the integration and adversarial test programme to cover:
 - A multi-office enterprise with separate policy and trust domains, proving that approved state and evidence cross boundaries while restricted records remain local.
 - A cross-border federation scenario with different data-residency or retention rules, proving that prohibited data is not replicated merely to simplify convergence.
 - A compromised or revoked operator/device whose trust and permissions change, with affected contributions and downstream verification identified for review and revalidation.
-- An unavailable CRDT-Merge, ACFA-RS or E4 service, proving that Memev reports degraded capability truthfully, preserves local history and does not claim guarantees it could not establish.
+- An unavailable CRDT-Merge, admission or trust service, proving that Memev reports degraded capability truthfully, preserves local history and does not claim guarantees it could not establish.
 - Reproducible reconstruction of who contributed what, under which authority, which evidence was admitted, what was shared across each boundary and why a cross-project issue was raised.
 - Growth in the number of people, projects, departments and nodes without turning the user experience into manual agent routing or requiring a central operator to reconcile every ordinary change.
 
@@ -410,7 +403,7 @@ Memev should not compete merely on launching more agents or storing more context
 - shared organisational memory that connects people, departments, projects, programmes and business activities under explicit access and sovereignty rules;
 - cross-functional intelligence that discovers evidence-backed conflicts, assumptions, risks, dependencies and reusable knowledge across otherwise independent work;
 - progressive scale from personal multi-agent use to multi-person businesses and federated, international enterprises;
-- distributed convergence, accountable contribution admission and trust governance through clearly separated CRDT-Merge, ACFA-RS and E4 integration boundaries.
+- distributed convergence, accountable contribution admission and trust governance through clearly separated CRDT-Merge, admission service and trust service integration boundaries.
 
 These are positioning hypotheses, not established advantages. They must be demonstrated through the integration and fault-injection tests above.
 
@@ -426,17 +419,17 @@ These are positioning hypotheses, not established advantages. They must be demon
 8. Complete onboarding, supported workflows and release paths.
 9. Progress cloud, paid convergence and enterprise capabilities on stable interfaces without making them accidental blockers to local-first delivery.
 10. Define and implement the governed organisational memory and cross-project knowledge graph, including identity-aware retrieval, provenance, classification, retention, derived-insight invalidation and cross-functional issue discovery.
-11. Extend the paid CRDT-Merge integration contract to structured project and organisational state; define where ACFA-RS contribution admission and E4 trust governance participate, with explicit service failure and degraded-mode behaviour.
+11. Extend the paid CRDT-Merge integration contract to structured project and organisational state; define where the admission service and the trust service participate, with explicit service failure and degraded-mode behaviour.
 12. Deliver Business multi-person/multi-device operation and then Enterprise multi-office and international federation, validating each deployment profile with partition, confidentiality, trust and recovery tests.
 
 Workstreams may proceed in parallel when their interfaces and ownership are stable. Do not create parallel implementations of the same authority or data model. Do not build elaborate visualisations before the underlying project relationships and event semantics are reliable.
 
 ## Review and adoption protocol
 
-The two review seats should review this addendum independently against the current repository and Scope One requirements. Each should classify every recommendation as **agree**, **disagree** or **needs evidence**, identify omissions and cite concrete files, contracts or tests.
+The owner reviews this addendum against the current repository and Scope One requirements. Each recommendation is classified as **agree**, **disagree** or **needs evidence**, omissions are identified, and concrete files, contracts or tests are cited.
 
 The outcome-led user experience, Memev-owned decomposition and orchestration, PMO-style project structure, lead-agent interaction, simple connections/access settings, blocker workflow and separation between user decisions and internal execution management should be reviewed as explicit product requirements.
 
-The owner resolves disagreements. Only recommendations with explicit consensus and acceptance should be converted into development contracts or changes to the requirement register. Record rejected or deferred recommendations with a short rationale. This document itself is advisory until that review is complete.
+The owner resolves disagreements. Apart from section 13, only recommendations with explicit acceptance should be converted into development contracts or changes to the requirement register. Section 13 is in scope by owner direction, 1 Nov 2026, and is built through the SO-F-* contracts and the SO-2.x decision records. Record rejected or deferred recommendations with a short rationale. Apart from section 13, this document is advisory until that review is complete.
 
 **Non-goal:** This addendum does not authorise cutting agreed Scope One scope, claiming unfinished capabilities as delivered, or merging implementation work without the repository's normal tests and review.

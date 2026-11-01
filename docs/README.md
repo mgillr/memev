@@ -20,7 +20,6 @@ this folder links back here, and this page links down to every page.
 | [ARCHITECTURE.md](ARCHITECTURE.md) | what runs today, and the Personal, Business and Corporate charts |
 | [MODULES.md](MODULES.md) | the module interdependency map, generated from the real imports |
 | [DESIGN.md](DESIGN.md) | the log, the index, recall, memory quality, the graph, scale |
-| [scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md](scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md) | the Scope One addendum: architecture, delivery and competitive risks, a proposal for review |
 | [MAPPING.md](MAPPING.md) | everything Memev does without being asked |
 | [BUS.md](BUS.md) | the comms bus: seats, the lead, roster, comms checks, tasks |
 | [CONTRACTS.md](CONTRACTS.md) | signed, immutable work contracts |
