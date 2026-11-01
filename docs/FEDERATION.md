@@ -104,9 +104,6 @@ A regional service may improve connectivity, routing, discovery or operational m
 not become the owner of all memory or the sole authority for ordinary state ordering, and it is not
 a relay: a relay only forwards and holds no state ([RELAY.md](RELAY.md)). If a topology chooses a
 central service for a specific function, that dependency and its failure mode must be explicit.
-Neither a relay nor a regional service holds trust: each only forwards or caches what its sources signed,
-and a node never takes a forwarder's word for a record or a revocation notice (see
-[Trust between sites](#trust-between-sites-decided-not-built)).
 
 ```mermaid
 flowchart TB
@@ -189,11 +186,6 @@ replace it. The trust service concerns distributed trust governance across peopl
 services and sites. The admission path reads trust only as an eligibility input: trust does not
 replace identity, access policy, data classification or independent evidence. Where an external
 admission service is configured, it runs before the node's own admission and before any append.
-Trust governance inside the core is decided in ADR 8
-([DECISIONS.md](scope-one/DECISIONS.md), [the definition](scope-one/design/trust-governance.md)): local, signed,
-revocable records that each site holds in its own operation log. An outside trust service is optional and is evidence
-only: it supplies references that a person attaches to a grant at approval, never to a single contribution, and the
-core never depends on it. This is a different thing from the merge-time check of [PAID-TRUST.md](PAID-TRUST.md).
 Neither service should be described as a universal storage layer or as guaranteeing that every record
 is synchronised everywhere. If the convergence, admission or trust service is unavailable, the node
 keeps its local history, reports the degraded capability, and does not claim a guarantee it could not
@@ -286,37 +278,6 @@ The gate (`relationshipGate`) turns the evaluation into the optional check that 
 - Carrying a relationship record, an acceptance or a revocation from one node to the other. The test carries them itself.
 - Binding the sending node in the gate: refusing a contribution whose `origin.node` is not a party of the live relationship.
 - The classification schema that pins the class names, and enforcement of the other actions (read, compute, retain, export) at the point each happens; the evaluation only answers.
-- A second version of the relationship record that both parties sign, with a freshness field and the sending node bound by
-  the signatures, so that a node that is silent for longer than the window can be refused (ADR 8).
-
-## Trust between sites (decided, not built)
-
-Planned. The owner decided ADR 8 on 1 Nov 2026 ([DECISIONS.md](scope-one/DECISIONS.md)); this section states what it means for
-federation, and no running code path implements it yet. Trust is an eligibility input of the admission path and never
-grants access.
-
-- **Each site is its own root.** A root is a signed record with a validity window, and a succession record moves it to
-  its successor. A company or a group of sites in Business or Corporate may add one optional organisation key as a
-  co-root, held by an operator subject. Each site accepts it through its own signed, expiring record and can drop it
-  alone. Nothing is shared by default.
-- **Across organisations, only by contract.** Two organisations meet only through a contract that both parties sign,
-  that names a scope, expires and can be revoked. It carries a freshness field and binds the sending node. Trust is
-  never transitive: a party trusted by a trusted party is not thereby trusted.
-- **Revocation is pushed, and bounded by freshness.** A revocation notice is signed by its issuer, so any node can
-  forward it, and the receiving node applies it only when its own records give the issuer authority over what it
-  revokes. Each contract has a freshness window, 24 hours by default, measured on the receiving node's own clock from
-  signed messages of the peer. When the peer has been silent for longer, the node refuses new contributions from that
-  side, queues them, evaluates each at the time it is admitted, and keeps its local work.
-- **Relays and regional nodes hold no trust.** They forward or cache signed records and decide nothing.
-- **Earlier work is kept.** A revocation marks the earlier work of the revoked subject as coming from a revoked source,
-  through an overlay kept per operation id, and the work is verified again only when the cause is a compromise.
-- **Who may change trust.** Only a person or an operator subject grants or revokes. An agent proposes and a person
-  approves. The table of who may write trust is provisional until ADR 5 and the workflow SO-A-05 are decided.
-- **Tier.** Local trust is part of the free core. Multi-site and cross-organisation trust are in the contact-us tiers,
-  Business and Corporate, enforced through the `services` list of the licence; a lapsed licence never invalidates
-  trust that already exists.
-
-The topology of work breakdown row 1.3.6 stays open: nothing here picks one.
 
 ## Partitions, offline operation and recovery
 
@@ -354,8 +315,7 @@ Every federation relationship needs explicit:
 
 A node must treat remote content as untrusted data, not executable instructions. A remote agent's
 request is not an approval. A signed contribution proves a key signed it; authority and validity
-must be checked separately. A trust record from another node is never applied as trust, and a
-forwarded revocation notice is applied only on the authority of the notice's own issuer.
+must be checked separately.
 
 ## Relationship to the tiers
 
