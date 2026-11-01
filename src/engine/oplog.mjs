@@ -15,6 +15,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { Worker } from 'node:worker_threads';
 import { sha256, readJson, writeJson, now, machineBootId, pidNamespace, processStart } from './util.mjs';
 import { mergeContractHash } from './envelope.mjs';
 import { oplogRecordToEnvelope, LOCAL_MERGE_CONTRACT } from './envelope-adapters.mjs';
@@ -91,6 +92,23 @@ const lockedBy = (dir, bytes) => {
   return new VaultLocked(h.pid === undefined ? `the vault's op log at ${dir} has a lock file (LOCK) that names no holder` : `the vault's op log at ${dir} is locked by pid ${h.pid}${h.host ? ` on ${h.host}` : ''}`, h);
 };
 
+/**
+ * The lease. It runs in a worker_threads worker, so a main thread blocked in a long synchronous call keeps the lock: every `ms` it
+ * sets the lock's mtime to now, after checking that the file still carries `token`. The lock's bytes are never written. When the
+ * file is gone, unreadable or another opener's, the worker stops and never renews again.
+ */
+function renewLoop() {
+  const { workerData: { file, token, ms } } = require('node:worker_threads');
+  const fs = require('node:fs');
+  const timer = setInterval(() => {
+    try {
+      if (JSON.parse(fs.readFileSync(file, 'utf8')).token !== token) throw new Error('not ours');
+      const t = new Date();
+      fs.utimesSync(file, t, t);
+    } catch { clearInterval(timer); }
+  }, ms);
+}
+
 export class OpLog {
   constructor(dir, { segmentBytes = 16 * 1024 * 1024, snapshotEvery = 1000, fsync = true, deviceId = null, mergeContract = LOCAL_MERGE_CONTRACT, envelopes = true, readOnly = false } = {}) {
     this.dir = dir; this.readOnly = readOnly; this.token = null; this.segmentBytes = segmentBytes; this.snapshotEvery = snapshotEvery; this.fsync = fsync;
@@ -138,11 +156,29 @@ export class OpLog {
     } catch (e) { fs.closeSync(fd); fs.rmSync(file, { force: true }); throw e; }
     fs.closeSync(fd);
     held.set(key, token); this.token = token; this.lockKey = key; this.lockFile = file;
+    this.renewer = new Worker(`(${renewLoop})()`, { eval: true, workerData: { file, token, ms: Number(process.env.MEMEV_LOCK_RENEW_MS) || 15000 } });
+    this.renewer.on('error', () => {}); this.renewer.unref();
+  }
+
+  /** Does the lock file still carry this log's token? */
+  holds() {
+    try { return JSON.parse(fs.readFileSync(this.lockFile, 'utf8')).token === this.token; } catch { return false; }
+  }
+
+  /** Before every write to the op log folder: a log that lost its lock writes nothing and fails closed. */
+  _assertHeld() {
+    this._writable();
+    if (this.holds()) return;
+    let bytes = '';
+    try { bytes = fs.readFileSync(this.lockFile, 'utf8'); } catch { /* the lock is gone */ }
+    const h = holderOf(bytes);
+    throw new VaultLocked(`this process no longer holds the vault lock on ${this.lockKey}${h.pid === undefined ? '' : `; pid ${h.pid} does`}; nothing more is written`, h);
   }
 
   /** Give the lock up, if it is still ours: a lock file with another token is never deleted. */
   _release() {
     if (this.token === null) return;
+    void this.renewer.terminate();
     try { if (JSON.parse(fs.readFileSync(this.lockFile, 'utf8')).token === this.token) fs.rmSync(this.lockFile, { force: true }); } catch { /* gone or not ours */ }
     held.delete(this.lockKey); this.token = null;
   }
@@ -209,6 +245,7 @@ export class OpLog {
   append(op) {
     this._writable();
     if (this.fd === null) throw new Error('op log is not open');
+    this._assertHeld();
     const rec = { seq: this.seq + 1, ts: now(), type: op.type, path: op.path ?? null, agent: op.agent ?? null, client: op.client ?? null, data: op.data ?? null, prev: op.path ? this.heads.get(op.path)?.hash ?? null : null };
     if (this.deviceId) rec.dev = this.deviceId;
     rec.hlc = this.tick();
@@ -233,7 +270,7 @@ export class OpLog {
   }
 
   roll() {
-    this._writable();
+    this._assertHeld();
     const a = this.active;
     if (!a.bytes) return;
     fs.fsyncSync(this.fd); fs.closeSync(this.fd);
@@ -250,7 +287,7 @@ export class OpLog {
    * Returns the number of segments moved.
    */
   archiveSealed() {
-    this._writable();
+    this._assertHeld();
     const arch = path.join(this.dir, 'archive');
     let moved = 0;
     for (const seg of this.manifest.segments) {
@@ -267,13 +304,13 @@ export class OpLog {
   }
 
   snapshot() {
-    this._writable();
+    this._assertHeld();
     writeJson(this.snapshotPath, { version: 1, seq: this.seq, hlc: formatHlc(this.clock), at: now(), active: { name: this.active.name, offset: this.active.bytes }, heads: Object.fromEntries(this.heads) }, 0o600);
     this._saveManifest();
     this.sinceSnapshot = 0;
   }
 
-  _saveManifest() { this._writable(); writeJson(this.manifestPath, this.manifest, 0o600); }
+  _saveManifest() { this._assertHeld(); writeJson(this.manifestPath, this.manifest, 0o600); }
 
   /** Stream records in order, optionally from a seq and for one path. Bounded memory. */
   *iterate({ fromSeq = 1, path: only = null, raw = false } = {}) {
@@ -314,5 +351,10 @@ export class OpLog {
     return { seq: this.seq, segments: this.manifest.segments.length, sealed: this.manifest.segments.filter((s) => s.sealed).length, bytes, paths: this.heads.size };
   }
 
-  close() { if (this.fd !== null) { try { fs.fsyncSync(this.fd); } catch {} fs.closeSync(this.fd); this.fd = null; this.snapshot(); this._release(); } }
+  close() {
+    if (this.fd === null) return;
+    try { fs.fsyncSync(this.fd); } catch {}
+    fs.closeSync(this.fd); this.fd = null;
+    try { this.snapshot(); } finally { this._release(); }
+  }
 }

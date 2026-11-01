@@ -99,7 +99,7 @@ export class Vault extends EventEmitter {
   close() {
     for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} }
     this._projectStores?.clear(); this._coordinators?.clear();
-    if (!this.opts.readOnly) { this.commits.flush(); this.index.save(); this._saveGraph(); this.devices?.saveSoon(); }
+    if (!this.opts.readOnly && this.log.holds()) { this.commits.flush(); this.index.save(); this._saveGraph(); this.devices?.saveSoon(); }   // a holder that lost the lock writes nothing
     this.log.close();
   }
 
