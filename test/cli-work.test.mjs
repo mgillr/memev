@@ -1,5 +1,5 @@
-// PG-19.1 (WP19-01): the work command is dispatched to runWork from src/cli/main.mjs, and runWork reads the project store through
-// a port that opens the real store of the vault. Each test name starts with WP19-01 and the criterion it covers.
+// PG-19.2: the work command is dispatched to runWork from src/cli/main.mjs, and runWork reads project data through a port that goes
+// through Vault#tasksReader, a read-only reader with one member. WP19-01 tests cover the dispatch and the port; PG-19.2 WP19-03 tests cover the reader.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -107,44 +107,95 @@ function reachable(root) {
   return out;
 }
 
-test('WP19-01 AC05: the object openStore returns cannot write: it has no write method and rejects mutation', async () => {
-  const { root } = vaultWithProject();
-  const { openStore } = await import('../src/cli/work-store.mjs');
-  const reader = openStore('p', { root });
-  assert.equal(Object.isFrozen(reader), true, 'the object is frozen');
-  assert.deepEqual(Object.keys(reader), ['snapshot'], 'the one read function and nothing else');
-  for (const w of ['append', 'put', 'withWrite', 'close', 'open', 'update', 'delete', 'remove']) {
-    assert.equal(typeof reader[w], 'undefined', `${w} does not exist`);
-    assert.throws(() => reader[w](), TypeError, `calling ${w} fails`);
-    assert.throws(() => { reader[w] = () => {}; }, TypeError, `assigning ${w} fails`);
-  }
-  assert.throws(() => { reader.snapshot = () => ({}); }, TypeError, 'the read function cannot be replaced');
-  assert.throws(() => { delete reader.snapshot; }, TypeError);
-  // what it returns is a copy: changing it changes nothing in the store
-  const before = fs.readFileSync(path.join(root, '.memev', 'projects', 'p', 'events.jsonl'), 'utf8');
-  const tasks = reader.snapshot('task');
-  tasks.T1.title = 'changed'; delete tasks.T2;
-  assert.equal(reader.snapshot('task').T1.title, 'task T1', 'a second read is unchanged');
-  assert.ok(reader.snapshot('task').T2);
-  assert.equal(fs.readFileSync(path.join(root, '.memev', 'projects', 'p', 'events.jsonl'), 'utf8'), before, 'the store file is untouched');
+// PG-19.2 WP19-03: Vault#tasksReader(identity, project) is the one read-only door from the vault to project data for the CLI.
+const READER = { agent: 'cli', scopes: ['read'], paths: ['**'] };
+const eventsOf = (root, id = 'p') => path.join(root, '.memev', 'projects', id, 'events.jsonl');
+
+test('PG-19.2 WP19-03 AC01: the reader is frozen: assigning to snapshot, adding a key and deleting snapshot each throw and change nothing', () => {
+  const { root, v } = newVault(); const store = v.projectStore('p');
+  store.append({ type: 'task.upserted', entity: { kind: 'task', id: 'T1', data: { title: 'task T1', project: 'p', status: 'READY', scope_version: 1 } } });
+  assert.equal(typeof v.tasksReader, 'function', 'Vault#tasksReader exists');
+  const reader = v.tasksReader(READER, 'p');
+  assert.equal(Object.isFrozen(reader), true);
+  const snap = reader.snapshot;
+  assert.throws(() => { 'use strict'; reader.snapshot = () => ({}); }, TypeError);
+  assert.throws(() => { 'use strict'; reader.extra = 1; }, TypeError);
+  assert.throws(() => { 'use strict'; delete reader.snapshot; }, TypeError);
+  assert.equal(reader.snapshot, snap, 'nothing changed');
+  assert.equal(Reflect.ownKeys(reader).length, 1);
+  assert.ok(root);
+  v.close();
 });
 
-test('WP19-01 AC05: the object openStore returns does not expose the store itself', async () => {
-  const { root } = vaultWithProject();
-  const { openStore } = await import('../src/cli/work-store.mjs');
+test('PG-19.2 WP19-03 AC02: the reader has exactly one member, snapshot, and nothing on its prototype', () => {
+  const { v } = newVault(); v.projectStore('p').append({ type: 'task.upserted', entity: { kind: 'task', id: 'T1', data: { title: 't', project: 'p', status: 'READY', scope_version: 1 } } });
+  const reader = v.tasksReader(READER, 'p');
+  assert.deepEqual(Reflect.ownKeys(reader), ['snapshot']);
+  assert.equal(typeof reader.snapshot, 'function');
+  const proto = Object.getPrototypeOf(reader);
+  assert.ok(proto === Object.prototype || proto === null, 'the prototype is Object.prototype or null');
+  if (proto) assert.deepEqual(Reflect.ownKeys(proto).sort(), Reflect.ownKeys(Object.prototype).sort(), 'the prototype has no member of its own');
+  v.close();
+});
+
+test('PG-19.2 WP19-03 AC03: the records it returns are copies: changing one changes nothing in the store or in a second read', () => {
+  const { root, v } = newVault();
+  const store = v.projectStore('p');
+  store.append({ type: 'task.upserted', entity: { kind: 'task', id: 'T1', data: { title: 'task T1', project: 'p', status: 'READY', scope_version: 1, nested: { deep: ['a'] } } } });
+  store.append({ type: 'task.upserted', entity: { kind: 'task', id: 'T2', data: { title: 'task T2', project: 'p', status: 'READY', scope_version: 1 } } });
+  const reader = v.tasksReader(READER, 'p');
+  const first = reader.snapshot('task');
+  const storeBefore = JSON.stringify(store.snapshot('task'));
+  first.T1.title = 'changed'; first.T1.nested.deep.push('b'); first.T1.nested.added = true; delete first.T2; first.T3 = { title: 'x' };
+  assert.equal(JSON.stringify(reader.snapshot('task')), storeBefore, 'a second read is unchanged');
+  assert.equal(JSON.stringify(store.snapshot('task')), storeBefore, 'the store is unchanged');
+  assert.notEqual(reader.snapshot('task'), reader.snapshot('task'), 'two calls return different objects');
+  assert.notEqual(reader.snapshot('task').T1, reader.snapshot('task').T1);
+  assert.ok(root);
+  v.close();
+});
+
+test('PG-19.2 WP19-03 AC04: the reader cannot write: no write method, and the event log bytes are the same after every call', () => {
+  const { root, v } = newVault();
+  const store = v.projectStore('p');
+  store.append({ type: 'task.upserted', entity: { kind: 'task', id: 'T1', data: { title: 'task T1', project: 'p', status: 'READY', scope_version: 1 } } });
+  const bytes = () => fs.readFileSync(eventsOf(root));
+  const before = bytes();
+  const reader = v.tasksReader(READER, 'p');
+  for (const w of ['append', 'put', 'withWrite', 'close', 'open', 'update', 'delete', 'remove', 'set', 'write']) {
+    assert.equal(typeof reader[w], 'undefined', `${w} does not exist`);
+    assert.throws(() => reader[w](), TypeError, `calling ${w} fails`);
+  }
+  const tasks = reader.snapshot('task');
+  tasks.T1.status = 'DONE'; for (const k of Object.keys(tasks.T1)) if (typeof tasks.T1[k] === 'function') tasks.T1[k]();
+  assert.throws(() => reader.snapshot.call(null, 'task').T1.append(), TypeError);
+  reader.snapshot('nothing-of-this-kind');
+  assert.deepEqual(bytes(), before, 'the event log is byte for byte the same');
+  assert.equal(store.snapshot('task').T1.status, 'READY', 'no event reached the store');
+  v.close();
+});
+
+test('PG-19.2 WP19-03 AC05: the reader does not expose the ProjectStore: nothing reachable is a store, and what snapshot returns survives structuredClone and JSON', async () => {
+  const { v } = newVault(); const store = v.projectStore('p');
+  for (const id of ['T1', 'T2']) store.append({ type: 'task.upserted', entity: { kind: 'task', id, data: { title: `task ${id}`, project: 'p', status: 'READY', scope_version: 1 } } });
+  addEntity(store, 'milestone', { title: 'm' }, 'M1');
   const { ProjectStore } = await import('../src/engine/project-store.mjs');
-  const reader = openStore('p', { root });
+  const reader = v.tasksReader(READER, 'p');
   assert.equal(reader instanceof ProjectStore, false);
-  const all = [...reachable(reader), ...['task', 'event', 'approval'].flatMap((k) => reachable(reader.snapshot(k)))];
+  const kinds = ['project', 'task', 'lease', 'attempt', 'evidence', 'conflict', 'session', 'approval', 'event', 'milestone', 'deliverable', 'work_package'];
+  const all = [...reachable(reader), ...kinds.flatMap((k) => reachable(reader.snapshot(k)))];
   assert.ok(all.length > 3);
   for (const o of all) {
     assert.equal(o instanceof ProjectStore, false, 'nothing reachable is a store');
+    assert.notEqual(o.constructor, ProjectStore, 'nothing reachable has the store constructor');
     for (const k of ['withWrite', 'append', 'snapshotPath', 'sourceOf', 'hasRecord']) assert.equal(Object.hasOwn(o, k) && typeof o[k] === 'function' && o !== Object.prototype, false, `${k} is not reachable`);
   }
-  assert.equal(Object.getPrototypeOf(reader), Object.prototype, 'a plain object, with no class behind it');
+  assert.equal(all.some((o) => typeof o === 'object' && Reflect.ownKeys(o).some((k) => typeof k === 'symbol' && o[k] instanceof ProjectStore)), false, 'no symbol key holds a store');
+  for (const k of kinds) { const snap = reader.snapshot(k); assert.deepEqual(structuredClone(snap), snap); assert.deepEqual(JSON.parse(JSON.stringify(snap)), snap); }
+  v.close();
 });
 
-test('WP19-01 AC05: the read-only view agrees with the store on every kind of record, and skips a torn last line without cutting it', async () => {
+test('PG-19.2 WP19-03 AC06: the reader serves what impact needs, returns null for a project with no store and creates none, and refuses a credential that may not read', () => {
   const { root, v } = newVault();
   const store = v.projectStore('p');
   for (const id of ['T1', 'T2']) store.append({ type: 'task.upserted', entity: { kind: 'task', id, data: { title: `task ${id}`, project: 'p', status: 'READY', scope_version: 1 } } });
@@ -152,17 +203,34 @@ test('WP19-01 AC05: the read-only view agrees with the store on every kind of re
   store.append({ type: 'evidence.upserted', entity: { kind: 'evidence', id: 'E1', data: { task_id: 'T1', criterion: 'c1' } } });
   addEntity(store, 'milestone', { title: 'm' }, 'M1');
   assert.equal(link(store, { link_type: 'scope-to-milestone', from: ref('scope', 'S1'), to: ref('milestone', 'M1'), actor: 'planner' }).ok, true);
-  const { openStore } = await import('../src/cli/work-store.mjs');
-  const reader = openStore('p', { root });
+  const reader = v.tasksReader(READER, 'p');
   for (const kind of ['project', 'task', 'lease', 'attempt', 'evidence', 'conflict', 'session', 'approval', 'event', 'milestone', 'deliverable', 'work_package']) {
     assert.deepEqual(reader.snapshot(kind), store.snapshot(kind), `${kind} agrees with the store`);
   }
-  const file = path.join(root, '.memev', 'projects', 'p', 'events.jsonl');
+  assert.equal(v.tasksReader(READER, 'nope'), null, 'a project with no store gives null');
+  assert.equal(fs.existsSync(path.join(root, '.memev', 'projects', 'nope')), false, 'and none is created');
+  assert.throws(() => v.tasksReader({ agent: 'w', scopes: ['write'], paths: ['**'] }, 'p'), /may not read/, 'a credential that may not read is refused');
+  assert.throws(() => v.tasksReader(null, 'p'), /may not read/, 'no credential is refused');
+  assert.throws(() => v.tasksReader(READER, ''), /project name/);
+  v.close();
+});
+
+test('PG-19.2 WP19-03 AC06: the reader skips a torn last line of the event log without cutting it', () => {
+  const { root, v } = newVault();
+  v.projectStore('p').append({ type: 'task.upserted', entity: { kind: 'task', id: 'T1', data: { title: 't', project: 'p', status: 'READY', scope_version: 1 } } });
+  const file = eventsOf(root);
   fs.appendFileSync(file, '{"seq":99,"entity":{"kind":"task","id":"T9","da');
   const before = fs.readFileSync(file, 'utf8');
-  assert.equal(openStore('p', { root }).snapshot('task').T9, undefined, 'an unfinished line is not read');
+  const reader = v.tasksReader(READER, 'p');
+  assert.equal(reader.snapshot('task').T9, undefined, 'an unfinished line is not read');
+  assert.ok(reader.snapshot('task').T1);
   assert.equal(fs.readFileSync(file, 'utf8'), before, 'and it is not cut: that is the writer\'s to finish');
   v.close();
+});
+
+test('WP19-01 AC05: the port goes through the vault method tasksReader and nothing else', () => {
+  assert.match(read(PORT), /tasksReader/);
+  assert.doesNotMatch(read(PORT) + MAIN(), /ProjectStore|projectStore|project-store|[Cc]oordinator/);
 });
 
 test('WP19-01 scope: the work case added no recovery or control subcommand of its own and work.mjs is unchanged by it', () => {
