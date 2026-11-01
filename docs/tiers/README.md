@@ -48,18 +48,20 @@ Planned add-ons and services, and the custom module use cases, are in [the add-o
 
 ## Several sites and federation (planned)
 
-Nothing in this section is built. The architectural target is a federation of independently
-operated site nodes: each site owns its node and its memory, sites converge the state they are
-authorised to share through the convergence engine under its contract, and no central coordinator
-sequences ordinary updates. The company vault and the main corporate vault above are the one-node
-case of that target, and the one-node case is what the first Business release ships.
+Some local federation foundations are implemented: signed contribution validation, two-step
+admission, relationship records and deny-by-default policy evaluation. These are local primitives,
+not an operational multi-node service. Cross-node transport, external admission, complete sender-node
+binding and production replay/recovery guarantees are not shipped. The architectural target remains
+a federation of independently operated site nodes: each site owns its node and its state, and sites
+share only what their policies and relationships authorise. The company vault and the main corporate
+vault above are the one-node case of that target, and the one-node case is what the first Business
+release is intended to ship.
 
 Federation across sites, and federated computation on top of it, are planned capabilities of
 Corporate, and of a Business licence whose services list includes the multi-site federation design
 ([services.md](services.md)). They are not a tier: the four tiers stand,
-and the planned rows in the tables on this page are where they appear. The trust service and the
-admission service that the federation pages name are planned adapter boundaries beside the merge
-boundary ([EXTENSION-POINTS.md](../EXTENSION-POINTS.md)). The pages:
+and the planned rows in the tables on this page are where they appear. The trust and admission
+integrations at the external service boundaries remain planned ([EXTENSION-POINTS.md](../EXTENSION-POINTS.md)). The pages:
 [FEDERATION.md](../FEDERATION.md), [ORGANISATIONAL-INTELLIGENCE.md](../ORGANISATIONAL-INTELLIGENCE.md),
 [FEDERATED-COMPUTATION.md](../FEDERATED-COMPUTATION.md) and
 [DATA-SOVEREIGNTY.md](../DATA-SOVEREIGNTY.md); the architecture chart is in
@@ -119,10 +121,11 @@ copied outside Memev.
 | Connectors that bring CRM, ticketing and chat data into the vault | planned | AI apps can use those vendors' own MCP servers next to Memev today |
 | High-availability servers, air-gapped package | planned | |
 | SIEM and audit export, retention rules, legal hold | planned | |
-| Project state machine | planned | the code is present in `src/engine/project-state.mjs` and nothing imports it yet ([PROJECTS.md](../PROJECTS.md)) |
+| ProjectStore, task state machine and Coordinator | built | local project records, legal task transitions, claims, leases, dispatch control, recovery and evidence-bound verification ([PROJECTS.md](../PROJECTS.md)); broader workspace UI and external integrations are still in progress |
 | Federation of independently operated site nodes | planned | Corporate, and a Business licence whose services list includes the multi-site federation design ([services.md](services.md)); the company vault is the one-node case and the first release ([FEDERATION.md](../FEDERATION.md)) |
 | Federated computation across sites | planned | Corporate, and a Business licence whose services list includes the multi-site federation design; workload-specific algorithms, the engine converges supported state only ([FEDERATED-COMPUTATION.md](../FEDERATED-COMPUTATION.md)) |
-| The trust service and the admission service | planned | two adapter boundaries beside the merge boundary, named generically until they are published ([EXTENSION-POINTS.md](../EXTENSION-POINTS.md)) |
+| Local federation foundations: signed contribution validation, admission, relationship records and policy evaluation | built | local primitives only; not an operational multi-node service ([FEDERATION.md](../FEDERATION.md)) |
+| External trust and admission service integrations | planned | adapter boundaries beside the merge boundary, named generically until they are published ([EXTENSION-POINTS.md](../EXTENSION-POINTS.md)) |
 
 Nothing on these pages is sold before it is built. A planned part goes into an offer only with a
 delivery date.

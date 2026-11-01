@@ -84,8 +84,10 @@ Each lookup directory is the one the app's own docs name, cited in the last colu
 | Amp | `~/.config/amp` on macOS and Linux, `%USERPROFILE%\.config\amp` on Windows | [manual](https://ampcode.com/manual) |
 | Goose | `~/.config/goose` on macOS and Linux, `%APPDATA%\Block\goose` on Windows | [config files](https://goose-docs.ai/docs/guides/config-files) |
 
-Cloud apps (claude.ai, ChatGPT, others that take a remote MCP URL) connect through the tunnel, side by
-side; see [CLOUD.md](CLOUD.md).
+Cloud apps (claude.ai, ChatGPT, and other apps that accept a custom remote MCP URL) connect through the
+tunnel, side by side; see [CLOUD.md](CLOUD.md). **Grok is not currently a supported local client, and
+Memev has no tested or documented Grok remote-MCP integration.** Do not assume it can connect unless
+the specific Grok app supports custom remote MCP and that path has been validated.
 
 One page per app: [Claude Code](clients/claude-code.md), [Codex](clients/codex.md),
 [Gemini CLI](clients/gemini-cli.md), [Cursor](clients/cursor.md), [Claude Desktop](clients/claude-desktop.md),

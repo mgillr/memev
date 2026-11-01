@@ -6,6 +6,11 @@ This page is a runbook for an AI app that installs Memev at the person's request
 commands, shows the person each result, and stops at the first failure. It never invents a download
 address, a token, or a host, and it never posts this page anywhere.
 
+**Availability:** Free Core is a closed, invite-only preview. The GitHub repository is private and
+`npx memev init` is not published. The person must already have repository access and provide the
+clone URL from their invitation. If they do not have access, stop: there is no public installation
+route to substitute.
+
 ## Identify the operating system and runtime
 
 State the operating system you are running on, and the Node version, before you touch anything. Memev
@@ -18,7 +23,7 @@ Node version, git, the port, and a folder it can write to, and stops with the fi
 Ask the person which path fits, and explain the one you choose before you run it:
 
 - From a copy of the repository: `node bin/memev.mjs init --no-connect`, run in the folder the person
-  downloaded.
+  downloaded after obtaining access to the private repository.
 - npm, from a copy of the repository: `npm install -g . && memev init --no-connect`, which also puts
   `memev` on the PATH.
 - Docker, for an always-on server or a home lab: `docker compose up -d`; the apps are connected by hand.
@@ -28,7 +33,7 @@ Ask the person which path fits, and explain the one you choose before you run it
 Every path sets up the same thing: it creates the notes folder, starts Memev and runs a self-test.
 `--no-connect` keeps Memev from connecting the AI apps it finds, at init and afterwards: it also turns
 off the background connect that would otherwise connect each app a few seconds after Memev starts. The person already has a copy of the repository, or names the release to install; there
-is no other source.
+is no other source. Never try to clone the private repository without the person's supplied URL and access.
 
 ## Ask permission before each privileged action
 

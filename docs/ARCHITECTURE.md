@@ -7,8 +7,8 @@ This page has two parts. The first shows what is built and running today, module
 second shows the three tiers side by side with one diagram each: [Personal](#personal),
 [Business](#business-coming) and [Corporate](#corporate-coming). Business and Corporate are coming; their
 diagrams show the design, not shipped code. A last section shows the planned extension of the same
-design to [several sites and federation](#several-sites-and-federation-planned); nothing in it is
-built.
+design to [several sites and federation](#several-sites-and-federation-planned); local federation
+primitives exist, but complete inter-node operation is not shipped.
 
 ## What runs today
 
@@ -21,7 +21,7 @@ flowchart LR
         apps["AI apps<br/>Claude Code, Codex, Gemini CLI,<br/>Cursor, Claude Desktop, Windsurf,<br/>VS Code, Zed"]
         proxy["memev mcp, memev hook<br/>src/cli: mcp-stdio, hooks"]
         daemon["Memev daemon on 127.0.0.1:7787<br/>src/server: main, http, mcp<br/>and the background jobs in src/cli/sync"]
-        engine["Engine, src/engine<br/>oplog, index, graph, quality,<br/>secrets, tokens, devices,<br/>bus, contracts, license"]
+        engine["Engine, src/engine<br/>oplog, index, graph, quality,<br/>ProjectStore, Coordinator,<br/>bus, contracts, identity, license"]
         vault[("Vault ~/memev<br/>Markdown + git<br/>.memev: log, index, config")]
         apps -->|"MCP over stdio or HTTP"| proxy
         proxy -->|"HTTP, bearer token"| daemon
@@ -48,6 +48,8 @@ flowchart LR
 | The vault, log, index and graph | `src/engine/vault.mjs`, `oplog.mjs`, `index.mjs`, `graph.mjs`, `quality.mjs` | [DESIGN.md](DESIGN.md) |
 | Tokens, device keys and the licence | `src/engine/tokens.mjs`, `devices.mjs`, `license.mjs`, `entitlements.mjs` | [PRICING.md](PRICING.md), [CHARTER.md](../CHARTER.md) |
 | The comms bus | `src/engine/bus.mjs`, `src/cli/bus-cli.mjs` | [BUS.md](BUS.md) |
+| Project state and governed execution | `src/engine/project-store.mjs`, `project-state.mjs`, `coordinator.mjs`, `relationships.mjs` | [PROJECTS.md](PROJECTS.md) |
+| Federation foundations | `src/engine/federation/` (contributions, admission, membership and policy) | [FEDERATION.md](FEDERATION.md) |
 | Signed contracts | `src/engine/contracts.mjs`, `vendor/attest` | [CONTRACTS.md](CONTRACTS.md) |
 | Secure link and relay | `src/cli/tunnel.mjs`, `src/cli/relay.mjs`, `src/cli/remote.mjs`, `src/cli/invite.mjs` | [CLOUD.md](CLOUD.md), [RELAY.md](RELAY.md) |
 | Backup and sync | `src/cli/github.mjs`, `src/cli/sync.mjs`, `src/engine/git.mjs` | [GITHUB.md](GITHUB.md) |
@@ -96,7 +98,7 @@ Three things are the same in every tier:
 Personal is one person. On one computer it is free. Personal with more computers is the paid step: a
 second computer joins the vault over the secure link with its own device key (built), and several
 computers editing at once with the convergence engine merging them is planned. A person can connect
-several cloud AI apps side by side, and local coding tools, all to the same memory.
+several cloud AI apps side by side, and local coding tools, all to the same authorised project state and knowledge context.
 
 ```mermaid
 flowchart LR
@@ -209,7 +211,8 @@ Details: [tiers/corporate.md](tiers/corporate.md).
 
 ### Several sites and federation (planned)
 
-Nothing in this section is built. The architectural target is a federation of independently
+No end-to-end multi-node deployment is shipped. Local federation primitives are implemented as
+specified in [FEDERATION.md](FEDERATION.md); the architectural target is a federation of independently
 operated site nodes: each site owns its node and its memory, sites converge the state they are
 authorised to share through the convergence engine under its contract, and no central coordinator
 sequences ordinary updates. The company vault and the main corporate vault above are the one-node
@@ -259,8 +262,10 @@ What the planned extension needs, beside the merge boundary that exists today
 - **A regional service (planned):** may help with routing, discovery or permitted caching. It is not
   a relay, which only forwards ([RELAY.md](RELAY.md)), and it never becomes the owner of a site's
   memory or the sequencer of ordinary updates.
-- **The project state machine (planned):** the code is present in `src/engine/project-state.mjs`,
-  and nothing imports it yet ([PROJECTS.md](PROJECTS.md)); the planned multi-site work wires it in.
+- **Project state and governed execution (implemented locally):** `ProjectStore`,
+  `project-state.mjs` and `Coordinator` persist project records, enforce legal task transitions,
+  coordinate claims and leases, and bind verification to evidence. See [PROJECTS.md](PROJECTS.md).
+  This local capability does not imply a complete federated deployment.
 - **Federated computation (planned):** authorised computational work coordinated across sites,
   with workload-specific algorithms; the engine converges supported state only and does not replace
   those algorithms.

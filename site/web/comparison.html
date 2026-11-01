@@ -26,7 +26,11 @@
 
   <p>Part of the Memev documentation. Up: the README.</p>
 
-  <p>Memev is a local-first memory and team channel for AI apps. This page states the facts about how Memev works and the open standards it builds on, so you can compare its approach with hosted alternatives on your own terms.</p>
+  <p>Memev is operating infrastructure for human and AI work. It connects people, agents and tools
+  through shared project state, coordination, governed execution, contracts and evidence-based
+  verification. The local vault is the durable state substrate. This page compares that model with
+  hosted context services and distinguishes current Free Core capabilities from planned team and
+  multi-computer services.</p>
 
   <h2>Install</h2>
   <p>In a copy of the Memev repository, run the install command:</p>
@@ -37,25 +41,29 @@
 
   <table>
     <thead>
-      <tr><th>Question</th><th>Memev</th><th>A typical hosted memory service</th></tr>
+      <tr><th>Question</th><th>Memev</th><th>A typical hosted context service</th></tr>
     </thead>
     <tbody>
-      <tr><td>Where your notes live</td><td>A folder of plain Markdown on your own computer</td><td>On the vendor's servers</td></tr>
-      <tr><td>Who can read them</td><td>You, unless you choose to share</td><td>The vendor, subject to its policy</td></tr>
-      <tr><td>Backup</td><td>A private GitHub repository under your own account</td><td>The vendor's storage</td></tr>
-      <tr><td>How apps receive context</td><td>The Model Context Protocol, an open standard</td><td>Usually a proprietary API</td></tr>
-      <tr><td>Team sharing</td><td>One channel between computers you own, with no server in the middle</td><td>Through the vendor's cloud</td></tr>
-      <tr><td>If you stop paying</td><td>The notes are plain files you keep</td><td>Access may end</td></tr>
-      <tr><td>Turning the cloud link off</td><td>The optional web link can be switched off</td><td>Often not applicable</td></tr>
+      <tr><td>Product model</td><td>Local operating infrastructure for shared state, coordination and governed work</td><td>Usually context storage and retrieval</td></tr>
+      <tr><td>Durable state</td><td>Inspectable local records, project state and provenance</td><td>Usually vendor-managed context records</td></tr>
+      <tr><td>Work governance</td><td>Contracts, task lifecycle, evidence and verification are distinct</td><td>Usually delegated to the AI app or external project system</td></tr>
+      <tr><td>Coordination</td><td>Connected AI-tool seats and a local communications bus</td><td>Provider-specific collaboration features, if any</td></tr>
+      <tr><td>How tools connect</td><td>MCP and supported hooks, using open integration points</td><td>Usually a proprietary API or connector</td></tr>
+      <tr><td>Operator control</td><td>Local-first; optional remote connectors and backup are configured deliberately</td><td>Data and availability depend on the vendor's service</td></tr>
+      <tr><td>Multi-computer editing</td><td>Not part of the Free Core; paid convergence and federation remain separate planned capabilities</td><td>Depends on the service</td></tr>
     </tbody>
   </table>
 
-  <p>Memev keeps notes as plain Markdown, so they stay readable and portable with no special tool. It hands context to apps over the Model Context Protocol, the open standard that many editors and assistants already support. It backs up to a private GitHub repository under your own account.</p>
+  <p>The local vault keeps records inspectable and portable. The ProjectStore and Coordinator
+  maintain local project state and task lifecycle; contracts describe obligations; evidence supports
+  verification; and the communications bus coordinates connected tools. GitHub backup is optional
+  and remains under the operator's control. These are capabilities around work, not a claim that
+  Memev replaces the AI tools or project systems people already use.</p>
 
   <h2>Sources</h2>
 
   <ul>
-    <li>Model Context Protocol, the open standard Memev uses to hand context to apps: <a href="https://modelcontextprotocol.io">https://modelcontextprotocol.io</a></li>
+    <li>Model Context Protocol, the open standard Memev uses to connect supported apps: <a href="https://modelcontextprotocol.io">https://modelcontextprotocol.io</a></li>
     <li>GitHub private repositories, where Memev stores your backup under your own account: <a href="https://docs.github.com/en/repositories/creating-and-managing-repositories/about-repositories">https://docs.github.com/en/repositories/creating-and-managing-repositories/about-repositories</a></li>
     <li>CommonMark, the plain-text Markdown format Memev writes your notes in: <a href="https://commonmark.org">https://commonmark.org</a></li>
   </ul>

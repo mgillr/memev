@@ -1,0 +1,67 @@
+name: Free Core bug report
+description: Report a reproducible problem in the invited Free Core Preview.
+title: "[Free Core] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include vault contents, prompts, customer data, tokens, private keys, connector URLs or unredacted diagnostic bundles. For suspected vulnerabilities, use SECURITY.md and report privately.
+  - type: input
+    id: build
+    attributes:
+      label: Memev commit or build
+      description: The commit SHA or build identifier shown by your installation.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS/version, Node version and AI application/version.
+    validations:
+      required: true
+  - type: textarea
+    id: area
+    attributes:
+      label: Test area
+      description: Install, local vault, AI integration, recall, bus, contracts, diagnostics, backup or recovery.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. ...\n2. ...\n3. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+  - type: dropdown
+    id: repeatable
+    attributes:
+      label: Is it repeatable?
+      options:
+        - Every time
+        - Sometimes
+        - Happened once
+        - Not yet checked
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted logs or output
+      description: Remove paths, usernames and all secrets or private data before posting.
+    validations:
+      required: false

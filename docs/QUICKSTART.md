@@ -2,7 +2,7 @@
 
 Part of the [Memev documentation](README.md). Up: the [README](../README.md).
 
-You need Node 22 or newer and git.
+You need Node 22 or newer and git. **Free Core is currently a closed, invite-only preview:** the repository is private and `memev` is not published on npm. You must have repository access and the clone URL supplied by the maintainer before following this guide.
 
 In a copy of the Memev repository:
 
@@ -10,9 +10,7 @@ In a copy of the Memev repository:
 node bin/memev.mjs init   # or: npm install -g . && memev init
 ```
 
-`npx memev init` will work once Memev is on the npm registry (coming soon). Or ask an AI app that
-can run commands to do it: "Download the Memev repository, run `node bin/memev.mjs init` inside it,
-and show me the checklist it prints."
+`npx memev init` is not available because Memev is not on the npm registry. If you have preview access, ask an AI app that can run commands to do this: "Clone the private Memev repository using the URL supplied with my preview invitation, run `node bin/memev.mjs init` inside it, and show me the checklist it prints."
 
 `init`:
 
@@ -24,7 +22,10 @@ and show me the checklist it prints."
 4. connects every AI app it finds (see [CLIENTS.md](CLIENTS.md)), backing up each file it changes,
 5. leaves the private tunnel for cloud apps off (see [CLOUD.md](CLOUD.md)); init asks once on a terminal,
    or `memev cloud on` turns it on; `--local-only` and `--org` (an install for an organisation) skip the question,
-6. prints a checklist: what is connected, what needs one click from you, and how to back up to GitHub.
+6. prints a checklist: what is connected, what needs one click from you, and how to back up to GitHub,
+7. gives each connected AI app a seat on the communications bus. You choose the lead: terminal setup asks
+   you directly; when an AI runs setup non-interactively, the first fresh AI session asks which seat
+   should lead. Your answer is recorded, and no AI can appoint itself.
 
 On a terminal, init also offers an optional step to import what you have already worked on
 (see [IMPORT.md](IMPORT.md)). It is off unless you say yes, and it never blocks init.
@@ -34,7 +35,10 @@ HH:MM" as each one starts, and "Ready: <app> and <app> share one memory" once on
 memory another one saved: ask one to remember something and another about it. `--timeout SECONDS`
 (default 600) sets how long it waits; it exits non-zero and names the apps that did not join.
 
-Open a new session in any connected app. It starts with a short resume card: what you were doing,
+Open a new session in any connected app. If setup did not ask you to choose a lead, that first fresh
+session asks which connected AI should lead and coordinate the others; answer once and the choice is
+recorded. You can change it later from the terminal with `memev bus operator <seat>`. The session starts
+with a short resume card: what you were doing,
 what is next, recent decisions. Work as usual. Memev saves a checkpoint before compaction and at the
 end of each turn; each prompt gets the few memories that match it.
 

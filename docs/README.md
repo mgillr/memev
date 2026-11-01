@@ -8,6 +8,8 @@ this folder links back here, and this page links down to every page.
 | Page | What it holds |
 |---|---|
 | [QUICKSTART.md](QUICKSTART.md) | install, first session, everyday commands, the vault layout, Windows (preview) |
+| [FREE-CORE-PREVIEW.md](FREE-CORE-PREVIEW.md) | invited tester onboarding, safe setup, test sequence and feedback |
+| [KNOWN-ISSUES.md](KNOWN-ISSUES.md) | preview limitations, platform status, data and remote-feature boundaries |
 | [OFFICE.md](OFFICE.md) | one vault, inviting teammates, the lead, the roster and what is shared |
 | [INSTALL-FOR-AI.md](INSTALL-FOR-AI.md) | the install steps written for an AI app to follow |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | `memev doctor` and the fix for each symptom |
@@ -25,7 +27,7 @@ this folder links back here, and this page links down to every page.
 | [CONTRACTS.md](CONTRACTS.md) | signed, immutable work contracts |
 | [PROJECTS.md](PROJECTS.md) | the project layer: task states, the transition table, derived project status |
 | [OPERATION-ENVELOPE.md](OPERATION-ENVELOPE.md) | the one record shape for an operation: fields, canonical serialisation, content hash, merge contract hash, versioning |
-| [FEDERATION.md](FEDERATION.md) | planned: a contribution is an operation envelope with a signature and admission block, and a node admits it in two steps |
+| [FEDERATION.md](FEDERATION.md) | implemented admission, relationship and policy foundations; end-to-end multi-node operation is not shipped |
 | [CLIENTS.md](CLIENTS.md) | what is added to each AI app; per-app pages below |
 | [CLOUD.md](CLOUD.md) | the secure link, devices, invites, joining another computer |
 | [AGENT-IDENTITY.md](AGENT-IDENTITY.md) | a person vouches for an agent role, and a third party checks it offline |
@@ -37,7 +39,7 @@ this folder links back here, and this page links down to every page.
 | [ISOLATION.md](ISOLATION.md) | how this repository is kept separate from earlier work |
 | [THREAT-MODEL.md](THREAT-MODEL.md) | assets, threats and mitigations; also [SECURITY.md](../SECURITY.md) |
 | [SOLUTIONS.md](SOLUTIONS.md) | the problems users report, what Memev does, the check for each |
-| [COMPARISON.md](COMPARISON.md) | how Memev compares with hosted memory services |
+| [COMPARISON.md](COMPARISON.md) | how Memev compares with hosted context services and project-work infrastructure |
 
 ### Per-app pages
 

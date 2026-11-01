@@ -10,8 +10,9 @@ Part of the [tiers pages](README.md). Up: the [README](../../README.md). Archite
 > trial is planned: 5 members and 10 computers, 14 days with one 14-day extension. The terms are in
 > [BUSINESS-TRIAL.md](../BUSINESS-TRIAL.md).
 
-For a company that wants one memory for its members and their AI apps, on its own server, with the
-company able to see and search what its members' AI apps have learned.
+For a company coordinating human and AI work through shared project state, contracts, evidence and
+organisation policy, on its own server, with authorised visibility into the work records its members
+create. The local vault remains the durable state substrate, not the product boundary.
 
 Corporate is the same model at larger scale and with stricter control: see [Corporate](corporate.md).
 
