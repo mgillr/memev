@@ -579,14 +579,25 @@ export class Vault extends EventEmitter {
     return this.coordinator(id).status(id, { history });
   }
 
-  /** A read-only view of one project for `memev work impact`: a frozen object whose only function reads a kind of record and returns
-   *  a copy. It carries no write method and does not hand out the store. Null for a project with no store. */
-  tasksReader(identity, project) {
-    this._need(identity, 'read', null);
-    const id = this._projectId(project);
-    if (!fs.existsSync(path.join(this.root, STATE, 'projects', id, 'events.jsonl'))) return null;
-    const st = this.projectStore(id);
-    return Object.freeze({ snapshot: (kind) => structuredClone(st.snapshot(kind)) });
+  /** A read-only view of one project for `memev work impact`, read from the project's files with no vault opened and nothing written:
+   *  opening the vault or its project store beside a running daemon rewrites snapshots, the graph and the op log, and may cut a torn
+   *  last line of the event log, so this reads the event log alone and applies each record as the store does. The result is a frozen
+   *  object whose only function reads a kind of record and returns a copy; it has no write method and does not hand out the store.
+   *  Null for a project with nothing recorded. */
+  static readProject(root, project) {
+    if (!project) throw new VaultError('bad_request', 'a project name is needed');
+    const file = path.join(root, STATE, 'projects', slug(project), 'events.jsonl');
+    if (!fs.existsSync(file)) return null;
+    const entities = new Map();
+    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+      if (!line) continue;
+      let rec; try { rec = JSON.parse(line); } catch { continue; } // a line the writer has not finished is skipped, never cut
+      if (rec.refused || !rec.entity) continue;
+      const { kind, id, data } = rec.entity;
+      if (!entities.has(kind)) entities.set(kind, new Map());
+      entities.get(kind).set(id, data);
+    }
+    return Object.freeze({ snapshot: (kind) => structuredClone(Object.fromEntries(entities.get(kind)?.entries() ?? [])) });
   }
 
   /** Record one turn of a session (continuous recording). */

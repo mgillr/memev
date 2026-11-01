@@ -338,8 +338,8 @@ async function run(argv, env) {
       // status, pause, resume and cancel of a project go through the running daemon's own tools; the CLI opens no project store itself
       // impact reads the project store through the work-store port, so it needs no daemon
       if (pos[0] === 'impact') {
-        const { runWork } = await import('./work.mjs'); const { openStore, closeStores } = await import('./work-store.mjs');
-        try { return await runWork(pos, flags, { root, openStore: (p) => openStore(p, { root }) }); } finally { closeStores(); }
+        const { runWork } = await import('./work.mjs'); const { openStore } = await import('./work-store.mjs');
+        return runWork(pos, flags, { root, openStore: (p) => openStore(p, { root }) });
       }
       const verbs = ['status', 'pause', 'resume', 'cancel'];
       if (!verbs.includes(pos[0])) { console.error('usage: memev work status <project> | pause <project> | resume <project> | cancel <project> <task> --reason <why> | impact <id> --project <project>  (add --json for data)'); return 2; }
