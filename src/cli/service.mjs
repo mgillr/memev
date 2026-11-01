@@ -35,6 +35,8 @@ Type=simple
 ExecStart="${launcher}" serve --root "${root}"
 Restart=on-failure
 RestartSec=5
+# exit 5 is a held vault lock (VaultLocked): another process holds the vault, so start again only when it is gone
+RestartPreventExitStatus=5
 Environment=MEMEV_SERVICE=1
 
 [Install]
@@ -49,6 +51,7 @@ WantedBy=default.target
   <key>ProgramArguments</key>
   <array><string>${esc(launcher)}</string><string>serve</string><string>--root</string><string>${esc(root)}</string></array>
   <key>RunAtLoad</key><true/>
+  <key>ThrottleInterval</key><integer>60</integer>
   <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
   <key>StandardOutPath</key><string>${esc(logFile)}</string>
   <key>StandardErrorPath</key><string>${esc(logFile)}</string>
