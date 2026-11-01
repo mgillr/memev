@@ -483,3 +483,16 @@ test('SO-F-03 AC13: no module under src/engine/federation imports child_process,
   // it only reads: the federation modules are not written by the test
   assert.ok(files.every((f) => fs.statSync(f).isFile()));
 });
+
+// ---- the page and the schema file the contract names
+
+test('SO-F-03 docs: docs/FEDERATION.md names the contribution schema and the two-step admission, and labels them planned', () => {
+  const page = fs.readFileSync(path.join(PKG, 'docs/FEDERATION.md'), 'utf8');
+  assert.match(page, /## Contribution and admission[\s\S]*contribution-v1\.json[\s\S]*two-step admission[\s\S]*planned/);
+  assert.match(page, /^## Status\n\nPlanned\./m);
+  assert.ok(fs.existsSync(path.join(PKG, 'docs/schemas/contribution-v1.json')));
+  // every field of the block is on the page
+  for (const f of CONTRIBUTION_FIELDS) assert.ok(page.includes(`\`${f}\``), f);
+  assert.ok(page.includes('`federation.admitted`') && page.includes('`federation.rejected`'));
+  assert.ok(!/## .*(second envelope)/i.test(page), 'the page does not suggest a second envelope');
+});
