@@ -2,7 +2,7 @@
   "title": "PG-05.1 Engine integration: merge semantics, mapping, boundary (memev)",
   "project": "memev",
   "workdir": null,
-  "request": "Programme contract for work package WP05 in memev: Engine integration: merge semantics, mapping, boundary. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP05.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP01-03, WP04-01, WP04-03, WP05-02, WP05-05. Depends on contracts: SO-2.12, SO-2.13, WO-05-B. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.12 and SO-2.13: WP05-06 degrades as SO-2.12 requirement 8 says when the paid engine is absent and keeps the paid interface behind SO-2.13 requirements 3 and 4; neither is restated here. Signed vault contract WO-05-A and WO-05-C (cited by id only): foundation: the call-out boundary and the external convergence service specification; this spec cites them and does not specify them again. Signed vault contract WO-05-B (cited by id only): the paid-engine client behind a flag, off by default (draft PR #201, still open); WP05-05 is dropped from this spec because that signed contract owns it, and WP05-06 depends on it. Build layer (lead workstream decision under owner delegation, 1 Nov 2026): the unsigned fold (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-13, cited by id only) is the build layer, and it overlaps this spec at SO-F-02, SO-F-06. This spec will cite those ids and keep only what the fold does not cover; trim pending fold PR (the final fold ids come in the lead's separate pull request, branch contracts/scope-one-fold-build-layer). Nothing is trimmed yet. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "request": "Programme contract for work package WP05 in memev: Engine integration: merge semantics, mapping, boundary. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP05.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP01-03, WP04-01, WP04-03, WP05-02, WP05-05. Depends on contracts: SO-2.12, SO-2.13, WO-05-B. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.12 and SO-2.13: WP05-06 degrades as SO-2.12 requirement 8 says when the paid engine is absent and keeps the paid interface behind SO-2.13 requirements 3 and 4; neither is restated here. Signed vault contract WO-05-A and WO-05-C (cited by id only): foundation: the call-out boundary and the external convergence service specification; this spec cites them and does not specify them again. Signed vault contract WO-05-B (cited by id only): the paid-engine client behind a flag, off by default (draft PR #201, still open); WP05-05 is dropped from this spec because that signed contract owns it, and WP05-06 depends on it. Build layer (owner delegation, 1 Nov 2026): the signed fold contracts SO-F-02, SO-F-06 (cited by id; delivered by pull request #341, WBS.md section 9.2 on its branch) are the build layer. Each task below that overlaps them cites the fold id and keeps only what the fold does not cover. Tasks of this spec that name no fold contract have no fold overlap. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
   "tasks": [
     {
       "id": "WP05-01",
@@ -11,9 +11,10 @@
       "depends_on": [],
       "requirements": [
         "MV-ARCH-05: Merge semantics are chosen per object class (observations, metadata, membership, counters, task ownership, task state, contracts, approvals, external actions), never one CRDT for everything. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:14; evidence docs/scope-one/programme/DECOMPOSITION.md:69; baseline 8.5)",
-        "The call-out boundary WO-05-A sends one JSON line {a, b, base} of text and expects {text} or {refuse:true}, and crdt-merge has no three-way text merge, so a provider shim maps a note to structured state (for example lines to a set); the shim lives outside the Memev core (in memev-ops or on the crdt-merge side) (source: repository analysis of 1 Nov 2026, section 5; signed vault contract WO-05-A, cited by id only)"
+        "The call-out boundary WO-05-A sends one JSON line {a, b, base} of text and expects {text} or {refuse:true}, and crdt-merge has no three-way text merge, so a provider shim maps a note to structured state (for example lines to a set); the shim lives outside the Memev core (in memev-ops or on the crdt-merge side) (source: repository analysis of 1 Nov 2026, section 5; signed vault contract WO-05-A, cited by id only)",
+        "SO-F-02 (signed fold contract, cited by id; pull request #341) owns an authority owner, a scope version and a merge class on every entity type, and the semantic-conflict rule for incompatible approvals; this task cites it and does not restate it (source: pull request #341, WBS.md section 9.2)"
       ],
-      "description": "Repo: memev. Task ownership is a lease/claim, not a counter. Contracts and approvals are never silently merged.",
+      "description": "Repo: memev. Task ownership is a lease/claim, not a counter. Contracts and approvals are never silently merged. The merge-class names in the table are those of SO-F-02: last-writer, set-union, append-only and human-resolution. SO-F-02 declares the class on each entity type in docs/schemas/project-v1.json and enforces it in the store; this task owns the table and its rationale and declares and enforces nothing.",
       "scope": [
         "docs/MERGE-SEMANTICS.md"
       ],
@@ -38,6 +39,14 @@
           "verifier": {
             "type": "command",
             "cmd": "for n in \"provider shim\" \"three-way text merge\" \"structured state\" outside; do grep -qi \"$n\" docs/MERGE-SEMANTICS.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The table uses the four merge-class names of SO-F-02 and cites SO-F-02",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"last-writer\" \"set-union\" \"append-only\" \"human-resolution\" \"SO-F-02\"; do grep -qi \"$n\" docs/MERGE-SEMANTICS.md || exit 1; done",
             "expect_exit": 0
           }
         },
@@ -127,9 +136,10 @@
       ],
       "requirements": [
         "MV-INT-01: Memev vault data is represented in CRDT-compatible state (P0 agent memory integration). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:40; evidence docs/scope-one/programme/DECOMPOSITION.md:86; baseline 8.5)",
-        "The representation is structured state that a provider shim can pass to the engine; the shim that translates the call-out line protocol lives outside the Memev core and the core holds no convergence logic (source: repository analysis of 1 Nov 2026, section 5; signed vault contract WO-05-A, cited by id only)"
+        "The representation is structured state that a provider shim can pass to the engine; the shim that translates the call-out line protocol lives outside the Memev core and the core holds no convergence logic (source: repository analysis of 1 Nov 2026, section 5; signed vault contract WO-05-A, cited by id only)",
+        "SO-F-06 (signed fold contract, cited by id; pull request #341) owns validation of engine input and output per merge class at the one boundary src/engine/merge.mjs, and the keep-both fallback when the engine is unavailable; this task cites it and does not restate it (source: pull request #341, WBS.md section 9.2)"
       ],
-      "description": "Repo: memev.",
+      "description": "Repo: memev. SO-F-06 validates the engine payload against docs/schemas/convergence-v1.json at the one boundary src/engine/merge.mjs; the state map produces the structured state and calls neither the engine nor the validator.",
       "scope": [
         "src/engine/state-map.mjs",
         "test/state-map.test.mjs"
@@ -169,6 +179,14 @@
           }
         },
         {
+          "statement": "The state map does not import the merge boundary or name the convergence schema, which are SO-F-06",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f src/engine/state-map.mjs && ! grep -Eq \"from '[^']*merge\\.mjs'|convergence-v1\" src/engine/state-map.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
           "statement": "Changes stay in scope",
           "verifier": {
             "type": "scope"
@@ -199,9 +217,10 @@
         "SO-2.12 requirement 8: \"The system must remain useful locally and degrade safely if a paid or remote service is unavailable. It must not falsely claim distributed convergence, trust verification or evidence admission while those services are unavailable.\" (source: contract SO-2.12 T1)",
         "SO-2.13 requirement 3: \"Keep paid multi-device convergence behind a stable, tested interface.\" (source: contract SO-2.13 T1)",
         "SO-2.13 requirement 4: \"Do not let cloud availability become a hidden dependency for local project integrity.\" (source: contract SO-2.13 T1)",
-        "The round trip runs through the paid-engine client of signed vault contract WO-05-B (off by default; draft PR #201) and does not rebuild it (source: signed vault contract WO-05-B, cited by id only)"
+        "The round trip runs through the paid-engine client of signed vault contract WO-05-B (off by default; draft PR #201) and does not rebuild it (source: signed vault contract WO-05-B, cited by id only)",
+        "SO-F-06 (signed fold contract, cited by id; pull request #341) owns validation of engine input and output per merge class at the one boundary src/engine/merge.mjs, and the keep-both fallback when the engine is unavailable; this task cites it and does not restate it (source: pull request #341, WBS.md section 9.2)"
       ],
-      "description": "Repo: memev. Skipped with a stated reason when the paid engine is not installed (reported as not run, not as pass). The client that this test exercises is WO-05-B, not a task of this spec.",
+      "description": "Repo: memev. Skipped with a stated reason when the paid engine is not installed (reported as not run, not as pass). The client that this test exercises is WO-05-B, not a task of this spec. The refusal of malformed engine output and of forbidden transitions at the boundary is tested by SO-F-06 with a stub engine; this task does not repeat those tests and runs the real engine once through the boundary.",
       "scope": [
         "test/engine-roundtrip.test.mjs",
         "scripts/**"
@@ -213,6 +232,14 @@
             "type": "test_red_green",
             "test_file": "test/engine-roundtrip.test.mjs",
             "cmd": "node --test test/engine-roundtrip.test.mjs"
+          }
+        },
+        {
+          "statement": "The round trip test repeats no refusal test of SO-F-06",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f test/engine-roundtrip.test.mjs && ! grep -Eqi 'malformed|forbidden' test/engine-roundtrip.test.mjs",
+            "expect_exit": 0
           }
         },
         {

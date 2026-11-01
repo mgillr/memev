@@ -12,16 +12,69 @@
       "requirements": [
         "MV-LIC-03: A software licensing lawyer reviews the combined distribution against the BSL restriction on standalone merge products or services. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:89; evidence docs/scope-one/programme/DECOMPOSITION.md:120; baseline 8.6)"
       ],
-      "description": "Repo: memev-ops. Owner action; the task holds the written result only. Related SR-3.05 and SR-3.06.",
+      "description": "Repo: memev-ops. Owner action; the task holds the written result only. Related SR-3.05 and SR-3.06. The owner supplies the lawyer's written result; this task records it and nothing is written as counsel's view that counsel has not given. The record has five sections: Question put to counsel, Documents reviewed, Reviewer, Outcome and Changes required, and writes no patent number. It does not change LICENSE, PATENTS or NOTICE.",
       "scope": [
         "contracts/COUNSEL-REVIEW.md"
       ],
       "criteria": [
         {
-          "statement": "record exists",
+          "statement": "The record has its five sections",
           "verifier": {
-            "type": "file_exists",
-            "path": "contracts/COUNSEL-REVIEW.md"
+            "type": "command",
+            "cmd": "for n in \"Question put to counsel\" \"Documents reviewed\" \"Reviewer\" \"Outcome\" \"Changes required\"; do grep -qi \"^## $n\" contracts/COUNSEL-REVIEW.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The question names the BSL restriction on standalone merge products or services",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/COUNSEL-REVIEW.md",
+            "pattern": "^## Question put to counsel(?:(?!^## )[\\s\\S])*standalone merge",
+            "flags": "im"
+          }
+        },
+        {
+          "statement": "Documents reviewed lists LICENSE, PATENTS, NOTICE and docs/LICENSING-NOTICE.md as list items",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in LICENSE PATENTS NOTICE LICENSING-NOTICE.md; do grep -Eq \"^- .*$n\" contracts/COUNSEL-REVIEW.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The reviewer section gives the review date",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/COUNSEL-REVIEW.md",
+            "pattern": "^## Reviewer(?:(?!^## )[\\s\\S])*Reviewed on 20\\d\\d-\\d\\d-\\d\\d",
+            "flags": "im"
+          }
+        },
+        {
+          "statement": "The outcome is exactly one of approved, approved with changes or not approved",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/COUNSEL-REVIEW.md",
+            "pattern": "^## Outcome\\s+(approved with changes|approved|not approved)\\b",
+            "flags": "im"
+          }
+        },
+        {
+          "statement": "The record states the change date reviewed",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/COUNSEL-REVIEW.md",
+            "pattern": "2028-03-29",
+            "flags": "i"
+          }
+        },
+        {
+          "statement": "The record writes no patent number",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eqi 'US ?[0-9]{1,2}[, ]?[0-9]{3}[, ]?[0-9]{3}|WO ?[0-9]{4}/[0-9]+|EP ?[0-9]{6,7}' contracts/COUNSEL-REVIEW.md",
+            "expect_exit": 0
           }
         },
         {

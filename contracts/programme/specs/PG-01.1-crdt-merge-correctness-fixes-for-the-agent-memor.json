@@ -60,7 +60,7 @@
       "requirements": [
         "MV-CRDT-07: E4 KeyPair verification is strict Ed25519 with no HMAC fallback keyed by the public key. (Added from live review; not in the notes.) (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:30; evidence docs/scope-one/programme/DECOMPOSITION.md:82; baseline 8.5)"
       ],
-      "description": "Repo: crdt-merge. PR #179 open since 2026-09-28 and mergeable; it adds tests/e4/resilience/test_key_ownership.py (tampered message at :43, wrong key at :49, forged revocation proof at :89). Review against those tests; merge is the owner's call. Any E4 trust criterion carries this caveat: 4 tests in crdt-merge security/tests/test_byzantine_fault_injection.py already fail on main and need triage before an E4 contract is signed; this task does not depend on or include any unpushed crdt-merge commit.",
+      "description": "Repo: crdt-merge. PR #179 is merged to crdt-merge main through pull request #181 (252c93e6); it added tests/e4/resilience/test_key_ownership.py (tampered message at :43, wrong key at :49, forged revocation proof at :89). Review against those tests. The E4 trust triage is resolved: crdt-merge main 252c93e6 (pull request #181, which includes pull requests #179 and #180) fixed the fixtures of the 4 tests in security/tests/test_byzantine_fault_injection.py, verification stays fail-closed and security/ now runs in CI (source: crdt-merge pull request #181, merged to main as 252c93e6). This task does not depend on or include any unpushed crdt-merge commit.",
       "scope": [
         "crdt_merge/e4/resilience/**",
         "tests/e4/resilience/test_key_ownership.py",

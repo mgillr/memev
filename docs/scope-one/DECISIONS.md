@@ -41,7 +41,7 @@ current code already uses, so no contract is blocked on a guess.
 
 - Status: open
 - Decision owner: engineering owner of the project-state contract
-- Rationale: when two lanes or two devices work the same project, a lease decides who may
+- Rationale: when two writers or two devices work the same project, a lease decides who may
   write. The handoff does not fix lease duration, renewal, or what happens on expiry.
 - Safe default: a single active writer per project; a lease is implicit while a write is
   in flight and there is no background renewal. Contending writes are queued, not merged.
@@ -95,8 +95,7 @@ current code already uses, so no contract is blocked on a guess.
   runtimes) are reached only across adapter boundaries, and there is no migration to another implementation.
 - Sources: what is decided is the owner decision of 31 Oct 2026 (below): topology is local-first and the cloud is
   only a relay and a backup. The wider statement that the vault is the only authority is recorded in the owner
-  vault as decision D-SO-MEMORY-AUTHORITY, which that record shows as taken by the lead workstream under the owner's
-  delegation of 30 Oct 2026, not as the owner's own word. It is cited by id and is not copied here.
+  vault as decision D-SO-MEMORY-AUTHORITY, which that record shows as taken under the owner's delegation of 30 Oct 2026, not as the owner's own word. It is cited by id and is not copied here.
 - Rationale for leaving it proposed: no owner-signed contract or owner statement in this repository carries the
   second part, so it is not stated here as decided.
 - Safe default: keep the code as it is: one store under the vault, no second database, and the engine behind the
@@ -130,10 +129,14 @@ do not accept the addendum's other recommendations; those still need explicit ac
 
 ## Decisions taken under owner delegation
 
-- Layer to build against (decided, lead workstream decision under owner delegation, 1 Nov 2026): the unsigned fold
-  (`SO-A-01` to `SO-A-12`, `SO-R-E`, `SO-F-01` to `SO-F-13`, cited by id only) is the build layer. The programme
-  specs `PG-04.1`, `PG-05.1`, `PG-08.1`, `PG-09.1`, `PG-09.2`, `PG-13.1` and `PG-14.1` will cite the fold ids and keep
-  only what the fold does not cover. Trim pending the fold pull request; nothing is trimmed yet.
+- Layer to build against (decided, owner delegation, 1 Nov 2026): the fold (`SO-A-01` to `SO-A-12`, `SO-R-E`,
+  `SO-F-01` to `SO-F-13` except `SO-F-11`, which was dropped and whose guards moved into `SO-F-03`, `SO-F-04`,
+  `SO-F-07` and `SO-F-10`; 25 signed contracts, cited by id only) is the build layer. The programme specs `PG-04.1`,
+  `PG-05.1`, `PG-08.1`, `PG-09.1`, `PG-10.1`, `PG-13.1` and `PG-14.1` cite the fold ids per task and keep only what the
+  fold does not cover; the table is in [RECONCILIATION.md](RECONCILIATION.md). `PG-06.1` and `PG-12.1` were signed and
+  overlap the fold; the signer superseded them (1 Nov 2026) with `PG-06.2` and `PG-12.2`, which cite the fold ids and
+  keep only the gaps. The signed files are unchanged and stay on record; the manifest and RECONCILIATION carry the
+  back-reference.
 - ADR 7 (memory and project-state authority) stays proposed, pending owner confirmation.
 
 ## Product-owner decision list

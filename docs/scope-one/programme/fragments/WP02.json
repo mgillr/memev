@@ -5,7 +5,7 @@
       "id": "WP02-01",
       "title": "History generator: random interleavings of operations on N replicas with drop, duplicate, reorder and restart",
       "phase": "implement",
-      "owner": "lane-engine",
+      "owner": "area-engine",
       "depends_on": [
         "WP01-01",
         "WP01-02"
@@ -56,7 +56,7 @@
       "id": "WP02-02",
       "title": "Conformance suite for ORSet, LWWMap, AgentState, TrustAgentState and gossip: commutativity, associativity, idempotency",
       "phase": "implement",
-      "owner": "lane-engine",
+      "owner": "area-engine",
       "depends_on": [
         "WP02-01"
       ],
@@ -106,7 +106,7 @@
       "id": "WP02-03",
       "title": "Scenario suite: deletion propagation, stale replica, duplicate and out-of-order delivery, process restart, clock skew, replica id collision, partition and heal",
       "phase": "implement",
-      "owner": "lane-engine",
+      "owner": "area-engine",
       "depends_on": [
         "WP02-01"
       ],
@@ -166,7 +166,7 @@
       "id": "WP02-04",
       "title": "Run the conformance gate in CI on every PR to crdt-merge",
       "phase": "release",
-      "owner": "lane-engine",
+      "owner": "area-engine",
       "depends_on": [
         "WP02-02",
         "WP02-03"

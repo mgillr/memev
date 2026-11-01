@@ -2,7 +2,7 @@
   "title": "PG-09.2 Identity, admission and ACFA boundary (memev-ops)",
   "project": "memev",
   "workdir": null,
-  "request": "Programme contract for work package WP09 in memev-ops: Identity, admission and ACFA boundary. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP09.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: none. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Signed vault contract WO-05-D (cited by id only): the external trust service specification; the adapters sit on its boundary and this spec does not specify the service. Build layer (lead workstream decision under owner delegation, 1 Nov 2026): the unsigned fold (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-13, cited by id only) is the build layer, and it overlaps this spec at SO-F-01, SO-F-08. This spec will cite those ids and keep only what the fold does not cover; trim pending fold PR (the final fold ids come in the lead's separate pull request, branch contracts/scope-one-fold-build-layer). Nothing is trimmed yet. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "request": "Programme contract for work package WP09 in memev-ops: Identity, admission and ACFA boundary. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP09.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: none. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Signed vault contract WO-05-D (cited by id only): the external trust service specification; the adapters sit on its boundary and this spec does not specify the service.  Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
   "tasks": [
     {
       "id": "WP09-04",
@@ -12,16 +12,70 @@
       "requirements": [
         "MV-LIC-02: ACFA-RS licence and patent terms are checked separately before the release package is designed. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:88; evidence docs/scope-one/programme/DECOMPOSITION.md:119; baseline 8.5)"
       ],
-      "description": "Repo: memev-ops. Owner or counsel task: LICENSE is Apache-2.0; patent position unverified.",
+      "description": "Repo: memev-ops. Owner or counsel task: LICENSE is Apache-2.0; patent position unverified. The record has four sections, Licence of ACFA-RS, Patent position, Sources and date and Result, and writes no patent number. The result is one of cleared, not cleared or awaiting counsel; no release package is designed before it reads cleared. ACFA-RS is described only as an external integration behind the provider boundary.",
       "scope": [
         "contracts/ACFA-LICENCE-CHECK.md"
       ],
       "criteria": [
         {
-          "statement": "record exists",
+          "statement": "The record has its four sections",
           "verifier": {
-            "type": "file_exists",
-            "path": "contracts/ACFA-LICENCE-CHECK.md"
+            "type": "command",
+            "cmd": "for n in \"Licence of ACFA-RS\" \"Patent position\" \"Sources and date\" \"Result\"; do grep -qi \"^## $n\" contracts/ACFA-LICENCE-CHECK.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The licence section states the licence as Apache-2.0",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/ACFA-LICENCE-CHECK.md",
+            "pattern": "^## Licence of ACFA-RS(?:(?!^## )[\\s\\S])*Apache-2\\.0",
+            "flags": "im"
+          }
+        },
+        {
+          "statement": "The patent section says \"not verified\" or \"verified by counsel on\" a date",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/ACFA-LICENCE-CHECK.md",
+            "pattern": "^## Patent position(?:(?!^## )[\\s\\S])*(not verified|verified by counsel on 20\\d\\d-\\d\\d-\\d\\d)",
+            "flags": "im"
+          }
+        },
+        {
+          "statement": "The sources section gives the date the licence and patent files were read",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/ACFA-LICENCE-CHECK.md",
+            "pattern": "^## Sources and date(?:(?!^## )[\\s\\S])*Read on 20\\d\\d-\\d\\d-\\d\\d",
+            "flags": "im"
+          }
+        },
+        {
+          "statement": "The result is exactly one of cleared, not cleared or awaiting counsel",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/ACFA-LICENCE-CHECK.md",
+            "pattern": "^## Result\\s+(cleared|not cleared|awaiting counsel)\\b",
+            "flags": "im"
+          }
+        },
+        {
+          "statement": "The result section ties the release package to a cleared result",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/ACFA-LICENCE-CHECK.md",
+            "pattern": "^## Result(?:(?!^## )[\\s\\S])*release package",
+            "flags": "im"
+          }
+        },
+        {
+          "statement": "The record writes no patent number",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eqi 'US ?[0-9]{1,2}[, ]?[0-9]{3}[, ]?[0-9]{3}|WO ?[0-9]{4}/[0-9]+|EP ?[0-9]{6,7}' contracts/ACFA-LICENCE-CHECK.md",
+            "expect_exit": 0
           }
         },
         {

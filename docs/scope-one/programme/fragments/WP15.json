@@ -5,7 +5,7 @@
       "id": "WP15-01",
       "title": "Structural no-import guard: nothing under the Apache core imports the licensed engine package",
       "phase": "verify",
-      "owner": "lane-product",
+      "owner": "area-product",
       "depends_on": [],
       "requirements": [
         "MV-REC-06",
@@ -53,7 +53,7 @@
       "id": "WP15-02",
       "title": "Licence boundary stated once: Apache-2.0 core, BSL-1.1 engine (change date 2028-03-29), ACFA-RS own licence, commercial services",
       "phase": "design",
-      "owner": "lane-product",
+      "owner": "area-product",
       "depends_on": [],
       "requirements": [
         "MV-LIC-04"

@@ -5,7 +5,7 @@
       "id": "WP18-01",
       "title": "A2A adapter alongside the existing MCP server; no replacement protocol",
       "phase": "implement",
-      "owner": "lane-product",
+      "owner": "area-product",
       "depends_on": [
         "WP04-02"
       ],
@@ -66,7 +66,7 @@
       "id": "WP18-02",
       "title": "SDK and a framework adapter (LangGraph first) so an existing agent can join a project, claim work, submit evidence and sync state",
       "phase": "implement",
-      "owner": "lane-product",
+      "owner": "area-product",
       "depends_on": [
         "WP18-01",
         "WP10-03"
@@ -115,7 +115,7 @@
       "id": "WP18-03",
       "title": "Public conformance tests that any implementation can run",
       "phase": "verify",
-      "owner": "lane-product",
+      "owner": "area-product",
       "depends_on": [
         "WP18-02",
         "WP02-04"
@@ -164,7 +164,7 @@
       "id": "WP18-04",
       "title": "Payment after verified acceptance: agentic payment protocol adapters and a Stripe adapter, idempotency, reconciliation; a payment receipt is never taken as proof of delivery",
       "phase": "implement",
-      "owner": "lane-product",
+      "owner": "area-product",
       "depends_on": [
         "WP10-03"
       ],

@@ -5,7 +5,7 @@
       "id": "WP06-01",
       "title": "Acceptance state model: received, replicated, evaluated, accepted, rejected, superseded; transitions and who may make them",
       "phase": "design",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP04-01",
         "WP07-02"
@@ -65,7 +65,7 @@
       "id": "WP06-02",
       "title": "Acceptance evaluator implementing the seven questions (authorised, invariant, superseded dependency, auto-accept, verification, offline, global authority)",
       "phase": "implement",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP06-01"
       ],
@@ -126,7 +126,7 @@
       "id": "WP06-03",
       "title": "Acceptance is on the default path: a replicated operation does not change authoritative state until accepted",
       "phase": "implement",
-      "owner": "lane-core",
+      "owner": "area-core",
       "depends_on": [
         "WP06-02"
       ],

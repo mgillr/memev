@@ -5,7 +5,7 @@
       "id": "WP12-01",
       "title": "Transport adapter interface (send state, receive state, digests) with an in-memory implementation",
       "phase": "implement",
-      "owner": "lane-fed",
+      "owner": "area-fed",
       "depends_on": [
         "WP04-02",
         "WP05-03"
@@ -67,7 +67,7 @@
       "id": "WP12-02",
       "title": "Relay-backed transport: reconnect, backoff, partition recovery",
       "phase": "implement",
-      "owner": "lane-fed",
+      "owner": "area-fed",
       "depends_on": [
         "WP12-01"
       ],
@@ -118,7 +118,7 @@
       "id": "WP12-03",
       "title": "Three-node local harness: three vaults with separate identities exchange envelopes through the transport",
       "phase": "implement",
-      "owner": "lane-fed",
+      "owner": "area-fed",
       "depends_on": [
         "WP12-02",
         "WP09-01"

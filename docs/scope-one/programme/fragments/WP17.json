@@ -72,7 +72,7 @@
       "requirements": [
         "MV-PGM-02"
       ],
-      "description": "Repo: memev. One row per item in the live 8 PRs + 8 branches: id, disposition, owner lane, reason. Owner approves; no PR is closed by this task.",
+      "description": "Repo: memev. One row per item in the live 8 PRs + 8 branches: id, disposition, owner, reason. Owner approves; no PR is closed by this task.",
       "scope": {
         "allow": [
           "docs/scope-one/DISPOSITIONS.md"
@@ -240,7 +240,7 @@
     },
     {
       "id": "WP17-05",
-      "title": "Claim register so that two workstreams do not write the same WBS or contract at once",
+      "title": "Claim register so that two authors do not write the same WBS or contract at once",
       "phase": "plan",
       "owner": "owner",
       "depends_on": [],
@@ -248,7 +248,7 @@
         "MV-PGM-06",
         "MV-PGM-03"
       ],
-      "description": "Repo: memev-ops. A file listing, per work package, which workstream holds it. Starts with the known overlap: the lead workstream's WBS and SO-* contract work in the same repo on 31 Oct.",
+      "description": "Repo: memev-ops. A file listing, per work package, which claim holds it. Starts with the known overlap: the Scope One WBS and SO-* contract work in the same repo on 31 Oct.",
       "scope": {
         "allow": [
           "contracts/CLAIMS.md"
@@ -267,11 +267,11 @@
         {
           "id": "WP17-05-AC02",
           "mandatory": true,
-          "statement": "register lists lane names",
+          "statement": "register lists area names",
           "verifier": {
             "type": "grep",
             "file": "contracts/CLAIMS.md",
-            "pattern": "lane-engine",
+            "pattern": "area-engine",
             "must": "present"
           }
         },

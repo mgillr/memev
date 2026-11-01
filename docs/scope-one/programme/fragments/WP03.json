@@ -5,7 +5,7 @@
       "id": "WP03-01",
       "title": "Shared serialisation test vectors (JSON) produced by the Python reference for ORSet, LWWMap, AgentState",
       "phase": "implement",
-      "owner": "lane-engine",
+      "owner": "area-engine",
       "depends_on": [
         "WP02-02"
       ],
@@ -64,7 +64,7 @@
       "id": "WP03-02",
       "title": "TypeScript edition reads and re-emits every vector byte-identically",
       "phase": "verify",
-      "owner": "lane-engine",
+      "owner": "area-engine",
       "depends_on": [
         "WP03-01"
       ],
@@ -112,7 +112,7 @@
       "id": "WP03-03",
       "title": "Rust edition reads and re-emits every vector byte-identically",
       "phase": "verify",
-      "owner": "lane-engine",
+      "owner": "area-engine",
       "depends_on": [
         "WP03-01"
       ],

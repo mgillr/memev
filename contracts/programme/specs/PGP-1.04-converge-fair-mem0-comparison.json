@@ -28,7 +28,8 @@
           "verifier": {
             "type": "grep",
             "file": "README.md",
-            "pattern": "^## A comparison with Mem0"
+            "pattern": "^## A comparison with Mem0",
+            "flags": "m"
           }
         },
         {
@@ -52,6 +53,75 @@
           "verifier": {
             "type": "command",
             "cmd": "! grep -Eqi 'Mem0 (gave up|abandon)|gave up on c' CHARTER.md ROADMAP.md dashboard.html",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The comparison section describes the choice as single-pass, ADD-only extraction",
+          "verifier": {
+            "type": "grep",
+            "file": "README.md",
+            "pattern": "^## A comparison with Mem0(?:(?!^## )[\\s\\S])*single-pass, ADD-only extraction",
+            "flags": "m"
+          }
+        },
+        {
+          "statement": "The comparison section cites Mem0's own announcement",
+          "verifier": {
+            "type": "grep",
+            "file": "README.md",
+            "pattern": "^## A comparison with Mem0(?:(?!^## )[\\s\\S])*mem0\\.ai/blog/mem0-the-token-efficient-memory-algorithm",
+            "flags": "m"
+          }
+        },
+        {
+          "statement": "The comparison section cites Mem0's own migration guide",
+          "verifier": {
+            "type": "grep",
+            "file": "README.md",
+            "pattern": "^## A comparison with Mem0(?:(?!^## )[\\s\\S])*docs\\.mem0\\.ai/migration/oss-v2-to-v3",
+            "flags": "m"
+          }
+        },
+        {
+          "statement": "The comparison section calls the choice a published design decision, not a gap",
+          "verifier": {
+            "type": "grep",
+            "file": "README.md",
+            "pattern": "^## A comparison with Mem0(?:(?!^## )[\\s\\S])*It is a published design decision, not a gap",
+            "flags": "m"
+          }
+        },
+        {
+          "statement": "The comparison section says neither design makes the other unnecessary",
+          "verifier": {
+            "type": "grep",
+            "file": "README.md",
+            "pattern": "^## A comparison with Mem0(?:(?!^## )[\\s\\S])*neither makes the other unnecessary",
+            "flags": "m"
+          }
+        },
+        {
+          "statement": "The stale-replica delete fix is stated as in progress, not released",
+          "verifier": {
+            "type": "grep",
+            "file": "README.md",
+            "pattern": "is in progress in crdt-merge"
+          }
+        },
+        {
+          "statement": "The comparison table has its seven property rows",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"Design choice\" \"What decides the stored result\" \"Offline merge\" \"Concurrent writers\" \"Deletes\" \"Formal property\" \"Byzantine contributors\"; do grep -Eq \"^\\| $n \\|\" README.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The comparison section quotes no benchmark number or percentage for Mem0 or for converge",
+          "verifier": {
+            "type": "command",
+            "cmd": "! awk '/^## A comparison with Mem0/{f=1;next} /^## /{f=0} f' README.md | grep -Eqi '[0-9]+(\\.[0-9]+)? ?(%|x |ms|tokens)'",
             "expect_exit": 0
           }
         },

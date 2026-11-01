@@ -120,4 +120,4 @@ Existing contract families keep their own ids (SR-*, QL-*, SO-*, WO-*); where on
 - MV-PGM-04: One canonical contract format and id namespace for new work (memev attest/1 specs versus proofline/1).
 - MV-PGM-05: Requirements owned by an existing contract stay covered by it; no duplicate contracts are written for them.
 - MV-PGM-07: The three engine plans are reconciled into one: the notes (crdt-merge via call-out, never vendored), PI-04/PI-05 on branch dev-integration-specs (vendor the Apache-2.0 TS core, Node oplog engine) and SR-3.01/SR-3.03 (new memev-merge text engine). RESOLVED by the owner decision of 31 Oct 2026: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary; PI-04/PI-05 and SR-3.01/SR-3.03 are superseded (docs/scope-one/DECISIONS.md, ADR 6).
-- MV-PGM-06: Parallel workstream work is deconflicted: one claim register for who is writing which WBS or contract.
+- MV-PGM-06: Parallel work is deconflicted: one claim register for who is writing which WBS or contract.

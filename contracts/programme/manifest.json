@@ -16,6 +16,30 @@
       "pull_request": "memev-ops #13"
     },
     {
+      "id": "PG-06.1",
+      "manifest": "this manifest (contracts/programme/specs, signed; the file is unchanged)",
+      "reason": "the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer; the signer decided to supersede the signed version",
+      "superseded_by": "PG-06.2"
+    },
+    {
+      "id": "PG-12.1",
+      "manifest": "this manifest (contracts/programme/specs, signed; the file is unchanged)",
+      "reason": "the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer; the signer decided to supersede the signed version",
+      "superseded_by": "PG-12.2"
+    },
+    {
+      "id": "PG-03.2",
+      "manifest": "this manifest (contracts/programme/specs, signed; the file is unchanged)",
+      "reason": "the signed PG-03.2 cannot be met as scoped because the TypeScript edition lacks the features its vectors need (ORSet tombstones and element_types, and AgentState); the signer decided to supersede it with a contract that builds them",
+      "superseded_by": "PG-03.4"
+    },
+    {
+      "id": "PG-03.3",
+      "manifest": "this manifest (contracts/programme/specs, signed; the file is unchanged)",
+      "reason": "the signed PG-03.3 cannot be met as scoped because the Rust edition lacks the features its vectors need (an ORSet type key, optional tombstones on read, the canonical sort, LWWMap, AgentState, and node_id on LWWRegister); the signer decided to supersede it with a contract that builds them",
+      "superseded_by": "PG-03.5"
+    },
+    {
       "id": "PI-04",
       "manifest": "branch dev-integration-specs of memev (not modified)",
       "reason": "owner engine decision 31 Oct 2026: the Apache-2.0 core vendors nothing from crdt-merge; recorded as superseded in docs/scope-one/DECISIONS.md"
@@ -122,13 +146,14 @@
   "decisions": [
     {
       "id": "LAYER",
-      "question": "Which layer is built against: the unsigned fold (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-13, cited by id only) or the programme specs",
+      "question": "Which layer is built against: the fold (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-13 except SO-F-11, which was dropped; 25 signed contracts, cited by id only) or the programme specs",
       "status": "decided",
-      "decided_by": "lead workstream decision under owner delegation, 1 Nov 2026",
-      "decision": "the unsigned fold is the build layer; the programme specs cite the fold ids and keep only what the fold does not cover",
+      "decided_by": "owner delegation, 1 Nov 2026",
+      "decision": "the fold is the build layer; the programme specs cite the fold ids per task and keep only what the fold does not cover",
       "overlaps": {
         "PG-04.1": [
-          "SO-F-03"
+          "SO-F-03",
+          "SO-F-12"
         ],
         "PG-05.1": [
           "SO-F-02",
@@ -140,24 +165,157 @@
         ],
         "PG-09.1": [
           "SO-F-01",
+          "SO-F-03",
           "SO-F-08"
         ],
-        "PG-09.2": [
-          "SO-F-01",
-          "SO-F-08"
+        "PG-10.1": [
+          "SO-F-09"
         ],
         "PG-13.1": [
+          "SO-F-01",
           "SO-F-04",
           "SO-F-05",
-          "SO-F-07",
-          "SO-F-12",
-          "SO-F-13"
+          "SO-F-07"
         ],
         "PG-14.1": [
           "SO-F-13"
+        ],
+        "PG-06.2": [
+          "SO-A-03",
+          "SO-F-12"
+        ],
+        "PG-12.2": [
+          "SO-F-07",
+          "SO-F-12"
         ]
       },
-      "trim": "pending fold PR (the final fold ids come in the lead pull request, branch contracts/scope-one-fold-build-layer); nothing is trimmed yet"
+      "by_task": {
+        "PG-04.1": {
+          "WP04-01": [
+            "SO-F-03",
+            "SO-F-12"
+          ],
+          "WP04-02": [
+            "SO-F-03"
+          ],
+          "WP04-03": [
+            "SO-F-03",
+            "SO-F-12"
+          ],
+          "WP04-04": [
+            "SO-F-03",
+            "SO-F-12"
+          ]
+        },
+        "PG-05.1": {
+          "WP05-01": [
+            "SO-F-02"
+          ],
+          "WP05-04": [
+            "SO-F-06"
+          ],
+          "WP05-06": [
+            "SO-F-06"
+          ]
+        },
+        "PG-08.1": {
+          "WP08-02": [
+            "SO-A-03"
+          ],
+          "WP08-03": [
+            "SO-A-10"
+          ]
+        },
+        "PG-09.1": {
+          "WP09-01": [
+            "SO-F-01",
+            "SO-F-03"
+          ],
+          "WP09-02": [
+            "SO-F-08"
+          ],
+          "WP09-03": [
+            "SO-F-03"
+          ]
+        },
+        "PG-10.1": {
+          "WP10-01": [
+            "SO-F-09"
+          ],
+          "WP10-02": [
+            "SO-F-09"
+          ]
+        },
+        "PG-13.1": {
+          "WP13-01": [
+            "SO-F-05"
+          ],
+          "WP13-03": [
+            "SO-F-01",
+            "SO-F-04"
+          ],
+          "WP13-04": [
+            "SO-F-07"
+          ],
+          "WP13-05": [
+            "SO-F-04"
+          ]
+        },
+        "PG-14.1": {
+          "WP14-04": [
+            "SO-F-13"
+          ]
+        },
+        "PG-06.2": {
+          "WP06-01": [
+            "SO-A-03"
+          ],
+          "WP06-02": [
+            "SO-F-12"
+          ],
+          "WP06-03": [
+            "SO-F-12"
+          ]
+        },
+        "PG-12.2": {
+          "WP12-01": [
+            "SO-F-07",
+            "SO-F-12"
+          ]
+        }
+      },
+      "superseded_signed": {
+        "PG-06.1 by PG-06.2": {
+          "WP06-01": [
+            "SO-A-03"
+          ],
+          "WP06-02": [
+            "SO-F-12"
+          ],
+          "WP06-03": [
+            "SO-F-12"
+          ]
+        },
+        "PG-12.1 by PG-12.2": {
+          "WP12-01": [
+            "SO-F-07",
+            "SO-F-12"
+          ]
+        }
+      },
+      "superseded_signed_other": {
+        "PG-03.2 by PG-03.4": "the signed PG-03.2 cannot be met as scoped because the TypeScript edition lacks the features its vectors need (ORSet tombstones and element_types, and AgentState); the signer decided to supersede it with a contract that builds them",
+        "PG-03.3 by PG-03.5": "the signed PG-03.3 cannot be met as scoped because the Rust edition lacks the features its vectors need (an ORSet type key, optional tombstones on read, the canonical sort, LWWMap, AgentState, and node_id on LWWRegister); the signer decided to supersede it with a contract that builds them"
+      },
+      "other_overlaps": {
+        "PGP-1.03": [
+          "SO-A-11"
+        ],
+        "SR-6.03": [
+          "SO-R-E"
+        ]
+      },
+      "trim": "done: each overlapping task cites its fold id and keeps only the gaps; PG-06.1 and PG-12.1 were signed and overlap the fold, so they are not edited; the signer superseded them with PG-06.2 and PG-12.2, which cite the fold ids and keep only the gaps (1 Nov 2026)"
     },
     {
       "id": "ADR-7",
@@ -175,7 +333,7 @@
       "title": "crdt-merge: four correctness bugs fixed (ORSet resurrection, LWWMap get/value, TrustAgentState delete, tag collisions)",
       "repo": "crdt-merge",
       "branch": "fix/crdt-correctness-four-bugs",
-      "pull_request": "crdt-merge #180",
+      "pull_request": "crdt-merge #180 (merged to crdt-merge main through #181 as 252c93e6)",
       "programme_tasks": "WP01-01, WP01-02, WP01-04, WP01-05",
       "depends_on": [],
       "vault_contracts": [],
@@ -194,9 +352,7 @@
       "pull_request": "memev #326",
       "programme_tasks": "WP07-01, WP07-02, WP07-03, WP15-01",
       "depends_on": [
-        "SO-1.01",
-        "SO-05",
-        "SO-06"
+        "SO-1.01"
       ],
       "vault_contracts": [
         "SO-05-A",
@@ -225,9 +381,10 @@
         "MEM-064, MEM-065, MEM-066, MEM-137 and REV-032"
       ],
       "tasks": 4,
-      "criteria": 21,
+      "criteria": 22,
       "spec": "specs/PGP-1.03-memev-docs-tiers-reconciliation.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "proposed: unsigned, signs after a clean red-team round",
+      "build_layer": "cites SO-A-11 as the owner of the overlapping part (see RECONCILIATION)"
     },
     {
       "id": "PGP-1.04",
@@ -242,7 +399,7 @@
       "depends_on": [],
       "vault_contracts": [],
       "tasks": 1,
-      "criteria": 6,
+      "criteria": 14,
       "spec": "specs/PGP-1.04-converge-fair-mem0-comparison.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -280,7 +437,7 @@
         "WO-05-E"
       ],
       "tasks": 2,
-      "criteria": 9,
+      "criteria": 19,
       "spec": "specs/PGP-1.06-memev-ops-sr3-engine-decision.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -352,6 +509,28 @@
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
+      "id": "PG-03.4",
+      "type": "programme work package",
+      "area": "PG-03",
+      "title": "Cross-language protocol vectors (crdt-merge-ts)",
+      "repo": "crdt-merge-ts",
+      "programme_tasks": "WP03-02-A, WP03-02-B, WP03-02",
+      "requirements": [
+        "MV-DEM-06"
+      ],
+      "cross_references": [],
+      "vault_contracts": [],
+      "depends_on": [
+        "PG-03.1"
+      ],
+      "tasks": 3,
+      "criteria": 20,
+      "spec": "specs/PG-03.4-cross-language-protocol-vectors.json",
+      "status": "proposed: unsigned, signs after a clean red-team round",
+      "supersedes": "PG-03.2",
+      "supersedes_reason": "the signed PG-03.2 cannot be met as scoped because the TypeScript edition lacks the features its vectors need (ORSet tombstones and element_types, and AgentState); the signer decided to supersede it with a contract that builds them"
+    },
+    {
       "id": "PG-03.2",
       "kind": "evidence",
       "type": "programme work package",
@@ -370,7 +549,32 @@
       "tasks": 1,
       "criteria": 3,
       "spec": "specs/PG-03.2-cross-language-protocol-vectors.json",
-      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+      "status": "signed (signing pull request #340); superseded by PG-03.4 on the signer's decision of 1 Nov 2026; this spec file is unchanged and stays on record",
+      "superseded_by": "PG-03.4",
+      "superseded_reason": "the signed PG-03.2 cannot be met as scoped because the TypeScript edition lacks the features its vectors need (ORSet tombstones and element_types, and AgentState); the signer decided to supersede it with a contract that builds them",
+      "build_layer": "superseded by PG-03.4; the file is not edited"
+    },
+    {
+      "id": "PG-03.5",
+      "type": "programme work package",
+      "area": "PG-03",
+      "title": "Cross-language protocol vectors (crdt-merge-rs)",
+      "repo": "crdt-merge-rs",
+      "programme_tasks": "WP03-03-A, WP03-03-B, WP03-03",
+      "requirements": [
+        "MV-DEM-06"
+      ],
+      "cross_references": [],
+      "vault_contracts": [],
+      "depends_on": [
+        "PG-03.1"
+      ],
+      "tasks": 3,
+      "criteria": 19,
+      "spec": "specs/PG-03.5-cross-language-protocol-vectors.json",
+      "status": "proposed: unsigned, signs after a clean red-team round",
+      "supersedes": "PG-03.3",
+      "supersedes_reason": "the signed PG-03.3 cannot be met as scoped because the Rust edition lacks the features its vectors need (an ORSet type key, optional tombstones on read, the canonical sort, LWWMap, AgentState, and node_id on LWWRegister); the signer decided to supersede it with a contract that builds them"
     },
     {
       "id": "PG-03.3",
@@ -391,7 +595,10 @@
       "tasks": 1,
       "criteria": 3,
       "spec": "specs/PG-03.3-cross-language-protocol-vectors.json",
-      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+      "status": "signed (signing pull request #340); superseded by PG-03.5 on the signer's decision of 1 Nov 2026; this spec file is unchanged and stays on record",
+      "superseded_by": "PG-03.5",
+      "superseded_reason": "the signed PG-03.3 cannot be met as scoped because the Rust edition lacks the features its vectors need (an ORSet type key, optional tombstones on read, the canonical sort, LWWMap, AgentState, and node_id on LWWRegister); the signer decided to supersede it with a contract that builds them",
+      "build_layer": "superseded by PG-03.5; the file is not edited"
     },
     {
       "id": "PG-04.1",
@@ -415,13 +622,30 @@
         }
       ],
       "vault_contracts": [],
-      "build_layer": "the unsigned fold (SO-F-03) is the build layer, lead workstream decision under owner delegation, 1 Nov 2026; this spec will cite those ids and keep only what the fold does not cover; trim pending fold PR",
+      "build_layer": "the fold (SO-F-03, SO-F-12) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP04-01": [
+          "SO-F-03",
+          "SO-F-12"
+        ],
+        "WP04-02": [
+          "SO-F-03"
+        ],
+        "WP04-03": [
+          "SO-F-03",
+          "SO-F-12"
+        ],
+        "WP04-04": [
+          "SO-F-03",
+          "SO-F-12"
+        ]
+      },
       "depends_on": [
         "SO-1.01",
         "SO-1.04"
       ],
       "tasks": 4,
-      "criteria": 19,
+      "criteria": 24,
       "spec": "specs/PG-04.1-canonical-operation-envelope.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -449,7 +673,18 @@
         "WO-05-A and WO-05-C",
         "WO-05-B"
       ],
-      "build_layer": "the unsigned fold (SO-F-02, SO-F-06) is the build layer, lead workstream decision under owner delegation, 1 Nov 2026; this spec will cite those ids and keep only what the fold does not cover; trim pending fold PR",
+      "build_layer": "the fold (SO-F-02, SO-F-06) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP05-01": [
+          "SO-F-02"
+        ],
+        "WP05-04": [
+          "SO-F-06"
+        ],
+        "WP05-06": [
+          "SO-F-06"
+        ]
+      },
       "depends_on": [
         "PG-01.1",
         "PG-04.1",
@@ -459,9 +694,45 @@
         "WO-05-B"
       ],
       "tasks": 4,
-      "criteria": 19,
+      "criteria": 22,
       "spec": "specs/PG-05.1-engine-integration-merge-semantics-mapping-bound.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
+    },
+    {
+      "id": "PG-06.2",
+      "type": "programme work package",
+      "area": "PG-06",
+      "title": "Replication separate from acceptance (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP06-01, WP06-02, WP06-03",
+      "requirements": [
+        "MV-ARCH-06",
+        "MV-ARCH-07"
+      ],
+      "cross_references": [],
+      "vault_contracts": [],
+      "build_layer": "the fold (SO-A-03, SO-F-12) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP06-01": [
+          "SO-A-03"
+        ],
+        "WP06-02": [
+          "SO-F-12"
+        ],
+        "WP06-03": [
+          "SO-F-12"
+        ]
+      },
+      "depends_on": [
+        "PG-04.1",
+        "PGP-1.02"
+      ],
+      "tasks": 3,
+      "criteria": 24,
+      "spec": "specs/PG-06.2-replication-separate-from-acceptance.json",
+      "status": "proposed: unsigned, signs after a clean red-team round",
+      "supersedes": "PG-06.1",
+      "supersedes_reason": "the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer; the signer decided to supersede the signed version"
     },
     {
       "id": "PG-06.1",
@@ -483,7 +754,21 @@
       "tasks": 3,
       "criteria": 17,
       "spec": "specs/PG-06.1-replication-separate-from-acceptance.json",
-      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+      "status": "signed (signing pull request #340); superseded by PG-06.2 on the signer's decision of 1 Nov 2026; this spec file is unchanged and stays on record",
+      "superseded_by": "PG-06.2",
+      "superseded_reason": "the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer; the signer decided to supersede the signed version",
+      "build_layer": "superseded by PG-06.2; it overlapped the fold (WP06-01: SO-A-03; WP06-02: SO-F-12; WP06-03: SO-F-12) and was not edited; PG-06.2 carries the fold ids and keeps only the gaps",
+      "fold_tasks": {
+        "WP06-01": [
+          "SO-A-03"
+        ],
+        "WP06-02": [
+          "SO-F-12"
+        ],
+        "WP06-03": [
+          "SO-F-12"
+        ]
+      }
     },
     {
       "id": "PG-08.1",
@@ -512,7 +797,15 @@
         "SO-05-B",
         "SO-08-B"
       ],
-      "build_layer": "the unsigned fold (SO-A-03, SO-A-10) is the build layer, lead workstream decision under owner delegation, 1 Nov 2026; this spec will cite those ids and keep only what the fold does not cover; trim pending fold PR",
+      "build_layer": "the fold (SO-A-03, SO-A-10) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP08-02": [
+          "SO-A-03"
+        ],
+        "WP08-03": [
+          "SO-A-10"
+        ]
+      },
       "depends_on": [
         "PG-10.1",
         "PGP-1.02",
@@ -522,7 +815,7 @@
         "SO-2.08"
       ],
       "tasks": 2,
-      "criteria": 12,
+      "criteria": 13,
       "spec": "specs/PG-08.1-scope-one-lifecycle-gaps-intake-to-delivery.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -550,13 +843,25 @@
         "MEM-145, MEM-146 and MEM-147",
         "WO-05-D"
       ],
-      "build_layer": "the unsigned fold (SO-F-01, SO-F-08) is the build layer, lead workstream decision under owner delegation, 1 Nov 2026; this spec will cite those ids and keep only what the fold does not cover; trim pending fold PR",
+      "build_layer": "the fold (SO-F-01, SO-F-03, SO-F-08) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP09-01": [
+          "SO-F-01",
+          "SO-F-03"
+        ],
+        "WP09-02": [
+          "SO-F-08"
+        ],
+        "WP09-03": [
+          "SO-F-03"
+        ]
+      },
       "depends_on": [
         "PG-04.1",
-        "PG-06.1"
+        "PG-06.2"
       ],
       "tasks": 3,
-      "criteria": 13,
+      "criteria": 19,
       "spec": "specs/PG-09.1-identity-admission-and-acfa-boundary.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -574,10 +879,9 @@
       "vault_contracts": [
         "WO-05-D"
       ],
-      "build_layer": "the unsigned fold (SO-F-01, SO-F-08) is the build layer, lead workstream decision under owner delegation, 1 Nov 2026; this spec will cite those ids and keep only what the fold does not cover; trim pending fold PR",
       "depends_on": [],
       "tasks": 1,
-      "criteria": 3,
+      "criteria": 9,
       "spec": "specs/PG-09.2-identity-admission-and-acfa-boundary.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -605,16 +909,61 @@
         }
       ],
       "vault_contracts": [],
+      "build_layer": "the fold (SO-F-09) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP10-01": [
+          "SO-F-09"
+        ],
+        "WP10-02": [
+          "SO-F-09"
+        ]
+      },
       "depends_on": [
         "PG-04.1",
-        "PG-06.1",
+        "PG-06.2",
         "PGP-1.02",
         "SO-2.03"
       ],
       "tasks": 4,
-      "criteria": 15,
+      "criteria": 28,
       "spec": "specs/PG-10.1-evidence-knowledge-status-and-receipts.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
+    },
+    {
+      "id": "PG-12.2",
+      "type": "programme work package",
+      "area": "PG-12",
+      "title": "Multi-node gossip transport (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP12-01, WP12-02, WP12-03",
+      "requirements": [
+        "MV-INT-06"
+      ],
+      "cross_references": [
+        {
+          "contract": "SO-2.12",
+          "boundary": "WP12-01 to WP12-03 (transport) are prerequisites of federated computation and are not repeated there"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "the fold (SO-F-07, SO-F-12) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP12-01": [
+          "SO-F-07",
+          "SO-F-12"
+        ]
+      },
+      "depends_on": [
+        "PG-04.1",
+        "PG-05.1",
+        "PG-09.1"
+      ],
+      "tasks": 3,
+      "criteria": 15,
+      "spec": "specs/PG-12.2-multi-node-gossip-transport.json",
+      "status": "proposed: unsigned, signs after a clean red-team round",
+      "supersedes": "PG-12.1",
+      "supersedes_reason": "the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer; the signer decided to supersede the signed version"
     },
     {
       "id": "PG-12.1",
@@ -641,7 +990,16 @@
       "tasks": 3,
       "criteria": 12,
       "spec": "specs/PG-12.1-multi-node-gossip-transport.json",
-      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+      "status": "signed (signing pull request #340); superseded by PG-12.2 on the signer's decision of 1 Nov 2026; this spec file is unchanged and stays on record",
+      "superseded_by": "PG-12.2",
+      "superseded_reason": "the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer; the signer decided to supersede the signed version",
+      "build_layer": "superseded by PG-12.2; it overlapped the fold (WP12-01: SO-F-07, SO-F-12) and was not edited; PG-12.2 carries the fold ids and keeps only the gaps",
+      "fold_tasks": {
+        "WP12-01": [
+          "SO-F-07",
+          "SO-F-12"
+        ]
+      }
     },
     {
       "id": "PG-13.1",
@@ -674,17 +1032,32 @@
       "vault_contracts": [
         "SO-09-A"
       ],
-      "build_layer": "the unsigned fold (SO-F-04, SO-F-05, SO-F-07, SO-F-12, SO-F-13) is the build layer, lead workstream decision under owner delegation, 1 Nov 2026; this spec will cite those ids and keep only what the fold does not cover; trim pending fold PR",
+      "build_layer": "the fold (SO-F-01, SO-F-04, SO-F-05, SO-F-07) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP13-01": [
+          "SO-F-05"
+        ],
+        "WP13-03": [
+          "SO-F-01",
+          "SO-F-04"
+        ],
+        "WP13-04": [
+          "SO-F-07"
+        ],
+        "WP13-05": [
+          "SO-F-04"
+        ]
+      },
       "depends_on": [
         "PG-04.1",
-        "PG-06.1",
+        "PG-06.2",
         "PG-09.1",
         "PG-10.1",
-        "PG-12.1",
+        "PG-12.2",
         "SO-2.02"
       ],
       "tasks": 5,
-      "criteria": 21,
+      "criteria": 28,
       "spec": "specs/PG-13.1-federation-sites-sharing-classes-disclosure.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -713,19 +1086,24 @@
         }
       ],
       "vault_contracts": [],
-      "build_layer": "the unsigned fold (SO-F-13) is the build layer, lead workstream decision under owner delegation, 1 Nov 2026; this spec will cite those ids and keep only what the fold does not cover; trim pending fold PR",
+      "build_layer": "the fold (SO-F-13) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP14-04": [
+          "SO-F-13"
+        ]
+      },
       "depends_on": [
-        "PG-03.2",
+        "PG-03.4",
         "PG-09.1",
         "PG-10.1",
-        "PG-12.1",
+        "PG-12.2",
         "PG-13.1",
         "SO-2.04",
         "SO-2.05",
         "SO-2.06"
       ],
       "tasks": 5,
-      "criteria": 19,
+      "criteria": 33,
       "spec": "specs/PG-14.1-federation-demonstrators-and-benchmark.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -752,7 +1130,7 @@
         "PGP-1.06"
       ],
       "tasks": 1,
-      "criteria": 3,
+      "criteria": 9,
       "spec": "specs/PG-15.1-licensing-boundary.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -788,7 +1166,7 @@
         "SO-1.02"
       ],
       "tasks": 2,
-      "criteria": 7,
+      "criteria": 11,
       "spec": "specs/PG-16.1-positioning-tiers-public-claims-blueprint.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -863,7 +1241,7 @@
     },
     {
       "task": "WP01-06",
-      "title": "Land crdt-merge PR #179 (strict Ed25519 verification, no HMAC fallback keyed by the public key) after review",
+      "title": "Review crdt-merge PR #179 (strict Ed25519 verification, no HMAC fallback keyed by the public key); merged to crdt-merge main through #181 as 252c93e6",
       "contract": "PG-01.1",
       "note": "specified in this set"
     },
@@ -906,14 +1284,14 @@
     {
       "task": "WP03-02",
       "title": "TypeScript edition reads and re-emits every vector byte-identically",
-      "contract": "PG-03.2",
-      "note": "specified in this set"
+      "contract": "PG-03.4",
+      "note": "specified in this set (PG-03.4 supersedes the signed PG-03.2)"
     },
     {
       "task": "WP03-03",
       "title": "Rust edition reads and re-emits every vector byte-identically",
-      "contract": "PG-03.3",
-      "note": "specified in this set"
+      "contract": "PG-03.5",
+      "note": "specified in this set (PG-03.5 supersedes the signed PG-03.3)"
     },
     {
       "task": "WP04-01",
@@ -978,20 +1356,20 @@
     {
       "task": "WP06-01",
       "title": "Acceptance state model: received, replicated, evaluated, accepted, rejected, superseded; transitions and who may make them",
-      "contract": "PG-06.1",
-      "note": "specified in this set"
+      "contract": "PG-06.2",
+      "note": "specified in this set (PG-06.2 supersedes the signed PG-06.1)"
     },
     {
       "task": "WP06-02",
       "title": "Acceptance evaluator implementing the seven questions (authorised, invariant, superseded dependency, auto-accept, verification, offline, global authority)",
-      "contract": "PG-06.1",
-      "note": "specified in this set"
+      "contract": "PG-06.2",
+      "note": "specified in this set (PG-06.2 supersedes the signed PG-06.1)"
     },
     {
       "task": "WP06-03",
       "title": "Acceptance is on the default path: a replicated operation does not change authoritative state until accepted",
-      "contract": "PG-06.1",
-      "note": "specified in this set"
+      "contract": "PG-06.2",
+      "note": "specified in this set (PG-06.2 supersedes the signed PG-06.1)"
     },
     {
       "task": "WP07-01",
@@ -1096,56 +1474,56 @@
     {
       "task": "WP11-01",
       "title": "Stage 1 recall: phrase matching, alias expansion, exact id lookup, temporal filters",
-      "contract": "Lead",
-      "note": "recall stages are not in the programme share of the agreed split; the lead workstream carries them through docs/scope-one/WBS.md; not specified here"
+      "contract": "Claim A",
+      "note": "recall stages are not in the programme share of the agreed split; docs/scope-one/WBS.md carries them; not specified here"
     },
     {
       "task": "WP11-02",
       "title": "Stage 1 recall: reciprocal rank fusion, decision and accepted-fact boost, superseded and contested handling",
-      "contract": "Lead",
-      "note": "recall stages are not in the programme share of the agreed split; the lead workstream carries them through docs/scope-one/WBS.md; not specified here"
+      "contract": "Claim A",
+      "note": "recall stages are not in the programme share of the agreed split; docs/scope-one/WBS.md carries them; not specified here"
     },
     {
       "task": "WP11-03",
       "title": "Stage 2 recall: graph-aware retrieval (decisions, amendments, dependent tasks, evidence, contracts, supersessions)",
-      "contract": "Lead",
-      "note": "recall stages are not in the programme share of the agreed split; the lead workstream carries them through docs/scope-one/WBS.md; not specified here"
+      "contract": "Claim A",
+      "note": "recall stages are not in the programme share of the agreed split; docs/scope-one/WBS.md carries them; not specified here"
     },
     {
       "task": "WP11-04",
       "title": "Stage 4 recall: trust-aware ranking by knowledge status",
-      "contract": "Lead",
-      "note": "recall stages are not in the programme share of the agreed split; the lead workstream carries them through docs/scope-one/WBS.md; not specified here"
+      "contract": "Claim A",
+      "note": "recall stages are not in the programme share of the agreed split; docs/scope-one/WBS.md carries them; not specified here"
     },
     {
       "task": "WP11-05",
       "title": "Stage 3 (local semantic retrieval) is delivered by the existing contract SR-2.01; this task only checks the interface",
-      "contract": "Lead",
-      "note": "recall stages are not in the programme share of the agreed split; the lead workstream carries them through docs/scope-one/WBS.md; not specified here"
+      "contract": "Claim A",
+      "note": "recall stages are not in the programme share of the agreed split; docs/scope-one/WBS.md carries them; not specified here"
     },
     {
       "task": "WP11-06",
       "title": "get and recall stay separate operations (regression guard)",
-      "contract": "Lead",
-      "note": "recall stages are not in the programme share of the agreed split; the lead workstream carries them through docs/scope-one/WBS.md; not specified here"
+      "contract": "Claim A",
+      "note": "recall stages are not in the programme share of the agreed split; docs/scope-one/WBS.md carries them; not specified here"
     },
     {
       "task": "WP12-01",
       "title": "Transport adapter interface (send state, receive state, digests) with an in-memory implementation",
-      "contract": "PG-12.1",
-      "note": "specified in this set"
+      "contract": "PG-12.2",
+      "note": "specified in this set (PG-12.2 supersedes the signed PG-12.1)"
     },
     {
       "task": "WP12-02",
       "title": "Relay-backed transport: reconnect, backoff, partition recovery",
-      "contract": "PG-12.1",
-      "note": "specified in this set"
+      "contract": "PG-12.2",
+      "note": "specified in this set (PG-12.2 supersedes the signed PG-12.1)"
     },
     {
       "task": "WP12-03",
       "title": "Three-node local harness: three vaults with separate identities exchange envelopes through the transport",
-      "contract": "PG-12.1",
-      "note": "specified in this set"
+      "contract": "PG-12.2",
+      "note": "specified in this set (PG-12.2 supersedes the signed PG-12.1)"
     },
     {
       "task": "WP13-01",
@@ -1246,8 +1624,8 @@
     {
       "task": "WP16-04",
       "title": "Deployment model scales by topology and trust boundary, not by computer count, documented",
-      "contract": "Lead",
-      "note": "deployment model: the business and enterprise deployment rows of baseline 8.6 belong to the lead workstream (SO-2.14 is the business deployment design record); not specified here"
+      "contract": "Claim A",
+      "note": "deployment model: the business and enterprise deployment rows of baseline 8.6 are claimed outside the programme specs (SO-2.14 is the business deployment design record); not specified here"
     },
     {
       "task": "WP16-05",
@@ -1283,17 +1661,17 @@
       "task": "WP17-03",
       "title": "One canonical contract format and id namespace: decide attest/1 specs versus proofline/1 and write the mapping",
       "contract": "SO-1.02",
-      "note": "reconciliation and the claim register: SO-1.02, docs/scope-one/WBS.md and docs/scope-one/RECONCILIATION.md; lead workstream"
+      "note": "reconciliation and the claim register: SO-1.02, docs/scope-one/WBS.md and docs/scope-one/RECONCILIATION.md"
     },
     {
       "task": "WP17-04",
       "title": "Requirement ownership map: each MV-* id is either covered by an existing SR/QL/SO/WO contract or by a new task here",
       "contract": "SO-1.02",
-      "note": "reconciliation and the claim register: SO-1.02, docs/scope-one/WBS.md and docs/scope-one/RECONCILIATION.md; lead workstream"
+      "note": "reconciliation and the claim register: SO-1.02, docs/scope-one/WBS.md and docs/scope-one/RECONCILIATION.md"
     },
     {
       "task": "WP17-05",
-      "title": "Claim register so that two workstreams do not write the same WBS or contract at once",
+      "title": "Claim register so that two authors do not write the same WBS or contract at once",
       "contract": "PGP-1.03",
       "note": "claim register is in docs/scope-one/RECONCILIATION.md (this docs pull request)"
     },
@@ -1301,7 +1679,7 @@
       "task": "WP17-06",
       "title": "Judgement rule recorded: a feature is accepted only with an answer to 'does this make Memev more essential to a distributed agent ecosystem'",
       "contract": "SO-1.02",
-      "note": "reconciliation and the claim register: SO-1.02, docs/scope-one/WBS.md and docs/scope-one/RECONCILIATION.md; lead workstream"
+      "note": "reconciliation and the claim register: SO-1.02, docs/scope-one/WBS.md and docs/scope-one/RECONCILIATION.md"
     },
     {
       "task": "WP18-01",

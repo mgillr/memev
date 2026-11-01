@@ -5,7 +5,7 @@
       "id": "WP10-01",
       "title": "Knowledge status lattice: own observation, single-source claim, corroborated, verified, approved decision, disputed, superseded; transition rules",
       "phase": "design",
-      "owner": "lane-trust",
+      "owner": "area-trust",
       "depends_on": [
         "WP04-01"
       ],
@@ -65,7 +65,7 @@
       "id": "WP10-02",
       "title": "Status and origin fields on notes and facts; repetition by many agents never raises a disputed claim",
       "phase": "implement",
-      "owner": "lane-trust",
+      "owner": "area-trust",
       "depends_on": [
         "WP10-01"
       ],
@@ -128,7 +128,7 @@
       "id": "WP10-03",
       "title": "Link accepted work to an independently verifiable receipt",
       "phase": "implement",
-      "owner": "lane-trust",
+      "owner": "area-trust",
       "depends_on": [
         "WP10-01",
         "WP07-02"
@@ -191,7 +191,7 @@
       "id": "WP10-04",
       "title": "As-of query: which version of a spec or decision was authoritative when an agent did a piece of work",
       "phase": "implement",
-      "owner": "lane-trust",
+      "owner": "area-trust",
       "depends_on": [
         "WP10-02",
         "WP07-02"

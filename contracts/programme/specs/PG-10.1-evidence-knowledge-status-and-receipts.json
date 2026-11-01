@@ -2,7 +2,7 @@
   "title": "PG-10.1 Evidence, knowledge status and receipts (memev)",
   "project": "memev",
   "workdir": null,
-  "request": "Programme contract for work package WP10 in memev: Evidence, knowledge status and receipts. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP10.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP04-01, WP07-02. Depends on contracts: SO-2.03, PG-06.1. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.03: WP10-01 and WP10-02 hold the knowledge status lattice and the origin fields; SO-2.03 holds retention, deletion, invalidation and derived-record provenance, and this spec takes none of them. Boundary with SO-2.01: WP10 defines the status of a fact, not the organisational model.  Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "request": "Programme contract for work package WP10 in memev: Evidence, knowledge status and receipts. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP10.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP04-01, WP07-02. Depends on contracts: SO-2.03, PG-06.2. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.03: WP10-01 and WP10-02 hold the knowledge status lattice and the origin fields; SO-2.03 holds retention, deletion, invalidation and derived-record provenance, and this spec takes none of them. Boundary with SO-2.01: WP10 defines the status of a fact, not the organisational model. Build layer (owner delegation, 1 Nov 2026): the signed fold contracts SO-F-09 (cited by id; delivered by pull request #341, WBS.md section 9.2 on its branch) are the build layer. Each task below that overlaps them cites the fold id and keeps only what the fold does not cover. Tasks of this spec that name no fold contract have no fold overlap. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
   "tasks": [
     {
       "id": "WP10-01",
@@ -11,27 +11,70 @@
       "depends_on": [],
       "requirements": [
         "MV-ARCH-08: Schemas and docs preserve the distinctions: replicated is not verified, signed is not true, converged is not completed, admitted is not correct, trust is not access control, a payment receipt is not proof of delivery. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:17; evidence docs/scope-one/programme/DECOMPOSITION.md:72; baseline 8.5)",
-        "MV-TRU-03: Shared knowledge records distinguish own observation, single-source claim, corroborated claim, verified result, approved decision, disputed contribution and superseded fact; repetition by many agents does not raise a disputed claim. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:52; evidence docs/scope-one/programme/DECOMPOSITION.md:95; baseline 8.5)"
+        "MV-TRU-03: Shared knowledge records distinguish own observation, single-source claim, corroborated claim, verified result, approved decision, disputed contribution and superseded fact; repetition by many agents does not raise a disputed claim. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:52; evidence docs/scope-one/programme/DECOMPOSITION.md:95; baseline 8.5)",
+        "SO-F-09 (signed fold contract, cited by id; pull request #341) owns the finding as a graph claim capped at theory, and the dismissal, correction and adjudication events; this task cites it and does not restate it (source: pull request #341, WBS.md section 9.2)"
       ],
-      "description": "Repo: memev. Records the distinctions (replicated is not verified; signed is not true; converged is not completed; trust is not access control; payment receipt is not delivery). Boundary: provenance, retention, deletion and invalidation are SO-2.03 requirements 2 to 4; this task defines the status of a fact only and does not restate them.",
+      "description": "Repo: memev. Records the distinctions (replicated is not verified; signed is not true; converged is not completed; trust is not access control; payment receipt is not delivery). Boundary: provenance, retention, deletion and invalidation are SO-2.03 requirements 2 to 4; this task defines the status of a fact only and does not restate them. SO-F-09 defines a finding and its cap at theory; this page defines the lattice only and, once SO-F-09 lands, records where the finding cap sits in it.",
       "scope": [
         "docs/KNOWLEDGE-STATUS.md"
       ],
       "criteria": [
         {
-          "statement": "doc exists",
+          "statement": "The page has one heading for each of the seven statuses of MV-TRU-03",
           "verifier": {
-            "type": "file_exists",
-            "path": "docs/KNOWLEDGE-STATUS.md"
+            "type": "command",
+            "cmd": "for n in \"own observation\" \"single-source claim\" \"corroborated claim\" \"verified result\" \"approved decision\" \"disputed contribution\" \"superseded fact\"; do grep -qi \"^### $n\" docs/KNOWLEDGE-STATUS.md || exit 1; done",
+            "expect_exit": 0
           }
         },
         {
-          "statement": "doc says repetition does not raise a disputed claim",
+          "statement": "The page has a transitions section",
           "verifier": {
             "type": "grep",
             "file": "docs/KNOWLEDGE-STATUS.md",
-            "pattern": "repetition",
+            "pattern": "^## Transitions",
+            "flags": "m"
+          }
+        },
+        {
+          "statement": "A sentence says repetition does not raise a disputed claim",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/KNOWLEDGE-STATUS.md",
+            "pattern": "repetition[^\\n]{0,160}disputed",
             "flags": "i"
+          }
+        },
+        {
+          "statement": "The page states the six distinctions of MV-ARCH-08",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"replicated is not verified\" \"signed is not true\" \"converged is not completed\" \"admitted is not correct\" \"trust is not access control\" \"payment receipt is not proof of delivery\"; do grep -qi \"$n\" docs/KNOWLEDGE-STATUS.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The page has no heading on retention, deletion or invalidation, which are SO-2.03",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eqi '^#+ .*(retention|deletion|invalidation)' docs/KNOWLEDGE-STATUS.md",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The page has no section on findings or on dismissal, correction or adjudication, which are SO-F-09",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eqi '^#+ .*(finding|dismissal|correction|adjudication)' docs/KNOWLEDGE-STATUS.md",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The page cites SO-F-09 as the owner of the finding cap",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/KNOWLEDGE-STATUS.md",
+            "pattern": "SO-F-09"
           }
         },
         {
@@ -60,9 +103,10 @@
         "WP10-01"
       ],
       "requirements": [
-        "MV-TRU-03: Shared knowledge records distinguish own observation, single-source claim, corroborated claim, verified result, approved decision, disputed contribution and superseded fact; repetition by many agents does not raise a disputed claim. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:52; evidence docs/scope-one/programme/DECOMPOSITION.md:95; baseline 8.5)"
+        "MV-TRU-03: Shared knowledge records distinguish own observation, single-source claim, corroborated claim, verified result, approved decision, disputed contribution and superseded fact; repetition by many agents does not raise a disputed claim. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:52; evidence docs/scope-one/programme/DECOMPOSITION.md:95; baseline 8.5)",
+        "SO-F-09 (signed fold contract, cited by id; pull request #341) owns the finding as a graph claim capped at theory, and the dismissal, correction and adjudication events; this task cites it and does not restate it (source: pull request #341, WBS.md section 9.2)"
       ],
-      "description": "Repo: memev.",
+      "description": "Repo: memev. SO-F-09 also edits src/engine/graph.mjs and src/engine/project-store.mjs, for finding records; this task adds only the status and origin fields on notes and facts and the transition guard.",
       "scope": [
         "src/engine/vault.mjs",
         "src/engine/graph.mjs",
@@ -71,7 +115,16 @@
       ],
       "criteria": [
         {
-          "statement": "status tests fail before, pass after",
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The knowledge status tests are red on the base and green after",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/knowledge-status.test.mjs",
@@ -79,12 +132,27 @@
           }
         },
         {
-          "statement": "suite green",
+          "statement": "The 4 named tests are present: a note carries a status and an origin that survive a reload; repetition by many agents does not raise a disputed claim; a single-source claim becomes corroborated only with an independent second source; a transition the table does not allow is refused",
           "verifier": {
             "type": "command",
-            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
-            "expect_exit": 0,
-            "timeout_s": 1800
+            "cmd": "for n in \"knowledge status: a note carries a status and an origin that survive a reload\" \"knowledge status: repetition by many agents does not raise a disputed claim\" \"knowledge status: a single-source claim becomes corroborated only with an independent second source\" \"knowledge status: a transition the table does not allow is refused\"; do grep -qF \"$n\" test/knowledge-status.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The named knowledge status tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^knowledge status:' test/knowledge-status.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The status module holds no finding logic, which is SO-F-09",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f src/engine/knowledge-status.mjs && ! grep -Eqi 'finding|adjudicat|dismiss' src/engine/knowledge-status.mjs",
+            "expect_exit": 0
           }
         },
         {
@@ -115,7 +183,7 @@
       "requirements": [
         "MV-TRU-02: Accepted work carries independently verifiable evidence (P1 verification receipts). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:51; evidence docs/scope-one/programme/DECOMPOSITION.md:94; baseline 8.5)"
       ],
-      "description": "Repo: memev. Owns the receipt format: how accepted work links to an independently verifiable receipt, using the existing contracts/receipts shape (no new signing scheme). Feeding memev_task_verify from a passing memev_contract_verify receipt is wiring owned by PGP-1.02 T4 (requirement 2 there); this task does not wire it. Shares src/engine/project-store.mjs with PG-06.1, which lands first.",
+      "description": "Repo: memev. Owns the receipt format: how accepted work links to an independently verifiable receipt, using the existing contracts/receipts shape (no new signing scheme). Feeding memev_task_verify from a passing memev_contract_verify receipt is wiring owned by PGP-1.02 T4 (requirement 2 there); this task does not wire it. Shares src/engine/project-store.mjs with PG-06.2, which lands first.",
       "scope": [
         "src/engine/contracts.mjs",
         "src/engine/project-store.mjs",
@@ -123,7 +191,16 @@
       ],
       "criteria": [
         {
-          "statement": "receipt-link tests fail before, pass after",
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The work receipt tests are red on the base and green after",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/work-receipt.test.mjs",
@@ -131,12 +208,27 @@
           }
         },
         {
-          "statement": "suite green",
+          "statement": "The 4 named tests are present: accepted work links to a receipt entry that names the contract, the task and the scope version; the linked receipt verifies from the vault alone, without the project store; a receipt entry altered after the link fails verification; work with no passing verify has no receipt link and is not marked accepted",
           "verifier": {
             "type": "command",
-            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
-            "expect_exit": 0,
-            "timeout_s": 1800
+            "cmd": "for n in \"work receipt: accepted work links to a receipt entry that names the contract, the task and the scope version\" \"work receipt: the linked receipt verifies from the vault alone, without the project store\" \"work receipt: a receipt entry altered after the link fails verification\" \"work receipt: work with no passing verify has no receipt link and is not marked accepted\"; do grep -qF \"$n\" test/work-receipt.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The named work receipt tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^work receipt:' test/work-receipt.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The project store adds no signing scheme: it links to the existing contract receipt and signature check",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f src/engine/project-store.mjs && ! grep -Eq \"generateKeyPair|dsseSign|createSign\" src/engine/project-store.mjs",
+            "expect_exit": 0
           }
         },
         {
@@ -174,11 +266,27 @@
       ],
       "criteria": [
         {
-          "statement": "as-of tests fail before, pass after",
+          "statement": "The as-of tests are red on the base and green after",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/as-of-query.test.mjs",
             "cmd": "node --test test/as-of-query.test.mjs"
+          }
+        },
+        {
+          "statement": "The 4 named tests are present: the answer is the version that was authoritative at the time of the work; an amendment made after the work does not change the answer; a time before the first version returns nothing, not the first version; a superseded decision is still answerable for the period it was authoritative",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"as-of: the answer is the version that was authoritative at the time of the work\" \"as-of: an amendment made after the work does not change the answer\" \"as-of: a time before the first version returns nothing, not the first version\" \"as-of: a superseded decision is still answerable for the period it was authoritative\"; do grep -qF \"$n\" test/as-of-query.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The named as-of tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^as-of:' test/as-of-query.test.mjs",
+            "expect_exit": 0
           }
         },
         {

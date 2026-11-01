@@ -1,0 +1,223 @@
+{
+  "title": "PG-03.4 Cross-language protocol vectors (crdt-merge-ts)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract for work package WP03 in crdt-merge-ts: Cross-language protocol vectors. Supersedes PG-03.2 (signed; the PG-03.2 file is unchanged and stays on record, and the manifest and RECONCILIATION mark it superseded by this contract). Reason: the signed PG-03.2 cannot be met as scoped because the TypeScript edition lacks the features its vectors need (ORSet tombstones and element_types, and AgentState); the signer decided to supersede it with a contract that builds them. Depends on contracts: PG-03.1 (signed). The Python serialisation is that of crdt-merge main 252c93e6. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP03.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP03-01. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json.   Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "WP03-02-A",
+      "title": "ORSet in the TypeScript edition: tombstones and element_types, remove() writes tombstones, canonical sort",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "MV-DEM-06: Python, Rust and TypeScript nodes exchange identical protocol representations (P2). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:74; evidence docs/scope-one/programme/DECOMPOSITION.md:111; baseline 8.5)",
+        "The Python serialisation to match is that of crdt-merge main 252c93e6 (ORSet tombstones from pull request #180, merged through pull request #181); the canonical sort for tag lists and sets is the one that PG-03.1 defines (crdt-merge pull request #183) (source: crdt-merge main 252c93e6; contract PG-03.1, cited by id)"
+      ],
+      "description": "Repo: crdt-merge-ts. ORSet in src/core.ts gains tombstones and element_types, as in the Python edition at crdt-merge 252c93e6. remove() writes a tombstone for every tag it observes instead of only clearing the tags, so a removed element does not come back after a merge. Tag lists and sets serialise in the canonical sort of PG-03.1. Jest runs from tests/.",
+      "scope": [
+        "src/**",
+        "tests/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The ORSet tests fail before and pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/orset.test.ts",
+            "cmd": "npx jest --forceExit tests/orset.test.ts"
+          }
+        },
+        {
+          "statement": "The four named ORSet tests are present: orset: remove writes a tombstone for every observed tag; orset: element_types survives a merge and a round trip; orset: a removed element does not return after a merge; orset: tag lists and sets serialise in the canonical sort of PG-03.1",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"orset: remove writes a tombstone for every observed tag\" \"orset: element_types survives a merge and a round trip\" \"orset: a removed element does not return after a merge\" \"orset: tag lists and sets serialise in the canonical sort of PG-03.1\"; do grep -qF \"$n\" tests/orset.test.ts || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The named ORSet tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "npx jest --forceExit tests/orset.test.ts -t \"^orset:\"",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "ORSet in src/core.ts declares tombstones and element_types",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -q tombstones src/core.ts && grep -q element_types src/core.ts",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The edition type-checks",
+          "verifier": {
+            "type": "command",
+            "cmd": "npx tsc --noEmit -p tsconfig.json",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The existing test suite still passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npx jest --forceExit",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP03-02-B",
+      "title": "LWWMap kept and AgentState added in the TypeScript edition",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "MV-DEM-06: Python, Rust and TypeScript nodes exchange identical protocol representations (P2). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:74; evidence docs/scope-one/programme/DECOMPOSITION.md:111; baseline 8.5)",
+        "The Python serialisation to match is that of crdt-merge main 252c93e6 (ORSet tombstones from pull request #180, merged through pull request #181); the canonical sort for tag lists and sets is the one that PG-03.1 defines (crdt-merge pull request #183) (source: crdt-merge main 252c93e6; contract PG-03.1, cited by id)"
+      ],
+      "description": "Repo: crdt-merge-ts. LWWMap already passes its vectors and is kept as it is. AgentState is added in src/agent-state.ts and exported from src/index.ts, with the serialisation of the Python edition at crdt-merge 252c93e6 and the canonical sort of PG-03.1 for tag lists and sets.",
+      "scope": [
+        "src/**",
+        "tests/**"
+      ],
+      "criteria": [
+        {
+          "statement": "The LWWMap and AgentState tests fail before and pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/lww-agent.test.ts",
+            "cmd": "npx jest --forceExit tests/lww-agent.test.ts"
+          }
+        },
+        {
+          "statement": "The four named tests are present: lww-agent: the existing LWWMap behaviour is kept and its serialisation matches the vectors; lww-agent: AgentState serialises with the fields of the Python edition; lww-agent: AgentState merge is commutative and idempotent; lww-agent: AgentState tag lists and sets serialise in the canonical sort of PG-03.1",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"lww-agent: the existing LWWMap behaviour is kept and its serialisation matches the vectors\" \"lww-agent: AgentState serialises with the fields of the Python edition\" \"lww-agent: AgentState merge is commutative and idempotent\" \"lww-agent: AgentState tag lists and sets serialise in the canonical sort of PG-03.1\"; do grep -qF \"$n\" tests/lww-agent.test.ts || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The named tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "npx jest --forceExit tests/lww-agent.test.ts -t \"^lww-agent:\"",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "AgentState lives in src/agent-state.ts and is exported from src/index.ts",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f src/agent-state.ts && grep -q AgentState src/index.ts",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The edition type-checks",
+          "verifier": {
+            "type": "command",
+            "cmd": "npx tsc --noEmit -p tsconfig.json",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP03-02",
+      "title": "TypeScript edition reads and re-emits every vector byte-identically",
+      "phase": "verify",
+      "depends_on": [
+        "WP03-02-A",
+        "WP03-02-B"
+      ],
+      "requirements": [
+        "MV-DEM-06: Python, Rust and TypeScript nodes exchange identical protocol representations (P2). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:74; evidence docs/scope-one/programme/DECOMPOSITION.md:111; baseline 8.5)",
+        "The Python serialisation to match is that of crdt-merge main 252c93e6 (ORSet tombstones from pull request #180, merged through pull request #181); the canonical sort for tag lists and sets is the one that PG-03.1 defines (crdt-merge pull request #183) (source: crdt-merge main 252c93e6; contract PG-03.1, cited by id)"
+      ],
+      "description": "Repo: crdt-merge-ts. Vectors are copied unchanged from crdt-merge at a pinned commit into tests/vectors/; no vector is edited, excluded or skipped to pass. On the base 35 vectors pass and 30 fail, so this is red then green. Jest runs from tests/.",
+      "scope": [
+        "src/**",
+        "tests/**"
+      ],
+      "criteria": [
+        {
+          "statement": "Every vector in tests/vectors/** is read and re-emitted byte-identically (30 fail and 35 pass on the base; all pass after)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/vectors.test.ts",
+            "cmd": "npx jest --forceExit tests/vectors.test.ts"
+          }
+        },
+        {
+          "statement": "The vector test enumerates the files under tests/vectors rather than naming a subset",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f tests/vectors.test.ts && grep -Eq \"readdirSync|glob\" tests/vectors.test.ts",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The vector test skips and excludes no vector",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f tests/vectors.test.ts && ! grep -Eqi \"\\.skip|xit\\(|xtest\\(|\\.todo|exclud\" tests/vectors.test.ts",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}

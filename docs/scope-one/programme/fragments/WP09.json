@@ -5,7 +5,7 @@
       "id": "WP09-01",
       "title": "Signed node and agent identity with scoped delegation, revocation and admission, on top of the sibling identity project and agentid-bind",
       "phase": "implement",
-      "owner": "lane-trust",
+      "owner": "area-trust",
       "depends_on": [
         "WP04-02"
       ],
@@ -69,7 +69,7 @@
       "id": "WP09-02",
       "title": "ACFA-RS adapter boundary: numeric contributions only, agreed contributor set, Krum n>=2f+3 and Bulyan n>=4f+3 enforced, trusted-identity pinned verification",
       "phase": "implement",
-      "owner": "lane-trust",
+      "owner": "area-trust",
       "depends_on": [
         "WP09-01"
       ],
@@ -132,7 +132,7 @@
       "id": "WP09-03",
       "title": "Equivocation and suspicious-contribution handler: evidence goes to Memev authority and exclusion policy",
       "phase": "implement",
-      "owner": "lane-trust",
+      "owner": "area-trust",
       "depends_on": [
         "WP09-01",
         "WP06-02"

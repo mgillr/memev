@@ -2,7 +2,7 @@
   "title": "SR-6.03 Installers and a container anyone can fetch",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G50: Installers have no download URL; the Docker image is on no registry. Repository: memev. Depends on contracts: SR-6.01.",
+  "request": "Closes G50: Installers have no download URL; the Docker image is on no registry. Boundary with SO-R-E (signed fold contract, cited by id; pull request #341): SO-R-E is the maintainer-run script scripts/docker-publish.sh for the first public image and does not touch .github/workflows/release.yml; this contract owns the automated publish from the release workflow. Repository: memev. Depends on contracts: SR-6.01.",
   "tasks": [
     {
       "id": "T1",

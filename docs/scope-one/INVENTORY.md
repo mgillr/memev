@@ -1,6 +1,6 @@
 # Scope One contract and work-item inventory
 
-Dated 2026-10-30, at the baseline commit recorded in BASELINE.md; the open pull request section is refreshed to 31 October 2026. One row per contract and work item the author can see: the signed set, open branches, delivered (merged) contracts, open pull requests, and owner-held work. Contract ids and lane words stand for owners; no person, seat, server or client product is named on this page.
+Dated 2026-10-30, at the baseline commit recorded in BASELINE.md; the open pull request section is refreshed to 31 October 2026. One row per contract and work item the author can see: the signed set, open branches, delivered (merged) contracts, open pull requests, and owner-held work. Contract ids stand for owners; no person, seat, server or client product is named on this page.
 
 [Back to the documentation index](../README.md)
 
@@ -9,7 +9,7 @@ Dated 2026-10-30, at the baseline commit recorded in BASELINE.md; the open pull 
 - source: where the author saw it (signed set, git branch, changelog, market analysis, author statement).
 - requirement ids covered: the SO-REQ ids the item implements, or none when not mapped.
 - status: queued, ready, in progress, blocked, implemented-awaiting-verification, verified, superseded, cancelled, or unknown.
-- owner: the owning lane word or contract id, or unowned.
+- owner: the owning claim id or contract id, or unowned.
 - last known activity: the most recent observed state, or unknown.
 - overlaps and conflicts: other items the same work overlaps, or none.
 - disposition: KEEP, INTEGRATE, EXTEND, REPAIR, REPLACE, RESEQUENCE, MERGE, SUPERSEDE, CANCEL_WITH_APPROVAL, or NEW.

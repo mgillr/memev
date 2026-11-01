@@ -2,7 +2,7 @@
   "title": "PGP-1.03 memev: engine decision recorded, tier docs aligned, README rewritten, reconciliation against the work breakdown",
   "project": "memev",
   "workdir": null,
-  "request": "Per-pull-request contract for memev, branch docs/engine-decision-tiers-reconcile. Proposed and unsigned; the signer signs after the red-team gate. Repository: memev. Documents only: no src/ change, no change to docs/scope-one/WBS.md, to any SO-1.x contract, signature or red-team record. RECONCILIATION.md refers to docs/scope-one/WBS.md and to SO-1.02 (reconciliation) and does not restate them. Programme tasks covered: WP16-03 (memev side), WP15-02 (memev side), WP17-05 and the live-inventory step of WP17-01; the rest of WP08-01, WP17-01 and WP17-02 is SO-1.02 and docs/scope-one/WBS.md. Boundary with SO-2.13 and SO-2.14: these pages keep the tier names, prices, licences and the open-core boundary statement; multi-person project permissions and team administration (SO-2.14) and the commercial service boundary (SO-2.13) are not written here. Owner decisions of 31 Oct 2026 apply (the engine decision confirmed by the owner, t542u): crdt-merge stays in its own repository (BSL 1.1 with its PATENTS file) and is reached only across the call-out boundary, never vendored, so inclusion cannot relicense it; tiers are the free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that, with no Federated tier and no separate Personal trial; federation is planned, not available. Depends on contracts: SO-1.02. Signed vault contract WO-05-E (cited by id only): the licence boundary text guard; this contract states the licences once and does not weaken it. Signed vault contract MEM-064, MEM-065, MEM-066, MEM-137 and REV-032 (cited by id only): their price and tier values are superseded by the owner decision of 31 Oct 2026, which this contract applies. ",
+  "request": "Per-pull-request contract for memev, branch docs/engine-decision-tiers-reconcile. Proposed and unsigned; the signer signs after the red-team gate. Repository: memev. Documents only: no src/ change, no change to docs/scope-one/WBS.md, to any SO-1.x contract, signature or red-team record. RECONCILIATION.md refers to docs/scope-one/WBS.md and to SO-1.02 (reconciliation) and does not restate them. Programme tasks covered: WP16-03 (memev side), WP15-02 (memev side), WP17-05 and the live-inventory step of WP17-01; the rest of WP08-01, WP17-01 and WP17-02 is SO-1.02 and docs/scope-one/WBS.md. Boundary with SO-2.13 and SO-2.14: these pages keep the tier names, prices, licences and the open-core boundary statement; multi-person project permissions and team administration (SO-2.14) and the commercial service boundary (SO-2.13) are not written here. Boundary with SO-A-11 (signed fold contract, cited by id; pull request #341): it owns the script scripts/register-check.mjs that checks the register and the inventory; this contract writes the reconciliation pages by hand, builds no checker, and the script is run over these pages when it lands. Owner decisions of 31 Oct 2026 apply (the engine decision confirmed by the owner, t542u): crdt-merge stays in its own repository (BSL 1.1 with its PATENTS file) and is reached only across the call-out boundary, never vendored, so inclusion cannot relicense it; tiers are the free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that, with no Federated tier and no separate Personal trial; federation is planned, not available. Depends on contracts: SO-1.02. Signed vault contract WO-05-E (cited by id only): the licence boundary text guard; this contract states the licences once and does not weaken it. Signed vault contract MEM-064, MEM-065, MEM-066, MEM-137 and REV-032 (cited by id only): their price and tier values are superseded by the owner decision of 31 Oct 2026, which this contract applies. ",
   "tasks": [
     {
       "id": "T1",
@@ -136,7 +136,8 @@
           "verifier": {
             "type": "grep",
             "file": "README.md",
-            "pattern": "^## Plans and roadmap"
+            "pattern": "^## Plans and roadmap",
+            "flags": "m"
           }
         },
         {
@@ -144,7 +145,8 @@
           "verifier": {
             "type": "grep",
             "file": "README.md",
-            "pattern": "^## Licensing"
+            "pattern": "^## Licensing",
+            "flags": "m"
           }
         },
         {
@@ -190,8 +192,9 @@
       ],
       "requirements": [
         "docs/scope-one/INVENTORY.md lists the open pull requests as they are on GitHub, keeps the MEM-067 cancelled row, and no longer says 27 open draft pull requests (source: gh pr list of memev, 31 Oct 2026)",
-        "docs/scope-one/RECONCILIATION.md maps every programme requirement against docs/scope-one/WBS.md as same, missing or conflicting, with a claim register naming each workstream (source: owner request of 31 Oct 2026)",
-        "SO-1.02 requirement 1: \"Reconcile every Scope One branch and open PR against current `main` before commissioning overlapping work.\"; SO-1.02 requirement 2: \"Give each canonical requirement one owner, one implementation path, explicit dependencies and acceptance tests.\" (source: contract SO-1.02 T1; this task consumes the work breakdown and the reconciliation of SO-1.02 and claims no ownership of docs/scope-one/WBS.md)"
+        "docs/scope-one/RECONCILIATION.md maps every programme requirement against docs/scope-one/WBS.md as same, missing or conflicting, with a claim register naming each claim (source: owner request of 31 Oct 2026)",
+        "SO-1.02 requirement 1: \"Reconcile every Scope One branch and open PR against current `main` before commissioning overlapping work.\"; SO-1.02 requirement 2: \"Give each canonical requirement one owner, one implementation path, explicit dependencies and acceptance tests.\" (source: contract SO-1.02 T1; this task consumes the work breakdown and the reconciliation of SO-1.02 and claims no ownership of docs/scope-one/WBS.md)",
+        "SO-A-11 (signed fold contract, cited by id; pull request #341) owns the register check script scripts/register-check.mjs; this task owns the pages the script reads and builds no checker (source: pull request #341, WBS.md section 9.2)"
       ],
       "description": "The headline counts are generated from the requirement mapping.",
       "scope": [
@@ -214,7 +217,8 @@
           "verifier": {
             "type": "grep",
             "file": "docs/scope-one/RECONCILIATION.md",
-            "pattern": "^## Claim register"
+            "pattern": "^## Claim register",
+            "flags": "m"
           }
         },
         {
@@ -222,7 +226,16 @@
           "verifier": {
             "type": "grep",
             "file": "docs/scope-one/RECONCILIATION.md",
-            "pattern": "^## Headline"
+            "pattern": "^## Headline",
+            "flags": "m"
+          }
+        },
+        {
+          "statement": "The reconciliation cites SO-A-11 as the owner of the register check script",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/RECONCILIATION.md",
+            "pattern": "SO-A-11"
           }
         },
         {
