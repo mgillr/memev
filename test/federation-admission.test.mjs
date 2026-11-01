@@ -18,6 +18,9 @@ import { buildEnvelope, validateEnvelope, canonicalize, ENVELOPE_FIELDS } from '
 import { NAMESPACE, setupAgentRole, bindingMessage, signNamespaced, verifyNamespaced, roleKeyToOpenSsh, CONTRIBUTION_NAMESPACE, AgentBindError } from '../src/engine/agentid-bind.mjs';
 import { CONTRIBUTION_SCHEMA, CONTRIBUTION_FIELDS, signContribution, validateContribution, contributionMessage } from '../src/engine/federation/contribution.mjs';
 import { Admission } from '../src/engine/federation/admission.mjs';
+// SO-F-03.4 reaches the code through namespace imports and checks the shape first, so a missing export is an assertion and never a load error
+import * as admissionNs from '../src/engine/federation/admission.mjs';
+import * as contributionNs from '../src/engine/federation/contribution.mjs';
 
 after(cleanup);
 
@@ -496,4 +499,242 @@ test('SO-F-03 docs: docs/FEDERATION.md names the contribution schema and the two
   for (const f of CONTRIBUTION_FIELDS) assert.ok(page.includes(`\`${f}\``), f);
   assert.ok(page.includes('`federation.admitted`') && page.includes('`federation.rejected`'));
   assert.ok(!/## .*(second envelope)/i.test(page), 'the page does not suggest a second envelope');
+});
+
+// ---- SO-F-03.4: the replay mark is per sender and scope, and every Admission reads the log again, incrementally
+
+const SENDER = 'node-01|agent:writer';
+function shape() {
+  assert.equal(typeof admissionNs.Admission, 'function', 'the module exports Admission');
+  for (const m of ['admit', 'highWater', 'verifySignature', 'authorize']) assert.equal(typeof admissionNs.Admission.prototype[m], 'function', `Admission has ${m}`);
+  assert.equal(typeof admissionNs.Admission.sender, 'function');
+  for (const f of ['contributionMessage', 'signContribution', 'validateContribution']) assert.equal(typeof contributionNs[f], 'function', `the contribution module exports ${f}`);
+}
+const inBoth = (made) => identityDoc(made, { memberships: made.flatMap((r) => [SCOPE_A, SCOPE_B].map((s) => ({ subject: `agent:${r.role}`, scope: s.id, since: SINCE }))) });
+const admissionFor = (w, scope, log = w.log) => new admissionNs.Admission({ log, identity: w.identity, scope, policy: POLICY });
+const admittedSeqs = (log) => records(log).filter((r) => r.type === 'federation.admitted').map((r) => r.data.sequence);
+// a log wrapper that counts the iterate calls and the fromSeq of each, and that exposes the seq of the log or not
+function counting(log, { withSeq = true } = {}) {
+  const reads = [];
+  const w = { reads, append: (op) => log.append(op), iterate: (o) => { reads.push(o && o.fromSeq !== undefined ? o.fromSeq : 'all'); return log.iterate(o); } };
+  if (withSeq) Object.defineProperty(w, 'seq', { get: () => log.seq, enumerable: true });
+  return w;
+}
+
+test('SO-F-03.4 AC14: the replay mark is kept per sender and scope, the same whichever Admission was made first', () => {
+  shape();
+  const w = world({ roles: ['writer', 'other'], doc: inBoth });
+  const [writer, other] = w.made;
+  const admA = w.adm;
+  const admB0 = admissionFor(w, SCOPE_B);   // made before sequence 2 is admitted in scope A
+  assert.equal(admA.admit(contribute(writer, { seq: 2, scope: SCOPE_A })).ok, true);
+  const admB1 = admissionFor(w, SCOPE_B);   // made after
+  assert.equal(admA.highWater(SENDER, SCOPE_A), 2);
+  assert.equal(admA.highWater(SENDER), 2, 'no scope means the scope the Admission holds');
+  assert.equal(admA.highWater(SENDER, SCOPE_B), 0);
+  for (const b of [admB0, admB1]) {
+    assert.equal(b.highWater(SENDER, SCOPE_B), 0);
+    assert.equal(b.highWater(SENDER), 0, 'no scope means scope B for the Admission for B');
+    assert.equal(b.highWater(SENDER, SCOPE_A), 2);
+  }
+  // sequence 1 for scope B is a new message and not a replay of sequence 2 in scope A, and then a replay for both Admissions for B
+  const one = contribute(writer, { seq: 1, scope: SCOPE_B });
+  assert.equal(admB0.admit(one).ok, true);
+  for (const b of [admB0, admB1]) {
+    const r = b.admit(one);
+    assert.deepEqual({ ok: r.ok, step: r.step, code: r.code }, { ok: false, step: 'replay', code: 'replay' });
+    assert.equal(b.highWater(SENDER, SCOPE_B), 1);
+  }
+  assert.equal(admA.highWater(SENDER, SCOPE_A), 2, 'scope A keeps its own mark');
+  assert.equal(admA.admit(contribute(writer, { seq: 1, scope: SCOPE_A })).code, 'replay');
+  // another sender and another node keep their own marks
+  assert.equal(admA.admit(contribute(other, { seq: 1, scope: SCOPE_A })).ok, true);
+  assert.equal(admA.admit(contribute(writer, { seq: 1, scope: SCOPE_A, node: 'node-02' })).ok, true);
+  assert.equal(admA.highWater('node-01|agent:other', SCOPE_A), 1);
+  assert.equal(admA.highWater('node-02|agent:writer', SCOPE_A), 1);
+  assert.equal(admA.highWater(SENDER, SCOPE_A), 2);
+  assert.equal(admB1.highWater('node-01|agent:other', SCOPE_B), 0);
+  assert.equal(admB1.highWater('node-02|agent:writer', SCOPE_B), 0);
+});
+
+test('SO-F-03.4 AC15: a message replayed into a different scope is refused at the signature step, and the same message again in its own scope is a replay', () => {
+  shape();
+  const w = world({ roles: ['writer'], doc: inBoth });
+  const [writer] = w.made;
+  const admA = w.adm;
+  const orig = contribute(writer, { seq: 2, scope: SCOPE_A });
+  assert.equal(admA.admit(orig).ok, true);
+  const admB = admissionFor(w, SCOPE_B);   // made over the same log after the original was admitted
+  const copy = retouch(orig, (x) => { x.extension.contribution.scope = SCOPE_B; });   // the content hash is rebuilt, the signature is not
+  assert.notEqual(contributionNs.contributionMessage(copy), contributionNs.contributionMessage(orig), 'the scope is inside the signed bytes');
+  assert.deepEqual(contributionNs.validateContribution(copy), { ok: true, errors: [] }, 'only the signature stands in the way');
+  const markA = admA.highWater(SENDER, SCOPE_A), markB = admB.highWater(SENDER, SCOPE_B);
+  const refused = admB.admit(copy);
+  assert.deepEqual({ ok: refused.ok, step: refused.step, code: refused.code, signature_valid: refused.signature_valid }, { ok: false, step: 'signature', code: 'bad_signature', signature_valid: false });
+  const again = admA.admit(orig);
+  assert.deepEqual({ ok: again.ok, step: again.step, code: again.code }, { ok: false, step: 'replay', code: 'replay' });
+  assert.equal(admB.highWater(SENDER, SCOPE_B), markB, 'the refused copy moved no mark');
+  assert.equal(admA.highWater(SENDER, SCOPE_A), markA);
+  assert.equal(markA, 2);
+  assert.deepEqual(admittedSeqs(w.log), [2], 'the refused copy appended no federation.admitted');
+  // sequence 2 signed for scope B by the same sender is a new message
+  const fresh = admB.admit(contribute(writer, { seq: 2, scope: SCOPE_B }));
+  assert.equal(fresh.ok, true, 'a sequence in another scope is not a replay');
+  assert.deepEqual(admittedSeqs(w.log), [2, 2]);
+  assert.equal(admB.highWater(SENDER, SCOPE_B), 2);
+});
+
+test('SO-F-03.4 AC16: an Admission reads what another Admission over the same log appended, so none admits a sequence twice', () => {
+  shape();
+  const w = world();
+  const { role, log } = w;
+  const first = new admissionNs.Admission({ log, identity: w.identity, scope: SCOPE_A, policy: POLICY });
+  const second = new admissionNs.Admission({ log, identity: w.identity, scope: SCOPE_A, policy: POLICY });
+  assert.equal(first.admit(contribute(role, { seq: 7 })).ok, true);
+  for (const seq of [3, 7]) {
+    const r = second.admit(contribute(role, { seq }));
+    assert.deepEqual({ ok: r.ok, step: r.step, code: r.code }, { ok: false, step: 'replay', code: 'replay' }, `sequence ${seq}`);
+  }
+  assert.equal(second.admit(contribute(role, { seq: 8 })).ok, true);
+  const r8 = first.admit(contribute(role, { seq: 8 }));
+  assert.deepEqual({ ok: r8.ok, step: r8.step, code: r8.code }, { ok: false, step: 'replay', code: 'replay' });
+  assert.equal(first.highWater(SENDER), 8);
+  assert.equal(second.highWater(SENDER), 8);
+  const late = new admissionNs.Admission({ log, identity: w.identity, scope: SCOPE_A, policy: POLICY });
+  assert.equal(late.highWater(SENDER), 8, 'one made after the records reads the same mark as one made before');
+  assert.deepEqual(admittedSeqs(log), [7, 8], 'one federation.admitted record for each of the two sequences admitted');
+});
+
+test('SO-F-03.4 AC17: the log is read again incrementally, from the record after the last one read and only when it has moved', () => {
+  shape();
+  const w = world();
+  const { role, log } = w;
+  // a log that holds three records
+  const seed = admissionFor(w, SCOPE_A);
+  assert.equal(seed.admit(contribute(role, { seq: 1 })).ok, true);
+  assert.equal(seed.admit(contribute(role, { seq: 2 })).ok, true);
+  assert.equal(seed.admit({}).step, 'format');
+  assert.equal(log.seq, 3);
+
+  // a log with a seq
+  const c = counting(log);
+  const adm = new admissionNs.Admission({ log: c, identity: w.identity, scope: SCOPE_A, policy: POLICY });
+  assert.deepEqual(c.reads, [1], 'made over a log that holds records, it reads from record 1 once');
+  assert.equal(adm.admit(contribute(role, { seq: 10 })).ok, true);                    // record 4
+  assert.equal(adm.admit(contribute(role, { seq: 10 })).code, 'replay');             // record 5
+  assert.equal(adm.admit({}).step, 'format');                                         // record 6
+  assert.equal(log.seq, 6);
+  assert.equal(adm.highWater(SENDER), 10);
+  assert.equal(adm.highWater(SENDER), 10);
+  assert.deepEqual(c.reads, [1], 'its own records are the very next ones and cause no further read');
+  // another Admission appends
+  const other = admissionFor(w, SCOPE_A);
+  assert.equal(other.admit(contribute(role, { seq: 11 })).ok, true);                  // record 7
+  assert.equal(adm.highWater(SENDER), 11);
+  assert.deepEqual(c.reads, [1, 7], 'one read, from the last seq it knew plus 1');
+  assert.equal(adm.highWater(SENDER), 11);
+  assert.equal(adm.admit(contribute(role, { seq: 11 })).code, 'replay');
+  assert.deepEqual(c.reads, [1, 7], 'nothing is read while the log has not moved');
+  assert.equal(other.admit(contribute(role, { seq: 12 })).ok, true);                  // record 9 (the replay was record 8)
+  assert.equal(adm.admit(contribute(role, { seq: 12 })).code, 'replay');
+  assert.deepEqual(c.reads, [1, 7, 9], 'admit reads once as well, before the replay check');
+
+  // a log with no seq property: every highWater reads, from the record after the last one read, and the marks are the same
+  const n = counting(log, { withSeq: false });
+  assert.equal('seq' in n, false);
+  const bare = new admissionNs.Admission({ log: n, identity: w.identity, scope: SCOPE_A, policy: POLICY });
+  assert.deepEqual(n.reads, [1]);
+  const last = log.seq;
+  assert.equal(bare.highWater(SENDER), 12);
+  assert.equal(bare.highWater(SENDER), 12);
+  assert.deepEqual(n.reads, [1, last + 1, last + 1]);
+  assert.equal(bare.admit(contribute(role, { seq: 13 })).ok, true);                   // reads once, appends the very next record
+  assert.deepEqual(n.reads, [1, last + 1, last + 1, last + 1]);
+  assert.equal(bare.highWater(SENDER), 13);
+  assert.deepEqual(n.reads, [1, last + 1, last + 1, last + 1, last + 2]);
+});
+
+test('SO-F-03.4 AC18: the scope of a stored record is the scope of its stored envelope, and a record with none moves no mark', () => {
+  shape();
+  const w = world();
+  const { log } = w;
+  const stored = (type, sender, sequence, scope, extra = {}) => log.append({ type, data: { sender, sequence, envelope: scope === undefined ? { extension: { contribution: {} } } : { extension: { contribution: { scope } } }, ...extra } });
+  stored('federation.admitted', SENDER, 7, SCOPE_B);
+  stored('federation.admitted', SENDER, 9, undefined);                 // an envelope with no scope
+  stored('federation.admitted', SENDER, 11, 'team-a');                 // a scope that is not an object
+  stored('federation.admitted', SENDER, 1.5, SCOPE_A);                 // a sequence that is not an integer
+  stored('federation.admitted', SENDER, '8', SCOPE_A);
+  stored('federation.rejected', SENDER, 50, SCOPE_A);                  // a rejected event moves nothing
+  log.append({ type: 'federation.admitted', data: { sender: SENDER, sequence: 12 } });   // no envelope at all
+  log.append({ type: 'federation.admitted', data: null });
+  const adm = new admissionNs.Admission({ log, identity: w.identity, scope: SCOPE_A, policy: POLICY });
+  assert.equal(adm.highWater(SENDER, SCOPE_A), 0);
+  assert.equal(adm.highWater(SENDER), 0);
+  assert.equal(adm.highWater(SENDER, SCOPE_B), 7);
+  // parts that a plain join would run together keep their own marks
+  const s1 = { type: 'team', id: 's|team|u' }, s2 = { type: 'team', id: 'u' };
+  stored('federation.admitted', 'n', 3, s1);
+  stored('federation.admitted', 'n|team|s', 5, s2);
+  assert.equal(adm.highWater('n', s1), 3);
+  assert.equal(adm.highWater('n|team|s', s2), 5);
+  assert.equal(adm.highWater('n', s2), 0);
+  assert.equal(adm.highWater('n|team|s', s1), 0);
+  const later = new admissionNs.Admission({ log, identity: w.identity, scope: SCOPE_A, policy: POLICY });
+  assert.equal(later.highWater('n', s1), 3);
+  assert.equal(later.highWater('n|team|s', s2), 5);
+  assert.equal(later.highWater('n', s2), 0);
+  assert.equal(later.highWater('n|team|s', s1), 0);
+});
+
+// the two stale-cursor interleavings: X has read nothing, Y appends, X appends a refusal after Y's record, then X is sent what Y admitted
+for (const withSeq of [true, false]) for (const refusal of ['format', 'signature']) {
+  test(`SO-F-03.4 AC19: an own append moves the cursor only when its seq is the last seq read plus 1 (${refusal} refusal, log ${withSeq ? 'with' : 'without'} a seq)`, () => {
+    shape();
+    const w = world();
+    const { role, log, dir } = w;
+    const c = counting(log, { withSeq });
+    const x = new admissionNs.Admission({ log: c, identity: w.identity, scope: SCOPE_A, policy: POLICY });
+    const y = admissionFor(w, SCOPE_A);
+    const seventy = contribute(role, { seq: 70 });
+    assert.equal(y.admit(seventy).ok, true);                                          // record 1
+    const attacker = makeRole(path.join(dir, 'attacker'), 'writer');
+    const bad = refusal === 'format' ? { op_id: 'not-an-envelope' } : contribute(role, { seq: 71, sign: signer(attacker) });
+    const refused = x.admit(bad);                                                     // record 2, after the one Y appended
+    assert.equal(refused.step, refusal);
+    assert.equal(log.seq, 2);
+    const before = c.reads.length;
+    const r = x.admit(seventy);
+    assert.deepEqual({ ok: r.ok, step: r.step, code: r.code }, { ok: false, step: 'replay', code: 'replay' });
+    assert.equal(x.highWater(SENDER), 70);
+    assert.deepEqual(c.reads.slice(before), [1], 'the read starts at the last seq X had read, none, plus 1');
+    assert.deepEqual(admittedSeqs(log), [70], 'the log holds the federation.admitted record of sequence 70 exactly once');
+  });
+}
+
+test('SO-F-03.4 AC20: the reason of external_failed is a fixed text that holds none of the message of the throw', () => {
+  shape();
+  const MARK = 'THROWN-MARKER-5b2e8a';
+  const thrown = [
+    (env) => new Error(`${MARK} ${env.payload.note}`),
+    (env) => `${MARK} ${env.payload.note}`,
+    (env) => ({ message: `${MARK} ${env.payload.note}` }),
+    () => null,
+    () => undefined,
+  ];
+  const reasons = [];
+  for (const make of thrown) {
+    const w = world({ external: (env) => { throw make(env); } });
+    const r = w.adm.admit(contribute(w.role, { seq: 1 }));
+    assert.deepEqual({ ok: r.ok, step: r.step, code: r.code, signature_valid: r.signature_valid }, { ok: false, step: 'external', code: 'external_failed', signature_valid: false });
+    assert.equal(typeof r.reason, 'string');
+    assert.ok(r.reason.length > 0 && r.reason.length <= 160, 'one non-empty text of at most 160 characters');
+    reasons.push(r.reason);
+    for (const text of [JSON.stringify(r), logText(w.log)]) {
+      assert.ok(!text.includes(MARK), 'nothing of the message of the throw');
+      assert.ok(!text.includes(SECRET), 'nothing of the payload');
+    }
+    assert.deepEqual(kinds(w.log), ['federation.rejected'], 'one federation.rejected record and nothing else');
+    assert.equal(records(w.log)[0].data.reason, r.reason);
+  }
+  assert.equal(new Set(reasons).size, 1, 'the same text for every thing thrown');
 });
