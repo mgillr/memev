@@ -629,6 +629,25 @@
    "status": "proposed and unsigned; no red-team record"
   },
   {
+   "id": "SO-08-C",
+   "area": "SO-08",
+   "title": "SO-08-C Production callers for recovery and control, and the bus for the Coordinator",
+   "repo": "memev",
+   "closes": "Production callers for recover, reconstruct, eligibilityPass and applyBusMessage of SO-08-B, and the bus for the Coordinator in vault.mjs; a gap found after SO-08-B, decided under owner delegation, 1 Nov 2026",
+   "depends_on": [
+    "SO-08-B",
+    "SO-1.01",
+    "SO-A-03"
+   ],
+   "implements": [],
+   "programme_task": "WP08-02 (PG-08.1)",
+   "tasks": 3,
+   "criteria": 23,
+   "spec": "specs/SO-08-C.json",
+   "adapted_from": "none; written from the open follow-ups of pull request #361",
+   "status": "proposed and unsigned; no red-team record"
+  },
+  {
    "id": "SO-R-E",
    "area": "SO-R",
    "title": "Publish the versioned container image by a maintainer-run script after the Docker smoke passes: the registry account read from the environment or the origin remote, image name memev, tags the version and the sha, a published-image smoke, and the owner's go for the first public image",
@@ -908,7 +927,32 @@
    "criteria": 8,
    "spec": "specs/SO-F-09.json",
    "adapted_from": "unsigned fold of 30 Oct 2026",
-   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
+   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026",
+   "superseded_by": "SO-F-09.2",
+   "superseded_reason": "owner delegation, 1 Nov 2026: the lead accepted four definitions the SO-F-09 text leaves open (a stub session is an agent subject or a raw status op; a verification record may be written by a person, operator or service; 'by' is set from the resolved credential; withholding is strict: if any source is withheld the whole statement is) and SO-F-09.2 writes them in and pins them with four criteria; the scope is unchanged, because the signed scope already lists changelog.d/SO-F-09.md and docs/MODULES.md"
+  },
+  {
+   "id": "SO-F-09.2",
+   "area": "SO-F",
+   "title": "Finding model for organisational intelligence: a finding is a graph claim capped at theory by evidence, promoted to fact only by a person or a verification, with dismissal, correction and adjudication events and no disclosure beyond the reader's permissions",
+   "repo": "memev",
+   "closes": "Build layer of the design records SO-2.04, SO-2.01: the fold contract SO-F-09 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-F-01",
+    "SO-F-02"
+   ],
+   "implements": [
+    "SO-2.04",
+    "SO-2.01"
+   ],
+   "tasks": 1,
+   "criteria": 12,
+   "spec": "specs/SO-F-09.2.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "proposed and unsigned; no red-team record",
+   "supersedes": "SO-F-09",
+   "supersedes_signed_contract": "k-so-f-09-finding-model-fo-cbe213 (version 2; the spec file contracts/scope-one/specs/SO-F-09.json is unchanged)",
+   "supersedes_reason": "owner delegation, 1 Nov 2026: the lead accepted four definitions the SO-F-09 text leaves open (a stub session is an agent subject or a raw status op; a verification record may be written by a person, operator or service; 'by' is set from the resolved credential; withholding is strict: if any source is withheld the whole statement is) and SO-F-09.2 writes them in and pins them with four criteria; the scope is unchanged, because the signed scope already lists changelog.d/SO-F-09.md and docs/MODULES.md"
   },
   {
    "id": "SO-F-13",
