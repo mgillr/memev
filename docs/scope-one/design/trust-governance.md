@@ -6,7 +6,7 @@ Part of the [Memev documentation](../../README.md). Up: the [README](../../../RE
 
 ## Why this page exists
 
-The addendum asks for two named integrations beside the merge boundary, the admission service and the trust service, and says the exact schemas, APIs, policy model, failure semantics and guarantees must be specified, tested and accepted before being described as delivered (addendum lines 331 to 347). The work breakdown rows 4.3.7 and 4.3.8 are blocked in part because the trust-governance side has no definition in this repository (WBS.md lines 374 and 375). The admission side has one: SO-F-03.3 and SO-F-08 define the contribution admission and the admission adapter. What is missing is a definition of trust governance itself: who or what is trusted at each boundary, and how trust is granted, scoped, delegated, revoked and audited. This page proposes it. The build contract that follows from it, for the part that does not depend on the open questions, is PG-W-21A (unsigned).
+The addendum asks for two named integrations beside the merge boundary, the admission service and the trust service, and says the exact schemas, APIs, policy model, failure semantics and guarantees must be specified, tested and accepted before being described as delivered (addendum lines 331 to 347). The work breakdown rows 4.3.7 and 4.3.8 are blocked in part because the trust-governance side has no definition in this repository (WBS.md lines 374 and 375). The admission side has one: SO-F-03.3 and SO-F-08 define the contribution admission and the admission adapter. What is missing is a definition of trust governance itself: who or what is trusted at each boundary, and how trust is granted, scoped, delegated, revoked and audited. This page proposes it. The build contracts that follow from it are two, both unsigned: PG-W-21A, the record and the evaluation, which depends on no open question and no open pull request, and PG-W-21B, the book, the gate and the events, which is not to be signed before the owner signs off this ADR.
 
 ## What the repository says today
 
@@ -83,13 +83,13 @@ If the trust check cannot run (no records readable, the check throws), the node 
 ### What is not claimed
 
 - No contract enforces any of this yet. SO-F-08 is a signed contract that requires the admission path to read trust only as an eligibility input; its code is not on main.
-- Nothing here is built. The build contract PG-W-21A is unsigned.
+- Nothing here is built. The build contracts PG-W-21A and PG-W-21B are unsigned.
 - The trust service of `docs/PAID-TRUST.md` is not specified here, and this page states no key format, signature scheme or release date for it.
 - No tier, price or licence changes. The tiers stand (DECISIONS.md lines 104 to 111).
 
 ## Open questions for the owner
 
-Each question lists its options and what follows from each. None is settled here, and until the owner records an answer in [DECISIONS.md](../DECISIONS.md) the safe default of ADR 8 holds: local records only, deny by default, no record crosses a node. The build contract marks what depends on each question as deferred.
+Each question lists its options and what follows from each. None is settled here, and until the owner records an answer in [DECISIONS.md](../DECISIONS.md) the safe default of ADR 8 holds: local records only, deny by default, no record crosses a node. The second build contract (PG-W-21B) marks what depends on each question as deferred; the first (PG-W-21A) depends on none of them.
 
 1. **Trust root model.** Who is the first issuer a node accepts?
    - A. Each site is its own root. Consequence: fits local-first and independent sites, and a cross-site relationship needs an explicit exchange of roots; nothing is shared by default.
@@ -133,9 +133,13 @@ Each question lists its options and what follows from each. None is settled here
     - B. Source of records: the core applies what it returns. Consequence: one source of truth across sites, and a hard dependency whose failure mode is the degraded mode above.
     - C. Not used by the core: the adapter stays planned and unspecified here. Consequence: smallest; the core's local records are the whole of trust governance in this release.
 
-## What the build contract covers
+## What the build contracts cover
 
-PG-W-21A is the build contract for the part that does not depend on the answers: the trust record data model and its schema, an evaluation with deny by default, delegation that only narrows and revocation that cascades, the operation-log events, the read-only reader, the composition of checks on the Admission external hook, the revalidation requests, and tests of the boundaries (trust never grants, the crdt-merge call-out is not touched, a personal scope is never shared). It defers, with a pointer to the question, the trust root (1), cross-organisation trust (2), a default for new devices (3), revocation across nodes (4), any tier gate (5), the final rule for who may grant (6, shipped as one provisional table), further purposes (7), any effect on admitted history beyond a review request (8), delegation depth beyond the stated limit (9), use of the external service (10), and the wiring into the finding code. The topology of row 1.3.6 stays open and is not an input to any of it.
+The build is split in two unsigned contracts, so that the part that depends on nothing open can proceed alone.
+
+PG-W-21A (work package WP21-01) is the trust record data model and its schema, the validator, and an evaluation with deny by default, delegation that only narrows and revocation that cascades, as of a stated time. It is a pure library that imports only the identity module on main, so it depends on no open owner question and on no open pull request. It has no production caller, which is stated here and not waived.
+
+PG-W-21B (work packages WP21-02 and WP21-03) is the trust book over the operation log with its audit events and read-only reader, the eligibility gate for the Admission external hook, the composition of checks on that hook, the revalidation requests, and tests of the boundaries (trust never grants, the crdt-merge call-out is not touched, a personal scope is never shared). It builds on PG-W-21A, on the Admission of SO-F-03.3 and on the actor of SO-F-09.2, so it starts after those pull requests merge, and it is not to be signed before the owner signs off this ADR. It defers, with a pointer to the question, the trust root (1), cross-organisation trust (2), a default for new devices (3), revocation across nodes (4), any tier gate (5), the final rule for who may grant (6, shipped as one provisional table), further purposes (7), any effect on admitted history beyond a review request (8), delegation depth beyond the stated limit (9), use of the external service (10), and the wiring into the finding code. It does not close the open follow-up "Finding ops replay trusts the `by` field" in [RECONCILIATION.md](../RECONCILIATION.md), which blocks the first finding writer; its trust book reads only resolved actors on its write path. The topology of row 1.3.6 stays open and is not an input to any of it.
 
 ## How this closes
 
