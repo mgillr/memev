@@ -46,8 +46,11 @@ const PATCHABLE = ['title', 'note', 'priority', 'labels'];
 const sleepMs = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 export class Coordinator {
-  constructor(store, { now = () => Date.now(), policies = DEFAULT_POLICIES, busy = { retries: 400, delay: 2 }, lifecycle = false } = {}) {
+  constructor(store, { now = () => Date.now(), policies = DEFAULT_POLICIES, busy = { retries: 400, delay: 2 }, lifecycle = false, bus = null } = {}) {
     this.store = store;
+    // the bus the transitions are posted on (src/engine/bus.mjs): transport only, the store is the truth
+    this.bus = bus;
+    this._held = false;
     this.lifecycle = lifecycle;
     this.now = now;
     this.policies = policies;
@@ -56,8 +59,11 @@ export class Coordinator {
 
   // Hold the store's lock across a callback, retrying while another live writer holds it.
   _withWrite(fn) {
+    // a call made while this coordinator already holds the lock (a bus message that runs an action) joins that turn
+    if (this._held) return fn(this.store);
+    const turn = (s) => { this._held = true; try { return fn(s); } finally { this._held = false; } };
     for (let i = 0; i < this.busy.retries; i++) {
-      const r = this.store.withWrite(fn);
+      const r = this.store.withWrite(turn);
       if (!r || r.busy !== true || r.retry !== true) return r;
       sleepMs(this.busy.delay);
     }
@@ -136,6 +142,20 @@ export class Coordinator {
   // Persist the records of the moves a call made, one task.transitioned event each, in the same writer turn.
   _logMoves(s, taskId, records) {
     for (const rec of records) s.append({ type: 'task.transitioned', entity: { kind: 'event', data: { type: 'task.transitioned', task_id: taskId, ...rec } } });
+    this._post(s, taskId, records);
+  }
+
+  // Each move is also posted on the bus, to the operator seat and to the seat of the task's assignee, as ids and states only.
+  // The post is best effort: a bus that is down or refuses a message never blocks or undoes a transition.
+  _post(s, taskId, records) {
+    if (!this.bus || !records.length) return;
+    const task = s.snapshot('task')[taskId];
+    const project = task?.project ?? this.store.id;
+    const newest = Object.values(s.snapshot('lease')).filter((l) => l.task_id === taskId).sort((a, b) => (b.generation || 0) - (a.generation || 0))[0];
+    const assignee = task?.holder ?? newest?.agent ?? null;
+    for (const rec of records) {
+      try { this.bus.postTransition({ project, task: taskId, from: rec.from, to: rec.to, correlation: rec.correlationId ?? null, assignee }); } catch { /* transport only */ }
+    }
   }
 
   // Run a chain of moves in memory and stop at the first refusal. Nothing is written here.
@@ -174,7 +194,9 @@ export class Coordinator {
 
   // pause(project): stop new dispatch and keep the truth. In-flight tasks stay IN_PROGRESS and carry a cancellation
   // field of requested; the project record keeps the checkpoint resume() needs.
-  pause(project, { actor = 'operator', reason = 'paused' } = {}) {
+  // capability(taskId, task) is the adapter's capability record for the client holding the task: true when it can cancel
+  // cooperatively. Without a record the answer for an in-flight task is unsupported, never confirmed.
+  pause(project, { actor = 'operator', reason = 'paused', capability = null } = {}) {
     if (!this.lifecycle) return this._off();
     return this._withWrite((s) => {
       const proj = this._project(s, project);
@@ -182,14 +204,17 @@ export class Coordinator {
       const tasks = this._tasksOf(s, project);
       const view = { paused: false, scopeVersion: proj.scope_version, tasks: tasks.map(([id, t]) => ({ id, state: t.status, ...(t.cancellation ? { cancellation: t.cancellation } : {}) })) };
       const p = pause(view);
+      const cancellations = {};
       for (const [id, t] of tasks) {
         const nt = p.tasks.find((x) => x.id === id);
+        if (nt.state === TASK_STATES.IN_PROGRESS && typeof capability === 'function') nt.cancellation = capability(id, t) === true ? 'requested' : 'unsupported';
+        if (nt.state === TASK_STATES.IN_PROGRESS) cancellations[id] = nt.cancellation;
         if (nt.cancellation !== t.cancellation) this._putTask(s, id, { ...t, cancellation: nt.cancellation });
       }
       const checkpoint = { scopeVersion: p.checkpoint.scopeVersion, tasks: p.checkpoint.tasks.map((x) => ({ id: x.id, state: x.state, ...(x.cancellation ? { cancellation: x.cancellation } : {}) })) };
       this._putProject(s, project, { ...proj, paused: true, pause_checkpoint: checkpoint, paused_reason: reason });
       this._logEvent(s, 'project.paused', { project, ...this._ctx(actor, reason, `pause:${project}:${this.now()}`) });
-      return { ok: true, paused: true };
+      return { ok: true, paused: true, cancellations };
     });
   }
 
@@ -373,7 +398,7 @@ export class Coordinator {
     }
     const counts = {};
     for (const x of states) counts[x.state] = (counts[x.state] || 0) + 1;
-    return { project, status: projectStatus(states, { paused: !!proj.paused, cancelled: !!proj.cancelled }), paused: !!proj.paused, scope_version: proj.scope_version ?? 1, counts, tasks, eligible: this.eligible(project), ...(history ? { history: this.history().filter((e) => tasks[e.task_id]).slice(-100), ...(this.lifecycle ? { execution: this._executionOf(Object.keys(tasks)) } : {}) } : {}) };
+    return { project, status: projectStatus(states, { paused: !!proj.paused, cancelled: !!proj.cancelled }), paused: !!proj.paused, scope_version: proj.scope_version ?? 1, counts, tasks, eligible: this.eligible(project), ...(history ? { history: this.history().filter((e) => tasks[e.task_id]).slice(-100), ...(this.lifecycle ? { execution: this._executionOf(Object.keys(tasks)), work: this._workDetail(project, tasks) } : {}) } : {}) };
   }
 
   // verify(taskId, { actor, evidence }) is the only way to VERIFIED. Each evidence item names the criterion it
@@ -790,6 +815,11 @@ export class Coordinator {
       if (this.lifecycle && owner && this._project(s, owner.project).paused) return { ok: false, paused: true, sent: false, reason: 'the project is paused' };
       const existing = Object.values(s.snapshot('attempt')).find((a) => a.kind === 'dispatch' && a.key === key);
       if (existing) return { ok: true, sent: false, duplicate: true, result: existing.result ?? null };
+      // a task is sent once under a lease: a second dispatch, under another key, while that lease is live is refused
+      const held = this.lifecycle && owner?.lease_id ? s.snapshot('lease')[owner.lease_id] : null;
+      if (held && held.status === 'active' && held.expires > this.now() && Object.values(s.snapshot('attempt')).some((a) => a.kind === 'dispatch' && a.task_id === taskId && a.at >= held.issued)) {
+        return { ok: false, code: 'LEASE_LIVE', sent: false, reason: `the task was already sent under the live lease of ${held.agent}` };
+      }
       const resource = this._resourceOf(taskId, owner, payload && typeof payload === 'object' ? payload.resource : undefined);
       const hash = payloadHash(payload);
       const lease = owner?.lease_id ? s.snapshot('lease')[owner.lease_id] : null;
@@ -848,6 +878,117 @@ export class Coordinator {
         entity: { kind: 'attempt', id: attemptId, data: { task_id: taskId, kind: 'external', policy: kind, key, status: 'recorded', result, at: this.now() } },
       });
       return { ok: true, repeated: true, result };
+    });
+  }
+
+  // ---- recovery and control (SO-08-B)
+
+  // What an operator needs to act on, from the store: the tasks in flight with their owner and lease expiry, the blocked ones
+  // with their reasons, the approvals still pending and the evidence gone stale.
+  _workDetail(project, tasks) {
+    const leases = this.store.snapshot('lease');
+    const active = []; const blocked = [];
+    for (const [id, t] of Object.entries(tasks)) {
+      if (t.state === TASK_STATES.IN_PROGRESS) { const l = t.lease_id ? leases[t.lease_id] : null; active.push({ task: id, title: t.title, owner: l?.agent ?? t.holder ?? null, lease_expires: l?.expires ?? null }); }
+      if (t.state === TASK_STATES.BLOCKED) blocked.push({ task: id, title: t.title, reason: t.blocked_reason ?? 'blocked' });
+    }
+    return { active, blocked, approvals: this._pendingApprovals(tasks), stale_evidence: Object.entries(this.store.snapshot('evidence')).filter(([, e]) => e.stale === true && tasks[e.task_id]).map(([id, e]) => ({ id, task: e.task_id, criterion: e.criterion ?? null })) };
+  }
+  _pendingApprovals(tasks) {
+    return Object.entries(this.store.snapshot('approval')).filter(([, a]) => tasks[a.task_id] && (a.status ?? 'pending') === 'pending').map(([id, a]) => ({ id, task: a.task_id, what: a.what ?? null }));
+  }
+  _newestLease(s, taskId) {
+    return Object.entries(s.snapshot('lease')).filter(([, l]) => l.task_id === taskId).map(([id, l]) => ({ ...l, id })).sort((a, b) => (b.generation || 0) - (a.generation || 0))[0] ?? null;
+  }
+
+  // recover(taskId): the procedure after a session stops heart-beating. It refuses while the lease is live; otherwise it marks a
+  // lapsed lease, inspects what the task left behind (its checkpoint, its lease, the artifacts its attempts changed and the
+  // external actions with no recorded success), writes one inspection record and returns a plan: resume from the checkpoint,
+  // reassign, or ask the user. A side effect that did not succeed is never resumed or repeated blind, so it asks the user.
+  recover(taskId, { actor = 'operator' } = {}) {
+    if (!this.lifecycle) return this._off();
+    const pre = this.store.snapshot('task')[taskId];
+    if (!pre) return { ok: false, error: 'no_such_task' };
+    const held = pre.lease_id ? this.store.snapshot('lease')[pre.lease_id] : null;
+    if (held && held.status === 'active') {
+      if (held.expires > this.now()) return { ok: false, code: 'LEASE_LIVE', reason: 'the session still holds a live lease; nothing to recover' };
+      this.sweep();
+    }
+    return this._withWrite((s) => {
+      const task = s.snapshot('task')[taskId];
+      if (task.status !== TASK_STATES.BLOCKED || task.blocked_reason !== 'owner_lost') return { ok: false, code: 'NOT_RECOVERABLE', reason: `a ${task.status} task has not lost its owner` };
+      const lease = this._newestLease(s, taskId);
+      const attempts = Object.values(s.snapshot('attempt')).filter((a) => a.task_id === taskId);
+      const inspection = {
+        checkpoint: task.checkpoint ?? lease?.checkpoint ?? null,
+        lease_id: lease?.id ?? null,
+        lease_status: lease?.status ?? null,
+        artifacts: [...new Set(attempts.flatMap((a) => a.artifacts || []))],
+        side_effects: attempts.filter((a) => a.kind === 'external' && a.result?.status !== 'success').map((a) => ({ key: a.key, kind: a.policy ?? null, status: a.result?.status ?? null })),
+      };
+      const action = inspection.side_effects.length ? 'ask_user' : inspection.checkpoint ? 'resume' : 'reassign';
+      const plan = { action, ...(action === 'resume' ? { checkpoint: inspection.checkpoint } : {}) };
+      this._logEvent(s, 'task.recovery.inspected', { task_id: taskId, generation: task.generation ?? 0, ...inspection, plan: action, actor, time: this.now() });
+      return { ok: true, inspection, plan };
+    });
+  }
+
+  // reassignAfterRecovery(taskId, { to }): the reassignment of a lost task, refused until recover() has recorded an inspection of
+  // the generation the task is at now.
+  reassignAfterRecovery(taskId, { to, actor = 'operator', reason = 'reassigned after recovery' } = {}) {
+    if (!this.lifecycle) return this._off();
+    return this._withWrite((s) => {
+      const task = s.snapshot('task')[taskId];
+      if (!task) return { ok: false, error: 'no_such_task' };
+      const seen = Object.values(s.snapshot('event')).some((e) => e.type === 'task.recovery.inspected' && e.task_id === taskId && e.generation === (task.generation ?? 0));
+      if (!seen) return { ok: false, code: 'NOT_INSPECTED', reason: 'recover the task first: a reassignment follows an inspection record' };
+      return this.reassign(taskId, { to, actor, reason });
+    });
+  }
+
+  // reconstruct(project): what a start needs from the store. Leases past their expiry are marked (their tasks BLOCKED with
+  // owner_lost) and the rest is read back: the pause flag, the tasks in flight under live leases and the pending approvals.
+  // It dispatches nothing.
+  reconstruct(project) {
+    const marked = this.sweep().expired;
+    const tasks = {};
+    for (const [id, t] of Object.entries(this.store.snapshot('task'))) if (t.project === project) tasks[id] = { state: t.status, title: t.title };
+    const leases = Object.entries(this.store.snapshot('lease')).filter(([, l]) => tasks[l.task_id]).map(([id, l]) => ({ id, task_id: l.task_id, agent: l.agent, expires: l.expires, status: l.status }));
+    return {
+      project,
+      paused: !!(this.store.snapshot('project')[project]?.paused),
+      inflight: Object.keys(tasks).filter((id) => tasks[id].state === TASK_STATES.IN_PROGRESS),
+      leases: { active: leases.filter((l) => l.status === 'active'), expired: leases.filter((l) => marked.includes(l.id)) },
+      approvals: this._pendingApprovals(tasks),
+    };
+  }
+
+  // eligibilityPass(project, { send }): the one place a start may dispatch from. It offers the tasks eligible now and never one that
+  // holds a live lease; a paused project offers none. With send each offered task is dispatched once (keyed by its generation).
+  eligibilityPass(project, { send = null, agent = 'coordinator' } = {}) {
+    const tasks = this.store.snapshot('task');
+    const leases = this.store.snapshot('lease');
+    const t = this.now();
+    const live = (id) => { const x = tasks[id]; const l = x?.lease_id ? leases[x.lease_id] : null; return (l && l.status === 'active' && l.expires > t) || Object.values(leases).some((y) => y.task_id === id && y.status === 'active' && y.expires > t); };
+    const dispatchable = this.eligible(project).filter((id) => !live(id));
+    const sent = [];
+    if (send) for (const id of dispatchable) { const r = this.dispatch(id, agent, `pass:${id}:${tasks[id].generation ?? 0}`, { resource: this._resourceOf(id, tasks[id], undefined), what: tasks[id].title }, () => send(id)); if (r.ok && r.sent) sent.push(id); }
+    return { ok: true, dispatchable, sent };
+  }
+
+  // applyBusMessage(msg): a request that arrived on the bus (cancel, pause or resume), applied once. The message id is recorded in the
+  // same turn as the change, so a second delivery of the same message, here or in another process, changes nothing.
+  applyBusMessage(msg) {
+    if (!this.lifecycle) return this._off();
+    if (!msg || typeof msg.id !== 'string' || !msg.id) return { ok: false, code: 'NO_ID', reason: 'a bus message needs an id to be applied once' };
+    if (!['cancel', 'pause', 'resume'].includes(msg.kind)) return { ok: false, code: 'UNKNOWN_KIND', reason: 'a bus message asks for cancel, pause or resume' };
+    if (!msg.project) return { ok: false, code: 'NO_PROJECT', reason: 'a bus message names its project' };
+    return this._withWrite((s) => {
+      if (Object.values(s.snapshot('event')).some((e) => e.type === 'bus.processed' && e.message_id === msg.id)) return { ok: true, duplicate: true };
+      const o = { actor: msg.actor || 'operator', reason: msg.reason };
+      const r = msg.kind === 'cancel' ? this.cancel(String(msg.task_id), o) : msg.kind === 'pause' ? this.pause(msg.project, o) : this.resume(msg.project, o);
+      if (r.ok) this._logEvent(s, 'bus.processed', { message_id: msg.id, kind: msg.kind, project: msg.project, ...(msg.task_id ? { task_id: msg.task_id } : {}) });
+      return r;
     });
   }
 }
