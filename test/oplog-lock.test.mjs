@@ -12,6 +12,7 @@ import * as OPLOG from '../src/engine/oplog.mjs';
 import * as UTIL from '../src/engine/util.mjs';
 import { Vault } from '../src/engine/vault.mjs';
 import { cleanup, tmpdir } from './helpers/tmp.mjs';
+import { command as runnerCommand, watch as runnerWatch, entry as runnerEntry } from '../src/cli/runner.mjs';
 import { OWNER, killAll, sleep, stealLock, bytesNoLock, readLock, writeLock, age, deadPid, bootMs, bareDir, sampleBare, plant, releaseTogether, makeVault, openVault, Child, holder, tryOpen, tree, bytes, files, STATE_FILES, isLocked, seqs, consecutive } from './helpers/oplog-lock.mjs';
 
 after(() => { killAll(); cleanup(); });
@@ -648,4 +649,34 @@ test('T1-platform: the macOS and Linux readers run the commands they should, by 
   assert.equal(UTIL.parseLstart('Mon Foo  1 09:00:00 2026'), null);
   assert.equal(UTIL.parseLstart('Wed Dec 31 23:59:59 1969'), -1000);
   assert.ok(Number.isFinite(UTIL.processStart(process.pid)) || !LINUX, 'this process\'s own start time is readable');
+});
+
+test('T1-runner: runner on, status, watch and off work while another process holds the vault, and change nothing under .memev/oplog', async () => {
+  const { root, dir, lock } = makeVault();
+  const seat = 'cursor@host';
+  const op = { identity: OWNER, client: 'codex', local: true, cli: true };
+  const w = openVault(root);
+  const host = w.devices.get(w.devices.hostId);
+  w.bus.register({ client: 'codex', device: host });
+  w.bus.register({ client: 'cursor', device: host });
+  w.bus.setOperator('codex@host', { by: 'terminal' });
+  w.close();
+  const quiet = console.log; console.log = () => {};
+  const ran = [];
+  try {
+    assert.equal(await runnerCommand('runner', ['on', seat], { 'max-runs-per-day': '3', command: 'echo' }, { root, env: {} }), 0);
+    const w2 = openVault(root);                                                  // a task arrives after the runner was turned on
+    w2.bus.send({ ...op, device: w2.devices.get(w2.devices.hostId) }, { to: seat, type: 'task', body: 'do it' });
+    w2.close();
+    const h = await holder(root);                                                // and another process holds the vault from here on
+    const before = bytes(dir), held = fs.readFileSync(lock);
+    assert.equal(await runnerCommand('runner', ['status'], {}, { root, env: {} }), 0);
+    await runnerWatch({ root, seat, pollMs: 5, stop: () => ran.length > 0, run: async (r) => { ran.push(r.body); return { code: 0 }; } });
+    assert.equal(await runnerCommand('runner', ['off', seat], {}, { root, env: {} }), 0);
+    assert.deepEqual(bytes(dir), before, 'nothing under .memev/oplog changed');
+    assert.ok(fs.readFileSync(lock).equals(held), 'the holder still holds its lock');
+    await h.kill9();
+  } finally { console.log = quiet; }
+  assert.deepEqual(ran, ['do it'], 'watch read the bus and started the task');
+  assert.equal(runnerEntry(root, seat).enabled, false);
 });
