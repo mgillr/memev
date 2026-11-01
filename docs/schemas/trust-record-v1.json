@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Memev trust record, version 1",
-  "description": "A grant (who trusts which subject, for which purposes, in which scope, between which times) and a revocation (which grant is withdrawn, by whom, from when, and why). PROVISIONAL: the choices come from ADR 8 in docs/scope-one/DECISIONS.md, which is proposed, and a change is a new schema version, not an edit of memev-trust/1. Trust is an eligibility input only: a record never grants a permission, a membership or a read, and a personal scope is never shared. Unauthenticated: the subject and the issuer of every record are unauthenticated strings, so the caller must evaluate over its own log, the one it already trusts as it trusts its operation log, with a resolved actor (never a name a caller supplies) and a credential-resolved subject, as the actor resolution paragraph of docs/scope-one/design/trust-governance.md says. Fail closed: a record of kind revocation that fails the validator and names a grant denies that grant and every grant delegated from it; canonically equal grants count once and different grants with one id deny; times are real calendar times with a zone. The validator and the evaluation are src/engine/federation/trust-record.mjs; the module has no production caller yet.",
+  "description": "A grant (who trusts which subject, for which purposes, in which scope, between which times) and a revocation (which grant is withdrawn, by whom, from when, and why). PROVISIONAL: the choices come from ADR 8 in docs/scope-one/DECISIONS.md, which is proposed, and a change is a new schema version, not an edit of memev-trust/1. Trust is an eligibility input only: a record never grants a permission, a membership or a read, and a personal scope is never shared. Unauthenticated: the subject and the issuer of every record are unauthenticated strings, so the caller must evaluate over its own log, the one it already trusts as it trusts its operation log, with a resolved actor (never a name a caller supplies) and a credential-resolved subject, as the actor resolution paragraph of docs/scope-one/design/trust-governance.md says. Fail closed: a malformed revocation (a record of kind revocation that fails this schema and names a grant) denies that grant and every grant delegated from it only when its issuer is the issuer of the grant or a root or an issuer that cannot be read, and a well-formed stranger's is ignored, as a valid one is; grants that evaluation cannot tell apart (purposes as a set, the same instants in any zone, the same scope type and id, the same depth and parent, whatever the evidence) count once, different grants with one id deny, and a renewed grant needs a new id; times are real calendar times with a zone. Limit: a revocation must name its grant exactly, so a record whose kind is not exactly revocation or whose grant is not exactly a grant id names no grant and cannot revoke anything; it is ignored and not denied, so callers must validate records before appending them to a log. The validator and the evaluation are src/engine/federation/trust-record.mjs; the module has no production caller yet.",
   "oneOf": [
     {
       "$ref": "#/$defs/grant"
@@ -78,7 +78,7 @@
           }
         },
         "purposes": {
-          "description": "The purposes the grant covers, a closed list of two in version 1. PROVISIONAL: two purposes are option A of question 7 in ADR 8, which is proposed, and a further purpose is a new schema version.",
+          "description": "The purposes the grant covers, a closed list of two in version 1. PROVISIONAL: two purposes are option A of question 7 in ADR 8, which is proposed, and a further purpose is a new schema version. A list with no hole in it; two grants that differ only in the order or repeats of purposes are the same grant.",
           "type": "array",
           "minItems": 1,
           "items": {
@@ -99,7 +99,7 @@
           "format": "date-time"
         },
         "evidence": {
-          "description": "References only, never a body.",
+          "description": "References only, never a body, and not read by the evaluation: two grants that differ only in their evidence are the same grant. At most 8, with no hole in the list.",
           "type": "array",
           "maxItems": 8,
           "items": {
@@ -132,7 +132,7 @@
       }
     },
     "revocation": {
-      "description": "Takes effect from its time. It is applied only when its issuer is the issuer of the grant or a root the caller passes, and it makes every grant delegated from the revoked one ineligible. A record of kind revocation that fails this schema and names a grant is not ignored: it denies that grant and every grant delegated from it, at any time (deny.bad_revocation). PROVISIONAL: who may revoke is a part of question 6 in ADR 8, which is proposed; this adds no role-by-action matrix.",
+      "description": "Takes effect from its time. It is applied only when its issuer is the issuer of the grant or a root the caller passes, and it makes every grant delegated from the revoked one ineligible. A malformed revocation (a record of kind revocation that fails this schema and names a grant) denies that grant and every grant delegated from it, at any time, only when its issuer is the issuer of the grant or a root or an issuer that cannot be read; one by a well-formed stranger is ignored, as a valid one is. The rule id is deny.bad_revocation. PROVISIONAL: who may revoke is a part of question 6 in ADR 8, which is proposed; this adds no role-by-action matrix.",
       "type": "object",
       "required": [
         "schema",
@@ -156,7 +156,7 @@
           "pattern": "^[A-Za-z0-9._@+-]+$"
         },
         "grant": {
-          "description": "The id of the grant revoked.",
+          "description": "The id of the grant revoked, written exactly: a value that is not exactly a grant id (a number, a list, a trailing space, another case) names no grant and revokes nothing.",
           "type": "string",
           "pattern": "^[A-Za-z0-9._@+-]+$"
         },

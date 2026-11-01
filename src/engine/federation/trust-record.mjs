@@ -17,9 +17,19 @@
 //
 // Fail closed: every input is copied once with structuredClone and only the copy is validated and used, so a getter runs
 // once and cannot answer differently on a later read, and an input that cannot be copied is a deny. Every comparison of a
-// time is written as the negation of the passing case, so a time that is not a number never lets a window pass. A record
-// of kind revocation that fails the validator and names a grant denies that grant and every grant delegated from it.
-// Replaying a record is idempotent: canonically equal grants count once, and different grants with one id deny.
+// time is written as the negation of the passing case, so a time that is not a number never lets a window pass. A
+// malformed revocation (a record of kind revocation that fails the validator and names a grant) counts against that grant
+// only when its issuer could have revoked it: the issuer of the grant or a root or an issuer that cannot be read as a
+// subject id. Then it denies the grant and every grant delegated from it, at any time. A malformed revocation by a
+// well-formed stranger is ignored, as a valid revocation by that stranger is, so a bad record never beats a good one.
+// Replaying a record is idempotent: grants that evaluation cannot tell apart count once (same purposes as a set, same
+// instants whatever the zone, same scope type and id, same depth and parent, whatever the evidence), and different grants
+// with one id deny. Re-issuing a renewed grant under the same id is a permanent deny: a renewal needs a new id.
+//
+// Limit, stated and not hidden: a revocation must name its grant exactly. A record whose kind is not exactly revocation,
+// or whose grant is not exactly a grant id (a number, a list, a space or a newline on the end, another case), names no grant
+// and cannot revoke anything, and it is ignored. The module does not fail closed on it, because one unreadable record would
+// then deny every grant. A caller must validate records before appending them to its log.
 //
 // scope.parent is accepted by the validator (validateScope allows it) and is ignored by the evaluation: a grant names a
 // scope by its type and id alone, and it never reaches a parent or a child scope.
@@ -53,6 +63,8 @@ function isCalendarTime(x) {
   if (!(month >= 1 && month <= 12 && day >= 1 && day <= days && hour <= 23 && minute <= 59 && second <= 59)) return false;
   return m[8] === 'Z' || (Number(m[9]) <= 23 && Number(m[10]) <= 59);
 }
+// A list with no hole in it: every index from 0 to the length is there. The checks that read a list skip a hole.
+const dense = (a) => Array.isArray(a) && Object.keys(a).length === a.length;
 const isTime = (x) => typeof x === 'string' && ISO_TIME.test(x) && isCalendarTime(x) && Number.isFinite(Date.parse(x));
 const ms = (x) => Date.parse(x);
 const isId = (x) => typeof x === 'string' && ID_PART.test(x);
@@ -80,14 +92,14 @@ function validateGrant(r) {
     e.push(...validateScope(r.scope).map((m) => `scope: ${m}`));
     if (r.scope.type === 'personal') e.push('scope: a personal scope is never shared');
   }
-  if (!Array.isArray(r.purposes) || r.purposes.length === 0) e.push(`purposes: must be a non-empty list of ${TRUST_PURPOSES.join(', ')}`);
+  if (!dense(r.purposes) || r.purposes.length === 0) e.push(`purposes: must be a non-empty list of ${TRUST_PURPOSES.join(', ')}`);
   else if (!r.purposes.every((p) => TRUST_PURPOSES.includes(p))) e.push(`purposes: every purpose must be one of ${TRUST_PURPOSES.join(', ')}`);
   if (!isTime(r.start)) e.push('start: must be a time (ISO 8601 with a zone)');
   if (!present(r.expires) || r.expires === null) e.push('expires: an expiry is required');
   else if (!isTime(r.expires)) e.push('expires: must be a time (ISO 8601 with a zone)');
   else if (isTime(r.start) && !(ms(r.expires) > ms(r.start))) e.push('expires: must be after the start');
   if (present(r.evidence)) {
-    if (!Array.isArray(r.evidence)) e.push('evidence: must be a list of texts');
+    if (!dense(r.evidence)) e.push('evidence: must be a list of texts, with no hole in it');
     else {
       if (r.evidence.length > MAX_EVIDENCE) e.push(`evidence: at most ${MAX_EVIDENCE} references`);
       r.evidence.forEach((x, i) => { if (typeof x !== 'string') e.push(`evidence[${i}]: must be a text`); else if (x.length > MAX_EVIDENCE_LENGTH) e.push(`evidence[${i}]: at most ${MAX_EVIDENCE_LENGTH} characters`); });
@@ -177,9 +189,19 @@ const PRIORITY = Object.values(RULES);
 const before = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const byPriority = (a, b) => b.stage - a.stage || PRIORITY.indexOf(a.d.rule) - PRIORITY.indexOf(b.d.rule) || before(a.d.chain.join('\n'), b.d.chain.join('\n')) || before(a.d.reason, b.d.reason);
 
-// Canonical JSON: the keys of every object in sorted order, so that two records that differ only in key order are one record.
-const sortKeys = (x) => (Array.isArray(x) ? x.map(sortKeys) : isObj(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, sortKeys(x[k])])) : x);
-const canonical = (x) => JSON.stringify(sortKeys(x));
+// Canonical JSON of what the evaluation can tell apart, so that two grants that differ in nothing it reads are one grant:
+// the purposes as a sorted set, the start and the expiry as instants (the same instant in two zones is equal), the scope
+// by its type and id (scope.parent is ignored), the delegation as a depth and a parent (no block is depth 0), and the keys
+// in a fixed order. The evidence is left out: it is a list of references for a reader, and the evaluation never reads it.
+// Any other difference (the id, the subject, the issuer, the scope, an instant, the purposes, the depth, the parent) keeps
+// two grants apart, and two grants apart under one id are a conflict.
+const canonical = (g) => JSON.stringify({
+  schema: g.schema, kind: g.kind, id: g.id, subject: g.subject, issuer: g.issuer,
+  scope: { type: g.scope.type, id: g.scope.id },
+  purposes: [...new Set(g.purposes)].sort(),
+  start: ms(g.start), expires: ms(g.expires),
+  delegation: { depth: g.delegation?.depth ?? 0, parent: g.delegation?.parent ?? null },
+});
 
 function validRequest(req, c) {
   if (!isObj(req) || !isSubject(req.subject)) return 'the request needs a subject id';
@@ -188,8 +210,8 @@ function validRequest(req, c) {
   if (!TRUST_PURPOSES.includes(req.purpose)) return `the request needs a purpose, one of ${TRUST_PURPOSES.join(', ')}`;
   if (!isObj(c)) return 'the call needs records, roots and a time';
   if (!isTime(c.at)) return 'at is required and must be a time: the clock is never read';
-  if (!Array.isArray(c.records)) return 'records must be a list';
-  if (!Array.isArray(c.roots) || !c.roots.every(isSubject)) return 'roots must be a list of subject ids';
+  if (!dense(c.records)) return 'records must be a list with no hole in it';
+  if (!dense(c.roots) || !c.roots.every(isSubject)) return 'roots must be a list of subject ids with no hole in it';
   return null;
 }
 
@@ -199,8 +221,10 @@ function validRequest(req, c) {
  * that fail the validator are never honoured as grants. A grant is honoured when its issuer is a root, or holds a live
  * grant that delegates, names that grant as the parent, and is only narrowed by it. A revocation applies from its time,
  * when its issuer is the issuer of the grant or a root. A record of kind revocation that fails the validator and names a
- * grant denies that grant and every grant delegated from it (deny.bad_revocation), at any time. Canonically equal grants
- * count once; different grants that share an id are honoured by no one and deny (deny.conflicting_grant). The request and
+ * grant denies that grant and every grant delegated from it (deny.bad_revocation), at any time, when its issuer is the
+ * issuer of the grant or a root or cannot be read as a subject id; from a well-formed stranger it is ignored. A record that
+ * names no grant exactly revokes nothing. Grants that evaluation cannot tell apart count once; different grants that share
+ * an id are honoured by no one and deny (deny.conflicting_grant). The request and
  * the call are copied once, first, and only the copy is read: an input that cannot be read or copied is a deny. The chain
  * lists the grant ids from the granting end to the grant of the subject.
  */
@@ -231,9 +255,9 @@ function decide(request, { records, roots, at }) {
   const byId = new Map(); const clash = new Map();
   for (const [id, same] of forms) { if (same.size === 1) byId.set(id, [...same.values()][0]); else clash.set(id, [...same.values()]); }
   const revocations = valid.filter((r) => r.kind === 'revocation');
-  // PROVISIONAL (ADR 8, question 6, in part): a record of kind revocation that fails the validator and names a grant is not
-  // ignored. It cannot be placed in time or traced to its issuer, so it denies the grant it names, at any time.
-  const badRevoked = new Set(checked.filter(([r, ok]) => !ok && isObj(r) && r.kind === 'revocation' && isId(r.grant)).map(([r]) => r.grant));
+  // PROVISIONAL (ADR 8, question 6, in part): a record of kind revocation that fails the validator and names a grant cannot be
+  // placed in time, so it counts at any time. It counts only when its issuer could have revoked the grant (see badRevokedAt).
+  const badRevoked = checked.filter(([r, ok]) => !ok && isObj(r) && r.kind === 'revocation' && isId(r.grant)).map(([r]) => r);
   if (valid.length === 0) return deny(RULES.NO_RECORDS, 'there are no valid trust records');
   if (roots.length === 0) return deny(RULES.NO_ROOTS, 'no root was passed: there is no default root');
 
@@ -241,7 +265,9 @@ function decide(request, { records, roots, at }) {
   // and from its time. This adds no role-by-action matrix: the one who granted, or a root the caller passed, may withdraw.
   // Each time comparison is the negation of the passing case, so a time that is not a number revokes, starts late and expires.
   const revokedAt = (g) => revocations.some((v) => v.grant === g.id && !(now < ms(v.time)) && (v.issuer === g.issuer || roots.includes(v.issuer)));
-  const badRevokedAt = (g) => badRevoked.has(g.id);
+  // The same issuers as for a valid revocation: the issuer of the grant or a root. An issuer that cannot be read as a subject id
+  // cannot be told from either, so it denies, whoever wrote it. A well-formed stranger is ignored, as for a valid revocation.
+  const badRevokedAt = (g) => badRevoked.some((v) => v.grant === g.id && (!isSubject(v.issuer) || v.issuer === g.issuer || roots.includes(v.issuer)));
   const notYet = (g) => !(ms(g.start) <= now);
   const over = (g) => !(now < ms(g.expires));
 

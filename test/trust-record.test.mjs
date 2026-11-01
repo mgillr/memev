@@ -467,7 +467,7 @@ test('PG-W-21A AC02: a duplicate of a grant is idempotent, and a different grant
   const chain = evaluate(ask(), ctx([parentGrant(), childGrant(), parentGrant(), childGrant()]));
   assert.equal(chain.eligible, true); assert.deepEqual(chain.chain, ['p', 'c']);
   // different records with one id: an injected grant never lets one be honoured, and the id has its own rule
-  const injections = { 'another purpose': grant({ purposes: ['verify'] }), 'another subject': grant({ subject: 'device:evil' }), 'another expiry': grant({ expires: '2026-01-11T00:00:00Z' }), 'another issuer': grant({ issuer: 'person:stranger' }), 'a different list order': grant({ purposes: ['verify', 'contribute'] }), 'with evidence': grant({ evidence: ['e'] }) };
+  const injections = { 'another purpose': grant({ purposes: ['verify'] }), 'another subject': grant({ subject: 'device:evil' }), 'another expiry': grant({ expires: '2026-01-11T00:00:00Z' }), 'another issuer': grant({ issuer: 'person:stranger' }), 'another purpose set': grant({ purposes: ['contribute', 'verify'] }), 'another start instant': grant({ start: '2026-01-11T00:00:00Z' }) };
   for (const [what, injected] of Object.entries(injections)) {
     for (const records of [[grant(), injected], [injected, grant()]]) {
       const r = evaluate(ask(), ctx(records));
