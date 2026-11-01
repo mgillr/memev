@@ -1,0 +1,275 @@
+{
+  "title": "QL-W-01B A signed contract with no base revision gets one from a signed base attestation that Vault.contractVerify reads, without editing a signed byte (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract QL-W-01B in memev: a signed contract that records no base revision gets a verifiable one from a small signed base attestation that Vault.contractVerify reads (work package WP23-02). It is the back-fill that the register row of pull request #380 (QL-W-01A) leaves open for the signed bodies that predate base recording, and it never edits a signed byte. Proposed and unsigned; the signer signs it after the red-team gate. The id is in the style of SO-W-08B: its second part starts with a letter, so the redteam gate's specIdOf reads the whole name and the contract has its own record path; the work package number 23 is not in docs/scope-one/programme/fragments. Why: contracts/signed holds 142 signed bodies at the base commit and 138 of them record no base. 105 of the 138 have a test_red_green criterion, and for each of those Vault.contractVerify returns BLOCKED with 'no base revision recorded' (src/engine/contracts.mjs, baseCheck), so no signed red-green criterion of them can reach PASS. A top-level base key sits inside the hash that the signature covers (specSha256 in src/engine/redteam-gate.mjs, canonicalHash in vendor/attest/signature.mjs) and the engine records it as written at signing (contractSign), so a body cannot gain a base without a new signature and a new id. 75 of the 105 are not superseded by a later signed version and are the ones a verify can still be asked for; the other 30 are superseded. All 75 are signed by one key, 45c92c2850024872 (signer-2); the 30 superseded ones include all 17 signed by the older key 9234819001ae43bd. What changes: (1) a base attestation is a JSON record in contracts/attestations/<contract id>.json, with exactly the keys schema ('memev-base-attestation/1'), contract (the signed contract's id), contract_sha256 (the canonicalHash of the signed body, which is the payload of its signature), base ({ sha, recorded_at }, a 40-hex commit), signer (the 16-hex id of the key that signed the contract) and sig (a DSSE envelope made by sign() of vendor/attest/signature.mjs, with the machine's contract key, over the record without sig: the same key, the same routine and the same key file under contracts/keys that signed the contract and that sign approval records). (2) Vault#contractAttestBase(identity, { id, base, local, dryRun }) writes it. It is a local operator action like contractApprove (admin scope, local only), it needs a signed contract that verifies, signed locally, whose body records no base, whose signature key is this machine's key, and an explicit base that is a commit in the contract's workdir (else the vault root) and an ancestor of that workdir's HEAD, and it refuses a contract that already has an attestation. A refusal throws a ContractError with a code and writes nothing: no record, no key, no log event. dryRun runs every check and returns the record without writing it. (3) contractVerify, for a locally signed body that has no base (no base key, or null), reads the attestation through the new export checkBaseAttestation(root, id, { workdir }) and, only when it is accepted, uses its base exactly as it uses a base the body records: for MEMEV_CONTRACT_BASE, for the ancestor check and for the scope and red-green criteria. The result says where the base came from in base_source ('contract', 'attestation', 'approval' or null). A refused attestation leaves the contract as it is today, BLOCKED with 'no base revision recorded (base attestation refused: <reason>)', and sets no MEMEV_CONTRACT_BASE. (4) An attestation never overrides a base the body records, including a recorded base that is not a sha: such a body is judged as it is today and its attestation is not read. (5) A record is refused when the sha256 is not the signed body's, when the signer is not the key in the contract's own signature file, when the signature does not verify with contracts/keys/<signer>.pub, when it has any key beyond the six or a wrong schema or a base that is not 40 hex, when its base is not a commit in the workdir or not an ancestor of HEAD, and when a second record in the folder names the same contract. Duplicates are refused and never resolved by choosing one: attesting again fails with already_attested, and verify with two records naming one contract treats both as refused. (6) The folder is written only by the engine: the vault refuses plain writes under contracts/attestations in any letter case, and the vault's pre-commit hook refuses a modified, deleted or renamed file there, as it does for contracts/signed and contracts/keys. (7) memev contract attest-base <id> --base <sha> [--dry-run] reaches the engine through the admin token, as approve does, by a new MCP tool memev_contract_attest_base that is not read-only. (8) docs/CONTRACTS.md says all of this in the Base revision section. Boundaries: (a) this contract adds no record. Writing the records for the 75 is the signer's operation, one memev contract attest-base per contract with a base the signer chooses, after this is built; each choice is checked by its own dry run and by a verify whose red half must fail on an assertion. (b) An attestation cannot be revoked or replaced. A wrong one is repaired by superseding the contract (QL-W-01A, pull request #380, covers new signings; its refusal and its register row about back-filling are not changed by this contract). (c) An attestation also unblocks the scope criterion of the contract, because scope and red-green share one base check, so a signer chooses a base for which the scope criterion makes sense. (d) No check that the base precedes the commit that added the signed body: that is the signer's judgement, backed by the red half of verify. (e) contractSign, the remote signing path, the approval record and the red-team gate are unchanged, and no signed body, signature, key, red-team record or existing spec file is touched. Base revision: 54a98028ca455d82c64c3a07f3b813eff8263a26, the memev main commit that merged pull request #379 (SR-W-03A); it is the commit the red runs of this contract are judged at, and the signer drafts with --workdir at the checkout top level and --base this commit (criterion 22 pins it). Nothing here needs a caller beyond contractVerify, the CLI and the MCP tool. The tests reach the engine only through Vault methods, and import the one new export with import() inside the test body after asserting typeof, so a missing export or method fails on an assertion and not at load. Depends on contracts: SR-0.03.3 (signed) and QL-W-01A (proposed and unsigned, pull request #380; the two touch different functions of src/engine/contracts.mjs and the same section of docs/CONTRACTS.md, and a verify of a contract with no attestation behaves as QL-W-01A requirement 4 says). Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository; tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier. Nothing in this contract decides ADR 3, ADR 5, ADR 7 or SO-A-05.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "A signed base attestation gives a locally signed contract with no base a verifiable one, is refused when it does not match, never overrides a recorded base, and is written once",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a base attestation is the file contracts/attestations/<contract id>.json, one JSON object with exactly the keys schema (the string memev-base-attestation/1), contract (the id of a signed contract), contract_sha256 (64 hex, the canonicalHash of the signed body), base (an object with exactly sha, 40 lowercase hex, and recorded_at), signer (16 hex, a key id) and sig (the DSSE envelope sign() of vendor/attest/signature.mjs makes over the record without sig, with the contract key of the machine); the file is named for the contract it attests (source: src/engine/contracts.mjs, contractApprove and _approvalBase for the pattern of a record signed with the contract key)",
+        "Vault#contractAttestBase(identity, { id, base, local = true, dryRun = false }) is a local operator action: it throws ContractError forbidden for local:false and for an identity without admin scope, and otherwise needs, in this order, a signed contract (not_found), whose signature verifies (invalid), signed locally and with no base key or a null one (has_base; a remote-signed contract is refused with has_base because its base comes from its approval record), an explicit base of 40 hex characters (bad_request), this machine holding a contract key that is the key of the contract signature file (wrong_signer, and no key is created), no attestation already there (already_attested), a workdir that is a git checkout (not_a_checkout; the workdir is the body workdir, else the vault root), a base that is a commit there (base_not_found) and an ancestor of its HEAD (not_ancestor); every refusal happens before the first write and writes no record, no key, no log event and no memory",
+        "on success it writes the record, the public key under contracts/keys when it is not there, and one contract.base_attested log event (id, base, signer), through internal writes, and returns { attested: true, id, base, signer, contract_sha256 }; with dryRun it runs every check and returns { attested: false, dry_run: true, id, base, signer, contract_sha256, record } and writes nothing",
+        "checkBaseAttestation(root, id, { workdir = root }) is exported from src/engine/contracts.mjs and is the one place that judges a record: it returns { status: \"none\" } when the folder holds no record that is named for the contract or names it, { status: \"ok\", sha, signer } for an accepted record, and { status: \"refused\", reason } otherwise, checking in this order: more than one record names the contract (\"two attestations name this contract\"), the shape (\"malformed record\": exactly the six keys, the schema, contract equal to id, the hex forms, base with exactly sha and recorded_at), the signed body and its signature file being readable, \"contract sha256 does not match the signed body\", \"signer is not the key that signed the contract\" (the keyid of the first signature of the signature file), \"signature does not verify\" (with contracts/keys/<signer>.pub, over the record without sig), \"the workdir is not a git checkout\", \"base not found\" and \"base is not an ancestor of HEAD\" (source: baseCheck in contractVerify for the last three)",
+        "Vault#contractVerify reads an attestation only for a locally signed body that has no base key or a null one; it never reads one for a body that records a base, whatever that base is, and never for a remote-signed body; an accepted attestation gives the base for criterionEnv, for baseCheck and for the scope and red-green criteria exactly as a recorded base does; a refused one leaves base unset and gives the criteria BLOCKED with the detail \"no base revision recorded (base attestation refused: <reason>)\"; the result gains base_source, one of \"contract\", \"attestation\", \"approval\" or null, and nothing else of the result changes",
+        "contracts/attestations is written only by the engine: PROTECTED in src/engine/vault.mjs gains /^contracts\\/attestations\\//i, so a plain write is refused with code immutable in any letter case, and PRE_COMMIT in src/engine/contracts.mjs refuses a staged modification, deletion or rename under contracts/attestations/ and accepts an addition",
+        "memev contract attest-base <id> --base <sha> [--dry-run] calls the new MCP tool memev_contract_attest_base over the admin token with callAdmin, as approve does; the tool is registered in src/server/mcp.mjs without readOnlyHint and is classified with the write tools in test/mcp-hints.test.mjs; the usage line of src/cli/contracts-cli.mjs names attest-base",
+        "contractSign, contractApprove, the red-team gate, the remote signing path and every signed file are unchanged; this task adds no attestation record to the repository",
+        "docs/CONTRACTS.md, in the Base revision section, says that a signed base attestation gives a locally signed contract with no base a base, where the records are, who may write one and what makes verify refuse one, that it never overrides a base the contract records, that a second attestation for a contract is refused, and that a wrong one is repaired by superseding the contract",
+        "the new test file reaches the engine only through Vault methods and the exports named here, imported with import() inside the test body after asserting typeof, and each red-green criterion of this task runs only its own subtest, whose name starts with T1-cNN: (NN is the criterion's position in this task) (source: the convention of SR-0.03.3 T1 requirement 8)"
+      ],
+      "description": "Repo: memev. Depends on nothing that is not on main: SR-0.03.3 is signed and its base recording, the approval record and baseCheck are in src/engine/contracts.mjs at the base. QL-W-01A (pull request #380) changes contractSign and this contract changes contractVerify, contractAttestBase and the exports, so they merge in either order. The fixtures are the vault of test/helpers/tmp.mjs, the git repositories and hand-signed contracts of test/helpers/contracts-base.mjs (re-signed with the vault machine key, so that the signer matches), and test/helpers/redgreen.mjs. A read-only stand-in of the eleven tests was red on an assertion at the base and green against a draft change that adds checkBaseAttestation, contractAttestBase, the verify branch, the protected path, the hook text, the MCP tool and the CLI line; the ten existing test files that sign or verify a contract stayed green.",
+      "scope": [
+        "src/engine/contracts.mjs",
+        "src/engine/vault.mjs",
+        "src/server/mcp.mjs",
+        "src/cli/contracts-cli.mjs",
+        "test/contracts-base-attest.test.mjs",
+        "test/mcp-hints.test.mjs",
+        "docs/CONTRACTS.md",
+        "docs/MODULES.md",
+        "changelog.d/QL-W-01B.md"
+      ],
+      "criteria": [
+        {
+          "statement": "Attesting a base for a locally signed contract with no base writes contracts/attestations/<id>.json with exactly the keys schema, contract, contract_sha256, base, signer and sig, whose sha256 equals the canonicalHash of the signed body and the payload of its signature file, whose signer is the key of that signature file, and leaves the signed body and signature bytes unchanged. checkBaseAttestation is exported and accepts it. The test fails before the change on an assertion about the missing method, not on a load error, and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-attest.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/contracts-base-attest.test.mjs"
+          }
+        },
+        {
+          "statement": "contractVerify takes the attested base: a command criterion sees it in MEMEV_CONTRACT_BASE, the red-green criterion is PASS with the base in its detail, the scope criterion is no longer BLOCKED for a missing base, and the result says base_source is attestation. Before the attestation the same contract is BLOCKED with no base revision recorded, no base is in the environment and base_source is null. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-attest.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c02:' test/contracts-base-attest.test.mjs"
+          }
+        },
+        {
+          "statement": "A base the body records is never replaced: with a valid attestation naming another commit, verify uses the recorded base (base_source is contract), and with a recorded base that is not a sha it stays BLOCKED with nothing in the environment and base_source null; contractAttestBase refuses both with code has_base. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-attest.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/contracts-base-attest.test.mjs"
+          }
+        },
+        {
+          "statement": "An attestation whose sha256 is not the signed body is refused, even when it is validly signed by the right key: checkBaseAttestation says refused with a reason that names sha256, and verify is BLOCKED with base attestation refused in its detail, no base in the environment and base_source null. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-attest.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/contracts-base-attest.test.mjs"
+          }
+        },
+        {
+          "statement": "A base that is not an ancestor of HEAD, a commit that does not exist, and a base that is not 40 hex (HEAD, a short sha, an option, nothing) are refused by contractAttestBase with the codes not_ancestor, base_not_found and bad_request and nothing is written; a validly signed record naming a commit that is not an ancestor of HEAD is refused by verify with not an ancestor of HEAD in the detail and no base in the environment. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-attest.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/contracts-base-attest.test.mjs"
+          }
+        },
+        {
+          "statement": "A second attestation for a contract is refused with code already_attested and the first record is byte-identical; two records in the folder that name one contract make verify refuse both (base attestation refused: two attestations name this contract), with no base in the environment and base_source null. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-attest.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/contracts-base-attest.test.mjs"
+          }
+        },
+        {
+          "statement": "checkBaseAttestation refuses a record whose base was edited after signing, a record naming a signer that did not sign the contract, a record naming the right signer but signed by another private key, a record with an extra key, a wrong schema or a base that is not 40 hex, and accepts the good record. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-attest.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c07:' test/contracts-base-attest.test.mjs"
+          }
+        },
+        {
+          "statement": "contractAttestBase refuses a remote caller (forbidden), a token without admin scope (forbidden), an unknown contract (not_found), a missing base (bad_request), a contract signed by another key (wrong_signer), a remote-signed contract (has_base), a contract whose signature does not verify (invalid) and a machine that holds no contract key (wrong_signer, and no key is created); the vault is byte-identical after each refusal. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-attest.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/contracts-base-attest.test.mjs"
+          }
+        },
+        {
+          "statement": "A plain write under contracts/attestations is refused with code immutable in any letter case, and the exported PRE_COMMIT hook of the vault refuses a commit that modifies or deletes a committed record there while it accepts adding one. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-attest.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c09:' test/contracts-base-attest.test.mjs"
+          }
+        },
+        {
+          "statement": "A dry run returns the record, writes nothing, repeats every refusal, and does not use up the attestation: a real attestation afterwards succeeds. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-attest.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c10:' test/contracts-base-attest.test.mjs"
+          }
+        },
+        {
+          "statement": "Every record under contracts/attestations of this repository is named for its contract and is accepted by checkBaseAttestation against the working tree (no record is a pass). The test fails before the change on an assertion about the missing export and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-base-attest.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c11:' test/contracts-base-attest.test.mjs"
+          }
+        },
+        {
+          "statement": "The memev_contract_attest_base tool is listed, is not read-only and is classified with the other write tools, and the other tool tests stay green",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/mcp-hints.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The CLI reaches the engine through the admin token, as approve does",
+          "verifier": {
+            "type": "grep",
+            "file": "src/cli/contracts-cli.mjs",
+            "pattern": "callAdmin\\('memev_contract_attest_base'"
+          }
+        },
+        {
+          "statement": "The MCP tool is registered",
+          "verifier": {
+            "type": "grep",
+            "file": "src/server/mcp.mjs",
+            "pattern": "tool\\('memev_contract_attest_base'"
+          }
+        },
+        {
+          "statement": "The base, signing and remote tests stay green: recording at signing, the legacy contract without a base (BLOCKED with no base revision recorded), the format, the environment, the remote and the unknown-commit cases, and the contract and gate tests",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/contracts-base.test.mjs test/contracts-base-legacy.test.mjs test/contracts-base-format.test.mjs test/contracts-base-env.test.mjs test/contracts-base-remote.test.mjs test/contracts-base-unknown.test.mjs test/contracts.test.mjs test/contracts-remote.test.mjs test/contracts-gates.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "The gate --report is byte-identical with and without the change: run on the same contracts tree, once with src, scripts and vendor as they are and once with them restored from the base, the two outputs do not differ",
+          "verifier": {
+            "type": "command",
+            "cmd": "h=$(mktemp -d) && b=$(mktemp -d) && git worktree add -q --detach \"$h\" HEAD && git worktree add -q --detach \"$b\" HEAD && git -C \"$b\" checkout -q \"$MEMEV_CONTRACT_BASE\" -- src scripts vendor && (cd \"$h\" && node scripts/gate/redteam-gate.mjs --report > \"$h.out\" 2>&1); (cd \"$b\" && node scripts/gate/redteam-gate.mjs --report > \"$b.out\" 2>&1); diff \"$h.out\" \"$b.out\"; rc=$?; git worktree remove --force \"$h\"; git worktree remove --force \"$b\"; rm -f \"$h.out\" \"$b.out\"; exit $rc",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "No signed body, signature, key, red-team record or existing spec differs from the base, and this change adds no attestation record",
+          "verifier": {
+            "type": "command",
+            "cmd": "git diff --exit-code \"$MEMEV_CONTRACT_BASE\" HEAD -- contracts/signed contracts/keys contracts/quality-loop contracts/scope-one contracts/seed-readiness contracts/attestations",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "One full run of test/contracts-base-attest.test.mjs passes every labelled subtest (T1-c01 to T1-c11) with nothing skipped and nothing todo, and prints its whole output.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/contracts-base-attest.test.mjs > \"$f\" 2>&1; rc=$?; cat \"$f\"; ok=1; [ \"$rc\" -eq 0 ] || ok=0; grep -Eq '^# skipped 0$' \"$f\" || ok=0; grep -Eq '^# todo 0$' \"$f\" || ok=0; grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c01:' \"$f\" || ok=0; grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c02:' \"$f\" || ok=0; grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c03:' \"$f\" || ok=0; grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c04:' \"$f\" || ok=0; grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c05:' \"$f\" || ok=0; grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c06:' \"$f\" || ok=0; grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c07:' \"$f\" || ok=0; grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c08:' \"$f\" || ok=0; grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c09:' \"$f\" || ok=0; grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c10:' \"$f\" || ok=0; grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c11:' \"$f\" || ok=0; rm -f \"$f\"; [ \"$ok\" -eq 1 ]",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "docs/CONTRACTS.md says that a signed base attestation gives a signed contract with no base one, and that it never overrides a base the contract records",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CONTRACTS.md",
+            "pattern": "base attestation[^.]*never (overrides|replaces)[^.]*base|never (overrides|replaces) a base the contract records",
+            "flags": "s"
+          }
+        },
+        {
+          "statement": "docs/CONTRACTS.md says that a second attestation for a contract is refused and where the records are",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CONTRACTS.md",
+            "pattern": "contracts/attestations/[^.]*\\.|second attestation",
+            "flags": "s"
+          }
+        },
+        {
+          "statement": "The change touches only the files of its scope in src, scripts and vendor, adds no import to src/engine/contracts.mjs, and the test file has no static import of the engine",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git diff --name-only \"$MEMEV_CONTRACT_BASE\" HEAD -- src scripts vendor | grep -vxE 'src/engine/contracts.mjs|src/engine/vault.mjs|src/server/mcp.mjs|src/cli/contracts-cli.mjs')\" && test -z \"$(git diff \"$MEMEV_CONTRACT_BASE\" HEAD -- src/engine/contracts.mjs | grep -E '^\\+import ')\" && ! grep -Eq \"^import .*src/\" test/contracts-base-attest.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "This contract is drafted with the memev checkout as its workdir and a pinned base. The workdir is the checkout top level (git rev-parse --show-toplevel equals the working directory). The base is 54a98028ca455d82c64c3a07f3b813eff8263a26, the memev main commit that merged pull request #379 (SR-W-03A), the commit the red runs are judged at.",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$MEMEV_CONTRACT_BASE\" = 54a98028ca455d82c64c3a07f3b813eff8263a26 ] && [ \"$(git rev-parse --show-toplevel)\" = \"$(pwd -P)\" ]",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The leak scan passes on files",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The leak scan passes on every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing.",
+        "Anything outside the requirements of this task is not built, not stubbed and not defaulted in code; if the work seems to need it, stop and report what it needs.",
+        "A test_red_green command of this contract prints its whole output: it is never piped through tail or head, and never captures its output without printing it."
+      ]
+    }
+  ]
+}
