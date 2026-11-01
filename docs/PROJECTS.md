@@ -160,6 +160,14 @@ That is a semantic conflict. The store reads every approval event in the log, an
 
 Both approvals stay in the log and as entities, unchanged. Nothing is written to the log for the conflict, and it is never written into a task: the stored task keeps its own status, and the conflict is read through `store.conflicts()` and `store.view('task')`. The view shows a task that is not in a terminal state as `CONFLICTED`, with the status it had as `prior_status` and the record attached. It is a display and makes no transition, so a cancelled task stays `CANCELLED`, and anything that acts on a task reads the stored one. The same log always gives the same result.
 
+"Terminal" here means a state with an empty row in `TRANSITIONS`, which today is `CANCELLED` only (a test holds the store's list equal to those rows). `VERIFIED` and `FAILED` have moves out, and the legacy `DONE` status of a coordinator without the lifecycle is not in the table at all, so a task in any of those three does show as `CONFLICTED`.
+
+### What reads it, and what is not enforced yet
+
+**The conflict is surfaced and not enforced.** Nothing in `src/` calls `view('task')` or `conflicts()` today. The coordinator reads `snapshot()`, so until the wiring below lands, a task with an unresolved approve and reject can still be claimed, reported, reassigned or cancelled. This change adds the derivation and the two readers and nothing that acts on them: changing the coordinator is outside the scope of SO-F-02.
+
+**The wiring that follows.** SO-1.01 wiring will make the coordinator consume `view('task')` and `conflicts()` on its read side: `claim`, the eligibility check, `status` and the task listing around `_tasksOf`. Its writes keep using `snapshot()`, so a conflicted task is never written back as `CONFLICTED`. Until that lands the store's readers have no caller in `src/`, which this page records rather than hides.
+
 A person settles a conflict by recording an approval, with a decision, whose `resolves` lists the events it settles. The list is honoured only when:
 
 - every entry is an earlier approval event of the same task, so an approval on another task settles nothing here
@@ -171,7 +179,7 @@ Some choices are made on purpose:
 
 - The approval's `task_version` does not decide anything. A stale approval after a scope amendment still counts, and an approve and a reject on the same version are a conflict too. The rule applies no approval, it only surfaces them, and whether an approval covers the current scope is the question the state machine answers through the scope version its evidence binds to.
 - One person who approves and then rejects has made a conflict, and a resolving approval that names both events settles it. A later write never replaces an earlier one.
-- Who may settle a conflict is not checked: `by` is a note on the approval and is not verified, so any subject that can write an approval can name both sides. The permission matrix is ADR 5, which is open, and who a writer is gets resolved at the store boundary by SO-F-01. This rule does not decide either.
+- Who may settle a conflict is not checked: `by` is a note on the approval and is not verified, so any writer can settle a conflict by naming both sides, an agent included. ADR 5 (the permission matrix, open) or SO-03-A should close that; who a writer is gets resolved at the store boundary by SO-F-01. This rule does not decide either.
 - The set of decisions is provisional, as above.
 
 Approvals that agree, a single approval, and approvals with no decision are not conflicts.

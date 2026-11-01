@@ -468,6 +468,17 @@ test('SO-F-02 AC03: the derived view shows CONFLICTED on a live task and leaves 
   s.close();
 });
 
+test('SO-F-02 AC03: terminal means an empty row of the transition table, so VERIFIED, FAILED and legacy DONE show as CONFLICTED', () => {
+  const s = open('p-view2');
+  const statuses = ['VERIFIED', 'FAILED', 'DONE', 'CANCELLED'];
+  statuses.forEach((st, i) => { putTask(s, `task-${i}`, st); putAppr(s, `a${i}`, `task-${i}`, 'approve'); putAppr(s, `b${i}`, `task-${i}`, 'reject'); });
+  const v = s.view('task');
+  assert.deepEqual(statuses.map((_, i) => v[`task-${i}`].status), ['CONFLICTED', 'CONFLICTED', 'CONFLICTED', 'CANCELLED']);
+  assert.deepEqual(statuses.slice(0, 3).map((_, i) => v[`task-${i}`].prior_status), ['VERIFIED', 'FAILED', 'DONE']);
+  assert.ok(TRANSITIONS.VERIFIED.length > 0 && TRANSITIONS.FAILED.length > 0 && !Object.hasOwn(TRANSITIONS, 'DONE'));
+  s.close();
+});
+
 test('SO-F-02 AC03: one person who changes their mind, and a stale version, are conflicts until a resolution names both events', () => {
   const s = open('p-mind');
   putTask(s, 'task-1');
@@ -481,6 +492,19 @@ test('SO-F-02 AC03: one person who changes their mind, and a stale version, are 
   s.close();
 });
 
+test('SO-F-02 AC03: the docs and the changelog say the conflict is surfaced, not enforced, and what will read it', () => {
+  for (const [name, text] of [['docs/PROJECTS.md', read('docs/PROJECTS.md')], ['changelog.d/SO-F-02.md', read('changelog.d/SO-F-02.md')]]) {
+    assert.match(text, /surfaced and not enforced/, name);
+    assert.match(text, /SO-1\.01 wiring will (?:make the coordinator )?consume `view\('task'\)` and `conflicts\(\)`/, name);
+    assert.match(text, /`?claim`?, (?:the )?eligibility(?: check)?, `?status`?/, name);
+    assert.match(text, /around `_tasksOf`/, name);
+    assert.match(text, /snapshot\(\)/, name);
+    assert.match(text, /can still be claimed, reported, reassigned or cancelled/, name);
+    assert.match(text, /VERIFIED/, name);
+    assert.match(text, /DONE/, name);
+  }
+});
+
 test('SO-F-02 AC03: the resolver is not checked, and the documentation says so', () => {
   const s = open('p-by');
   putTask(s, 'task-1');
@@ -489,5 +513,8 @@ test('SO-F-02 AC03: the resolver is not checked, and the documentation says so',
   putAppr(s, 'r', 'task-1', 'approve', { resolves: [a.id, b.id], by: 'agent:x' });
   assert.equal(s.conflicts().length, 0, 'a decision on who may settle is not made here');
   s.close();
-  assert.match(read('docs/PROJECTS.md'), /Who may settle a conflict is not checked/);
+  const page = read('docs/PROJECTS.md');
+  assert.match(page, /Who may settle a conflict is not checked/);
+  assert.match(page, /any writer can settle a conflict by naming both sides/);
+  assert.match(page, /ADR 5 \(the permission matrix, open\) or SO-03-A should close that/);
 });

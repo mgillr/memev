@@ -29,8 +29,10 @@ export const MERGE_CLASSES = Object.freeze(['last-writer', 'set-union', 'append-
  */
 export const APPROVAL_DECISIONS = Object.freeze(['approve', 'reject']);
 
-// A task in one of these states is never shown as CONFLICTED: the state machine has no move out of it (the empty row of
-// TRANSITIONS in project-state.mjs, which a test holds equal to this list). The store may not import the state machine.
+// A task in one of these states is never shown as CONFLICTED. "Terminal" means exactly an empty row in TRANSITIONS in
+// project-state.mjs: no move out of the state. A test holds this list equal to those rows, because the store may not import
+// the state machine. Only CANCELLED has an empty row. VERIFIED and FAILED have moves out, and the legacy DONE status of a
+// coordinator without the lifecycle is not in the table, so tasks in those three do show as CONFLICTED in view().
 export const TERMINAL_TASK_STATUSES = Object.freeze(['CANCELLED']);
 
 // Why an approval's data cannot be used by the conflict rule, or null. The write path refuses such data; replay, which
@@ -319,7 +321,7 @@ export class ProjectStore {
     this.derived = conflicts.map((c) => ({ ...c, id: `conf_sem_${sha256(c.events.join('|')).slice(0, 12)}` }));
   }
 
-  /** The semantic conflicts the log derives right now, as plain records. Derived, never stored. */
+  /** The semantic conflicts the log derives right now, as plain records. Derived, never stored. See view() for who reads it. */
   conflicts() { return this.derived.map((c) => ({ ...c })); }
 
   /**
@@ -327,6 +329,11 @@ export class ProjectStore {
    * a terminal state, a copy shown as CONFLICTED with `prior_status` and the conflict record. This is a display: it makes
    * no transition, a terminal task keeps its status, and the stored task is never changed, so a caller that acts on a
    * task reads `snapshot`. For `conflict`: the stored conflicts and the derived ones. Any other kind is its snapshot.
+   *
+   * Surfaced, not enforced: nothing in src/ calls view() or conflicts() yet, and the coordinator reads snapshot(), so a
+   * conflicted task can still be claimed, reported, reassigned or cancelled. The SO-1.01 wiring will read through
+   * view('task') and conflicts() on the coordinator's read side (claim, eligibility, status, around _tasksOf) and keep
+   * writing from snapshot(). Changing the coordinator is outside the scope of SO-F-02.
    */
   view(kind) {
     const out = this.snapshot(kind);
