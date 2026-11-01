@@ -32,7 +32,7 @@ A task takes the strongest class of the requirements it serves: conflicting, the
 - Section 3 of the work breakdown has 98 leaves, one per Scope One requirement (`SO-REQ-001` to `SO-REQ-098`). The programme covers Scope One in six requirements (`MV-S1-01` to `MV-S1-06`) and points at those leaves rather than copying them.
 - Section 2 has 57 seed-readiness contracts. The programme's overlap table names eight of them (SR-1.15, SR-2.01, SR-3.01, SR-3.03, SR-3.05, SR-3.06, SR-6.07, SR-6.10). Four of those (SR-3.03, SR-3.06, SR-6.07, SR-6.10) are not in the manifest and so are not leaves of the work breakdown.
 - Sections 6 to 8 (pull requests, branches, merged foundations) are mirrored here by [INVENTORY.md](INVENTORY.md), refreshed to the live `gh pr list` state.
-- 45 leaves are blocked on owner decisions. None is decided here.
+- 14 leaves are blocked in the work breakdown (the blocked count of the summary in [WBS.md](WBS.md)). Some wait on an owner decision (the open ADRs, the memory authority, the contract-set repairs) and others on a contract, a definition or a leaf that does not exist yet. None is decided here.
 
 ## Boundaries with the Scope One contracts
 
