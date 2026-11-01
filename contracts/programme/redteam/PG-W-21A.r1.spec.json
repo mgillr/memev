@@ -1,0 +1,161 @@
+{
+  "title": "PG-W-21A Trust record v1, its validator and schema, and a pure eligibility evaluation (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract PG-W-21A in memev: the trust record, its validator and schema, and a pure evaluation of eligibility (work package WP21-01). Proposed and unsigned; the signer signs it after the red-team gate. The id is in the style of SO-W-08B: its second part starts with a letter, so the redteam gate's specIdOf reads the whole name and the contract has its own record path; the work package number 21 is not in docs/scope-one/programme/fragments. Why: work breakdown rows 4.3.7 and 4.3.8 are blocked in part because trust governance, the second of the two integrations the addendum names beside the merge boundary, has no definition in this repository. A definition is proposed in ADR 8 (docs/scope-one/DECISIONS.md, full text in docs/scope-one/design/trust-governance.md); this contract builds only its first, self-contained part, the data model and the evaluation, as a library with tests. It is independent of every open pull request: it imports only src/engine/identity.mjs, which is on main, and it reads no store, clock, file or network. The record format is provisional; changing it later is a new schema version. Boundaries: (1) trust is an eligibility input only: nothing here grants a permission, a membership or a read, and a personal scope is never shared. (2) The module has no production caller in this contract: it is a library with tests, and nothing consumes it until a later contract builds on it (PG-W-21B, unsigned, which is not to be signed before the owner signs off ADR 8). (3) crdt-merge stays in its own repository behind the call-out boundary (ADR 6, decided); nothing here touches it. (4) The topology of work breakdown row 1.3.6 stays OPEN and is an input to none of this. Depends on contracts: SO-F-01 (the subject and scope model). Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier. Nothing in this contract decides ADR 3, ADR 5, ADR 7 or SO-A-05, and it adds no role-by-action matrix.",
+  "tasks": [
+    {
+      "id": "WP21-01",
+      "title": "Trust record, version 1: the grant and revocation records, their validator and schema, and a pure evaluation that denies by default, lets delegation only narrow, and cascades revocation, as of a stated time",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a trust record has schema 'memev-trust/1' and one of two kinds. A grant names its id, the subject trusted, the issuer, one scope, the purposes it covers (a closed list of two in version 1: contribute and verify), a start, a required expiry after the start, optional evidence references (at most 8, each a text of at most 128 characters) and an optional delegation block { depth (a whole number, 0 or more), parent (a grant id, optional) }. A revocation names its id, the grant it revokes, its issuer, a time and a reason from a closed list (compromised, left, error, other). PROVISIONAL (source: ADR 8 in docs/scope-one/DECISIONS.md, which is proposed; full text in docs/scope-one/design/trust-governance.md, section How trust is granted, scoped, delegated, revoked and audited)",
+        "the validator refuses a record with an unknown field, a subject or issuer that is not a subject id of one of the six types of src/engine/identity.mjs, a personal scope (a personal scope is never shared), a scope that validateScope refuses, an empty or unknown purpose, an expiry that is missing or not after the start, evidence over the limits, and a delegation depth that is not a whole number of 0 or more (source: src/engine/identity.mjs:13-14, :66-75; docs/FEDERATION.md:147-151)",
+        "evaluate(request { subject, scope, purpose }, { records, roots, at }) returns { eligible, rule, reason, chain } and denies by default: no records, no roots, a grant whose issuer is neither a root nor the holder of a live delegating grant, a purpose or a scope the grant does not name, a time before the start or at or after the expiry, a revoked grant and an invalid request each deny with a rule id. A root is a subject id the caller passes in; there is no default root and no default grant for any subject, device or node. At is required: there is no default to the clock (source: docs/scope-one/DECISIONS.md:66-67, deny by default as the safe default of ADR 5, which is not decided; docs/FEDERATION.md:228-230; addendum line 335)",
+        "a delegated grant only narrows its parent: the same scope, the same or fewer purposes, an expiry no later than the parent's, and a depth lower than the parent's; a parent of depth 0 cannot delegate. A revocation takes effect from its time, so an evaluation at an earlier time is unchanged, and revoking a grant makes every grant delegated from it ineligible (source: addendum line 274; docs/scope-one/design/trust-governance.md)",
+        "the module is pure: it reads and writes no file, no network and no clock, imports only src/engine/identity.mjs, and does not change its inputs (source: addendum lines 333 to 335, trust is not a store and not access)",
+        "out of scope for this task, by design: the choice of any root (roots are a parameter of evaluate and the module has no default root), any grant made automatically or by default for any subject, device or node, any purpose beyond contribute and verify, and any command, route or store that accepts these records; this task defines and tests the record and the evaluation only"
+      ],
+      "description": "Repo: memev. Starts at once: it depends on nothing that is not on main (src/engine/identity.mjs). Defines the trust record and the one function that answers whether a subject is eligible for a purpose in a scope as of a time. It writes nothing, reads no store and has no caller outside its tests: it has no production caller in this task, which is the position SR-1.15 asks to be stated, not a waiver of it. Trust is an eligibility input only: nothing here grants a permission, a membership or a read. The schema file docs/schemas/trust-record-v1.json lists the same fields as the validator. The record format is provisional: a change to it is a new schema version, not an edit of memev-trust/1.",
+      "scope": [
+        "src/engine/federation/trust-record.mjs",
+        "docs/schemas/trust-record-v1.json",
+        "test/trust-record.test.mjs",
+        "changelog.d/PG-W-21A.md",
+        "docs/MODULES.md",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "the validator accepts a grant, a delegated grant and a revocation, and refuses each of these naming the field: an unknown field, a subject id of no known type, a personal scope, a scope with no type, an empty purposes list, a purpose outside contribute and verify, a missing expiry, an expiry not after the start, nine evidence references, a 129-character reference and a negative or fractional delegation depth; the test fails before the module exists and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21A AC01:' test/trust-record.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21A AC01:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "evaluation denies by default, each with its rule id: no records; an empty roots list; a grant whose issuer is not a root and holds no delegating grant; a purpose the grant does not name (verify asked, only contribute granted); another scope of the same type; a time before the start; a time at the expiry; a subject with no grant at all, whatever its type; and an invalid request; and it allows one root-issued grant for its purpose, scope and live window, with the grant id in the chain",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21A AC02:' test/trust-record.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21A AC02:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "delegation only narrows: a child grant that names a wider purpose list, another scope, a later expiry or a depth equal to or above its parent's is not honoured (eligible false, rule naming the chain), a parent of depth 0 cannot delegate, and a narrowing child of a live parent is eligible with both grant ids in the chain",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21A AC03:' test/trust-record.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21A AC03:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "revocation is as-of and cascades: a revoked grant is eligible at a time before the revocation and ineligible at it and after; revoking a parent makes its child ineligible; revoking a child leaves the parent eligible; a revocation by a subject that is not the issuer of the grant or a root is not applied",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21A AC04:' test/trust-record.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21A AC04:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "the evaluation is pure: with frozen records, roots and request it does not throw and returns an equal result on a second call; the inputs are unchanged; and a call with no at returns a deny with rule deny.bad_request instead of reading the clock",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21A AC05:' test/trust-record.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21A AC05:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "docs/schemas/trust-record-v1.json parses, names schema memev-trust/1, and lists exactly the fields, purposes and reasons the validator accepts; adding a field to the validator without the schema fails the test",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-W-21A AC06:' test/trust-record.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-W-21A AC06:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "the module marks every choice as provisional and names the decision record",
+          "verifier": {
+            "type": "grep",
+            "file": "src/engine/federation/trust-record.mjs",
+            "pattern": "ADR 8.*PROVISIONAL|PROVISIONAL.*ADR 8",
+            "flags": "s"
+          }
+        },
+        {
+          "statement": "the module imports only src/engine/identity.mjs and no node module that reads a file, a network or a process: every import line of src/engine/federation/trust-record.mjs names ../identity.mjs",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$(grep -E '^import ' src/engine/federation/trust-record.mjs | wc -l)\" -ge 1 ] && ! grep -E '^import ' src/engine/federation/trust-record.mjs | grep -Ev \"identity\\.mjs\"",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "the module names no clock, file, network or process call: src/engine/federation/trust-record.mjs has no Date.now, new Date(), fs, net, http, fetch or child_process",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eq 'Date\\.now|new Date\\(\\)|node:fs|node:net|node:http|node:child_process|fetch\\(' src/engine/federation/trust-record.mjs",
+            "expect_exit": 0,
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The leak scan passes on files",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The leak scan passes on every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing.",
+        "Anything outside the requirements of this task is not built, not stubbed and not defaulted in code; if the work seems to need it, stop and report what it needs."
+      ]
+    }
+  ]
+}

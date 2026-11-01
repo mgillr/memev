@@ -9,6 +9,8 @@ import path from 'node:path';
 import { readJson, writeJson, now, randomToken, exists, sha256 } from './util.mjs';
 import { findSecrets, redactSecrets } from './secrets.mjs';
 import { formatHlc, parseHlc, recordHash } from './oplog.mjs';
+import { EXECUTION_EVENT_KINDS, validateExecutionEvent } from './evidence.mjs';
+import { validateLink } from './relationships.mjs';
 import { SUBJECT_TYPES } from './identity.mjs';
 
 // The current schema version. A store at an older version is migrated forward on open; a store at a
@@ -135,6 +137,14 @@ export const ENTITY_KINDS = Object.freeze({
   event: declare(null, 'evt', ['type'], 'service', 'append-only', { authority: NO_SERVICE }),
 });
 
+// The relationship model's entity types (docs/schemas/relationships-v1.json), added in place and declared the same way. They are
+// not in ENTITY_KINDS: that set is held equal to the project schema file, which names nine types. Every store has them.
+const RELATIONSHIP_KINDS = Object.freeze({
+  milestone: declare('milestones.json', 'mile', ['title'], 'person', 'last-writer'),
+  deliverable: declare('deliverables.json', 'deliv', ['title'], 'person', 'last-writer'),
+  work_package: declare('work-packages.json', 'wp', ['title'], 'person', 'last-writer'),
+});
+
 export class ProjectStoreError extends Error {
   constructor(code, message) { super(message); this.code = code; }
 }
@@ -158,13 +168,13 @@ export class ProjectStore {
     this.allowSecrets = allowSecrets;
     // a type passed in can add to the built-in ones, never replace one: the frozen declarations stay what the schema says
     for (const name of Object.keys(kinds)) {
-      if (Object.hasOwn(ENTITY_KINDS, name)) throw new ProjectStoreError('bad_declaration', `refused: the entity type ${name} is built in and cannot be redeclared`);
+      if (Object.hasOwn(ENTITY_KINDS, name) || Object.hasOwn(RELATIONSHIP_KINDS, name)) throw new ProjectStoreError('bad_declaration', `refused: the entity type ${name} is built in and cannot be redeclared`);
     }
-    this.kinds = Object.freeze({ ...ENTITY_KINDS, ...kinds });
+    this.kinds = Object.freeze({ ...ENTITY_KINDS, ...RELATIONSHIP_KINDS, ...kinds });
     this.dir = path.join(this.root, STATE, 'projects', this.id);
     this._open = false;
     this._lockDepth = 0;
-    this.seq = 0; this.generation = 0; this.entities = new Map(); this.eventKeys = new Map(); this.usedIds = new Set(); this.recovered = []; this.clock = { ms: 0, c: 0 };
+    this.seq = 0; this.generation = 0; this.entities = new Map(); this.eventKeys = new Map(); this.usedIds = new Set(); this.recovered = []; this.clock = { ms: 0, c: 0 }; this.sources = new Map();
     this.approvals = new Map(); this.derived = []; this._unusable = new Map(); this._ignored = [];
   }
 
@@ -215,7 +225,7 @@ export class ProjectStore {
   // fragment: it is truncated and reported. A line that does not parse in the middle of the file is
   // torn or edited: it is skipped and reported, and every valid record after it is kept.
   _replay() {
-    this.seq = 0; this.generation = 0; this.entities = new Map(); this.eventKeys = new Map(); this.usedIds = new Set(); this.recovered = []; this.clock = { ms: 0, c: 0 };
+    this.seq = 0; this.generation = 0; this.entities = new Map(); this.eventKeys = new Map(); this.usedIds = new Set(); this.recovered = []; this.clock = { ms: 0, c: 0 }; this.sources = new Map();
     this.approvals = new Map(); this.derived = []; this._unusable = new Map(); this._ignored = [];
     if (!exists(this.eventsPath)) return;
     let content = fs.readFileSync(this.eventsPath, 'utf8');
@@ -246,6 +256,7 @@ export class ProjectStore {
       const { kind, id, data } = rec.entity;
       if (!this.entities.has(kind)) this.entities.set(kind, new Map());
       this.entities.get(kind).set(id, data);
+      if (id) this.sources.set(`${kind}:${id}`, { id: rec.id, ts: rec.ts, seq: rec.seq });
       // every approval write is its own event: a later write with the same id replaces the entity, never the event
       if (kind === 'approval') {
         const why = unusableApproval(data);
@@ -365,6 +376,15 @@ export class ProjectStore {
         throw new ProjectStoreError('invalid', `missing required field: ${f}`);
       }
     }
+    // an execution event (requested, accepted, observed, verified) carries its resource, time and payload hash
+    if (ent.kind === 'event' && EXECUTION_EVENT_KINDS.includes(data.type)) {
+      const v = validateExecutionEvent(data);
+      if (!v.ok) throw new ProjectStoreError('invalid', `missing required field: ${v.reason}`);
+    }
+    if (ent.kind === 'event' && data.type === 'relationship.linked') {
+      const v = validateLink(data);
+      if (!v.ok) throw new ProjectStoreError('invalid', `invalid link: ${v.reason}`);
+    }
     const sv = def.scopeVersionField;
     if (sv && Object.hasOwn(data, sv) && !(Number.isInteger(data[sv]) && data[sv] > 0)) {
       throw new ProjectStoreError('invalid', `${sv} must be a positive whole number`);
@@ -445,6 +465,11 @@ export class ProjectStore {
     }
     return { dropped };
   }
+
+  // The event record an entity's current value comes from: its id, time and sequence number, or null.
+  sourceOf(kind, id) { return this.sources.get(`${kind}:${id}`) ?? null; }
+  // Whether an event record with this id is in the log.
+  hasRecord(id) { return typeof id === 'string' && id.startsWith('evt_') && this.usedIds.has(id); }
 
   // The current entities of a kind, as a plain object.
   snapshot(kind) { return Object.fromEntries(this.entities.get(kind)?.entries() ?? []); }
