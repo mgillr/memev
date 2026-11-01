@@ -1567,7 +1567,7 @@
         "SR-1.24"
       ],
       "tasks": 1,
-      "criteria": 19,
+      "criteria": 23,
       "spec": "../seed-readiness/specs/SR-1.34-a-daemon-start-waits-long-enough-for-a-slow-machine.json",
       "status": "proposed 1 Nov 2026 (ASTL decision); unsigned; red-team review by ASTL Team, signing by ASTL; builder Claim F; no code until signed",
       "kind": "feature"
