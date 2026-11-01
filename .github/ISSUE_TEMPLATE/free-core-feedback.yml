@@ -1,0 +1,52 @@
+name: Free Core feedback
+description: Share usability feedback or a successful test result from the invited preview.
+title: "[Free Core feedback] "
+labels: ["free-core-preview", "feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not include private vault contents, customer data, prompts, tokens, private keys or connector URLs.
+  - type: input
+    id: build
+    attributes:
+      label: Memev commit or build
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS/version, Node version and AI application/version.
+    validations:
+      required: true
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Overall outcome
+      options:
+        - Worked as expected
+        - Worked with difficulty
+        - Could not complete
+        - Suggestion or product feedback
+    validations:
+      required: true
+  - type: textarea
+    id: task
+    attributes:
+      label: What were you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: experience
+    attributes:
+      label: What happened?
+      description: Include what was clear, confusing, useful or missing.
+    validations:
+      required: true
+  - type: textarea
+    id: improvement
+    attributes:
+      label: What would make this better?
+    validations:
+      required: false
