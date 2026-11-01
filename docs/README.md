@@ -25,9 +25,11 @@ this folder links back here, and this page links down to every page.
 | [CONTRACTS.md](CONTRACTS.md) | signed, immutable work contracts |
 | [PROJECTS.md](PROJECTS.md) | the project layer: task states, the transition table, derived project status |
 | [OPERATION-ENVELOPE.md](OPERATION-ENVELOPE.md) | the one record shape for an operation: fields, canonical serialisation, content hash, merge contract hash, versioning |
+| [FEDERATION.md](FEDERATION.md) | planned: a contribution is an operation envelope with a signature and admission block, and a node admits it in two steps |
 | [CLIENTS.md](CLIENTS.md) | what is added to each AI app; per-app pages below |
 | [CLOUD.md](CLOUD.md) | the secure link, devices, invites, joining another computer |
 | [AGENT-IDENTITY.md](AGENT-IDENTITY.md) | a person vouches for an agent role, and a third party checks it offline |
+| [IDENTITY-AND-SCOPES.md](IDENTITY-AND-SCOPES.md) | subjects, scopes and memberships, how a request resolves to a subject and a scope, and what is planned |
 | [RELAY.md](RELAY.md) | the relay protocol and the `memev cloud relay` client |
 | [GITHUB.md](GITHUB.md) | backup to your own private repository |
 | [DOCKER.md](DOCKER.md) | running Memev in a container |
