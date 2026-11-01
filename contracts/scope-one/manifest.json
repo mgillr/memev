@@ -791,7 +791,33 @@
    "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
    "supersedes": "SO-F-03.2",
    "supersedes_signed_contract": "k-so-f-03-2-contribution-s-bc1be8 (the spec file contracts/scope-one/specs/SO-F-03.2.json is unchanged)",
-   "supersedes_reason": "owner delegation, 1 Nov 2026: pull request #358 carries commit cfcc2db, which replaces the stale 'under review in pull request #224' line at README.md:195 with the current state of federation, and that line stays; README.md is in no scope of SO-F-03.2. SO-F-03.3 adds README.md to the scope of T1 and changes no requirement, criterion or other scope entry"
+   "supersedes_reason": "owner delegation, 1 Nov 2026: pull request #358 carries commit cfcc2db, which replaces the stale 'under review in pull request #224' line at README.md:195 with the current state of federation, and that line stays; README.md is in no scope of SO-F-03.2. SO-F-03.3 adds README.md to the scope of T1 and changes no requirement, criterion or other scope entry",
+   "superseded_by": "SO-F-03.4",
+   "superseded_reason": "owner decision, 1 Nov 2026, and the red-team review of pull request #374: the replay sequence is per sender and scope, one Admission per scope. SO-F-03.3 keeps the high-water mark per sender across all scopes, in memory, read from the log once, so a second Admission over one log, bare or not, admits a sequence twice, and with one Admission per scope the answer depends on the order the Admissions were made in. SO-F-03.4 keys the mark by sender and scope (the scope is inside the signed bytes: contributionMessage, src/engine/federation/contribution.mjs line 67), makes each Admission read the log again from the record after the last one it read when the log has moved, supersedes criterion 2 of SO-F-03.3 by name (its statement said per sender), carries every other criterion verbatim with its command unpiped, and adds five criteria (SO-F-03.4 AC14 to AC18); the five SO-F-03 tests stay green and are not edited, and the scope is unchanged"
+  },
+  {
+   "id": "SO-F-03.4",
+   "area": "SO-F",
+   "title": "Contribution signature and two-step admission: a signed, scoped, classified contribution built on the operation envelope, admission into the node's own operation log, replay refused across restarts, and authority checked apart from the signature",
+   "repo": "memev",
+   "closes": "Build layer of the design records SO-2.02, SO-2.03: the fold contract SO-F-03 adapted to memev main, as the fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-F-01",
+    "SO-F-02",
+    "PG-04.1"
+   ],
+   "implements": [
+    "SO-2.02",
+    "SO-2.03"
+   ],
+   "tasks": 1,
+   "criteria": 17,
+   "spec": "specs/SO-F-03.4.json",
+   "adapted_from": "fold of 30 Oct 2026",
+   "status": "proposed and unsigned; no red-team record; a spec delta for red-team review in pull request #374",
+   "supersedes": "SO-F-03.3",
+   "supersedes_signed_contract": "k-so-f-03-3-contribution-s-0bb27e (the spec file contracts/scope-one/specs/SO-F-03.3.json is unchanged)",
+   "supersedes_reason": "owner decision, 1 Nov 2026, and the red-team review of pull request #374: the replay sequence is per sender and scope, one Admission per scope. SO-F-03.3 keeps the high-water mark per sender across all scopes, in memory, read from the log once, so a second Admission over one log, bare or not, admits a sequence twice, and with one Admission per scope the answer depends on the order the Admissions were made in. SO-F-03.4 keys the mark by sender and scope (the scope is inside the signed bytes: contributionMessage, src/engine/federation/contribution.mjs line 67), makes each Admission read the log again from the record after the last one it read when the log has moved, supersedes criterion 2 of SO-F-03.3 by name (its statement said per sender), carries every other criterion verbatim with its command unpiped, and adds five criteria (SO-F-03.4 AC14 to AC18); the five SO-F-03 tests stay green and are not edited, and the scope is unchanged"
   },
   {
    "id": "SO-F-04",
@@ -816,36 +842,36 @@
   {
    "id": "SO-F-04A",
    "area": "SO-F",
-   "title": "SO-F-04A Composition of the checks on the Admission external hook: one function of the hook's shape that runs the relationship check of SO-F-04 and any other check, a refusal beating a degraded answer, and nothing added to the steps or events of the Admission",
+   "title": "SO-F-04A Composition of the checks on the Admission external hook: one synchronous function of the shape the hook takes that runs the relationship check of SO-F-04, any other local check and the service checks of SO-F-08 in the order given, honours a degraded answer only from a service check, lets a refusal beat a degraded answer, never lets a degraded answer admit, and adds nothing to the steps or events of the Admission",
    "repo": "memev",
-   "closes": "Follow-up to SO-F-04, from the open row 'Two users of the Admission external hook' of docs/scope-one/RECONCILIATION.md (relationshipGate of SO-F-04, pull request #368, and SO-F-08, which has no code); additive, it supersedes nothing; it owns composeExternal, which PG-W-21B WP21-03 will cite",
+   "closes": "Follow-up to SO-F-04, from the open row 'Two users of the Admission external hook' of docs/scope-one/RECONCILIATION.md (relationshipGate of SO-F-04, pull request #368, and SO-F-08, which has no code); additive, it supersedes nothing; it owns composeExternal, which PG-W-21B WP21-03 will cite; a degraded answer is honoured only from a service check and never admits, and the hook stays synchronous",
    "depends_on": [
     "SO-F-04",
     "SO-F-03.3"
    ],
    "implements": [],
    "tasks": 1,
-   "criteria": 10,
+   "criteria": 13,
    "spec": "specs/SO-F-04A.json",
    "adapted_from": "none; written from the open follow-up rows of pull request #368",
-   "status": "proposed and unsigned; no red-team record; a spec delta for red-team review, with the owner decisions of 1 Nov 2026 folded in"
+   "status": "proposed and unsigned; no red-team record; a spec delta for red-team review, with the owner decisions of 1 Nov 2026 and the red-team response folded in"
   },
   {
    "id": "SO-F-04B",
    "area": "SO-F",
-   "title": "SO-F-04B One Admission per scope: an AdmissionSet that holds the Admissions of a node's scopes, refuses a second Admission for the same scope, routes a contribution to the Admission of its scope, and keeps the replay mark per sender and scope, the same live as after a restart",
+   "title": "SO-F-04B One Admission per scope: an AdmissionSet that holds the Admissions of a node's scopes, refuses a second Admission for a scope through a registry kept for the log, and routes a contribution to the Admission of its scope",
    "repo": "memev",
-   "closes": "Follow-up to SO-F-04, from the open row 'One scope per Admission' of docs/scope-one/RECONCILIATION.md (Admission, SO-F-04, pull request #368); additive, it supersedes nothing and leaves a lone Admission, with its SO-F-03.3 per-sender mark, unchanged",
+   "closes": "Follow-up to SO-F-04, from the open row 'One scope per Admission' of docs/scope-one/RECONCILIATION.md (Admission, SO-F-04, pull request #368); additive, it supersedes nothing; it depends on SO-F-03.4, which owns the replay mark per sender and scope, and keeps no mark of its own",
    "depends_on": [
     "SO-F-04",
-    "SO-F-03.3"
+    "SO-F-03.4"
    ],
    "implements": [],
    "tasks": 1,
-   "criteria": 11,
+   "criteria": 14,
    "spec": "specs/SO-F-04B.json",
    "adapted_from": "none; written from the open follow-up rows of pull request #368",
-   "status": "proposed and unsigned; no red-team record; a spec delta for red-team review, with the owner decisions of 1 Nov 2026 folded in"
+   "status": "proposed and unsigned; no red-team record; a spec delta for red-team review, with the owner decisions of 1 Nov 2026 and the red-team response folded in"
   },
   {
    "id": "SO-F-05",
