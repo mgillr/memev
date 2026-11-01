@@ -1,0 +1,85 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SO-W-08C",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "dfa057c3f65bd0fa27d6076fe68c1d03b09f7b78060e474dce1ca307034f7973",
+      "base_commit": "713f5b7a925c83f6e16f7e1522ae88792ae925f2",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/vault.mjs",
+            "sha256": "0ba848b4dc3f7e0d1ef477947269bc4528084c897a4b0e0ecad5d7e297253196"
+          },
+          {
+            "path": "src/server/mcp.mjs",
+            "sha256": "d10ed26cf7cf60bda231a1c353b50b5a2c02a5c9bd64e6f40ac109ef48e202d1"
+          },
+          {
+            "path": "src/server/main.mjs",
+            "sha256": "7fa8892a63b1c3447febd7736244fc6a013a51b0a50e658f3d8be76c6040c4d0"
+          },
+          {
+            "path": "test/mcp-hints.test.mjs",
+            "sha256": "f0dbf8a47cc282052171d07a6a5759acd7baee8967ebe7519e3e136d86d24681"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "none of T1 to T3 can pass until pull request #361 merges: recover, reconstruct, eligibilityPass, applyBusMessage and the Coordinator bus option exist only there, so every criterion is red on main",
+          "disposition": "rejected",
+          "reason": "the request says in terms that the contract starts once #361 merges; I confirmed on main that the vault builds the Coordinator as new Coordinator(this.projectStore(id), { lifecycle: true }) with no bus (vault.mjs:429), that memev_task_verify and the tool list test exist as the spec says, and that the daemon has a 5000 ms flush timer to copy"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "the caller reachability criteria are greps for call sites, so a call in a dead branch passes; and \"test/dead-code.test.mjs\" is run only if it exists, which it does not today",
+          "disposition": "rejected",
+          "reason": "the red-green tests start the real daemon and call the real MCP handler, so a dead call fails them; the conditional is for a later dead-code test and does no harm"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "projects.poll_ms is a new config key that is not in DEFAULT_CONFIG of vault.mjs, so the default of 5000 must be added there",
+          "disposition": "rejected",
+          "reason": "vault.mjs is in the scope of T1 to T3 and docs/PROJECTS.md must document the key and its default (a grep criterion)"
+        },
+        {
+          "n": 4,
+          "severity": "low",
+          "how": "T2 widens the MCP surface by one write tool, memev_task_recover",
+          "disposition": "rejected",
+          "reason": "the spec makes it an operator action, local only, refused for a read-only token or a remote caller, as memev_task_verify is, with AC02 testing each refusal"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the signer, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of SO-W-08C, the production callers of the SO-08-B recovery and control functions, renamed from SO-08-C.json, made against the #363 branch at 713f5b7a925c (the second signing pass; the first pass of 1 Nov 2026 held this spec for the findings named below). It has 3 tasks and 23 criteria. The spec hash equals the hash the owner delegation gave (dfa057c3f65b). Earlier finding, fixed: the first pass held it for the shared gate id SO-08 (see SO-W-08B); the spec is now SO-W-08C.json with its own record path, its test names SO-W-08C T<n> AC<n>, its change note changelog.d/SO-W-08C.md and its dependency SO-W-08B (a row of the manifest); no old SO-08-C id remains in the text. The design choices you were told are in the text and are the lead's: a bus request is the existing task message from the operator seat with a JSON body {request, project, task, reason}, and the poll interval is vault.config.projects.poll_ms (default 5000, 0 turns it off), with no new message type. Checks run: the manifest kind is feature and each implement task has a mandatory test_red_green criterion that runs its own test file; every task drafts through makeTask; every command parses with sh -n; no criterion statement repeats within a task; every grep pattern compiles and is within 200 characters; every depends_on is a row of the Scope One or programme manifest; the leak scan is clean; the specIdOf and locate of the gate give this spec its own record path and no other spec of the 154 shares one; each task has red-green criteria that start the real daemon or call the real MCP handler against a real Vault. I did not run any named test (no file exists yet) or npm test. Four findings (one medium, three low), none blocks signing. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NDhjYjY4OTNiOTg4NTdhM2M0OGNiNmNlNzNlMmFkZDZlNTg4M2RkNWQ5ZGQ0MjMxZGIyMDczOTQ4ODU2OGY4Mg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "fA97+JDndpbdOT3hlwQKAXV41yVNrn2kbMwu0hwwMUc+Pcqg/e0WdtdAoyP+ICESYklIYqnr5pDFhtuQmSI7Cg=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MDMyYzM2NTIxZGIxMjliMDk0M2JjODk1OGJhOWU4YmExZGFmNjQ3ZmJiYTc5ZDE2NDdmZTliNzY1YjA5ZmVkZQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "ngu/TOh8Z1VNweyp4fNwzsDVpfV5ElI+T4D0541iESq2EE72qxSWdi42UQKegXVdNDIXd2gUFtWfk86Xc2aCBA=="
+          }
+        ]
+      }
+    }
+  ]
+}
