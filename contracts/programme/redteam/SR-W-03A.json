@@ -1,0 +1,44 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SR-W-03A",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "fcf88095f2eef3edfd6bec07f812f9675fa594527ec8596d1b04f42b7cf68580",
+      "base_commit": "ba24c82e16c91f5962f20d49b396d46054a505da",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "fef5139ba1222068699f08e3d2d75a5fda18bdad8c75181ca007bded9edc84ee"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM RECORD, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), so this record is signed with the interim reviewer key on the owner's standing decision, and the contract it makes signable waits for an independent re-review. The review was a red-team read of pull request #379 at head 23472d0 (spec hash fcf88095f2ee), made before this record. It read the whole spec and found no blocking finding.\nWhat the review ran: every red-green command was run at the pinned base ba24c82 in a scratch worktree, holding a test file written for the three labelled subtests and, for the green half, a patch of notAnAssertion that follows the spec's three rules. Red: T1-c01 and T1-c02 each fail on code: 'ERR_ASSERTION' at the base (not a load error, ENOENT or TypeError); T1-c03 passes at the base and with the patch, as the spec says. Green: all three pass with the patch; the 12 test files of criteria 4 and 5 pass (89 tests); criteria 6, 9 and 10 pass at a commit on the base. Mutants: a patch that treats every headerless run as BLOCKED fails T1-c03, one that never blocks fails T1-c01 and T1-c02, one that ignores the indented not ok shape fails T1-c02, and one that drops the count lines from the shape fails T1-c02. No command pipes through tail or head, every command parses with sh -n, the grep of criterion 8 does not match the base, the manifest row states 16 criteria and the spec has 16, the scope is src/engine/contracts.mjs, the new test and its changelog entry, and the row and register text agree with the spec and with DECISIONS.md. The gate --report on main merged with the pull request shows 0 NOT SIGNABLE and only SR-W-03A as NO RECORD; the history leak scan is clean. I did not run npm test.\nNon-blocking notes for the builder: (1) the pinned base is behind main (membership.mjs and policy.mjs were added after it), so criteria 9 and the scope criterion hold only on a branch that starts at ba24c82 and has not merged main when verify runs; (2) the TAP shape does not name the lines # suites, # cancelled, # skipped, # todo and # duration_ms, so a tail that leaves only those lines is still judged as before; (3) criterion 6 leaves two output files in the temporary directory. No finding is open.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZGNlOTMxN2NmMGQ0ODI0NWM0NjdhNWRkOTcyOTM5OTc5NWZmNzhkZWJmODA1ZTk3NTVhYzMzYTE3NTBmZTkxMA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "rz+UWwse/K/58AKso+1+Bb3LPj87mdLy3C7u7fsoVSWYkOGbHXPLacWpU80Dc0u1NZmAZkXTMGyZz5l91ISdCA=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ODg5YzVkY2NmMTA4NzFmZjE1YWE5ODIxZDgyZTEwYzUwOGM5ODAzZWZiNTI1ZDNkY2FmMjQ4NzMyY2JlN2Y5ZA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "3U3kxYTL4Rupq3A305HTvIHaqRgALE2GOY6ePbS1O2q/TpKEcHWdobkswq9nhGbohL+tiiBixc9tFWNIZm/OAw=="
+          }
+        ]
+      }
+    }
+  ]
+}
