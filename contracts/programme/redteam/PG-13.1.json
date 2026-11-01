@@ -1,0 +1,116 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PG-13.1",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "181629251055c1f98e99da3b91fff4bba2400d035535feb74aa18c8f1124b208",
+      "base_commit": "afdccd6413dca3c3715633696e3b7bf76ed9f6b9",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/scope-one/programme/REQUIREMENTS.md",
+            "sha256": "8b70ac41d38fe2f855bf9d74e1409358a1a89d6e68d571aea20186f15db81705"
+          },
+          {
+            "path": "docs/scope-one/WBS.md",
+            "sha256": "15f122b0a8bd47fea7591256767a5707b98578dfbfdf8dc197e57e1522e5ff91"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "findings",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "high",
+          "how": "the request names the layer decision as a lane label of another agent (\"lead ...\" plus the word for a work lane) and the same label sits in docs/scope-one/DECISIONS.md; it is an agent label in a public repository, and a signed contract is immutable, so it would be permanent. Replace it with \"owner delegation, 1 Nov 2026\"",
+          "disposition": "rejected",
+          "reason": "Fixed in the text, not by a criterion: the request now names the layer decision as owner delegation, 1 Nov 2026. I searched the spec and the programme manifest for lane, agent and seat labels and found none."
+        },
+        {
+          "n": 2,
+          "severity": "medium",
+          "how": "a task description says the task is to be trimmed once the fold pull request lands (\"Trim pending fold PR\"), so signing now freezes text that is expected to change and would need a new version; sign after the trim, or state the trim as done",
+          "disposition": "rejected",
+          "reason": "Fixed in the text: no task description says the task is to be trimmed. The tasks that overlap a signed fold contract now cite its id and keep only the gap, and each such task has a criterion that fails if the module re-implements what the fold owns."
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Third review, of pull request #325 at head afdccd6 (the second, at 79cbaae, found the weak criteria and the open layer question; the criteria are tightened and the layer is decided by owner delegation of 1 Nov 2026, as DECISIONS.md records). The engine decision is owner-confirmed (t542u, 31 Oct 2026). Checks run, and the only checks made: the spec hash equals specSha256 of the file at the reviewed head; every MV citation resolves to the cited line of docs/scope-one/programme/REQUIREMENTS.md or DECOMPOSITION.md and its text matches; every quoted SO-1.x, SO-2.x, SR and QL requirement is a verbatim stretch of the signed contract it cites; each verifier (grep pattern, file_exists path, wiring entry) was run against the tree it names (this tree, or the pull request head where the spec is for another repository); the request, tasks and manifest rows were read against the leak rules of this repository (the leak scan stays clean, and I also read by hand for agent and lane labels, which the scan does not catch); no duplicate of SO-1.01, SO-1.02, SO-1.04, SO-1.10, SO-1.11, SO-2.x, SR, QL, WBS or baseline section 8 was found. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. The earlier findings are fixed: the disclosure page now has a criterion for every control and for the counsel review, the trust-domain page criterion names both federation forms, and WP13-04 scope now includes src/engine/site.mjs. The four fail-visible tests are named and run. The layer hold is released (owner delegation, 1 Nov 2026). Held for the label.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NDVmZTQ1ZjI0NmEzMDM2NDU0ODM1OWViZGQzYWRjNGNlZjEyZWFkMWRlY2E4NjAxODYyMWEyMThhMmUwM2U5MA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "i0YcrePY71dEupZEcGOiWahLi7EMHrwKeOOl8taps80BHfbdG89abrXUFU9RMO8E7Yuo8SbuoaYu+MYHvCMqAA=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "376aa89e648e13f44a6d280902460993dbb3c526093159b1cb35616d88b38e65",
+      "base_commit": "2df1272008a9f32d2c69d130003a0d521b846d2d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "test/site.test.mjs",
+            "sha256": "fc8bad28220485c4b78fbb93411c20d29c6d5628101515f68bcc5d7c140db42b"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Fourth review, of the merged tree of pull requests #325 and #340 at the reviewed head. Round 1 (afdccd6) held one high answer (an agent label in the request) and one medium (text waiting for the fold trim). Commit 3da0df2 of #325 changes the request, adds the fold requirements SO-F-01, SO-F-04, SO-F-05 and SO-F-07 to WP13-01, WP13-03, WP13-04 and WP13-05 with criteria that fail on repetition of what the fold owns, and replaces one criterion of WP13-03, recorded in the reviewer note. Checks run, and the only checks made: the spec hash equals specSha256 of the file on disk at the reviewed head; every task drafts through makeTask; every command criterion parses with sh -n; every grep pattern compiles as a regular expression; no criterion statement repeats within a task; every test_red_green command names its own test file and that file is inside the task scope; every MV citation resolves to a line of docs/scope-one/programme/REQUIREMENTS.md, DECOMPOSITION.md or WBS.md; every fold id the spec cites (SO-A, SO-F) matches the title of a signed contract under contracts/signed; every SO, SR, QL and PG spec id it names resolves to a spec file here, except ids of specs that live in the other repository (SR-3.03, SR-3.06), which I did not resolve; I read the request, task descriptions and requirements by hand for agent, lane and seat labels (a word search for agent, lane and seat labels finds none in the spec or in the programme manifest) and the leak scan stays clean. All passed. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Nothing high.",
+      "amendments": [
+        {
+          "task": "WP13-03",
+          "field": "criterion",
+          "from": "The site module imports the identity modules of WP09-01 rather than defining its own",
+          "to": null,
+          "reviewer_note": 1
+        }
+      ],
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YzY3YzcwZjRkYmY4Njg5NDQ2YzBiYjNhYmYyMjlkZDIzMzIxMTg2MGEyZTgxNTI0YTg0N2Q0ZmM5MmIwOTYwMA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "OY4+O3gk9uTolTnjmGYO1F6l/ezIggUCiWBykbMn1txkVmSqVCkZ/rZQUa/ia5mQTIooKOcfZMgyRqswkz5zDQ=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MjljN2EyMDliODc5NWI3MTYzNGJmNjA1ZWYzZmMzMTU0N2RkYjBiZDA2ZjY3NzkzZDYyMmJiYzc1Y2NlY2RlNw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "RfHSd/89QseOjTVwvDMbEStgn6lziHLLRdpaKIAcyt/+AmcfzqHeRwW3lFhK3b6KJnKQJxznSM5id2ICDRXBCg=="
+          }
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": [
+    {
+      "n": 1,
+      "text": "INTERIM SOLO REVIEW, pending independent re-review. Round 2 of PG-13.1 replaces one criterion of round 1. Removed: \"The site module imports the identity modules of WP09-01 rather than defining its own\" (a grep for an import of agentid-bind, admission or devices); it is carried by three criteria of WP13-03: the site module imports the identity module of SO-F-01 or the admission module, reads the relationship record schema of SO-F-04, and has no key scheme and no token resolution of its own. The identity modules are now owned by SO-F-01 and SO-F-03, so the old import target is no longer the one the site module should use.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NDIzMTVlNWMwYjlmYmZhYjJmNjBhN2IxOThjNTlkYjZmMDAyOTY5ODJmODJhMjMwNTBlNDY1YjBiODU3ZGMyYw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "vIB0hqWt/yOSgX53ocFFuzsSpyJfBJoQk50j/kUXA2GjN4ItoT5RcsBtTNtEINaj6DhaJFHMRJGehz/Od8RFDQ=="
+          }
+        ]
+      }
+    }
+  ]
+}
