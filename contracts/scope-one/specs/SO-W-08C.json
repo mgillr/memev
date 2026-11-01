@@ -1,8 +1,8 @@
 {
-  "title": "SO-08-C Production callers for recovery and control, and the bus for the Coordinator",
+  "title": "SO-W-08C Production callers for recovery and control, and the bus for the Coordinator",
   "project": "memev",
   "workdir": null,
-  "request": "Production callers for the recovery and control functions of SO-08-B, and the bus for the Coordinator. Proposed and unsigned; the signer signs it after the red-team gate. Maps to PG-08.1, task WP08-02, as SO-08-B does. Why: pull request #361 builds recover, reconstruct, eligibilityPass and applyBusMessage and the Coordinator's bus option, and its own notes say none has a production caller and the vault does not give the Coordinator the bus (docs/scope-one/RECONCILIATION.md, Open follow-ups: 'Production caller for recovery and reconstruction' and 'Give the Coordinator the bus'). By SR-1.15 (no code without a caller) code without a caller is to be wired or removed. Where the callers live: SO-1.01 requirement 3 allows only the vault, the coordinator and the project store to reach the store, so the callers are vault methods; the MCP server calls a vault method for recover (T2), and the daemon, which runs at start and keeps running, calls the vault at start and on a timer (T3). The vault builds the Coordinator with its bus (T1). Checked: no existing spec covers it (a search of contracts/ and docs/ for these four functions finds only the register). It stays inside the same boundary as SO-08-B: no new bus message type, no dispatch to an adapter (SO-05-B), no second store. Still open and not covered: the capability record (waits on SO-05-B) and the bus seat names for vault claims (name/client is not a seat name). Depends on contracts: SO-08-B (recovery and control; pull request #361, a draft stacked on #350) and pull request #350 (its base): this contract starts once #361 merges, because recover, reconstruct, eligibilityPass and applyBusMessage and the Coordinator's bus option exist only there; SO-1.01 (the one store authority) and SO-A-03. Owner decisions of 31 Oct 2026 apply: local-first topology, the cloud only a relay and a backup; every supported provider on equal footing; crdt-merge reached only through the provider boundary of src/engine/merge.mjs; no second database for project state.",
+  "request": "Production callers for the recovery and control functions of SO-08-B, and the bus for the Coordinator. Proposed and unsigned; the signer signs it after the red-team gate. Maps to PG-08.1, task WP08-02, as SO-W-08B does. Id: SO-W-08C, not SO-08-C, because the gate reduces a file name such as SO-08-C.json to the id SO-08, which it would share with SO-W-08B. Why: pull request #361 builds recover, reconstruct, eligibilityPass and applyBusMessage and the Coordinator's bus option, and its own notes say none has a production caller and the vault does not give the Coordinator the bus (docs/scope-one/RECONCILIATION.md, Open follow-ups: 'Production caller for recovery and reconstruction' and 'Give the Coordinator the bus'). By SR-1.15 (no code without a caller) code without a caller is to be wired or removed. Where the callers live: SO-1.01 requirement 3 allows only the vault, the coordinator and the project store to reach the store, so the callers are vault methods; the MCP server calls a vault method for recover (T2), and the daemon, which runs at start and keeps running, calls the vault at start and on a timer (T3). The vault builds the Coordinator with its bus (T1). Checked: no existing spec covers it (a search of contracts/ and docs/ for these four functions finds only the register). It stays inside the same boundary as SO-08-B: no new bus message type, no dispatch to an adapter (SO-05-B), no second store. Still open and not covered: the capability record (waits on SO-05-B) and the bus seat names for vault claims (name/client is not a seat name). Depends on contracts: SO-W-08B (the repository text of the signed vault contract SO-08-B, recovery and control; pull request #361, a draft stacked on #350) and pull request #350 (its base): this contract starts once #361 merges, because recover, reconstruct, eligibilityPass and applyBusMessage and the Coordinator's bus option exist only there; SO-1.01 (the one store authority) and SO-A-03. Owner decisions of 31 Oct 2026 apply: local-first topology, the cloud only a relay and a backup; every supported provider on equal footing; crdt-merge reached only through the provider boundary of src/engine/merge.mjs; no second database for project state.",
   "tasks": [
     {
       "id": "T1",
@@ -20,7 +20,7 @@
         "test/project-callers-bus.test.mjs",
         "test/helpers/**",
         "docs/MODULES.md",
-        "changelog.d/SO-08-C.md"
+        "changelog.d/SO-W-08C.md"
       ],
       "criteria": [
         {
@@ -28,7 +28,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/project-callers-bus.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-C T1 AC01:' test/project-callers-bus.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-08-C T1 AC01:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T1 AC01:' test/project-callers-bus.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T1 AC01:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
           }
         },
         {
@@ -36,7 +36,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/project-callers-bus.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-C T1 AC02:' test/project-callers-bus.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-08-C T1 AC02:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T1 AC02:' test/project-callers-bus.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T1 AC02:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
           }
         },
         {
@@ -44,7 +44,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/project-callers-bus.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-C T1 AC03:' test/project-callers-bus.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-08-C T1 AC03:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T1 AC03:' test/project-callers-bus.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T1 AC03:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
           }
         },
         {
@@ -94,7 +94,7 @@
         "test/helpers/**",
         "docs/MODULES.md",
         "docs/PROJECTS.md",
-        "changelog.d/SO-08-C.md"
+        "changelog.d/SO-W-08C.md"
       ],
       "criteria": [
         {
@@ -102,7 +102,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/project-callers-recover.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-C T2 AC01:' test/project-callers-recover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-08-C T2 AC01:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T2 AC01:' test/project-callers-recover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T2 AC01:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
           }
         },
         {
@@ -110,7 +110,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/project-callers-recover.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-C T2 AC02:' test/project-callers-recover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-08-C T2 AC02:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T2 AC02:' test/project-callers-recover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T2 AC02:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
           }
         },
         {
@@ -118,7 +118,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/project-callers-recover.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-C T2 AC03:' test/project-callers-recover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-08-C T2 AC03:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T2 AC03:' test/project-callers-recover.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T2 AC03:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
           }
         },
         {
@@ -179,7 +179,7 @@
         "docs/MODULES.md",
         "docs/PROJECTS.md",
         "docs/BUS.md",
-        "changelog.d/SO-08-C.md"
+        "changelog.d/SO-W-08C.md"
       ],
       "criteria": [
         {
@@ -187,7 +187,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/project-callers-start.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-C T3 AC01:' test/project-callers-start.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-08-C T3 AC01:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T3 AC01:' test/project-callers-start.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T3 AC01:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
           }
         },
         {
@@ -195,7 +195,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/project-callers-start.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-C T3 AC02:' test/project-callers-start.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-08-C T3 AC02:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T3 AC02:' test/project-callers-start.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T3 AC02:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
           }
         },
         {
@@ -203,7 +203,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/project-callers-start.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-C T3 AC03:' test/project-callers-start.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-08-C T3 AC03:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T3 AC03:' test/project-callers-start.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T3 AC03:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
           }
         },
         {
@@ -211,7 +211,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/project-callers-start.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-C T3 AC04:' test/project-callers-start.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-08-C T3 AC04:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T3 AC04:' test/project-callers-start.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T3 AC04:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
           }
         },
         {
@@ -219,7 +219,7 @@
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/project-callers-start.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-08-C T3 AC05:' test/project-callers-start.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-08-C T3 AC05:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-W-08C T3 AC05:' test/project-callers-start.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - SO-W-08C T3 AC05:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
           }
         },
         {

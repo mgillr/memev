@@ -611,11 +611,11 @@
    "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); adapted from the unsigned fold of 30 Oct 2026"
   },
   {
-   "id": "SO-08-B",
+   "id": "SO-W-08B",
    "area": "SO-08",
    "title": "Recovery and control: disconnect recovery, restart reconstruction, pause, resume and cancel through memev work, transitions on the existing bus, idempotent bus delivery and memev work status",
    "repo": "memev",
-   "closes": "Repository text of the acceptance criteria of the signed vault contract SO-08-B (cited by id), restated from the vault set-work bundle in the memev spec format; unsigned, it does not replace or amend the vault contract",
+   "closes": "Repository text of the acceptance criteria of the signed vault contract SO-08-B (cited by id), restated from the vault set-work bundle in the memev spec format; unsigned, it does not replace or amend the vault contract (spec id SO-W-08B, because the gate reduces the file name SO-08-B.json to SO-08)",
    "depends_on": [
     "SO-1.01",
     "SO-A-03"
@@ -624,18 +624,18 @@
    "programme_task": "WP08-02 (PG-08.1)",
    "tasks": 1,
    "criteria": 11,
-   "spec": "specs/SO-08-B.json",
+   "spec": "specs/SO-W-08B.json",
    "adapted_from": "vault set-work bundle",
    "status": "proposed and unsigned; no red-team record"
   },
   {
-   "id": "SO-08-C",
+   "id": "SO-W-08C",
    "area": "SO-08",
-   "title": "SO-08-C Production callers for recovery and control, and the bus for the Coordinator",
+   "title": "SO-W-08C Production callers for recovery and control, and the bus for the Coordinator",
    "repo": "memev",
    "closes": "Production callers for recover, reconstruct, eligibilityPass and applyBusMessage of SO-08-B, and the bus for the Coordinator in vault.mjs; a gap found after SO-08-B, decided under owner delegation, 1 Nov 2026",
    "depends_on": [
-    "SO-08-B",
+    "SO-W-08B",
     "SO-1.01",
     "SO-A-03"
    ],
@@ -643,7 +643,7 @@
    "programme_task": "WP08-02 (PG-08.1)",
    "tasks": 3,
    "criteria": 23,
-   "spec": "specs/SO-08-C.json",
+   "spec": "specs/SO-W-08C.json",
    "adapted_from": "none; written from the open follow-ups of pull request #361",
    "status": "proposed and unsigned; no red-team record"
   },

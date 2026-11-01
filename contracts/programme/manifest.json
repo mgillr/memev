@@ -149,7 +149,7 @@
     {
       "ids": "SO-08-B",
       "covers": "recovery and control: disconnect recovery, restart reconstruction, pause, resume and cancel, with cancellation read from the adapter capability record",
-      "used_by": "WP08-02 (PG-08.1)"
+      "used_by": "WP08-02 (PG-08.1); the repository text is SO-W-08B and the production callers are SO-W-08C"
     },
     {
       "ids": "SO-R-C",
@@ -681,7 +681,9 @@
       "tasks": 4,
       "criteria": 24,
       "spec": "specs/PG-04.1-canonical-operation-envelope.json",
-      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
+      "superseded_by": "PG-04.2",
+      "superseded_reason": "owner delegation, 1 Nov 2026: pull request #357 links docs/OPERATION-ENVELOPE.md from docs/README.md and maps src/engine/envelope.mjs into docs/MODULES.md, and pull request #366 changes docs/MODULES.md for WP04-03 and WP04-04; so docs/README.md is added to the scope of WP04-01 and docs/MODULES.md to the scope of WP04-02, WP04-03 and WP04-04; no other scope entry, requirement or criterion changes"
     },
     {
       "id": "PG-04.2",
@@ -781,7 +783,9 @@
       "tasks": 4,
       "criteria": 22,
       "spec": "specs/PG-05.1-engine-integration-merge-semantics-mapping-bound.json",
-      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
+      "superseded_by": "PG-05.2",
+      "superseded_reason": "owner delegation, 1 Nov 2026: pull request #364 changes docs/CONVERGENCE.md (a link to docs/MERGE-SEMANTICS.md only), docs/MODULES.md (generated; src/engine/state-map.mjs is a new module) and changelog.d/PG-05.1.md, which PG-05.1 does not list in a scope; PG-05.2 adds docs/CONVERGENCE.md to the scope of WP05-01 and docs/MODULES.md and changelog.d/PG-05.1.md to the scope of WP05-04, and changes no criterion"
     },
     {
       "id": "PG-05.2",
@@ -1335,7 +1339,9 @@
       "tasks": 2,
       "criteria": 14,
       "spec": "specs/PG-19.1-memev-work-command-wired-to-runwork.json",
-      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
+      "superseded_by": "PG-19.2",
+      "superseded_reason": "owner delegation, 1 Nov 2026: PG-19.1 says src/cli/work-store.mjs returns the real project store, which SO-1.01 requirement 3 forbids (only the vault, the coordinator and the project store reach the store); PG-19.2 routes openStore through one read-only vault method, Vault#tasksReader(identity, project), whose frozen reader has one member, snapshot(kind), that returns copies, with no ProjectStore instance and no write path; it adds task WP19-03 with scope src/engine/vault.mjs, test/cli-work.test.mjs and docs/MODULES.md, and keeps every PG-19.1 criterion"
     },
     {
       "id": "PG-19.2",
@@ -1668,7 +1674,7 @@
       "task": "WP08-02",
       "title": "Provider-neutral execution adapter contract: discovery, session lifecycle, dispatch, checkpoint, progress, cancellation, recovery",
       "contract": "PG-08.1",
-      "note": "specified in this set"
+      "note": "specified in this set; recovery and control restated as SO-W-08B (repository text of the signed vault contract SO-08-B), production callers SO-W-08C (contracts/scope-one/specs)"
     },
     {
       "task": "WP08-03",
