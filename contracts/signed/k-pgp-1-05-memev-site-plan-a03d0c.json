@@ -1,0 +1,162 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Plans page, home and trial copy state the owner tier decision",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "Free core, Personal at $12/month or $120/year for up to 3 computers, contact us for teams and organisations; no Federated tier; no per-computer price for Business or Corporate (source: owner decision 31 Oct 2026)",
+        "Federation across independent sites is on the roadmap and is not stated as available (source: owner decision 31 Oct 2026)",
+        "Plan copy shares one constant for the computer limit (source: web/src/lib/site.ts PERSONAL_COMPUTERS)"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "web/src/app/plans/page.tsx",
+          "web/src/app/page.tsx",
+          "web/src/app/trial/page.tsx",
+          "web/src/app/contact/page.tsx",
+          "web/src/components/**",
+          "web/src/lib/site.ts"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "The computer limit is one constant",
+          "verifier": {
+            "type": "grep",
+            "file": "web/src/lib/site.ts",
+            "pattern": "PERSONAL_COMPUTERS = 3"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "The plans page states federation is not available today",
+          "verifier": {
+            "type": "grep",
+            "file": "web/src/app/plans/page.tsx",
+            "pattern": "not available today"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "The plans page names no Federated tier or plan",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eqi 'Federated (tier|plan)' web/src/app/plans/page.tsx",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "The site builds",
+          "verifier": {
+            "type": "command",
+            "cmd": "cd web && npm ci && npm run build",
+            "expect_exit": 0,
+            "timeout_s": 1200
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ],
+  "id": "k-pgp-1-05-memev-site-plan-a03d0c",
+  "title": "PGP-1.05 memev-site: plans, home and trial copy follow the tier decision, and federation is stated as planned",
+  "workdir": null,
+  "created": "2026-10-31T23:55:20.866Z",
+  "version": 1,
+  "request": "Per-pull-request contract for memev-site, branch fix/plans-match-tier-decision. Proposed and unsigned; the signer signs after the red-team gate. Repository: memev-site (paths relative to that repository; the contract lives in the memev contracts tree). Programme task WP16-03 (site side). Owner decisions of 31 Oct 2026 apply (the engine decision confirmed by the owner, t542u): crdt-merge stays in its own repository (BSL 1.1 with its PATENTS file) and is reached only across the call-out boundary, never vendored, so inclusion cannot relicense it; tiers are the free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that, with no Federated tier and no separate Personal trial; federation is planned, not available. Depends on contracts: none. Signed vault contract MEM-064, MEM-065 and MEM-066 (cited by id only): their price and tier values are superseded by the owner decision of 31 Oct 2026, which this contract applies. ",
+  "provenance": {
+    "spec_sha256": "dae8190c9c621297ca90bfdfcacbacb13e4f1ce616b8cd8de44e301f7ddd417a",
+    "record": "contracts/programme/redteam/PGP-1.05.json",
+    "review": "interim solo review by the signer, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}

@@ -1,0 +1,73 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PG-12.2",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "0ae095c7496330e83a216b65267bd57c3e2e9878786937ec7826218e79906605",
+      "base_commit": "2df1272008a9f32d2c69d130003a0d521b846d2d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/cli/relay.mjs",
+            "sha256": "ac392b19f82fa05c9480d26e5f693e84699e28d1a5a7f095fbcac6fd5f41047e"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "WP12-01 must not become a standalone merge service (BSL restriction, OQ-10) and no criterion in this spec enforces it",
+          "disposition": "rejected",
+          "reason": "the guard is PGP-1.02 T3 (test/licence-core-guard.test.mjs); this task scope is the transport module and its test, which hold no engine code, and the description states the restriction"
+        },
+        {
+          "n": 2,
+          "severity": "medium",
+          "how": "R2 cites converge src/network.py and tests/test_network.py; converge is BUSL-1.1 and a copy of its code would be a licence problem",
+          "disposition": "rejected",
+          "reason": "the spec says the pattern is cited and described only and the conformance test is written fresh; C3 and C4 name five tests the owner can read, with counsel review left to WP15-03; unchanged from PG-12.1, whose record accepted the same reasoning"
+        },
+        {
+          "n": 3,
+          "severity": "medium",
+          "how": "WP12-02 and WP12-03 carry only a red-then-green test and the scope check, with no named tests",
+          "disposition": "rejected",
+          "reason": "unchanged from PG-12.1, whose record passed with them; each red-then-green command runs its own test file, and naming tests here would invent behaviour the work packages do not specify"
+        },
+        {
+          "n": 4,
+          "severity": "low",
+          "how": "the contract depends on tasks WP04-02, WP05-03 and WP09-01 and on PG-09.1 via the manifest, which are unsigned",
+          "disposition": "rejected",
+          "reason": "depends_on is an ordering; the transport tasks are specified on their own"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. First review of this spec, which supersedes PG-12.1 (signed, record clean at afdccd6, left unchanged), made against the merged tree of pull requests #325 and #340 at the reviewed head. I compared it with PG-12.1: the three tasks and their ids are the same, WP12-02 and WP12-03 are unchanged, and WP12-01 adds the SO-F-07 and SO-F-12 boundaries and three criteria; SO-F-12 owns src/engine/replication/** and SO-F-07 src/engine/federation/**, neither of which is in the scope of src/engine/transport.mjs. Checks run, and the only checks made: the spec hash equals specSha256 of the file on disk at the reviewed head; every task drafts through makeTask; every command criterion parses with sh -n; every grep pattern compiles as a regular expression; no criterion statement repeats within a task; every test_red_green command names its own test file and that file is inside the task scope; every MV citation resolves to a line of docs/scope-one/programme/REQUIREMENTS.md, DECOMPOSITION.md or WBS.md; every fold id the spec cites (SO-A, SO-F) matches the title of a signed contract under contracts/signed; every SO, SR, QL and PG spec id it names resolves to a spec file; I read the request, task descriptions and requirements by hand for agent, lane and seat labels (a word search for agent, lane and seat labels finds none) and the leak scan stays clean. All passed. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. I tried to break it four ways and each is recorded as an answer, rejected with its reason. Nothing high. Every criterion of PG-12.1 is kept verbatim in PG-12.2 (checked by comparing the criteria objects).",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "Mzg4NjYyMDFiNTQ4OWQ1M2EyYWQ5NmEwMTg1NWU0NGMwNjg3NzcwYzJjNDFjMDBlZDFkNGQ4Mzc2ZDRkZTRlZQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "I1phXZBuMj/lDaQTdMxNBTG5drkrqJqTvf/Nd2sxoDzXJoYBkJvlrBwOM3WOMJcdoimJO2Z9Uv/3bROewK19DA=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YTNmZDZlZTQwMzJlYjQwYTYyM2U3YTQxMzI4OWVhOGQzNTcxMTUzN2ZlN2NhMmUzZjk1YmU3MTQyMzBhNTEzYg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "BgOEwv9Gt22PCiK8qHam6FVlhmAEWMwxY9N/jo+IVwePhDiF57973p3YRawzTn6s1kZXc9CCA+730fpfuVAbBQ=="
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -45,7 +45,7 @@ A task takes the strongest class of the requirements it serves: conflicting, the
 
 ## Claim register
 
-Who writes which task, so that two authors do not write the same one. Claims are anonymous ids: Claim A is the Scope One baseline and the signing of contracts, Claim B the programme specs and their work pull requests, Claim C the crdt-merge conformance work and the Scope One decision records, Claim D the seed-readiness and quality-loop follow-ups. A status is as of the date above.
+Who writes which task, so that two authors do not write the same one. Claims are anonymous ids: Claim A is the Scope One baseline and the signing of contracts, Claim B the programme specs and their work pull requests, Claim C the crdt-merge conformance work and the Scope One decision records, Claim D the seed-readiness and quality-loop follow-ups, Claim E the Scope One build-layer contracts of the fold (`SO-A-xx`). A status is as of the date above.
 
 | Task id | Claim | Branch or pull request | Status |
 | --- | --- | --- | --- |
@@ -55,11 +55,11 @@ Who writes which task, so that two authors do not write the same one. Claims are
 | Red-team records | Claim A | `contracts/**/redteam/` | in progress |
 | `WP01-01` to `WP01-05` (crdt-merge correctness) | Claim B | crdt-merge, branch `fix/crdt-correctness-four-bugs` #180 | merged to crdt-merge main through #181 as `252c93e6` (includes #179 and #180) |
 | `WP07-01` to `WP07-04`, `WP15-01` (memev wiring, single-authority guard and licence guard; implements `SO-1.01`) | Claim B | memev, branch `feat/wire-project-engine` #326 | in progress |
-| `WP17-05`, `WP16-03` and `WP15-02` for memev (this reconciliation, tiers, README, decisions) | Claim B | memev, branch `docs/engine-decision-tiers-reconcile` #325 | open |
+| `WP17-05`, `WP16-03` and `WP15-02` for memev (this reconciliation, tiers, README, decisions) | Claim B | memev, branch `docs/engine-decision-tiers-reconcile` #325 | merged (squash 5b28be9) |
 | `WP16-02` (converge README) | Claim B | converge, branch `docs/fair-mem0-comparison` #1 | open |
 | `WP16-03` (site plans) | Claim B | memev-site, branch `fix/plans-match-tier-decision` #1 | open |
 | `WP05-02`, `WP15-02` for memev-ops (SR-3.01 and SR-3.03 superseded, SR-3.05) | Claim B | memev-ops, branch `docs/engine-decision-sr3` #13 | open |
-| Programme contract specs (`contracts/programme`, one per work package and one per work pull request) | Claim B | memev, same branch as the row above #325 | open, unsigned; signing under Claim A |
+| Programme contract specs (`contracts/programme`, one per work package and one per work pull request) | Claim B | memev, same branch as the row above #325 | merged with the row above (squash 5b28be9); unsigned; signing under Claim A |
 | Baseline 8.1 (dashboard and command centre, lead-agent single authority, release and installation readiness, failure-path suite, ADR 4 and ADR 5 drafts) | Claim A | `SO-1.x` contracts and `WBS.md` | agreed split |
 | Baseline 8.2 (intake to end-to-end demo, extending `SO-1.x`), with `WP08-01` to `WP08-03` | Claim A | `SO-1.02` (`WP08-01`, `WP17-01`, `WP17-02`), `SO-1.04` (`WP08-02`), `SO-1.10` and `SO-1.11` (`WP08-03`) | agreed split; `PG-08.1` (programme) holds the build gaps of `WP08-02` and `WP08-03` only, trimmed against `SO-A-03` and `SO-A-10` |
 | Baseline 8.3 (organisational intelligence, WBS 5.3.x and 4.3.2), with `WP08-04` | Claim A (baseline scope); Claim C (decision records `SO-2.01` to `SO-2.06`, branches `feat/so-2-0X-<slug>`, active) | `SO-2.01` to `SO-2.06` | agreed split; no programme spec |
@@ -68,10 +68,16 @@ Who writes which task, so that two authors do not write the same one. Claims are
 | `WP11-01` to `WP11-06`, `WP17-03`, `WP17-04`, `WP17-06` | Claim A | `SO-1.02` and `WBS.md` | no programme spec |
 | Baseline 8.4 A2A (`WP18-01`), SDK and framework adapter (`WP18-02`), payments (`WP18-04`); 8.5 (`WP01` to `WP06`, `WP09`, `WP10`, `WP12` to `WP14`); 8.6 licensing (`WP15`), tiers and claims (`WP16`), conformance tests (`WP18-03`) | Claim B | `contracts/programme` | specs proposed, work unclaimed; except the rows below for `PG-02.1`, `PG-03.1`, `PG-03.4`, `PG-03.5`, `PG-06.2` and `PG-12.2` |
 | `PG-02.1` (CRDT conformance gate; `WP02-01` to `WP02-04`) | Claim C | crdt-merge, branch `feat/pg-02-1-crdt-conformance-gate` | queued after `SO-2.01` to `SO-2.06` |
+| `PG-05.1` (merge semantics: docs/MERGE-SEMANTICS.md, not yet written; trimmed `WP05-01` to `WP05-04` and `WP05-06`; `WP05-05` stays with `WO-05-B`, draft pull request #201) | Claim D | branch `feat/pg-05-1-merge-semantics` | claimed |
+| `SO-08-B` (recovery and control, `WP08-02`; a signed vault contract, cited by id) | Claim E | branch `feat/so-08-b-*` (none pushed yet) | claimed |
+| `PG-19.1` (the work command wired to `runWork` in `src/cli/main.mjs`, with a production `openStore` port; `WP19-01`, `WP19-02`; not `SO-08-B`) | unclaimed | none | proposed, unsigned; decided under owner delegation, 1 Nov 2026 |
 | `PG-03.1` (vectors, crdt-merge); one pull request | Claim C | branch `feat/pg-03-1-*` | queued after `SO-2.01` to `SO-2.06` |
-| `PG-03.4` (crdt-merge-ts; supersedes the signed `PG-03.2`) and `PG-03.5` (crdt-merge-rs; supersedes the signed `PG-03.3`); one pull request per package; depend on `PG-03.1` | Claim C | branches `feat/pg-03-4-*`, `feat/pg-03-5-*` | active |
+| `PG-03.4` (crdt-merge-ts; supersedes the signed `PG-03.2`) and `PG-03.6` (crdt-merge-rs; supersedes `PG-03.5`, which superseded the signed `PG-03.3`); one pull request per package; depend on `PG-03.1` | Claim C | branches `feat/pg-03-4-*`, `feat/pg-03-5-*` (the branch name of the crdt-merge-rs pull request is unchanged) | active |
 | `SO-F-01` (identity and scopes model, version 1; a signed fold contract of pull request #341) | Claim C | branch `feat/so-f-01-identity-and-scopes` | claimed |
-| `PG-03.2` and `PG-03.3` (signed; files unchanged) | superseded | none | superseded by `PG-03.4` and `PG-03.5` (signer's decision, 1 Nov 2026; reason: the editions lack the features the vectors need, so the signed scope cannot be met); the manifest records `superseded_by` |
+| `SO-A-03` (the four execution event kinds; a signed fold contract of pull request #341) | Claim E | branch `feat/so-a-03-*` (none pushed yet) | claimed |
+| `SO-A-04` (relationship model and change propagation; a signed fold contract of pull request #341) | Claim E | branch `feat/so-a-04-*` (none pushed yet) | claimed |
+| `PG-03.2` and `PG-03.3` (signed; files unchanged) | superseded | none | superseded by `PG-03.4` and, through `PG-03.5`, `PG-03.6` (signer's decision, 1 Nov 2026; reason: the editions lack the features the vectors need, so the signed scope cannot be met); the manifest records `superseded_by` |
+| `PG-03.5` (crdt-merge-rs; the file is unchanged, specSha256 `8b748b0e38f3efe054c03a600845d83746e5874c87a384711356ec96746ebd56`) | superseded | none | superseded by `PG-03.6` (owner delegation, 1 Nov 2026; reason: `PG-03.5` hard-pins crdt-merge commit `b92d0ef` in `tests/vectors/SOURCE`, and crdt-merge main is now `aab0099` with byte-identical vectors, so an edition pinned at `aab0099` would fail it); the manifest records `superseded_by` |
 | `PG-12.2` (multi-node gossip transport; `WP12-01` to `WP12-03`; supersedes the signed `PG-12.1`) | unclaimed | none | open, unclaimed |
 | `PG-06.2` (replication separate from acceptance; `WP06-01` to `WP06-03`; supersedes the signed `PG-06.1`) | unclaimed | none | open, unclaimed |
 | `PG-06.1` and `PG-12.1` (signed; files unchanged) | superseded | none | superseded by `PG-06.2` and `PG-12.2` (signer's decision, 1 Nov 2026; reason: the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer); the manifest records `superseded_by` |
@@ -80,8 +86,9 @@ Who writes which task, so that two authors do not write the same one. Claims are
 | `SR-6.03` installers and public release | signed vault contracts `WO-02-A` and `MEM-015` | cited by id, no programme task | covered by the vault contracts |
 | `SR-0.03` tasks 1, 3 and 4 (one pull request) | Claim D | branch `feat/sr-0-03-tasks-1-3-4` | active |
 | `SR-0.03` task 2 (the scope verifier, 16 criteria) | Claim D | branch `feat/sr-0-03-task-2-scope-verifier`, stacked on #336 | claimed |
-| `SR-0.03` version 2 (signed as `k-sr-0-03-verify-runs-ever-2259f2`; files unchanged) | superseded | none | superseded by `SR-0.03.3` (version 3, in `contracts/programme/specs`; owner delegation, 1 Nov 2026); the spec pins a base that is still pending (the memev main commit after the README re-sign fix); the manifest records `superseded_by` |
+| `SR-0.03` version 2 (signed as `k-sr-0-03-verify-runs-ever-2259f2`; files unchanged) | superseded | none | superseded by `SR-0.03.3` (version 3, in `contracts/programme/specs`; owner delegation, 1 Nov 2026); the spec pins the base `3989c80bea615381947758e0ab1d28dfe18f115b` on T1 criterion 7 (the memev main commit that merged pull request #343, which carried the README re-sign fix; owner delegation, 1 Nov 2026); the manifest records `superseded_by` |
 | `QL-1.01` task 2 (the red-team gate, linked to #314) | Claim D | branch `feat/ql-1-01-task-2` | queued after `SR-0.03` |
+| `SO-F-03` (signed as `k-so-f-03-contribution-sig-2ba083`, version 2; files unchanged) | superseded | none | superseded by `SO-F-03.2` (owner delegation, 1 Nov 2026; reason: it builds on the operation envelope of `PG-04.1`, which is built first); no claim on `SO-F-03` existed, so none moved, and `SO-F-03.2` is unclaimed; the manifest records `superseded_by` and `supersedes` |
 | Every other `WP*` task (the work itself) | unclaimed | none | not started |
 
 ## Signed vault contracts, cited by id
@@ -114,7 +121,9 @@ The owner vault holds signed contracts that already cover some programme work. T
 | Decision | Question | Overlaps | Status |
 | --- | --- | --- | --- |
 | Layer to build against | The fold (`SO-A-01` to `SO-A-12`, `SO-R-E`, `SO-F-01` to `SO-F-13` except `SO-F-11`, which was dropped; 25 signed contracts, cited by id only) or the programme specs | `PG-04.1`: `SO-F-03`, `SO-F-12`; `PG-05.1`: `SO-F-02`, `SO-F-06`; `PG-08.1`: `SO-A-03`, `SO-A-10`; `PG-09.1`: `SO-F-01`, `SO-F-03`, `SO-F-08`; `PG-10.1`: `SO-F-09`; `PG-13.1`: `SO-F-01`, `SO-F-04`, `SO-F-05`, `SO-F-07`; `PG-14.1`: `SO-F-13`; `PG-06.2`: `SO-A-03`, `SO-F-12`; `PG-12.2`: `SO-F-07`, `SO-F-12`; superseded, signed files not edited: `PG-06.1` by `PG-06.2`; `PG-12.1` by `PG-12.2` | DECIDED: the fold is the build layer (owner delegation, 1 Nov 2026). Each overlapping programme task cites its fold id and keeps only what the fold does not cover (table below). `PG-06.1` and `PG-12.1` were signed and overlap the fold; the signer superseded them with `PG-06.2` and `PG-12.2` (1 Nov 2026), which cite the fold ids and keep only the gaps; the signed files are unchanged. |
+| Wiring of the work command | Which spec covers dispatching `memev work` to `runWork` in `src/cli/main.mjs` and a production `openStore` for `runWork`? | `SO-A-03` (defines `runWork`), `SO-A-01` (lists `src/cli/main.mjs` in scope for `memev work prefer` only), `SO-08-B` (recovery and control; not this gap) | decided: no existing spec covers it; the new unsigned spec `PG-19.1` does (owner delegation, 1 Nov 2026) |
 | Memory and project-state authority | Is the vault the only authority (local-first, no second database)? | all `SO-1.x`, `SO-2.x` and programme specs | PROPOSED, pending owner confirmation: recorded as ADR 7 in [DECISIONS.md](DECISIONS.md); the owner decision of 31 Oct 2026 (local-first, the cloud only a relay and a backup) is the only part decided |
+| Operation envelope before contribution signature | Does `SO-F-03` build on the operation envelope that `PG-04.1` specifies, and in what order? | `PG-04.1` `WP04-01` and `WP04-02`; `SO-F-03` | DECIDED: build `PG-04.1` `WP04-01` and `WP04-02` first, then `SO-F-03` (owner delegation, 1 Nov 2026). The signed `SO-F-03` is superseded by `SO-F-03.2` (file unchanged), which adds `PG-04.1` as a predecessor beside `SO-F-01` and `SO-F-02` and names docs/OPERATION-ENVELOPE.md, src/engine/envelope.mjs and test/envelope.test.mjs (not yet written) in its scope, so a reviewer reads them; every other criterion is kept. |
 
 ## Fold overlaps by task
 
@@ -234,7 +243,7 @@ One row per requirement of [programme/REQUIREMENTS.md](programme/REQUIREMENTS.md
 
 | Follow-up | Where | Detail | Status |
 | --- | --- | --- | --- |
-| `LWWRegister` merge with equal timestamp and equal `node_id` | the crdt-merge reference first, then the TypeScript and Rust editions (`PG-03.4`, `PG-03.5`) | The Python reference keeps self and the Rust edition keeps other, so merge is not commutative in that case. The case is excluded from the vectors and must not be asserted. A higher timestamp wins, and on equal timestamps the greater `node_id` wins, in all editions. Fix the reference first; the editions follow (owner delegation, 1 Nov 2026) | open |
+| `LWWRegister` merge with equal timestamp and equal `node_id` | the crdt-merge reference first, then the TypeScript and Rust editions (`PG-03.4`, `PG-03.6`) | The Python reference keeps self and the Rust edition keeps other, so merge is not commutative in that case. The case is excluded from the vectors and must not be asserted. A higher timestamp wins, and on equal timestamps the greater `node_id` wins, in all editions. Fix the reference first; the editions follow (owner delegation, 1 Nov 2026) | open |
 
 
 ## Programme tasks by work package

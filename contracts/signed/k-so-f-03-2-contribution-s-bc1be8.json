@@ -1,0 +1,230 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Contribution signature and two-step admission: a signed, scoped, classified contribution built on the operation envelope, admission into the node's own operation log, replay refused across restarts, a",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a contribution is an operation envelope (PG-04.1) that carries subject, scope, a classification string whose values the classification schema of",
+        "admission is two steps before append",
+        "a valid signature with a subject that lacks authority for the scope is rejected",
+        "a replayed contribution is refused after the vault is closed and reopened, and a role-binding signature presented as a contribution signature is",
+        "no module under src/engine/federation imports child_process, node",
+        "docs/FEDERATION.md carries a section Contribution and admission naming the contribution schema and the two-step admission, labelled planned",
+        "the contribution schema exists"
+      ],
+      "description": "State may cross a boundary only as a contribution the receiving node can verify and judge. This contract defines the signature and admission block of the operation envelope of PG-04.1 and the node's own admission: verify the signature (the role key of MEM-145 through the same ssh-keygen path, offline), check authority and policy for the scope and classification, then append; a failed step records a rejected event in the vault's operation log through the OpLog API and appends nothing of the payload. Replay is refused through a per-sender sequence whose high-water mark is persisted through the operation log, so it survives a restart (the restart rule of SR-1.03). A signature proves a key signed; authority is a separate check. The external admission service of SO-F-08 runs before this step when configured. The classification field's values are constrained later by the classification schema of SO-F-05.",
+      "scope": {
+        "allow": [
+          "changelog.d/SO-F-03.md",
+          "docs/FEDERATION.md",
+          "docs/MODULES.md",
+          "docs/README.md",
+          "docs/schemas/contribution-v1.json",
+          "src/engine/agentid-bind.mjs",
+          "src/engine/federation/**",
+          "test/federation-admission.test.mjs",
+          "test/helpers/**",
+          "docs/OPERATION-ENVELOPE.md",
+          "src/engine/envelope.mjs",
+          "test/envelope.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "a contribution is an operation envelope (PG-04.1) that carries subject, scope, a classification string whose values the classification schema of SO-F-05 constrains later, schema version, causal context, provenance, payload hash, a per-sender sequence and a signature made with the role key of MEM-145 through the same ssh-keygen path, in a namespace distinct from the role-binding namespace, and verified offline; the schema docs/schemas/contribution-v1.json defines only the signature and admission block, not a second envelope; the validator accepts the fixtures and refuses a missing field",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03 AC02:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03 AC02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "admission is two steps before append: signature verification, then authority and policy for the scope and classification; a replayed envelope (sequence already seen: the per-sender high-water mark is persisted through the operation log and rebuilt on open, so a restart does not forget it) and a failure at either step record a rejected event in the vault's operation log through the OpLog API (src/engine/oplog.mjs), no new store, and append nothing of the payload; this is the node's own admission, run after the external admission service of SO-F-08 when that is configured",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03 AC03:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03 AC03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "a valid signature with a subject that lacks authority for the scope is rejected: the test signs with a real key and the wrong scope and asserts rejection, proving that a signature is not authority",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03 AC04:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03 AC04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "a replayed contribution is refused after the vault is closed and reopened, and a role-binding signature presented as a contribution signature is rejected",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03 AC12:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03 AC12:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "no module under src/engine/federation imports child_process, node:net, node:http, node:https or node:dgram: the test scans the files read-only",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-admission.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-03 AC13:' test/federation-admission.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-03 AC13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "docs/FEDERATION.md carries a section Contribution and admission naming the contribution schema and the two-step admission, labelled planned",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/FEDERATION.md",
+            "pattern": "## Contribution and admission[\\s\\S]*contribution-v1\\.json[\\s\\S]*two-step admission[\\s\\S]*planned"
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "the contribution schema exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/schemas/contribution-v1.json"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "The full test suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "The leak scan passes on files and every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "id": "T1-AC11",
+          "mandatory": true,
+          "statement": "Every changed file is inside this contract's scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "Stop and post BLOCKED when a criterion cannot pass without weakening a test, skipping a test or relaxing an assertion.",
+        "Stop and ask when the work would name a client product, a person, a server or a seat in repository text; the client names live in docs/CLIENTS.md only.",
+        "Stop when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would move convergence logic into the core, vendor the engine, or add a merge engine beside the provider boundary of src/engine/merge.mjs.",
+        "Stop when the work would implement a federation, replication, trust, admission or computation feature beyond the specification, schema, validator and conformance test the contract names; the product keeps the planned label on it.",
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-so-f-03-2-contribution-s-bc1be8",
+  "title": "SO-F-03.2 Contribution signature and two-step admission: a signed, scoped, classified contribution built on the operation envelope, admission into the node's own operation log, replay refused across restarts, and authority checked apart from the signature",
+  "workdir": null,
+  "created": "2026-11-01T02:28:43.572Z",
+  "version": 1,
+  "request": "Version 2 of this spec, which supersedes SO-F-03 (signed as contract k-so-f-03-contribution-sig-2ba083, version 2; the SO-F-03 spec file is unchanged and stays on record, and the manifest and RECONCILIATION mark it superseded by this spec). Decided under owner delegation, 1 Nov 2026: build PG-04.1 WP04-01 and WP04-02 first, then this contract, because it defines the signature and admission block of the operation envelope that PG-04.1 specifies. Changes from SO-F-03: (1) PG-04.1 is a predecessor beside SO-F-01 and SO-F-02; (2) the envelope specification docs/OPERATION-ENVELOPE.md, the implementation src/engine/envelope.mjs and the tests test/envelope.test.mjs are named in the scope of T1, so a reviewer reads them and a change to them after the review makes this spec stale (they are specified by PG-04.1 WP04-01 and WP04-02 and may not exist until those land). Every other requirement, criterion and scope entry is kept, including the guards that moved here from SO-F-11. Build layer of the Scope One programme, adapted from the fold of 30 Oct 2026 (fold id SO-F-03) and validated against memev main at d1c65ef. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository; they are cited by id only. Implements the design records SO-2.02 (Permission-aware knowledge access: retrieval governed by identity, project membership, classification, policy and jurisdiction); SO-2.03 (Provenance, retention and invalidation of organisational knowledge) (contracts/scope-one/specs). The decision record cites this contract by id and keeps only the gaps this one does not cover. Builds on signed vault contracts: MEM-145†. Memev contracts that land first: PG-04.1 (WP04-01, the envelope specification, and WP04-02, the envelope implementation and tests), SO-F-01, SO-F-02. Page: docs/FEDERATION.md comes from the federation architecture documentation (PR #223, branch docs/federation-architecture, not on main); until that merges, the first contract to need a page creates it with its Status section, labelled planned or architectural target, and the later ones extend it. Source in the fold: #222 section 13.7 (signed structured contributions; accountable admission) and #223 FEDERATION.md (state exchange with versioned contracts, provenance and defined reconciliation). Settled decisions this contract follows (owner decision 31 Oct 2026, docs/scope-one/DECISIONS.md): topology is local-first and the cloud is only a relay and a backup; every supported provider stands on equal footing and no work or tier depends on one; crdt-merge is reached only through the provider boundary of src/engine/merge.mjs (docs/EXTENSION-POINTS.md) and this contract adds no merge engine to the core; tiers follow docs/PRICING.md (Free core, Personal for up to 3 computers with no per-computer add-on, higher tiers by contacting us) with no Personal trial; the git backup keeps running every few minutes (sync.interval_min). Memory authority: ADR 7 (memory and project-state authority) is proposed in PR #325 and is not decided here; this contract cites it and the local-first decision, and keeps one store under the vault with no second database. Provenance: adapted from the fold of 30 Oct 2026. Changes: (1) converted from the vault task format to the memev spec format (named tests run as red-green checks on the own test file of the contract; inline regular expression flags became the flags key; hygiene and decision verifiers became commands or doc checks). (2) removed fold-only fields and the owner-decision marker field, reworded the stop rule that named a patent, and made the text pass the leak scan. (3) Duplicate removed: the operation envelope of PG-04.1 (docs/OPERATION-ENVELOPE.md, src/engine/envelope.mjs, test/envelope.test.mjs) is the one envelope. The fold defined a second envelope and the same test name; this contract now adds only the signature and admission block (docs/schemas/contribution-v1.json), the per-sender sequence and the rejected event,…",
+  "provenance": {
+    "spec_sha256": "032f9f414dec81f10e906a99f3d9f805ea0a13acfed595609c6e53236bb2ef4e",
+    "record": "contracts/scope-one/redteam/SO-F-03.2.json",
+    "review": "interim solo review by the signer, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}
