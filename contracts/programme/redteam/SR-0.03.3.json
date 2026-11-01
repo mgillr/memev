@@ -1,0 +1,78 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SR-0.03.3",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "cabc32fd00dee79cff76f439005f8b6933301e4c3e1fcda8e26a80c5802c6c71",
+      "base_commit": "5ba301aeafd643a2e7e4fbd926fa91f69d7eb238",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/cli/contracts-cli.mjs",
+            "sha256": "3684b07855229d3f9f6bac9dc89f3e3eb95a0263a717c64bc1f61b9f6db8ee68"
+          },
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "1a129a5d71412a1a07720633fc9d5a46755bdcd5cf6fef9805851cb8af4cff57"
+          },
+          {
+            "path": "src/engine/util.mjs",
+            "sha256": "2c204401397ca4866cfa6f5bae09efcc85b0b9fe7d1b6feae7f5944d503d4503"
+          },
+          {
+            "path": "src/server/mcp.mjs",
+            "sha256": "d10ed26cf7cf60bda231a1c353b50b5a2c02a5c9bd64e6f40ac109ef48e202d1"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "the scope criterion of T1, T3 and T4 can only be BLOCKED until T2 lands, so none of those three tasks can reach PASS on its own and the criterion text says so",
+          "disposition": "rejected",
+          "reason": "this is the stated purpose of version 3 (the request says in terms that verify returns BLOCKED for the scope criterion of T1, T3 and T4 until T2 lands, the criterion statements say it too, and the owner accepted the four unmet criteria of pull request #336 on 1 Nov 2026); no criterion was removed or loosened against version 2, and the criterion is kept so it runs once T2 lands"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "T1 pins base 3989c80 in a command criterion, so a later main would make the criterion read a stale base",
+          "disposition": "rejected",
+          "reason": "the pin is the point: a contract records one base at signing, 3989c80 is the merge of pull request #343 on main and an ancestor of the commit reviewed, and verify with a different base reports it"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "the tests of T1, T3 and T4 already exist on main since pull request #336, so their test_red_green criteria are green at head by design",
+          "disposition": "rejected",
+          "reason": "each criterion is judged red at the recorded base 3989c80, which predates #336 (the test files are absent there), and green at head; this is the red-green shape of every implement contract"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the signer, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of SR-0.03.3 as changed by pull request #345, made against main at 5ba301aeafd6. It has 5 tasks and 51 criteria. Checks run, and the only checks made: the spec hash equals the hash the owner delegation gave (cabc32fd00de); the manifest kind is feature; the tasks draft through makeTask; every command parses with sh -n; no criterion statement repeats within a task; every grep pattern compiles and is within 200 characters; every depends_on is a manifest row; the leak scan is clean; the spec names no agent label. The 31 files of pull request #336 are each inside the scope of at least one task (the three files outside T3 are in the scope of T1 or T4). The pinned base 3989c80bea61 is an ancestor of the commit reviewed. I did not run any named test or command in its target repository, and I did not re-read the vault contracts the request names. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZTVlNGQ3MzA2NjFjYmJjNGQ0YmU4OTRiODQ1YzA5YmFkMDA4MzkyYjkyNmQ1Nzc0OTBmMjAxNjM1YjIyZmM4Ng==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "ZyHAQfrgomhGVU87goiNLL/zW5kzGqefq9t0vr6R+JiD0czobKepTUXno9bSbOvN9Q1A4os5vMtagpQvOiCfAw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OTk0ZThmYjgxNDg2YTBlMTQ4MDg2MjQ1OTEzZTIxZjM2ZDBmNjAwM2FlOGI3ZDEyMTg1ZGMzY2U0MDM0NzNlOA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "vny1Pcx12IjglfPADj0q9YQKR6jabO0fFUtl7WvPuigz4SLROOjQbVTmlE+WYdGrhLwVgXpl1icvg103AY00AQ=="
+          }
+        ]
+      }
+    }
+  ]
+}
