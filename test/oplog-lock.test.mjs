@@ -167,10 +167,11 @@ test('T1-readonly: every writer of a read-only log refuses and nothing on disk c
 test('T1-readonly: a read-only open of a vault with a torn tail reads it as absent and leaves it', () => {
   const { root, dir } = makeVault();
   const seg = path.join(dir, 'seg-000001.jsonl');
+  const seq = new OPLOG.OpLog(dir, { readOnly: true }).open().seq;
   fs.appendFileSync(seg, '{"seq":99,"torn":');
   const before = tree(dir);
   const v = new Vault(root, { readOnly: true }).open();
-  assert.equal(v.log.seq, 3, 'the torn fragment is not a record');
+  assert.equal(v.log.seq, seq, 'the torn fragment is not a record');
   v.close();
   assert.deepEqual(tree(dir), before, 'the fragment was not truncated');
   const w = openVault(root);
