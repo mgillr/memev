@@ -45,10 +45,11 @@ view is only as broad as the participants authorise.**
 ## What Federation adds to the existing architecture
 
 The current local vault, daemon, MCP interface, communications bus, contracts, device identity,
-access tokens, audit trail and the convergence call-out boundary remain the foundations. The project
-state machine is planned: its code is present in `src/engine/project-state.mjs` and nothing imports
-it yet ([PROJECTS.md](PROJECTS.md)). Federation is planned to add relationships and protocols
-around those foundations:
+access tokens, audit trail and the convergence call-out boundary remain the foundations. The local
+project state machine, ProjectStore and Coordinator are implemented and wired into the vault
+([PROJECTS.md](PROJECTS.md)). Federation foundations add signed contributions, two-step local
+admission, durable relationship records and deny-by-default policy evaluation around those
+foundations. They do not yet provide complete inter-node operation:
 
 1. **Node identity:** each device, server, site and organisation has an identifiable operator and
    cryptographic identity appropriate to its role.
