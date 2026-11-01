@@ -1,0 +1,263 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "WP19-01",
+      "title": "memev work dispatches to runWork from main.mjs, with a production openStore port that opens the real project store",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "SR-1.15: no code without a caller (source: docs/scope-one/WBS.md leaf 2.2.15; owner delegation, 1 Nov 2026)",
+        "SO-A-03 (signed fold contract, cited by id; pull request #341) defines runWork and memev work status in src/cli/work.mjs; this spec wires them into the CLI and does not restate them (source: pull request #341, owner delegation, 1 Nov 2026)",
+        "SO-08-B (signed vault contract, cited by id) stays recovery and control under WP08-02; this spec adds no recovery or control command (source: owner delegation, 1 Nov 2026)",
+        "SO-1.01 (canonical execution integration) keeps the store, the state machine and the coordinator as one authority; the port opens that store and adds no second one (source: contracts/scope-one/specs/SO-1.01-canonical-execution-integration.json)"
+      ],
+      "description": "Repo: memev. The gap: src/cli/main.mjs does not dispatch the work command, and runWork has no production way to open the project store. This task adds the dispatch (case 'work' in main.mjs, which calls runWork from src/cli/work.mjs) and one port module, src/cli/work-store.mjs, that exports openStore and returns the real project store of the vault at the resolved root. No test double is used in a production path: a test injects its own store only through the same port argument that main.mjs fills with openStore. src/cli/work.mjs is owned by SO-A-03 and is not changed here; if runWork needs a port argument, that change is made in SO-A-03 first.",
+      "scope": {
+        "allow": [
+          "src/cli/main.mjs",
+          "src/cli/work-store.mjs",
+          "test/cli-work.test.mjs",
+          "test/helpers/**"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP19-01-AC01",
+          "mandatory": true,
+          "statement": "The work dispatch tests fail before and pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-work.test.mjs",
+            "cmd": "node --test test/cli-work.test.mjs"
+          }
+        },
+        {
+          "id": "WP19-01-AC02",
+          "mandatory": true,
+          "statement": "main.mjs reaches runWork",
+          "verifier": {
+            "type": "wiring",
+            "entry": "src/cli/main.mjs",
+            "symbol": "runWork"
+          }
+        },
+        {
+          "id": "WP19-01-AC03",
+          "mandatory": true,
+          "statement": "main.mjs has a case for the work command",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -Eq \"case 'work'\" src/cli/main.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP19-01-AC04",
+          "mandatory": true,
+          "statement": "The port module exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "src/cli/work-store.mjs"
+          }
+        },
+        {
+          "id": "WP19-01-AC05",
+          "mandatory": true,
+          "statement": "The port exports openStore and main.mjs imports it",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -Eq 'export (async )?function openStore' src/cli/work-store.mjs && grep -Eq \"from '\\./work-store\\.mjs'|import\\(.\\./work-store\\.mjs.\\)\" src/cli/main.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP19-01-AC06",
+          "mandatory": true,
+          "statement": "The production port holds no test double",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eqi 'mock|stub|fake|test double|in-memory|inmemory' src/cli/work-store.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP19-01-AC07",
+          "mandatory": true,
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP19-01-AC08",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP19-01-AC09",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP19-02",
+      "title": "An end-to-end CLI test runs the work command through bin/memev.mjs against a real project store",
+      "phase": "implement",
+      "depends_on": [
+        "WP19-01"
+      ],
+      "requirements": [
+        "SR-1.15: no code without a caller (source: docs/scope-one/WBS.md leaf 2.2.15; owner delegation, 1 Nov 2026)",
+        "SO-A-03 (signed fold contract, cited by id; pull request #341) defines runWork and memev work status in src/cli/work.mjs; this spec wires them into the CLI and does not restate them (source: pull request #341, owner delegation, 1 Nov 2026)",
+        "SO-08-B (signed vault contract, cited by id) stays recovery and control under WP08-02; this spec adds no recovery or control command (source: owner delegation, 1 Nov 2026)"
+      ],
+      "description": "Repo: memev. The test creates a temporary vault and a project with the real store, spawns bin/memev.mjs with the work command, and reads the real output and exit code. It does not import runWork or openStore and passes no store: that is what makes it end to end. Only the work status command that SO-A-03 defines is run.",
+      "scope": {
+        "allow": [
+          "test/cli-work-e2e.test.mjs",
+          "test/helpers/**"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP19-02-AC01",
+          "mandatory": true,
+          "statement": "The end-to-end test fails before and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-work-e2e.test.mjs",
+            "cmd": "node --test test/cli-work-e2e.test.mjs"
+          }
+        },
+        {
+          "id": "WP19-02-AC02",
+          "mandatory": true,
+          "statement": "The test spawns the CLI and imports neither runWork nor openStore",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -q 'bin/memev.mjs' test/cli-work-e2e.test.mjs && ! grep -Eq 'runWork|openStore' test/cli-work-e2e.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP19-02-AC03",
+          "mandatory": true,
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP19-02-AC04",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP19-02-AC05",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ],
+  "id": "k-pg-19-1-memev-work-comma-565912",
+  "title": "PG-19.1 memev work command wired to runWork with a production openStore (memev)",
+  "workdir": null,
+  "created": "2026-11-01T02:31:57.272Z",
+  "version": 1,
+  "request": "Programme contract for work package WP19 in memev: wire the work command into the CLI and give runWork a production openStore. Proposed and unsigned; the signer signs it after the red-team gate. WP19 is a new gap found after the programme decomposition of 31 Oct 2026 and decided under owner delegation, 1 Nov 2026; it is not in docs/scope-one/programme/fragments/. Depends on contracts: SO-A-03 (defines runWork and memev work status; signed fold contract, cited by id), SO-1.01 (the store, the state machine and the coordinator as one authority). Searched before drafting: no spec under contracts/*/specs names runWork or openStore, and none has a criterion for the work dispatch in src/cli/main.mjs; SO-A-01 lists main.mjs in its scope for memev work prefer only. Boundary with SO-08-B: it stays recovery and control under WP08-02; this contract adds no recovery or control command, only the dispatch, the port and the tests. Boundary with SO-A-03: src/cli/work.mjs and runWork belong to it; this contract changes neither. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "provenance": {
+    "spec_sha256": "715bad8c908bcc10a865dc5efc7cac6f312fc55562d2c892ce8f3eb7ad61e523",
+    "record": "contracts/programme/redteam/PG-19.1.json",
+    "review": "interim solo review by the signer, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}
