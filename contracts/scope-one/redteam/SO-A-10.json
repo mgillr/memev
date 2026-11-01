@@ -1,0 +1,135 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SO-A-10",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "c46d73f617d83804c6c34b6db51d8f0e9ba8c5d67f08749471ad5cbb49df201a",
+      "base_commit": "fff993f5e244f2533c0d714650220590de38057b",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/coordinator.mjs",
+            "sha256": "540783ec1d0352ff77f17b77852fa2d2bff9ca8f8488b35de046d7c4f3498fa5"
+          },
+          {
+            "path": "src/engine/project-state.mjs",
+            "sha256": "27d8fcb296415dd6b22439d4d60c68fa4fcb0a2af93d53db981206347ef5920d"
+          },
+          {
+            "path": "src/engine/project-store.mjs",
+            "sha256": "b015593048bc7c1d8ef6e633797c49bbfb91aacb4635b2a27cc6e0e57a03e7f3"
+          },
+          {
+            "path": "src/server/mcp.mjs",
+            "sha256": "6ca42da348ad8bde83317f20b78f7c629cc4727dbf3ded6db85f1d6753f4c54c"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "every named test is red at the base only because its test file does not exist yet, so a red result does not show that the test would catch a wrong implementation (4 test_red_green criteria)",
+          "disposition": "rejected",
+          "reason": "this is the shape of every implement contract of this repository (the SR-1 contracts have it): the criteria name seeded cases with asserted refusals, the gate checks that each command runs its own test file, and the independent re-review reads the tests when they exist. A mutation check belongs to the mutation gate (QL-1.02), not to this spec"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "the vault contracts the request names are not visible in this repository, so the prerequisite chain is not machine-checked",
+          "disposition": "rejected",
+          "reason": "the manifest depends_on lists only ids that are manifest rows, as the gate and the manifest test require; the vault ids are named in the request with a dagger, as SO-2.14 names them, and section 9 of the WBS lists what each build contract was checked against"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "1 grep or file criteria point at pages that are not on main (docs/scope-one/ACCEPTANCE.md), so they are red at base by construction",
+          "disposition": "rejected",
+          "reason": "each such page is in the scope of this contract and is created or extended by it; a page that is absent on main cannot already satisfy the criterion, and the pages that come from the federation documentation (PR #223) are named in the request"
+        },
+        {
+          "n": 4,
+          "severity": "medium",
+          "how": "possible duplicate of WP08-03 of the programme decomposition: a lifecycle test and the reference journey",
+          "disposition": "rejected",
+          "reason": "the overlap is settled in the spec text and in WBS section 9.2: one contract owns the thing and the other cites it, and this contract takes only the part named in its provenance; the programme specs are cited by id and nothing is copied"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of this adapted spec, made against main at fff993f5e244. It has 1 task and 9 criteria. Checks run, and the only checks made: the task drafts through makeTask; each command parses with sh -n; no criterion statement repeats; each grep pattern compiles with its flags and is within 200 characters; every criterion target (test file, page, schema) is inside the scope; no criterion was already satisfied on main (grep, file and test targets); each test name prefix starts with the contract id and is unique across the build layer; no test file or created file is repeated by another spec of this repository or of the programme branch (PR #325); every manifest depends_on is a manifest row; the leak scan is clean. All passed. Before this round I changed the fold where main or an owner decision disagreed with it; those changes are listed in the provenance of the spec (request) and are part of what this round reviewed. I did not read the vault contracts the request names, which this repository cannot show, I did not run any named test (its file does not exist yet), and I did not review the addendum or the owner baseline text itself. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "Yjg0Y2M3N2JmMDYwMjhiNTdmZmExOTVjOTI5MWY0MjI1ZTgzMGM3YjczYzMxYjEzMjMyYTA5MmFiNzkwMGQ1Yw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "3V94sPSehU4wdPqcm7SKt1SuT+XZAQVnlSTl4I34q4kk2fX5elMFO9ow9IHV0vx4KUvVVK9hUxbVHmXl2dW2CA=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NWQwMDAzNmU3NTU2ZjA4NjNjM2VmM2Q5OTM4NWViYjE2MzNmMmUzMWRjY2VhMmNmNjBmOGU5ZDBlNjUzNThiMQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "LDWfwK6jJmuPcBbqd5IPEKVLnDymc0tUAN/YoZ1Rmr4e09ureF3YVvnnC362OzB8mnBhasjIONsETdt0bZGqDg=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "c46d73f617d83804c6c34b6db51d8f0e9ba8c5d67f08749471ad5cbb49df201a",
+      "base_commit": "6be36f807b2251accfd48262f94eddfcd845c98e",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/coordinator.mjs",
+            "sha256": "540783ec1d0352ff77f17b77852fa2d2bff9ca8f8488b35de046d7c4f3498fa5"
+          },
+          {
+            "path": "src/engine/project-state.mjs",
+            "sha256": "27d8fcb296415dd6b22439d4d60c68fa4fcb0a2af93d53db981206347ef5920d"
+          },
+          {
+            "path": "src/engine/project-store.mjs",
+            "sha256": "b015593048bc7c1d8ef6e633797c49bbfb91aacb4635b2a27cc6e0e57a03e7f3"
+          },
+          {
+            "path": "src/server/mcp.mjs",
+            "sha256": "6ca42da348ad8bde83317f20b78f7c629cc4727dbf3ded6db85f1d6753f4c54c"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Re-review of the same spec, unchanged (same spec hash as round 1), made against main at 6be36f807b22. Since the merge of #341 (cdab1ab) the only file of this spec's scope that changed is docs/README.md, and every listed input under src/ has the same hash at main as at cdab1ab. Why: docs/README.md is in this spec's scope and gained index rows after round 1 was read at fff993f5e244 (rows for the SO-2.02 to SO-2.06 decision records, from #329 and #330 before the signing merge #341, and from #333, #337 and #338 after it). Checks run, and the only checks made: the diff of docs/README.md from fff993f5e244 to 6be36f807b22 adds only index rows that link design records under docs/scope-one/design/ and removes or rewords nothing; no criterion, requirement or stop rule of this spec reads those rows or any row they sit beside (the one README criterion is a grep for a link this spec itself adds, and it is still red on main as it should be); the spec on disk equals the round 1 snapshot byte for byte; the listed inputs under src/ are unchanged; the leak scan is clean. All passed. I did not re-run any named test (its file does not exist yet) and I did not re-read the vault contracts the request names. The answers of round 1 stand with their dispositions. Nothing high, nothing new.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YzMzYjgxNGJiZjVhNmJjYzA1NmJjZTkxZjhiOTI2OGM0NDg1NjllMmZlOTUzYTQzMWZhNmU2YzhhYmI0NmZiNQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "YyHrBI9zDQBax6pkSOD/9Hka8WXjmypTD+9kSU0MXy0+p+Gq8asWAltgcGbxNAKmtePB5oVK/ipCKUc2afgVDw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NWU3MjdmMjNmZWMzYmY4ZDE3YWZhZGI1YzRhMTM5NDI1MjI5YTViZWI3ZTI0OGRjYWM4MTExZmU1OWUyZmMwNA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "Iz/y0GzUx3Ef/i3sJ7TUHJ9ITltexzypUKVjzINlDTvJqhUNuUVM6c9YLXk4XBd0rCl4PjHP3I5CLVMxqU/tBQ=="
+          }
+        ]
+      }
+    }
+  ]
+}

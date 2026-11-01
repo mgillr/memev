@@ -1,0 +1,175 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PGP-1.02",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "005ad4cc56544becfb94acb597651daca515ca649df818b589b392b46a42820b",
+      "base_commit": "79cbaae69bd9120bfc6cf5d600fe0233728825c2",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/scope-one/programme/REQUIREMENTS.md",
+            "sha256": "8b70ac41d38fe2f855bf9d74e1409358a1a89d6e68d571aea20186f15db81705"
+          },
+          {
+            "path": "docs/scope-one/WBS.md",
+            "sha256": "15f122b0a8bd47fea7591256767a5707b98578dfbfdf8dc197e57e1522e5ff91"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "findings",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "high",
+          "how": "the request says the SO-1.01 design record is owned by a named work lane: that is the label of another agent, and a signed contract is immutable, so the label would be permanent. Replace it with a neutral phrase such as \"the owner of SO-1.01\"",
+          "disposition": "rejected",
+          "reason": "Fixed in the text, not by a criterion: the request no longer names a work lane as the owner of the SO-1.01 design record. I searched the spec and the programme manifest for lane, agent and seat labels and found none."
+        },
+        {
+          "n": 2,
+          "severity": "medium",
+          "how": "the manifest row lists depends_on SO-05 and SO-06 while the request cites SO-05-A and SO-06-A; those ids are vault contracts, not manifest rows, so the dependency is not machine-checked and the two spellings disagree",
+          "disposition": "rejected",
+          "reason": "Fixed in the manifest and the text: the manifest row now lists depends_on SO-1.01 only, a manifest row, while the vault contracts SO-05-A and SO-06-A are named in the request as vault contracts and not as dependencies."
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "T4 R2 says none of the eight functions is called outside project-state.mjs, which is true of the base of pull request #326 and false of its head fc6df28; say \"on the base of #326\" so the sentence is not read as present tense",
+          "disposition": "rejected",
+          "reason": "Fixed in the text: requirement 2 of T4 now says each function must be called from a module other than src/engine/project-state.mjs and that before pull request #326 none was, so it is not read as present tense."
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Second review, of pull request #325 at head 79cbaae (the first, at ea7e95d, found the agent label, the manifest kinds, wrong paths and missing citations; each of those is fixed at this head). The engine decision is owner-confirmed (t542u, 31 Oct 2026). Checks run, and the only checks made: the spec hash equals specSha256 of the file at 79cbaae; every MV citation resolves to the cited line of docs/scope-one/programme/REQUIREMENTS.md or DECOMPOSITION.md and its text matches; every quoted SO-1.x, SO-2.x, SR and QL requirement is a verbatim stretch of the signed contract it cites; each verifier (grep pattern, file_exists path, wiring entry) was run against the tree it names (this tree, or the pull request head where the spec is for another repository); the request, tasks and manifest rows were read against the leak rules of this repository (the leak scan stays clean, and I also read by hand for agent and lane labels, which the scan does not catch); no duplicate of SO-1.01, SO-1.02, SO-1.04, SO-1.10, SO-1.11, SO-2.x, SR, QL, WBS or baseline section 8 was found. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Amended text checked against memev #326 at fc6df28 (CI green): the eight functions of T4 R2 are reached from the coordinator, the vault or the MCP routes, test/project-wiring-remaining.test.mjs and test/task-verify-from-contract.test.mjs exist, and the line references of T1 and T2 resolve. The spec would otherwise pass; held for finding 1 only. Not signed.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MTUwOWJiZmRhYjZiN2FmNzYwMDU1NTAzZWIyMGRlOTJhN2Q1Y2I5MDA5ZDBiYmI2NmQxY2MyOGQyMjhlMGI2Mg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "iDa5qR7WAOfNMgH823dBhvRki3DCsS3R2WPIOCvB2Xdv5NZQMJ5v95F12pkdO1I1ntHgqP7F2IXcI5k9g9qYDQ=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "ec4a0e6dd741f0c7b488f7b7bb3954f2a2f9cf671b82f5d4b5dd360ae43126e5",
+      "base_commit": "2df1272008a9f32d2c69d130003a0d521b846d2d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "changelog.d/PGM-WIRING-LIFECYCLE.md",
+            "sha256": "ab452cc01182d6648bc6e3fe5dacfe68004d3e527eb467113795099fd66977af"
+          },
+          {
+            "path": "changelog.d/PGM-WIRING.md",
+            "sha256": "dd1e606e2d75f549b397c8b4455916d2b0dfad5d783686c89f7d4dc5a8341d70"
+          },
+          {
+            "path": "docs/MODULES.md",
+            "sha256": "a2320fb4eccf535f42c56b73dae6e26b99071ffc64e80d3096aefe4f4db2fe8b"
+          },
+          {
+            "path": "src/engine/card.mjs",
+            "sha256": "e30354f109423e5be70960e5d89c3800f2dd4e8b3a8b83749cdfc31a812ec98c"
+          },
+          {
+            "path": "src/engine/coordinator.mjs",
+            "sha256": "540783ec1d0352ff77f17b77852fa2d2bff9ca8f8488b35de046d7c4f3498fa5"
+          },
+          {
+            "path": "src/engine/project-state.mjs",
+            "sha256": "27d8fcb296415dd6b22439d4d60c68fa4fcb0a2af93d53db981206347ef5920d"
+          },
+          {
+            "path": "src/engine/project-store.mjs",
+            "sha256": "b015593048bc7c1d8ef6e633797c49bbfb91aacb4635b2a27cc6e0e57a03e7f3"
+          },
+          {
+            "path": "src/engine/vault.mjs",
+            "sha256": "0ba848b4dc3f7e0d1ef477947269bc4528084c897a4b0e0ecad5d7e297253196"
+          },
+          {
+            "path": "src/server/mcp.mjs",
+            "sha256": "6ca42da348ad8bde83317f20b78f7c629cc4727dbf3ded6db85f1d6753f4c54c"
+          },
+          {
+            "path": "test/licence-core-guard.test.mjs",
+            "sha256": "2a7909011a1c639fb6ad859888caff930877aea624dd26cf595d58d5729c73c1"
+          },
+          {
+            "path": "test/mcp-hints.test.mjs",
+            "sha256": "f0dbf8a47cc282052171d07a6a5759acd7baee8967ebe7519e3e136d86d24681"
+          },
+          {
+            "path": "test/project-wiring-remaining.test.mjs",
+            "sha256": "1bc19b85835ed0e16ebaf3e9b608e183aacfb4fde0c3b37a3de929f420893397"
+          },
+          {
+            "path": "test/project-wiring.test.mjs",
+            "sha256": "5661b7785f73d00d51096f56e54ff6cbe5e97cfbae1ae46241d42726c45ffedb"
+          },
+          {
+            "path": "test/task-verify-from-contract.test.mjs",
+            "sha256": "096979ab1e43d1677f5021eeb3d8303fe48b075bb876949f1b2235491644c8c5"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Fourth review, of the merged tree of pull requests #325 and #340 at the reviewed head. Round 1 (afdccd6) held one high answer (a work lane named in the request), one medium (the manifest dependency spelling) and one low (a present-tense claim about #326). Commit 3da0df2 of #325 fixes the request and the manifest row and rewords one requirement of T4, recorded in the reviewer note. Checks run, and the only checks made: the spec hash equals specSha256 of the file on disk at the reviewed head; every task drafts through makeTask; every command criterion parses with sh -n; every grep pattern compiles as a regular expression; no criterion statement repeats within a task; every test_red_green command names its own test file and that file is inside the task scope; every MV citation resolves to a line of docs/scope-one/programme/REQUIREMENTS.md, DECOMPOSITION.md or WBS.md; every fold id the spec cites (SO-A, SO-F) matches the title of a signed contract under contracts/signed; every SO, SR, QL and PG spec id it names resolves to a spec file here, except ids of specs that live in the other repository (SR-3.03, SR-3.06), which I did not resolve; I read the request, task descriptions and requirements by hand for agent, lane and seat labels (a word search for agent, lane and seat labels finds none in the spec or in the programme manifest) and the leak scan stays clean. All passed. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Nothing high.",
+      "amendments": [
+        {
+          "task": "T4",
+          "field": "requirement",
+          "from": "The state machine owns lifecycle changes, so amendScope (src/engine/project-state.mjs:184), applyUpdate (:236), reassign (:262), eligibleForDispatch (:287), pause (:293), requestCancellation (:304), resume (:320) and EventLog (:160) are reached from the coordinator, the vault or the MCP routes and not only defined (source: src/engine/project-state.mjs exports; state of pull request #326 on 31 Oct 2026, where none of them is called outside project-state.mjs)",
+          "to": "The state machine owns lifecycle changes, so amendScope, applyUpdate, reassign, eligibleForDispatch, pause, requestCancellation, resume and EventLog (exported by src/engine/project-state.mjs) must each be reached from the coordinator, the vault or an MCP route in src/server/mcp.mjs, and must not only be defined; each must be called from at least one module other than src/engine/project-state.mjs, and test/project-wiring-remaining.test.mjs must prove each call path (source: src/engine/project-state.mjs exports; before pull request #326 none of them was called outside project-state.mjs, and the criteria below hold the requirement open on any later change)",
+          "reviewer_note": 1
+        }
+      ],
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NDg5ZWJjMDBlMmI2NzRmYmQ0NGQ5YWMxMWUzOWRiYTRlOWMwNmI3OTFjYzY0ZDdkZmY0YjdjYjQwZTRmNTQzMw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "2moob7zoQEt10asWFFnuekH777+mFs8s+cWfY1BBaBkzh72Q+DXAj/E726G4dtCrN6WABPHpbJA01VICI6jLDw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NDY1MDRiZjZhMDUyMTg0YmMxOTExYWRiMjEwNGE0ZmY4NTljNzU2NTllOTJkN2NjMTIxZDU5YjAyZmY2MTYzMQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "mz7ChDt8lEA60VDAuryJ5iJzE8ftKuG7N1rssnbeEs3bhS25xGKPiZ0JFMvBU6ffnmbDkwEBVIoxQFNlIWEwCw=="
+          }
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": [
+    {
+      "n": 1,
+      "text": "INTERIM SOLO REVIEW, pending independent re-review. Round 2 of PGP-1.02 rewords one requirement of T4 and states it more strictly. From: \"The state machine owns lifecycle changes, so amendScope (src/engine/project-state.mjs:184), applyUpdate (:236), reassign (:262), eligibleForDispatch (:287), pause (:293), requestCancellation (:304), resume (:320) and EventLog (:160) are reached from the coordinator, the vault or the MCP routes and not only defined (source: src/engine/project-state.mjs exports; state of pull request #326 on 31 Oct 2026, where none of them is called outside project-state.mjs)\". The new text drops the line numbers, which a later edit would move, and requires that each of the eight is called from at least one other module and that test/project-wiring-remaining.test.mjs proves each call path; it says before #326 where the old text spoke of the state on 31 Oct 2026.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YTIzYTFjODZlYzk0OGEyMjg5MzJjMzFlZmEwYThiNzY1NTE3MjI0OTA0MjJhNjQ3NjQ4OGVjNjM0NzJkNWEzZA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "ftcYfKCR2IBlmsLh3rVWAMV4uAqLezwhzALMprzDjVUMzOQ5CuE+pvssnocxOc9QxOtdLaxu1YO/tZDxUBMhDw=="
+          }
+        ]
+      }
+    }
+  ]
+}

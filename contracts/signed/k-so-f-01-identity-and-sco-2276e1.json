@@ -1,0 +1,244 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Identity and scopes model, version 1: subjects, keys, expiry and revocation; scope types from personal to organisation; every authenticated request resolves to a subject and a scope; personal and orga",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "docs/schemas/identity-v1.json defines subjects (person, agent, device, node, operator, service) with keys, expiry and revocation, the scope types",
+        "every store write and every authenticated MCP and HTTP request resolves to a subject and a scope",
+        "a token or binding issued for a personal scope cannot read or write an organisational scope and the reverse",
+        "the role bindings of MEM-145 and MEM-146 resolve to subjects of the model (an agent subject bound to a person subject) without a second identity store",
+        "subject and scope resolution works with every non-loopback network call made to throw",
+        "the identity schema exists",
+        "docs/THREAT-MODEL.md carries one row for a credential of one scope used against another, naming the personal or organisational scope",
+        "docs/IDENTITY-AND-SCOPES.md describes the model and labels unenforced parts planned"
+      ],
+      "description": "Identity today is per device and per credential (device and client tokens, src/engine/tokens.mjs, with read, write and admin scopes; the open routes of src/server/http.mjs stay open). Business needs persons, roles and scopes; federation needs node and operator identity; policy at retrieval and action time needs a subject on every authenticated request. Nothing beyond the execution plane can be built before this model exists. This contract defines it with a schema, a validator and the resolution at the request boundary, building on the role bindings of MEM-145 and MEM-146 and the separation rules of MEM-134 (src/engine/identity.mjs). Personal keeps working with today's tokens: a device or client token resolves to its owner subject and the personal scope. The principals of SO-09-A (user, lead, specialist, remote seat) are the subjects this model names; SO-09-A is coordinated, not a dependency. MEM-134 depends on MEM-119, MEM-122 and MEM-123, which are drafts outside the signed set; the fold lists them.",
+      "scope": {
+        "allow": [
+          "changelog.d/SO-F-01.md",
+          "docs/IDENTITY-AND-SCOPES.md",
+          "docs/MODULES.md",
+          "docs/README.md",
+          "docs/THREAT-MODEL.md",
+          "docs/schemas/identity-v1.json",
+          "src/engine/identity.mjs",
+          "src/engine/tokens.mjs",
+          "src/engine/vault.mjs",
+          "src/server/http.mjs",
+          "src/server/mcp.mjs",
+          "test/helpers/**",
+          "test/identity.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "docs/schemas/identity-v1.json defines subjects (person, agent, device, node, operator, service) with keys, expiry and revocation, the scope types personal, team, department, project, programme, portfolio, site and organisation, and membership records; a token's identity scope is a field of its own, distinct from the read, write and admin scopes of src/engine/tokens.mjs; the validator accepts the fixtures and refuses a subject without an owner or a scope without a type",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/identity.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-01 AC02:' test/identity.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-01 AC02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "every store write and every authenticated MCP and HTTP request resolves to a subject and a scope: a device or client token resolves to its owner subject and the personal scope, a business token or binding to its organisational scope; a request that resolves to none is refused with a reason; the open routes of src/server/http.mjs are unchanged; the test issues one of each and one Personal request with today's token that still passes",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/identity.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-01 AC03:' test/identity.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-01 AC03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "a token or binding issued for a personal scope cannot read or write an organisational scope and the reverse; the test holds both and asserts refusal both ways, standalone (the MEM-134 separation tests are cited, not extended)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/identity.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-01 AC04:' test/identity.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-01 AC04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "the role bindings of MEM-145 and MEM-146 resolve to subjects of the model (an agent subject bound to a person subject) without a second identity store",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/identity.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-01 AC05:' test/identity.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-01 AC05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "subject and scope resolution works with every non-loopback network call made to throw: identity is resolved locally, and an agent subject names a role, never a provider",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/identity.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-01 AC13:' test/identity.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-01 AC13:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "the identity schema exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/schemas/identity-v1.json"
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "docs/THREAT-MODEL.md carries one row for a credential of one scope used against another, naming the personal or organisational scope",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/THREAT-MODEL.md",
+            "pattern": "^\\|[^\\n]*(personal|organisational) scope[^\\n]*\\|",
+            "flags": "m"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "docs/IDENTITY-AND-SCOPES.md describes the model and labels unenforced parts planned",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/IDENTITY-AND-SCOPES.md",
+            "pattern": "planned"
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "The full test suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "The leak scan passes on files and every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T1-AC11",
+          "mandatory": true,
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "id": "T1-AC12",
+          "mandatory": true,
+          "statement": "Every changed file is inside this contract's scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "Stop and post BLOCKED when a criterion cannot pass without weakening a test, skipping a test or relaxing an assertion.",
+        "Stop and ask when the work would name a client product, a person, a server or a seat in repository text; the client names live in docs/CLIENTS.md only.",
+        "Stop when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would move convergence logic into the core, vendor the engine, or add a merge engine beside the provider boundary of src/engine/merge.mjs.",
+        "Stop when the work would implement a federation, replication, trust, admission or computation feature beyond the specification, schema, validator and conformance test the contract names; the product keeps the planned label on it.",
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-so-f-01-identity-and-sco-2276e1",
+  "title": "SO-F-01 Identity and scopes model, version 1: subjects, keys, expiry and revocation; scope types from personal to organisation; every authenticated request resolves to a subject and a scope; personal and organisational scopes never mix",
+  "workdir": null,
+  "created": "2026-11-01T00:42:18.299Z",
+  "version": 2,
+  "supersedes": "k-so-f-01-identity-and-sco-a635b7",
+  "request": "Build layer of the Scope One programme, adapted from the unsigned fold of 30 Oct 2026 (fold id SO-F-01) and validated against memev main at d1c65ef. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository; they are cited by id only. Implements the design records SO-2.02 (Permission-aware knowledge access: retrieval governed by identity, project membership, classification, policy and jurisdiction); SO-2.14 (Business deployment: multi-person project permissions and team administration) (contracts/scope-one/specs). The decision record cites this contract by id and keeps only the gaps this one does not cover. Builds on signed vault contracts: MEM-134†, MEM-145†, MEM-146†, SO-09-A†. Source in the fold: #222 section 13.5 (identity, role, membership, purpose at retrieval and action time) and #223 FEDERATION.md (node identity); D-PI-PREREQ (the identity page and threat-model row fold here). Settled decisions this contract follows (owner decision 31 Oct 2026, docs/scope-one/DECISIONS.md): topology is local-first and the cloud is only a relay and a backup; every supported provider stands on equal footing and no work or tier depends on one; crdt-merge is reached only through the provider boundary of src/engine/merge.mjs (docs/EXTENSION-POINTS.md) and this contract adds no merge engine to the core; tiers follow docs/PRICING.md (Free core, Personal for up to 3 computers with no per-computer add-on, higher tiers by contacting us) with no Personal trial; the git backup keeps running every few minutes (sync.interval_min). Memory authority: ADR 7 (memory and project-state authority) is proposed in PR #325 and is not decided here; this contract cites it and the local-first decision, and keeps one store under the vault with no second database. Provenance: adapted from the unsigned fold of 30 Oct 2026. Changes: (1) converted from the vault task format to the memev spec format (named tests run as red-green checks on the own test file of the contract; inline regular expression flags became the flags key; hygiene and decision verifiers became commands or doc checks). (2) removed fold-only fields and the owner-decision marker field, reworded the stop rule that named a patent, and made the text pass the leak scan. (3) AC04 extended the MEM-134 separation tests, but MEM-134 is in progress and not on main (src/engine/identity.mjs has no separation tests). The separation test is written standalone here, and MEM-134 is cited only. (4) Local-first check added: subjects and scopes resolve on the computer with no hosted identity call; a test replaces the network modules with throwing wrappers. (5) AC06 pattern needed the multiline flag; the fold used a ^ anchor with a single-line match. (6) Boundary with PG-09.1 WP09-01 (signed node and agent identity, delegation, revocation, admission): this contract owns the subject and scope model and the resolution at the request boundary; WP09-01 builds node admission on it and should cite it. (7) No role-by-action matrix is introduced (ADR 5 stays open).",
+  "provenance": {
+    "spec_sha256": "3c0b2c672558857c6ec46b9d40b167c9a69a2aaa5fc4e82db755685690ed7b36",
+    "record": "contracts/scope-one/redteam/SO-F-01.json",
+    "review": "interim solo review by the author, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}

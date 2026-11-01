@@ -1,0 +1,307 @@
+{
+  "title": "PG-03.5 Cross-language protocol vectors (crdt-merge-rs)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract for work package WP03 in crdt-merge-rs: Cross-language protocol vectors. Supersedes PG-03.3 (signed; the PG-03.3 file is unchanged and stays on record, and the manifest and RECONCILIATION mark it superseded by this contract). Reason: the signed PG-03.3 cannot be met as scoped because the Rust edition lacks the features its vectors need (an ORSet type key, optional tombstones on read, the canonical sort, LWWMap, AgentState, and node_id on LWWRegister); the signer decided to supersede it with a contract that builds them. Depends on contracts: PG-03.1 (signed). The Python serialisation is that of crdt-merge main 252c93e6; the canonical form and vectors are those of crdt-merge pull request #183 (commit b92d0ef). Implemented by the draft pull request #1 of the edition repository; no head sha is pinned. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP03.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP03-01. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json.   Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "WP03-03-A",
+      "title": "ORSet, LWWMap, LWWRegister and the canonical form in the Rust edition",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "MV-DEM-06: Python, Rust and TypeScript nodes exchange identical protocol representations (P2). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:74; evidence docs/scope-one/programme/DECOMPOSITION.md:111; baseline 8.5)",
+        "The Python serialisation to match is that of crdt-merge main 252c93e6 (ORSet tombstones from pull request #180, merged through pull request #181); the canonical form and the vectors are those of crdt-merge pull request #183, pinned at commit b92d0ef in tests/vectors/SOURCE (source: crdt-merge main 252c93e6; crdt-merge pull request #183; contract PG-03.1, cited by id)",
+        "Vector numbers are never whole-number floats and never use exponent notation: TypeScript prints 5 where Python and Rust print 5.0, and cross-language float printing is out of scope (normative, owner delegation, 1 Nov 2026)",
+        "LWWRegister merge: a higher timestamp wins; on equal timestamps the greater node_id wins. Equal timestamp and equal node_id is a known open gap: the Python reference keeps self and Rust keeps other, so merge is not commutative there. That case is excluded from the vectors and must not be asserted; it is recorded in docs/scope-one/RECONCILIATION.md as an open follow-up against the crdt-merge reference, which is fixed first and the editions follow (normative, owner delegation, 1 Nov 2026)",
+        "An unknown element_types name is read as a string, matching the reference. A typed Rust ORSet<String> may reject typed elements on read; that is allowed and must be documented (normative, owner delegation, 1 Nov 2026)",
+        "Canonical order: object keys and set members sort by Unicode code point. The TypeScript UTF-16 comparison differs only for astral characters, which the vectors exclude; that is a known limitation and is noted in the edition (normative, owner delegation, 1 Nov 2026)"
+      ],
+      "description": "Repo: crdt-merge-rs. ORSet in src/core.rs gets the type key and optional sorted tombstones and element_types; remove() writes tombstones and an emptied element keeps its key, and a stale replica does not resurrect a removed element. LWWRegister carries {value, timestamp, node_id} with a Timestamp, and the greater node id settles a tie. LWWMap, Element and WireElement are added in src/core.rs. src/canonical.rs holds the canonical form of crdt-merge pull request #183. A typed ORSet<String> may reject typed elements on read and ORSet<Element> reads every type; this is allowed and is documented.",
+      "scope": [
+        "src/agent_state.rs",
+        "src/canonical.rs",
+        "src/core.rs",
+        "src/lib.rs",
+        "tests/agent_state_tests.rs",
+        "tests/vectors.rs",
+        "tests/wire_tests.rs",
+        "tests/vectors/**",
+        ".github/workflows/**",
+        "CHANGELOG.md",
+        "Cargo.toml"
+      ],
+      "criteria": [
+        {
+          "statement": "The wire-form tests (ORSet, LWWRegister, LWWMap, canonical form) fail before and pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/wire_tests.rs",
+            "cmd": "cargo test --test wire_tests"
+          }
+        },
+        {
+          "statement": "The tests cover tombstones, resurrection, node_id, the canonical form and the typed-element rule",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"tombstone\" \"resurrect\" \"node_id\" \"canonicalize\" \"rejects_a_typed_element\"; do grep -qi \"$n\" tests/wire_tests.rs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "src/core.rs defines WireElement, Timestamp and LWWMap",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -q WireElement src/core.rs && grep -q Timestamp src/core.rs && grep -q LWWMap src/core.rs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "src/canonical.rs exists and src/lib.rs exports it",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f src/canonical.rs && grep -q canonical src/lib.rs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The edition builds",
+          "verifier": {
+            "type": "command",
+            "cmd": "cargo build",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP03-03-B",
+      "title": "AgentState in the Rust edition",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "MV-DEM-06: Python, Rust and TypeScript nodes exchange identical protocol representations (P2). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:74; evidence docs/scope-one/programme/DECOMPOSITION.md:111; baseline 8.5)",
+        "The Python serialisation to match is that of crdt-merge main 252c93e6 (ORSet tombstones from pull request #180, merged through pull request #181); the canonical form and the vectors are those of crdt-merge pull request #183, pinned at commit b92d0ef in tests/vectors/SOURCE (source: crdt-merge main 252c93e6; crdt-merge pull request #183; contract PG-03.1, cited by id)",
+        "Vector numbers are never whole-number floats and never use exponent notation: TypeScript prints 5 where Python and Rust print 5.0, and cross-language float printing is out of scope (normative, owner delegation, 1 Nov 2026)",
+        "LWWRegister merge: a higher timestamp wins; on equal timestamps the greater node_id wins. Equal timestamp and equal node_id is a known open gap: the Python reference keeps self and Rust keeps other, so merge is not commutative there. That case is excluded from the vectors and must not be asserted; it is recorded in docs/scope-one/RECONCILIATION.md as an open follow-up against the crdt-merge reference, which is fixed first and the editions follow (normative, owner delegation, 1 Nov 2026)",
+        "An unknown element_types name is read as a string, matching the reference. A typed Rust ORSet<String> may reject typed elements on read; that is allowed and must be documented (normative, owner delegation, 1 Nov 2026)",
+        "Canonical order: object keys and set members sort by Unicode code point. The TypeScript UTF-16 comparison differs only for astral characters, which the vectors exclude; that is a known limitation and is noted in the edition (normative, owner delegation, 1 Nov 2026)"
+      ],
+      "description": "Repo: crdt-merge-rs. AgentState and Fact are added in src/agent_state.rs and exported from src/lib.rs, with the wire form of the Python edition at crdt-merge 252c93e6 and the canonical form of #183.",
+      "scope": [
+        "src/agent_state.rs",
+        "src/canonical.rs",
+        "src/core.rs",
+        "src/lib.rs",
+        "tests/agent_state_tests.rs",
+        "tests/vectors.rs",
+        "tests/wire_tests.rs",
+        "tests/vectors/**",
+        ".github/workflows/**",
+        "CHANGELOG.md",
+        "Cargo.toml"
+      ],
+      "criteria": [
+        {
+          "statement": "The AgentState tests fail before and pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/agent_state_tests.rs",
+            "cmd": "cargo test --test agent_state_tests"
+          }
+        },
+        {
+          "statement": "The tests cover facts, tags, counters, messages, merge and the wire form",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"add_fact\" \"merge\" \"tags\" \"counters\" \"message\" \"wire_form\"; do grep -qi \"$n\" tests/agent_state_tests.rs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "AgentState lives in src/agent_state.rs and is exported from src/lib.rs",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f src/agent_state.rs && grep -q agent_state src/lib.rs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The edition builds",
+          "verifier": {
+            "type": "command",
+            "cmd": "cargo build",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP03-03",
+      "title": "Rust edition reads and re-emits every vector byte-identically",
+      "phase": "verify",
+      "depends_on": [
+        "WP03-03-A",
+        "WP03-03-B"
+      ],
+      "requirements": [
+        "MV-DEM-06: Python, Rust and TypeScript nodes exchange identical protocol representations (P2). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:74; evidence docs/scope-one/programme/DECOMPOSITION.md:111; baseline 8.5)",
+        "The Python serialisation to match is that of crdt-merge main 252c93e6 (ORSet tombstones from pull request #180, merged through pull request #181); the canonical form and the vectors are those of crdt-merge pull request #183, pinned at commit b92d0ef in tests/vectors/SOURCE (source: crdt-merge main 252c93e6; crdt-merge pull request #183; contract PG-03.1, cited by id)",
+        "Vector numbers are never whole-number floats and never use exponent notation: TypeScript prints 5 where Python and Rust print 5.0, and cross-language float printing is out of scope (normative, owner delegation, 1 Nov 2026)",
+        "LWWRegister merge: a higher timestamp wins; on equal timestamps the greater node_id wins. Equal timestamp and equal node_id is a known open gap: the Python reference keeps self and Rust keeps other, so merge is not commutative there. That case is excluded from the vectors and must not be asserted; it is recorded in docs/scope-one/RECONCILIATION.md as an open follow-up against the crdt-merge reference, which is fixed first and the editions follow (normative, owner delegation, 1 Nov 2026)",
+        "An unknown element_types name is read as a string, matching the reference. A typed Rust ORSet<String> may reject typed elements on read; that is allowed and must be documented (normative, owner delegation, 1 Nov 2026)",
+        "Canonical order: object keys and set members sort by Unicode code point. The TypeScript UTF-16 comparison differs only for astral characters, which the vectors exclude; that is a known limitation and is noted in the edition (normative, owner delegation, 1 Nov 2026)"
+      ],
+      "description": "Repo: crdt-merge-rs. tests/vectors/ is copied unchanged from crdt-merge at the commit pinned in tests/vectors/SOURCE (b92d0ef, pull request #183): SOURCE, orset.json, lwwmap.json and agentstate.json. No vector is edited, excluded or ignored to pass. The 33 vectors (20 states and 13 merges) are re-emitted byte-identically, merged in both orders and checked against the recorded value; before the change the vector tests failed, among them the 19 ORSet vectors. The implementing pull request measured these counts; they are a floor for information and no exact count is a criterion. Measured: 129 tests in the full suite. CI runs cargo test. Known limitations are listed in CHANGELOG.md: whole-number float printing, the equal node id tie, unknown element types and the typed ORSet<String> read. Keys sort by code point, which is byte order for UTF-8.",
+      "scope": [
+        "src/agent_state.rs",
+        "src/canonical.rs",
+        "src/core.rs",
+        "src/lib.rs",
+        "tests/agent_state_tests.rs",
+        "tests/vectors.rs",
+        "tests/wire_tests.rs",
+        "tests/vectors/**",
+        ".github/workflows/**",
+        "CHANGELOG.md",
+        "Cargo.toml"
+      ],
+      "criteria": [
+        {
+          "statement": "Every vector in tests/vectors/** is read and re-emitted byte-identically",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/vectors.rs",
+            "cmd": "cargo test --test vectors"
+          }
+        },
+        {
+          "statement": "cargo test passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "cargo test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "tests/vectors/SOURCE pins crdt-merge commit b92d0ef (pull request #183)",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -q b92d0ef tests/vectors/SOURCE",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The ORSet vector file exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "tests/vectors/orset.json"
+          }
+        },
+        {
+          "statement": "The LWWMap vector file exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "tests/vectors/lwwmap.json"
+          }
+        },
+        {
+          "statement": "The AgentState vector file exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "tests/vectors/agentstate.json"
+          }
+        },
+        {
+          "statement": "The vector test reads the three vector files",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f tests/vectors.rs && grep -Eq \"read_dir|glob|orset|lwwmap|agentstate\" tests/vectors.rs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The vector test ignores and excludes no vector",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f tests/vectors.rs && ! grep -Eq \"#\\[ignore|should_panic\" tests/vectors.rs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "No vector holds a whole-number float or exponent notation (rule: Python and Rust print 5.0, TypeScript prints 5)",
+          "verifier": {
+            "type": "command",
+            "cmd": "node -e 'const fs=require(\"fs\");let bad=0;for(const f of fs.readdirSync(\"tests/vectors\")){if(!f.endsWith(\".json\"))continue;const t=fs.readFileSync(\"tests/vectors/\"+f,\"utf8\").replace(/\"(?:[^\"\\\\]|\\\\.)*\"/g,\"\\\"\\\"\");if(/\\d\\.0+(?![0-9])|\\d[eE][+-]?\\d/.test(t)){console.log(\"bad number in \"+f);bad=1}}process.exit(bad)'",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "CI runs cargo test",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f .github/workflows/ci.yml && grep -q \"cargo test\" .github/workflows/ci.yml",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "CHANGELOG.md lists the known limitations: whole-number floats, the equal node id tie, unknown element types and the typed ORSet<String> read that rejects typed elements",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"whole-number\" \"node.id\" \"element_types\" \"rejects\"; do grep -qi \"$n\" CHANGELOG.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}

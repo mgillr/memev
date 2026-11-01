@@ -1,0 +1,118 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SO-F-08",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "ce2f5a95cfe7596a9ce218dd200f798fb160d12b483f52cb97deba84aeee3980",
+      "base_commit": "fff993f5e244f2533c0d714650220590de38057b",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/merge.mjs",
+            "sha256": "50539d4c05a584105ab2e53372743550f45c9da549f85ac994c1114afbd55bca"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "every named test is red at the base only because its test file does not exist yet, so a red result does not show that the test would catch a wrong implementation (3 test_red_green criteria)",
+          "disposition": "rejected",
+          "reason": "this is the shape of every implement contract of this repository (the SR-1 contracts have it): the criteria name seeded cases with asserted refusals, the gate checks that each command runs its own test file, and the independent re-review reads the tests when they exist. A mutation check belongs to the mutation gate (QL-1.02), not to this spec"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "the vault contracts the request names are not visible in this repository, so the prerequisite chain is not machine-checked",
+          "disposition": "rejected",
+          "reason": "the manifest depends_on lists only ids that are manifest rows, as the gate and the manifest test require; the vault ids are named in the request with a dagger, as SO-2.14 names them, and section 9 of the WBS lists what each build contract was checked against"
+        },
+        {
+          "n": 3,
+          "severity": "medium",
+          "how": "possible duplicate of PG-09.1 WP09-02: the trust adapter boundary against the admission adapter",
+          "disposition": "rejected",
+          "reason": "the overlap is settled in the spec text and in WBS section 9.2: one contract owns the thing and the other cites it, and this contract takes only the part named in its provenance; the programme specs are cited by id and nothing is copied"
+        },
+        {
+          "n": 4,
+          "severity": "medium",
+          "how": "the fold decision verifiers are now doc greps, and a grep cannot show that a decision stands, only that the page states it",
+          "disposition": "rejected",
+          "reason": "the decisions are the owner decisions of 31 Oct 2026 in docs/scope-one/DECISIONS.md; the criterion checks that the page states the rule and the owner remains the authority. The fold lead-decided items (replication unit, trust and admission naming) are kept as criterion text, not marked decided"
+        },
+        {
+          "n": 5,
+          "severity": "medium",
+          "how": "the hashes of the two service names are no longer added by the contract, so generic naming is enforced only by the leak scan with the list the owner holds",
+          "disposition": "rejected",
+          "reason": "the names are not available to anyone building from the repository, so a criterion that needs them cannot be met; the owner adds the two hashes to scripts/leak-denylist.json directly and that file is outside the scope"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of this adapted spec, made against main at fff993f5e244. It has 1 task and 9 criteria. Checks run, and the only checks made: the task drafts through makeTask; each command parses with sh -n; no criterion statement repeats; each grep pattern compiles with its flags and is within 200 characters; every criterion target (test file, page, schema) is inside the scope; no criterion was already satisfied on main (grep, file and test targets); each test name prefix starts with the contract id and is unique across the build layer; no test file or created file is repeated by another spec of this repository or of the programme branch (PR #325); every manifest depends_on is a manifest row; the leak scan is clean. All passed. Before this round I changed the fold where main or an owner decision disagreed with it; those changes are listed in the provenance of the spec (request) and are part of what this round reviewed. I did not read the vault contracts the request names, which this repository cannot show, I did not run any named test (its file does not exist yet), and I did not review the addendum or the owner baseline text itself. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NzkzZjk1NTNkNWZkYWMxY2ZkNjljYzk2NzE4M2Q3ZWIyYjEyZGI0MDZhZTk4ODIxNDY3NmNjZGY2MTYzYWUxZg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "BkTqAGpY8UiJEzbxkswRyzFh9iWuoQHA/jXLBA8B0h2z7sSMBDvoVP2lq1oCZ6rPvLZLXgTLgUEFIg2koI/wAQ=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NzIzYjY2YjI2NDYxYzQ5NzQ3YzMzZmIzYWVmZmQ5NjljNjg5ODljN2VkOGI3MDIyMDI1MDkxZDBlYTYzN2UyZA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "7wyQBupJyCXW3HWe/ptnnAtpDyQu0hLuOIxuxWVM7modpUssUGCfmDmQlHUpM53jUDH9zIKAJusmVgOMj5R5BA=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "ce2f5a95cfe7596a9ce218dd200f798fb160d12b483f52cb97deba84aeee3980",
+      "base_commit": "6be36f807b2251accfd48262f94eddfcd845c98e",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/merge.mjs",
+            "sha256": "50539d4c05a584105ab2e53372743550f45c9da549f85ac994c1114afbd55bca"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Re-review of the same spec, unchanged (same spec hash as round 1), made against main at 6be36f807b22. Since the merge of #341 (cdab1ab) the only file of this spec's scope that changed is docs/README.md, and every listed input under src/ has the same hash at main as at cdab1ab. Why: docs/README.md is in this spec's scope and gained index rows after round 1 was read at fff993f5e244 (rows for the SO-2.02 to SO-2.06 decision records, from #329 and #330 before the signing merge #341, and from #333, #337 and #338 after it). Checks run, and the only checks made: the diff of docs/README.md from fff993f5e244 to 6be36f807b22 adds only index rows that link design records under docs/scope-one/design/ and removes or rewords nothing; no criterion, requirement or stop rule of this spec reads those rows or any row they sit beside (the one README criterion is a grep for a link this spec itself adds, and it is still red on main as it should be); the spec on disk equals the round 1 snapshot byte for byte; the listed inputs under src/ are unchanged; the leak scan is clean. All passed. I did not re-run any named test (its file does not exist yet) and I did not re-read the vault contracts the request names. The answers of round 1 stand with their dispositions. Nothing high, nothing new.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NDEwN2NiYTU0YmY1OTk3Yzc1NzAzN2E1YzRiNTYyMTA0OTNlYTg2ZTU0MmU1M2RhZjFmMWM4YTY4Yjc5NWVmMw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "cVyRQQgxLUMwkNU91uSpvrOpslO6CH0zSnIaaJZtr+cTk+PHM+VOQ/pNiKNHiPBLG0II9jy1DCKazRY8RWszAw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MDE3OWI2MTI0Yjk5ODc2ZDVkMWMyMjE0M2RkNTRkMzkzOTk2ZWU0ZGQyYjFkM2JhMWQyZDNmYThiNDdlZTkxNA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "8VnW7Nb/Aj62kuAufJkRYyvUmKYroXb7/Vz4zEmwVB2lwnRtpl6Rib/vdxMyzMGLgA5hfzv5slmwwPZopoIcCg=="
+          }
+        ]
+      }
+    }
+  ]
+}

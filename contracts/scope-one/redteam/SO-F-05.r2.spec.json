@@ -1,0 +1,110 @@
+{
+  "title": "SO-F-05 Classification model: six replication classes on notes and entities, local-only by default, refused only on the federation path, and derived data in the index and graph that inherits the source classification",
+  "project": "memev",
+  "workdir": null,
+  "request": "Build layer of the Scope One programme, adapted from the unsigned fold of 30 Oct 2026 (fold id SO-F-05) and validated against memev main at d1c65ef. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository; they are cited by id only. Implements the design records SO-2.02 (Permission-aware knowledge access: retrieval governed by identity, project membership, classification, policy and jurisdiction); SO-2.03 (Provenance, retention and invalidation of organisational knowledge) (contracts/scope-one/specs). The decision record cites this contract by id and keeps only the gaps this one does not cover. Memev contracts that land first: SO-F-02, SO-F-04. Page: docs/DATA-SOVEREIGNTY.md comes from the federation architecture documentation (PR #223, branch docs/federation-architecture, not on main); until that merges, the first contract to need a page creates it with its Status section, labelled planned or architectural target, and the later ones extend it. Source in the fold: #222 section 13.5 and 13.6.1 (replication classes, derived data) and #223 DATA-SOVEREIGNTY.md (replication classes 1 to 6, acceptance criteria 2 and 3). Settled decisions this contract follows (owner decision 31 Oct 2026, docs/scope-one/DECISIONS.md): topology is local-first and the cloud is only a relay and a backup; every supported provider stands on equal footing and no work or tier depends on one; crdt-merge is reached only through the provider boundary of src/engine/merge.mjs (docs/EXTENSION-POINTS.md) and this contract adds no merge engine to the core; tiers follow docs/PRICING.md (Free core, Personal for up to 3 computers with no per-computer add-on, higher tiers by contacting us) with no Personal trial; the git backup keeps running every few minutes (sync.interval_min). Memory authority: ADR 7 (memory and project-state authority) is proposed in PR #325 and is not decided here; this contract cites it and the local-first decision, and keeps one store under the vault with no second database. Provenance: adapted from the unsigned fold of 30 Oct 2026. Changes: (1) converted from the vault task format to the memev spec format (named tests run as red-green checks on the own test file of the contract; inline regular expression flags became the flags key; hygiene and decision verifiers became commands or doc checks). (2) removed fold-only fields and the owner-decision marker field, reworded the stop rule that named a patent, and made the text pass the leak scan. (3) Decision verifier D-SO-TOPOLOGY removed (settled: local-first). (4) Boundary with PG-13.1 WP13-01 (sharing classes enforced at the publish boundary): this contract owns the six-class classification, the local-only default and inheritance by derived data; WP13-01 enforces at the publish boundary using these classes and should map its shared and local-only groups onto them. (5) Backup rule stated to match the owner decision: the whole-vault git backup, run every few minutes, is the recovery copy class by definition.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Classification model: six replication classes on notes and entities, local-only by default, refused only on the federation path, and derived data in the index and graph that inherits the source classi",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a note or project entity can carry a classification from the six replication classes (local only, in-jurisdiction, federation metadata, approved",
+        "the index, graph edges, caches and logs carry the source classification and a query from a subject without clearance for a class returns nothing",
+        "the classification schema exists",
+        "docs/DATA-SOVEREIGNTY.md status section names the classification schema and states what is enforced and what is planned"
+      ],
+      "description": "Data sovereignty needs a classification on every note and entity and the rule that indexes, graph edges, caches and logs inherit it. Personal must keep working: an item with no classification is local only, and the validator refuses an item without one only on the federation path (an envelope). The replication unit, the split of the operation log into per-scope streams and the two-node conformance test are SO-F-12.",
+      "scope": [
+        "changelog.d/SO-F-05.md",
+        "docs/DATA-SOVEREIGNTY.md",
+        "docs/DESIGN.md",
+        "docs/MODULES.md",
+        "docs/README.md",
+        "docs/schemas/classification-v1.json",
+        "src/engine/graph.mjs",
+        "src/engine/index.mjs",
+        "src/engine/vault.mjs",
+        "test/classification.test.mjs",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "a note or project entity can carry a classification from the six replication classes (local only, in-jurisdiction, federation metadata, approved derived state, cross-border permitted, recovery copy); an item with no classification is local only; the validator refuses a classification outside the six classes, and refuses an item without one only on the federation path (an envelope, SO-F-03); every existing Personal note stays valid",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/classification.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-05 AC02:' test/classification.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-05 AC02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "the index, graph edges, caches and logs carry the source classification and a query from a subject without clearance for a class returns nothing derived from it; the per-scope streams inherit it in SO-F-12; the whole-vault git backup is the recovery copy class by definition",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/classification.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-05 AC03:' test/classification.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-05 AC03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "the classification schema exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/schemas/classification-v1.json"
+          }
+        },
+        {
+          "statement": "docs/DATA-SOVEREIGNTY.md status section names the classification schema and states what is enforced and what is planned",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/DATA-SOVEREIGNTY.md",
+            "pattern": "## Status.*classification-v1\\.json.*enforced.*planned",
+            "flags": "s"
+          }
+        },
+        {
+          "statement": "The full test suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "The leak scan passes on files and every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Every changed file is inside this contract's scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "Stop and post BLOCKED when a criterion cannot pass without weakening a test, skipping a test or relaxing an assertion.",
+        "Stop and ask when the work would name a client product, a person, a server or a seat in repository text; the client names live in docs/CLIENTS.md only.",
+        "Stop when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would move convergence logic into the core, vendor the engine, or add a merge engine beside the provider boundary of src/engine/merge.mjs.",
+        "Stop when the work would implement a federation, replication, trust, admission or computation feature beyond the specification, schema, validator and conformance test the contract names; the product keeps the planned label on it.",
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

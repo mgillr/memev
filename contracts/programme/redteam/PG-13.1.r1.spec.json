@@ -1,0 +1,264 @@
+{
+  "title": "PG-13.1 Federation sites, sharing classes, disclosure (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract for work package WP13 in memev: Federation sites, sharing classes, disclosure. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP13.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP04-02, WP06-03, WP09-01, WP09-02, WP10-01, WP12-02. Depends on contracts: SO-2.02, PG-09.1. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.02: WP13-01 enforces sharing classes at the publish boundary of a site; SO-2.02 governs retrieval and action time and takes none of it. Boundary with SO-2.12: WP13-03 (sites) is a prerequisite of federated computation. Boundary with SO-2.11 and SO-2.14: WP13 concerns sites of Memev; enterprise systems and multi-person project permissions stay with those contracts. Signed vault contract SO-09-A (cited by id only): the authorisation matrix at every entry point; WP13 enforces the publish boundary of a site and does not restate it. Build layer (lead workstream decision under owner delegation, 1 Nov 2026): the unsigned fold (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-13, cited by id only) is the build layer, and it overlaps this spec at SO-F-04, SO-F-05, SO-F-07, SO-F-12, SO-F-13. This spec will cite those ids and keep only what the fold does not cover; trim pending fold PR (the final fold ids come in the lead's separate pull request, branch contracts/scope-one-fold-build-layer). Nothing is trimmed yet. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "WP13-01",
+      "title": "Sharing classes enforced at the publish boundary: shared (approved state, decisions, handoffs, signed contributions, authorised knowledge) versus local-only (raw data, private memory, credentials, restricted documents)",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "MV-FED-02: Sharing classes are enforced: approved project state, decisions, task handoffs, signed contributions with receipts and authorised knowledge are shared; raw data, private memory, credentials and restricted documents stay local. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:61; evidence docs/scope-one/programme/DECOMPOSITION.md:101; baseline 8.5)",
+        "MV-FED-01: Independent site nodes: each runs its own Memev server, keeps local authoritative records, controls local identity, keeps working during partitions, publishes only authorised state and reconciles on reconnect. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:60; evidence docs/scope-one/programme/DECOMPOSITION.md:100; baseline 8.5)"
+      ],
+      "description": "Repo: memev. Enforces sharing classes at the publish boundary of a site only. Access control at retrieval and action time, and its default-deny rule, are SO-2.02 requirements 2 and 3; this task does not restate or implement them.",
+      "scope": [
+        "src/engine/publish-policy.mjs",
+        "test/publish-policy.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "publish policy tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/publish-policy.test.mjs",
+            "cmd": "node --test test/publish-policy.test.mjs"
+          }
+        },
+        {
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP13-02",
+      "title": "Disclosure policy document: minimisation, secure aggregation, differential privacy per data class; states that redaction is not those guarantees",
+      "phase": "design",
+      "depends_on": [
+        "WP13-01"
+      ],
+      "requirements": [
+        "MV-FED-03: Disclosure controls are explicit: deltas are not automatically GDPR-compliant; minimisation, secure aggregation or differential privacy where required; redaction is not those guarantees. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:62; evidence docs/scope-one/programme/DECOMPOSITION.md:102; baseline 8.5)"
+      ],
+      "description": "Repo: memev. Answers OQ-06; counsel review recorded.",
+      "scope": [
+        "docs/DISCLOSURE.md"
+      ],
+      "criteria": [
+        {
+          "statement": "doc exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/DISCLOSURE.md"
+          }
+        },
+        {
+          "statement": "doc says deltas are not automatically GDPR-compliant",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/DISCLOSURE.md",
+            "pattern": "not automatically",
+            "flags": "i"
+          }
+        },
+        {
+          "statement": "The page states every control and the counsel review of MV-FED-03",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"not automatically\" minimisation \"secure aggregation\" \"differential privacy\" \"redaction is not\" \"counsel review\"; do grep -qi \"$n\" docs/DISCLOSURE.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP13-03",
+      "title": "Organisation membership, permission boundaries and sovereignty policy per site (node identity is WP09-01)",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "MV-FED-05: Node identity, organisation membership, permission boundaries and sovereignty policies exist per site. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:64; evidence docs/scope-one/programme/DECOMPOSITION.md:104; baseline 8.5) Scope here: membership, permission boundaries and sovereignty policy. Node identity is WP09-01 (PG-09.1), reused and not rebuilt.",
+        "MV-FED-01: Independent site nodes: each runs its own Memev server, keeps local authoritative records, controls local identity, keeps working during partitions, publishes only authorised state and reconciles on reconnect. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:60; evidence docs/scope-one/programme/DECOMPOSITION.md:100; baseline 8.5)"
+      ],
+      "description": "Repo: memev. Reuses the node identity of WP09-01 (PG-09.1) and builds none of its own; owns membership, permission boundaries and sovereignty policy per site.",
+      "scope": [
+        "src/engine/site.mjs",
+        "test/site.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "site tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/site.test.mjs",
+            "cmd": "node --test test/site.test.mjs"
+          }
+        },
+        {
+          "statement": "The site module imports the identity modules of WP09-01 rather than defining its own",
+          "verifier": {
+            "type": "grep",
+            "file": "src/engine/site.mjs",
+            "pattern": "from '[^']*(agentid-bind|admission|devices)\\.mjs'"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP13-04",
+      "title": "Offline operation and reconcile on reconnect: a node keeps local authority during a partition and reconciles through acceptance",
+      "phase": "implement",
+      "depends_on": [
+        "WP13-03"
+      ],
+      "requirements": [
+        "MV-FED-01: Independent site nodes: each runs its own Memev server, keeps local authoritative records, controls local identity, keeps working during partitions, publishes only authorised state and reconciles on reconnect. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:60; evidence docs/scope-one/programme/DECOMPOSITION.md:100; baseline 8.5)",
+        "Fail-visible partition handling: on seeing two conflicting closures a node publishes the pair (the fork is the evidence), stops auto-accepting, and reconciles from the last uniquely agreed round; it never resumes on a timeout. The full Dolev-Strong closure stays in acfa-rs and is not claimed as deployed (source: converge src/finality.py and tests/test_finality.py, described only; repository analysis of 1 Nov 2026, section 3.4 item C3)"
+      ],
+      "description": "Repo: memev. Fail-visible finality is written as fresh tests. The converge pattern is cited and described only: converge is BUSL-1.1 and no code is copied (counsel review is WP15-03). Trim pending fold PR: the unsigned fold SO-F-07 and SO-F-12 overlap this task.",
+      "scope": [
+        "test/partition-reconcile.test.mjs",
+        "src/engine/site.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "partition test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/partition-reconcile.test.mjs",
+            "cmd": "node --test test/partition-reconcile.test.mjs"
+          }
+        },
+        {
+          "statement": "The four fail-visible tests are present",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"partition: two conflicting closures halt auto-accept\" \"partition: the conflicting pair is published as the evidence\" \"partition: reconcile from the last uniquely agreed round\" \"partition: a node never resumes on a timeout\"; do grep -qF \"$n\" test/partition-reconcile.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The fail-visible tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^partition:' test/partition-reconcile.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP13-05",
+      "title": "Intra- and inter-organisation trust: cross-organisation identity and trust-domain boundaries",
+      "phase": "design",
+      "depends_on": [
+        "WP13-03"
+      ],
+      "requirements": [
+        "MV-FED-04: Both intra-organisation (several offices) and inter-organisation federation are supported, with cross-organisation identity and trust. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:63; evidence docs/scope-one/programme/DECOMPOSITION.md:103; baseline 8.5)"
+      ],
+      "description": "Repo: memev. Identity is the node identity of WP09-01, reused.",
+      "scope": [
+        "docs/TRUST-DOMAINS.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The page covers both federation forms, cross-organisation identity and the trust-domain boundary",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in intra-organisation inter-organisation \"cross-organisation identity\" \"trust domain\"; do grep -qi \"$n\" docs/TRUST-DOMAINS.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,174 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PG-10.1",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "9984e57c6ecbd4668b9597495b2d6bbccec1a5846184c155a66cc92f5ea98957",
+      "base_commit": "afdccd6413dca3c3715633696e3b7bf76ed9f6b9",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/scope-one/programme/REQUIREMENTS.md",
+            "sha256": "8b70ac41d38fe2f855bf9d74e1409358a1a89d6e68d571aea20186f15db81705"
+          },
+          {
+            "path": "docs/scope-one/WBS.md",
+            "sha256": "15f122b0a8bd47fea7591256767a5707b98578dfbfdf8dc197e57e1522e5ff91"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "findings",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "WP10-01 C2 greps for \"repetition\" only, so the sentence that repetition does not raise a disputed claim is not checked",
+          "disposition": "added",
+          "reason": "The page criterion for the sentence is now a grep that needs both words in one sentence.",
+          "folded_as": {
+            "task": "WP10-01",
+            "statement": "A sentence says repetition does not raise a disputed claim",
+            "verifier": {
+              "type": "grep",
+              "file": "docs/KNOWLEDGE-STATUS.md",
+              "pattern": "repetition[^\\n]{0,160}disputed",
+              "flags": "i"
+            }
+          }
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "WP10-04 as-of query changes src/engine/project-store.mjs, shared with PGP-1.02 and PG-06.1",
+          "disposition": "rejected",
+          "reason": "The order is a build sequence, not something a signature fixes. WP10-03 now states that src/engine/project-store.mjs is shared with PG-06.2, which lands first; WP10-04 depends on WP10-02; signing the spec does not sign the order."
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Third review, of pull request #325 at head afdccd6. The engine decision is owner-confirmed (t542u, 31 Oct 2026). Checks run, and the only checks made: the spec hash equals specSha256 of the file at the reviewed head; every MV citation resolves to the cited line of docs/scope-one/programme/REQUIREMENTS.md or DECOMPOSITION.md and its text matches; every quoted SO-1.x, SO-2.x, SR and QL requirement is a verbatim stretch of the signed contract it cites; each verifier (grep pattern, file_exists path, wiring entry) was run against the tree it names (this tree, or the pull request head where the spec is for another repository); the request, tasks and manifest rows were read against the leak rules of this repository (the leak scan stays clean, and I also read by hand for agent and lane labels, which the scan does not catch); no duplicate of SO-1.01, SO-1.02, SO-1.04, SO-1.10, SO-1.11, SO-2.x, SR, QL, WBS or baseline section 8 was found. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Unchanged since 79cbaae and re-reviewed at afdccd6. Held for the weak WP10-01 criterion. It depends on PG-04.1 and PG-06.1, which are not signed; the layer question is decided (owner delegation, 1 Nov 2026) and is no longer a reason. The split with PGP-1.02 T4 is clear (this spec owns the receipt format). SO-2.03 is cited.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MDNiYTg0OTQxNzE3Y2VkZjk5ZGNhMTA5MWUyNzNhMjdhOTgwZjBhMTY1ZDQyZmZkMjcwOTJhZWVkYWJiZWE5Ng==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "ATgH0wbjNX1sQtN9yaJr0xxuKY2Z3V7SQjy1W8w1xvJsT+kzBxvfQp7zoecA+bWmItJJXdGjHSwCCTo+8sKiCQ=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "9b2e4c8d55e8a594df403a8f7e437418fd8bb4f25a4a172e7318be81dd046f29",
+      "base_commit": "2df1272008a9f32d2c69d130003a0d521b846d2d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "b5b7e0282a53460ad1098ebf2dfe0a83f01369a8e8233f83023e2d1947ad4663"
+          },
+          {
+            "path": "src/engine/graph.mjs",
+            "sha256": "f62490835d8e5f94e12875e7b35b6d4e8fab2b90da8d65339d4a10f80926e42a"
+          },
+          {
+            "path": "src/engine/project-store.mjs",
+            "sha256": "b015593048bc7c1d8ef6e633797c49bbfb91aacb4635b2a27cc6e0e57a03e7f3"
+          },
+          {
+            "path": "src/engine/vault.mjs",
+            "sha256": "0ba848b4dc3f7e0d1ef477947269bc4528084c897a4b0e0ecad5d7e297253196"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Fourth review, of the merged tree of pull requests #325 and #340 at the reviewed head. Round 1 (afdccd6) held one medium answer (a weak grep for the repetition sentence) and one low. Commit 3da0df2 of #325 replaces file_exists and bare red-green statements with criteria that name the headings, the six distinctions and the named tests, and cites SO-F-09 for the finding model; the removed or reworded criteria are in the amendments below. Checks run, and the only checks made: the spec hash equals specSha256 of the file on disk at the reviewed head; every task drafts through makeTask; every command criterion parses with sh -n; every grep pattern compiles as a regular expression; no criterion statement repeats within a task; every test_red_green command names its own test file and that file is inside the task scope; every MV citation resolves to a line of docs/scope-one/programme/REQUIREMENTS.md, DECOMPOSITION.md or WBS.md; every fold id the spec cites (SO-A, SO-F) matches the title of a signed contract under contracts/signed; every SO, SR, QL and PG spec id it names resolves to a spec file; I read the request, task descriptions and requirements by hand for agent, lane and seat labels (a word search for agent, lane and seat labels finds none) and the leak scan stays clean. All passed. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Nothing high.",
+      "amendments": [
+        {
+          "task": "WP10-01",
+          "field": "criterion",
+          "from": "doc exists",
+          "to": null,
+          "reviewer_note": 1
+        },
+        {
+          "task": "WP10-01",
+          "field": "statement",
+          "from": "doc says repetition does not raise a disputed claim",
+          "to": "A sentence says repetition does not raise a disputed claim",
+          "reviewer_note": 1
+        },
+        {
+          "task": "WP10-01",
+          "field": "verifier.pattern",
+          "statement": "A sentence says repetition does not raise a disputed claim",
+          "from": "repetition",
+          "to": "repetition[^\\n]{0,160}disputed",
+          "reviewer_note": 1
+        },
+        {
+          "task": "WP10-02",
+          "field": "statement",
+          "from": "status tests fail before, pass after",
+          "to": "The knowledge status tests are red on the base and green after",
+          "reviewer_note": 1
+        },
+        {
+          "task": "WP10-03",
+          "field": "statement",
+          "from": "receipt-link tests fail before, pass after",
+          "to": "The work receipt tests are red on the base and green after",
+          "reviewer_note": 1
+        },
+        {
+          "task": "WP10-04",
+          "field": "statement",
+          "from": "as-of tests fail before, pass after",
+          "to": "The as-of tests are red on the base and green after",
+          "reviewer_note": 1
+        }
+      ],
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YmM0MGJiNzNhZTVhMTllYmY1ZDQ4ZTRkZTkxZmU3NDEyZjM0NDAxZWMzNDEyOGM4NGE2Mjg3ZGFkN2FjMGZlMQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "+fxKXu/Hr3kVs/78HoYpH2hlIGWQQux8pk5o5GoX3YcpBSSh8UByXrKDMbpe1deUQvvcgrZMZEYP4M7YsabRCQ=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MjgzZjEyZDBlYzYyZGM4NTg2NDlkNjM1NjcxZTNlYmNlZGUzNWIxNzU5ZjkzNzY0MWM2ZTUzYzJmOGE4OGExMw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "y/Q4pEi0z1qt6CU2caUG9amRDr6RemJES1F5bbF+yB3G8Fp6AbDQijZvrnn/4I+w5iDxJkcwUQmTBVWqAOrvCQ=="
+          }
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": [
+    {
+      "n": 1,
+      "text": "INTERIM SOLO REVIEW, pending independent re-review. Round 2 of PG-10.1 replaces criteria that round 1 read. Removed: \"doc exists\" (a file_exists check of docs/KNOWLEDGE-STATUS.md); it is carried by the heading command, the transitions grep and every other grep and command criterion of WP10-01, each of which fails when docs/KNOWLEDGE-STATUS.md is missing. Reworded with the same verifier: \"status tests fail before, pass after\" is now \"The knowledge status tests are red on the base and green after\"; \"receipt-link tests fail before, pass after\" is now \"The work receipt tests are red on the base and green after\"; \"as-of tests fail before, pass after\" is now \"The as-of tests are red on the base and green after\". Reworded with a tighter pattern: \"doc says repetition does not raise a disputed claim\" is now \"A sentence says repetition does not raise a disputed claim\", whose pattern needs repetition and disputed within one line, where the old pattern was the single word repetition.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZTNjNmEyMzVlN2U5YTE0ZjYxMTEyMGJjYjJhODgwYTcwNDJmMGYzZmViMTNlNTY0Y2I4OWVhNzU1ZWFjNzQzMw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "/2g7lavQd35rT3L6w95p6Kuq9SRm+XJnZHqLl6Tpq0VFxJjyAmSZW314VAwwQVEAd0Q4Y5C5sewAT8d3qsviCw=="
+          }
+        ]
+      }
+    }
+  ]
+}

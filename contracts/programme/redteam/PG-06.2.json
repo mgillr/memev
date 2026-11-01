@@ -1,0 +1,66 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PG-06.2",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "3511e894fea5e4da364721f3f478f19a8f92cab5308b34cf13e4ca0152d9d001",
+      "base_commit": "2df1272008a9f32d2c69d130003a0d521b846d2d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/project-store.mjs",
+            "sha256": "b015593048bc7c1d8ef6e633797c49bbfb91aacb4635b2a27cc6e0e57a03e7f3"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "WP06-03 C1 is a grep for evaluateAcceptance in src/engine/project-store.mjs, so a mention in a comment would pass",
+          "disposition": "rejected",
+          "reason": "C2 is the red then green wired test and C3 requires the named test \"a replicated operation does not change authoritative state until accepted\"; the grep only pins where the call lives"
+        },
+        {
+          "n": 2,
+          "severity": "medium",
+          "how": "the contract shares src/engine/project-store.mjs with PGP-1.02 and PG-10.1 and depends on PG-04.1 and PGP-1.02, which are unsigned",
+          "disposition": "rejected",
+          "reason": "the order is stated in the task (PGP-1.02 lands first, PG-10.1 after) and in depends_on; signing the spec does not sign the order"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "the word accepted in the six acceptance states could be read as the dispatch.accepted event of SO-A-03",
+          "disposition": "rejected",
+          "reason": "WP06-01 says in its description and in a mandatory grep criterion that the acceptance states are separate from the event kinds of SO-A-03, and a criterion fails if the page defines the dispatch event kinds"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. First review of this spec, which supersedes PG-06.1 (signed, record clean at afdccd6, left unchanged), made against the merged tree of pull requests #325 and #340 at the reviewed head. I compared it with PG-06.1 task by task: the three tasks and their ids are the same, and what PG-06.1 owned that SO-A-03 and SO-F-12 now own is cited by fold id and not restated; the signed fold contracts SO-A-03 and SO-F-12 have no scope path in common with docs/ACCEPTANCE.md, src/engine/acceptance.mjs or the two test files, and SO-F-12 (src/engine/replication/**) is the stream code the new criteria require the tests to import. Checks run, and the only checks made: the spec hash equals specSha256 of the file on disk at the reviewed head; every task drafts through makeTask; every command criterion parses with sh -n; every grep pattern compiles as a regular expression; no criterion statement repeats within a task; every test_red_green command names its own test file and that file is inside the task scope; every MV citation resolves to a line of docs/scope-one/programme/REQUIREMENTS.md, DECOMPOSITION.md or WBS.md; every fold id the spec cites (SO-A, SO-F) matches the title of a signed contract under contracts/signed; every SO, SR, QL and PG spec id it names resolves to a spec file; I read the request, task descriptions and requirements by hand for agent, lane and seat labels (a word search for agent, lane and seat labels finds none) and the leak scan stays clean. All passed. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. I tried to break it three ways and each is recorded as an answer, rejected with its reason. Nothing high. Every criterion of PG-06.1 is kept verbatim in PG-06.2 (checked by comparing the criteria objects), and each of the three tasks gains one fold requirement and the criteria that fail if it re-implements what the fold owns.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OGM2YTQxMjkzMWNhYjZmODFkNzRhMWIxNDFlZjc0MjRlOGYyZjc0ZDEzMDFiNjc3Mjc3MWNiMGFmZjhlOWRjMw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "zdP/WclrU5Islj3caC99zm3BpenONloXeKF/Uup0aNBB5GHheoLpphsXQVmyt1MQYbEGBQ7Yh1rrN74bbX0gAA=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MzVhZGZmMDM4NWI5MTY4NjIxY2Y3OTIxOTA5ZTkyOTdhNDliNmM1YmI3ZWZhZDYzNjc3ODE5ZWQ2NjkxMTRjNw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "zZyis2TbGF6QM9qMl8jgGxMLk1Umo8qYsRWiMTj5YQ90I6L2Bd2gNpJnPTNB3d2NKt1898hlY2YER4+SvDGAAQ=="
+          }
+        ]
+      }
+    }
+  ]
+}

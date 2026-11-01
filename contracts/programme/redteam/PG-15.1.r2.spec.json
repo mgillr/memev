@@ -1,0 +1,99 @@
+{
+  "title": "PG-15.1 Licensing boundary (memev-ops)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract for work package WP15 in memev-ops: Licensing boundary. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP15.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP15-02. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.13: WP15 holds the licence boundary; SO-2.13 is the service boundary only and takes no licence term. Signed vault contract WO-05-E (cited by id only): the signed licence boundary text guard; this spec holds only the counsel review record (WP15-03).  Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "WP15-03",
+      "title": "Counsel review of the combined distribution against the BSL use restriction recorded",
+      "phase": "verify",
+      "depends_on": [],
+      "requirements": [
+        "MV-LIC-03: A software licensing lawyer reviews the combined distribution against the BSL restriction on standalone merge products or services. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:89; evidence docs/scope-one/programme/DECOMPOSITION.md:120; baseline 8.6)"
+      ],
+      "description": "Repo: memev-ops. Owner action; the task holds the written result only. Related SR-3.05 and SR-3.06. The owner supplies the lawyer's written result; this task records it and nothing is written as counsel's view that counsel has not given. The record has five sections: Question put to counsel, Documents reviewed, Reviewer, Outcome and Changes required, and writes no patent number. It does not change LICENSE, PATENTS or NOTICE.",
+      "scope": [
+        "contracts/COUNSEL-REVIEW.md"
+      ],
+      "criteria": [
+        {
+          "statement": "The record has its five sections",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"Question put to counsel\" \"Documents reviewed\" \"Reviewer\" \"Outcome\" \"Changes required\"; do grep -qi \"^## $n\" contracts/COUNSEL-REVIEW.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The question names the BSL restriction on standalone merge products or services",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/COUNSEL-REVIEW.md",
+            "pattern": "^## Question put to counsel(?:(?!^## )[\\s\\S])*standalone merge",
+            "flags": "im"
+          }
+        },
+        {
+          "statement": "Documents reviewed lists LICENSE, PATENTS, NOTICE and docs/LICENSING-NOTICE.md as list items",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in LICENSE PATENTS NOTICE LICENSING-NOTICE.md; do grep -Eq \"^- .*$n\" contracts/COUNSEL-REVIEW.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The reviewer section gives the review date",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/COUNSEL-REVIEW.md",
+            "pattern": "^## Reviewer(?:(?!^## )[\\s\\S])*Reviewed on 20\\d\\d-\\d\\d-\\d\\d",
+            "flags": "im"
+          }
+        },
+        {
+          "statement": "The outcome is exactly one of approved, approved with changes or not approved",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/COUNSEL-REVIEW.md",
+            "pattern": "^## Outcome\\s+(approved with changes|approved|not approved)\\b",
+            "flags": "im"
+          }
+        },
+        {
+          "statement": "The record states the change date reviewed",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/COUNSEL-REVIEW.md",
+            "pattern": "2028-03-29",
+            "flags": "i"
+          }
+        },
+        {
+          "statement": "The record writes no patent number",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eqi 'US ?[0-9]{1,2}[, ]?[0-9]{3}[, ]?[0-9]{3}|WO ?[0-9]{4}/[0-9]+|EP ?[0-9]{6,7}' contracts/COUNSEL-REVIEW.md",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}
