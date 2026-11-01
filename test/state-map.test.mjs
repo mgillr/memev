@@ -2,17 +2,20 @@
 // PG-05.1 WP05-04 (the state map) and WP05-01 (the merge-semantics table, docs/MERGE-SEMANTICS.md).
 // The state map turns a note, or the state of an agent, into structured state a provider shim can hand to the engine, and
 // back, with no loss. It holds no text merge: the core has none. The table checks read docs/MERGE-SEMANTICS.md.
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { PKG } from './helpers/tmp.mjs';
+import { PKG, tmpdir, cleanup } from './helpers/tmp.mjs';
+import { ProjectStore } from '../src/engine/project-store.mjs';
 import * as map from '../src/engine/state-map.mjs';
+
+after(cleanup);
 
 const doc = () => fs.readFileSync(path.join(PKG, 'docs', 'MERGE-SEMANTICS.md'), 'utf8');
 
 // The one place the merge-class names and their assignment to an entity type are written in this file. The four class names
-// and the owner and class of each of the nine entity types are those of SO-F-02 (#354, at 9955a0d). If SO-F-02
+// and the owner and class of each of the nine entity types are those of SO-F-02 (#354, at 1316fe3). If SO-F-02
 // changes one, change it here and in the table, and nowhere else.
 const CLASS = Object.freeze({ union: 'set-union', newest: 'last-writer', log: 'append-only', human: 'human-resolution' });
 // type: [owner, merge class, which declared fields are PROVISIONAL]
@@ -82,6 +85,24 @@ test('state map: a note maps to structured state and back without loss', () => {
 // path in a string literal, so the guard looks at the literal and not at the form of the statement.
 const NAMES_MERGE_BOUNDARY = /['"`][^'"`\n]*(?:merge\.mjs|\/merge)(?:[?#][^'"`\n]*)?['"`]|convergence-v1/;
 
+// An allow-list on top of that: the state map may import only these specifiers, as static statements, and nothing is loaded
+// any other way. A path built at run time, a case variant or a path that merely contains the word never gets past this.
+const ALLOWED_IMPORTS = Object.freeze(['./util.mjs']);
+const STATIC_IMPORT = /^[ \t]*(?:import|export)\s*(?:[\w$*{},\s]*?\bfrom\s*)?(['"])([^'"\n]*)\1/gm;
+function importProblems(src) {
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  const problems = [];
+  const statics = [...code.matchAll(STATIC_IMPORT)];
+  for (const m of statics) if (!ALLOWED_IMPORTS.includes(m[2])) problems.push(`import of ${m[2]}`);
+  if (/\bimport\s*\(/.test(code)) problems.push('dynamic import');
+  if (/\brequire\b|createRequire/.test(code)) problems.push('require');
+  if (/\bimport\.meta\.resolve\b/.test(code)) problems.push('import.meta.resolve');
+  // every import statement, and every export that has a source, must be one of the static forms read above
+  const starts = (code.match(/^[ \t]*import\b(?!\s*[(.])/gm) || []).length + (code.match(/^[ \t]*export\b[^;(=]*?\bfrom\b/gm) || []).length;
+  if (starts !== statics.length) problems.push('an import the guard cannot read');
+  return problems;
+}
+
 test('state map: the guard on the merge boundary catches every form of import, and the state map has none', () => {
   for (const bad of [
     "import { x } from './merge.mjs';", 'import { x } from "./merge.mjs";', "import './merge.mjs';", 'import "./merge.mjs"',
@@ -94,6 +115,24 @@ test('state map: the guard on the merge boundary catches every form of import, a
   }
   const src = fs.readFileSync(path.join(PKG, 'src', 'engine', 'state-map.mjs'), 'utf8');
   assert.doesNotMatch(src, NAMES_MERGE_BOUNDARY, 'the merge boundary and the convergence schema belong to SO-F-06');
+});
+
+test('state map: only a static import of ./util.mjs is allowed, and no dynamic import, require or import.meta.resolve', () => {
+  // the allow-list refuses what the pattern above could miss: other paths, case variants, built paths and every other way to load
+  for (const bad of [
+    "import { x } from './merge.js';", "import { x } from './merge/index.mjs';", "import { x } from './Merge.mjs';", "import { x } from './MERGE.MJS';",
+    "import { x } from './mer' + 'ge.mjs';", "import { x } from './other.mjs';", "import { x } from 'node:fs';", "import './sideeffect.mjs';",
+    "export * from './other.mjs';", "export { a } from './other.mjs';", "import { sha256 } from './util.mjs';\nimport('./' + 'mer' + 'ge.mjs');",
+    "const m = await import(name);", "import  ( './util.mjs' )", "const r = require('./util.mjs');", "const r = createRequire(import.meta.url)('./x');",
+    "const u = import.meta.resolve('./merge.mjs');", "import { sha256 } from './util.mjs';\nimport { x } from './merge/index.mjs';",
+  ]) assert.notDeepEqual(importProblems(bad), [], bad);
+  for (const ok of [
+    "import { sha256 } from './util.mjs';", "// SPDX\nimport { sha256 } from './util.mjs';\n\nexport function f() {}\n",
+    "import { sha256 } from './util.mjs';\n// import('./merge.mjs') is not allowed here\n", "export const importance = 1;",
+  ]) assert.deepEqual(importProblems(ok), [], ok);
+  const src = fs.readFileSync(path.join(PKG, 'src', 'engine', 'state-map.mjs'), 'utf8');
+  assert.deepEqual(importProblems(src), [], 'the state map imports only ./util.mjs, statically');
+  assert.match(src, /^import \{[^}]*\} from '\.\/util\.mjs';$/m, 'and it does import it');
 });
 
 test('state map: the core holds no text merge, only the representation', () => {
@@ -209,9 +248,14 @@ test('merge semantics table: the owner is a declaration, not the memory authorit
 test('merge semantics table: the class on each type and its enforcement belong to SO-F-02 and SO-F-06, which the page cites', () => {
   const text = doc();
   assert.match(text, /SO-F-02[^.\n]*(declares|declaration)/i);
-  assert.match(text, /SO-F-06[^.\n]*(enforce|check|apply|applies)/i);
+  assert.match(text, /SO-F-06 owns the enforcement: it validates/);
+  // SO-F-06 validates, rejects forbidden transitions, keeps human-resolution items and falls back when the engine is not there:
+  // it does not apply a class, and the page must not say it does
+  assert.doesNotMatch(text, /SO-F-06[^.\n]*\bapplies\b/i, 'SO-F-06 validates, it does not apply a class');
+  assert.doesNotMatch(text, /nothing applies/i, 'the page does not say that something applies a class');
   assert.match(text, /\(#354\)|#354/);
-  assert.match(text, /9955a0d/);
+  assert.match(text, /1316fe3/);
+  assert.doesNotMatch(text, /9955a0d/, 'the stale pin of #354 is gone');
   assert.doesNotMatch(text, /438887a/, 'the old pin of #354 is gone');
   assert.doesNotMatch(text, /final head/i, '#354 is still open, so no head of it is final');
 });
@@ -278,8 +322,35 @@ test('merge semantics table: evidence and attempts are append-only, and the same
     assert.match(row.rationale, new RegExp(`on the same (${name} )?id, a later write replaces the stored entity and both events stay in the log`, 'i'), name);
     assert.doesNotMatch(row.rationale, /does not overwrite|never overwrite|never replaced/i, `${name}: a later write on one id does replace the stored entity`);
   }
-  // an event has no snapshot and the log refuses a taken id, so nothing in it is replaced
-  assert.match(rows.get('event').rationale, /none is replaced/);
+  // the event entity goes through the same store path as every other kind: the same id is replaced and both events stay in the log
+  // (the log of the coordinator that refuses a taken id is its own task-move history, which the project store does not use)
+  assert.equal(rows.get('event').cls, CLASS.log, 'event');
+  assert.match(rows.get('event').rationale, /on the same (event )?id, a later write replaces the stored entity and both events stay in the log/i);
+  assert.doesNotMatch(rows.get('event').rationale, /none is replaced|does not overwrite|never overwrite|never replaced|refuses a taken id/i, 'event: a later write on one id does replace the stored entity');
+});
+
+test('project store: two writes of one id replace the stored entity and keep both events in the log, for evidence, attempt and event, before and after a reopen', () => {
+  const data = { evidence: ['task_id'], attempt: ['task_id'], event: ['type'] };
+  for (const kind of Object.keys(data)) {
+    const root = tmpdir();
+    const open = () => new ProjectStore(root, { id: `proj-same-${kind}` }).open();
+    const first = { [data[kind][0]]: 'one' };
+    const second = { [data[kind][0]]: 'two' };
+    const store = open();
+    const a = store.append({ type: `${kind}.upserted`, entity: { kind, id: 'same-id', data: first } });
+    const b = store.append({ type: `${kind}.upserted`, entity: { kind, id: 'same-id', data: second } });
+    assert.notEqual(a.id, b.id, `${kind}: two events`);
+    assert.deepEqual(store.snapshot(kind), { 'same-id': second }, `${kind}: the second write stands`);
+    store.close();
+    const again = open();
+    assert.deepEqual(again.snapshot(kind), { 'same-id': second }, `${kind}: the second write stands after a reopen`);
+    assert.equal(again.stats().entities[kind], 1, `${kind}: one stored entity`);
+    again.close();
+    const log = fs.readFileSync(path.join(root, '.memev', 'projects', `proj-same-${kind}`, 'events.jsonl'), 'utf8')
+      .split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((r) => r.entity?.kind === kind && r.entity.id === 'same-id');
+    assert.equal(log.length, 2, `${kind}: both events stay in the log`);
+    assert.deepEqual(log.map((r) => r.entity.data), [first, second], `${kind}: in log order`);
+  }
 });
 
 test('merge semantics table: an external action is an append-only attempt entry with kind external, and the coordinator dedups by key', () => {
