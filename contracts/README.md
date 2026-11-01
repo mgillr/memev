@@ -182,6 +182,13 @@ Fifth pass, 1 November 2026 (pull request #363). `PG-05.2` supersedes the signed
 | [PG-05.2](programme/specs/PG-05.2-engine-integration-merge-semantics-mapping-bound.json) | [`k-pg-05-2-engine-integrati-57bd85`](signed/k-pg-05-2-engine-integrati-57bd85.json) | Engine integration: merge semantics, mapping, boundary (memev), supersedes PG-05.1 | PG-01.1, PG-04.1, PGP-1.06, SO-2.12, SO-2.13, WO-05-B |
 | [PG-20.1](programme/specs/PG-20.1-scope-verifier-allows-own-change-note.json) | [`k-pg-20-1-the-scope-verifi-d2e89d`](signed/k-pg-20-1-the-scope-verifi-d2e89d.json) | The scope verifier allows a spec's own change note (memev) | SR-0.03.3 |
 
+Sixth pass, 1 November 2026 (pull request #363, second signing pass). `PG-04.2` supersedes the signed `PG-04.1` and `PG-19.2` supersedes the signed `PG-19.1` (both earlier files and contracts are unchanged). Each has an interim red-team record under `programme/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [PG-04.2](programme/specs/PG-04.2-canonical-operation-envelope.json) | [`k-pg-04-2-canonical-operat-9d598a`](signed/k-pg-04-2-canonical-operat-9d598a.json) | Canonical operation envelope (memev), supersedes PG-04.1 | SO-1.01, SO-1.04 |
+| [PG-19.2](programme/specs/PG-19.2-memev-work-command-wired-to-runwork.json) | [`k-pg-19-2-memev-work-comma-6c8a9e`](signed/k-pg-19-2-memev-work-comma-6c8a9e.json) | memev work command wired to runWork with a production openStore (memev), supersedes PG-19.1 | SO-1.01, SO-A-03 |
+
 ## Scope One build layer, 1 November 2026
 
 `scope-one/` also holds the build layer: 25 contracts adapted from the unsigned fold of 30 October 2026 (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-10, SO-F-12 and SO-F-13). They build what the design records SO-1.x and SO-2.x decide, and each cites the record it builds and the signed vault contracts it rests on, by id only. I validated each against main and the programme specs of PR #325, and changed the text where main or an owner decision of 31 October 2026 disagreed with it; every spec lists its changes in its request as adapted from the unsigned fold. SO-F-11 is dropped, with the reason in section 9.3 of [docs/scope-one/WBS.md](../docs/scope-one/WBS.md). Each has an interim red-team record (an interim solo review by the author, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`). The spec file is named by the id alone, because the gate reads the id from the file name and an id with a letter segment has no number to stop at.
@@ -250,3 +257,12 @@ round was committed. No signed file was edited and the earlier versions stay, li
 | Spec | Contract | Title | Depends on |
 |---|---|---|---|
 | [SO-F-03.3](scope-one/specs/SO-F-03.3.json) | [`k-so-f-03-3-contribution-s-0bb27e`](signed/k-so-f-03-3-contribution-s-0bb27e.json) | Contribution signature and two-step admission, built after the operation envelope; supersedes SO-F-03.2 | SO-F-01, SO-F-02, PG-04.1 |
+
+Second signing pass on pull request #363, 1 November 2026. `SO-F-02.2` supersedes the signed `SO-F-02` and `SO-F-09.2` supersedes the signed `SO-F-09` (the earlier files and contracts are unchanged, and the manifest records `superseded_by` on them). `SO-W-08B` and `SO-W-08C` were `SO-08-B` and `SO-08-C` until they were renamed, because the gate reduces a file name such as `SO-08-B.json` to the id `SO-08` and the two shared one record path; `SO-08-B` stays the id of the signed vault contract that `SO-W-08B` restates. Each has an interim red-team record under `scope-one/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1 of its own contract.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [SO-F-02.2](scope-one/specs/SO-F-02.2.json) | [`k-so-f-02-2-canonical-proj-d5d282`](signed/k-so-f-02-2-canonical-proj-d5d282.json) | Canonical project schema, version 1, with authority and merge classes: every entity type declares its owner authority, scope version and ...; supersedes SO-F-02 | SO-F-01, SO-1.01 |
+| [SO-F-09.2](scope-one/specs/SO-F-09.2.json) | [`k-so-f-09-2-finding-model--e25d9e`](signed/k-so-f-09-2-finding-model--e25d9e.json) | Finding model for organisational intelligence: a finding is a graph claim capped at theory by evidence, promoted to fact only by a ...; supersedes SO-F-09 | SO-F-01, SO-F-02 |
+| [SO-W-08B](scope-one/specs/SO-W-08B.json) | [`k-so-w-08b-recovery-and-co-f2e9ed`](signed/k-so-w-08b-recovery-and-co-f2e9ed.json) | Recovery and control: disconnect recovery, restart reconstruction, pause, resume and cancel through memev work, transitions on the ...; repository text of the signed vault contract SO-08-B | SO-1.01, SO-A-03 |
+| [SO-W-08C](scope-one/specs/SO-W-08C.json) | [`k-so-w-08c-production-call-efbd86`](signed/k-so-w-08c-production-call-efbd86.json) | Production callers for recovery and control, and the bus for the Coordinator; production callers of the SO-08-B functions | SO-W-08B, SO-1.01, SO-A-03 |

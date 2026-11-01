@@ -732,7 +732,7 @@
       "tasks": 4,
       "criteria": 24,
       "spec": "specs/PG-04.2-canonical-operation-envelope.json",
-      "status": "proposed and unsigned; no red-team record",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
       "supersedes": "PG-04.1",
       "supersedes_reason": "owner delegation, 1 Nov 2026: pull request #357 links docs/OPERATION-ENVELOPE.md from docs/README.md (docs-links test) and maps src/engine/envelope.mjs into docs/MODULES.md, and pull request #366 changes docs/MODULES.md for WP04-03 and WP04-04; so docs/README.md is added to the scope of WP04-01 and docs/MODULES.md to the scope of WP04-02, WP04-03 and WP04-04; no other scope entry, requirement or criterion changes"
     },
@@ -1370,7 +1370,7 @@
       "tasks": 3,
       "criteria": 27,
       "spec": "specs/PG-19.2-memev-work-command-wired-to-runwork.json",
-      "status": "proposed and unsigned; no red-team record",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
       "supersedes": "PG-19.1",
       "supersedes_reason": "owner delegation, 1 Nov 2026: PG-19.1 says src/cli/work-store.mjs returns the real project store, which SO-1.01 requirement 3 forbids (only the vault, the coordinator and the project store reach the store); PG-19.2 routes openStore through one read-only vault method, Vault#tasksReader(identity, project), whose frozen reader has one member, snapshot(kind), that returns copies, with no ProjectStore instance and no write path; it adds task WP19-03 with scope src/engine/vault.mjs, test/cli-work.test.mjs and docs/MODULES.md, and keeps every PG-19.1 criterion",
       "kind": "feature"
