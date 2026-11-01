@@ -8,7 +8,7 @@ this folder links back here, and this page links down to every page.
 | Page | What it holds |
 |---|---|
 | [QUICKSTART.md](QUICKSTART.md) | install, first session, everyday commands, the vault layout, Windows (preview) |
-| [FREE-CORE-PREVIEW.md](FREE-CORE-PREVIEW.md) | invited tester onboarding, safe setup, test sequence and feedback |
+| [FREE-CORE-PREVIEW.md](FREE-CORE-PREVIEW.md) | invited tester onboarding, safe setup, test sequence and feedback |\n| [KNOWN-ISSUES.md](KNOWN-ISSUES.md) | preview limitations, platform status, data and remote-feature boundaries |
 | [OFFICE.md](OFFICE.md) | one vault, inviting teammates, the lead, the roster and what is shared |
 | [INSTALL-FOR-AI.md](INSTALL-FOR-AI.md) | the install steps written for an AI app to follow |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | `memev doctor` and the fix for each symptom |
