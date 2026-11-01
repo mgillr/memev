@@ -192,7 +192,7 @@ Every line below says whether it exists. Nothing in the second and third lists i
 - Hosted end-to-end encrypted sync, hosted encrypted backup and a stable relay address.
 - A company vault with an admin console, one AI provider per organisation, sign-in with Google Workspace or Microsoft Entra ID, roles, an egress log, and a Business trial.
 - A single replicated event model across the log, the bus and project state, and evidence receipts for accepted work.
-- Federation across independent sites, an architecture under review in pull request #224, and decided only in part. It is not available, and Memev makes no claim about it beyond this line.
+- Federation across independent sites. It is specified in [docs/FEDERATION.md](docs/FEDERATION.md) and is being built in the SO-F contracts, one part at a time. It is not available in any release.
 
 ## What you get
 
