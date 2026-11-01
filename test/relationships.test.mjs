@@ -232,3 +232,25 @@ test('SO-A-04 AC04: progress derives from milestones, work packages and the veri
   addEntity(store, 'milestone', { title: 'empty' }, 'M9');
   assert.equal(progress(store).milestones.M9.percent, null);
 });
+
+test('SO-A-04 AC02: memev work impact takes the project store as an injected port, a function of the project or the store itself', async () => {
+  const { store } = graph();
+  const run = async (deps, flags = {}) => { const o = { out: '', err: '' }; const code = await runWork(['impact', 'S1'], flags, { ...deps, out: (s) => { o.out += `${s}\n`; }, err: (s) => { o.err += `${s}\n`; } }); return { code, ...o }; };
+  const asked = [];
+  const viaPort = await run({ openStore: (project) => { asked.push(project); return store; } }, { project: 'p' });
+  assert.equal(viaPort.code, 0);
+  assert.deepEqual(asked, ['p'], 'the port was asked for the project the caller named');
+  assert.match(viaPort.out, /task T1/);
+  const direct = await run({ store }, { project: 'p' });
+  assert.equal(direct.out, viaPort.out, 'the same listing from the store itself');
+  const noProject = await run({ openStore: () => store });
+  assert.equal(noProject.code, 1, 'a port needs the project to open');
+  assert.equal(noProject.err.trim().split('\n').length, 1);
+  const none = await run({});
+  assert.equal(none.code, 1, 'with no port and no store nothing is read');
+  const nothing = await run({ openStore: () => null }, { project: 'zz' });
+  assert.equal(nothing.code, 1, 'a port that has no such project says so');
+  assert.match(nothing.err, /zz/);
+  const src = fs.readFileSync(path.join(PKG, 'src/cli/work.mjs'), 'utf8');
+  assert.doesNotMatch(src, /project-store|ProjectStore|projectStore\(|\bcoordinator\(/, 'work.mjs never imports or builds the store');
+});
