@@ -530,7 +530,7 @@
         "PG-03.1"
       ],
       "tasks": 3,
-      "criteria": 20,
+      "criteria": 28,
       "spec": "specs/PG-03.4-cross-language-protocol-vectors.json",
       "status": "proposed: unsigned, signs after a clean red-team round",
       "supersedes": "PG-03.2",
@@ -576,7 +576,7 @@
         "PG-03.1"
       ],
       "tasks": 3,
-      "criteria": 19,
+      "criteria": 26,
       "spec": "specs/PG-03.5-cross-language-protocol-vectors.json",
       "status": "proposed: unsigned, signs after a clean red-team round",
       "supersedes": "PG-03.3",

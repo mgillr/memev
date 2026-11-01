@@ -229,6 +229,13 @@ One row per requirement of [programme/REQUIREMENTS.md](programme/REQUIREMENTS.md
 | `MV-PGM-07` | The three engine plans are reconciled into one: the notes (crdt-merge via call-out, never vendored), PI-04/PI-05 on branch dev-integration-specs (vend... | conflicting | 7.1 PI-04 and PI-05 and 1.2.4 SR-3.01, SR-3.03 are open or covered; superseded by owner decision 31 Oct 2026 |
 | `MV-PGM-06` | Parallel work is deconflicted: one claim register for who is writing which WBS or contract | missing | this register |
 
+## Open follow-ups
+
+| Follow-up | Where | Detail | Status |
+| --- | --- | --- | --- |
+| `LWWRegister` merge with equal timestamp and equal `node_id` | the crdt-merge reference first, then the TypeScript and Rust editions (`PG-03.4`, `PG-03.5`) | The Python reference keeps self and the Rust edition keeps other, so merge is not commutative in that case. The case is excluded from the vectors and must not be asserted. A higher timestamp wins, and on equal timestamps the greater `node_id` wins, in all editions. Fix the reference first; the editions follow (owner delegation, 1 Nov 2026) | open |
+
+
 ## Programme tasks by work package
 
 | Work package | Same | Missing | Conflicting |
