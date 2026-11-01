@@ -134,7 +134,7 @@ Who counts is decided from the subject named in the event, and that subject is m
 
 **What is unbuilt.** `resolveActor` does not authenticate a credential, and nor does the graph: it trusts that the token or binding it is given was verified by the boundary that received it. The log is replayed as it was written, so a record that did not come through `bindFindingEvent` carries whatever `by` its writer set, and is as trusted as the log file. Nothing in the product writes these operations yet and no module outside `graph.mjs` names them; when a writer does, it must call `bindFindingEvent`, and until it does the guarantee holds only for callers that use them. A source event named in a finding is the raiser's claim and is not looked up in the log.
 
-**Raw operations must close first.** `applyOp` and the replay of the log still take `by` as written: an operation that is applied directly, or read back from the log, is not checked against any credential, so a forged `by` on one counts as the subject it names. This is a known gap, and it must be closed before any writer calls `bindFindingEvent`, because until then a caller that goes around the entry point undoes what the entry point guarantees.
+**Raw operations must close first.** `applyOp` and the replay of the log still take `by` as written: an operation that is applied directly, or read back from the log, is not checked against any credential, so a forged `by` on one counts as the subject it names. This is open work, and it must be closed before any writer calls `bindFindingEvent`, because until then a caller that goes around the entry point undoes what the entry point guarantees.
 
 ### The three events
 

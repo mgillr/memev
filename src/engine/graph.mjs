@@ -323,7 +323,7 @@ export class Graph {
    * A verification must name one of the finding's own source events that the actor may read; one it may not read, one the finding
    * does not rest on and a missing one get the same refusal, so the check is not a way to find out what a finding rests on.
    * The data is copied as plain data first, and every check and the returned operation use the copy, so an object that changes
-   * between the check and the append cannot get past it. Nothing in the product writes these operations yet.
+   * between the check and the append cannot slip through. Nothing in the product writes these operations yet.
    */
   bindFindingEvent(actor, type, data) {
     if (!isResolvedActor(actor)) return { ok: false, code: 'no_credential', errors: ['a finding operation is made with an actor from resolveActor'] };
