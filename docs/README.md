@@ -105,6 +105,8 @@ The record a builder takes over with: what exists, what is missing, and the orde
 | [scope-one/design/artefact-history-and-previews.md](scope-one/design/artefact-history-and-previews.md) | SO-1.09 design record: artefact history, comparison and previews, and what is open |
 | [scope-one/BASELINE.md](scope-one/BASELINE.md) | the commit, working tree and test run the record is taken from |
 | [scope-one/DEPENDENCIES.md](scope-one/DEPENDENCIES.md) | the build-order edges between contracts |
+| [scope-one/design/relationship-model-and-staleness.md](scope-one/design/relationship-model-and-staleness.md) | SO-1.07 design record: relation kinds and staleness rules, with what is open |
+| [scope-one/DECISIONS.md](scope-one/DECISIONS.md) | the open ADRs and the questions only the owner can answer |
 | [scope-one/DECISIONS.md](scope-one/DECISIONS.md) | the open ADRs, the decided ones (engine boundary, tiers) and the questions only the owner can answer |
 | [scope-one/RECONCILIATION.md](scope-one/RECONCILIATION.md) | the programme decomposition against the Scope One work breakdown, and the claim register |
 | [scope-one/programme/README.md](scope-one/programme/README.md) | the programme requirements, work packages and proposed contracts (unsigned) |

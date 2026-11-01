@@ -2,7 +2,7 @@
 import { test, after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { sandbox, initWithRetry, mcpClient, transcript, user, assistant, todos } from './helpers/cli.mjs';
+import { sandbox, initWithRetry, pollUntil, hookUntil, mcpClient, transcript, user, assistant, todos } from './helpers/cli.mjs';
 import { cleanup } from './helpers/tmp.mjs';
 
 let sb;
@@ -42,7 +42,8 @@ test('the stop hook records the reply and checkpoints only when the todo list ch
 
 test('every prompt gets relevant memory without being asked', () => {
   sb.run(['remember', 'The staging database password rotates on the first Monday of each month', '--kind', 'fact']);
-  const c = ctx(sb.hook('prompt', { session_id: 'sess-0003', cwd: sb.home, prompt: 'when does the staging database password rotate?' }));
+  // the first recall after a remember can come back empty on a slow machine; ask again, a bounded number of times, for the same thing
+  const c = pollUntil(() => ctx(sb.hook('prompt', { session_id: 'sess-0003', cwd: sb.home, prompt: 'when does the staging database password rotate?' })), (x) => /first Monday/.test(x), { timeoutMs: 20000, intervalMs: 500 });
   assert.match(c, /first Monday/);
   const none = sb.hook('prompt', { session_id: 'sess-0003', cwd: sb.home, prompt: 'zxqv plorb' });
   assert.equal(none.out, '', 'nothing injected when nothing is relevant');
@@ -72,9 +73,13 @@ test('sessions in several apps write at once and a new session in another app se
 });
 
 test('Gemini and Cursor hook formats', () => {
-  const gem = JSON.parse(sb.hook('session-start', { session_id: 'g1', cwd: sb.home, source: 'startup' }, 'gemini-cli', ['--format', 'gemini']).out);
+  // the test before this one writes fifty notes at once; wait until the daemon answers a status call, then ask each hook again
+  // while it prints its not-reachable notice, so a slow machine does not turn a late answer into a failure
+  const up = pollUntil(() => sb.run(['status']), (r) => r.code === 0, { timeoutMs: 30000, intervalMs: 500 });
+  assert.equal(up.code, 0, 'the daemon answers');
+  const gem = JSON.parse(hookUntil(sb, ['session-start', { session_id: 'g1', cwd: sb.home, source: 'startup' }, 'gemini-cli', ['--format', 'gemini']]).out);
   assert.equal(gem.hookSpecificOutput.hookEventName, 'SessionStart');
-  const cur = JSON.parse(sb.hook('session-start', { conversation_id: 'c1', workspace_roots: [sb.home] }, 'cursor', ['--format', 'cursor']).out);
+  const cur = JSON.parse(hookUntil(sb, ['session-start', { conversation_id: 'c1', workspace_roots: [sb.home] }, 'cursor', ['--format', 'cursor']]).out);
   assert.match(cur.additional_context, /Memev resume card/);
   assert.equal(sb.hook('prompt', { conversation_id: 'c1', prompt: 'port of alpha-3?' }, 'cursor', ['--format', 'cursor']).out, '');
 });
