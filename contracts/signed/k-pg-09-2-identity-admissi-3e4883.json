@@ -1,0 +1,189 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "WP09-04",
+      "title": "ACFA-RS patent and licence check recorded before any release package is designed",
+      "phase": "verify",
+      "depends_on": [],
+      "requirements": [
+        "MV-LIC-02: ACFA-RS licence and patent terms are checked separately before the release package is designed. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:88; evidence docs/scope-one/programme/DECOMPOSITION.md:119; baseline 8.5)"
+      ],
+      "description": "Repo: memev-ops. Owner or counsel task: LICENSE is Apache-2.0; patent position unverified. The record has four sections, Licence of ACFA-RS, Patent position, Sources and date and Result, and writes no patent number. The result is one of cleared, not cleared or awaiting counsel; no release package is designed before it reads cleared. ACFA-RS is described only as an external integration behind the provider boundary.",
+      "scope": {
+        "allow": [
+          "contracts/ACFA-LICENCE-CHECK.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP09-04-AC01",
+          "mandatory": true,
+          "statement": "The record has its four sections",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"Licence of ACFA-RS\" \"Patent position\" \"Sources and date\" \"Result\"; do grep -qi \"^## $n\" contracts/ACFA-LICENCE-CHECK.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP09-04-AC02",
+          "mandatory": true,
+          "statement": "The licence section states the licence as Apache-2.0",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/ACFA-LICENCE-CHECK.md",
+            "pattern": "^## Licence of ACFA-RS(?:(?!^## )[\\s\\S])*Apache-2\\.0",
+            "flags": "im"
+          }
+        },
+        {
+          "id": "WP09-04-AC03",
+          "mandatory": true,
+          "statement": "The patent section says \"not verified\" or \"verified by counsel on\" a date",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/ACFA-LICENCE-CHECK.md",
+            "pattern": "^## Patent position(?:(?!^## )[\\s\\S])*(not verified|verified by counsel on 20\\d\\d-\\d\\d-\\d\\d)",
+            "flags": "im"
+          }
+        },
+        {
+          "id": "WP09-04-AC04",
+          "mandatory": true,
+          "statement": "The sources section gives the date the licence and patent files were read",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/ACFA-LICENCE-CHECK.md",
+            "pattern": "^## Sources and date(?:(?!^## )[\\s\\S])*Read on 20\\d\\d-\\d\\d-\\d\\d",
+            "flags": "im"
+          }
+        },
+        {
+          "id": "WP09-04-AC05",
+          "mandatory": true,
+          "statement": "The result is exactly one of cleared, not cleared or awaiting counsel",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/ACFA-LICENCE-CHECK.md",
+            "pattern": "^## Result\\s+(cleared|not cleared|awaiting counsel)\\b",
+            "flags": "im"
+          }
+        },
+        {
+          "id": "WP09-04-AC06",
+          "mandatory": true,
+          "statement": "The result section ties the release package to a cleared result",
+          "verifier": {
+            "type": "grep",
+            "file": "contracts/ACFA-LICENCE-CHECK.md",
+            "pattern": "^## Result(?:(?!^## )[\\s\\S])*release package",
+            "flags": "im"
+          }
+        },
+        {
+          "id": "WP09-04-AC07",
+          "mandatory": true,
+          "statement": "The record writes no patent number",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eqi 'US ?[0-9]{1,2}[, ]?[0-9]{3}[, ]?[0-9]{3}|WO ?[0-9]{4}/[0-9]+|EP ?[0-9]{6,7}' contracts/ACFA-LICENCE-CHECK.md",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "WP09-04-AC08",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP09-04-AC09",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ],
+  "id": "k-pg-09-2-identity-admissi-3e4883",
+  "title": "PG-09.2 Identity, admission and ACFA boundary (memev-ops)",
+  "workdir": null,
+  "created": "2026-11-01T01:10:42.726Z",
+  "version": 1,
+  "request": "Programme contract for work package WP09 in memev-ops: Identity, admission and ACFA boundary. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP09.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: none. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Signed vault contract WO-05-D (cited by id only): the external trust service specification; the adapters sit on its boundary and this spec does not specify the service.  Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "provenance": {
+    "spec_sha256": "d5dc575f61177c16b400c117686da355e7d53c05260fda9e50b5639267d2ab9c",
+    "record": "contracts/programme/redteam/PG-09.2.json",
+    "review": "interim solo review by the signer, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}

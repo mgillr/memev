@@ -1,0 +1,371 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "ORSet resurrection and LWWMap get/value",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "MV-CRDT-01: ORSet remove keeps observed-remove information so a stale replica cannot resurrect a removed element (A adds, B syncs, A removes, A syncs with B's old state). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:24; baseline 8.5)",
+        "MV-CRDT-02: LWWMap.get and LWWMap.value agree after an older delete is merged with a newer write. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:25; baseline 8.5)",
+        "ORSet.remove and remove_tag record the observed tags as tombstones and merge takes the union of tombstones, so a stale replica cannot bring a removed element back; add-wins against a concurrent unobserved add is unchanged (source: crdt-merge CHANGELOG.md entry of this branch; tests/test_orset_lwwmap_correctness.py:45 for the stale replica and :194 for the older delete merged with a newer write; programme task WP01-01)"
+      ],
+      "description": "Regression file: tests/test_orset_lwwmap_correctness.py. Fixed in crdt_merge/core.py.",
+      "scope": {
+        "allow": [
+          "crdt_merge/core.py",
+          "tests/test_orset_lwwmap_correctness.py",
+          ".github/workflows/crdt-laws.yml"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "The regression test file exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "tests/test_orset_lwwmap_correctness.py"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "The ORSet and LWWMap regressions are red on the base and green after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/test_orset_lwwmap_correctness.py",
+            "cmd": "python -m pytest -x -q tests/test_orset_lwwmap_correctness.py"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "The CRDT law workflow (.github/workflows/crdt-laws.yml, added by pull request #180) is triggered by all three regression files",
+          "verifier": {
+            "type": "grep",
+            "file": ".github/workflows/crdt-laws.yml",
+            "pattern": "test_orset_lwwmap_correctness.*test_trust_agent_state_delete.*test_crdt_state_tag_uniqueness",
+            "flags": "s"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "The existing CRDT property tests still pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "python -m pytest -q tests/test_crdt_properties.py",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "TrustAgentState delete is a replicated observed-remove",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "MV-CRDT-04: TrustAgentState delete is a replicated tombstone and its merge is observed-remove/causal; it is not called production-grade until then. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:27; baseline 8.5)",
+        "Every put carries a unique tag; delete tombstones the tags it observed; merge_context unions tombstones; exact timestamp ties break on (peer_id, tag) so merge_context is commutative (source: crdt-merge CHANGELOG.md entry of this branch; tests/test_trust_agent_state_delete.py:34 and :44; programme task WP01-04)"
+      ],
+      "description": "Regression file: tests/test_trust_agent_state_delete.py. Fixed in crdt_merge/e4/integration/agent_bridge.py; the API tables in docs/e4/E4-API-REFERENCE.md and docs/e4_integration.md state the new delete. This touches the E4 trust layer: The E4 trust triage is resolved: crdt-merge main 252c93e6 (pull request #181, which includes pull requests #179 and #180) fixed the fixtures of the 4 tests in security/tests/test_byzantine_fault_injection.py, verification stays fail-closed and security/ now runs in CI (source: crdt-merge pull request #181, merged to main as 252c93e6). This contract does not depend on or include any unpushed crdt-merge commit.",
+      "scope": {
+        "allow": [
+          "crdt_merge/e4/integration/agent_bridge.py",
+          "tests/test_trust_agent_state_delete.py",
+          "docs/e4/E4-API-REFERENCE.md",
+          "docs/e4_integration.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T2-AC01",
+          "mandatory": true,
+          "statement": "The regression test file exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "tests/test_trust_agent_state_delete.py"
+          }
+        },
+        {
+          "id": "T2-AC02",
+          "mandatory": true,
+          "statement": "The delete regression is red on the base and green after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/test_trust_agent_state_delete.py",
+            "cmd": "python -m pytest -x -q tests/test_trust_agent_state_delete.py"
+          }
+        },
+        {
+          "id": "T2-AC03",
+          "mandatory": true,
+          "statement": "The API reference states the delete is an observed-remove",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/e4/E4-API-REFERENCE.md",
+            "pattern": "Observed-remove"
+          }
+        },
+        {
+          "id": "T2-AC04",
+          "mandatory": true,
+          "statement": "The existing CRDT property tests still pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "python -m pytest -q tests/test_crdt_properties.py",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "T2-AC05",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "T2-AC06",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Contribution tags are globally unique and survive a round trip",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "MV-CRDT-06: Operation and contribution tags are globally unique ((node id, counter) or UUID) and equal-timestamp LWW and FWW ties are order independent. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:29; baseline 8.5)",
+        "CRDTMergeState contribution tags carry a random 128-bit id and are serialised with each contribution, so a remove in one process cannot tombstone an unrelated add in another and tombstones keep matching after to_dict and from_dict (source: crdt-merge CHANGELOG.md entry of this branch; tests/test_crdt_state_tag_uniqueness.py:44, :51 and :71; programme task WP01-05)"
+      ],
+      "description": "Regression file: tests/test_crdt_state_tag_uniqueness.py. Fixed in crdt_merge/model/crdt_state.py.",
+      "scope": {
+        "allow": [
+          "crdt_merge/model/crdt_state.py",
+          "tests/test_crdt_state_tag_uniqueness.py"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T3-AC01",
+          "mandatory": true,
+          "statement": "The regression test file exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "tests/test_crdt_state_tag_uniqueness.py"
+          }
+        },
+        {
+          "id": "T3-AC02",
+          "mandatory": true,
+          "statement": "The tag regression is red on the base and green after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/test_crdt_state_tag_uniqueness.py",
+            "cmd": "python -m pytest -x -q tests/test_crdt_state_tag_uniqueness.py"
+          }
+        },
+        {
+          "id": "T3-AC03",
+          "mandatory": true,
+          "statement": "The existing CRDT property tests still pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "python -m pytest -q tests/test_crdt_properties.py",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "T3-AC04",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "T3-AC05",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "Changelog states the fixes and the serialisation compatibility",
+      "phase": "implement",
+      "depends_on": [
+        "T1",
+        "T2",
+        "T3"
+      ],
+      "requirements": [
+        "The change log names each fix and says that the wire changes are additive and that removes made before upgrading are not protected (source: crdt-merge CHANGELOG.md entry of this branch)"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "CHANGELOG.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T4-AC01",
+          "mandatory": true,
+          "statement": "The change log names the ORSet fix",
+          "verifier": {
+            "type": "grep",
+            "file": "CHANGELOG.md",
+            "pattern": "ORSet.{0,3} resurrection by a stale replica"
+          }
+        },
+        {
+          "id": "T4-AC02",
+          "mandatory": true,
+          "statement": "The change log has the compatibility note",
+          "verifier": {
+            "type": "grep",
+            "file": "CHANGELOG.md",
+            "pattern": "Migration / serialisation compatibility"
+          }
+        },
+        {
+          "id": "T4-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "T4-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ],
+  "id": "k-pgp-1-01-crdt-merge-four-b1cfd3",
+  "title": "PGP-1.01 crdt-merge: four correctness bugs fixed (ORSet resurrection, LWWMap get/value, TrustAgentState delete, tag collisions)",
+  "workdir": null,
+  "created": "2026-11-01T01:10:42.421Z",
+  "version": 1,
+  "request": "Per-pull-request contract for crdt-merge, branch fix/crdt-correctness-four-bugs (pull request #180, merged to crdt-merge main through pull request #181 as 252c93e6). crdt-merge is an external engine under its own licence; Memev reaches it only across the provider boundary and none of its code is part of Memev. Proposed and unsigned; the signer signs after the red-team gate. Repository: crdt-merge (paths below are relative to that repository). Covers programme tasks WP01-01, WP01-02, WP01-04 and WP01-05; WP01-03, WP01-06 and WP01-07 stay in PG-01.1. The fixes are additive on the wire and change no licence term, LICENSE or PATENTS file. Depends on contracts: none. ",
+  "provenance": {
+    "spec_sha256": "8816de778dc2ee7222151dd107371d097cfd13691998e446a5538c4e2d18b786",
+    "record": "contracts/programme/redteam/PGP-1.01.json",
+    "review": "interim solo review by the signer, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}

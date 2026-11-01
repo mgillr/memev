@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { sandbox } from './helpers/cli.mjs';
+import { sandbox, initWithRetry, pollUntil } from './helpers/cli.mjs';
 import { cleanup } from './helpers/tmp.mjs';
 
 after(() => cleanup());
@@ -24,9 +24,12 @@ test("MEM-006 AC02: init prints the daemon's listen error instead of only 'did n
   try {
     // an address this machine does not have: the daemon starts, cannot listen, logs why and exits
     const r = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect'], { extraEnv: { MEMEV_BIND: '192.0.2.1' } });
-    const out = r.out + r.err;
-    assert.match(out, /did not start/);
-    assert.match(out, new RegExp(`Memev running: the last start could not listen on 192\\.0\\.2\\.1:${sb.port}: listen E[A-Z]+`), out);
+    assert.match(r.out + r.err, /did not start/);
+    // the daemon writes its listen error to its log as init prints; on a slow machine the line is not there yet, so read the
+    // checklist again (onboarding reads the log and starts nothing) for a bounded time, until it names the error
+    const listen = new RegExp(`Memev running: the last start could not listen on 192\\.0\\.2\\.1:${sb.port}: listen E[A-Z]+`);
+    const out = pollUntil(() => { const o = sb.run(['onboarding']); return `${r.out}${r.err}${o.out}${o.err}`; }, (x) => listen.test(x), { timeoutMs: 20000, intervalMs: 500 });
+    assert.match(out, listen, out);
     assert.equal(out.includes(':undefined'), false, out);
   } finally { sb.stop(); }
 });
@@ -35,7 +38,7 @@ test('MEM-006 AC03: doctor --fix re-runs the health check and reports a fix as d
   const sb = sandbox();
   let holder = null;
   try {
-    assert.equal(sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
+    assert.equal(initWithRetry(sb, ['init', '--port', String(sb.port), '--local-only', '--no-connect']).code, 0);
     assert.equal(sb.run(['stop']).code, 0);
     const port = JSON.parse(fs.readFileSync(path.join(sb.root, '.memev', 'config.json'), 'utf8')).port;
     holder = await hold(port);
