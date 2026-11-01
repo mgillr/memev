@@ -61,7 +61,7 @@ Who writes which task, so that two authors do not write the same one. Claims are
 | `WP05-02`, `WP15-02` for memev-ops (SR-3.01 and SR-3.03 superseded, SR-3.05) | Claim B | memev-ops, branch `docs/engine-decision-sr3` #13 | open |
 | Programme contract specs (`contracts/programme`, one per work package and one per work pull request) | Claim B | memev, same branch as the row above #325 | open, unsigned; signing under Claim A |
 | Baseline 8.1 (dashboard and command centre, lead-agent single authority, release and installation readiness, failure-path suite, ADR 4 and ADR 5 drafts) | Claim A | `SO-1.x` contracts and `WBS.md` | agreed split |
-| Baseline 8.2 (intake to end-to-end demo, extending `SO-1.x`), with `WP08-01` to `WP08-03` | Claim A | `SO-1.02` (`WP08-01`, `WP17-01`, `WP17-02`), `SO-1.04` (`WP08-02`), `SO-1.10` and `SO-1.11` (`WP08-03`) | agreed split; `PG-08.1` (programme) holds the build gaps of `WP08-02` and `WP08-03` only, trim pending fold PR |
+| Baseline 8.2 (intake to end-to-end demo, extending `SO-1.x`), with `WP08-01` to `WP08-03` | Claim A | `SO-1.02` (`WP08-01`, `WP17-01`, `WP17-02`), `SO-1.04` (`WP08-02`), `SO-1.10` and `SO-1.11` (`WP08-03`) | agreed split; `PG-08.1` (programme) holds the build gaps of `WP08-02` and `WP08-03` only, trimmed against `SO-A-03` and `SO-A-10` |
 | Baseline 8.3 (organisational intelligence, WBS 5.3.x and 4.3.2), with `WP08-04` | Claim A (baseline scope); Claim C (decision records `SO-2.01` to `SO-2.06`, branches `feat/so-2-0X-<slug>`, active) | `SO-2.01` to `SO-2.06` | agreed split; no programme spec |
 | Baseline 8.4 except A2A, SDK and payments (WBS 5.4.4 to 5.4.8 and the non-GitHub parts of 5.4.6), 5.5.11 federated computation, 5.6.5 commercial integration services | Claim A | `SO-2.07` to `SO-2.13` | agreed split |
 | Baseline 8.6 personal multi-device, business deployment, enterprise deployment, public distribution and external security assurance, with `WP16-04` | Claim A | `SO-2.14` and `WBS.md` | agreed split; no programme spec |
@@ -70,7 +70,7 @@ Who writes which task, so that two authors do not write the same one. Claims are
 | `PG-02.1` (CRDT conformance gate; `WP02-01` to `WP02-04`) | Claim C | crdt-merge, branch `feat/pg-02-1-crdt-conformance-gate` | queued after `SO-2.01` to `SO-2.06` |
 | `PG-03.1` (vectors, crdt-merge), `PG-03.2` (crdt-merge-ts), `PG-03.3` (crdt-merge-rs); one pull request per package | Claim C | branches `feat/pg-03-1-*`, `feat/pg-03-2-*`, `feat/pg-03-3-*` | queued after `SO-2.01` to `SO-2.06` |
 | `PG-12.1` (multi-node gossip transport; `WP12-01` to `WP12-03`) | unclaimed | none | open, unclaimed |
-| Which layer to build against: the unsigned fold or the programme specs `PG-04.1`, `PG-05.1`, `PG-08.1`, `PG-09.1`, `PG-09.2`, `PG-13.1`, `PG-14.1` | Owner (delegated) | decided: the unsigned fold is the build layer (owner delegation, 1 Nov 2026) | trim pending fold PR |
+| Which layer to build against: the fold or the programme specs `PG-04.1`, `PG-05.1`, `PG-08.1`, `PG-09.1`, `PG-10.1`, `PG-13.1`, `PG-14.1` | Owner (delegated) | decided: the fold is the build layer (owner delegation, 1 Nov 2026); the overlapping tasks cite their fold id and keep only the gaps | trimmed; `PG-06.1` and `PG-12.1` are signed, overlap the fold and need the signer's decision |
 | Upgrade, rollback, backup and restore, and uninstall (work breakdown 5.1.3, requirements 70 and 96) | signed vault contract `SO-R-C` | cited by id, no programme task | covered by the vault contract |
 | `SR-6.03` installers and public release | signed vault contracts `WO-02-A` and `MEM-015` | cited by id, no programme task | covered by the vault contracts |
 | `SR-0.03` tasks 1, 3 and 4 (one pull request) | Claim D | branch `feat/sr-0-03-tasks-1-3-4` | active |
@@ -106,8 +106,33 @@ The owner vault holds signed contracts that already cover some programme work. T
 
 | Decision | Question | Overlaps | Status |
 | --- | --- | --- | --- |
-| Layer to build against | The unsigned fold (`SO-A-01` to `SO-A-12`, `SO-R-E`, `SO-F-01` to `SO-F-13`, cited by id only) or the programme specs | `PG-04.1`: `SO-F-03`; `PG-05.1`: `SO-F-02`, `SO-F-06`; `PG-08.1`: `SO-A-03`, `SO-A-10`; `PG-09.1`: `SO-F-01`, `SO-F-08`; `PG-09.2`: `SO-F-01`, `SO-F-08`; `PG-13.1`: `SO-F-04`, `SO-F-05`, `SO-F-07`, `SO-F-12`, `SO-F-13`; `PG-14.1`: `SO-F-13` | DECIDED: the unsigned fold is the build layer (owner delegation, 1 Nov 2026). The programme specs will cite the fold ids and keep only what the fold does not cover; trim pending fold PR (the final fold ids come in the lead's separate pull request). Nothing is trimmed yet. |
+| Layer to build against | The fold (`SO-A-01` to `SO-A-12`, `SO-R-E`, `SO-F-01` to `SO-F-13` except `SO-F-11`, which was dropped; 25 signed contracts, cited by id only) or the programme specs | `PG-04.1`: `SO-F-03`, `SO-F-12`; `PG-05.1`: `SO-F-02`, `SO-F-06`; `PG-08.1`: `SO-A-03`, `SO-A-10`; `PG-09.1`: `SO-F-01`, `SO-F-03`, `SO-F-08`; `PG-10.1`: `SO-F-09`; `PG-13.1`: `SO-F-01`, `SO-F-04`, `SO-F-05`, `SO-F-07`; `PG-14.1`: `SO-F-13`; signed, not edited: `PG-06.1`: SO-A-03, SO-F-12; `PG-12.1`: SO-F-07, SO-F-12 | DECIDED: the fold is the build layer (owner delegation, 1 Nov 2026). Each overlapping programme task cites its fold id and keeps only what the fold does not cover (table below). `PG-06.1` and `PG-12.1` are signed and overlap the fold; they are not edited and need the signer's decision. |
 | Memory and project-state authority | Is the vault the only authority (local-first, no second database)? | all `SO-1.x`, `SO-2.x` and programme specs | PROPOSED, pending owner confirmation: recorded as ADR 7 in [DECISIONS.md](DECISIONS.md); the owner decision of 31 Oct 2026 (local-first, the cloud only a relay and a backup) is the only part decided |
+
+## Fold overlaps by task
+
+The fold is the build layer ([WBS.md](WBS.md) section 9.2 on its branch lists the same overlaps; the fold ids are cited by id only). A trimmed task cites the fold id, drops what the fold owns and keeps the gap. `PG-09.2`, `PG-15.1` and `PG-16.1` have no fold overlap.
+
+| Task | Spec | Fold contract | Owned by the fold, not restated | Kept here | Disposition |
+| --- | --- | --- | --- | --- | --- |
+| `WP04-01` to `WP04-04` | `PG-04.1` | `SO-F-03`, `SO-F-12` | the signature and admission block, the per-sender sequence, the rejected event, scope and classification on the envelope | the one envelope, with an optional extension block that the hash covers | trimmed: cited, envelope kept |
+| `WP05-01` | `PG-05.1` | `SO-F-02` | the merge class on each entity type and its enforcement in the store | the semantics table and its rationale; class names equal those of `SO-F-02` | trimmed |
+| `WP05-04`, `WP05-06` | `PG-05.1` | `SO-F-06` | validation of engine input and output at `src/engine/merge.mjs`; refusal of malformed output and forbidden transitions | the state map; one real-engine round trip | trimmed |
+| `WP08-02` | `PG-08.1` | `SO-A-03` | the four execution event kinds | the adapter contract module and its conformance suite | trimmed |
+| `WP08-03` | `PG-08.1` | `SO-A-10` | the reference journey, the fault matrix, the invariant checker and the stub sessions | the four `SO-1.11` step assertions that the journey does not assert one by one | trimmed |
+| `WP09-01` | `PG-09.1` | `SO-F-01`, `SO-F-03` | subjects, keys, expiry, revocation, scope types, request resolution; contribution signature and admission | admission of a node or agent to a site | trimmed |
+| `WP09-02` | `PG-09.1` | `SO-F-08` | the admission adapter and trust as an eligibility input only | the trust adapter boundary and its interface | trimmed |
+| `WP09-03` | `PG-09.1` | `SO-F-03` | the per-sender sequence, the rejected event and replay refusal | equivocation detection and the hand-off to the exclusion policy | trimmed |
+| `WP10-01`, `WP10-02` | `PG-10.1` | `SO-F-09` | the finding model, its cap at theory, dismissal, correction and adjudication | the status lattice, the status and origin fields | trimmed |
+| `WP13-01` | `PG-13.1` | `SO-F-05` | the six classes, local only by default, inheritance by derived data | enforcement at the publish boundary, calling the classes of `SO-F-05` and the evaluation of `SO-F-04` | trimmed |
+| `WP13-03` | `PG-13.1` | `SO-F-01`, `SO-F-04` | subjects, scope types, the relationship record and the policy document | membership and permission boundaries inside one site | trimmed |
+| `WP13-04` | `PG-13.1` | `SO-F-07` | the authorised view and the last-known label | reconcile on reconnect and fail-visible finality | trimmed |
+| `WP13-05` | `PG-13.1` | `SO-F-04` | the inter-organisation relationship record | the trust-domains page | trimmed |
+| `WP14-04` | `PG-14.1` | `SO-F-13` | the conflict detection of the organisational intelligence demonstrator | the demonstrator page | cited |
+| `WP06-01` to `WP06-03` | `PG-06.1`, signed | `SO-A-03` (`WP06-01`), `SO-F-12` (`WP06-02`, `WP06-03`) | the word accepted for dispatch events; the replication stream record | the acceptance states for replicated operations | signed, overlaps the fold, not edited; needs the signer's decision |
+| `WP12-01` | `PG-12.1`, signed | `SO-F-07`, `SO-F-12` | the read side of a stopped peer; the stream record | transport | signed, overlaps the fold, not edited; needs the signer's decision |
+| `PGP-1.03` task 4 | `PGP-1.03` | `SO-A-11` | the script that checks the register and the inventory | the reconciliation pages, written by hand | cited |
+| `SR-6.03` | `SR-6.03` (memev copy) | `SO-R-E` | the maintainer-run script for the first public image | the automated publish from the release workflow | cited |
 
 ## Requirement register
 

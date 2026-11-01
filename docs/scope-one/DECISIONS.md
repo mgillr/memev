@@ -129,10 +129,12 @@ do not accept the addendum's other recommendations; those still need explicit ac
 
 ## Decisions taken under owner delegation
 
-- Layer to build against (decided, owner delegation, 1 Nov 2026): the unsigned fold
-  (`SO-A-01` to `SO-A-12`, `SO-R-E`, `SO-F-01` to `SO-F-13`, cited by id only) is the build layer. The programme
-  specs `PG-04.1`, `PG-05.1`, `PG-08.1`, `PG-09.1`, `PG-09.2`, `PG-13.1` and `PG-14.1` will cite the fold ids and keep
-  only what the fold does not cover. Trim pending the fold pull request; nothing is trimmed yet.
+- Layer to build against (decided, owner delegation, 1 Nov 2026): the fold (`SO-A-01` to `SO-A-12`, `SO-R-E`,
+  `SO-F-01` to `SO-F-13` except `SO-F-11`, which was dropped and whose guards moved into `SO-F-03`, `SO-F-04`,
+  `SO-F-07` and `SO-F-10`; 25 signed contracts, cited by id only) is the build layer. The programme specs `PG-04.1`,
+  `PG-05.1`, `PG-08.1`, `PG-09.1`, `PG-10.1`, `PG-13.1` and `PG-14.1` cite the fold ids per task and keep only what the
+  fold does not cover; the table is in [RECONCILIATION.md](RECONCILIATION.md). `PG-06.1` and `PG-12.1` are signed and
+  overlap the fold, so they are not edited and need the signer's decision.
 - ADR 7 (memory and project-state authority) stays proposed, pending owner confirmation.
 
 ## Product-owner decision list

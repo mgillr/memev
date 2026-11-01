@@ -2,7 +2,7 @@
   "title": "PG-14.1 Federation demonstrators and benchmark (memev)",
   "project": "memev",
   "workdir": null,
-  "request": "Programme contract for work package WP14 in memev: Federation demonstrators and benchmark. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP14.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP03-02, WP08-04, WP09-03, WP10-03, WP12-03, WP13-04. Depends on contracts: SO-2.04, SO-2.05, SO-2.06, PG-12.1. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.04 and SO-2.05: WP14-04 names the demonstrators and depends on these design records for the organisational-intelligence demonstrator; it defines no organisational-knowledge model and builds no discovery logic. Boundary with SO-2.06: the acceptance tests of the organisational-intelligence demonstrator are defined there, not in WP14-04. Build layer (owner delegation, 1 Nov 2026): the unsigned fold (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-13, cited by id only) is the build layer, and it overlaps this spec at SO-F-13. This spec will cite those ids and keep only what the fold does not cover; trim pending fold PR (the final fold ids come in a separate pull request, branch contracts/scope-one-fold-build-layer). Nothing is trimmed yet. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "request": "Programme contract for work package WP14 in memev: Federation demonstrators and benchmark. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP14.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP03-02, WP08-04, WP09-03, WP10-03, WP12-03, WP13-04. Depends on contracts: SO-2.04, SO-2.05, SO-2.06, PG-12.1. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-2.04 and SO-2.05: WP14-04 names the demonstrators and depends on these design records for the organisational-intelligence demonstrator; it defines no organisational-knowledge model and builds no discovery logic. Boundary with SO-2.06: the acceptance tests of the organisational-intelligence demonstrator are defined there, not in WP14-04. Build layer (owner delegation, 1 Nov 2026): the signed fold contracts SO-F-13 (cited by id; delivered by pull request #341, WBS.md section 9.2 on its branch) are the build layer. Each task below that overlaps them cites the fold id and keeps only what the fold does not cover. Tasks of this spec that name no fold contract have no fold overlap. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
   "tasks": [
     {
       "id": "WP14-01",
@@ -200,9 +200,10 @@
       "requirements": [
         "MV-DEM-03: Three architectural acceptance demonstrators: autonomous project delivery, organisational intelligence, independent-site federation. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:71; evidence docs/scope-one/programme/DECOMPOSITION.md:108; baseline 8.5)",
         "SO-2.04 requirement 1: \"Evidence-backed discovery of recurring risks, dependencies, conflicts, assumptions and reusable knowledge\" (source: contract SO-2.04 T1)",
-        "SO-2.05 requirement 1: \"Surface relevant information between departments without granting unrestricted access to their private records\" (source: contract SO-2.05 T1)"
+        "SO-2.05 requirement 1: \"Surface relevant information between departments without granting unrestricted access to their private records\" (source: contract SO-2.05 T1)",
+        "SO-F-13 (signed fold contract, cited by id; pull request #341) owns cross-functional conflict detection on a bounded programme; this task cites it and does not restate it (source: pull request #341, WBS.md section 9.2)"
       ],
-      "description": "Repo: memev. Names the three demonstrators. The organisational-intelligence demonstrator is a scenario over the design records SO-2.04 (cross-project discovery) and SO-2.05 (cross-functional discovery) and is accepted by SO-2.06; this task defines no organisational-knowledge model, discovery logic or acceptance tests of its own.",
+      "description": "Repo: memev. Names the three demonstrators. The organisational-intelligence demonstrator is a scenario over the design records SO-2.04 (cross-project discovery) and SO-2.05 (cross-functional discovery) and is accepted by SO-2.06; this task defines no organisational-knowledge model, discovery logic or acceptance tests of its own. The detection behind the organisational intelligence demonstrator is built by SO-F-13; this page names the demonstrator and defines no detection.",
       "scope": [
         "docs/DEMONSTRATORS.md"
       ],
@@ -265,6 +266,15 @@
             "type": "grep",
             "file": "docs/DEMONSTRATORS.md",
             "pattern": "^## Independent-site federation(?:(?!^## )[\\s\\S])*planned",
+            "flags": "im"
+          }
+        },
+        {
+          "statement": "The organisational intelligence section names SO-F-13 for the detection",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/DEMONSTRATORS.md",
+            "pattern": "^## Organisational intelligence(?:(?!^## )[\\s\\S])*SO-F-13",
             "flags": "im"
           }
         },

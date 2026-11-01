@@ -122,13 +122,14 @@
   "decisions": [
     {
       "id": "LAYER",
-      "question": "Which layer is built against: the unsigned fold (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-13, cited by id only) or the programme specs",
+      "question": "Which layer is built against: the fold (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-13 except SO-F-11, which was dropped; 25 signed contracts, cited by id only) or the programme specs",
       "status": "decided",
       "decided_by": "owner delegation, 1 Nov 2026",
-      "decision": "the unsigned fold is the build layer; the programme specs cite the fold ids and keep only what the fold does not cover",
+      "decision": "the fold is the build layer; the programme specs cite the fold ids per task and keep only what the fold does not cover",
       "overlaps": {
         "PG-04.1": [
-          "SO-F-03"
+          "SO-F-03",
+          "SO-F-12"
         ],
         "PG-05.1": [
           "SO-F-02",
@@ -140,24 +141,128 @@
         ],
         "PG-09.1": [
           "SO-F-01",
+          "SO-F-03",
           "SO-F-08"
         ],
-        "PG-09.2": [
-          "SO-F-01",
-          "SO-F-08"
+        "PG-10.1": [
+          "SO-F-09"
         ],
         "PG-13.1": [
+          "SO-F-01",
           "SO-F-04",
           "SO-F-05",
-          "SO-F-07",
-          "SO-F-12",
-          "SO-F-13"
+          "SO-F-07"
         ],
         "PG-14.1": [
           "SO-F-13"
         ]
       },
-      "trim": "pending fold PR (the final fold ids come in a separate pull request, branch contracts/scope-one-fold-build-layer); nothing is trimmed yet"
+      "by_task": {
+        "PG-04.1": {
+          "WP04-01": [
+            "SO-F-03",
+            "SO-F-12"
+          ],
+          "WP04-02": [
+            "SO-F-03"
+          ],
+          "WP04-03": [
+            "SO-F-03",
+            "SO-F-12"
+          ],
+          "WP04-04": [
+            "SO-F-03",
+            "SO-F-12"
+          ]
+        },
+        "PG-05.1": {
+          "WP05-01": [
+            "SO-F-02"
+          ],
+          "WP05-04": [
+            "SO-F-06"
+          ],
+          "WP05-06": [
+            "SO-F-06"
+          ]
+        },
+        "PG-08.1": {
+          "WP08-02": [
+            "SO-A-03"
+          ],
+          "WP08-03": [
+            "SO-A-10"
+          ]
+        },
+        "PG-09.1": {
+          "WP09-01": [
+            "SO-F-01",
+            "SO-F-03"
+          ],
+          "WP09-02": [
+            "SO-F-08"
+          ],
+          "WP09-03": [
+            "SO-F-03"
+          ]
+        },
+        "PG-10.1": {
+          "WP10-01": [
+            "SO-F-09"
+          ],
+          "WP10-02": [
+            "SO-F-09"
+          ]
+        },
+        "PG-13.1": {
+          "WP13-01": [
+            "SO-F-05"
+          ],
+          "WP13-03": [
+            "SO-F-01",
+            "SO-F-04"
+          ],
+          "WP13-04": [
+            "SO-F-07"
+          ],
+          "WP13-05": [
+            "SO-F-04"
+          ]
+        },
+        "PG-14.1": {
+          "WP14-04": [
+            "SO-F-13"
+          ]
+        }
+      },
+      "signed_overlaps_not_edited": {
+        "PG-06.1": {
+          "WP06-01": [
+            "SO-A-03"
+          ],
+          "WP06-02": [
+            "SO-F-12"
+          ],
+          "WP06-03": [
+            "SO-F-12"
+          ]
+        },
+        "PG-12.1": {
+          "WP12-01": [
+            "SO-F-07",
+            "SO-F-12"
+          ]
+        }
+      },
+      "other_overlaps": {
+        "PGP-1.03": [
+          "SO-A-11"
+        ],
+        "SR-6.03": [
+          "SO-R-E"
+        ]
+      },
+      "trim": "done: each overlapping task cites its fold id and keeps only the gaps; PG-06.1 and PG-12.1 are signed and overlap the fold, so they are not edited and need the signer's decision"
     },
     {
       "id": "ADR-7",
@@ -223,9 +328,10 @@
         "MEM-064, MEM-065, MEM-066, MEM-137 and REV-032"
       ],
       "tasks": 4,
-      "criteria": 21,
+      "criteria": 22,
       "spec": "specs/PGP-1.03-memev-docs-tiers-reconciliation.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "proposed: unsigned, signs after a clean red-team round",
+      "build_layer": "cites SO-A-11 as the owner of the overlapping part (see RECONCILIATION)"
     },
     {
       "id": "PGP-1.04",
@@ -413,13 +519,30 @@
         }
       ],
       "vault_contracts": [],
-      "build_layer": "the unsigned fold (SO-F-03) is the build layer (owner delegation, 1 Nov 2026); this spec will cite those ids and keep only what the fold does not cover; trim pending fold PR",
+      "build_layer": "the fold (SO-F-03, SO-F-12) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP04-01": [
+          "SO-F-03",
+          "SO-F-12"
+        ],
+        "WP04-02": [
+          "SO-F-03"
+        ],
+        "WP04-03": [
+          "SO-F-03",
+          "SO-F-12"
+        ],
+        "WP04-04": [
+          "SO-F-03",
+          "SO-F-12"
+        ]
+      },
       "depends_on": [
         "SO-1.01",
         "SO-1.04"
       ],
       "tasks": 4,
-      "criteria": 19,
+      "criteria": 24,
       "spec": "specs/PG-04.1-canonical-operation-envelope.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -447,7 +570,18 @@
         "WO-05-A and WO-05-C",
         "WO-05-B"
       ],
-      "build_layer": "the unsigned fold (SO-F-02, SO-F-06) is the build layer (owner delegation, 1 Nov 2026); this spec will cite those ids and keep only what the fold does not cover; trim pending fold PR",
+      "build_layer": "the fold (SO-F-02, SO-F-06) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP05-01": [
+          "SO-F-02"
+        ],
+        "WP05-04": [
+          "SO-F-06"
+        ],
+        "WP05-06": [
+          "SO-F-06"
+        ]
+      },
       "depends_on": [
         "PG-01.1",
         "PG-04.1",
@@ -457,7 +591,7 @@
         "WO-05-B"
       ],
       "tasks": 4,
-      "criteria": 19,
+      "criteria": 22,
       "spec": "specs/PG-05.1-engine-integration-merge-semantics-mapping-bound.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -481,7 +615,19 @@
       "tasks": 3,
       "criteria": 17,
       "spec": "specs/PG-06.1-replication-separate-from-acceptance.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "proposed: unsigned, signs after a clean red-team round",
+      "build_layer": "signed, overlaps the fold (WP06-01: SO-A-03; WP06-02: SO-F-12; WP06-03: SO-F-12); not edited here; needs the signer's decision",
+      "fold_tasks": {
+        "WP06-01": [
+          "SO-A-03"
+        ],
+        "WP06-02": [
+          "SO-F-12"
+        ],
+        "WP06-03": [
+          "SO-F-12"
+        ]
+      }
     },
     {
       "id": "PG-08.1",
@@ -510,7 +656,15 @@
         "SO-05-B",
         "SO-08-B"
       ],
-      "build_layer": "the unsigned fold (SO-A-03, SO-A-10) is the build layer (owner delegation, 1 Nov 2026); this spec will cite those ids and keep only what the fold does not cover; trim pending fold PR",
+      "build_layer": "the fold (SO-A-03, SO-A-10) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP08-02": [
+          "SO-A-03"
+        ],
+        "WP08-03": [
+          "SO-A-10"
+        ]
+      },
       "depends_on": [
         "PG-10.1",
         "PGP-1.02",
@@ -520,7 +674,7 @@
         "SO-2.08"
       ],
       "tasks": 2,
-      "criteria": 12,
+      "criteria": 13,
       "spec": "specs/PG-08.1-scope-one-lifecycle-gaps-intake-to-delivery.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -548,13 +702,25 @@
         "MEM-145, MEM-146 and MEM-147",
         "WO-05-D"
       ],
-      "build_layer": "the unsigned fold (SO-F-01, SO-F-08) is the build layer (owner delegation, 1 Nov 2026); this spec will cite those ids and keep only what the fold does not cover; trim pending fold PR",
+      "build_layer": "the fold (SO-F-01, SO-F-03, SO-F-08) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP09-01": [
+          "SO-F-01",
+          "SO-F-03"
+        ],
+        "WP09-02": [
+          "SO-F-08"
+        ],
+        "WP09-03": [
+          "SO-F-03"
+        ]
+      },
       "depends_on": [
         "PG-04.1",
         "PG-06.1"
       ],
       "tasks": 3,
-      "criteria": 13,
+      "criteria": 19,
       "spec": "specs/PG-09.1-identity-admission-and-acfa-boundary.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -572,7 +738,6 @@
       "vault_contracts": [
         "WO-05-D"
       ],
-      "build_layer": "the unsigned fold (SO-F-01, SO-F-08) is the build layer (owner delegation, 1 Nov 2026); this spec will cite those ids and keep only what the fold does not cover; trim pending fold PR",
       "depends_on": [],
       "tasks": 1,
       "criteria": 9,
@@ -603,6 +768,15 @@
         }
       ],
       "vault_contracts": [],
+      "build_layer": "the fold (SO-F-09) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP10-01": [
+          "SO-F-09"
+        ],
+        "WP10-02": [
+          "SO-F-09"
+        ]
+      },
       "depends_on": [
         "PG-04.1",
         "PG-06.1",
@@ -610,7 +784,7 @@
         "SO-2.03"
       ],
       "tasks": 4,
-      "criteria": 25,
+      "criteria": 28,
       "spec": "specs/PG-10.1-evidence-knowledge-status-and-receipts.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -639,7 +813,14 @@
       "tasks": 3,
       "criteria": 12,
       "spec": "specs/PG-12.1-multi-node-gossip-transport.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "proposed: unsigned, signs after a clean red-team round",
+      "build_layer": "signed, overlaps the fold (WP12-01: SO-F-07, SO-F-12); not edited here; needs the signer's decision",
+      "fold_tasks": {
+        "WP12-01": [
+          "SO-F-07",
+          "SO-F-12"
+        ]
+      }
     },
     {
       "id": "PG-13.1",
@@ -672,7 +853,22 @@
       "vault_contracts": [
         "SO-09-A"
       ],
-      "build_layer": "the unsigned fold (SO-F-04, SO-F-05, SO-F-07, SO-F-12, SO-F-13) is the build layer (owner delegation, 1 Nov 2026); this spec will cite those ids and keep only what the fold does not cover; trim pending fold PR",
+      "build_layer": "the fold (SO-F-01, SO-F-04, SO-F-05, SO-F-07) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP13-01": [
+          "SO-F-05"
+        ],
+        "WP13-03": [
+          "SO-F-01",
+          "SO-F-04"
+        ],
+        "WP13-04": [
+          "SO-F-07"
+        ],
+        "WP13-05": [
+          "SO-F-04"
+        ]
+      },
       "depends_on": [
         "PG-04.1",
         "PG-06.1",
@@ -682,7 +878,7 @@
         "SO-2.02"
       ],
       "tasks": 5,
-      "criteria": 21,
+      "criteria": 28,
       "spec": "specs/PG-13.1-federation-sites-sharing-classes-disclosure.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
@@ -711,7 +907,12 @@
         }
       ],
       "vault_contracts": [],
-      "build_layer": "the unsigned fold (SO-F-13) is the build layer (owner delegation, 1 Nov 2026); this spec will cite those ids and keep only what the fold does not cover; trim pending fold PR",
+      "build_layer": "the fold (SO-F-13) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP14-04": [
+          "SO-F-13"
+        ]
+      },
       "depends_on": [
         "PG-03.2",
         "PG-09.1",
@@ -723,7 +924,7 @@
         "SO-2.06"
       ],
       "tasks": 5,
-      "criteria": 32,
+      "criteria": 33,
       "spec": "specs/PG-14.1-federation-demonstrators-and-benchmark.json",
       "status": "proposed: unsigned, signs after a clean red-team round"
     },
