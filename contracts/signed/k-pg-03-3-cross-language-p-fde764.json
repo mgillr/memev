@@ -1,0 +1,125 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "WP03-03",
+      "title": "Rust edition reads and re-emits every vector byte-identically",
+      "phase": "verify",
+      "depends_on": [],
+      "requirements": [
+        "MV-DEM-06: Python, Rust and TypeScript nodes exchange identical protocol representations (P2). (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:74; evidence docs/scope-one/programme/DECOMPOSITION.md:111; baseline 8.5)"
+      ],
+      "description": "Repo: crdt-merge-rs. Vectors copied from crdt-merge at a pinned commit into tests/vectors/.",
+      "scope": {
+        "allow": [
+          "tests/vectors.rs",
+          "tests/vectors/**"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP03-03-AC01",
+          "mandatory": true,
+          "statement": "The vector test reads and re-emits every vector byte-identically (red on the base, green after)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "tests/vectors.rs",
+            "cmd": "cargo test --test vectors"
+          }
+        },
+        {
+          "id": "WP03-03-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP03-03-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ],
+  "id": "k-pg-03-3-cross-language-p-fde764",
+  "title": "PG-03.3 Cross-language protocol vectors (crdt-merge-rs)",
+  "workdir": null,
+  "created": "2026-10-31T23:55:20.873Z",
+  "version": 1,
+  "request": "Programme contract for work package WP03 in crdt-merge-rs: Cross-language protocol vectors. Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP03.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP03-01. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json.  Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "provenance": {
+    "spec_sha256": "34faad26240818ba025bccff070f0675feb4852e1d993a16b6bc6ac1b4a60594",
+    "record": "contracts/programme/redteam/PG-03.3.json",
+    "review": "interim solo review by the signer, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}
