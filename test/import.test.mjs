@@ -125,8 +125,7 @@ test('MEM-105 AC12: the init offer defaults to no: Enter imports nothing, and th
   assert.equal(r.accepted, false, 'Enter declines');
   assert.equal(r.result.imported, 0, 'nothing imported');
   assert.deepEqual(readJsonFile(path.join(v.root, '.memev', 'config.json')).import, { asked: true, accepted: false }, 'the answer is kept, so it is not asked again');
-  v.close();
-  v.close();
+  // The onboarding offer owns and closes its own writer; the fixture was closed before the call.
 });
 
 test('MEM-105 AC12: the init offer reads its answer after an earlier question paused the input, and from a line split in two chunks', async () => {
@@ -145,8 +144,7 @@ test('MEM-105 AC12: the init offer reads its answer after an earlier question pa
   assert.equal(r.accepted, true, 'yes imports');
   assert.ok(r.result.imported >= 1, 'items imported');
   assert.equal(input.isPaused(), true, 'the input is paused again, so init can exit');
-  v.close();
-  v.close();
+  // The onboarding offer owns and closes its own writer; the fixture was closed before the call.
 });
 
 test('MEM-105 AC12: a terminal init reaches the offer through firstRun after the first question paused stdin, and y imports', async () => {
@@ -207,8 +205,7 @@ test('MEM-105 AC12: offerImport with ask=true and a no answer does not import', 
   assert.equal(r.asked, true, 'was asked');
   assert.equal(r.accepted, false, 'declined');
   assert.equal(r.result.imported, 0, 'nothing imported');
-  v.close();
-  v.close();
+  // The onboarding offer owns and closes its own writer; the fixture was closed before the call.
 });
 
 test('MEM-105 AC12: offerImport failure never throws', async () => {
@@ -225,8 +222,7 @@ test('MEM-105 AC12: offerImport failure never throws', async () => {
     threw = true;
   }
   assert.equal(threw, false, 'offerImport does not throw on bad path');
-  v.close();
-  v.close();
+  // The onboarding offer owns and closes its own writer; the fixture was closed before the call.
 });
 
 test('MEM-105 AC13: importing the same folder twice does not duplicate notes', () => {
