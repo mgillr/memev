@@ -99,24 +99,33 @@ flowchart LR
     laptop -. "the same secure link" .-> vault
 ```
 
-## How shared context and coordination work
+## How governed work moves through Memev
 
 ```mermaid
 flowchart TD
-    a["Open a supported AI session"] --> b["Load relevant project context"]
-    b --> c["Work on a task"]
-    c --> d["Record useful decisions and state"]
-    d --> e["Share task or status through the comms bus"]
-    e --> f["Another connected session picks up the handoff"]
-    f --> g["Check the result against task requirements"]
-    g --> h["Save the outcome for the next session"]
-    h --> b
+    a["Define project scope and obligations"] --> b["Plan work, dependencies and acceptance criteria"]
+    b --> c["Assign and coordinate people and agent seats"]
+    c --> d["People and agents execute in their own tools"]
+    d --> e["Record outputs, artifacts and evidence"]
+    e --> f["Verify evidence against scope and requirements"]
+    f --> g["Update project state and retain provenance"]
+    g --> h["Coordinate the next action or hand-off"]
 ```
 
-Memev keeps project context available without making you copy the same background into every new session. Retrieval is scoped and relevance-based, so the shared context stays useful rather than becoming a transcript dump. Connected sessions can coordinate through the communications bus, and work contracts provide a way to state what a task must deliver and retain verification results where the relevant checks are available.
+Memev does not replace the people, agents or tools doing the work, and it does not treat an agent's
+completion report as proof. Its local ProjectStore and Coordinator provide the project state,
+task lifecycle, claims, leases, dispatch control and recovery; contracts define obligations; and
+verification binds evidence to the relevant scope and artifact. Verification and operator
+acceptance remain distinct. The local engine is implemented, while the broader workspace UI and
+some end-to-end integrations are still in progress.
+
+Shared context is one supporting capability: connected tools can work from authorised project
+records instead of repeatedly reconstructing the background. The local vault keeps those records
+inspectable, and the communications bus carries coordination between connected seats. The small
+example below shows context continuity across two tools; it is not the whole product.
 
 <p align="center">
-<img src="docs/assets/demo.gif" alt="Tell Claude, Cursor knows: one app saves a fact, the next session in another app recalls it" width="480">
+<img src="docs/assets/demo.gif" alt="One AI tool saves project context and another connected tool can retrieve it; an example of Memev's shared-state layer" width="480">
 </p>
 
 ## Install
@@ -199,21 +208,41 @@ Every line below says whether it exists. Nothing in the second and third lists i
 
 ## What you get
 
-### Shared context
+### Governed work and verification
 
-Your project knowledge lives as plain Markdown in `~/memev`, kept in git. Every change is written to a checksummed log first. Claude Code, Codex, Gemini CLI, Cursor, Claude Desktop, Windsurf, VS Code and Zed can use the same notes, and cloud AI apps such as Claude and ChatGPT can connect side by side through the optional secure link. Session resume cards, project-aware recall, provenance and the graph help connected tools pick up relevant context instead of starting from scratch. To start with what you have already worked on, `memev import` reads project folders, AI history files, and chat export zips, previews what it found, and writes tagged, undoable notes with no model or network calls ([docs/IMPORT.md](docs/IMPORT.md)). See [docs/DESIGN.md](docs/DESIGN.md) and [docs/CLIENTS.md](docs/CLIENTS.md).
+Work contracts define obligations, deliverables, acceptance criteria and stop conditions. The
+ProjectStore and Coordinator retain project and task state, dependencies, claims, leases, dispatch
+and recovery. Evidence is checked against the task's scope and artifact; a completion report alone
+does not make work verified, and verification is not the same as operator acceptance. See
+[docs/PROJECTS.md](docs/PROJECTS.md) and [docs/CONTRACTS.md](docs/CONTRACTS.md).
 
-### Coordination between connected sessions
+### Coordination between connected people and agents
 
-Each connected app gets a seat on Memev's communications bus, joins the roster and reports a heartbeat. From one session, you can see which peers are present, run a communications check, hand out tasks and put an app on hold. The bus gives supported agents a shared coordination channel; the exact execution of a handoff depends on the connected client and workflow. See [docs/BUS.md](docs/BUS.md).
+Each connected app gets a seat on Memev's communications bus, joins the roster and reports a
+heartbeat. From one session, you can see which peers are present, run a communications check, hand
+out tasks and put an app on hold. The bus gives supported agents a shared coordination channel;
+the exact execution of a handoff depends on the connected client and workflow. See
+[docs/BUS.md](docs/BUS.md).
 
-### Defined work and verification
+### Shared project state and provenance
 
-Work contracts let you record the task, expected deliverables, acceptance criteria and stop conditions. Where checks are run, their outcomes and receipts can be retained alongside the work. This makes it possible to distinguish a task being assigned from evidence that its requirements were met. See [docs/CONTRACTS.md](docs/CONTRACTS.md).
+Project records, decisions and knowledge live as inspectable Markdown in `~/memev`, backed by a
+checksummed log and git history. Claude Code, Codex, Gemini CLI, Cursor, Claude Desktop, Windsurf,
+VS Code and Zed can use the same authorised records, and cloud AI apps such as Claude and ChatGPT
+can connect side by side through the optional secure link. Session resume cards, project-aware
+recall, provenance and the graph help connected tools use relevant context rather than starting
+from scratch. `memev import` can preview project folders, AI history files and chat exports before
+writing tagged, undoable records with no model or network calls ([docs/IMPORT.md](docs/IMPORT.md)).
+See [docs/DESIGN.md](docs/DESIGN.md) and [docs/CLIENTS.md](docs/CLIENTS.md).
 
-### Trust and control
+### Sovereignty and operator control
 
-You can inspect what Memev holds. `memev why` shows why a note came back, and `memev audit` lists junk and stale notes. Notes from one project are scoped away from another, and notes in Chinese, Japanese, Korean, Cyrillic, Greek or Arabic are searchable like any other. The vault stays on your computer and can be backed up to your own private GitHub repository. Cloud access is optional and off until you enable it; when you connect a cloud AI provider, that provider's own data handling still applies. Memev has no telemetry by default. The anonymous milestone report is off unless you turn it on with `memev report on`, and `memev report show` prints exactly what it would send ([docs/METRICS.md](docs/METRICS.md)).
+The vault stays on your computer and can be backed up to your own private GitHub repository.
+Cloud access is optional and off until you enable it; when you connect a cloud AI provider, that
+provider's own data handling still applies. Memev has no telemetry by default. The anonymous
+milestone report is off unless you turn it on with `memev report on`, and `memev report show`
+prints exactly what it would send ([docs/METRICS.md](docs/METRICS.md)). `memev why` and
+`memev audit` let you inspect the supporting knowledge and provenance layer.
 
 ## Documentation
 
@@ -248,11 +277,14 @@ up. The main pages:
 
 ## For developers
 
-Memev is a local MCP server and coordination layer built around a Markdown vault. Each session starts with a resume card, supported prompts can receive relevant project context (in apps with hooks), and state is saved before a compaction. The same core exposes the communications bus and work-contract mechanisms, bringing context, coordination and verification into one project workflow.
-The graph holds entities, links and claims with a status (fact, theory, conjecture) and provenance.
-Recall is BM25 over note sections, filtered by project and permissions before ranking. Node 22,
-nothing else. See [docs/DESIGN.md](docs/DESIGN.md), the [module map](docs/MODULES.md) and
-[docs/DEVELOPING.md](docs/DEVELOPING.md).
+Memev is local-first operating infrastructure for human and AI work, exposed through MCP and
+supported hooks. It combines shared project state, a coordination bus, work contracts and
+verification with an inspectable local record substrate. The ProjectStore and Coordinator govern
+task lifecycle, claims, leases, dispatch and recovery; agents and people execute work in their own
+tools. The vault preserves project records, entities, links, claims and provenance. Recall is BM25
+over note sections, filtered by project and permissions before ranking. Node 22, no runtime
+dependencies. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/PROJECTS.md](docs/PROJECTS.md),
+the [module map](docs/MODULES.md) and [docs/DEVELOPING.md](docs/DEVELOPING.md).
 
 ## Licensing
 
