@@ -1,0 +1,75 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SO-A-06",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "9dbdb6956ec9d0e74c61eb88731949078f36584eb2c3411091dcf8fba0e738a8",
+      "base_commit": "fff993f5e244f2533c0d714650220590de38057b",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/coordinator.mjs",
+            "sha256": "540783ec1d0352ff77f17b77852fa2d2bff9ca8f8488b35de046d7c4f3498fa5"
+          },
+          {
+            "path": "src/engine/project-state.mjs",
+            "sha256": "27d8fcb296415dd6b22439d4d60c68fa4fcb0a2af93d53db981206347ef5920d"
+          },
+          {
+            "path": "src/engine/project-store.mjs",
+            "sha256": "b015593048bc7c1d8ef6e633797c49bbfb91aacb4635b2a27cc6e0e57a03e7f3"
+          },
+          {
+            "path": "src/server/http.mjs",
+            "sha256": "bdc46b5ad8592c9bad976d3ac92196a5b57ab53ad14b205e0e9042e1a0886a35"
+          },
+          {
+            "path": "src/server/mcp.mjs",
+            "sha256": "6ca42da348ad8bde83317f20b78f7c629cc4727dbf3ded6db85f1d6753f4c54c"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "every named test is red at the base only because its test file does not exist yet, so a red result does not show that the test would catch a wrong implementation (5 test_red_green criteria)",
+          "disposition": "rejected",
+          "reason": "this is the shape of every implement contract of this repository (the SR-1 contracts have it): the criteria name seeded cases with asserted refusals, the gate checks that each command runs its own test file, and the independent re-review reads the tests when they exist. A mutation check belongs to the mutation gate (QL-1.02), not to this spec"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "the vault contracts the request names are not visible in this repository, so the prerequisite chain is not machine-checked",
+          "disposition": "rejected",
+          "reason": "the manifest depends_on lists only ids that are manifest rows, as the gate and the manifest test require; the vault ids are named in the request with a dagger, as SO-2.14 names them, and section 9 of the WBS lists what each build contract was checked against"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of this adapted spec, made against main at fff993f5e244. It has 1 task and 10 criteria. Checks run, and the only checks made: the task drafts through makeTask; each command parses with sh -n; no criterion statement repeats; each grep pattern compiles with its flags and is within 200 characters; every criterion target (test file, page, schema) is inside the scope; no criterion was already satisfied on main (grep, file and test targets); each test name prefix starts with the contract id and is unique across the build layer; no test file or created file is repeated by another spec of this repository or of the programme branch (PR #325); every manifest depends_on is a manifest row; the leak scan is clean. All passed. Before this round I changed the fold where main or an owner decision disagreed with it; those changes are listed in the provenance of the spec (request) and are part of what this round reviewed. I did not read the vault contracts the request names, which this repository cannot show, I did not run any named test (its file does not exist yet), and I did not review the addendum or the owner baseline text itself. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MjAwZTQzZWE2MWE1NDRiNDZjNzk2MDM5OTg0ODhhMmUxMGY1ZWRkYmZjZTAyYjEyNTgxODAxYzY3ZjRhOTNkNA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "KIqRLcINEFc0DP9esCnqBPDRalxnNeK08TfqIa3Ez+OnOIlDEtwuSM0U3YS21mDSiJTgkckXt6AwssnY8XicCg=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "Mzg4NDhmOTYxZTJiMDU1Nzk2Y2NiNTRhYzc3YzE5NTUxMjRlMGNlNmZhYjI2Zjg4NmIzN2Q2ZDIwNzk2ODJhNA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "1Uz3ltdWhhtE5ibw3bbvoprXkJwTCJvpQZldLNcNnnHsh9cozKkQZ8CnnFb1WbKFtLra4siooF9ZYCGIFTDhDw=="
+          }
+        ]
+      }
+    }
+  ]
+}
