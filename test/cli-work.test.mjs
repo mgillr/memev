@@ -346,7 +346,7 @@ test('PG-19.2 WP19-03 AC06: a project at an older schema version, which the stor
   const store = storeOn(copyProject(root));
   assert.ok(store.snapshot('task').T1, 'the store migrates the snapshot into its log');
   const before = fs.readdirSync(dir).sort().join();
-  assert.throws(() => new Vault(root, { git: false }).tasksReader(READER, 'p'), (e) => e.code === 'needs_migration' && /older/.test(e.message), 'the reader does not return an empty view of a project that has records');
+  assert.throws(() => new Vault(root, { git: false }).tasksReader(READER, 'p'), (e) => e.code === 'needs_migration' && /older/.test(e.message) && /any daemon command that opens the store migrates it/.test(e.message), 'the reader does not return an empty view of a project that has records, and its message names the remedy');
   assert.equal(fs.readdirSync(dir).sort().join(), before, 'and writes nothing');
   assert.equal(fs.existsSync(eventsOf(root)), false, 'it does not migrate');
 });
