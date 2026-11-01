@@ -1511,6 +1511,32 @@
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
+      "id": "SR-W-03A",
+      "kind": "feature",
+      "type": "programme work package",
+      "area": "SR-W",
+      "title": "A red run whose TAP header was cut off is red only when an assertion is visible (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP22-01 (additive to the signed SR-0.03.3 T3; proposed 1 Nov 2026; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "SR-0.03.3",
+          "boundary": "the signed evaluator; its criteria are unchanged and SR-W-03A adds one rule to the red stage of src/engine/contracts.mjs, a file the scope of its T3 already names; it does not supersede it"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "SR-0.03.3 (the red-green verifier) is the build layer, cited by id; this spec changes only notAnAssertion in src/engine/contracts.mjs",
+      "depends_on": [
+        "SR-0.03.3"
+      ],
+      "tasks": 1,
+      "criteria": 16,
+      "spec": "specs/SR-W-03A.json",
+      "base": "ba24c82e16c91f5962f20d49b396d46054a505da (the memev main commit that merged pull request #358, SO-F-03)",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); additive to the signed SR-0.03.3, which it does not supersede"
+    },
+    {
       "id": "PG-03.6",
       "type": "programme work package",
       "area": "PG-03",
@@ -2168,6 +2194,12 @@
       "task": "WP21-03",
       "title": "Admission, findings and actors meet the trust book: an eligibility gate for the Admission external hook, one composition rule for checks on that hook, revalidation requests after a revocation, and boundary tests",
       "contract": "PG-W-21B",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP22-01",
+      "title": "A red run whose TAP header was cut off is red only when an assertion is visible, and every other kind of output is judged as before",
+      "contract": "SR-W-03A",
       "note": "specified in this set"
     }
   ]

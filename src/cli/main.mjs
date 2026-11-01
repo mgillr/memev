@@ -76,7 +76,7 @@ Daily
   memev import list                list previous imports
   memev import undo [IMPORT-ID]    remove a previous import and its notes
   memev checkpoint --project P [--task T] [--done a,b] [--doing x] [--next c,d]
-  memev work status <project>  |  memev work pause|resume <project>  |  memev work cancel <project> <task> --reason <why>   a project's work, with --json
+  memev work status <project>  |  memev work impact <id> --project P  |  memev work pause|resume <project>  |  memev work cancel <project> <task> --reason <why>   a project's work, with --json
   memev claims [--status fact]  |  memev contract status|from-request|new|sign|approve|verify|list|amend|decompose|hook
   memev verify [id]  |  memev gate [--workdir DIR]   check signed contracts on this machine (never CI)
   memev token issue|list|revoke|rotate
@@ -336,8 +336,13 @@ async function run(argv, env) {
     }
     case 'work': {
       // status, pause, resume and cancel of a project go through the running daemon's own tools; the CLI opens no project store itself
+      // impact reads the project store through the work-store port, so it needs no daemon
+      if (pos[0] === 'impact') {
+        const { runWork } = await import('./work.mjs'); const { openStore } = await import('./work-store.mjs');
+        return runWork(pos, flags, { root, openStore: (p) => openStore(p, { root }) });
+      }
       const verbs = ['status', 'pause', 'resume', 'cancel'];
-      if (!verbs.includes(pos[0])) { console.error('usage: memev work status <project> | pause <project> | resume <project> | cancel <project> <task> --reason <why>  (add --json for data)'); return 2; }
+      if (!verbs.includes(pos[0])) { console.error('usage: memev work status <project> | pause <project> | resume <project> | cancel <project> <task> --reason <why> | impact <id> --project <project>  (add --json for data)'); return 2; }
       need(); if (!(await ensureDaemon(root, { quiet: true }))) throw new Error('the daemon is not running');
       const { runWork } = await import('./work.mjs');
       const call = async (name, args) => {
