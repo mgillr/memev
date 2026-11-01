@@ -3,7 +3,9 @@
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
+import os from 'node:os';
 import { spawn } from 'node:child_process';
+import { machineBootId, pidNamespace, processStart } from '../engine/util.mjs';
 import { PKG, api, daemonInfo, pidAlive, config } from './common.mjs';
 
 // Healthy means this vault's daemon answers: {"ok":true} and the vault_id in this vault's config.json. Anything else on
@@ -50,11 +52,41 @@ export function lastListenError(root) {
   return null;
 }
 
+/**
+ * The vault lock (.memev/oplog/LOCK) as it can be told from the file, which is read and never taken: null when no lock is there,
+ * else { pid, host, age (seconds since its last renewal), stale }. Stale follows the lock's own judge (src/engine/oplog.mjs): on this
+ * host, boot, machine and pid namespace the pid decides (gone, reused, or this process's own); on another host or boot, or with no
+ * readable holder, the age does (60 s without a holder, 90 s from elsewhere).
+ */
+export function vaultLock(root) {
+  const file = path.join(root, '.memev', 'oplog', 'LOCK');
+  let st; let bytes;
+  try { st = fs.statSync(file); bytes = fs.readFileSync(file, 'utf8'); } catch { return null; }
+  let o = null; try { o = JSON.parse(bytes); } catch { /* not a lock */ }
+  const age = Math.max(0, Math.round((Date.now() - st.mtimeMs) / 1000));
+  const named = !!o && Number.isInteger(o.pid) && o.pid > 0;
+  const here = named && o.host === os.hostname() && Math.abs(Number(o.boot) - (Date.now() - os.uptime() * 1000)) <= 120000 && (o.machine ?? null) === machineBootId() && (o.ns ?? null) === pidNamespace();
+  let stale;
+  if (!named) stale = age > 60;
+  else if (!here) stale = age > 90;
+  else if (o.pid === process.pid || !pidAlive(o.pid)) stale = true;
+  else { const start = processStart(o.pid); stale = start !== null && typeof o.start === 'number' && Math.abs(start - o.start) > 2000; }
+  return { pid: named ? o.pid : null, host: named ? (o.host ?? null) : null, age, stale };
+}
+
 // Why this vault's daemon is not serving, in one line: a port held by another program right now, or else the listen
 // error of its last start. Null when there is nothing more to say than that it is not running.
 export async function whyNotRunning(root) {
   const info = daemonInfo(root);
   if (info && pidAlive(info.pid)) return `the daemon (pid ${info.pid}) is running on port ${info.port} but does not answer; run memev restart`;
+  // the vault lock: another process holds the vault (the daemon cannot start until it is gone), or the lock is left behind
+  const lock = vaultLock(root);
+  if (lock) {
+    const who = lock.pid ? `pid ${lock.pid} on ${lock.host ?? 'an unknown host'}` : 'no readable holder';
+    return lock.stale
+      ? `stale vault lock: held by ${who}, which is gone, age ${lock.age}s; recoverable: the next memev start or writable open takes it over, and the file can be removed by hand once that process is gone`
+      : `the vault is locked by ${who}, age ${lock.age}s (VaultLocked); only that process may write the vault: stop it, then run memev start`;
+  }
   // the daemon refuses to start on a config with a syntax error (server/main.mjs), every time, so say that and not only
   // that it is not running
   const cfgFile = path.join(root, '.memev', 'config.json');

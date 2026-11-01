@@ -52,16 +52,16 @@ const stop = (code = 0) => {
   fs.rmSync(lock, { force: true }); try { fs.rmSync(path.join(state, 'daemon.json'), { force: true }); } catch {}
   process.exit(code);
 };
-// The lock's token is checked here at every renewal interval (the lease itself runs in a worker, which cannot reach this thread). A
-// daemon whose lock another holder has taken stops answering and exits with the VaultLocked code, so a supervisor waits for the
-// holder, instead of answering /healthz while every write is refused. The lock file is the other holder's and is left alone.
-const renewMs = Number(process.env.MEMEV_LOCK_RENEW_MS) > 0 ? Number(process.env.MEMEV_LOCK_RENEW_MS) : 15000;
+// The lock's token is checked here twice a second (the lease itself runs in a worker, which cannot reach this thread), well inside
+// the 2 s a daemon has to notice. A daemon whose lock another holder has taken stops answering and exits with the VaultLocked code,
+// so a supervisor waits for the holder, instead of answering /healthz while every write is refused. The lock file is the other
+// holder's and is left alone.
 const watch = setInterval(() => {
   let held = true; try { held = vault.log.holds(); } catch { held = false; }
   if (held) return;
   console.error('[memev] VaultLocked: another process holds the vault lock now; this daemon refuses writes and exits');
   stop(LOCKED);
-}, Math.min(renewMs, 1000)); watch.unref();
+}, 500); watch.unref();
 process.on('SIGTERM', () => stop(0)); process.on('SIGINT', () => stop(0));
 vault.on('reload', () => { vault.config = { ...vault.config, ...readJson(path.join(state, 'config.json'), {}) }; for (const x of extras) x.reload?.(); });
 // a daemon that cannot listen closes its vault first, which releases the lock
