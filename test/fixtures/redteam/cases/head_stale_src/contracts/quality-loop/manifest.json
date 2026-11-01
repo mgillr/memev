@@ -1,0 +1,9 @@
+{
+  "schema": "memev-quality-loop/1",
+  "contracts": [
+    {
+      "id": "QL-0.01",
+      "kind": "feature"
+    }
+  ]
+}

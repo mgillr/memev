@@ -208,7 +208,7 @@ never vault data. See [docs/CONVERGENCE.md](docs/CONVERGENCE.md).
 
 ### Shared context
 
-Your project knowledge lives as plain Markdown in `~/memev`, kept in git. Every change is written to a checksummed log first. Claude Code, Codex, Gemini CLI, Cursor, Claude Desktop, Windsurf, VS Code and Zed can use the same notes, and cloud AI apps such as Claude and ChatGPT can connect side by side through the optional secure link. Session resume cards, project-aware recall, provenance and the graph help connected tools pick up relevant context instead of starting from scratch. See [docs/DESIGN.md](docs/DESIGN.md) and [docs/CLIENTS.md](docs/CLIENTS.md).
+Your project knowledge lives as plain Markdown in `~/memev`, kept in git. Every change is written to a checksummed log first. Claude Code, Codex, Gemini CLI, Cursor, Claude Desktop, Windsurf, VS Code and Zed can use the same notes, and cloud AI apps such as Claude and ChatGPT can connect side by side through the optional secure link. Session resume cards, project-aware recall, provenance and the graph help connected tools pick up relevant context instead of starting from scratch. To start with what you have already worked on, `memev import` reads project folders, AI history files, and chat export zips, previews what it found, and writes tagged, undoable notes with no model or network calls ([docs/IMPORT.md](docs/IMPORT.md)). See [docs/DESIGN.md](docs/DESIGN.md) and [docs/CLIENTS.md](docs/CLIENTS.md).
 
 ### Coordination between connected sessions
 
@@ -236,6 +236,7 @@ up. The main pages:
 | [AI apps](docs/CLIENTS.md) | what is changed in each app, hooks vs instructions, undoing it |
 | [Cloud access](docs/CLOUD.md) | the secure link, connector URLs, other computers, turning it on |
 | [Comms bus](docs/BUS.md) | how your AI apps talk to each other, the roster and comms checks |
+| [Set up your office](docs/OFFICE.md) | one vault, inviting teammates, the lead, the roster and what is shared |
 | [GitHub backup](docs/GITHUB.md) | `memev github setup` |
 | [Docker](docs/DOCKER.md) | running Memev in a container |
 | [Tiers and setup](docs/tiers/README.md) | Personal, Personal with more computers, Business and Corporate, and the services around them (draft) |

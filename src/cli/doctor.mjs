@@ -12,7 +12,9 @@ import { redactSecrets, findSecrets } from '../engine/secrets.mjs';
 import { VERSION, isVault } from '../engine/vault.mjs';
 import { PKG, daemonInfo, pidAlive, config, out, clientsFile, tokenExpiryWarnings } from './common.mjs';
 import { EXPIRY_WARNING_DAYS } from '../engine/tokens.mjs';
-import { licensingStatus, licencePhrase } from './licensing.mjs';
+import { licensingStatus, licencePhrase, pendingMergeCopies, registry } from './licensing.mjs';
+import { relaySetting, relayState as readRelayState } from './relay.mjs';
+import { loadLicense } from '../engine/license.mjs';
 import { alt443, githubReachable } from './github.mjs';
 import { label } from '../engine/bus.mjs';
 import { fetchOut } from '../engine/net.mjs';
@@ -133,7 +135,11 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
     { desc: `${fixFor('node', platform)} Then run memev doctor --fix to point the launcher at it.`, destructive: false, cmd: 'runtime' }));
   const missing = Object.entries(clients.files || {}).filter(([f]) => { try { return !fs.readFileSync(f, 'utf8').includes('memev'); } catch { return true; } }).map(([f, rec]) => rec.client);
   const ids = Object.keys(clients.connected || {});
-  r.push(C('apps', 'AI apps connected', ids.length ? (missing.length ? 'warn' : 'ok') : 'warn', ids.length ? `${ids.join(', ')}${missing.length ? `; entries missing for ${[...new Set(missing)].join(', ')}` : ''}` : 'none yet', ids.length && !missing.length ? null : { desc: 'connect every installed app again', destructive: false, cmd: 'connect' }));
+  // after memev init --no-connect the person connects each app themselves, so --fix never connects them all (issue 284)
+  const chosen = config(root).clients?.auto_connect === false;
+  if (chosen && !ids.length) r.push(C('apps', 'AI apps connected', 'ok', 'none yet, as chosen with --no-connect: memev connect <app> connects one'));
+  else if (chosen && missing.length) r.push(C('apps', 'AI apps connected', 'warn', `${ids.join(', ')}; entries missing for ${[...new Set(missing)].join(', ')}: memev connect <app> for each, as chosen with --no-connect`));
+  else r.push(C('apps', 'AI apps connected', ids.length ? (missing.length ? 'warn' : 'ok') : 'warn', ids.length ? `${ids.join(', ')}${missing.length ? `; entries missing for ${[...new Set(missing)].join(', ')}` : ''}` : 'none yet', ids.length && !missing.length ? null : { desc: 'connect every installed app again', destructive: false, cmd: 'connect' }));
   const cfg = config(root);
   // deployment: report where the vault runs and what kind of AI provider it uses. Report only: it
   // never fails the run. The one warning is a choice that cannot work as written.
@@ -149,15 +155,76 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   else r.push(C('remote', 'remote access', 'ok', 'off (local only)'));
   const remote = run('git', ['remote'], { cwd: root }).stdout.trim();
   const jobs = readJson(path.join(state, 'jobs.json'), {});
-  r.push(C('backup', 'vault backed up off this machine', remote ? (jobs.sync?.error ? 'warn' : 'ok') : 'warn', remote ? (jobs.sync?.error ? `last sync: ${jobs.sync.error}` : `git remote ${remote}${jobs.sync?.at ? `, last sync ${jobs.sync.at}` : ''}`) : 'no backup yet: memev github setup'));
+  const relay = cfg.remote?.relay || {};
+  const relayState = readJson(path.join(state, 'relay-state.json'), null);
+  // the relay is the vault's address, not its backup. 'connecting' is not a failure yet, and 'off' with the setting on
+  // means the daemon is not holding the relay (stopped, or MEMEV_NO_TUNNEL), not that the relay is down
+  const fallback = `the relay address does not reach the vault${tun?.state === 'up' ? ' (the tunnel does)' : ''}, and your other computers still get its notes through this git backup`;
+  const relayHeld = env.MEMEV_NO_TUNNEL || relayState?.state === 'off';
+  const relayDown = relayState && !['up', 'connecting', 'off'].includes(relayState.state);
+  const relayLine = !remote ? ''
+    : relay.enabled && relayHeld
+      ? `; the relay is on but not running${env.MEMEV_NO_TUNNEL ? ' (MEMEV_NO_TUNNEL is set)' : ''}, so ${fallback}; memev cloud relay status shows the relay's state`
+      : relay.enabled && relayDown
+        ? `; the relay is on but unreachable, so ${fallback}; memev cloud relay status shows the relay's state`
+        : !relay.enabled && (relay.url || relay.domain)
+          ? `; the relay is off, so ${fallback}; memev cloud relay on switches it back on`
+          : '';
+  r.push(C('backup', 'vault backed up off this machine', remote ? (jobs.sync?.error ? 'warn' : 'ok') : 'warn', remote ? (jobs.sync?.error ? `last sync: ${jobs.sync.error}` : `git remote ${remote}${jobs.sync?.at ? `, last sync ${jobs.sync.at}` : ''}`) + relayLine : 'no backup yet: memev github setup'));
   if (jobs.sync?.warning) r.push(C('writers', 'one computer writes the git backup', 'warn', jobs.sync.warning));
+  let ls = null; let devices = [];
   try {
-    // report only: licence and seats never fail the doctor and never limit anything
-    const ls = licensingStatus({ root, env, vault, license });
+    // report only: licence and seats never fail the doctor and never limit anything. The device registry is read once,
+    // for this line and for the licence-change check below.
+    const reg = vault?.devices || (isVault(root) ? registry(root).reg : null);
+    devices = reg ? reg.list() : [];
+    ls = licensingStatus({ root, env, vault: reg ? { devices: reg } : null, license });
     const flagged = ls.usage.flagged || [];
     const renewal = ls.renewal;
     r.push(C('license', 'licence and seats (report only)', flagged.length || renewal ? 'warn' : 'ok', `${licencePhrase(ls.license)}; ${ls.usage.computers} computer(s), ${ls.usage.connectors} connector(s), ${ls.usage.local_clients} local client(s)${ls.notes.length ? `; ${ls.notes.join(' ')}` : ''}${renewal ? `; ${renewal}` : ''}${flagged.length ? `; credential flagged on ${flagged.map((f) => f.label).join(', ')}: memev devices` : ''}`));
   } catch (e) { r.push(C('license', 'licence and seats (report only)', 'ok', `not checked: ${e.message}`)); }
+  // the four paid paths, each named on every run so a regression is reported, not silent. Report only: none fails the
+  // run, and one file that cannot be read is reported on its own check instead of ending the run.
+  try {
+    const relay = relaySetting(root);
+    // as the backup line says it: the relay is the vault's address and the git backup carries the notes; a first connect
+    // under way is not a failure, and a relay the daemon is not holding (stopped, or MEMEV_NO_TUNNEL) is not running
+    const rs = readRelayState(root); const st = rs?.state;
+    const backup = remote ? 'your other computers still get its notes through the git backup'
+      : 'there is no backup yet, so your other computers do not get its notes: memev github setup';
+    const held = env.MEMEV_NO_TUNNEL || !st || st === 'off';
+    r.push(C('relay', 'relay reachable (falls back to the git backup)',
+      !relay.enabled || st === 'up' || st === 'connecting' ? 'ok' : 'warn',
+      !relay.enabled ? `off; ${backup}`
+        : st === 'up' ? `up at ${rs.address || relay.url}`
+        : st === 'connecting' ? 'connecting to the relay'
+        : held ? `on but not running${env.MEMEV_NO_TUNNEL ? ' (MEMEV_NO_TUNNEL is set)' : ''}, so the relay address does not reach the vault; ${backup}`
+        : `on but unreachable (${st}), so the relay address does not reach the vault; ${backup}`));
+  } catch (e) { r.push(C('relay', 'relay reachable (falls back to the git backup)', 'ok', `not checked: ${e.message}`)); }
+  try {
+    const pending = pendingMergeCopies(root);
+    r.push(C('merge', 'same-note conflicts keep both versions', pending.length ? 'warn' : 'ok',
+      pending.length
+        ? `${pending.length} note(s) edited on two computers at once, kept as two whole files: ${pending.map((p) => `${p.path} and ${p.copy}`).join('; ')}; a person decides what to keep`
+        : 'no unresolved same-note conflicts'));
+  } catch (e) { r.push(C('merge', 'same-note conflicts keep both versions', 'ok', `not checked: ${e.message}`)); }
+  let lic = { state: 'none' };
+  try { lic = license ?? loadLicense({ env }); } catch { lic = { state: 'none' }; }
+  const licState = lic?.state || 'none';
+  r.push(C('license-expired', 'an expired licence keeps this computer working',
+    licState === 'expired' ? 'warn' : 'ok',
+    licState === 'expired'
+      ? 'the licence is past its grace period: this computer keeps full read and write access, added computers can read but not write, and nothing is deleted'
+      : `licence ${licState}; this computer is never limited`));
+  // the licence's computer count against the computers using the vault: after a downgrade the ones past the count can
+  // only read, and a licence for more computers gives them writing back with no re-enrolment
+  try {
+    if (!ls) throw new Error('the licence and seats could not be read');
+    const over = devices.filter((d) => ls.read_only.includes(d.id));
+    r.push(C('license-change', 'changing the licence needs no re-enrolment', over.length ? 'warn' : 'ok', over.length
+      ? `${ls.computers_enrolled} computers use this vault and the ${ls.tier_label} tier covers ${ls.seats_licensed}, so ${over.map((d) => d.label || d.id).join(', ')} can read but not write; installing a licence for more computers gives them writing back with no re-enrolment (memev license status shows the seats)`
+      : `${ls.computers_enrolled} computer(s) use this vault, within the ${ls.seats_licensed} the ${ls.tier_label} tier covers; installing or removing a licence leaves the vault, its computers and its notes as they are`));
+  } catch (e) { r.push(C('license-change', 'changing the licence needs no re-enrolment', 'ok', `not checked: ${e.message}`)); }
   try { const s = fs.statfsSync(root); const freePct = (s.bavail / s.blocks) * 100; const inodePct = s.files ? (s.ffree / s.files) * 100 : 100; r.push(C('disk', 'disk space', freePct < 3 || inodePct < 3 ? 'warn' : 'ok', `${freePct.toFixed(0)}% space, ${inodePct.toFixed(0)}% inodes free`)); } catch {}
   const upd = updateLine(root, env);
   if (upd) r.push(C('update', 'update available', 'warn', upd));

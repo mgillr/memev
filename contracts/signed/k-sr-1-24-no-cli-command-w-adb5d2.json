@@ -1,0 +1,523 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "State writes go through the daemon or the lock",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "token issue, project set, backup set, devices rename and bus rename make their change through the daemon when it is present (see the presence requirement) and under the SR-1.01 vault lock only when it is not; while the daemon is present none of them writes a vault file from the CLI process",
+        "DESIGN.md's one-writer sentence names the state files it covers",
+        "every daemon route the CLI uses for a state write, and the existing /v1/bus-operator, requires a local request with the admin scope, the gate /v1/reload uses; the x-memev-client header grants nothing, and bus.resolve gives operator authority to no caller because of it",
+        "the CLI calls those routes with the admin token from .memev/admin.json, read without writing; clientToken(root, 'cli') is not used on these paths, so a missing, expired or revoked cli token is never reissued from the CLI",
+        "one helper runs every CLI state write: when the daemon is present it sends {op, args} to one local admin route and the daemon runs the same engine function; when it is not, the helper runs that function under the SR-1.01 vault lock and reads the files inside the lock",
+        "the daemon is present when .memev/daemon.lock, which holds the pid as plain decimal text, or .memev/daemon.json names a live pid, or the SR-1.01 vault lock is held by the pid one of them names; then the CLI routes through the daemon, waiting up to 10 s for /healthz, or exits non-zero naming the pid; a vault lock held by any other live process, another CLI included, makes the CLI wait for the lock, and once it holds the lock it checks presence again and, if the daemon has appeared, releases the lock and routes through it or exits non-zero; it takes the offline path only when none of these holds",
+        "a refused, failed or timed-out daemon call ends the command non-zero with a message; the CLI never retries and never falls back to a direct write",
+        "a config change made through the daemon merges only the changed keys into config.json as it is on disk at that moment and then reloads the daemon's copy; the project pin is the realpath of the CLI's git top-level folder, computed in the CLI and sent with the request",
+        "read commands (devices list, license status, status) never write from the CLI process: registry setup (hostDevice, ensureHost, migrate) runs in the daemon when it is present and under the SR-1.01 lock when it is not",
+        "token issue sends the requested scopes, paths, ttl and remote flag, and the daemon stores exactly those, ttl 0 (never expires) included",
+        "backup set validates the URL with assertBackupRemote and changes origin in .git/config and backup.remote in config.json together, in the daemon; a refusal changes neither",
+        "on the routes this task changes, neither an x-memev-client header nor a token whose agent is 'cli' gives operator authority, and /v1/bus-register never sets the operator; which seat leads and which messages carry operator authority is SR-1.28's (the trusted lead, an app posting and reading only as its own seat, operator messages recorded by the daemon)",
+        "the cli caller distinction memev recall relies on (the hook bar and journal filter in src/server/http.mjs) keeps its behaviour for the cli token; only operator authority moves to the admin scope",
+        "registry() and clientToken() never write from a read command: memev status, devices list, license status and plan read what is on disk and leave a missing or expired cli token as it is, answering from the daemon when it is present",
+        "local means a direct loopback request by an identity that is not remote; a token holding the admin scope with the remote flag, and any request through the tunnel or /c/<token>/, is refused on every admin route",
+        "with the daemon present and no usable admin token (admin.json missing or unreadable, or a 401 from the daemon) the command exits non-zero naming the admin credential; neither case is taken as no daemon, and every state request carries exactly the bearer from admin.json",
+        "a daemon operation reads and writes each state file with no await between the read and the write, or under a per-file lock, so concurrent requests never lose an update to config.json or tokens.json",
+        "the daemon's backup set checks git's exit code; when git fails, config.json's backup key and .git/config are both left as they were and the command exits non-zero",
+        "the admin route's operation table is a Map or a null-prototype object: an op outside it, __proto__, constructor and toString included, answers 400 and runs nothing",
+        "a config change through the daemon reloads only what it changes: project set and backup set restart neither the tunnel nor the relay",
+        "a rename through the daemon (devices rename, bus rename) is committed to the vault's git before the daemon answers",
+        "the CLI sends the admin bearer only to a daemon that proves it holds this start's secret: the daemon writes a random per-start secret into .memev/daemon.json (mode 0600) before it listens, and /healthz answers a nonce the CLI chooses with an HMAC of it under that secret; a listener that cannot prove it gets no request with an Authorization header, and the command exits non-zero naming the pid",
+        "the daemon runs every device change on its own registry (vault.devices), never on a second DeviceRegistry read from disk, so observations it holds in memory (last_seen and the security flags) are never dropped by a save",
+        "the helper waits up to 30 s for a state operation's answer (MEMEV_STATE_TIMEOUT_MS overrides it for tests); a timed-out call ends the command non-zero with a message that says the change may have been applied and names the command that shows it, and one command never applies its change twice",
+        "each red-green criterion of this task that runs test/cli-one-writer.test.mjs has its own subtest whose name starts with <task>-cNN: (NN is the criterion's position in this task, so T1-c35: for the first), and the criterion runs only that subtest"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "src/cli/main.mjs",
+          "src/cli/licensing.mjs",
+          "src/cli/bus-cli.mjs",
+          "src/engine/tokens.mjs",
+          "src/engine/devices.mjs",
+          "src/server/http.mjs",
+          "docs/DESIGN.md",
+          "test/cli-one-writer.test.mjs",
+          "test/helpers/**",
+          "src/cli/common.mjs",
+          "src/cli/daemon.mjs",
+          "src/engine/bus.mjs",
+          "src/cli/upgrade.mjs",
+          "src/server/main.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "With a live daemon each of the five commands leaves every vault file byte-identical in the CLI process and makes its change through the daemon",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "node --test test/cli-one-writer.test.mjs"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "The design page names the state files under the one-writer rule",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/DESIGN.md",
+            "pattern": "tokens.json"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/cli-one-writer.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/cli-one-writer.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/cli-one-writer.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "The admin route answers 403 with its own error code, for each of the five commands' operations, and changes no vault file (sha256 plus inode, mtimeMs and size) in four cases: (a) a loopback request with a valid read+write '**' non-admin token and the header x-memev-client: cli; (b) the same with a read-only token; (c) a remote request to /v1/<route>, with x-forwarded-for set, config.remote.enabled=true so the refusal is not remote_off, a remote cloud-connector token and user-agent Claude-User; (d) the same remote request to /c/<token>/v1/<route>. The same request from loopback with the admin token from .memev/admin.json succeeds. A token-issue request for scopes ['admin'] from any non-admin caller never returns a token, and tokens.json gains no record.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 route auth' test/cli-one-writer.test.mjs); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([5-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 route auth$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "For each of the five commands, against a live daemon (the test-held stub from answer 3), the CLI process writes nothing even when it has no usable credential. Run once with the 'cli' entry removed from .memev/clients.json, and once with the cli token's record in tokens.json expired; set both up while no daemon is running. Every vault file, including .memev/tokens.json and .memev/clients.json, keeps the same sha256, inode, mtimeMs and size, and the command exits 0.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 no cli credential' test/cli-one-writer.test.mjs); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 no cli credential$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "The five zero-write checks run against a stub daemon that the test holds. It is an HTTP server on the vault's port, named in .memev/daemon.json with a live pid; it answers /healthz with this vault's vault_id, records every request and writes nothing. Before and after snapshots cover every file under the vault root, including .memev/**, bus/** and .git/config, and compare each by sha256, inode, mtimeMs and size. The test asserts that the snapshot contains .memev/tokens.json, .memev/config.json, .memev/devices.json, .git/config and at least one bus/seats/*.json. It asserts that the stub got exactly one request per command, naming the expected change. A negative-control subtest, which calls new TokenStore(...).issue() in a child process inside the window, must be reported as a change.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 stub daemon' test/cli-one-writer.test.mjs); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([6-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 stub daemon$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "With a live daemon, run memev token issue app-x (through the daemon) and then, before that token's first request, memev devices list, memev license status, memev devices rename <host> new-label and memev status. Each leaves .memev/devices.json, .memev/device.json, .memev/tokens.json and .memev/clients.json identical (sha256, inode, mtimeMs, size) in the CLI process. Against the real daemon, the next 5 s flush keeps the daemon's last_seen observation for the cli device.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 read commands' test/cli-one-writer.test.mjs); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([4-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 read commands$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC11",
+          "mandatory": true,
+          "statement": "Set .memev/daemon.lock and .memev/daemon.json to name a live pid whose port accepts TCP but answers /healthz only after 5 s, as a starting or busy daemon would. Each of the five commands then writes no vault file (sha256, inode, mtimeMs, size). It either waits and routes through the daemon or exits non-zero naming the daemon. None takes the offline lock path while daemon.lock names a live pid.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 busy daemon' test/cli-one-writer.test.mjs); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([5-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 busy daemon$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC12",
+          "mandatory": true,
+          "statement": "A stub daemon answers the admin route with 404 (an older daemon), 403, 500, or a reply delayed past the CLI timeout. In every case each of the five commands exits non-zero with a message, the vault is identical (sha256, inode, mtimeMs, size), and the stub saw exactly one request per command: no retry and no direct-write fallback.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 daemon refuses' test/cli-one-writer.test.mjs); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([5-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 daemon refuses$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC13",
+          "mandatory": true,
+          "statement": "Against the real daemon, started from a different cwd than the CLI's: after the daemon is up, add a key to .memev/config.json without a reload (memev deployment set --mode local). Then run project set (from a git repository) and backup set through the daemon. config.json keeps the deployment key and gains no key it lacked before except projects and backup. The pin is keyed by the realpath of the CLI's git top-level folder. After memev restart, and again after kill -9 and start, `memev project` in that repository prints 'pinned' and `git remote get-url origin` prints the new URL.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 config persistence' test/cli-one-writer.test.mjs); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([2-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 config persistence$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC14",
+          "mandatory": true,
+          "statement": "With no daemon (memev stop; .memev/daemon.json absent), token issue, project set, backup set and devices rename each exit 0 and make their change: the token verifies with TokenStore.verify, and the pin, the backup remote and the device label are set. Eight concurrent `memev project set` runs from eight different folders leave all eight pins in config.json. While a project set holds the SR-1.01 lock (paused through a test seam), a concurrent `memev start` opens nothing and reports the vault as locked by the command's pid (SR-1.01 T3).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 offline' test/cli-one-writer.test.mjs); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([5-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 offline$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC15",
+          "mandatory": true,
+          "statement": "Against the real daemon, these commands each exit 0. token issue app --scopes read --paths 'memory/**' --ttl 7 --remote stores exactly scopes ['read'], paths ['memory/**'], remote true and an expiry 7 days out. devices rename of the host, after two apps are registered on the bus with one as operator, moves both seats to <app>@<new-label> and the operator follows; the zero-write variant against the stub uses the same seated fixture. bus rename of an existing seat makes `memev bus roster --json` show the new name.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 real daemon effect' test/cli-one-writer.test.mjs); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([4-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 real daemon effect$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC16",
+          "mandatory": true,
+          "statement": "With a stub daemon that refuses backup set with 403, .git/config is byte-identical and `git remote get-url origin` is unchanged. With the real daemon, backup set refuses '-uX', 'ext::sh -c id', '--upload-pack=x' and a URL containing a control character, through assertBackupRemote, with .git/config and config.json unchanged. A valid URL sets both origin and config.backup.remote, and the CLI process writes neither.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 backup set' test/cli-one-writer.test.mjs); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([3-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 backup set$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC17",
+          "mandatory": true,
+          "statement": "The paragraph of docs/DESIGN.md that begins '**One writer.**' names every state file it covers: tokens.json, clients.json, config.json, devices.json and bus/.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node -e \"const t=require('fs').readFileSync('docs/DESIGN.md','utf8');const p=t.split(/\\n\\s*\\n/).find((x)=>x.includes('**One writer.**'))||'';const miss=['tokens.json','clients.json','config.json','devices.json','bus/'].filter((f)=>!p.includes(f));if(miss.length){console.error('one-writer paragraph misses: '+miss.join(', '));process.exit(1)}\"",
+            "expect_exit": 0
+          }
+        },
+        {
+          "id": "T1-AC18",
+          "mandatory": true,
+          "statement": "With no operator set and one seated app, four local callers each make three calls: /mcp tools/call bus_send {to:'all', type:'hold'}, bus_unread with no seat, and POST /v1/bus-register {clients:['x'], operator:'<the seated app>'}. The callers are (i) a read+write '**' non-admin token with x-memev-client: cli, (ii) the 'cli' token from .memev/clients.json, (iii) a token issued with agent 'cli' and scopes read,write, and (iv) a read-only '**' token. Asserts: bus_tail read with the admin token shows no message with operator:true or from 'operator'; no seat is on hold; bus_unread never resolves to seat 'operator'; bus/operator.json is byte-identical (sha256). Positive control: `memev bus send all status x` from the vault's terminal still posts with operator:true.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 operator authority' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([5-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 operator authority$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC19",
+          "mandatory": true,
+          "statement": "Write only .memev/daemon.lock, containing a live pid as plain decimal text in the format main.mjs:17 writes, with no daemon.json. The configured port accepts TCP but answers /healthz only after 5 s. Each of the five commands writes no vault file (sha256, inode, mtimeMs, size, file list unchanged) and either routes through the daemon (the stub sees exactly one state request) or exits non-zero naming the pid. A second run, with daemon.lock absent and only daemon.json naming the live pid, gives the same result.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 starting daemon' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([5-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 starting daemon$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC20",
+          "mandatory": true,
+          "statement": "With a live daemon (the stub for the zero-write half), run memev status, memev devices list, memev license status and memev plan three times: with a valid cli token, with the 'cli' entry removed from .memev/clients.json, and with the cli token's record expired (both set up while no daemon runs). Every run leaves every vault file identical (sha256, inode, mtimeMs, size, file list), tokens.json and clients.json included. status either answers or exits non-zero with a message; it never mints a token.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 read commands without credential' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([4-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 read commands without credential$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC21",
+          "mandatory": true,
+          "statement": "Offline, issue a token with scopes read,write,admin, the remote flag and the note 'cloud connector'. With config.remote.enabled=true, send it as a remote request (x-forwarded-for set, user-agent Claude-User) to each new state route, to /c/<token>/v1/<route> and to /v1/bus-operator. Each answers 403 with the route's own error code, and every vault file, bus/operator.json included, is unchanged (sha256, inode, mtimeMs, size).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 remote admin refused' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([3-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 remote admin refused$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC22",
+          "mandatory": true,
+          "statement": "A test seam pauses the helper after its presence check and before it takes the SR-1.01 lock. Run project set and then devices rename; during the pause start the real daemon and wait for /healthz, then resume. The command routes through the daemon or exits non-zero naming the pid. After the daemon's next 5 s flush and a memev restart, the pin and the label are each either applied once or absent with a non-zero exit; nothing the CLI wrote was overwritten. A second subtest fixes the documented rule: a lock held by another CLI pid makes the second CLI wait, and all eight concurrent offline pins land.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 start between check and lock' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([3-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 start between check and lock$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC23",
+          "mandatory": true,
+          "statement": "With the stub daemon live: (i) .memev/admin.json is removed; (ii) admin.json is present but its token is revoked in tokens.json and the stub answers 401. In both cases each of the five commands exits non-zero naming the missing or refused admin credential, and every vault file is identical (sha256, inode, mtimeMs, size, file list). In the C9 run, the stub asserts that every state request carried exactly the bearer from admin.json.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 no admin credential' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([5-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 no admin credential$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC24",
+          "mandatory": true,
+          "statement": "Two more negative-control subtests run in the stub window, each in a child process. One creates .memev/new-file.json; the other deletes an existing bus/seats/*.json. The snapshot helper that the zero-write checks use must report each as a change, which requires comparing the before and after file lists as well as each file's sha256, inode, mtimeMs and size.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 snapshot controls' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([2-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 snapshot controls$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC25",
+          "mandatory": true,
+          "statement": "Against the real daemon, run eight concurrent memev project set commands from eight git folders and four concurrent memev token issue commands. config.json then holds all eight pins and the deployment key added before; tokens.json holds four new records, and each issued token verifies with TokenStore.verify.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 daemon concurrency' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 daemon concurrency$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC26",
+          "mandatory": true,
+          "statement": "POST each of '-uX', 'ext::sh -c id', '--upload-pack=x' and a URL containing a control character straight to the backup-set operation with the admin token. Each is refused with a 4xx, and .git/config and config.json stay byte-identical. Then, with .git/config.lock created by the test, memev backup set <valid url> through the real daemon exits non-zero and leaves config.json's backup key unchanged.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 backup set in daemon' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([2-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 backup set in daemon$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC27",
+          "mandatory": true,
+          "statement": "Send four direct loopback requests (no proxy header, Host 127.0.0.1): (1) a token with scopes read,write,admin and the remote flag, in Authorization; (2) the admin token from admin.json in the path as /c/<token>/v1/<route>; (3) the clients.json 'cli' token with no x-memev-client header; (4) a token issued with agent 'cli' and scopes read,write. For each, each of the five state operations and /v1/bus-operator answers 403 with the route's own code and returns no token, and every vault file and bus/operator.json is unchanged. The admin token in the Authorization header succeeds.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 loopback admin callers' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([4-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 loopback admin callers$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC28",
+          "mandatory": true,
+          "statement": "The daemon writes a per-start secret into .memev/daemon.json (mode 0600) and proves it on /healthz, for example as an HMAC of a nonce the CLI chooses. While daemon.lock names a live pid, a listener on the vault's port that answers /healthz with the right vault_id but no valid proof receives no request with an Authorization header from any of the five commands, and each command exits non-zero naming the pid. A stub that reads daemon.json and gives the proof still gets exactly one state request per command.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 daemon proof' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([5-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 daemon proof$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC29",
+          "mandatory": true,
+          "statement": "A local request carrying x-memev-client: cli with a read-only token limited to projects/a/**, and with a read+write '**' non-admin token, is refused on /v1/bus-operator with 403, and the bus operator is unchanged; the admin token from .memev/admin.json sets it.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 bus-operator gate' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 bus-operator gate$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC30",
+          "mandatory": true,
+          "statement": "POST to the admin route with the admin token, for each op '__proto__', 'constructor', 'toString', 'hasOwnProperty' and 'no-such-op', answers 400 naming the op, and every vault file is unchanged (sha256, inode, mtimeMs, size, file list).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 unknown operations' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 unknown operations$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC31",
+          "mandatory": true,
+          "statement": "With the real daemon and remote access on, a test seam counts tunnel and relay starts: memev project set and memev backup set through the daemon start neither, and .memev/tunnel.json is byte-identical.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 no tunnel restart' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 no tunnel restart$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T1-AC32",
+          "mandatory": true,
+          "statement": "When memev bus rename and memev devices rename through the real daemon return, git log -1 in the vault already names each change, with no wait.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 rename committed' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 rename committed$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T1-AC33",
+          "mandatory": true,
+          "statement": "memev token issue app0 --ttl 0 through the real daemon stores a record with no expiry, and the token verifies with TokenStore.verify.",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 ttl zero' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 ttl zero$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T1-AC34",
+          "mandatory": true,
+          "statement": "For a fixture vault holding journal and project notes, memev recall with the cli token returns exactly the notes, in order, that the base code returns for the same query (the expected list is recorded in the test).",
+          "verifier": {
+            "type": "command",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.24 recall unchanged' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.24 recall unchanged$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'",
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T1-AC35",
+          "mandatory": true,
+          "statement": "T1-c35: Against the real daemon, an app token makes a request, so its device's last_seen is held in memory and not yet flushed, and a remote request raises a 'reuse' flag on it. Within 1 s, memev devices rename <host> new-label runs through the daemon. After the next 5 s flush, devices.json holds that device's last_seen from the request, the flag and the new label.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c35:' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c35:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC36",
+          "mandatory": true,
+          "statement": "T1-c36: Against the real daemon with MEMEV_STATE_TIMEOUT_MS=1000 and a test seam that answers each state operation 2 s after applying it, each of the five commands exits non-zero with a message that says the change may have been applied and names the command that shows it. Once the daemon finishes, exactly one change is on disk for each: one new token record, one project pin, one backup remote, one device label, one seat name. On a vault with 5,000 notes and the default timeout, devices rename and bus rename finish their git commit within it.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-one-writer.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^T1-c36:' test/cli-one-writer.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^T1-c36:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC37",
+          "mandatory": true,
+          "statement": "One full run of test/cli-one-writer.test.mjs passes every labelled subtest (T1-c35, T1-c36) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/cli-one-writer.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^T1-c35:|^T1-c36:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC38",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-sr-1-24-no-cli-command-w-adb5d2",
+  "title": "SR-1.24 No CLI command writes vault state beside a live daemon",
+  "workdir": null,
+  "created": "2026-10-31T21:43:48.340Z",
+  "version": 2,
+  "supersedes": "k-sr-1-24-no-cli-command-w-a03500",
+  "request": "Closes G89: with the daemon stopped five CLI commands wrote vault files (token issue to .memev/tokens.json, project set and backup set to .memev/config.json, devices rename to .memev/devices.json and .memev/jobs.json, bus rename edits bus/ from the CLI process after starting a daemon), measured by hashing every vault file before and after; DESIGN.md says the daemon is the only writer. SR-1.01 closes the log-writing case (claims); this contract closes the state files. Found by the memev twin on 30 October 2026 at main be457db (a sealed run in the twin's evidence). Repository: memev. Depends on contracts: SR-1.01, QL-1.02. Sensitive path (the oplog): the QL-1.03 checklist applies before merge. Also closes issue #248: POST /v1/bus-operator was gated only by the x-memev-client request header (src/server/http.mjs:271, :303), so any loopback token could set the bus operator.",
+  "provenance": {
+    "spec_sha256": "fecfed126637122a3b7bd1053dde60fc9204c8632c4e27e70cb2b1bd3da7dfaa",
+    "record": "contracts/seed-readiness/redteam/SR-1.24.json",
+    "review": "interim solo review by the author, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}

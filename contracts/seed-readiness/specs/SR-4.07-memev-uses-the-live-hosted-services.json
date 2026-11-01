@@ -1,0 +1,345 @@
+{
+  "title": "SR-4.07 memev uses the live hosted services",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G101: the seed-stage analysis (A8, C7). memev has no built-in licence endpoint (src/cli/licensing.mjs:55-57 reads only --server and MEMEV_LICENSE_URL) and no built-in checkout address (docs/CHECKOUT.md: memev upgrade prints checkout.url from the vault's config), and hosted sync, backup and relay answer that they are not offered yet (src/services/providers.mjs:12). SR-4.02 to SR-4.05 build the services in memev-cloud and SR-5.01 the live checkout, but no contract makes memev use them. The repository still carries no address (docs/CHECKOUT.md says so, and the leak denylist names the company's domain), so a release takes the addresses from release configuration, never from the source. Repository: memev. Depends on contracts: SR-4.02, SR-4.03, SR-4.04, SR-4.05, SR-5.01, QL-1.02.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "A release knows where the licence server and the checkout are",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "the release workflow writes the licence endpoint and the checkout URL into the release tarball it attaches, as a release config file under src/ that only the commands needing it read (license activate, upgrade and task 2's hosted providers), from the repository variables MEMEV_RELEASE_LICENSE_URL and MEMEV_RELEASE_CHECKOUT_URL; no address appears in the repository's text and the leak scan still passes",
+        "precedence is --server, then MEMEV_LICENSE_URL, then the vault config, then the release config; a build from a checkout without the release config behaves as today (no address, and the command says none is set)",
+        "memev license activate and memev upgrade contact nothing until the person runs them, and no other command reads or contacts these addresses, so the no-telemetry statement stays true",
+        "a release whose variables lack either address fails before anything is published",
+        "the npm package is the release's own tarball: docs/RELEASING.md publishes the .tgz attached to the tag after checking its SHA-256, and never runs npm publish on the working tree, which carries no release config",
+        "the release-config step runs after the tests and the leak scan and before the tarball is built, refuses an empty or non-https value, and writes the file at the path src/cli/release-config.mjs reads, which ships in the tarball and is copied into the installed runtime",
+        "every address taken from the release config or the vault config passes the same https check (or plain http to loopback) as --server and MEMEV_LICENSE_URL",
+        "memev upgrade reads the checkout URL from the release config when the vault config has none, and nothing copies release values into the vault config"
+      ],
+      "scope": [
+        "src/cli/licensing.mjs",
+        "src/cli/main.mjs",
+        "src/cli/release-config.mjs",
+        ".github/workflows/**",
+        "docs/CHECKOUT.md",
+        "docs/RELEASING.md",
+        "test/release-config.test.mjs",
+        "changelog.d/SR-4.07.md",
+        "src/cli/upgrade.mjs",
+        "docs/MODULES.md",
+        "docs/PRICING.md",
+        "test/release-workflow.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "SR-4.07 release config: with a release config naming a stub licence server, memev license activate <key> reaches the stub with no flag or variable set; --server, MEMEV_LICENSE_URL and the vault config each override it in that order; without the file the command says no licence server is set; no other command contacts the stub (the stub counts requests)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/release-config.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 release config$' test/release-config.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 release config$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-4.07 checkout: memev upgrade prints the release config's checkout URL when the vault config has none, and the vault config's when it has one",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/release-config.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 checkout$' test/release-config.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 checkout$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The release workflow reads both addresses from repository variables and refuses a release without them",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -rq 'MEMEV_RELEASE_LICENSE_URL' .github/workflows/ && grep -rq 'MEMEV_RELEASE_CHECKOUT_URL' .github/workflows/",
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "The leak scan is clean",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/release-config.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/release-config.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/release-config.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "SR-4.07 release workflow: parses .github/workflows/release.yml and finds the one step that writes the release config. Asserts the step takes both values from vars.MEMEV_RELEASE_LICENSE_URL and vars.MEMEV_RELEASE_CHECKOUT_URL through env:, and sits after the npm test and leak-scan steps and before the release-tarball step. Runs that step's run text with sh -e -c in a temporary copy of the package three times. Licence variable empty: non-zero exit and no release config file. Checkout variable empty: the same. Both set to https values: exit 0, and the file at the path src/cli/release-config.mjs exports holds exactly those two values.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/release-config.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 release workflow$' test/release-config.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 release workflow$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-4.07 release config installed: in a temporary copy of the repository, run the workflow's release-config step with both variables set (licence URL pointing at a counting loopback stub). Assert the path src/cli/release-config.mjs exports lies under bin/, src/, templates/ or vendor/. Run scripts/release-tarball.mjs and assert tar -tzf lists the file. Install the tarball with memev update into a fresh MEMEV_CONFIG_DIR, then run that runtime's launcher with only PATH, HOME and MEMEV_CONFIG_DIR set: license activate KEY makes the stub count exactly 1 POST. With the file deleted from that runtime, the same command prints 'no licence server is set' and the stub stays at 1.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/release-config.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 release config installed$' test/release-config.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 release config installed$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-4.07 release publish: docs/RELEASING.md's Publish section downloads the tag's attached .tgz and .sha256 (gh release download), checks the SHA-256, and runs npm publish on that .tgz. It contains no bare 'npm publish' of the working tree. And npm pack --dry-run --json of a clean checkout lists no release config, which proves a bare publish ships the wrong artifact.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/release-config.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 release publish$' test/release-config.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 release publish$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-4.07 release config https: a release config naming http://licence.example.invalid/v1/activate, and separately a vault config naming it, each make memev license activate exit 1 with 'must be https' and open no connection (an HTTP_PROXY stub counts zero). The workflow's release-config step refuses a non-https value.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/release-config.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 release config https$' test/release-config.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 release config https$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-4.07 release config precedence: four counting stubs A to D. With --server A, MEMEV_LICENSE_URL B, vault config C and release config D, activate reaches only A. Without the flag it reaches only B; without the env as well, only C; without the vault config as well, only D. Each step asserts that the other three stubs counted zero.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/release-config.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 release config precedence$' test/release-config.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 release config precedence$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-4.07 release config quiet: the release config's licence and checkout URLs both point at counting stubs. Run init --local-only --no-connect, start the daemon and wait one sync tick, then doctor, status, plan, license status, upgrade and hook session-start: both stubs count zero. Then license activate KEY: the licence stub counts exactly 1 and the checkout stub 0.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/release-config.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 release config quiet$' test/release-config.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 release config quiet$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-4.07 checkout follows the release: memev upgrade with release config A prints A. Replace the release config with B: upgrade prints B. .memev/config.json is byte-identical before and after every command the test runs except init.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/release-config.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 checkout follows the release$' test/release-config.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 checkout follows the release$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Hosted sync, backup and relay through the live services",
+      "phase": "implement",
+      "depends_on": [
+        "T1"
+      ],
+      "requirements": [
+        "src/services/providers.mjs offers hosted sync, hosted backup and the hosted relay when the licence is valid or in grace and its services include sync, backup and relay respectively (the features sync_hosted, backup_hosted and relay_hosted) and the release config names the service address; each speaks the protocol of SR-4.03, SR-4.05 and SR-4.04, with sync and backup end-to-end encrypted as SR-4.03 requires",
+        "without the entitlement or the address each says why it is not available and names the tier that includes it; no provider says it is not offered yet",
+        "memev doctor reports each hosted service as off, not entitled, reachable or failing, and contacts a service only when it is on",
+        "the release-config step also writes the sync, backup and relay addresses from repository variables and refuses an empty one; the field names equal the keys src/cli/release-config.mjs exports",
+        "selectProvider chooses the hosted sync provider for a vault whose config names it, whose licence is valid or in grace and includes sync, and whose release config names the address, so the daemon's own sync tick uses it",
+        "memev backup now uploads a backup through the backup provider in use, and memev backup restore, run in a fresh vault and config folder, reproduces every note; memev backup set and status keep working for a git remote",
+        "switching remote access on with an entitled licence and the relay address opens the relay connection SR-4.04 defines, through the tunnel code",
+        "a hosted provider is accepted only with a verified licence, valid or in grace, whose services include the provider's service; a business licence (services ['team']), an expired licence or a hand-edited one is refused"
+      ],
+      "scope": [
+        "src/services/**",
+        "src/cli/doctor.mjs",
+        "src/cli/release-config.mjs",
+        "docs/CLOUD.md",
+        "docs/MODULES.md",
+        "test/hosted-providers.test.mjs",
+        "changelog.d/SR-4.07.md",
+        ".github/workflows/release.yml",
+        "src/cli/main.mjs",
+        "src/cli/tunnel.mjs",
+        "src/cli/relay.mjs",
+        "src/engine/entitlements.mjs",
+        "test/licensing.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "SR-4.07 hosted: against stub services that implement SR-4.03's sync and SR-4.05's backup protocols, a licensed vault syncs a note to a second vault and restores a backup byte for byte; the stub store holds no plaintext; an unlicensed vault is refused naming the tier; a provider that still answers not offered yet fails the test",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/hosted-providers.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 hosted$' test/hosted-providers.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 hosted$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "No provider says it is not offered yet",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -rn 'not offered yet' src/",
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/hosted-providers.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/hosted-providers.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/hosted-providers.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "SR-4.07 hosted e2e: the stubs log every request line, header and body. No logged bytes contain the vault's encryption key in raw, base64 or hex form. No base64-, hex- or gunzip-decoding of any stored object contains the note text. A third vault with the same licence file and activation key, but without the key material, cannot decrypt: restore fails and writes no file. A restore in a fresh process with a fresh MEMEV_CONFIG_DIR, given only the recovery material the docs name, matches byte for byte. When the stub flips one byte of a stored object, sync and restore stop with an integrity error and write nothing.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/hosted-providers.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 hosted e2e$' test/hosted-providers.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 hosted e2e$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-4.07 hosted doctor: the release config names counting stubs for sync, backup and relay. (a) With no licence, memev doctor --json shows each hosted service as 'not entitled' and the stubs count 0. (b) With the entitlement but the service not switched on, each shows 'off' and the stubs count 0. (c) With the service on and its stub up, it shows 'reachable', and only that stub counts at least 1. (d) With the service on and its stub closed, it shows 'failing'. (e) In every case, calling the memev_doctor MCP tool adds 0 requests.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/hosted-providers.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 hosted doctor$' test/hosted-providers.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 hosted doctor$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-4.07 hosted selection: with a valid licence carrying the hosted sync entitlement, the sync address in the release config and config.sync.provider = 'memev-sync', selectProvider('sync', ctx).id is 'memev-sync'. The same ctx with no licence, with an expired licence, or with no address returns git (or null without a remote). One daemon sync tick (the supervise path in src/cli/sync.mjs) delivers the note to the stub.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/hosted-providers.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 hosted selection$' test/hosted-providers.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 hosted selection$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-4.07 hosted relay: against a stub implementing SR-4.04, with an entitled licence and the relay address from the release config, switching remote access on makes the vault open the control connection to the stub. An HTTPS request to the stub's public name for the vault reaches the daemon, and the stub sees only TLS ciphertext. With no entitlement the stub counts zero connections and the reason names the tier.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/hosted-providers.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 hosted relay$' test/hosted-providers.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 hosted relay$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-4.07 hosted entitlement: every hosted provider is refused, with a reason naming the tier that includes it and zero stub requests, in each of four cases: no licence; a valid business licence (services ['team'], entitlements.mjs:27); an expired licence that carries the hosted entitlement; a hand-edited license.json that adds the entitlement, so the signature fails. Only a valid or grace licence with the entitlement is accepted.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/hosted-providers.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 hosted entitlement$' test/hosted-providers.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 hosted entitlement$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-4.07 hosted reasons: with the address set and no licence, the reason names the tier and not the address. With an entitled licence and no address, the reason says the address is not set and does not name a tier. Neither reason matches /not (offered|available) yet|coming soon|later/i. With both licence and address, ok is true.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/hosted-providers.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 hosted reasons$' test/hosted-providers.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 hosted reasons$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-4.07 hosted release: the release-config step writes the sync, backup and relay addresses from named repository variables and exits non-zero when any is empty. The field names it writes equal the key list src/cli/release-config.mjs exports for the providers (import it and compare).",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/hosted-providers.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 hosted release$' test/hosted-providers.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 hosted release$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-4.07 hosted backup command: through the spawned CLI, on a licensed vault with the backup address set, memev backup now uploads to the stub. memev backup restore, run in a fresh vault and a fresh config dir, reproduces every note byte for byte.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/hosted-providers.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-4.07 hosted backup command$' test/hosted-providers.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-4.07 hosted backup command$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

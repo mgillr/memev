@@ -1,0 +1,199 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Decision record",
+      "phase": "design",
+      "depends_on": [],
+      "requirements": [
+        "Paid managed, hosted or enterprise services that do not compromise the neutral open-core boundary",
+        "Prove local project execution and recovery without requiring hosted infrastructure.",
+        "Keep paid multi-device convergence behind a stable, tested interface.",
+        "Do not let cloud availability become a hidden dependency for local project integrity."
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "docs/scope-one/design/commercial-integration-services.md",
+          "docs/README.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "The decision record exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/scope-one/design/commercial-integration-services.md"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "The record decides requirement 1: Paid managed, hosted or enterprise services that do not compromise the neutral open-core boundary",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/commercial-integration-services.md",
+            "pattern": "^## Requirement 1:"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "The record decides requirement 2: Prove local project execution and recovery without requiring hosted infrastructure.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/commercial-integration-services.md",
+            "pattern": "^## Requirement 2:"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "The record decides requirement 3: Keep paid multi-device convergence behind a stable, tested interface.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/commercial-integration-services.md",
+            "pattern": "^## Requirement 3:"
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "The record decides requirement 4: Do not let cloud availability become a hidden dependency for local project integrity.",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/commercial-integration-services.md",
+            "pattern": "^## Requirement 4:"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "The record names the service list",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/commercial-integration-services.md",
+            "pattern": "^Service list:"
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "The record names the boundary tests",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/scope-one/design/commercial-integration-services.md",
+            "pattern": "^Boundary tests:"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "The decision record passes the leak scan",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "The documentation links and up-links stay valid",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-links.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-so-2-13-commercial-integ-d4d6ec",
+  "title": "SO-2.13 Commercial integration services that keep the open-core boundary neutral",
+  "workdir": null,
+  "created": "2026-10-31T22:42:58.842Z",
+  "version": 1,
+  "request": "Closes G-SO-24. Source: the master traceability baseline of 31 October 2026 (section 8.6) and, where named, the Scope One addendum (PR #222, docs/scope-one/ADDENDUM-ARCHITECTURE-AND-DELIVERY-REVIEW.md at head a1757a0); 8.3 to 8.6 released for contracting by the owner on 31 Oct 2026. This contract is the design-record stage: it asks for the decision record and builds nothing. Contracts marked with a dagger are signed in the owner's vault and are not visible in this repository. The programme decomposition on branch docs/engine-decision-tiers-reconcile (docs/scope-one/programme/) is read for overlap: WP15-01 and WP15-02 hold the licence boundary and WP16-07 the pricing dimensions; this contract is the service boundary and takes none of them. Owner decision 31 Oct 2026: local-first, the cloud only a relay and a backup.",
+  "provenance": {
+    "spec_sha256": "9db9a7b5728ad3adcc99a78ea87aae6187c352d558943875ad3e626dfb42b6a9",
+    "record": "contracts/scope-one/redteam/SO-2.13.json",
+    "review": "interim solo review by the author, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local"
+}

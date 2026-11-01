@@ -1,0 +1,218 @@
+{
+  "title": "SR-6.01 The repository goes public",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes G48: The repository is private, so no one can find, star or install it. Repository: memev. Depends on contracts: SR-1.20, SR-9.01.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Public-ready repository",
+      "phase": "release",
+      "depends_on": [],
+      "requirements": [
+        "history scanned and reported, never rewritten (a finding in history is recorded in docs/PROVENANCE.md); contributor guide, code of conduct, issue templates, security contact",
+        "a provenance check runs over the whole history: every author and committer identity is on an allowlist the owner keeps, the first commit is named, and no path, host or id from a prototype or another project remains in files or messages; its report is filed for diligence as docs/PROVENANCE.md",
+        "the provenance check reads every historical blob as well as the current files and the messages; a finding in history fails the check until docs/PROVENANCE.md records it with its commit and path, and history is never rewritten",
+        "it reads every ref the remote serves, pull-request heads and tags included, refuses a shallow repository, and checks author and committer apart, naming only the commit at fault",
+        "the identity allowlist is committed as sha256 hashes of 'name <email>' in scripts/provenance-allowlist.json and the prototype paths, hosts and ids as a hashed list in scripts/provenance-terms.json; neither is derived from the history it checks, and a missing or empty list fails",
+        "--github scans issues, pull requests, review comments and release notes the same way, and a finding there is recorded in docs/PROVENANCE.md too",
+        "private vulnerability reporting is on, and the repository goes public only after the leak scan and the provenance check pass on the exact refs being published and after SR-1.20 is closed",
+        "docs/PROVENANCE.md names the root commit and lists each author and committer identity by its sha256, never in clear, and docs/README.md links it",
+        "the CI check job runs the leak scan with --history and gitleaks on every pull request, with no paths filter that skips root Markdown files or .github/ISSUE_TEMPLATE/**, and neither step can be skipped"
+      ],
+      "description": "",
+      "scope": [
+        "README.md",
+        "CONTRIBUTING.md",
+        "CODE_OF_CONDUCT.md",
+        "SECURITY.md",
+        ".github/**",
+        "scripts/provenance.mjs",
+        "docs/PROVENANCE.md",
+        "test/provenance.test.mjs",
+        "docs/README.md",
+        "scripts/provenance-allowlist.json",
+        "scripts/provenance-terms.json"
+      ],
+      "criteria": [
+        {
+          "statement": "The leak scan is clean over files and history",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history"
+          }
+        },
+        {
+          "statement": "Contributor guide",
+          "verifier": {
+            "type": "file_exists",
+            "path": "CONTRIBUTING.md"
+          }
+        },
+        {
+          "statement": "Code of conduct",
+          "verifier": {
+            "type": "file_exists",
+            "path": "CODE_OF_CONDUCT.md"
+          }
+        },
+        {
+          "statement": "The repository is public",
+          "verifier": {
+            "type": "command",
+            "cmd": "gh repo view --json visibility -q .visibility | grep -qx PUBLIC"
+          }
+        },
+        {
+          "statement": "Fixture: a bare 'remote' repository whose main is clean, holding a commit by an identity not on the allowlist only on branch side, and a commit whose message names a prototype path reachable only from refs/pull/1/head. In a normal clone of it (which has no refs/pull/*), `node scripts/provenance.mjs --history` exits 1 naming both shas: the script reads every ref the remote serves, refs/pull/* included. In a `git clone --depth 1 file://` of a clean fixture it exits non-zero naming shallow history and never prints clean.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/provenance.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-6.01 provenance remote refs and shallow$' test/provenance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-6.01 provenance remote refs and shallow$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The test copies scripts/provenance.mjs and the committed allowlist file exactly as they are in the repository (no injected allowlist, no environment override) into a fixture repository whose one commit is authored and committed by an identity absent from that file: exit 1 naming the commit and the identity. With the allowlist file removed, or emptied, any non-empty fixture exits non-zero naming the missing allowlist. The script never derives allowed identities from the history it checks.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/provenance.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-6.01 provenance committed allowlist$' test/provenance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-6.01 provenance committed allowlist$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Separate fixtures with allowlisted identities: (a) a commit message naming a prototype path, (b) a file naming a prototype host, (c) a file naming a prototype id. Each exits 1 naming the commit. The test adds its fixture terms through the same mechanism the real run uses (a committed hashed list, as scripts/leak-denylist.json does). (d) With the prototype list empty, or its source missing, the script exits non-zero naming the empty list and never prints clean.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/provenance.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-6.01 provenance prototype terms$' test/provenance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-6.01 provenance prototype terms$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Fixture with commits G1 (clean), B (identity not on the allowlist) and G2 (clean): exit 1, and the output names B's sha and neither G1's nor G2's. Adding B's identity to the fixture allowlist, and changing nothing else, gives exit 0 and the word clean. Replacing B's identity with an allowlisted one and its message with one naming a prototype path gives exit 1 naming B.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/provenance.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-6.01 provenance names only the bad commit$' test/provenance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-6.01 provenance names only the bad commit$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A fixture commit with an allowlisted author and a committer not on the allowlist (GIT_COMMITTER_NAME and GIT_COMMITTER_EMAIL set to it) exits 1 naming the commit and the committer. The mirror case, with a non-allowlisted author and an allowlisted committer, exits 1 naming the author.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/provenance.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-6.01 provenance committer identity$' test/provenance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-6.01 provenance committer identity$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The test reads .github/workflows/ci.yml. The check job runs on every pull_request with no paths filter that skips root Markdown files or .github/ISSUE_TEMPLATE/**. Its steps include `node scripts/leak-scan.mjs --history` and the checksum-verified gitleaks run, neither with continue-on-error nor behind an if: that can skip it.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/provenance.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-6.01 provenance ci workflow$' test/provenance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-6.01 provenance ci workflow$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "SR-6.01 provenance: a fixture repository with a commit by an identity not on the allowlist, or a message naming a prototype path, fails the check naming the commit",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/provenance.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-6.01 provenance' test/provenance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-6.01 provenance$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "The provenance check passes over the real history, every finding in history being one docs/PROVENANCE.md records with its commit and path",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/provenance.mjs --history",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The provenance report is filed",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/PROVENANCE.md"
+          }
+        },
+        {
+          "statement": "Fixture repository, all commits by allowlisted identities with clean messages: commit A adds notes.txt holding a prototype path and a personal home path (both strings built from parts at run time), commit B deletes notes.txt, and commit C is clean. `node scripts/provenance.mjs --history` run in the fixture exits 1, and its output names A's sha and notes.txt. The same fixture rebuilt without commit A exits 0. With A's finding recorded in the fixture's docs/PROVENANCE.md (its commit and path), the run exits 0 and still prints the finding as recorded: a finding in history is reported, never rewritten away.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/provenance.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-6.01 provenance deleted blob$' test/provenance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-6.01 provenance deleted blob$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Using a fake GitHub API (a local HTTP server, or fixture JSON passed by flag) holding one issue, one pull request with a review comment and one release, where only the review comment names a prototype path: `node scripts/provenance.mjs --github` exits 1 naming the PR number and the comment id. With that comment clean, it exits 0.",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/provenance.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SR-6.01 provenance github content$' test/provenance.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SR-6.01 provenance github content$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "Private vulnerability reporting is enabled on the repository the checkout's origin names, which is the canonical clone the contract runs in (the owner's handle stays out of the repository's text).",
+          "verifier": {
+            "type": "command",
+            "cmd": "gh api 'repos/{owner}/{repo}/private-vulnerability-reporting' -q .enabled | grep -qx true"
+          }
+        },
+        {
+          "statement": "The commit that last changed docs/PROVENANCE.md (the recorded clean run) has a committer date earlier than the PublicEvent of the repository the checkout's origin names. This only partly binds the order, because the worker sets commit dates; the task's requirement that the flip comes after the clean runs and after SR-1.20 carries the rest.",
+          "verifier": {
+            "type": "command",
+            "cmd": "c=$(git log -1 --format=%cI -- docs/PROVENANCE.md); p=$(gh api --paginate repos/{owner}/{repo}/events -q '.[] | select(.type==\"PublicEvent\") | .created_at' | head -1); [ -n \"$c\" ] && [ -n \"$p\" ] && node -e 'process.exit(Date.parse(process.argv[1]) > Date.parse(process.argv[2]) ? 0 : 1)' \"$p\" \"$c\""
+          }
+        },
+        {
+          "statement": "docs/PROVENANCE.md names the root commit, which must be the only root, and lists every distinct author and committer name on HEAD's history by its sha256 hex, so the report names no one in clear: the leak scan refuses the owner's names in any tracked file.",
+          "verifier": {
+            "type": "command",
+            "cmd": "r=$(git rev-list --max-parents=0 HEAD); [ \"$(printf '%s\\n' \"$r\" | wc -l)\" -eq 1 ] && grep -q \"$r\" docs/PROVENANCE.md && git log --format='%an%n%cn' HEAD | sort -u | node -e 'const fs=require(\"fs\"),c=require(\"crypto\");const t=fs.readFileSync(\"docs/PROVENANCE.md\",\"utf8\");const miss=fs.readFileSync(0,\"utf8\").split(\"\\n\").filter(Boolean).filter((n)=>!t.includes(c.createHash(\"sha256\").update(n).digest(\"hex\")));if(miss.length){console.log(\"missing \"+miss.length+\" identities\");process.exit(1)}'"
+          }
+        },
+        {
+          "statement": "The repository the checkout's origin names reports visibility public and is not a fork, an unauthenticated git ls-remote of it succeeds, and its main is an ancestor of the checked HEAD, so the history the checks read is the history being served.",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$(gh repo view --json visibility -q .visibility)\" = PUBLIC ] && [ \"$(gh repo view --json isFork -q .isFork)\" = false ] && u=$(gh repo view --json url -q .url) && m=$(env -u GH_TOKEN -u GITHUB_TOKEN GIT_TERMINAL_PROMPT=0 git -c credential.helper= ls-remote \"$u\" refs/heads/main | cut -f1) && [ -n \"$m\" ] && git merge-base --is-ancestor \"$m\" HEAD"
+          }
+        },
+        {
+          "statement": "The tests that the in-scope files touch pass.",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/docs-links.test.mjs test/readme.test.mjs test/isolation.test.mjs test/leak-scan.test.mjs test/release-workflow.test.mjs",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "History is not rewritten: the contract's base is an ancestor of HEAD",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ -n \"$MEMEV_CONTRACT_BASE\" ] && git merge-base --is-ancestor \"$MEMEV_CONTRACT_BASE\" HEAD",
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "The provenance check of the repository's GitHub content passes, every finding there being one docs/PROVENANCE.md records",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/provenance.mjs --github",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}

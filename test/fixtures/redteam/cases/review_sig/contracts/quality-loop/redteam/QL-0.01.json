@@ -1,0 +1,121 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "QL-0.01",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "4f3535a56f89e7c5fa846882794dcacb884a2035cd9fa085aac6aaccc763d55f",
+      "base_commit": "33af04c55a98f07d8dfc5f17c6e4c29d3faf542d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          }
+        ]
+      },
+      "verdict": "findings",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "high",
+          "how": "a missing input is accepted and nothing checks it",
+          "criterion": {
+            "task": "T1",
+            "statement": "T1-c04: a refuses a missing input",
+            "verifier": {
+              "type": "test_red_green",
+              "test_file": "test/a.test.mjs",
+              "cmd": "node --test --test-name-pattern='^T1-c04:' test/a.test.mjs"
+            }
+          },
+          "disposition": "added"
+        },
+        {
+          "n": 2,
+          "severity": "medium",
+          "how": "the scope could be narrower",
+          "disposition": "rejected",
+          "reason": "the scope already names the two files and nothing else"
+        }
+      ],
+      "notes": "1. T1 has no check that a refuses a missing input. 2. The grep of T1 is weak but not contradictory.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MmJhNDZjNjA2ODI3M2IwNDY4ZDg4M2Q5NTBjZmQzZmZiNjQ3ZGU1NTg2Zjc5NDE4NzQyMDVlYjMzMDllM2U0Yg==",
+        "signatures": [
+          {
+            "keyid": "dc0bb08f6d3ce05e",
+            "sig": "dTpxnPzxRlb+yO0PPwe9YczpF8/mrtqZ0wBxSDyRFYYTdG268ClUb/9foKYAdImuD5y2F+VkSw5fYOwy45pfDA=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "e14fb15d44b9f0388a514cc9583fb6f664730c1bd04fdfd074e8b2a24ff5491f",
+      "base_commit": "33af04c55a98f07d8dfc5f17c6e4c29d3faf542d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/a.mjs",
+            "sha256": "037ecd1db38c230c248787e60fd7bfc0cb0101b187b59535b6e7483be762d350"
+          },
+          {
+            "path": "src/b.mjs",
+            "sha256": "e14de72ee386d71f7f30286c197a9e572f114343b003af72ac632cf5a05bcbbb"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "the metric threshold could be tighter",
+          "disposition": "rejected",
+          "reason": "the threshold is the measured baseline"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "the grep should stay",
+          "criterion": {
+            "task": "T1",
+            "statement": "src/a.mjs exports a",
+            "verifier": {
+              "type": "grep",
+              "file": "src/a.mjs",
+              "pattern": "export const a"
+            }
+          },
+          "disposition": "added"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "the request text is long",
+          "disposition": "rejected",
+          "reason": "the request is not part of any check"
+        }
+      ],
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OWNhMjBhZGM5ZmVjZDEyYTk1NTFiN2NmYTIxMDE5ODk2NDZmMGE2YTY4OTVlNDJjYjE3YmQ5MzhkZjg2ZDE3YQ==",
+        "signatures": [
+          {
+            "keyid": "dc0bb08f6d3ce05e",
+            "sig": "GsFOEmtqNoLP0i1lOByu1jA8YsyWCgbX+GfKy8WeHQsa/WjlIL0QOGf9qt+amUOZ6qY/BN41Xw1XvVTO6eJpCg=="
+          }
+        ]
+      }
+    }
+  ]
+}

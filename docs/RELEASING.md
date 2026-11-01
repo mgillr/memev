@@ -4,6 +4,12 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md).
 
 A checklist for cutting a release of the `memev` npm package.
 
+## Roles
+
+The release owner is the maintainer who cuts a release: they run this checklist, publish the
+package, tag the release and keep the post-release verification record. Anyone can prepare a
+release; only the release owner publishes it.
+
 ## Before you tag
 
 - [ ] The working tree is clean and on `main` at the commit you intend to release.
@@ -41,6 +47,27 @@ Pushing a `v*` tag runs `.github/workflows/release.yml`: the full test suite, th
 - [ ] Tag the release and push the tag, then wait for the release workflow to pass: the test suite, the leak scan and the tag check run before anything is attached.
 - [ ] `npm publish`, run by the maintainer from their own terminal, only after that workflow passed.
 - [ ] Confirm the published version runs: `npm exec --yes --package memev@<version> -- memev --version`.
+
+## Failure and rollback
+
+- [ ] If `npm publish` fails or the published package is broken, do not republish the same version:
+      bump the version and release again, or deprecate the bad version with a message so installs
+      warn: `npm deprecate memev@<version> "broken; use <previous>"`.
+- [ ] Roll back the npm tag: `npm dist-tag add memev@<previous> latest`.
+- [ ] Roll back the installer: the one-line install command takes the tarball URL as its argument
+      and has no address built in, so the rollback is to publish the previous tarball URL with its
+      `.sha256` in every place that one-line install command is given (the release notes, the
+      repository page and the registry description); the installer checks the hash, so the
+      previous pair works unchanged.
+- [ ] A broken tag is not rewritten: cut a new tag for the fixed release and deprecate the broken
+      one in its release notes.
+
+## Post-release verification record
+
+- [ ] Record in the release notes of the tag: the version, the tag, the date, the result of
+      `npm publish`, the output of `npm exec --yes --package memev@<version> -- memev --version`,
+      and the `release.yml` run for the tag that passed the full suite, the leak scan with
+      `--history`, the tag check and the release tarball build for that commit.
 
 ## After
 

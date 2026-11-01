@@ -1,0 +1,59 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SO-1.04",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "33e3e59de69aa3322d2f0b0b5955dfc55104b5f5ba04b23fda0eca608fc1debf",
+      "base_commit": "b73bd477d4fb1f2365cdfae61849b34077623118",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/README.md",
+            "sha256": "6bcaca76b3820e83b132eddd408bab81cd687eaf82ffae6be2612a9c3d97f851"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "a grep on \"## Requirement k:\" is met by a heading over an empty section, so the contract cannot check that a decision was made, only that the record answers each of its 4 requirement(s) by heading",
+          "disposition": "rejected",
+          "reason": "a verifier cannot read a decision; SR-3.01 task 1 has the same shape. The owner accepts the record as the decision (the ADR flow of docs/scope-one/DECISIONS.md), and this contract does not claim more than that the record exists and is complete by heading"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "the contract depends on vault contracts that have no manifest row here, so the dependency is not machine-checked",
+          "disposition": "rejected",
+          "reason": "the manifest depends_on lists only ids that are manifest rows, as the gate and the manifest test require; the vault ids are named in the request text, as SR-6.04 names SR-6.02, and the WBS (section 9) lists what each was checked against"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of a new spec, made against main at b73bd477d4fb. It has 1 task and 10 criteria. Checks run, and the only checks made: the task drafts through makeTask; each command parses with sh -n; no criterion statement repeats; every requirement string is a verbatim stretch of the addendum text it cites (4 of 4); each grep pattern compiles as a regular expression and names the one decision-record path; the requirement and criterion counts agree; every manifest depends_on is a manifest row. All passed. I tried to break it two ways and both are recorded as answers 1 and 2, rejected with their reasons. I did not review the addendum text itself, and I did not read the vault contracts the request names, which this repository cannot show. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MzkzM2VkOWU5ZDgwZDY1NGQyZGYwODYwMGVkNmZjYjA2YTcwM2E3MThiZGRjNjQyNGMzNjEwYTBlOTM2YzBhYg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "xrIt0AQCjkXnfFffERORix0bE224nU2TGsuAQS7VdLCZgBrnVyXUr8BhEK9G1Reri0nL5hXHCtyaHr3sWj6EBg=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OTc3YmQ0MDNkNTE5NjI3YjNkNzY3ZTU2NTM5NThmM2RhNTNmZDVlMmU3ODE3OTM5MGUwYzFlYWE5ZTkzYzVlZg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "G3+Eq7Ti6FNn13W8QMTBiCQTg1htnmGjYP6xQB5LXe2LGTQAcinsu/Vau6PpprwoCtKUTaYbU3K/jWLYDtLQAA=="
+          }
+        ]
+      }
+    }
+  ]
+}

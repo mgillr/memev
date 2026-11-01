@@ -117,6 +117,10 @@ export function renderCard(c, { maxChars = 6000, footer, root } = {}) {
     L.push('Active projects:');
     for (const a of c.active_projects) L.push(`  ${a.project} (${a.at}): ${a.task || ''}${a.doing ? ` | in progress: ${a.doing}` : ''}`);
   }
+  if (c.project_tasks?.counts && Object.keys(c.project_tasks.counts).length) {
+    const t = c.project_tasks;
+    L.push(`Project tasks (${c.project}): ${t.status}; ${Object.entries(t.counts).map(([k, n]) => `${n} ${k}`).join(', ')}.${t.eligible.length ? ` Ready to claim: ${t.eligible.join(', ')} (memev_task_claim).` : ''}`);
+  }
   for (const k of c.open_contracts || []) {
     L.push(`Active contract ${k.id} v${k.version || 1} "${k.title}"${k.project ? ` (project ${k.project})` : ''}: ${k.passed ?? 0}/${k.total ?? '?'} tasks pass${k.last_verified ? ` at last verify ${k.last_verified}` : ', not verified yet'}.`);
     if (k.remaining?.length) {

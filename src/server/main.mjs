@@ -13,6 +13,14 @@ const root = path.resolve(flags.root || process.env.MEMEV_ROOT || '.');
 const state = path.join(root, '.memev');
 const lock = path.join(state, 'daemon.lock');
 
+// a vault config with a syntax error is a broken install, not a missing one: refuse to start on
+// defaults and say exactly which file to fix
+const cfgFile = path.join(state, 'config.json');
+if (fs.existsSync(cfgFile)) {
+  try { JSON.parse(fs.readFileSync(cfgFile, 'utf8')); }
+  catch { console.error(`[memev] ${cfgFile} is not valid json; fix the file and start again`); process.exit(5); }
+}
+
 function takeLock() {
   try { fs.writeFileSync(lock, String(process.pid), { flag: 'wx', mode: 0o600 }); return true; }
   catch { const pid = Number(fs.readFileSync(lock, 'utf8')); if (pidAlive(pid) && pid !== process.pid) return false; fs.rmSync(lock, { force: true }); return takeLock(); }
