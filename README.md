@@ -43,7 +43,7 @@ Organisations are adopting AI in many places at once: individual employees, depa
 
 The ambition scales from several AI tools on one computer, to many computers in one office, multiple departments, offices in different countries and, ultimately, independent organisations. The number and location of connected systems should not fragment the organisation's collective intelligence.
 
-This is the product direction, not a claim that the full organisational platform ships today. The current product is the **Free Core**: a complete, local-first foundation for one person on one computer at a time, connecting supported AI apps through shared project state, a coordination bus and governed work. Multi-user company operation, cross-department organisational inference and multi-office federation are planned extensions. The boundary between what exists and what is planned is explicit below and in the [architecture](docs/ARCHITECTURE.md).
+This is the product direction, not a claim that the full organisational platform ships today. The current product is the **Free Core**: a complete, local-first foundation for one person on one computer at a time, connecting supported AI apps through shared project state, a coordination bus and governed work. It is free for good, not a time-limited trial or a feature-restricted teaser; the core capabilities that work today remain free under the [Memev Charter](CHARTER.md). The repository is currently in a closed, invite-only preview. Multi-user company operation, cross-department organisational inference and multi-office federation are planned extensions. The boundary between what exists and what is planned is explicit below and in the [architecture](docs/ARCHITECTURE.md).
 
 The architecture is built around six connected responsibilities:
 
@@ -60,12 +60,15 @@ Federation and cross-organisation operation are planned, not shipped. The decisi
 
 ## Who it is for
 
+Memev is one architecture with different entry points. The Free Core is useful on its own; the larger team and business capabilities extend the same foundations rather than replacing the individual product.
+
 | If you are | What is available or planned | Why it matters |
 |---|---|---|
-| One person using several AI tools | **Free Core, available now:** one local vault shared by supported AI apps, with project state, recall, graph, hooks, contracts, communications bus, doctor and GitHub backup | Your tools can work from the same durable context and coordinate instead of operating as separate silos |
-| A developer building AI systems | **Free Core, available now:** local MCP integration, agent communications primitives, project lifecycle and signed work contracts | Build and test workflows on an inspectable foundation without a paid core licence |
-| A team adopting AI across departments | **Business, planned:** a company environment, organisation-level identity and policy, shared organisational context and administration | Connect departmental AI without requiring every department to replace its existing tools |
-| A large or regulated enterprise | **Corporate, planned:** private deployment, stronger identity and audit integrations, with controlled organisational boundaries | Extend the same architecture across business units and operating environments |
+| An individual developer or professional | **Free Core, closed preview:** one person, one computer, supported AI apps sharing local project context, recall, graph, hooks, contracts, communications bus, diagnostics and GitHub backup | Your AI tools can work from the same durable context and coordinate instead of operating as separate silos |
+| A developer building AI systems or agents | **Free Core, closed preview:** local MCP integration, agent communications primitives, project lifecycle and signed work contracts | Build and test AI workflows on an inspectable, open-source foundation without paying for the core |
+| A small team or engineering team | **Today:** each person can use the Free Core independently. **Planned Business capability:** a shared company environment, team identity, permissions, shared organisational context and administration | Move from individually connected AI tools to team-wide coordination without forcing everyone onto one AI provider |
+| A business with AI in multiple departments | **Business, planned:** organisational context and state, cross-department coordination, policy and administration | Connect departmental AI so the organisation can reason and coordinate across functional boundaries |
+| A large or regulated enterprise | **Corporate, planned:** private deployment, stronger identity and audit integrations, controlled organisational boundaries and higher-availability operation | Extend the same architecture across business units and operating environments |
 | An organisation with several offices or countries | **Multi-site federation, planned:** independently operated nodes and authorised exchange of state and computation | Extend organisational intelligence across locations while preserving local control |
 
 ## Plans by tier
