@@ -12,6 +12,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir, cleanup, newVault, PKG } from './helpers/tmp.mjs';
 import { Vault } from '../src/engine/vault.mjs';
 import { OpLog } from '../src/engine/oplog.mjs';
+import { SCOPE_TYPES, SUBJECT_TYPES } from '../src/engine/identity.mjs';
 import { deviceKeygen } from '../src/engine/devices.mjs';
 import { buildEnvelope, validateEnvelope, canonicalize, ENVELOPE_FIELDS } from '../src/engine/envelope.mjs';
 import { NAMESPACE, setupAgentRole, bindingMessage, signNamespaced, verifyNamespaced, roleKeyToOpenSsh, CONTRIBUTION_NAMESPACE, AgentBindError } from '../src/engine/agentid-bind.mjs';
@@ -89,6 +90,8 @@ test('SO-F-03 AC02: the schema defines only the signature and admission block, a
   assert.equal(schema.properties.signature.properties.namespace.const, CONTRIBUTION_NAMESPACE);
   assert.notEqual(CONTRIBUTION_NAMESPACE, NAMESPACE, 'a namespace of its own, apart from the role binding namespace');
   assert.equal(schema.additionalProperties, false);
+  assert.deepEqual(schema.properties.scope.properties.type.enum, SCOPE_TYPES, 'the scope types are those of the identity model');
+  assert.equal(schema.properties.subject.pattern, `^(${SUBJECT_TYPES.join('|')}):[A-Za-z0-9._@+-]+$`);
 });
 
 test('SO-F-03 AC02: a contribution is an operation envelope, and the validator accepts a signed fixture', () => {
@@ -161,14 +164,15 @@ test('SO-F-03 AC02: the signature is made with the role key through ssh-keygen, 
   const v = (m, s, o = {}) => verifyNamespaced(m, s, { principal: 'writer', publicKey: r.publicKey, namespace: CONTRIBUTION_NAMESPACE, ...o });
   assert.equal(v(msg, sig), 'valid');
   assert.equal(v(`${msg} `, sig), 'invalid', 'a changed message does not verify');
-  assert.equal(v(msg, sig, { principal: 'someone' }), 'invalid', 'another principal does not verify');
   assert.equal(v(msg, sig, { publicKey: other.publicKey }), 'invalid', 'another key does not verify');
   assert.equal(v(msg, sig, { namespace: 'memev-other' }), 'invalid', 'another namespace does not verify');
-  assert.equal(v(msg, `${sig}x`), 'invalid');
+  const flip = (s, i) => `${s.slice(0, i)}${s[i] === 'A' ? 'B' : 'A'}${s.slice(i + 1)}`;
+  assert.equal(v(msg, flip(sig, 120)), 'invalid', 'a changed signature does not verify');
   assert.equal(v(msg, 'not a signature'), 'invalid');
   // the key may be given in the form OpenSSH writes, as well as the form of a role's .pub file
   assert.match(roleKeyToOpenSsh(r.publicKey), /^ssh-ed25519 [A-Za-z0-9+/=]+$/);
   assert.equal(v(msg, sig, { publicKey: roleKeyToOpenSsh(r.publicKey) }), 'valid');
+  assert.equal(v(msg, sig, { publicKey: `${roleKeyToOpenSsh(r.publicKey)} a comment` }), 'valid', 'the comment OpenSSH adds is dropped');
   // the binding namespace is kept for bindings: neither function takes it
   assert.throws(() => signNamespaced(msg, { keyPath: r.keyPath, principal: 'writer', namespace: NAMESPACE }), (e) => e instanceof AgentBindError && e.code === 'bad-namespace');
   assert.throws(() => verifyNamespaced(msg, sig, { principal: 'writer', publicKey: r.publicKey, namespace: NAMESPACE }), (e) => e instanceof AgentBindError && e.code === 'bad-namespace');

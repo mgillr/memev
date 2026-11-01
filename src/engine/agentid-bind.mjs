@@ -95,8 +95,8 @@ function requireOpenSSH() {
   if (noOpenSSH(r)) throw new AgentBindError('openssh', OPENSSH_NEEDED);
 }
 
-function signMessage(message, sshKeyPath, principal) {
-  const r = run('ssh-keygen', ['-Y', 'sign', '-f', sshKeyPath, '-n', NAMESPACE, '-I', principal], { timeout: SIG_TIMEOUT_MS, input: message });
+function signMessage(message, sshKeyPath, principal, namespace = NAMESPACE) {
+  const r = run('ssh-keygen', ['-Y', 'sign', '-f', sshKeyPath, '-n', namespace, '-I', principal], { timeout: SIG_TIMEOUT_MS, input: message });
   if (r.error) throw new AgentBindError('sign-failed', 'could not run ssh-keygen to sign the binding');
   if (!r.ok) throw new AgentBindError('sign-failed', 'could not sign the binding: ' + (r.stderr.trim() || 'ssh-keygen failed'));
   return r.stdout;
@@ -179,6 +179,89 @@ export function verifyAgentBinding(role, { allowedSigners, principal, dir } = {}
   const r = run('ssh-keygen', ['-Y', 'verify', '-f', allowedSigners, '-I', p, '-n', NAMESPACE, '-s', sshsigPath], { timeout: SIG_TIMEOUT_MS, input: bindingMessage(role, p, rolePub) });
   if (r.ok) return 'bound';
   return noOpenSSH(r) ? 'unavailable' : 'invalid';
+}
+
+// ---- a namespaced signature and its check, for contributions (SO-F-03)
+// The role key signs through the same ssh-keygen path, in a namespace of its own, so a signature made for a role binding
+// (namespace memev) is never a signature of another kind, and the reverse. The binding namespace stays with the bindings: these two
+// functions refuse it. The public key is the form of a role's .pub file (base64 of the SPKI) or the form OpenSSH writes.
+export const CONTRIBUTION_NAMESPACE = 'memev-contribution';
+const NS_RE = /^[a-z0-9][a-z0-9.-]{0,63}$/;
+function checkNamespace(ns) {
+  if (typeof ns !== 'string' || !NS_RE.test(ns) || ns === NAMESPACE) throw new AgentBindError('bad-namespace', 'a signature namespace is lower-case words, and memev is kept for role bindings');
+  return ns;
+}
+const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
+const sshString = (b) => { const n = Buffer.alloc(4); n.writeUInt32BE(b.length); return Buffer.concat([n, b]); };
+
+/** The OpenSSH public key line ("ssh-ed25519 AAAA...") of a role key given as base64 SPKI, or the line itself. Throws bad-key. */
+export function roleKeyToOpenSsh(publicKey) {
+  const text = String(publicKey ?? '').trim();
+  const line = /^(ssh-ed25519 [A-Za-z0-9+/]+={0,2})(?: [^\r\n]*)?$/.exec(text);   // the comment OpenSSH adds after the key is dropped
+  if (line) return line[1];
+  const der = /^[A-Za-z0-9+/]+={0,2}$/.test(text) ? Buffer.from(text, 'base64') : Buffer.alloc(0);
+  if (der.length !== ED25519_SPKI_PREFIX.length + 32 || !der.subarray(0, ED25519_SPKI_PREFIX.length).equals(ED25519_SPKI_PREFIX)) throw new AgentBindError('bad-key', 'not an ed25519 public key');
+  const blob = Buffer.concat([sshString(Buffer.from('ssh-ed25519')), sshString(der.subarray(ED25519_SPKI_PREFIX.length))]);
+  return `ssh-ed25519 ${blob.toString('base64')}`;
+}
+
+// The role key files that deviceKeygen writes are PKCS#8 PEM, which ssh-keygen -Y sign does not read on every version. The same
+// key is written as an OpenSSH private key in a private temporary directory for the one call, and removed after.
+function opensshPrivateKey(pem) {
+  const jwk = crypto.createPrivateKey(pem).export({ format: 'jwk' });
+  if (jwk.kty !== 'OKP' || jwk.crv !== 'Ed25519') throw new AgentBindError('bad-key', 'only an ed25519 key can sign');
+  const seed = Buffer.from(jwk.d, 'base64url'), pub = Buffer.from(jwk.x, 'base64url');
+  const check = crypto.randomBytes(4);
+  let priv = Buffer.concat([check, check, sshString(Buffer.from('ssh-ed25519')), sshString(pub), sshString(Buffer.concat([seed, pub])), sshString(Buffer.alloc(0))]);
+  const pad = (8 - (priv.length % 8)) % 8;
+  priv = Buffer.concat([priv, Buffer.from(Array.from({ length: pad }, (_, i) => i + 1))]);
+  const count = Buffer.alloc(4); count.writeUInt32BE(1);
+  const body = Buffer.concat([Buffer.from('openssh-key-v1\0'), sshString(Buffer.from('none')), sshString(Buffer.from('none')), sshString(Buffer.alloc(0)), count, sshString(Buffer.concat([sshString(Buffer.from('ssh-ed25519')), sshString(pub)])), sshString(priv)]);
+  const b64 = body.toString('base64').match(/.{1,70}/g).join('\n');
+  return `-----BEGIN OPENSSH PRIVATE KEY-----\n${b64}\n-----END OPENSSH PRIVATE KEY-----\n`;
+}
+
+/** Sign a message with a key file (a role key, or an OpenSSH key) in a namespace other than the binding one. Returns the armoured signature. */
+export function signNamespaced(message, { keyPath, principal, namespace } = {}) {
+  const ns = checkNamespace(namespace);
+  const p = checkPrincipal(principal);
+  if (!exists(keyPath)) throw new AgentBindError('no-ssh-key', 'key not found: ' + path.basename(String(keyPath)));
+  requireOpenSSH();
+  const content = fs.readFileSync(keyPath, 'utf8');
+  if (!content.startsWith('-----BEGIN PRIVATE KEY-----')) {
+    if (isEncryptedKey(content)) throw noTerminalRefusal();
+    return signMessage(message, keyPath, p, ns);
+  }
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-nssign-'));
+  try {
+    fs.chmodSync(tmp, 0o700);
+    const file = path.join(tmp, 'key');
+    writePrivate(file, opensshPrivateKey(content));
+    return signMessage(message, file, p, ns);
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
+/**
+ * Check a namespaced signature against one public key, offline. Returns 'valid', 'invalid', or 'unavailable' when ssh-keygen is
+ * missing or older than 8.0 (nothing was checked, so it says nothing about the signature). A namespace or principal that is not
+ * allowed throws; a key or a signature that cannot be read is 'invalid'.
+ */
+export function verifyNamespaced(message, signature, { principal, publicKey, namespace } = {}) {
+  const ns = checkNamespace(namespace);
+  const p = checkPrincipal(principal);
+  let key;
+  try { key = roleKeyToOpenSsh(publicKey); } catch { return 'invalid'; }
+  if (typeof signature !== 'string' || !signature.startsWith('-----BEGIN SSH SIGNATURE-----')) return 'invalid';
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-nsverify-'));
+  try {
+    fs.chmodSync(tmp, 0o700);
+    const allowed = path.join(tmp, 'allowed_signers'), sig = path.join(tmp, 'sig');
+    fs.writeFileSync(allowed, `${p} namespaces="${ns}" ${key}\n`);
+    fs.writeFileSync(sig, signature);
+    const r = run('ssh-keygen', ['-Y', 'verify', '-f', allowed, '-I', p, '-n', ns, '-s', sig], { timeout: SIG_TIMEOUT_MS, input: message });
+    if (r.ok) return 'valid';
+    return noOpenSSH(r) ? 'unavailable' : 'invalid';
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
 // One checked, rollback-safe step: create the role key pair when absent, bind it to the person, and
