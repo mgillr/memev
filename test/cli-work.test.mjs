@@ -5,8 +5,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { sandbox } from './helpers/cli.mjs';
-import { newVault, cleanup, PKG } from './helpers/tmp.mjs';
+import { newVault, cleanup, tmpdir, PKG } from './helpers/tmp.mjs';
+import { ProjectStore, SCHEMA_VERSION } from '../src/engine/project-store.mjs';
 import { addEntity, link } from '../src/engine/relationships.mjs';
+import { Vault } from '../src/engine/vault.mjs';
 after(cleanup);
 
 const read = (f) => fs.readFileSync(path.join(PKG, f), 'utf8');
@@ -117,6 +119,7 @@ test('PG-19.2 WP19-03 AC01: the reader is frozen: assigning to snapshot, adding 
   assert.equal(typeof v.tasksReader, 'function', 'Vault#tasksReader exists');
   const reader = v.tasksReader(READER, 'p');
   assert.equal(Object.isFrozen(reader), true);
+  assert.equal(Object.isFrozen(reader.snapshot), true, 'the snapshot function is frozen too');
   const snap = reader.snapshot;
   assert.throws(() => { 'use strict'; reader.snapshot = () => ({}); }, TypeError);
   assert.throws(() => { 'use strict'; reader.extra = 1; }, TypeError);
@@ -226,6 +229,105 @@ test('PG-19.2 WP19-03 AC06: the reader skips a torn last line of the event log w
   assert.ok(reader.snapshot('task').T1);
   assert.equal(fs.readFileSync(file, 'utf8'), before, 'and it is not cut: that is the writer\'s to finish');
   v.close();
+});
+
+// ---- the reader and the project store read one log: both ways, on a copy of the same directory
+// The store is opened on a COPY of the project directory, because opening it rewrites snapshots and may cut the log.
+const copyProject = (root, id = 'p') => {
+  const to = path.join(tmpdir('agree-'), 'vault');
+  fs.cpSync(path.join(root, '.memev', 'projects', id), path.join(to, '.memev', 'projects', id), { recursive: true });
+  return to;
+};
+const storeOn = (root) => new ProjectStore(root, { id: 'p', fsync: false }).open();
+const allKinds = (st) => Object.keys(st.kinds);
+const rawLine = (root, rec) => fs.appendFileSync(eventsOf(root), `${JSON.stringify(rec)}\n`);
+
+// One fixed log with every record shape the replay treats on its own: a repeated id that replaces and does not merge, a refused
+// stale-generation record, approvals (a repeated approval id, an approve and a reject), a tombstone (a record of an id whose data
+// is null), a record with no entity, a refused record that carries an entity, and a line that is not json in the middle.
+function fixedLog() {
+  const { root, v } = newVault();
+  const st = v.projectStore('p');
+  const task = (id, data) => st.append({ type: 'task.upserted', entity: { kind: 'task', id, data: { title: `task ${id}`, project: 'p', status: 'READY', scope_version: 1, ...data } } });
+  task('T1', { owner: 'a', labels: ['x'] });
+  task('T2', {});
+  task('T3', {});
+  task('T1', { status: 'IN_PROGRESS' });                 // the same id again: the later record replaces, nothing merges
+  st.append({ type: 'lease.upserted', entity: { kind: 'lease', id: 'L1', data: { task_id: 'T1', owner: 'a' } } });
+  st.append({ type: 'attempt.upserted', entity: { kind: 'attempt', id: 'AT1', data: { task_id: 'T1' } } });
+  st.append({ type: 'evidence.upserted', entity: { kind: 'evidence', id: 'E1', data: { task_id: 'T1', criterion: 'c1' } } });
+  st.append({ type: 'session.upserted', entity: { kind: 'session', id: 'S1', data: { project_id: 'p' } } });
+  st.append({ type: 'project.upserted', entity: { kind: 'project', id: 'p', data: { name: 'p' } } });
+  st.append({ type: 'approval.upserted', entity: { kind: 'approval', id: 'AP1', data: { task_id: 'T1', decision: 'approve' } } });
+  st.append({ type: 'approval.upserted', entity: { kind: 'approval', id: 'AP1', data: { task_id: 'T1', decision: 'reject' } } }); // same id, a second event
+  st.append({ type: 'approval.upserted', entity: { kind: 'approval', id: 'AP2', data: { task_id: 'T2', decision: 'approve' } } });
+  st.append({ type: 'event.recorded', entity: { kind: 'event', id: 'EV1', data: { type: 'note', text: 'a bare event' } } });
+  addEntity(st, 'milestone', { title: 'm' }, 'M1');
+  assert.throws(() => st.append({ type: 'task.upserted', gen: 0, entity: { kind: 'task', id: 'T9', data: { title: 'stale', project: 'p', status: 'READY' } } }), /stale|older/); // a refused record is written
+  const lines = fs.readFileSync(eventsOf(root), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.ok(lines.some((r) => r.refused && r.entity), 'the log holds a refused record that carries an entity');
+  const seq = Math.max(...lines.map((r) => r.seq)) + 1; const gen = Math.max(...lines.map((r) => r.gen));
+  rawLine(root, { schema_version: SCHEMA_VERSION, seq, ts: new Date().toISOString(), id: 'evt_tombstone0001', type: 'task.upserted', entity: { kind: 'task', id: 'T3', data: null }, gen });
+  rawLine(root, { schema_version: SCHEMA_VERSION, seq: seq + 1, ts: new Date().toISOString(), id: 'evt_bareevent0001', type: 'note', entity: null, gen });
+  fs.appendFileSync(eventsOf(root), 'this line is not json\n');
+  rawLine(root, { schema_version: SCHEMA_VERSION, seq: seq + 2, ts: new Date().toISOString(), id: 'evt_afterbad00001', type: 'task.upserted', entity: { kind: 'task', id: 'T4', data: { title: 'after the bad line', project: 'p', status: 'READY' } }, gen });
+  v.close();
+  return root;
+}
+
+test('PG-19.2 WP19-03 AC06: one fixed log gives the same records through the reader and through the store opened on a copy, for every kind', () => {
+  const root = fixedLog();
+  const { v } = { v: new Vault(root, { git: false }) };
+  const reader = v.tasksReader(READER, 'p');
+  const store = storeOn(copyProject(root));
+  const kinds = allKinds(store);
+  assert.ok(kinds.length >= 12);
+  for (const kind of kinds) assert.deepEqual(reader.snapshot(kind), store.snapshot(kind), `${kind} agrees with the store`);
+  // the fixed log really exercises each path, so a reader that skips one of them cannot agree
+  assert.deepEqual(Object.keys(reader.snapshot('task')).sort(), ['T1', 'T2', 'T3', 'T4']);
+  assert.equal(reader.snapshot('task').T1.status, 'IN_PROGRESS', 'the repeated id replaced the earlier record');
+  assert.equal(Object.hasOwn(reader.snapshot('task'), 'T3') && reader.snapshot('task').T3, null, 'a tombstone is the null the store keeps');
+  assert.equal(reader.snapshot('task').T9, undefined, 'a refused record is not applied');
+  assert.deepEqual(reader.snapshot('approval').AP1.decision, 'reject');
+  assert.equal(reader.snapshot('event').EV1.type, 'note');
+});
+
+test('PG-19.2 WP19-03 AC06: a last record with no newline is not applied, as the store does not apply it, and the reader leaves it in the file', () => {
+  const root = fixedLog();
+  const complete = JSON.stringify({ schema_version: SCHEMA_VERSION, seq: 99, ts: new Date().toISOString(), id: 'evt_unterminated01', type: 'task.upserted', entity: { kind: 'task', id: 'T7', data: { title: 'no newline', project: 'p', status: 'READY' } }, gen: 5 });
+  fs.appendFileSync(eventsOf(root), complete);                         // a whole record, and no newline after it
+  const before = fs.readFileSync(eventsOf(root), 'utf8');
+  const reader = new Vault(root, { git: false }).tasksReader(READER, 'p');
+  const store = storeOn(copyProject(root));
+  assert.equal(store.snapshot('task').T7, undefined, 'the store cuts it');
+  assert.equal(reader.snapshot('task').T7, undefined, 'the reader does not apply it');
+  for (const kind of allKinds(store)) assert.deepEqual(reader.snapshot(kind), store.snapshot(kind), `${kind} agrees`);
+  assert.equal(fs.readFileSync(eventsOf(root), 'utf8'), before, 'and it is not cut: the writer finishes that line');
+});
+
+test('PG-19.2 WP19-03 AC06: a schema version above the supported one is refused, as the store refuses it', () => {
+  const { root, v } = newVault();
+  v.projectStore('p').append({ type: 'task.upserted', entity: { kind: 'task', id: 'T1', data: { title: 't', project: 'p', status: 'READY' } } });
+  v.close();
+  const meta = path.join(root, '.memev', 'projects', 'p', 'meta.json');
+  fs.writeFileSync(meta, JSON.stringify({ ...JSON.parse(fs.readFileSync(meta, 'utf8')), schema_version: SCHEMA_VERSION + 97 }));
+  const logBefore = fs.readFileSync(eventsOf(root), 'utf8');
+  let storeCode; try { storeOn(copyProject(root)); } catch (e) { storeCode = e.code; }
+  assert.equal(storeCode, 'future_schema', 'the store refuses');
+  const vault = new Vault(root, { git: false });
+  assert.throws(() => vault.tasksReader(READER, 'p'), (e) => e.code === 'future_schema' && /newer than this Memev knows/.test(e.message), 'the reader refuses with the same code');
+  assert.equal(fs.readFileSync(eventsOf(root), 'utf8'), logBefore, 'nothing is written');
+});
+
+test('PG-19.2 WP19-03 AC06: a project with meta.json and no event log gives an empty reader, not null, as the store has no records', () => {
+  const { root, v } = newVault();
+  v.projectStore('p').append({ type: 'task.upserted', entity: { kind: 'task', id: 'T1', data: { title: 't', project: 'p', status: 'READY' } } });
+  v.close();
+  fs.rmSync(eventsOf(root));
+  const reader = new Vault(root, { git: false }).tasksReader(READER, 'p');
+  assert.notEqual(reader, null, 'the project exists: it has a meta.json');
+  const store = storeOn(copyProject(root));
+  for (const kind of allKinds(store)) { assert.deepEqual(reader.snapshot(kind), store.snapshot(kind), `${kind} agrees`); assert.deepEqual(reader.snapshot(kind), {}); }
 });
 
 test('WP19-01 AC05: the port goes through the vault method tasksReader and nothing else', () => {
