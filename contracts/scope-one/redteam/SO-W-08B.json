@@ -1,0 +1,74 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SO-W-08B",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "40e601158f986e35b9b8bf3b842044875e5f4214d283b239b986f3971ad9d82f",
+      "base_commit": "713f5b7a925c83f6e16f7e1522ae88792ae925f2",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/cli/main.mjs",
+            "sha256": "0915c5b38d2b7530cb4a07fa7715e6f73fffebd2646a959348eeddfa1b5c52ef"
+          },
+          {
+            "path": "src/engine/bus.mjs",
+            "sha256": "2110ec795d0a62293227b728281193587b3fe9abd535cc7e24739efe1faf9c89"
+          },
+          {
+            "path": "src/engine/coordinator.mjs",
+            "sha256": "540783ec1d0352ff77f17b77852fa2d2bff9ca8f8488b35de046d7c4f3498fa5"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "low",
+          "how": "the test names still carry the SO-08-B AC prefix while the spec is SO-W-08B, so a reader may look for the wrong id",
+          "disposition": "rejected",
+          "reason": "the request says so in terms: SO-08-B stays the id of the signed vault contract this text restates and pull request #361 names its tests that way; renaming the tests would make the implementation differ from the vault contract"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "src/engine/bus.mjs, src/engine/coordinator.mjs and src/cli/main.mjs are shared with many specs, so two specs may change the same file",
+          "disposition": "rejected",
+          "reason": "the stop rules and the description say to rebase onto them; each spec's scope criterion judges only its own diff"
+        },
+        {
+          "n": 3,
+          "severity": "low",
+          "how": "the docs/BUS.md and docs/PROJECTS.md criteria are a grep and an existence check for headings, not a check that the text is true",
+          "disposition": "rejected",
+          "reason": "the behaviour criteria AC01 to AC06 are red-green tests of the real behaviour, run against pull request #361"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW by the signer, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). First review of SO-W-08B, the repository text of the signed vault contract SO-08-B, renamed from SO-08-B.json, made against the #363 branch at 713f5b7a925c (the second signing pass; the first pass of 1 Nov 2026 held this spec for the findings named below). It has 1 tasks and 11 criteria. The spec hash equals the hash the owner delegation gave (40e601158f98). Earlier finding, fixed: the first pass held it because the gate reduces the file name SO-08-B.json to the id SO-08, the same as SO-08-C.json, so the two shared one record path. The spec is now SO-W-08B.json; I checked specIdOf and locate over all 154 spec files: each has its own record path, none is shared, and SO-W-08B and SO-W-08C resolve to contracts/scope-one/redteam/SO-W-08B.json and SO-W-08C.json. The only differences from the spec of the first pass are the title (the id) and the request (one added sentence that explains the id); the tasks are identical byte for byte (1 task, 11 criteria). I ran all seven criteria that run without the full suite against pull request #361 at its head (six red-green tests and the docs/BUS.md grep): all pass; the files of #361 outside this scope (changelog notes of SO-A-03 and SO-A-04, relationships-v1.json, evidence.mjs, project-store.mjs, relationships.mjs and two tests) are carried from its base #350. Checks run: the manifest kind is feature and each implement task has a mandatory test_red_green criterion that runs its own test file; every task drafts through makeTask; every command parses with sh -n; no criterion statement repeats within a task; every grep pattern compiles and is within 200 characters; every depends_on is a row of the Scope One or programme manifest; the leak scan is clean; the specIdOf and locate of the gate give this spec its own record path and no other spec of the 154 shares one. I did not run npm test. Three low findings, none blocks signing. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MWJkMTQ3YmRiY2I0MjkwMzhlN2JhMDMwM2Y3ZjJjYzBkMWFkMzRkMGI1Nzg1ZWYwZWIzMGIyYjAzZTgxY2E4Mw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "FQOWmlpB5NmRKI2aRrGRgp0xL4QrWPco2JYcXZychemExoXCzABZZdYnjwfxGiR1XHk6F47ZeuvKYknI/ytVCA=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OGFmYTJmZDdiM2Y1NGUxMWIwOWMzNzBkOWQ2YTdjMjJiYjZlMDk5Y2I5YmFlZWMxM2M5MWQ1N2Q5Yjc4Mjg5Mw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "a+LOQvuwupg0ijiF8hB0vh/HRnvqtLhhm4v8SGLRTNOkJOx4VENAY5wdsCsm7gTIWQvi4JrF4fxZ0OPHJVB+CQ=="
+          }
+        ]
+      }
+    }
+  ]
+}

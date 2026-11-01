@@ -1,0 +1,63 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PGP-1.05",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "dae8190c9c621297ca90bfdfcacbacb13e4f1ce616b8cd8de44e301f7ddd417a",
+      "base_commit": "79cbaae69bd9120bfc6cf5d600fe0233728825c2",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/scope-one/programme/REQUIREMENTS.md",
+            "sha256": "8b70ac41d38fe2f855bf9d74e1409358a1a89d6e68d571aea20186f15db81705"
+          },
+          {
+            "path": "docs/scope-one/WBS.md",
+            "sha256": "15f122b0a8bd47fea7591256767a5707b98578dfbfdf8dc197e57e1522e5ff91"
+          }
+        ]
+      },
+      "manifest_kind": "evidence",
+      "verdict": "clean",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "medium",
+          "how": "the price and tier figures ($12 a month, $120 a year, up to 3 computers) have no direct criterion; C1 pins only the PERSONAL_COMPUTERS constant and C2 and C3 pin the federation wording",
+          "disposition": "rejected",
+          "reason": "the figures live in site copy that follows the owner tier decision of 31 Oct 2026 (t542u, 31 Oct 2026 confirms the engine side), and a grep on a price would break on any later owner change; the build criterion C4 and the negative grep C3 are the checks, and the request records the figures"
+        },
+        {
+          "n": 2,
+          "severity": "low",
+          "how": "C4 runs npm ci and npm run build with network access, which this review did not run",
+          "disposition": "rejected",
+          "reason": "the build is the evidence at verify time; the review read memev-site #1 at b195278, where the C1 to C3 greps pass and the files named in scope exist, and made no claim about the build"
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Second review, of pull request #325 at head 79cbaae (the first, at ea7e95d, found the agent label, the manifest kinds, wrong paths and missing citations; each of those is fixed at this head). The engine decision is owner-confirmed (t542u, 31 Oct 2026). Checks run, and the only checks made: the spec hash equals specSha256 of the file at 79cbaae; every MV citation resolves to the cited line of docs/scope-one/programme/REQUIREMENTS.md or DECOMPOSITION.md and its text matches; every quoted SO-1.x, SO-2.x, SR and QL requirement is a verbatim stretch of the signed contract it cites; each verifier (grep pattern, file_exists path, wiring entry) was run against the tree it names (this tree, or the pull request head where the spec is for another repository); the request, tasks and manifest rows were read against the leak rules of this repository (the leak scan stays clean, and I also read by hand for agent and lane labels, which the scan does not catch); no duplicate of SO-1.01, SO-1.02, SO-1.04, SO-1.10, SO-1.11, SO-2.x, SR, QL, WBS or baseline section 8 was found. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Checked against memev-site pull request #1 at b195278: the constant, the \"not available today\" text and the absence of a Federated tier or plan on the plans page all hold. The tier decision is the owner decision of 31 Oct 2026 (t542u, 31 Oct 2026 for the engine side).",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MjdhOWNjMzk1NzgyYzIzMzdkYWM0NTU5N2Y3M2JlZDZlZDkwNGVmYjE0ZjBmODQ5MTBhZWIyN2Q3ZjRhNmMxYw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "FMM7bMQj3c75fcczMau4ifkWTXOZfDJy9j60+19YxaJdYHj2Ivt4GjxA5IVMON4i/PQ3nAE31yKjpCffnPqpDQ=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MjY1ZDBhYzgyNzk3YmJjMjk4ZTYwMTgxMmQwNDAyNmEwMDYyZTE1MzAwOTliNmUxYzRiYjNlOWE4YjJkNTVmNg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "TDZWa7TFULHZ8L62BBFKXhZ7Tfiv+3uStT9YJQKNQjNBLt0buPuWehu6hXue/uDyXFZUUWAOoptaAJs4dc9pDg=="
+          }
+        ]
+      }
+    }
+  ]
+}

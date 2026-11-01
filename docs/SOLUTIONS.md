@@ -212,7 +212,7 @@ Microsoft's own guidance calls oversharing the largest risk in a Copilot rollout
   that appear only in notes the token may not read. Before this change those names could leak
   through the graph.
 - Planned: departments, roles and path grants with deny by default, a separate index and graph per
-  scope, and "restricted" notes that the organisation's one AI provider does not receive.
+  scope, and "restricted" notes that the AI providers the organisation's policy allows do not receive.
 
 **Tier.** Business and Corporate (both coming) for roles and scopes.
 
