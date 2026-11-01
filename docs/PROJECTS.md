@@ -223,3 +223,11 @@ a writer that has gone stale, but the coordinator does not depend on it.
 
 The retry policies for external actions are read from a small local table until SO-03-A's policy
 module is on main; when it lands it is passed in as `policies`.
+
+## The execution history
+
+A task's history keeps four event kinds apart, and they are never merged into one: a requested action (`dispatch.requested`), an accepted dispatch (`dispatch.accepted`), an observed execution (`execution.observed`) and a verified outcome (`outcome.verified`). The order is requested, accepted, observed, verified, and each kind carries the resource it concerns, the time and a hash of its payload. The kinds and their check live in `src/engine/evidence.mjs`, and the project store refuses an event of these kinds that lacks one of the three fields.
+
+A provider's success response is not completion. The word accepted in `dispatch.accepted` is a dispatch event of the coordinator: the provider took the request. It is not the acceptance state of replicated operations, and it moves no task. A task leaves `IN_PROGRESS` for `VERIFYING` only after an `execution.observed` event under its current lease and generation, and the coordinator refuses the move with `NOT_OBSERVED` when there is none. A report is the observation of the work it carries, so a report under the current lease records one; a late or stale report records none. `VERIFIED` is reached only through the evidence rule above, and the coordinator then records `outcome.verified`. The four kinds are recorded when the coordinator runs with its lifecycle on.
+
+`memev work status <project>` (`--json` for the same fields as data) prints the project status and, for each task, how many times each kind was recorded, in plain words: asked for, taken on, seen running and confirmed. Only a confirmed task counts as done, so a task that was seen running is not done.

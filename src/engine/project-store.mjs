@@ -9,6 +9,7 @@ import path from 'node:path';
 import { readJson, writeJson, now, randomToken, exists, sha256 } from './util.mjs';
 import { findSecrets, redactSecrets } from './secrets.mjs';
 import { formatHlc, parseHlc, recordHash } from './oplog.mjs';
+import { EXECUTION_EVENT_KINDS, validateExecutionEvent } from './evidence.mjs';
 import { SUBJECT_TYPES } from './identity.mjs';
 
 // The current schema version. A store at an older version is migrated forward on open; a store at a
@@ -364,6 +365,11 @@ export class ProjectStore {
       if (data[f] === undefined || data[f] === null || data[f] === '') {
         throw new ProjectStoreError('invalid', `missing required field: ${f}`);
       }
+    }
+    // an execution event (requested, accepted, observed, verified) carries its resource, time and payload hash
+    if (ent.kind === 'event' && EXECUTION_EVENT_KINDS.includes(data.type)) {
+      const v = validateExecutionEvent(data);
+      if (!v.ok) throw new ProjectStoreError('invalid', `missing required field: ${v.reason}`);
     }
     const sv = def.scopeVersionField;
     if (sv && Object.hasOwn(data, sv) && !(Number.isInteger(data[sv]) && data[sv] > 0)) {

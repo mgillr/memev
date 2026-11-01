@@ -25,6 +25,7 @@
 // tests over a store double use.
 
 import { randomToken } from './util.mjs';
+import { payloadHash, observedUnderLease, requireObserved, executionStage, EXECUTION_EVENT_KINDS } from './evidence.mjs';
 import {
   transition, projectStatus, TASK_STATES,
   amendScope, reassign, pause, resume, requestCancellation, eligibleForDispatch, applyUpdate, EventLog,
@@ -66,6 +67,51 @@ export class Coordinator {
   // The exclusive set a task holds while in progress: its declared resources plus its declared
   // artifacts, since both are mutable and must not be written by two tasks at once.
   _lockSet(t) { return [...new Set([...(t.resources || []), ...(t.artifacts || [])])]; }
+
+  // ---- the execution history: requested, accepted, observed and verified are four event kinds that stay apart
+  // (evidence.mjs). They are recorded only with `lifecycle: true`, in the same log as the task moves.
+
+  // The resource an execution event concerns: the one the caller names, else the task's exclusive set, else the task id.
+  _resourceOf(taskId, task, explicit) {
+    if (typeof explicit === 'string' && explicit) return explicit;
+    const set = task ? this._lockSet(task) : [];
+    return set.length ? set.join(',') : taskId;
+  }
+  _execEvent(s, type, taskId, fields) {
+    const data = { type, task_id: taskId, time: this.now(), ...fields };
+    s.append({ type: 'task.event', entity: { kind: 'event', data } });
+    return data;
+  }
+  _execEvents(s) { return Object.values(s.snapshot('event')).filter((e) => EXECUTION_EVENT_KINDS.includes(e.type)); }
+
+  // executionEvents(taskId): the four kinds of one task, or of every task, in log order.
+  executionEvents(taskId = null) {
+    return this._execEvents(this.store).filter((e) => !taskId || e.task_id === taskId);
+  }
+
+  // The four kinds of each task, kept apart, as counts and the furthest kind reached.
+  _executionOf(ids) {
+    const events = this.executionEvents();
+    return Object.fromEntries(ids.map((id) => {
+      const x = executionStage(events, id);
+      return [id, { stage: x.stage, requested: x.requested.length, accepted: x.accepted.length, observed: x.observed.length, verified: x.verified.length }];
+    }));
+  }
+
+  // observe(lease, { resource, payload, actor }): record an execution.observed event under the lease. It is refused unless the
+  // lease is the task's current one. An observation alone moves no state; the report that follows does.
+  observe(lease, { resource, payload = null, actor } = {}) {
+    if (!this.lifecycle) return this._off();
+    return this._withWrite((s) => {
+      const l = s.snapshot('lease')[lease.id];
+      if (!l) return { ok: false, error: 'no_such_lease' };
+      const task = s.snapshot('task')[l.task_id];
+      if (!task) return { ok: false, error: 'no_such_task' };
+      if (l.status !== 'active' || l.generation !== task.generation) return { ok: false, stale: true, reason: 'lease_not_current' };
+      const event = this._execEvent(s, 'execution.observed', l.task_id, { lease_id: lease.id, generation: l.generation, resource: this._resourceOf(l.task_id, task, resource), payload_hash: payloadHash(payload), actor: actor ?? l.agent });
+      return { ok: true, event };
+    });
+  }
 
 
   // ---- the lifecycle: moves through project-state's table (only with `lifecycle: true`)
@@ -327,7 +373,7 @@ export class Coordinator {
     }
     const counts = {};
     for (const x of states) counts[x.state] = (counts[x.state] || 0) + 1;
-    return { project, status: projectStatus(states, { paused: !!proj.paused, cancelled: !!proj.cancelled }), paused: !!proj.paused, scope_version: proj.scope_version ?? 1, counts, tasks, eligible: this.eligible(project), ...(history ? { history: this.history().filter((e) => tasks[e.task_id]).slice(-100) } : {}) };
+    return { project, status: projectStatus(states, { paused: !!proj.paused, cancelled: !!proj.cancelled }), paused: !!proj.paused, scope_version: proj.scope_version ?? 1, counts, tasks, eligible: this.eligible(project), ...(history ? { history: this.history().filter((e) => tasks[e.task_id]).slice(-100), ...(this.lifecycle ? { execution: this._executionOf(Object.keys(tasks)) } : {}) } : {}) };
   }
 
   // verify(taskId, { actor, evidence }) is the only way to VERIFIED. Each evidence item names the criterion it
@@ -345,6 +391,7 @@ export class Coordinator {
       for (const e of ev) s.append({ type: 'evidence.upserted', entity: { kind: 'evidence', data: { task_id: taskId, criterion: e.criterion, scope_version: e.scopeVersion, artifact_hash: e.artifactHash, ref: e.ref } } });
       s.append({ type: 'task.upserted', entity: { kind: 'task', id: taskId, data: { ...task, status: r.view.state } } });
       this._logMoves(s, taskId, [r.record]);
+      this._execEvent(s, 'outcome.verified', taskId, { resource: this._resourceOf(taskId, task), payload_hash: payloadHash(task.artifact_hash ?? null), scope_version: task.scope_version ?? 1, actor });
       return { ok: true, state: r.view.state };
     });
   }
@@ -709,8 +756,19 @@ export class Coordinator {
       let status = 'DONE';
       let moved = [];
       if (this.lifecycle) {
+        // the move needs an execution.observed event under this lease and generation; a report is the observation of the
+        // work it carries, so it records one when the lease has none yet
+        const ref = { taskId: l.task_id, leaseId: lease.id, generation: l.generation };
+        const events = this._execEvents(s);
+        const observedNow = !observedUnderLease(events, ref);
+        const observed = observedNow
+          ? { type: 'execution.observed', task_id: l.task_id, time: t, lease_id: lease.id, generation: l.generation, resource: this._resourceOf(l.task_id, task, null), payload_hash: payloadHash({ output, artifacts, artifact_hash: result.artifact_hash ?? null }), actor: l.agent }
+          : null;
+        const guard = requireObserved(observed ? [...events, observed] : events, ref);
+        if (!guard.ok) return { ok: false, code: guard.code, reason: guard.reason };
         const c = this._chain(s, this._view(l.task_id, task), [[TASK_STATES.VERIFYING, { actor: l.agent, reason: 'work reported, awaiting evidence', correlationId: lease.id }]]);
         if (!c.ok) return { ok: false, code: c.code, reason: c.reason };
+        if (observedNow) s.append({ type: 'task.event', entity: { kind: 'event', data: observed } });
         status = c.view.state; moved = c.records;
       }
       s.append({ type: 'attempt.upserted', entity: { kind: 'attempt', id: attemptId, data: { task_id: l.task_id, lease_id: lease.id, agent: l.agent, status: 'ok', output, artifacts, at: t } } });
@@ -732,7 +790,14 @@ export class Coordinator {
       if (this.lifecycle && owner && this._project(s, owner.project).paused) return { ok: false, paused: true, sent: false, reason: 'the project is paused' };
       const existing = Object.values(s.snapshot('attempt')).find((a) => a.kind === 'dispatch' && a.key === key);
       if (existing) return { ok: true, sent: false, duplicate: true, result: existing.result ?? null };
+      const resource = this._resourceOf(taskId, owner, payload && typeof payload === 'object' ? payload.resource : undefined);
+      const hash = payloadHash(payload);
+      const lease = owner?.lease_id ? s.snapshot('lease')[owner.lease_id] : null;
+      const ref = { agent, key, ...(lease ? { lease_id: owner.lease_id, generation: lease.generation } : {}) };
+      if (this.lifecycle && owner) this._execEvent(s, 'dispatch.requested', taskId, { ...ref, resource, payload_hash: hash });
       const result = send ? send(payload) : { sent: true };
+      // a provider's answer is recorded as an accepted dispatch and nothing more: it moves no state and is not completion
+      if (this.lifecycle && owner && result?.ok !== false && !result?.error) this._execEvent(s, 'dispatch.accepted', taskId, { ...ref, resource, payload_hash: hash });
       const attemptId = `att_${randomToken(6)}`;
       s.append({
         type: 'attempt.upserted',
