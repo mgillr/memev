@@ -1,0 +1,154 @@
+{
+  "title": "PG-08.1 Scope One lifecycle gaps (intake to delivery) (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract for work package WP08 in memev: Scope One lifecycle gaps (intake to delivery). Proposed and unsigned; the signer signs it after the red-team gate. Source: the programme decomposition of 31 Oct 2026 (docs/scope-one/programme/WBS.md, docs/scope-one/programme/DECOMPOSITION.md, docs/scope-one/programme/fragments/WP08.json) and the owner notes behind docs/scope-one/programme/REQUIREMENTS.md. Depends on tasks outside this contract: WP07-03, WP10-03. Depends on contracts: SO-1.04, SO-1.10, SO-1.11, SO-2.08. Covers only what the Scope One contracts (SO-1.01 to SO-1.11) do not already cover; the mapping is in contracts/programme/manifest.json. Boundary with SO-1.04, SO-1.10 and SO-1.11: WP08-02 builds what SO-1.04 decides (the adapter contract) and WP08-03 builds the SO-1.11 steps that the signed SO-11-A loop does not name; the decision records are cited by requirement number and not restated. Boundary with SO-2.08: SO-2.08 holds the adapter and capability mapping for each framework and runtime; WP08-02 is the base execution adapter contract those adapters implement. Signed vault contract SO-11-A (cited by id only): the loop test with two stub sessions over the MCP stdio path, the failure matrix mapping, the load test and the invariant checker: WP08-03 reuses it and specifies only the SO-1.11 steps it does not name. Signed vault contract SO-05-B (cited by id only): per-client capability records: the adapter contract reads them and defines no second record. Signed vault contract SO-08-B (cited by id only): pause, resume, cancel and recovery through the capability record: the adapter contract carries the cancellation semantics it reads. Build layer (owner delegation, 1 Nov 2026): the signed fold contracts SO-A-03, SO-A-10 (cited by id; delivered by pull request #341, WBS.md section 9.2 on its branch) are the build layer. Each task below that overlaps them cites the fold id and keeps only what the fold does not cover. Tasks of this spec that name no fold contract have no fold overlap. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "tasks": [
+    {
+      "id": "WP08-02",
+      "title": "Provider-neutral execution adapter contract: the module and its conformance test (the gaps SO-1.04, SO-05-B and SO-08-B leave open)",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "MV-S1-05: Provider-neutral execution adapters: discovery, session lifecycle, dispatch, checkpoint, progress, cancellation, recovery. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:112; evidence docs/scope-one/programme/DECOMPOSITION.md:137; baseline 8.2)",
+        "SO-1.04 requirement 1: \"Define one adapter contract with declared capabilities, identity, session discovery, dispatch, progress/result reporting, checkpointing, cancellation semantics and recovery.\" (source: contract SO-1.04 T1)",
+        "SO-1.04 requirement 2: \"Keep provider-specific behaviour inside adapters; the planner and coordinator must consume capability declarations rather than provider-specific conditionals.\" (source: contract SO-1.04 T1)",
+        "SO-1.04 requirement 4: \"Never report successful completion merely because a provider returned a success-shaped response.\" (source: contract SO-1.04 T1)",
+        "SO-A-03 (signed fold contract, cited by id; pull request #341) owns the four execution event kinds requested, accepted, observed and verified, and the guard that observation precedes verification; this task cites it and does not restate it (source: pull request #341, WBS.md section 9.2)"
+      ],
+      "description": "Repo: memev. Specifies only what is not already specified. SO-1.04 decides the contract but is a design record and builds nothing; the per-client capability records are signed vault contract SO-05-B and the cancellation flow is signed vault contract SO-08-B (both cited by id; neither is delivered on main). This task builds the execution adapter contract module and the suite that any adapter must pass, reads capability from the SO-05-B record and defines no second record, and leaves the event distinction (SO-1.04 requirement 3) and the pause and cancel flow to those contracts. SO-2.08 holds the adapter for each framework and runtime that implements this contract. SO-A-03 builds the four event kinds of SO-1.04 requirement 3 (requested, accepted, observed, verified); this task builds none of them.",
+      "scope": [
+        "docs/ADAPTERS.md",
+        "src/engine/adapter-contract.mjs",
+        "test/adapter-contract.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "The adapter contract tests are red on the base and green after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/adapter-contract.test.mjs",
+            "cmd": "node --test test/adapter-contract.test.mjs"
+          }
+        },
+        {
+          "statement": "All eight named conformance tests are present",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"adapter contract: declares capabilities, identity and session discovery\" \"adapter contract: dispatch is accepted, not completed\" \"adapter contract: progress and result reporting\" \"adapter contract: checkpoint and recovery\" \"adapter contract: unsupported cancellation is reported unsupported, never confirmed\" \"adapter contract: a success-shaped response is not completion\" \"adapter contract: capability declarations, not provider conditionals, drive the coordinator\" \"adapter contract: two stub adapters pass the same conformance suite\"; do grep -qF \"$n\" test/adapter-contract.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The named conformance tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^adapter contract:' test/adapter-contract.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "docs/ADAPTERS.md names the six contract parts of SO-1.04 requirement 1 that are not capability records",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in discovery dispatch checkpoint progress cancellation recovery; do grep -qi \"$n\" docs/ADAPTERS.md || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The contract module never branches on a provider or client name, so provider-specific behaviour stays in adapters",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eq \"(client|provider|app|adapter) *={2,3} *['\\\"]\" src/engine/adapter-contract.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    },
+    {
+      "id": "WP08-03",
+      "title": "Lifecycle test: the SO-1.11 steps that the signed end-to-end loop does not name (blocker, revoked permission, conflicting edit, final report with receipts)",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "MV-S1-01: Outcome-to-delivery lifecycle: intake and scope, formal spec with approvals, contracts and work packages, resource choice, coordinated execution with recovery, verification against the original requirements, delivery with evidence and limits. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:108; evidence docs/scope-one/programme/DECOMPOSITION.md:133; baseline 8.2)",
+        "MV-S1-02: PMO-grade project workspace and a persistent lead-agent interface over canonical state. (source: owner notes of 31 Oct 2026, docs/scope-one/programme/REQUIREMENTS.md:109; evidence docs/scope-one/programme/DECOMPOSITION.md:134; baseline 8.2)",
+        "SO-1.11 requirement 9: \"A genuine blocker requiring human judgement is raised; the lead agent explains options, records the user's choice and updates affected work.\" (source: contract SO-1.11 T1)",
+        "SO-1.11 requirement 11: \"Revoke a required permission and confirm Memev safely pauses or reroutes affected work, then asks the user only if a new grant is necessary.\" (source: contract SO-1.11 T1)",
+        "SO-1.11 requirement 14: \"Reconcile a conflicting edit without silently losing work.\" (source: contract SO-1.11 T1)",
+        "SO-1.11 requirement 15: \"Produce a final report linking delivered artefacts, checks, evidence, decisions and outstanding limitations.\" (source: contract SO-1.11 T1)",
+        "SO-A-10 (signed fold contract, cited by id; pull request #341) owns the fifteen-step reference journey, the fault matrix F21 to F31 and the invariant checker over each fault log, with two stub sessions; this task cites it and does not restate it (source: pull request #341, WBS.md section 9.2)"
+      ],
+      "description": "Repo: memev. Specifies only the gap. The loop (two stub sessions over the MCP stdio path, disconnect recovery, a failed check, a scope amendment, pause and resume, a verified delivery summary), the concurrency load test, the baseline comparison and the no-false-verified invariant checker are signed vault contract SO-11-A (acceptance criteria 1 to 5, test/scope-one-e2e.test.mjs; cited by id, not delivered on main) and are not repeated here. SO-1.11 is the design record of the journey, SO-1.10 the fault classes. This test adds the SO-1.11 steps the loop does not name: requirements 9, 11, 14 and 15. Requirements 1 and 2 (connections) belong to SO-1.06, requirement 8 (the workspace) to SO-1.05 and requirement 16 (other configurations) is recorded in the SO-1.11 record. SO-A-10 owns the gate: the fifteen-step reference journey as one scenario with two stub sessions, the fault matrix and the invariant checker. This task keeps only the four SO-1.11 step assertions the journey does not assert one by one, reuses the stub sessions and the invariant checker from test/helpers and builds none of its own, and is dropped for any step that the journey of SO-A-10 asserts with the same outcome (the signer decides at signing).",
+      "scope": [
+        "test/lifecycle.test.mjs"
+      ],
+      "criteria": [
+        {
+          "statement": "The lifecycle test is red on the base and green after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/lifecycle.test.mjs",
+            "cmd": "node --test test/lifecycle.test.mjs"
+          }
+        },
+        {
+          "statement": "All five named SO-1.11 step tests are present",
+          "verifier": {
+            "type": "command",
+            "cmd": "for n in \"SO-1.11 R9: a blocker needing judgement is raised, the choice is recorded and affected work is updated\" \"SO-1.11 R11: a revoked permission pauses or reroutes affected work and asks only if a new grant is needed\" \"SO-1.11 R14: a conflicting edit is reconciled without losing either side\" \"SO-1.11 R15: the final report links artefacts, checks, evidence, decisions and limitations\" \"SO-1.11 R15: each delivered item carries a verification receipt (WP10-03)\"; do grep -qF \"$n\" test/lifecycle.test.mjs || exit 1; done",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The named step tests run and pass",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-name-pattern='^SO-1.11 R(9|11|14|15):' test/lifecycle.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The lifecycle test takes its stub sessions from test/helpers and defines none of its own",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -f test/lifecycle.test.mjs && grep -q \"helpers\" test/lifecycle.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing."
+      ]
+    }
+  ]
+}

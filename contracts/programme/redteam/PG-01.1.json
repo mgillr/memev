@@ -1,0 +1,88 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "PG-01.1",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "7ba24d174d78706a68e63d4bf1fcff732715862579c639d1aedc88857f121ecf",
+      "base_commit": "afdccd6413dca3c3715633696e3b7bf76ed9f6b9",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/scope-one/programme/REQUIREMENTS.md",
+            "sha256": "8b70ac41d38fe2f855bf9d74e1409358a1a89d6e68d571aea20186f15db81705"
+          },
+          {
+            "path": "docs/scope-one/WBS.md",
+            "sha256": "15f122b0a8bd47fea7591256767a5707b98578dfbfdf8dc197e57e1522e5ff91"
+          }
+        ]
+      },
+      "manifest_kind": "evidence",
+      "verdict": "findings",
+      "answers": [
+        {
+          "n": 1,
+          "severity": "high",
+          "how": "the spec says 4 tests in security/tests/test_byzantine_fault_injection.py fail on main and need triage before an E4 contract is signed, and it carries an E4 trust criterion; I found no record that the triage is done (the fail-closed E4 pull request is open for owner review, not merged), so the spec states its own precondition as unmet",
+          "disposition": "rejected",
+          "reason": "The precondition is met, not the spec weakened. The spec now states the triage as resolved and cites crdt-merge pull request #181 merged to main as 252c93e6. I checked on the code host that #181 is merged to main with that merge commit and that its title names #179 and #180; I did not run the four tests. No criterion is added because the E4 caveat was text, and the trust criteria are unchanged."
+        }
+      ],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Third review, of pull request #325 at head afdccd6 (the second, at 79cbaae, found the weak criteria and the open layer question; the criteria are tightened and the layer is decided by owner delegation of 1 Nov 2026, as DECISIONS.md records). The engine decision is owner-confirmed (t542u, 31 Oct 2026). Checks run, and the only checks made: the spec hash equals specSha256 of the file at the reviewed head; every MV citation resolves to the cited line of docs/scope-one/programme/REQUIREMENTS.md or DECOMPOSITION.md and its text matches; every quoted SO-1.x, SO-2.x, SR and QL requirement is a verbatim stretch of the signed contract it cites; each verifier (grep pattern, file_exists path, wiring entry) was run against the tree it names (this tree, or the pull request head where the spec is for another repository); the request, tasks and manifest rows were read against the leak rules of this repository (the leak scan stays clean, and I also read by hand for agent and lane labels, which the scan does not catch); no duplicate of SO-1.01, SO-1.02, SO-1.04, SO-1.10, SO-1.11, SO-2.x, SR, QL, WBS or baseline section 8 was found. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Otherwise it passes: WP01-06 still names the file that crdt-merge #179 adds, and the caveat text is the only change since 79cbaae. Not signed until the triage is recorded as done, or the owner says otherwise.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZDdiZGUwY2RlMmY4NDAzMDU2OTNhMGQwMWU5ZTEwZjFhZGI1NTcyMTM0ZmNhYWRhOWZjOTE3OWZmOTQwMjcyMg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "6OMVyf8qBWeCETEGwhUEoCX/QZci4fdGqV5KY66Q0sUxJ671keG8g88+2vtdaKNqyxqB1/IODt3EZO7SacopDQ=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "c5b2bb3aa82df8e4b896d52d14c1031d8f63a72e38a2944df3896c04f313839d",
+      "base_commit": "2df1272008a9f32d2c69d130003a0d521b846d2d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "docs/scope-one/programme/REQUIREMENTS.md",
+            "sha256": "84e62695045dedc65095f75fe25dd7982846dcf2bd8b0b5b351a4da17693041b"
+          },
+          {
+            "path": "docs/scope-one/WBS.md",
+            "sha256": "77a1f842357671ba8ff0ab85f9b91d4023d09aef08eba052f0b135d19c6688aa"
+          }
+        ]
+      },
+      "manifest_kind": "evidence",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), and the reviewer is the signer, not the author of the spec. Fourth review, of the merged tree of pull requests #325 and #340 at the reviewed head. Round 1 (afdccd6) held one high answer, that the spec stated its own E4 triage precondition as unmet. Commit a7a2228 of #325 changes only the description of WP01-06 and states the triage as resolved by crdt-merge #181 (main 252c93e6); the diff of the spec between afdccd6 and the reviewed head is that one description and nothing else, so no criterion, requirement, stop rule or scope changed. Checks run, and the only checks made: the spec hash equals specSha256 of the file on disk at the reviewed head; every task drafts through makeTask; every command criterion parses with sh -n; every grep pattern compiles as a regular expression; no criterion statement repeats within a task; every test_red_green command names its own test file and that file is inside the task scope; every MV citation resolves to a line of docs/scope-one/programme/REQUIREMENTS.md, DECOMPOSITION.md or WBS.md; every fold id the spec cites (SO-A, SO-F) matches the title of a signed contract under contracts/signed; every SO, SR, QL and PG spec id it names resolves to a spec file; I read the request, task descriptions and requirements by hand for agent, lane and seat labels (a word search for agent, lane and seat labels finds none) and the leak scan stays clean. All passed. I did not read the vault contracts the specs cite by id only (this repository cannot show them), and I did not run the builds or tests of any other repository. Nothing high.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MWUwZDE0ZTQxMDk5ZDdmYjI2ZjA0YzlmNGM1NTVkNjAwNDFmYzRiMDc1N2QwYjkzNTUzN2YxYWQxNzZmNzZkNw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "0DLjX0RpwbFWHz4WGbEK27AEv1LlPK+PCkrkGwfvvj5mo4h0RDQxC4mqo/G25ojvsE7brk1qbOyJXpQStZ+6Dg=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NWJjOTg5M2M0YWZhMzQ5NWRjYThjM2YzMzgyM2ZhOTlmNzhjZmM2YTI5MTA5OWJlNzZiMzEzODk2MWFmNjlkNg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "Oys6DgD/xsqOG5bs6kEgMrJ9A01LmjW4obGEVVFu9xzjhdOm/9ingHoRMkgJ1sk4fATGNVC2u53l8s+7NpQgBw=="
+          }
+        ]
+      }
+    }
+  ]
+}

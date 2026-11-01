@@ -7,7 +7,7 @@
 //        node scripts/gate/redteam-gate.mjs --report [spec.json ...]  exit 0 unless a record is malformed, a record
 //                                                                     claims clean on a changed spec, or a signed
 //                                                                     contract has no SIGNABLE record
-// With no spec named, every .json file under contracts/seed-readiness/specs/, contracts/quality-loop/specs/ and contracts/scope-one/specs/.
+// With no spec named, every .json file under contracts/seed-readiness/specs/, contracts/quality-loop/specs/, contracts/scope-one/specs/ and contracts/programme/specs/.
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { gate } from '../../src/engine/redteam-gate.mjs';

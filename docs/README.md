@@ -100,6 +100,7 @@ The record a builder takes over with: what exists, what is missing, and the orde
 | [scope-one/REQUIREMENTS.md](scope-one/REQUIREMENTS.md) | the full requirement register, one row per requirement |
 | [scope-one/TRACEABILITY.md](scope-one/TRACEABILITY.md) | each requirement traced to code, contract, dependency and test |
 | [scope-one/INVENTORY.md](scope-one/INVENTORY.md) | every branch, contract and source, with status and disposition |
+| [scope-one/design/artefact-history-and-previews.md](scope-one/design/artefact-history-and-previews.md) | SO-1.09 design record: artefact history, comparison and previews, and what is open |
 | [scope-one/BASELINE.md](scope-one/BASELINE.md) | the commit, working tree and test run the record is taken from |
 | [scope-one/DEPENDENCIES.md](scope-one/DEPENDENCIES.md) | the build-order edges between contracts |
 | [scope-one/DECISIONS.md](scope-one/DECISIONS.md) | the open ADRs, the decided ones (engine boundary, tiers) and the questions only the owner can answer |
@@ -107,6 +108,7 @@ The record a builder takes over with: what exists, what is missing, and the orde
 | [scope-one/programme/README.md](scope-one/programme/README.md) | the programme requirements, work packages and proposed contracts (unsigned) |
 | [scope-one/SLICE-PLAN.md](scope-one/SLICE-PLAN.md) | the ordered slices and the deferred work |
 | [scope-one/WBS.md](scope-one/WBS.md) | the work breakdown: every requirement, contract, pull request and branch once, with its status and owner |
+| [scope-one/design/decision-queue.md](scope-one/design/decision-queue.md) | SO-1.08 design record: the decision queue, its states and fields, and what is open |
 | [scope-one/design/organisational-knowledge-model.md](scope-one/design/organisational-knowledge-model.md) | the SO-2.01 decision record: the organisational knowledge model, with its open owner decisions |
 | [scope-one/design/permission-aware-knowledge-access.md](scope-one/design/permission-aware-knowledge-access.md) | the SO-2.02 decision record: permission-aware knowledge access, with its open owner decisions |
 | [scope-one/design/provenance-retention-invalidation.md](scope-one/design/provenance-retention-invalidation.md) | the SO-2.03 decision record: provenance, retention and invalidation, with its open owner decisions |
