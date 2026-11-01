@@ -579,19 +579,19 @@ export class Vault extends EventEmitter {
     return this.coordinator(id).status(id, { history });
   }
 
-  /** A read-only view of one project for `memev work impact`, read from the project's files with no vault opened and nothing written:
-   *  opening the vault or its project store beside a running daemon rewrites snapshots, the graph and the op log, and may cut a torn
-   *  last line of the event log, so this reads the event log alone and applies each record as the store does. The result is a frozen
-   *  object whose only function reads a kind of record and returns a copy; it has no write method and does not hand out the store.
-   *  Null for a project with nothing recorded. */
-  static readProject(root, project) {
-    if (!project) throw new VaultError('bad_request', 'a project name is needed');
-    const file = path.join(root, STATE, 'projects', slug(project), 'events.jsonl');
+  /** A read-only reader of one project for `memev work impact`: a frozen object whose one member, snapshot(kind), returns a copy of the
+   *  records of that kind. It needs a credential that may read, and is null for a project with no event log (none is created). It
+   *  reads the project's event log and applies each record as the project store does, and never opens that store: opening it
+   *  rewrites its snapshots and cuts a torn last line, which another process may be in the middle of writing. A line not yet
+   *  finished is skipped, never cut. The reader has no write method and does not hand out the store. */
+  tasksReader(identity, project) {
+    this._need(identity, 'read', null);
+    const file = path.join(this.root, STATE, 'projects', this._projectId(project), 'events.jsonl');
     if (!fs.existsSync(file)) return null;
     const entities = new Map();
     for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
       if (!line) continue;
-      let rec; try { rec = JSON.parse(line); } catch { continue; } // a line the writer has not finished is skipped, never cut
+      let rec; try { rec = JSON.parse(line); } catch { continue; }
       if (rec.refused || !rec.entity) continue;
       const { kind, id, data } = rec.entity;
       if (!entities.has(kind)) entities.set(kind, new Map());
