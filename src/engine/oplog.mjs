@@ -15,6 +15,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { sha256, readJson, writeJson, now } from './util.mjs';
+import { mergeContractHash } from './envelope.mjs';
+import { oplogRecordToEnvelope, LOCAL_MERGE_CONTRACT } from './envelope-adapters.mjs';
 
 const CHUNK = 1 << 20;
 const segName = (n) => `seg-${String(n).padStart(6, '0')}.jsonl`;
@@ -67,13 +69,18 @@ export function recordHash(rec) {
 }
 
 export class OpLog {
-  constructor(dir, { segmentBytes = 16 * 1024 * 1024, snapshotEvery = 1000, fsync = true, deviceId = null } = {}) {
+  constructor(dir, { segmentBytes = 16 * 1024 * 1024, snapshotEvery = 1000, fsync = true, deviceId = null, mergeContract = LOCAL_MERGE_CONTRACT, envelopes = true } = {}) {
     this.dir = dir; this.segmentBytes = segmentBytes; this.snapshotEvery = snapshotEvery; this.fsync = fsync;
     this.heads = new Map(); this.seq = 0; this.sinceSnapshot = 0; this.fd = null; this.recovered = [];
     // Each record names the device that wrote it and carries a hybrid logical clock, so logs from
     // several devices can later be merged in a deterministic order. Records written before this
     // (no dev, no hlc) stay valid: the hash covers only the fields a record has.
     this.deviceId = deviceId; this.clock = { ms: 0, c: 0 };
+    // Every append also builds the operation envelope of the record it wrote (docs/OPERATION-ENVELOPE.md), under the merge
+    // contract given here. The envelope is held in memory only: `lastEnvelope` is the one of the latest append, and nothing of it
+    // is written to the log. A record that cannot be an envelope is still written (the log is the authority); it is counted.
+    this.mergeContractHash = mergeContractHash(mergeContract); this.envelopes = envelopes !== false;
+    this.lastEnvelope = null; this.envelopeFailures = 0; this.lastEnvelopeError = null;
   }
 
   /** The next hybrid logical clock value: wall-clock milliseconds, plus a counter when time stalls or goes back. */
@@ -154,9 +161,15 @@ export class OpLog {
     if (this.fsync) fs.fdatasyncSync(this.fd);
     const a = this.active; a.bytes += Buffer.byteLength(line); a.last = rec.seq; if (!a.first) a.first = rec.seq;
     this._apply(rec);
+    if (this.envelopes) this._buildEnvelope(rec);
     if (++this.sinceSnapshot >= this.snapshotEvery) this.snapshot();
     if (a.bytes >= this.segmentBytes) this.roll();
     return rec;
+  }
+
+  _buildEnvelope(rec) {
+    try { this.lastEnvelope = oplogRecordToEnvelope(rec, { mergeContractHash: this.mergeContractHash }); this.lastEnvelopeError = null; }
+    catch (e) { this.lastEnvelope = null; this.envelopeFailures++; this.lastEnvelopeError = e.message; }
   }
 
   roll() {
