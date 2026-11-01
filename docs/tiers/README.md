@@ -46,7 +46,7 @@ Services, remote and onsite work, travel and response times are in [services.md]
 
 Planned add-ons and services, and the custom module use cases, are in [the add-ons roadmap](../roadmap/add-ons.md).
 
-## Several sites and federation (foundations partial; multi-node operation planned)
+## Several sites and federation (planned)
 
 Some local federation foundations are implemented: signed contribution validation, two-step
 admission, relationship records and deny-by-default policy evaluation. These are local primitives,
