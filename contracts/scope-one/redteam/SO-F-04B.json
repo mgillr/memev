@@ -1,0 +1,52 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SO-F-04B",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "723c1a05a5697c1711cdc0d2743bfd9bdc8fb8bd089b7b5c69da468cdc41d718",
+      "base_commit": "81f61e3e382527b7f05519ce2d1aff82cdc45cea",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/federation/admission.mjs",
+            "sha256": "49ee79820656d77c1bdc7cfa6c3cc80e6278181700810ad35c80eb52a0f7784a"
+          },
+          {
+            "path": "src/engine/federation/contribution.mjs",
+            "sha256": "1133539a02ce8433989a4c97e45bfb7bb97e007efd9affe832a21d879f1b3670"
+          },
+          {
+            "path": "src/engine/federation/membership.mjs",
+            "sha256": "ce0fc9d3a1775904f8457b139ecc15ed2b689c0731d0935e25c2246456c82fb3"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM RECORD, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026), so this record is signed with the interim reviewer key on the owner's standing decision. The review itself was made by ASTL Team, the reviewer of record for pull request #374, over three rounds: rounds 1 and 2 at 190fab1, four text fixes folded in after them, and a third round that confirmed the head 81f61e3. ASTL Team approved the pull request and reported to the signer that the double-admit is closed, that AC19 and five adversarial interleavings pass, that every round-2 item is closed, and that the gate and scans are clean. This record states that approval as a clean verdict on SO-F-04B at the spec hash of 81f61e3 (723c1a05a569); the findings of rounds 1 and 2 are in the thread of the pull request and are not repeated here. Checks the signer ran on the spec at 81f61e3: the spec drafts through makeTask; it has 1 task and 15 criteria, the number the manifest row states; the manifest kind is feature and the implement task has a mandatory test_red_green criterion that runs its own test file; every command parses with sh -n; no criterion statement repeats within a task; every grep pattern compiles and is within 200 characters; every depends_on is a row of the Scope One or programme manifest. I did not run npm test. No finding is open.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MzUwN2Q5NzNkNzU5NzdlNjM2OTcxOTcwYTdkYWE3YzI5MTUwYWU3MzBmZDc2ZTY4OThiNGY5MWRkYzZmNDg2MA==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "jt1SLRtLr6MUyQZwL6da5mCoxl75M6TCNmwl++ZZf0ETssuM+IbAfudhYFC8yMU/a9gY7pmyWVbkOyJecJpUCQ=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NDFlNGRjNThjNzU3YjBmNWRiMDYzY2ExMWE2NzcwYzhiZGZiMmQ3NTFiOTllMTA0ZDc2YWEzYWQ0Yjg1NzY4Nw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "ErKZkupyIFXXxC7b1slEyxsgifJ3G7HvTk94Nkcg44hs07ZRZIpR/SfWWgF1bP4TPenbvi+ga+qWuXLpY638Cw=="
+          }
+        ]
+      }
+    }
+  ]
+}
