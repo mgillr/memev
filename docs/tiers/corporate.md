@@ -15,7 +15,7 @@ home vault never crosses into it: separate identities and keys, with no grants, 
 Anyone who leaves loses all vault access: access ends, keys are revoked, devices are removed, the
 local cache is wiped and what they synced stays in the main vault.
 
-A licence counts once per organisation, by person and by computer. Corporate has no public price:
+The terms of a Corporate licence are agreed with you. Corporate has no public price:
 contact us. Organisations that are on-premises, air-gapped or led by compliance get a sales-assisted
 pilot rather than a self-serve trial. The trial terms: [BUSINESS-TRIAL.md](../BUSINESS-TRIAL.md).
 
@@ -75,7 +75,7 @@ The same chart, next to Personal and Business, is in [ARCHITECTURE.md](../ARCHIT
 
 ## Limits
 
-- The number of computers comes from your licence, checked offline with no call home. Air-gapped
+- The number of computers comes from the agreement you are issued a licence under, checked offline with no call home. Air-gapped
   installs work the same way.
 - Everything above is planned. An offer for any of it will carry a delivery date and acceptance
   checks.

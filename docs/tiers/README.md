@@ -8,14 +8,19 @@ three tiers: [ARCHITECTURE.md](../ARCHITECTURE.md#the-three-tiers).
 > free. Personal with more computers has a set price. Business and Corporate are coming and have no
 > public price: contact us. See [PRICING.md](../PRICING.md).
 
-There are four tiers: Personal (one computer), Personal with more computers, Business and Corporate.
+The tier decision of 31 October 2026 ([DECISIONS.md](../scope-one/DECISIONS.md)): the free core, Personal at
+$12/month or $120/year for up to 3 computers, and contact us for anything above. There is no Federated tier.
+The columns below keep the names the app and the licence use today: Personal is the free core, and
+Personal with more computers is the paid Personal tier. Business and Corporate are the contact-us tiers.
+
+There are four columns: Personal (one computer), Personal with more computers, Business and Corporate.
 There is no Team tier. Teammates belong on the business side: an org admin invites members into the
 company vault.
 
 | | [Personal](free.md) | [Personal with more computers](free.md#personal-with-more-computers-draft) | [Business](business.md) | [Corporate](corporate.md) |
 |---|---|---|---|---|
 | For | one person, one computer at a time | one person, several computers at once | a company: all members' work data in one company vault that the company can see and search | the same model as Business, at larger scale, with one main corporate vault |
-| How it is counted | one computer | up to 3 computers | once per organisation, by person and by computer | once per organisation, by person and by computer |
+| How it is counted | one computer | up to 3 computers | contact us | contact us |
 | Where Memev runs | your computer, backed up to your own GitHub | your computers | a server in your office or your cloud account, or cloud-hosted on a host the operator manages ([deploy-cloud.md](../deploy-cloud.md), [deploy-on-prem.md](../deploy-on-prem.md); both coming) | your data centre or private cloud, more than one server (coming) |
 | Who can see what | you | you | the company, through the admin console, sees and searches everything in the company vault (coming) | the same, plus your identity provider's groups (coming) |
 | AI apps and models | several cloud AI apps side by side (Claude, ChatGPT; more coming soon) and local coding tools via MCP | the same, on each computer | ONE AI provider for the organisation: one cloud AI service or an on-premises LLM, over MCP (coming) | the same, with an air-gapped on-premises option (coming) |

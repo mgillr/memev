@@ -155,12 +155,12 @@ const crit = { type: 'array', description: 'Acceptance criteria: { statement, ve
 tool('memev_contract_draft', 'Draft a task contract: tasks with acceptance criteria that can be checked by a machine. Sign it to bind yourself to it.', S({ title: str('What the work is'), project: str('Project'), workdir: str('Directory the criteria run in (a repository path on this machine)'), tasks: { type: 'array', items: { type: 'object', properties: { id: str('T1'), title: str('Task'), scope: arr('Paths the task may change'), criteria: crit, depends_on: arr('Task ids') } } } }, ['title', 'tasks']), (v, a, c) => ({ data: v.contractDraft(c.identity, { ...a, client: c.client }) }));
 tool('memev_contract_sign', 'Sign a drafted contract with this machine\'s key. A signed contract cannot be edited; until memev_contract_verify passes, it stays open and this session is reminded before it stops.', S({ id: str('Draft id'), session: str('Your session id, if you know it') }, ['id']), (v, a, c) => ({ data: v.contractSign(c.identity, { id: a.id, client: c.client, session: a.session || c.session, local: c.local }) }));
 tool('memev_contract_approve', 'Approve a remote-signed contract so its command criteria may run on this machine. Local operator action only.', S({ id: str('Contract id') }, ['id']), (v, a, c) => ({ data: v.contractApprove(c.identity, { id: a.id, local: c.local }) }));
-tool('memev_contract_verify', 'Check the signature and re-run every acceptance criterion on this machine. Records a receipt in the vault and returns PASS/FAIL per task and what is left. Only an all-PASS result closes the contract.', S({ id: str('Contract id') }, ['id']), (v, a, c) => {
+tool('memev_contract_verify', 'Check the signature and re-run every acceptance criterion on this machine. Records a receipt in the vault and returns PASS/FAIL per task and what is left. Only an all-PASS result closes the contract.', S({ id: str('Contract id') }, ['id']), async (v, a, c) => {
     // the verify is what feeds the project tasks tied to this contract (SR-1.27, SR-1.30): their scope version and artifact hash
     // are read before the checks run, and a pass or a failure is applied to them after, through the state machine
     const sig = v.contractCheckSignature(a.id);
     const bindings = sig.ok ? v.tasksBindings(a.id, sig.contract) : [];
-    const data = v.contractVerify(c.identity, { id: a.id, client: c.client }, { local: c.local });
+    const data = await v.contractVerify(c.identity, { id: a.id, client: c.client }, { local: c.local });
     if (bindings.length && Array.isArray(data.tasks)) data.tasks_verified = v.tasksFeedVerify(a.id, bindings, data.tasks, data);
     return { data };
   });
