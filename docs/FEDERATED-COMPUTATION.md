@@ -113,7 +113,7 @@ encryption, access controls and output review.
 | Memev | work specification, project/programme context, participant coordination, policy, identity binding, approvals, lifecycle, evidence and result distribution |
 | Compute runtime | executes the authorised workload on selected resources |
 | Federated algorithm | defines training, optimisation, analytics or aggregation semantics |
-| crdt-merge | convergence of supported replicated state and contributions under its defined contract; the engine is in its own repository under its original licence, currently BSL 1.1, never vendored into Memev and called as an external dependency ([CONVERGENCE.md](CONVERGENCE.md)) |
+| crdt-merge | convergence of supported replicated state and contributions under its defined contract; the engine is in its own repository under the Business Source License 1.1 (BSL 1.1), and Memev (Apache-2.0) uses it only through its call-out boundary, never vendored ([CONVERGENCE.md](CONVERGENCE.md)) |
 | The admission service (planned) | accountable admission, reconciliation and reconstruction of supported contributions and evidence |
 | The trust service (planned) | trust governance across participants, operators, devices and services |
 | Data-local adapters (planned) | expose approved computation to local data without granting general export access |
@@ -139,7 +139,7 @@ failure semantics and measurable acceptance tests before it is represented as im
 ## Status and staged validation
 
 1. **Current foundation (built):** local Memev execution, MCP, communications bus, contracts,
-   device identity and the external merge boundary. Planned beside them: the project state machine
+   device identity and the merge call-out boundary. Planned beside them: the project state machine
    (code present in `src/engine/project-state.mjs`, not wired) and the one company vault of
    Business.
 2. **Next integration work:** durable work specifications, remote execution contracts, node

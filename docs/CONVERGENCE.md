@@ -61,8 +61,9 @@ The engine's research basis is described in the paper *Conflict-Free Replicated 
 Neural Network Model Merging: A Two-Layer Architecture* (arXiv:2605.19373), which addresses
 neural-network model merging. It is a specific implementation and architecture, not a claim on the
 general CRDT idea. The licence facts above do not change with it: crdt-merge stays in its own
-repository under its original licence, currently BSL 1.1, never vendored into Memev and called as
-an external dependency, and only licence information passes between an install and our side.
+repository under the Business Source License 1.1 (BSL 1.1), Memev (Apache-2.0) uses it only through
+its call-out boundary, it is never vendored, and only licence information passes between an install
+and our side.
 
 What Memev calls today is narrower than that research: the boundary in
 [EXTENSION-POINTS.md](EXTENSION-POINTS.md) hands the engine two versions of one note and their

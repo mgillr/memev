@@ -44,7 +44,7 @@ view is only as broad as the participants authorise.**
 ## What Federation adds to the existing architecture
 
 The current local vault, daemon, MCP interface, communications bus, contracts, device identity,
-access tokens, audit trail and external convergence boundary remain the foundations. The project
+access tokens, audit trail and the convergence call-out boundary remain the foundations. The project
 state machine is planned: its code is present in `src/engine/project-state.mjs` and nothing imports
 it yet ([PROJECTS.md](PROJECTS.md)). Federation is planned to add relationships and protocols
 around those foundations:
@@ -86,6 +86,11 @@ Federation is a planned capability of Corporate, and of a Business licence whose
 includes the multi-site federation design ([tiers/services.md](tiers/services.md)), not a tier.
 
 ## Topology
+
+Memev is local-first, and the cloud acts only as a relay and a backup ([RELAY.md](RELAY.md)).
+Federation keeps that: each site's node holds its own memory, and there is no central memory server
+or central coordinator on which every site depends. This page is the single description of the
+topology; other pages link here rather than restate it.
 
 The planned federation does not require a single topology. Deployment designs may include:
 
@@ -163,9 +168,10 @@ Federation must distinguish source ownership from the ability to participate in 
   stays the single-writer backup of the whole local vault for Personal and for the one-node
   Business, and there are no per-scope git repositories.
 
-The convergence engine is crdt-merge. It lives in its own repository under its original licence,
-currently BSL 1.1, it is never vendored into Memev, and Memev calls it as an external dependency;
-only licence information passes between an install and our side ([CONVERGENCE.md](CONVERGENCE.md)).
+The convergence engine is crdt-merge. It lives in its own repository under the Business Source
+License 1.1 (BSL 1.1); Memev (Apache-2.0) uses it only through its call-out boundary, it is never
+vendored, and only licence information passes between an install and our side
+([CONVERGENCE.md](CONVERGENCE.md)).
 Its current Memev boundary is narrower than the federation target: today's boundary hands the
 engine two conflicting versions of one note and their common base
 ([EXTENSION-POINTS.md](EXTENSION-POINTS.md)). Extending the contract to structured project,
@@ -175,9 +181,15 @@ separate schemas, authority rules, tests and integration work, all planned.
 The trust service and the admission service have distinct roles, and both are planned adapter
 boundaries beside the merge boundary, named generically until they are published. The admission
 service concerns accountable admission and reconstruction of contributions and evidence under its
-defined protocol. The trust service concerns distributed trust governance. Neither should be
-described as a universal storage layer or as guaranteeing that every record is synchronised
-everywhere.
+defined protocol, for the signed contributions that need it; it complements convergence and does not
+replace it. The trust service concerns distributed trust governance across people, agents, devices,
+services and sites. The admission path reads trust only as an eligibility input: trust does not
+replace identity, access policy, data classification or independent evidence. Where an external
+admission service is configured, it runs before the node's own admission and before any append.
+Neither service should be described as a universal storage layer or as guaranteeing that every record
+is synchronised everywhere. If the convergence, admission or trust service is unavailable, the node
+keeps its local history, reports the degraded capability, and does not claim a guarantee it could not
+establish.
 
 ## Partitions, offline operation and recovery
 
@@ -240,15 +252,19 @@ A release claiming a federation capability must demonstrate, at minimum:
 7. stale and unavailable remote information is visibly distinguished from live information;
 8. policy applies to derived data, indexes, caches, logs, backups and recovery copies;
 9. failure of an optional regional service does not stop direct paths that are designed to operate independently;
-10. recovery and reconciliation are tested against documented RPO/RTO targets.
+10. recovery and reconciliation are tested against documented RPO/RTO targets;
+11. no site depends on a central memory server or central coordinator for ordinary updates: with every
+    other site unreachable, a site's local work and its recovery from its own permitted state continue;
+12. when the convergence, admission or trust service is unavailable, the node reports degraded
+    capability, keeps local history and claims no guarantee it could not establish.
 
 ## Status
 
 - **Built:** local vault and daemon, MCP integration, device credentials, optional remote access,
-  communications bus, work contracts and the external merge boundary.
+  communications bus, work contracts and the merge call-out boundary.
 - **Planned:** the project state machine (code present, not wired), the one company vault of
-  Business and the main corporate vault of Corporate (the one-node case), the external convergence
-  service, and the trust service and admission service adapter boundaries.
+  Business and the main corporate vault of Corporate (the one-node case), the convergence
+  service behind its call-out boundary, and the trust service and admission service adapter boundaries.
 - **Architectural target (planned):** multi-site federation, cross-organisation federation, full
   structured state convergence and sovereign recovery.
 - **Research and extension areas (planned):** federated computation and federated learning.

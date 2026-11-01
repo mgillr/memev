@@ -19,11 +19,6 @@ this folder links back here, and this page links down to every page.
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | what runs today, and the Personal, Business and Corporate charts |
 | [MODULES.md](MODULES.md) | the module interdependency map, generated from the real imports |
-| [ARCHITECTURAL-INTERDEPENDENCIES.md](ARCHITECTURAL-INTERDEPENDENCIES.md) | how the current components fit together, and what the planned federation capabilities depend on |
-| [FEDERATION.md](FEDERATION.md) | planned: independently operated site nodes, membership, replication and cross-organisation boundaries |
-| [ORGANISATIONAL-INTELLIGENCE.md](ORGANISATIONAL-INTELLIGENCE.md) | planned: a work graph across people, projects, programmes, portfolios and functions |
-| [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) | planned: distributed execution, analytics, optimisation, evaluation and federated learning across sites |
-| [DATA-SOVEREIGNTY.md](DATA-SOVEREIGNTY.md) | planned: jurisdiction-aware data, derived information, replication and recovery |
 | [DESIGN.md](DESIGN.md) | the log, the index, recall, memory quality, the graph, scale |
 | [MAPPING.md](MAPPING.md) | everything Memev does without being asked |
 | [BUS.md](BUS.md) | the comms bus: seats, the lead, roster, comms checks, tasks |
@@ -52,7 +47,7 @@ this folder links back here, and this page links down to every page.
 
 | Page | What it holds |
 |---|---|
-| [tiers/README.md](tiers/README.md) | the four tiers side by side, what is built and what is planned, several sites and federation (planned) |
+| [tiers/README.md](tiers/README.md) | the four tiers side by side, what is built and what is planned |
 | [tiers/free.md](tiers/free.md) | Personal, one computer, free; Personal with more computers |
 | [tiers/business.md](tiers/business.md) | Business (coming) |
 | [tiers/corporate.md](tiers/corporate.md) | Corporate (coming) |

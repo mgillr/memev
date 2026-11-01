@@ -238,7 +238,7 @@ flowchart LR
     a <-->|"authorised state, planned"| b
     b <-->|"authorised state, planned"| c
     a <-->|"authorised state, planned"| c
-    engine["crdt-merge convergence engine<br/>separate repository, external dependency<br/>(paid, planned): converges authorised state"]
+    engine["crdt-merge convergence engine<br/>separate repository, BSL 1.1, call-out boundary<br/>(paid, planned): converges authorised state"]
     regional["Regional service (planned)<br/>routing, discovery, permitted caching;<br/>never the owner of a site's memory"]
     a & b & c <-.-> engine
     a & b & c -.-> regional

@@ -82,7 +82,7 @@ flowchart TB
     exchange --> intelligence
   end
   subgraph engines["External and workload-specific mechanisms"]
-    merge["crdt-merge<br/>supported state convergence<br/>(external engine, its own repository)"]
+    merge["crdt-merge<br/>supported state convergence<br/>(its own repository, BSL 1.1, call-out boundary)"]
     admission["The admission service (planned)<br/>accountable contribution admission"]
     trust["The trust service (planned)<br/>trust governance"]
     runtime["Compute runtimes + workload algorithms (planned)"]
