@@ -22,6 +22,7 @@ import { attach as attachContracts, installVaultHooks } from './contracts.mjs';
 import { assess, DEFAULT_GATE } from './quality.mjs';
 import { STATE, isVault } from './vault-marker.mjs';
 import { ProjectStore } from './project-store.mjs';
+import { SCHEMA_VERSION } from './project-store.mjs';
 import { Coordinator } from './coordinator.mjs';
 import { resolveRequest, vaultScope } from './identity.mjs';
 
@@ -588,6 +589,38 @@ export class Vault extends EventEmitter {
     const id = this._projectId(project);
     if (!fs.existsSync(path.join(this.root, STATE, 'projects', id, 'events.jsonl'))) return null;
     return this.coordinator(id).status(id, { history });
+  }
+
+  /** A read-only reader of one project for `memev work impact`: a frozen object whose one member, snapshot(kind), is frozen too and
+   *  returns a copy of the records of that kind. It needs a credential that may read. It is null for a project that has neither
+   *  a meta.json nor an event log (none is created), and an empty reader for one that has a meta.json and no log. It refuses a
+   *  project whose meta.json carries a schema version above the supported one, as the project store does (future_schema), and one
+   *  below it (needs_migration): the store would migrate that one by writing, and an empty view of its records would be wrong.
+   *  It reads the event log and applies each record as the store's replay does (project-store.mjs _replay and _applyRecord): a
+   *  refused record or one with no entity is not applied, a later record of an id replaces the earlier one, a null record of an
+   *  id leaves the null, and a line that is not json is skipped. It never opens the store: opening it rewrites its snapshots and
+   *  cuts a torn last line, and another process may be in the middle of writing that line. A last line with no newline is not
+   *  applied, even when it is a whole record, because the store cuts it on its next open; the reader leaves it in the file for
+   *  the writer to finish. The reader has no write method and does not hand out the store. */
+  tasksReader(identity, project) {
+    this._need(identity, 'read', null);
+    const dir = path.join(this.root, STATE, 'projects', this._projectId(project));
+    const file = path.join(dir, 'events.jsonl'), meta = readJson(path.join(dir, 'meta.json'), null);
+    if (!meta && !fs.existsSync(file)) return null;
+    const version = meta?.schema_version ?? SCHEMA_VERSION;
+    if (version > SCHEMA_VERSION) throw new VaultError('future_schema', `refusing to open: schema version ${version} is newer than this Memev knows (${SCHEMA_VERSION})`);
+    if (version < SCHEMA_VERSION) throw new VaultError('needs_migration', `schema version ${version} is older than ${SCHEMA_VERSION}: any daemon command that opens the store migrates it, and this reader writes nothing, so it cannot read it until then`);
+    const entities = new Map();
+    const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+    for (const line of text.slice(0, text.lastIndexOf('\n') + 1).split('\n')) {
+      if (!line) continue;
+      let rec; try { rec = JSON.parse(line); } catch { continue; }
+      if (rec.refused || !rec.entity) continue;
+      const { kind, id, data } = rec.entity;
+      if (!entities.has(kind)) entities.set(kind, new Map());
+      entities.get(kind).set(id, data);
+    }
+    return Object.freeze({ snapshot: Object.freeze((kind) => structuredClone(Object.fromEntries(entities.get(kind)?.entries() ?? []))) });
   }
 
   /** Record one turn of a session (continuous recording). */

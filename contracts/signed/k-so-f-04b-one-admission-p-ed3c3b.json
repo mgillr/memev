@@ -1,0 +1,277 @@
+{
+  "schema": "attest/1",
+  "project": "memev",
+  "owner_rules": [
+    "Done means ALL evidence: implemented as specified (task id), a test that FAILED before and passes now, suites green, measured number vs target, docs regenerated, committed AND pushed to the contract's branch.",
+    "Never defer: no \"later\", \"follow-up\", \"out of scope\". If blocked: what blocks, what you tried, what you need; then continue with the next task.",
+    "Root cause, then fix: file:line + mechanism. No weakening tests, raising timeouts, skips, relaxed assertions.",
+    "No silent scope cuts: never lower targets, caps or test sizes without owner approval.",
+    "Never bypass guards: no --no-verify, no bypass env vars, no skip flags.",
+    "Deliver continuously: one task per commit, pushed to the contract's branch as it goes green.",
+    "Honest reporting: TASK-ID | status | commit | tests | measured vs target | missing."
+  ],
+  "defaults": {
+    "base": "origin/main",
+    "branch": "main",
+    "flaky_reruns": 1,
+    "max_corrective_cycles": 3,
+    "regression_tolerance_pct": 20
+  },
+  "forbidden": {
+    "test_skip_only": true,
+    "timeout_raise": true,
+    "assertion_removal": true,
+    "test_file_deletion": true,
+    "no_verify": true,
+    "bypass_env": [
+      "SKIP_HOOKS",
+      "HUSKY=0",
+      "CONTRACT_SKIP",
+      "CI_SKIP"
+    ],
+    "protected_values": []
+  },
+  "baseline": {
+    "metrics": {}
+  },
+  "phases": [
+    {
+      "id": "intake"
+    },
+    {
+      "id": "design"
+    },
+    {
+      "id": "plan"
+    },
+    {
+      "id": "implement"
+    },
+    {
+      "id": "verify"
+    },
+    {
+      "id": "integrate"
+    },
+    {
+      "id": "release"
+    },
+    {
+      "id": "monitor"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "SO-F-04B One Admission per scope: an AdmissionSet that holds the Admissions of a node's scopes, refuses a second Admission for a scope through a registry kept for the log, and routes a contribution to the Admission of its scope",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "AdmissionSet, exported from src/engine/federation/admission.mjs, holds the Admissions of one log, and add refuses, with a TypeError that names the problem, a value that is not an Admission (a brand registered by the constructor, not instanceof), an Admission over another log and a second Admission for a scope already held for the log by this set or any other",
+        "a registry kept for the log (a WeakMap keyed by the log object) is what refuses a second set over one log and an Admission added to two sets; a refused add changes neither the set nor the registry; there is no remove",
+        "admit validates the envelope and routes a contribution to the one Admission of its scope; a malformed envelope is refused at the format step; a scope that no held Admission holds, including every scope of an empty set, is refused once at the authority step with the code scope_mismatch, before any external check or signature check, with signature_valid false and a record that does not claim a verified signature",
+        "the set keeps no mark of its own: a sequence is a replay in the same cases through the set, through a held Admission's own admit, for an Admission that admitted before it was added, and after the log is opened again, because each Admission holds the mark per sender and scope of SO-F-03.4; highWater(sender, scope) of the set reads it and is 0 for a scope none holds",
+        "a message replayed into a different scope is refused through the set at the signature step (the scope is inside the signed bytes), one aimed at a scope no held Admission holds is refused with scope_mismatch, and the original sent again to its own scope is a replay",
+        "a lone Admission and a set holding one Admission give the same results and the same events for the same contributions, and the set adds no event type, no store and no file; two scopes with two relationships under the gates of SO-F-04 are admitted and refused each on its own relationship, and one revocation leaves the other",
+        "no module under src builds an Admission but admission.mjs, so that nothing in the product builds a second Admission behind a set",
+        "docs/FEDERATION.md states that a node holds one Admission per scope in an AdmissionSet, that a second for the same scope is refused when it is added, through a registry kept for the log, that a bare Admission over the log is not refused by the set and is safe for replay because every Admission reads the log (SO-F-03.4), that the set keeps no mark, that its refusal for a scope it does not hold reports step authority before any signature check, and that a subclass that overrides admit is accepted by add"
+      ],
+      "description": "A node with several relationships has several scopes, and the Admission holds one. This contract makes the arrangement explicit: one Admission per scope, held in one set that routes a contribution to the Admission of its scope, so that adding a second Admission for a scope is an error at the moment it is added, wherever the second one is added. The replay answer does not depend on the set: each Admission holds the mark per sender and scope of SO-F-03.4, so what the set must not do is keep a second mark that could disagree with the log. The set does not claim to stop a bare Admission built behind it; it pins that nothing in src builds one. It leaves the choice of a different design (several scopes in one Admission, a release of a scope from the registry) to the owner. The named test imports each module of the contract by namespace (import * as ns), never by name, and asserts that the export it needs is a function or a class before it uses it, so that on the base the red run fails on an assertion; the red-green check treats a load error as BLOCKED, not as red.",
+      "scope": {
+        "allow": [
+          "changelog.d/SO-F-04B.md",
+          "docs/FEDERATION.md",
+          "docs/MODULES.md",
+          "src/engine/federation/admission.mjs",
+          "test/admission-set.test.mjs",
+          "test/helpers/**"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "T1-AC01",
+          "mandatory": true,
+          "statement": "AdmissionSet is a class exported from src/engine/federation/admission.mjs; add holds an Admission for each distinct scope of one log and returns normally; add throws a TypeError that names the scope when an Admission for the same scope is already held, a TypeError that names the log when the Admission's log is not the set's log, and a TypeError that names the Admission for a value that is not one: null, undefined, a plain object, a string, a number, an object with the same fields and methods as an Admission, and an object made with Object.create(Admission.prototype) with an own log and scope; an instance of a subclass of Admission is accepted, including one that overrides admit, whose admit the set then calls when it routes a contribution to it; a refused add leaves the set as it was (a scope refused by a spoof can still be added by a real Admission afterwards); new AdmissionSet with a value that is not an operation log is a TypeError; the test fails by assertion on the base",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/admission-set.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-04B AC01:' test/admission-set.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-04B AC01:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC02",
+          "mandatory": true,
+          "statement": "a scope is held once for a log, whatever the set: with two sets over one log, a second Admission for a scope the first set holds is refused by the second set with a TypeError that names the scope; one Admission added to a second set is refused; a scope the first set does not hold can be added to the second, and is then refused to the first; a refused add changes nothing, so the same refusal comes again; a set over another log is not affected by the registry of the first; the test fails by assertion on the base",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/admission-set.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-04B AC02:' test/admission-set.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-04B AC02:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC03",
+          "mandatory": true,
+          "statement": "admit routes by the scope of the contribution: with two held Admissions whose policies differ, each contribution gets the answer of the Admission of its own scope; a contribution for a scope no held Admission holds is appended once as federation.rejected with step authority and code scope_mismatch and nothing of the payload, its result has signature_valid false and its record carries no signature_valid true, no spy external check and no spy signature check of any held Admission is called, and the record has the same keys as the federation.rejected record an Admission writes; a malformed envelope is refused at step format with signature_valid false; an AdmissionSet with no Admission refuses a well-formed contribution with scope_mismatch and a malformed one at format and its highWater is 0; nothing is appended to the admitted stream for any refusal",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/admission-set.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-04B AC03:' test/admission-set.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-04B AC03:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC04",
+          "mandatory": true,
+          "statement": "the replay answer is the same through the set, through a held Admission and for an Admission that admitted before it was added: an Admission that admitted sequence 7 before add() refuses sequences 3 and 7 as replay after add(), through the set and called directly, and the set's highWater(sender, scope) reads 7 for its scope, 0 for another held scope and 0 for a scope none holds; sequence 1 of the same sender in the other held scope is admitted, as a new message, and is then a replay; the set and a set made over the log opened again give the same marks and the same answers; the test fails by assertion on the base",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/admission-set.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-04B AC04:' test/admission-set.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-04B AC04:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC05",
+          "mandatory": true,
+          "statement": "a message replayed into a different scope is rejected through the set: an envelope admitted in scope A, copied with its scope changed to scope B and its content hash rebuilt so that only the signature stands in the way, is refused at step signature with the code bad_signature, the same copy aimed at a scope no held Admission holds is refused with scope_mismatch, and the original envelope sent again to scope A is refused with replay; nothing is added to the admitted stream and the marks are unchanged; the test signs with a real key through the real signing path; the test fails by assertion on the base",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/admission-set.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-04B AC05:' test/admission-set.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-04B AC05:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC06",
+          "mandatory": true,
+          "statement": "two scopes with two relationships: a RelationshipBook with an established relationship for scope one and one for scope two, relationshipGate of SO-F-04 as the external check of each held Admission; a node with a relationship for scope one only refuses a contribution for scope two with deny.no_relationship; a permitted contribution is admitted in each scope; after the relationship of scope one is revoked a contribution for it, including one signed before the revocation, is refused at step external with a deny code, and a contribution for scope two is still admitted; the test fails by assertion on the base",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/admission-set.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-04B AC06:' test/admission-set.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-04B AC06:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC07",
+          "mandatory": true,
+          "statement": "a lone Admission and a set holding one Admission give the same results and the same events (type, step, code and sequence) for the same sequence of contributions in one scope, accepted, refused and replayed, on two separate sandbox nodes; the log holds only federation.admitted and federation.rejected events, and the set creates no file of its own (the sandbox folders hold the same number of files); the test fails by assertion on the base",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/admission-set.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-04B AC07:' test/admission-set.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-04B AC07:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC08",
+          "mandatory": true,
+          "statement": "no module under src builds an Admission but admission.mjs: the test scans every .mjs, .js and .cjs file under src read-only for new Admission( and asserts that only src/engine/federation/admission.mjs may hold it, after asserting that AdmissionSet exists, so that it is red on the base",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/admission-set.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^SO-F-04B AC08:' test/admission-set.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | awk -v pat='^SO-F-04B AC08:' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "id": "T1-AC09",
+          "mandatory": true,
+          "statement": "docs/FEDERATION.md describes AdmissionSet in one paragraph: one Admission per scope, a second Admission for the same scope refused when it is added, through a registry kept for the log",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/FEDERATION.md",
+            "pattern": "AdmissionSet.*one Admission per scope.*second.*refused when it is added.*registry.*log",
+            "flags": "i"
+          }
+        },
+        {
+          "id": "T1-AC10",
+          "mandatory": true,
+          "statement": "docs/FEDERATION.md says, in one paragraph, that the refusal of the set for a scope it does not hold has the code scope_mismatch and reports step authority before any signature check has run, and that a subclass of Admission that overrides admit is accepted by add",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/FEDERATION.md",
+            "pattern": "AdmissionSet.*scope_mismatch.*step authority.*before any signature check.*subclass.*overrides admit.*accepted",
+            "flags": "i"
+          }
+        },
+        {
+          "id": "T1-AC11",
+          "mandatory": true,
+          "statement": "docs/FEDERATION.md says, in one paragraph, that the set keeps no mark of its own, that each Admission holds the mark per sender and scope of SO-F-03.4, and that a bare Admission over the log is not refused by the set and is safe for replay because every Admission reads the log",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/FEDERATION.md",
+            "pattern": "AdmissionSet.*no mark of its own.*per sender and scope.*SO-F-03\\.4.*bare Admission.*safe for replay",
+            "flags": "i"
+          }
+        },
+        {
+          "id": "T1-AC12",
+          "mandatory": true,
+          "statement": "The full test suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 900
+          }
+        },
+        {
+          "id": "T1-AC13",
+          "mandatory": true,
+          "statement": "The leak scan passes on files and every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "id": "T1-AC14",
+          "mandatory": true,
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "id": "T1-AC15",
+          "mandatory": true,
+          "statement": "Every changed file is inside this contract's scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "Stop and post BLOCKED when a criterion cannot pass without weakening a test, skipping a test or relaxing an assertion.",
+        "Stop and ask when the work would name a client product, a person, a server or a seat in repository text; the client names live in docs/CLIENTS.md only.",
+        "Stop when the work would add a runtime dependency, a model call, a network call at install or start, a second store for project state, or any reporting that is not opt-in and off by default.",
+        "Stop when the work would move convergence logic into the core, vendor the engine, or add a merge engine beside the provider boundary of src/engine/merge.mjs.",
+        "Stop when the work would implement a federation, replication, trust, admission or computation feature beyond the specification, schema, validator and conformance test the contract names; the product keeps the planned label on it.",
+        "Stop and ask when the signed text of a contribution no longer covers extension.contribution.scope (contributionMessage of src/engine/federation/contribution.mjs, or the envelope, changed so that the scope is outside the signed bytes), or when the work would change either to make a test pass: the mark per sender and scope is safe only while the scope is signed.",
+        "Stop and ask when the work would change anything in the Admission constructor but the one registration of the instance in a module-private WeakSet after its existing validation, change a step, a code or an event of the Admission, or edit a test of SO-F-03 or SO-F-04 to make the set pass.",
+        "Stop and ask when the work would give the set a replay mark of its own, seed or merge a mark in add(), add an event type, a store or a file, or build the per-scope rule anywhere but in the Admission of SO-F-03.4.",
+        "Stop and ask when the work would add a second guard in the Admission constructor (the test AC04 of SO-F-03 builds a second Admission for a held scope and must keep passing), or give the registry a remove, an expiry or a place outside memory without an owner decision.",
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ],
+  "id": "k-so-f-04b-one-admission-p-ed3c3b",
+  "title": "SO-F-04B One Admission per scope: an AdmissionSet that holds the Admissions of a node's scopes, refuses a second Admission for a scope through a registry kept for the log, and routes a contribution to the Admission of its scope",
+  "workdir": null,
+  "created": "2026-11-01T07:56:05.957Z",
+  "version": 1,
+  "request": "Follow-up to the signed SO-F-04, written from the open follow-up row 'One scope per Admission' of docs/scope-one/RECONCILIATION.md (Admission, SO-F-04, pull request #368). Unsigned: a delta proposed for red-team review. It does not supersede SO-F-04 and does not edit it; it depends on SO-F-03.4, proposed in the same pull request, which supersedes the signed SO-F-03.3 and owns the replay mark. The id has no '.N' suffix because in this repository a '.N' id is a superseding version; this is an additive follow-up, as SO-W-08C is to SO-W-08B. OWNER DECISION (1 Nov 2026, on pull request #374): the sequence is per sender and scope, matching one Admission per scope, on condition that the scope is bound inside the signed envelope. PRECONDITION, CHECKED: the scope is bound in the signed bytes. At 042d727, contributionMessage in src/engine/federation/contribution.mjs (line 67) is the text that is signed: a header line and the canonical text of the whole envelope without its content hash and without the signature, so extension.contribution.scope, the sequence, the subject and the node (origin.node) are all inside the signed bytes; signContribution (line 85) signs that text. No test of SO-F-03 proves the scope part (the test at test/federation-admission.test.mjs:226 to 228 proves it for the payload hash only), so a criterion of SO-F-03.4 does. If the signed text ever stops covering the scope, a mark per sender and scope is not safe and the stop rules apply. RELATION TO SO-F-03.3, FLAGGED: SO-F-03.3 (signed) says the sequence is per sender (its request, requirement and criterion 2: 'the per-sender high-water mark is persisted through the operation log and rebuilt on open'), docs/FEDERATION.md line 224 says the same, and test/federation-admission.test.mjs keys the mark by the sender alone (highWater('node-01|agent:writer')). A mark per sender and scope therefore differs from the signed text. An earlier draft of this contract kept the SO-F-03.3 per-sender mark for a lone Admission and gave the set a mark of its own; the red-team showed that this could not be seeded safely and left a bare Admission over the log able to admit a sequence twice. The rule is therefore moved to its root: SO-F-03.4 supersedes SO-F-03.3 openly (the criterion that said per sender is superseded by name, the five SO-F-03 tests it selects stay green and are not edited, and the Admission reads the log again when it has moved), and this contract keeps no mark of its own. RED-TEAM RESPONSE (1 Nov 2026): the set no longer shares a mark, so add() has nothing to seed and nothing to merge; an Admission that admitted sequence 7 before it was added, one added to two sets and two sets over one log are covered by the Admission's own re-read of the log (SO-F-03.4) and by a registry kept for the log. The word 'enforced' of the earlier draft overclaimed: the set refuses a second Admission among the Admissions it is given, and it cannot refuse a bare new Admission(...) it is never told of. That is safe for replay because every Admission reads the log (SO-F-03.4); a scan criterion pins that no module under src builds an Admission but admission.mjs, so that nothing in the product builds a second Admission behind the set. A second Admission with a policy of its own would still answer by that policy; that is not a replay matter and is not closed here. MERGE ORDER of the three specs of pull request #374, which touch the same files. Spec pull requests: #374 changes contracts/scope-one/manifest.json, docs/scope-one/RECONCILIATION.md and docs/scope-one/WBS.md the way every spec-only pull request does, by adding rows and, for a superseded contract, two fields, so it and the other open spec pull request that does the same (SO-F-09.3, #373) take a plain merge of main in whichever order they land, keeping both sets of rows; no spec depends on that order. BUILD ORDER: SO-F-03.4 first (it needs only main, where #358 landed SO-F-03.3), then SO-F-04A, then SO-F-04B (both need pull request #368, SO-F-…",
+  "provenance": {
+    "spec_sha256": "723c1a05a5697c1711cdc0d2743bfd9bdc8fb8bd089b7b5c69da468cdc41d718",
+    "record": "contracts/scope-one/redteam/SO-F-04B.json",
+    "review": "interim solo review by the signer, pending independent re-review (owner decision 31 Oct 2026)"
+  },
+  "origin": "local",
+  "base": {
+    "sha": "2f24e942e2b80649487829ed021c1f0b78b6bccb",
+    "recorded_at": "2026-11-01T07:56:05.963Z"
+  }
+}
