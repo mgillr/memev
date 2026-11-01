@@ -22,7 +22,7 @@ The free core does not require a Memev account, subscription or licence. It does
 ## Before you install
 
 1. **Use a dedicated test computer, OS account or disposable VM where possible.** Do not replace an existing Memev installation or point this preview at an existing vault.
-2. Use Node.js 22 or newer and Git. Docker is not required for the basic local installation.
+2. Use Node.js 22 or newer and Git. Docker is not required for the basic local installation. The first cohort should prioritise macOS and Linux; Windows is still labelled preview in the installation documentation and should be treated as exploratory testing, not as a supported release path.
 3. Do not use customer, employer, patient, regulated, confidential or otherwise sensitive data in this preview. Use synthetic or non-sensitive test projects.
 4. Do not connect a work GitHub account or repository. If you test backup, create a separate private throwaway repository.
 5. Keep the secure remote link off unless a test specifically requires it. Do not expose a local daemon or share connector URLs and tokens.
@@ -39,6 +39,7 @@ git clone https://github.com/mgillr/memev.git
 cd memev
 node --version
 git --version
+git rev-parse HEAD
 npm install -g .
 memev init --local-only
 ```
@@ -53,7 +54,7 @@ memev doctor
 memev clients
 ```
 
-Save the output for your test notes, but remove usernames, local paths, tokens, connector URLs and other private details before sharing it.
+Record the output of `git rev-parse HEAD` as the build identifier for every report. Save diagnostic output for your test notes, but remove usernames, local paths, tokens, connector URLs and other private details before sharing it.
 
 ## First test: local operation
 
