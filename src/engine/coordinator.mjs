@@ -815,10 +815,10 @@ export class Coordinator {
       if (this.lifecycle && owner && this._project(s, owner.project).paused) return { ok: false, paused: true, sent: false, reason: 'the project is paused' };
       const existing = Object.values(s.snapshot('attempt')).find((a) => a.kind === 'dispatch' && a.key === key);
       if (existing) return { ok: true, sent: false, duplicate: true, result: existing.result ?? null };
-      // a task is not sent a second time to someone else while the lease of the first send is live
+      // a task is sent once under a lease: a second dispatch, under another key, while that lease is live is refused
       const held = this.lifecycle && owner?.lease_id ? s.snapshot('lease')[owner.lease_id] : null;
-      if (held && held.status === 'active' && held.expires > this.now() && held.agent !== agent && !String(agent).startsWith(`${held.agent}/`)) {
-        return { ok: false, code: 'LEASE_LIVE', sent: false, reason: `the task is held under a live lease of ${held.agent}` };
+      if (held && held.status === 'active' && held.expires > this.now() && Object.values(s.snapshot('attempt')).some((a) => a.kind === 'dispatch' && a.task_id === taskId && a.at >= held.issued)) {
+        return { ok: false, code: 'LEASE_LIVE', sent: false, reason: `the task was already sent under the live lease of ${held.agent}` };
       }
       const resource = this._resourceOf(taskId, owner, payload && typeof payload === 'object' ? payload.resource : undefined);
       const hash = payloadHash(payload);
