@@ -78,6 +78,12 @@
       "manifest": "this manifest (contracts/programme/specs, signed 1 Nov 2026; the file is unchanged)",
       "reason": "owner delegation, 1 Nov 2026: pull request #364 changes docs/CONVERGENCE.md (a link to docs/MERGE-SEMANTICS.md only), docs/MODULES.md (generated; src/engine/state-map.mjs is a new module) and changelog.d/PG-05.1.md, which PG-05.1 does not list in a scope; PG-05.2 adds docs/CONVERGENCE.md to the scope of WP05-01 and docs/MODULES.md and changelog.d/PG-05.1.md to the scope of WP05-04, and changes no criterion",
       "superseded_by": "PG-05.2"
+    },
+    {
+      "id": "PG-W-21A",
+      "manifest": "this manifest (contracts/programme/specs, signed as k-pg-w-21a-trust-record-v1-ac28ab; the file is unchanged)",
+      "reason": "owner decision of 1 Nov 2026 (ADR 8, docs/scope-one/DECISIONS.md): trust records carry a signature block and a raisable required verification level, roots are records with validity windows and a succession record, an optional organisation co-root is accepted by each site alone, a new device holds low trust only and none in a personal scope, and delegation is reserved in the format and never honoured in release 1 (ADR 8 question 9), so the narrowing and cascade criteria of PG-W-21A no longer apply; the review findings of pull request #378 at head 2cadd76 become criteria; the revocation field grant is renamed target; the signed file is unchanged and pull request #378 retargets to PG-W-21A.2 once it is signed",
+      "superseded_by": "PG-W-21A.2"
     }
   ],
   "resolved_without_contract": [
@@ -1529,6 +1535,43 @@
       "criteria": 15,
       "spec": "specs/PG-W-21A.json",
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); independent of every open pull request and of every open owner question; the record format is provisional (ADR 8, proposed)",
+      "kind": "feature",
+      "superseded_by": "PG-W-21A.2",
+      "superseded_reason": "owner decision of 1 Nov 2026 (ADR 8, docs/scope-one/DECISIONS.md): trust records carry a signature block and a raisable required verification level, roots are records with validity windows and a succession record, an optional organisation co-root is accepted by each site alone, a new device holds low trust only and none in a personal scope, and delegation is reserved in the format and never honoured in release 1 (ADR 8 question 9), so the narrowing and cascade criteria of PG-W-21A no longer apply; the review findings of pull request #378 at head 2cadd76 become criteria; the revocation field grant is renamed target; the signed file is unchanged and pull request #378 retargets to PG-W-21A.2 once it is signed"
+    },
+    {
+      "id": "PG-W-21A.2",
+      "type": "programme work package",
+      "area": "PG-W",
+      "title": "Trust record v2, superseding PG-W-21A: a signature block, a raisable verification level, roots as records with succession, an optional organisation co-root, the new-device rule and reserved delegation (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP21-01 (the work package of PG-W-21A, restated under ADR 8, decided 1 Nov 2026)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "SO-F-01",
+          "boundary": "it owns the subject and scope model; PG-W-21A.2 reads subject ids and validates scopes with src/engine/identity.mjs and changes it in no way"
+        },
+        {
+          "contract": "PG-W-21B",
+          "boundary": "builds the trust book, the verification of signatures and the eligibility gate on this record; it depends on PG-W-21A.2 and is amended for ADR 8 in its own pull request"
+        },
+        {
+          "contract": "SO-F-03.3",
+          "boundary": "the namespaced signature of a contribution is the model for the signature block; PG-W-21A.2 checks the shape of the block and never verifies it"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "SO-F-01 (subjects and scopes) is the build layer, cited by id; this spec adds only the trust record, its validator and schema, and the pure evaluation, with their tests; the build of PG-W-21A in pull request #378 retargets to it",
+      "depends_on": [
+        "SO-F-01"
+      ],
+      "tasks": 1,
+      "criteria": 40,
+      "spec": "specs/PG-W-21A.2.json",
+      "status": "proposed and unsigned; no red-team record; draft with no base, the signer's HEAD at signing becomes its base; the record format is provisional (ADR 8, decided; ADR 5 open)",
+      "supersedes": "PG-W-21A",
+      "supersedes_reason": "owner decision of 1 Nov 2026 (ADR 8, docs/scope-one/DECISIONS.md): trust records carry a signature block and a raisable required verification level, roots are records with validity windows and a succession record, an optional organisation co-root is accepted by each site alone, a new device holds low trust only and none in a personal scope, and delegation is reserved in the format and never honoured in release 1 (ADR 8 question 9), so the narrowing and cascade criteria of PG-W-21A no longer apply; the review findings of pull request #378 at head 2cadd76 become criteria; the revocation field grant is renamed target; the signed file is unchanged and pull request #378 retargets to PG-W-21A.2 once it is signed",
       "kind": "feature"
     },
     {
@@ -2105,8 +2148,8 @@
     },
     {
       "task": "WP21-01",
-      "title": "Trust record, version 1: the grant and revocation records, their validator and schema, and a pure evaluation that denies by default, lets delegation only narrow, and cascades revocation",
-      "contract": "PG-W-21A",
+      "title": "Trust record, version 2: the signed grant, revocation, root and succession records, their validator and schema, and a pure evaluation that denies by default, with a raisable verification level, roots with succession, an optional co-root, the new-device rule, and delegation reserved and never honoured",
+      "contract": "PG-W-21A.2",
       "note": "specified in this set"
     },
     {

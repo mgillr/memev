@@ -1,0 +1,370 @@
+{
+  "title": "PG-W-21A.2 Trust record v2, superseding PG-W-21A: a signature block, a raisable verification level, roots as records with succession, an optional organisation co-root, the new-device rule and reserved delegation (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract PG-W-21A.2 in memev: the trust record, version 2, its validator and schema, and a pure evaluation of eligibility (work package WP21-01, as ADR 8 decided it on 1 Nov 2026). It supersedes PG-W-21A, which was signed as k-pg-w-21a-trust-record-v1-ac28ab; the signed file contracts/programme/specs/PG-W-21A.json and the signed contract are not edited. Proposed and unsigned; the signer signs it after the red-team gate, and the signer's HEAD at signing becomes its base (a draft has no base key). The id is in the style of SO-W-08B: its second part starts with a letter, so the redteam gate's specIdOf reads the whole name, and PG-W-21A.2 is distinct from PG-W-21A and has its own record path. Why: ADR 8 is decided (docs/scope-one/DECISIONS.md, full text in docs/scope-one/design/trust-governance.md). It adds to the record what PG-W-21A could not carry: a signature block on every record, a required verification level that can be raised, roots as records with validity windows and a succession record, an optional organisation co-root that each site accepts alone, the personal-scope rule for a new device, and delegation reserved in the format only. The build of PG-W-21A is in review as pull request #378, which has not merged and so has put nothing on main; once this spec is signed, #378 retargets to it, and memev-trust/1 is never released (the schema file of version 1 is removed with the change, and nothing accepts it). What is kept from PG-W-21A: the purposes contribute and verify, the required expiry, the evidence limits, deny by default with a fixed rule set, evaluation as of a stated time and never the clock, a revocation that applies from its time and only by the issuer or a root, purity and no production caller, and the provisional labels. What changes, and why: delegation that narrows and cascades (criteria 3 and 4 of PG-W-21A) is replaced by delegation reserved in the format only, which the evaluator never honours, because ADR 8 question 9 decided no delegation in release 1; the revocation field grant is renamed target because a root record can be revoked; roots are records; the carried review findings of pull request #378 at head 2cadd76 become criteria. Boundaries: (1) trust is an eligibility input only: nothing here grants a permission, a membership or a read, and a personal scope is never shared. (2) The module checks the shape of a signature and never verifies it; verification, the book, the events and the proposal and approval of a grant are PG-W-21B, and SO-A-05 is not decided. (3) The table of who may write trust stays provisional under ADR 5. (4) Nothing crosses a node here: the freshness window, revocation notices, relationship contracts, pairing and the entitlement gate are separate specs named in docs/scope-one/RECONCILIATION.md. (5) crdt-merge stays in its own repository behind the call-out boundary (ADR 6, decided). (6) ADR 3, ADR 5 and ADR 7, SO-A-05 and the topology of work breakdown row 1.3.6 stay open and are an input to none of this. No production caller: the module is a library with tests. The scope names docs/schemas/trust-record-v1.json and changelog.d/PG-W-21A.md only because pull request #378 holds them and this change removes the first and replaces the second. Depends on contracts: SO-F-01 (the subject and scope model). Owner decisions of 31 Oct and 1 Nov 2026 apply: crdt-merge is reached only across the WO-05-A call-out boundary; tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that (Business and Corporate); there is no Federated tier; ADR 8 is decided.",
+  "tasks": [
+    {
+      "id": "WP21-01",
+      "title": "Trust record, version 2: signed grant, revocation, root and succession records, a pure evaluation that denies by default, a raisable verification level, roots with succession and an optional co-root, the new-device rule, and delegation reserved and never honoured",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "a trust record has schema memev-trust/2 and one of four kinds: a grant, a revocation, a root and a succession. Every record has an id, an issuer and a signature block { principal, namespace (exactly memev-trust), sshsig } of the shape of the contribution signature (source: validateContribution in src/engine/federation/contribution.mjs; ADR 8 clarification 6 and 12 records signed and logged in docs/scope-one/DECISIONS.md). trustMessage(record) is the signed text: the header memev-trust v2 and the canonical record without its signature. The module checks the shape of the signature and never verifies it: the caller verifies it with the namespaced verifier of src/engine/agentid-bind.mjs before a record is appended, which PG-W-21B owns. PROVISIONAL (ADR 8)",
+        "a grant names its id, the subject trusted, the issuer, one scope that is never personal, the purposes (contribute and verify, a closed list of two), a required verification level (a whole number of 0 to 8: 0 is no verification beyond the node own admission checks and N is N independent verifications), a start, a required expiry after the start, optional evidence references (at most 8, each a text of at most 128 characters), an optional delegation block { depth (0 or 1), parent (a grant id, optional) } and an optional source { kind: contract, ref }. The level is the raisable required-verification level of ADR 8 question 7. The highest level among the live grants that cover a request applies, so a second grant never lowers a raise (source: docs/scope-one/DECISIONS.md, ADR 8 question 7). PROVISIONAL",
+        "only a person or an operator subject writes a record as its issuer, and only such a subject is a root: an agent, a service, a device or a node subject cannot grant or revoke (source: ADR 8 question 6 and clarification 5; GRANT_AUTHORITY of PG-W-21B stays provisional under ADR 5, which is open, and the proposal step through SO-A-05, which is not decided, is not built here). PROVISIONAL",
+        "a revocation names its id, its target (a grant or a root record id), its issuer, a time and a reason from a closed list (compromised, left, error, other). It applies from its time, and only when its issuer is the issuer of the target or a root. Version 1 called the target grant; version 2 calls it target because a root record can be revoked too (source: PG-W-21A requirement 1, signed as k-pg-w-21a-trust-record-v1-ac28ab, which is not edited)",
+        "roots are records with validity windows, and a succession record moves a root. The caller pins the subjects that are the site own root (the module has no default root and no default grant); a root record names a subject, a role (root or co-root), a start, an expiry after it, and is issued by a root; a succession record names the root that hands over (from), its successor (to), a time and is issued by from. A subject is a root at a time when it is pinned and not handed over, when a live unrevoked root record of role root issued by a root names it, or when it is the successor of a succession whose time has come. A grant is honoured when its issuer is a root at the time asked, except that a grant of a root that handed over is kept when it starts before the succession time and the successor is a root (so a change of key does not orphan what was granted), and a grant of the old root that starts at or after that time is not honoured (source: ADR 8 clarification 4). PROVISIONAL",
+        "an optional organisation co-root is a root record of role co-root whose subject is an operator subject, issued by a root of the site and expiring (source: ADR 8 clarification 3). It is accepted only through that record, so the organisation key alone is nothing. The site drops it alone by revoking the record, or it expires. A co-root issues and revokes grants and nothing else: it issues no root record, no co-root and no succession, and it revokes no root record. A record of another site is never read: the evaluation reads the records it is given",
+        "the personal-scope rule: a grant, a root or a request in a personal scope is refused, so a new device of the owner has no trust record in personal scope. Low trust is a grant to a device subject that names its owner (a person), names only contribute, has a level of 1 or more, and is for a scope that is not personal; the one-tap raise is a grant issued by the owner that also names the approving device, and an operator can issue the same grant to recover a lost device (source: ADR 8 question 3 and clarifications 1 and 2). A device or an agent is eligible only while its owner is eligible for the same purpose in the same scope, so it is never above the owner, and revoking the owner ends it. Whether the scope is one of the owner organisation scopes is the membership check of the admission path and not a trust record. PROVISIONAL",
+        "delegation is reserved in the format only: a block of depth 0 or 1 that can only narrow, which the writer of PG-W-21B refuses and the evaluator never honours: a grant that carries a depth of 1 or a parent is deny.delegation_reserved, and a grant whose issuer is not a root has no authority whatever parent it names. A grant that comes from a contract cannot carry a depth of 1 and is never a parent (source: ADR 8 question 9 and clarification 8). The signed PG-W-21A criteria on narrowing and on cascading to delegated grants no longer apply, because no delegated grant is honoured in release 1; this is the one weakening of PG-W-21A and the owner decision above is its reason",
+        "the evaluation denies by default, with a fixed rule id from the exported set RULES (fifteen ids), as of a stated time and never the clock: no records, no roots, a subject with no grant, a purpose or a scope the grant does not name, a time before the start or at the expiry, a revoked grant, an issuer that is not a root, a reserved delegation, an owner that is not eligible and an invalid request each deny. A decision is { eligible, rule, reason, chain, verification } (source: PG-W-21A requirement 3)",
+        "carried from the review of pull request #378 at head 2cadd76 (symbols in src/engine/federation/trust-record.mjs there): a malformed revocation counts against a grant only when its issuer is the issuer of the grant, a root, or unreadable (badRevokedAt); an unreadable revocation target is a stated limit and is not closed, because failing closed on one unreadable record would deny every grant, so the header, the schema and the changelog say so; the canonical comparison (canonical) takes the purposes as a sorted set, the start and expiry as instants, the scope by type and id, the delegation as a depth and a parent, and leaves the evidence out; purposes, evidence, roots and records must be dense (dense); the deny codes are the fixed set RULES; every time comparison is the negation of the passing case; the inputs are copied once with structuredClone; a time must be a real calendar time (isCalendarTime); and the winner is deterministic, by the furthest stage, then the rule listed first in RULES, then the chain that sorts first (byPriority)",
+        "the module is pure: it reads and writes no file, no network and no clock, imports only src/engine/identity.mjs, and does not change its inputs; it has no production caller (source: PG-W-21A requirement 5; SR-1.15 asks the position to be stated, not waived). The record format is provisional and a change to it is a new schema version. docs/schemas/trust-record-v2.json lists the same fields as the validator",
+        "out of scope by design: verifying a signature, the trust book and its events (PG-W-21B), the proposal and approval of a grant (SO-A-05 is not decided and ADR 5 is open), any record that crosses a node, the freshness window and the transport of revocation notices (the transport spec), device pairing (the pairing spec), and any tier gate (the entitlement spec). ADR 3, ADR 5 and ADR 7 stay open and the topology of work breakdown row 1.3.6 is an input to none of this"
+      ],
+      "description": "Repo: memev. Starts at once: it depends on nothing that is not on main (src/engine/identity.mjs), and it is built on the branch of pull request #378, which it retargets. Defines the trust record and the one function that answers whether a subject is eligible for a purpose in a scope as of a time, with the level of verification that its contributions need. It writes nothing, reads no store and has no caller outside its tests: it has no production caller in this task, which is the position SR-1.15 asks to be stated, not a waiver of it. Trust is an eligibility input only. The subtests are labelled T1-c01 to T1-c29 and each criterion runs only its own subtest; the test file loads the module with a dynamic import inside a try, and every subtest starts by asserting that the module loaded and that every export is there with the right typeof, so that a missing or old module is an assertion failure and never a load error, an ENOENT or a TypeError. Every call that could throw is wrapped in assert.doesNotThrow. A commit that holds only the test file comes before the module. The schema file docs/schemas/trust-record-v2.json lists the same fields as the validator. The record format is provisional: a change to it is a new schema version.",
+      "scope": [
+        "src/engine/federation/trust-record.mjs",
+        "docs/schemas/trust-record-v2.json",
+        "docs/schemas/trust-record-v1.json",
+        "test/trust-record.test.mjs",
+        "changelog.d/PG-W-21A.2.md",
+        "changelog.d/PG-W-21A.md",
+        "docs/MODULES.md",
+        "test/helpers/**"
+      ],
+      "criteria": [
+        {
+          "statement": "the validator accepts a grant, a root, a co-root, a succession, a revocation, a grant with a reserved delegation block and a grant with a contract source, and refuses each of these naming the field: an unknown field, the schema memev-trust/1, a missing kind, a personal scope, a missing expiry, an expiry not after the start, nine evidence references, a 129-character reference, an off-list or empty purposes list and a subject of no known type; the subtest fails before the module is version 2 and passes after, and the red is an assertion and never a load error",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "every kind of record carries a signature block of exactly principal, namespace and sshsig, with the namespace exactly memev-trust, and the validator refuses, naming the field signature, a missing block, a block that is not an object, an empty block, another namespace (memev and memev-contribution), an empty principal, an empty or non-text sshsig, a missing principal and an extra field",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c02:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "trustMessage(record) returns the text that is signed: the header line memev-trust v2 and the canonical text of the record without its signature, so a different signature gives the same message, a different key order gives the same message, a change to any other field (id, subject, issuer, scope, purposes, verification, start, expires, evidence) gives a different message, and an invalid or hostile input gives null and never throws",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "only a person or an operator subject writes a record: a grant, a revocation, a root and a succession whose issuer is an agent, service, device or node subject are refused naming issuer, a root list that holds such a subject is deny.bad_request, and a subject of any of the six types can still be trusted",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "the purposes are contribute and verify and nothing else: another text, a different case, an empty text, null and a number are refused naming purposes, a request for another purpose is deny.bad_request, and a grant that names only contribute is deny.purpose_not_granted for verify",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c05:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "the required verification level is a whole number of 0 to 8 on every grant, 0 meaning no verification beyond the node own admission checks and each higher number meaning that many independent verifications, and it is refused when missing, negative, above 8, fractional, a text, null, NaN or infinite; the decision carries the level of the winning grant (null for a deny), the highest level among the live grants that cover the request applies whatever the order of the records, and revoking the grant that raised it lowers it",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c06:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "a new device holds low trust only: a grant to a device subject must name its owner (a person subject), must name only the purpose contribute, must have a level of 1 or more, and is never in a personal scope; a grant issued by the owner must also name the approving device (a device subject other than the subject), an owner or an approving device on a grant to any other kind of subject is refused (an agent subject names its owner and nothing else), and a request in a personal scope is deny.bad_request",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c07:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "a device or an agent is never eligible above its owner: it is eligible only while the owner is eligible for the same purpose in the same scope at the same time, so with no owner grant, a revoked owner grant, an owner grant for another purpose and an owner grant for another scope the decision is deny.owner_not_eligible; a device grant never makes its owner eligible; and a device grant issued by its owner is honoured only while the owner is eligible",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c08:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "delegation is reserved in the format and nothing more: a block holds a depth of 0 or 1 and an optional parent grant id and no other field, a depth of 2, a negative or fractional depth, a text depth and an empty block are refused naming delegation, a grant that comes from a contract (source kind contract and a reference) cannot carry a depth of 1, and a source with another kind, no reference, an empty reference or an extra field is refused naming source",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c09:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "the evaluator never honours delegation: a grant that carries a depth of 1 or a parent is deny.delegation_reserved even when a root issued it, a child that names a live parent gets no authority from it (deny.delegation_reserved, and deny.untrusted_issuer when it names none), a grant that comes from a contract is never a parent (deny.delegation_reserved), a block of depth 0 with no parent changes nothing, and every eligible decision has a chain of one grant",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c10:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "a root record names a subject, a role (root or co-root), a window and an issuer, and a succession record names a root that hands over, its successor, a time and an issuer: the validator refuses a missing or off-list role, a missing or non-increasing window, a subject of a type other than person or operator for a root, a subject of a type other than operator for a co-root, an unknown field, a successor or predecessor that is not a person or operator subject, and a missing or unreal time",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c11:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "a root record gives a subject the authority of a root for its window only: inside the window a grant it issued is honoured; with no record, before the start, at the expiry, with a record issued by a stranger and after a revocation of the record from the time of the revocation it is deny.untrusted_issuer, an earlier evaluation of a revoked record is unchanged, and with no pinned root nothing is a root (deny.no_roots)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c12:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "a succession record hands a root to its successor from its time: the successor is a root from that time and not before, a grant of the old root that starts before the time stays honoured, a grant of the old root that starts at or after the time is deny.untrusted_issuer, a succession issued by anyone but the root that hands over is ignored, the successor cannot name itself, and the successor can revoke what the old root granted",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c13:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "an optional organisation co-root is held by an operator subject and is accepted only through a root record of role co-root that a site root issued and that expires: the organisation key alone is nothing, a co-root cannot accept itself, the record expires, the site drops it alone by revoking its record (the co-root cannot), the site own grants stay when it is dropped, a co-root issues and revokes grants and nothing else (it adds no root, no co-root and no succession, and it does not revoke a root record)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c14:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "a revocation applies from its time and not before, when its issuer is the issuer of the grant or a root, so an evaluation at an earlier time is unchanged and a stranger revokes nothing; the reasons are compromised, left, error and other and no other, and the target field is named target, so a revocation that names grant is refused as an unknown field",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c15:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "a malformed revocation (a record of kind revocation that fails the validator and names a target) counts against grant G only when its issuer is the issuer of G, a root, or cannot be read as a subject id (missing, null, a number, an empty text, a text of no subject type, a trailing space, a list or an object), and then it denies G with deny.bad_revocation at any time; from a well-formed stranger, from a subject that is not a root and from an operator that did not issue G it is ignored, as a valid revocation from them is, and a malformed revocation of another record leaves G eligible; each of six malformations (an extra field, the schema of version 1, an off-list reason, a missing time, a time with no zone, a missing signature) is tried for each issuer",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c16:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "the limit on an unreadable revocation target is kept and stated, not closed: a revocation whose target is a number, a list, an object, missing, has a trailing space or a trailing newline, has another case or a zero-width character, or whose kind is Revocation, revoke, a list or missing (twelve cases) names no target and revokes nothing, a revocation that names its target exactly revokes, and the module header, the schema description and the changelog note each say that a revocation must name its target exactly, that a record that does not cannot revoke anything and that a caller must validate records before appending them to its log",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c17:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "records that evaluation cannot tell apart are one record and a real difference under one id is a conflict: in the canonical form the purposes are a sorted set, the start and the expiry are instants (the same instant in two zones is equal), the scope is its type and id (scope.parent is left out), the delegation is a depth and a parent (no block is depth 0), the evidence and the signature are left out, and the level, the owner, the approving device and the source are in; grants that differ in nothing in the form count once in either order, and a difference in the id, subject, issuer, scope, an instant, the purposes, the level, the delegation or the source under one id is deny.conflicting_grant for every order, while a grant with another id still holds",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c18:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "an array with a hole in it is not a list: purposes and evidence with a hole are refused by the validator naming the field, and records and roots with a hole, in any position, are deny.bad_request from evaluate, while a dense list is accepted",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c19:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "every decision carries a rule id from the fixed exported set RULES, which is frozen and holds exactly fifteen ids (allow.grant, deny.bad_request, deny.no_records, deny.no_roots, deny.no_grant, deny.conflicting_grant, deny.scope_not_granted, deny.purpose_not_granted, deny.not_yet_valid, deny.expired, deny.revoked, deny.bad_revocation, deny.untrusted_issuer, deny.delegation_reserved and deny.owner_not_eligible); a scenario reaches each id and none reaches another, and the module source writes each id once, in RULES, and no other",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c20:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "a time that is not a number never lets a window pass: no time comparison is written in the open form and each is the negation of the passing case (the expiry as !(now < ms(expires)), the start as !(ms(start) <= now), a revocation as !(now < ms(time))), a getter that returns a valid start or expiry for the first N reads and NaN afterwards, for N from 0 to 16, is never eligible in 2030, and an at that is NaN, empty, a number, null, a list, an object or a Date is deny.bad_request",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c21:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "the request and the call are copied once with structuredClone and only the copy is read: a getter runs once, a getter that throws, a function, a symbol and a value that cannot be copied are deny.bad_request and never a throw, frozen inputs give equal results on two calls, and no call changes its input",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c22:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "a time is a real calendar time and nothing rolls over, for a grant start, a revocation time, a root start, a succession time and at: 22 times are refused (30 February, 29 February in a non-leap year and in 2100, 31 April, month 13, month 0, day 0, day 32, T24:00:00Z, minute 60, second 60, an offset of +24:00, a zoneless time, a date only, a text with a space, an empty text, a number and null) and 10 are accepted (29 February in 2024 and 2000, 23:59:59, a fraction of a second, +23:59 and -12:00 offsets, and 30 April)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c23:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "the answer does not depend on the order of the records: every permutation of six scenarios gives the same whole decision, and where two denies sit at one stage the rule listed first in RULES wins even where the chain would sort the other way",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c24:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "the evaluation is pure: with traps on Date.now, Math.random, setTimeout, fetch, process.hrtime and performance.now none is called by evaluate, the validator or trustMessage (and the traps are shown to work), a call with no at is deny.bad_request, and the module source names no clock, random, file, network, timer or process call",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c25:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "the module imports only src/engine/identity.mjs, with one static import and no dynamic import, require, createRequire or import.meta.resolve, and nothing outside the tests imports the module: it has no production caller",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c26:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "docs/schemas/trust-record-v2.json parses, names memev-trust/2, and lists exactly the fields of a grant, a revocation, a root, a succession, a signature, a delegation block and a source, the purposes, the reasons, the roles and the fifteen rule ids that the module exports, and a field that the validator does not list is refused",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c27:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "the module marks every choice as provisional and names ADR 8 and ADR 5 (at least six labels), says in its header that a record is not authenticated here and that the signature is checked by the caller, names the decision page, says that scope.parent is accepted and ignored, and the schema description says the same about the signature",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c28:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "the supersession is recorded: the manifest row of PG-W-21A names PG-W-21A.2 in superseded_by, the manifest row of PG-W-21A.2 names PG-W-21A in supersedes, and the spec file of PG-W-21A.2 is in contracts/programme/specs",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/trust-record.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c29:' test/trust-record.test.mjs"
+          }
+        },
+        {
+          "statement": "One full run of test/trust-record.test.mjs passes every labelled subtest from T1-c01 to T1-c29 with nothing skipped and nothing todo, and prints its whole output",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/trust-record.test.mjs > \"$f\" 2>&1; rc=$?; cat \"$f\"; n=1; ok=0; while [ \"$n\" -le 29 ]; do l=$(printf 'T1-c%02d:' \"$n\"); grep -Eq \"^[[:space:]]*ok [0-9]+ - $l\" \"$f\" || ok=1; n=$((n+1)); done; [ \"$rc\" -eq 0 ] && [ \"$ok\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\"",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "docs/schemas/trust-record-v1.json is not on this branch: memev-trust/1 was never merged, so nothing accepts it and the schema file of version 1 does not exist",
+          "verifier": {
+            "type": "command",
+            "cmd": "test ! -e docs/schemas/trust-record-v1.json",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "the change note names the supersession, the signature block, the level, the roots and the stated limit",
+          "verifier": {
+            "type": "grep",
+            "file": "changelog.d/PG-W-21A.2.md",
+            "pattern": "PG-W-21A.2.*supersedes|supersedes.*PG-W-21A",
+            "flags": "s"
+          }
+        },
+        {
+          "statement": "docs/MODULES.md lists the module as generated: the module graph is up to date",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/docs/module-graph.mjs --check",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The row for PG-W-21A.2 is in the claim register of docs/scope-one/RECONCILIATION.md with Claim D",
+          "verifier": {
+            "type": "command",
+            "cmd": "grep -E '^\\| `PG-W-21A\\.2`' docs/scope-one/RECONCILIATION.md | grep -q 'Claim D'",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The leak scan passes on files",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The leak scan passes on every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing.",
+        "Anything outside the requirements of this task is not built, not stubbed and not defaulted in code; if the work seems to need it, stop and report what it needs.",
+        "A test_red_green command of this contract prints its whole output: it is never piped through tail or head, and never captures its output without printing it."
+      ]
+    }
+  ]
+}
