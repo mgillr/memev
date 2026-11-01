@@ -1,0 +1,186 @@
+{
+  "title": "QL-W-01A Signing refuses a contract with a test_red_green criterion when no base revision can be recorded (memev)",
+  "project": "memev",
+  "workdir": null,
+  "request": "Programme contract QL-W-01A in memev: a contract with a test_red_green criterion is not signed without a base revision (work package WP23-01). It builds on the base revision that SR-0.03.3 T1 (signed) already records, and adds the refusal at signing. Proposed and unsigned; the signer signs it after the red-team gate. The id is in the style of SO-W-08B: its second part starts with a letter, so the redteam gate's specIdOf reads the whole name and the contract has its own record path; the work package number 23 is not in docs/scope-one/programme/fragments. Why: Vault.contractVerify returns BLOCKED with 'no base revision recorded' for every scope and test_red_green criterion of a contract whose body has no base (src/engine/contracts.mjs, baseCheck), because the red run is made in a worktree of the base. Vault.contractSign records a base only from an explicit base in the draft or from the HEAD of a workdir that is a git checkout (SR-0.03.3 T1 requirement 1), and signs without one otherwise. None of the 138 signed bodies in contracts/signed records a base, so no signed red-green criterion can reach PASS through verify; and 529 criteria in 17 contracts also lack base_commit in their red-team records. A contract that can never verify should not be signable. What changes: (1) for a local caller, contractSign refuses a contract that has at least one test_red_green criterion when, after the existing rule (the explicit base, else the workdir's HEAD), no base was found: it throws a ContractError with code no_base whose message says how to give one (a base in the draft, --base, or a workdir that is a git checkout), before the signature is made, and writes nothing (no signed body, no signature file, no new key, no log event, no memory, no link; the draft is unchanged). (2) A contract with no test_red_green criterion signs as today, with or without a base. (3) A remote caller (local:false) is unchanged: no git is run, no base is recorded, and verify stays BLOCKED until a local approval records one (SR-0.03.3 T1 requirement 6). (4) contractVerify is unchanged and keeps its BLOCKED for a missing base. (5) A spec with a test_red_green criterion names its base revision in its request, and its manifest row records it in base, as SR-0.03.3 does; the signer passes it with --base; docs/CONTRACTS.md says so. Boundaries: (a) no signed body, record or spec is touched, and the gate --report output does not change, because existing records are grandfathered; back-filling the base through superseding versions is a register follow-up, not part of this contract. (b) The scope criterion has the same BLOCKED without a base; this contract does not extend the refusal to it. (c) The red evidence of existing signed criteria that was really a load error, and the commands that cut their output with a tail, are register follow-ups owned by each spec's author. (d) A cut TAP header is the separate contract SR-W-03A. Base revision: ba24c82e16c91f5962f20d49b396d46054a505da, the memev main commit that merged pull request #358; it is the commit the red runs of this contract are judged at, and the signer drafts with --workdir at the checkout top level and --base this commit (criterion 12 pins it). No production caller beyond signing itself: contractSign is already called by the CLI and the MCP tool; no export is added. The tests reach the engine only through Vault.contractDraft and Vault.contractSign; if an export is added anyway, the test imports it with import() inside the test body, so a missing export fails on an assertion and not at load. Depends on contracts: SR-0.03.3 (signed). Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository; tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier. Nothing in this contract decides ADR 3, ADR 5, ADR 7 or SO-A-05.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Signing refuses a contract with a test_red_green criterion when no base revision can be recorded, and a spec names its base revision",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "for a local caller, after the base is resolved by the existing rule (the explicit base of the draft, else git rev-parse HEAD of the workdir when it is a git checkout), contractSign throws a ContractError with code no_base when the contract has a test_red_green criterion in any task and no base was found; the message says that a base is needed and how to give one (a base in the draft or --base <sha>, or a workdir that is a git checkout) (source: src/engine/contracts.mjs, contractSign; docs/CONTRACTS.md, Base revision)",
+        "the refusal is made before the DSSE signature, the key write, the signed-body and signature writes, the contract.signed event, the memory and the links: a refused sign writes nothing and leaves the draft as it was",
+        "a contract with no test_red_green criterion signs as today, with a base when one is found and without one otherwise; a contract with a test_red_green criterion signs and records base = { sha, recorded_at } when an explicit base or a git workdir gives one, as today",
+        "a remote caller (local:false) is unchanged: contractSign runs no git, records no base and does not refuse, and contractVerify returns BLOCKED with 'no base revision recorded' for its scope and red-green criteria until a local approval records one (source: SR-0.03.3 T1 requirement 6)",
+        "contractVerify is unchanged, including the BLOCKED detail 'no base revision recorded' for a body without a base; no signed body, red-team record or spec file changes, and the output of the gate --report does not change",
+        "docs/CONTRACTS.md, in the Base revision section, says that signing refuses a contract with a test_red_green criterion and no base, and that a spec with a test_red_green criterion names its base revision in its request and in the base field of its manifest row, and that the signer passes it with --base",
+        "the new test file reaches the engine only through Vault.contractDraft and Vault.contractSign, and each red-green criterion of this task runs only its own subtest, whose name starts with T1-cNN: (NN is the criterion's position in this task) (source: the convention of SR-0.03.3 T1 requirement 8)"
+      ],
+      "description": "Repo: memev. Depends on nothing that is not on main: SR-0.03.3 is signed and its base recording is in src/engine/contracts.mjs at the base. The refusal sits in contractSign, the one function every signing route calls (the CLI, and the MCP tool over a local token). The fixtures are the git repositories and the vault of test/helpers/contracts-base.mjs and test/helpers/tmp.mjs. A read-only run of the 91 tests of the twelve test files that sign a test_red_green criterion, with the refusal added, was green.",
+      "scope": [
+        "src/engine/contracts.mjs",
+        "test/contracts-sign-base.test.mjs",
+        "docs/CONTRACTS.md",
+        "changelog.d/QL-W-01A.md"
+      ],
+      "criteria": [
+        {
+          "statement": "A local contract with a test_red_green criterion and no base (a workdir that is not a git checkout, or no workdir, and no explicit base) is refused with code no_base and a message that names a base in the draft or --base and a git checkout. The test fails before the change (the contract signs) on an assertion, not on a load error, and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-sign-base.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c01:' test/contracts-sign-base.test.mjs"
+          }
+        },
+        {
+          "statement": "A refused signing writes nothing: the listing of the vault's contracts folder is the same before and after, the draft is byte-identical, no signed body exists and the signature check of the id fails. The test fails before the change on an assertion and passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/contracts-sign-base.test.mjs",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c02:' test/contracts-sign-base.test.mjs"
+          }
+        },
+        {
+          "statement": "A contract with a test_red_green criterion signs and records its base when an explicit base or a git workdir gives one, and a contract with no test_red_green criterion signs without a base, with and without a git workdir. This holds before and after the change",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c03:' test/contracts-sign-base.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "A remote caller signs a contract with a test_red_green criterion as before: no base is recorded, and verify is BLOCKED until a local approval records one. This holds before and after the change",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/contracts-sign-base.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The base tests stay green: recording at signing, the legacy contract without a base (BLOCKED with 'no base revision recorded'), the format, the environment and the remote cases",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test test/contracts-base.test.mjs test/contracts-base-legacy.test.mjs test/contracts-base-format.test.mjs test/contracts-base-env.test.mjs test/contracts-base-remote.test.mjs test/contracts-base-unknown.test.mjs",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "The gate --report is byte-identical with and without the change: run on the same contracts tree, once with src, scripts and vendor as they are and once with them restored from the base, the two outputs do not differ",
+          "verifier": {
+            "type": "command",
+            "cmd": "h=$(mktemp -d) && b=$(mktemp -d) && git worktree add -q --detach \"$h\" HEAD && git worktree add -q --detach \"$b\" HEAD && git -C \"$b\" checkout -q \"$MEMEV_CONTRACT_BASE\" -- src scripts vendor && (cd \"$h\" && node scripts/gate/redteam-gate.mjs --report > \"$h.out\" 2>&1); (cd \"$b\" && node scripts/gate/redteam-gate.mjs --report > \"$b.out\" 2>&1); diff \"$h.out\" \"$b.out\"; rc=$?; git worktree remove --force \"$h\"; git worktree remove --force \"$b\"; exit $rc",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "No signed body, signature, red-team record or existing spec file differs from the base",
+          "verifier": {
+            "type": "command",
+            "cmd": "git diff --exit-code \"$MEMEV_CONTRACT_BASE\" HEAD -- contracts/signed contracts/keys contracts/quality-loop contracts/scope-one contracts/seed-readiness",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "One full run of test/contracts-sign-base.test.mjs passes every labelled subtest (T1-c01, T1-c02, T1-c03, T1-c04) with nothing skipped and nothing todo, and prints its whole output.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/contracts-sign-base.test.mjs > \"$f\" 2>&1; rc=$?; cat \"$f\"; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c01:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c02:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c03:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c04:' \"$f\"",
+            "expect_exit": 0,
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "docs/CONTRACTS.md says that signing refuses a contract with a test_red_green criterion and no base",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CONTRACTS.md",
+            "pattern": "signing refuses[^.]*test_red_green|refuses to sign[^.]*test_red_green",
+            "flags": "s"
+          }
+        },
+        {
+          "statement": "docs/CONTRACTS.md says that a spec with a test_red_green criterion names its base revision in its request and in its manifest row",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/CONTRACTS.md",
+            "pattern": "names its base revision in its request"
+          }
+        },
+        {
+          "statement": "The change adds no export and touches no other file of src, scripts or vendor, and the test file has no static import of the engine",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git diff \"$MEMEV_CONTRACT_BASE\" HEAD -- src/engine/contracts.mjs | grep -E '^\\+export ')\" && test -z \"$(git diff --name-only \"$MEMEV_CONTRACT_BASE\" HEAD -- src scripts vendor | grep -vx src/engine/contracts.mjs)\" && ! grep -Eq \"^import .*src/engine\" test/contracts-sign-base.test.mjs",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "This contract is drafted with the memev checkout as its workdir and a pinned base. The workdir is the checkout top level (git rev-parse --show-toplevel equals the working directory). The base is ba24c82e16c91f5962f20d49b396d46054a505da, the memev main commit that merged pull request #358 (SO-F-03), the commit the red runs are judged at.",
+          "verifier": {
+            "type": "command",
+            "cmd": "[ \"$MEMEV_CONTRACT_BASE\" = ba24c82e16c91f5962f20d49b396d46054a505da ] && [ \"$(git rev-parse --show-toplevel)\" = \"$(pwd -P)\" ]",
+            "expect_exit": 0
+          }
+        },
+        {
+          "statement": "The existing suite stays green",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "The leak scan passes on files",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "The leak scan passes on every commit message",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/leak-scan.mjs --history",
+            "expect_exit": 0,
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "Commits are authored by the repository owner's GitHub account with its noreply address, carry no AI markers, and add no em-dash",
+          "verifier": {
+            "type": "command",
+            "cmd": "test -z \"$(git log origin/main..HEAD --format=%ae | grep -v 'users.noreply.github.com$')\" && test -z \"$(git log origin/main..HEAD --format=%B | grep -iE 'co-authored-by|generated (with|by)')\" && test -z \"$(git diff origin/main...HEAD | grep -F \"$(printf '\\342\\200\\224')\")\"",
+            "expect_exit": 0,
+            "timeout_s": 120
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "statement": "Committed and pushed on its own branch for review; nothing is pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task.",
+        "A criterion that cannot be checked from this repository is reported as unchecked, never marked as passing.",
+        "Anything outside the requirements of this task is not built, not stubbed and not defaulted in code; if the work seems to need it, stop and report what it needs.",
+        "A test_red_green command of this contract prints its whole output: it is never piped through tail or head, and never captures its output without printing it."
+      ]
+    }
+  ]
+}
