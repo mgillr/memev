@@ -1,14 +1,109 @@
-# Organisational intelligence
+# Organisational intelligence (planned)
 
-[Back to the docs index](README.md)
+Part of the [Memev documentation](README.md). Up: the [README](../README.md). Related:
+[Federation](FEDERATION.md), [Projects](PROJECTS.md), [Contracts](CONTRACTS.md),
+[Data sovereignty](DATA-SOVEREIGNTY.md).
 
-How a shared workspace can notice something across otherwise independent work without becoming an unbounded inference engine. This page defines the one record the layer produces, a finding, and the three events that let people dismiss, correct and decide it. The code is the finding part of `src/engine/graph.mjs`, and `test/findings.test.mjs` pins what is written here.
+> **Planned. Architectural target, not shipped code.** The local knowledge graph and the contracts
+> are built; everything that crosses a site or an organisation on this page rests on the planned
+> federation ([FEDERATION.md](FEDERATION.md)) and carries the planned label.
 
-## Status
+## Purpose
 
-Planned. The finding model is built and tested as a data model on the memory graph: raising, dismissing, correcting, adjudicating and verifying a finding are graph operations, a reader sees a finding only as far as their scope allows, and `resolveActor` with `Graph.bindFindingEvent` make the operations from a credential. Nothing raises a finding yet, and nothing calls that entry point: the vault does not write finding operations, so the step that makes `by` trustworthy in a running product is unbuilt (see "Who counts"). No code watches work across projects, detects a conflict or a link, ranks findings or routes a decision; that detection, with its precision and recall, is the next contract (SO-F-13) and stays an architectural target until it lands. The product does not offer this layer today, and the names and shapes here may change before it does.
+Memev is intended to maintain an evolving, evidence-linked understanding of authorised work
+across one person, a business, a multi-site organisation (planned) or a federation of independent
+organisations (planned).
 
-## What a finding is
+The unit of understanding is not limited to a chat, a person or a project. Work may be connected
+through projects, programmes, portfolios, departments, business functions, suppliers, systems,
+sites and organisations. The same model should work from one person's projects through to a
+corporate portfolio.
+
+People continue to use the AI assistants and tools they prefer. Memev is meant to provide the shared
+context, relationships, state and coordination mechanisms that let independently operating tools
+and participants work against the same authorised picture (planned beyond one vault).
+
+## The work model
+
+The intended canonical work graph can represent:
+
+- people, roles, teams and organisational units;
+- AI agents, service identities, devices and delegated capabilities;
+- projects, programmes, portfolios and workstreams;
+- tasks, milestones, deliverables and dependencies;
+- requirements, constraints, interfaces and technical artefacts;
+- decisions, approvals, assumptions and unresolved questions;
+- procurement, budgets, commercial commitments and delivery obligations;
+- risks, issues, incidents and change requests;
+- evidence, provenance, versions, verification and ownership;
+- sites, jurisdictions, organisations and federation relationships.
+
+The graph connects information that remains in different systems. It does not require every source
+document or database to be copied into one central repository. A node may hold the source, a
+permitted projection, a reference, a verified summary or a query interface, depending on policy.
+
+## Cross-functional reasoning
+
+Memev should be able to detect when a change in one work area may affect other work areas, even
+when the participants did not manually connect them.
+
+Example: a project updates a component's dimensions and thermal constraints. Another project
+contains an installation plan that depends on the previous dimensions. A programme milestone,
+procurement order and portfolio delivery commitment may also depend on the old specification.
+
+The system should:
+1. identify the changed source and exact version;
+2. locate related requirements, artefacts, tasks and commitments;
+3. distinguish direct evidence from inferred relationships;
+4. calculate or explain potential downstream effects;
+5. identify owners and the decisions that may be required;
+6. present the evidence, uncertainty and last-confirmed time;
+7. request validation where the relationship or consequence is not proven;
+8. track the accepted resolution and its effect on dependent work.
+
+The same reasoning applies outside engineering: a procurement change can affect finance and
+delivery; a staffing change can affect capacity and programme dates; a contractual change can
+affect sales commitments, operations and compliance.
+
+## Evidence and authority
+
+Memev must not silently convert a hypothesis into a fact or change an approved commitment merely
+because an agent inferred a dependency.
+
+Every important relationship should carry its basis: source references, versions, timestamps,
+provenance, confidence or verification status, and the identity or process that accepted it.
+Inferred dependencies remain hypotheses until validated by an authorised person or an approved
+verification process.
+
+The finding model below is where this rule is written down for the graph: a finding is a claim that evidence alone caps at theory.
+
+Convergence is not truth. A converged task state is not proof of completion; a signed statement is
+not automatically an authorised approval; a model-generated explanation is not evidence by itself.
+
+## Personal, Business and Corporate scale
+
+| Scope | Intelligence context |
+|---|---|
+| Personal | connect the person's projects, tools, decisions, files and ongoing work across AI sessions and computers |
+| Business, one node | relate projects, customers, suppliers, staff capacity, finance, operations and delivery commitments in the one company vault (coming) |
+| Business, several sites (planned, with the multi-site federation design) | identify dependencies across sites and teams while respecting local ownership |
+| Corporate (planned) | reason across programmes, portfolios, functions, risk, governance and international sites |
+| Cross-organisation federation (planned) | coordinate selected work and commitments between independent participants without merging their private organisational memories |
+
+The graph's scale changes; its underlying concepts of identity, scope, provenance, evidence and
+authority do not.
+
+## The finding model
+
+How a shared workspace can notice something across otherwise independent work without becoming an unbounded inference engine. This section defines the one record the layer produces, a finding, and the three events that let people dismiss, correct and decide it. The code is the finding part of `src/engine/graph.mjs`, and `test/findings.test.mjs` pins what is written here.
+
+The model is the first built piece of the evidence-and-authority rule above: what the layer produces is a finding, which evidence can take no further than theory, and which a person or a verification record has to confirm before it counts as a fact.
+
+### Status of the finding model
+
+Planned. The finding model is built and tested as a data model on the memory graph: raising, dismissing, correcting, adjudicating and verifying a finding are graph operations, a reader sees a finding only as far as their scope allows, and `resolveActor` with `Graph.bindFindingEvent` make the operations from a credential. Nothing raises a finding yet, and nothing calls that entry point: the vault does not write finding operations, so the step that makes `by` trustworthy in a running product is unbuilt (see "The cap and who counts"). No code watches work across projects, detects a conflict or a link, ranks findings or routes a decision; that detection, with its precision and recall, is the next contract (SO-F-13) and stays an architectural target until it lands. The product does not offer this layer today, and the names and shapes here may change before it does.
+
+### What a finding is
 
 A finding is a claim in the memory graph, the same claim `src/engine/graph.mjs` already holds for `memev_claim`, with more attached to it:
 
@@ -19,7 +114,7 @@ A finding is a claim in the memory graph, the same claim `src/engine/graph.mjs` 
 
 The status is the claim status the graph already derives: conjecture, theory, fact, contested or refuted. Findings are stored as claims, so they are saved with the graph snapshot and rebuilt from the log the same way.
 
-## The cap
+### The cap and who counts
 
 For an ordinary claim, support of 0.85 or more from at least two independent sources, with opposition under 0.2, makes it a fact. That rule is unchanged.
 
@@ -39,7 +134,7 @@ Who counts is decided from the subject named in the event, and that subject is m
 
 **What is unbuilt.** `resolveActor` does not authenticate a credential, and nor does the graph: it trusts that the token or binding it is given was verified by the boundary that received it. The log is replayed as it was written, so a record that did not come through `bindFindingEvent` carries whatever `by` its writer set, and is as trusted as the log file. Nothing in the product writes these operations yet and no module outside `graph.mjs` names them; when a writer does, it must call `bindFindingEvent`, and until it does the guarantee holds only for callers that use them. A source event named in a finding is the raiser's claim and is not looked up in the log.
 
-## The three events
+### The three events
 
 Each is an append-only operation in the same log as claims, named for what it does. Nothing is deleted; each leaves an entry in the finding's own history with who acted, when, an optional reason and whether it took effect.
 
@@ -49,7 +144,7 @@ Each is an append-only operation in the same log as claims, named for what it do
 
 Verification (`claim.finding.verify`) is a separate record, not one of the three. It is how a passing verification record reaches a finding without a person.
 
-## What is provisional
+### What is provisional
 
 These are placeholders until the decisions that own them land, and they may change with them:
 
@@ -57,7 +152,7 @@ These are placeholders until the decisions that own them land, and they may chan
 - **The confirm and reject outcomes.** They are in `FINDING_AUTHORITY` as the outcomes of an adjudication, and stand in for the seven decision states of the decision queue (SO-A-05, SO-1.08), which are not in code yet. When they land, adjudication moves onto them.
 - **A decision over the evidence** (`overridden`), as above, until the knowledge status lattice of PG-10.1.
 
-## What a reader sees
+### What a reader sees
 
 A finding never discloses a record its reader has no permission for. Permission is the scope rule of SO-F-01: a reader's scope reads a source only when it is that source's scope.
 
@@ -68,13 +163,30 @@ A finding never discloses a record its reader has no permission for. Permission 
 
 This is a view over the graph. The ordinary claim listing and provenance calls of the vault do not know about it and are not changed here, so nothing may raise a finding through them until they route through this view.
 
-## What is not here
+### What the finding model does not do
 
 - Detecting anything: conflicts, links between projects, decision routing, precision and recall (SO-F-13).
 - A fact lattice. The knowledge status lattice is owned by the programme package that defines it; when it lands, the cap here maps into it as at most corroborated.
 - Any merge engine. Findings travel as operations like any other graph operation, and convergence stays behind the provider boundary of `src/engine/merge.mjs`.
 - A second store. Findings live in the vault's graph.
 
-## Change log
+### Change log
 
 - Version 1: the finding model, the cap, the four events and the scoped view.
+
+## Status and implementation boundary
+
+The current repository contains a local knowledge graph and the contract mechanisms (built). The
+project state machine is planned: its code is present in `src/engine/project-state.mjs` and
+nothing imports it yet ([PROJECTS.md](PROJECTS.md)). The finding model ([above](#the-finding-model)) is built and tested as a data model on the local graph, and nothing raises a finding yet. Those are foundations, not proof that a
+complete organisation-wide graph or continuous cross-site reasoning engine is already implemented.
+
+The wider work graph, cross-system dependency discovery, federated queries, impact analysis and
+continuous portfolio-level reasoning are architectural targets, all planned. They require
+canonical schemas, source adapters, policy evaluation, provenance, evaluation datasets and
+measurable precision/recall criteria.
+
+A first useful implementation should focus on a bounded project or programme: ingest versioned
+sources, map explicit dependencies, identify a real change impact, show its evidence and obtain
+human validation. Expansion to cross-functional and cross-site reasoning should follow demonstrated
+accuracy and safe authority handling.
