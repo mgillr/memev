@@ -1,7 +1,7 @@
 name: Free Core bug report
 description: Report a reproducible problem in the invited Free Core Preview.
 title: "[Free Core] "
-labels: ["bug", "free-core-preview"]
+labels: ["bug"]
 body:
   - type: markdown
     attributes:
