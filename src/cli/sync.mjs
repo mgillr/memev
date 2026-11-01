@@ -33,8 +33,8 @@ function rawLicense(env = process.env) {
   try { return JSON.parse(fs.readFileSync(licenseFile(env), 'utf8')); } catch { return null; }
 }
 
-// the paid client module, present only when the install ships it; its presence is the "installed"
-// check, and the engine command is reached through the boundary's commandProvider, never imported
+// the paid client module; it ships with every install, so its presence alone does not make the engine installed. The engine
+// command is reached through the boundary's commandProvider, never imported.
 const PAID_CLIENT = new URL('../engine/paid-merge.mjs', import.meta.url);
 
 /** The paid engine flag: off by default on every install. */
@@ -42,17 +42,32 @@ export function paidEngineOn(config) {
   return config?.merge?.paid === true;
 }
 
+/** Whether a configured engine command can be run: an existing file when it names a path, or found on the PATH when it is a bare name. */
+function commandFound(command, env = process.env) {
+  const runnable = (f) => { try { return fs.statSync(f).isFile(); } catch { return false; } };
+  if (command.includes('/') || command.includes(path.sep)) return runnable(command);
+  const exts = process.platform === 'win32' ? ['', ...String(env.PATHEXT ?? '.EXE;.CMD;.BAT').split(';')] : [''];
+  return String(env.PATH ?? '').split(path.delimiter).filter(Boolean).some((d) => exts.some((x) => runnable(path.join(d, command + x))));
+}
+
 /**
- * The state of the paid engine flag, for the status line: on only when the install turns it on,
- * and usable only when the paid client is installed; otherwise the free behaviour runs and the
- * reason says which.
+ * The state of the paid engine, for the status line. `on` is the flag. `installed` means there is an engine the install can call: a
+ * provider it set itself (merge.provider), or a configured engine command (merge.command) that exists as a file or on the PATH, with
+ * the paid client module present. The licence is not part of it: the gate in merge.mjs still decides at each merge whether the engine
+ * is called. `reason` says why the free behaviour runs, or is null when the flag is on and the engine is installed.
  */
-export function paidEngineStatus(config, { client = PAID_CLIENT } = {}) {
+export function paidEngineStatus(config, { client = PAID_CLIENT, env = process.env } = {}) {
   const on = paidEngineOn(config);
-  const installed = fs.existsSync(client);
+  const merge = config?.merge ?? {};
+  let installed = false;
+  let why = null;
+  if (merge.provider) installed = true;
+  else if (!fs.existsSync(client)) why = 'the engine is not installed';
+  else if (typeof merge.command !== 'string' || !merge.command) why = 'the paid engine has no command configured';
+  else if (!commandFound(merge.command, env)) why = `the engine command is not installed: ${path.basename(merge.command).slice(0, 64)}`;
+  else installed = true;
   if (!on) return { on: false, installed, reason: 'the paid engine flag is off' };
-  if (!installed) return { on: true, installed: false, reason: 'the engine is not installed' };
-  return { on: true, installed: true, reason: null };
+  return { on: true, installed, reason: installed ? null : why };
 }
 
 /** The lines of a jsonl file that are valid JSON objects with a device and a dseq. */
@@ -129,8 +144,7 @@ function paidEngineFor(config, opts) {
   if (opts.stop) return { reason: 'the stop sync skips the merge engine' };
   const st = paidEngineStatus(config, { client: opts.client });
   if (!st.installed) return { reason: st.reason };
-  const command = config?.merge?.command;
-  if (typeof command !== 'string' || !command) return { reason: 'the paid engine has no command configured' };
+  const command = config.merge.command;
   const provider = commandProvider(command, { args: config.merge.args ?? [], timeoutMs: opts.engineTimeoutMs ?? config.merge.timeout_ms ?? 30000, maxBuffer: ENGINE_MAX_BUFFER });
   return { provider };
 }
