@@ -1,0 +1,202 @@
+{
+  "title": "SR-1.34 A daemon start waits long enough for a slow machine, and a hook says 'starting'",
+  "project": "memev",
+  "workdir": null,
+  "request": "Closes the open follow-up 'Raise the daemon start wait' (docs/scope-one/RECONCILIATION.md, found 1 Nov 2026; not in the gap register of the investment analysis): startDaemon and ensureDaemon wait 6000 ms (src/cli/daemon.mjs:69 and :76), then stop the daemon (daemon.mjs:91-92). On a slow Windows runner the daemon has not reached listen by then (src/server/main.mjs opens the vault at line 28 before listen; its 'cannot listen' line is at line 45), so it is stopped before it can write its log: the start reports 'did not start', the listen-error line is never written, and a session-start hook shows 'Memev is not reachable' instead of the resume card (hooks.mjs:192). Measured on the Windows job of ci.yml on main: the daemon did not serve within 6 s in 8 runs of doctor MEM-006 AC02, the worst bound for one start is 12.7 s (run 41244882353, job 124666127747), the ceiling is 30 s (see requirement 6; the logs carry no start-to-serving time, so this is a bound). Repository: memev. Depends on contracts: SR-1.01, SR-1.24 (both signed in their second versions and left untouched: src/cli/daemon.mjs is already in the scope of SR-1.01 T3 and SR-1.24 T1, and neither names the start wait). Sequenced with SR-1.01 and SR-1.24, which change src/cli/daemon.mjs. Sensitive path: none (the oplog is not touched).",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "A start waits long enough for a slow machine, and a hook says 'starting'",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "src/cli/daemon.mjs exports START_WAIT_MS = 30000 and uses it as the default wait of ensureDaemon and startDaemon in place of 6000. The wait is a ceiling, not a delay: the loop already returns as soon as this vault's daemon answers and stops as soon as the child exits with anything but 3, and that does not change. When the wait ends the daemon is still stopped, as today (daemon.mjs:91-92), so a start that gives up leaves no daemon that comes up unreported",
+        "the hook path keeps a short wait: src/cli/hooks.mjs defines HOOK_START_WAIT_MS = 4000 and passes it to ensureDaemon (hooks.mjs:84). Hooks still fail open and exit 0. A start made by a hook whose short wait ends does NOT stop the daemon it began, because stopping it would make 'still starting' untrue and a slow machine would never get a daemon from hooks alone: startDaemon takes an option for this (for example { keep: true }) that skips the stop at the end of the wait and leaves the child to come up; the stop at the end of a start made by memev start, memev init or memev restart is unchanged. The daemon's own lock (daemon.lock, main.mjs:20-26) keeps two starts from running two daemons",
+        "when the daemon is still starting (daemon.lock names a live pid and the daemon has not answered), the session-start card says 'starting' and names no error, instead of 'Memev is not reachable right now' (hooks.mjs:192 at main b5932d3); when no daemon is starting the existing text stays",
+        "memev start and memev init print one line to stderr when a start is still waiting after 6 s: 'Memev is still starting; waiting up to 30 s (see <path of daemon.log>)'. Quiet callers print nothing. init calls startDaemon with quiet:true (main.mjs:272), so the line comes from a callback or option that init and start pass, not from the quiet flag",
+        "ensureDaemon in mcp-stdio.mjs, bus-cli.mjs and memev start keep the long default; nothing outside src/cli/daemon.mjs, src/cli/hooks.mjs and src/cli/main.mjs changes behaviour",
+        "the ceiling comes from measurement and is recorded here, not guessed. The Windows job's CI logs on main (the ci.yml runs 41197857234 to 41277608997, 64 job attempts, 19 failed) hold no daemon start-to-serving time: a test reports its own duration and a pass or fail, and the daemon log is not in the log. The evidence that the logs do give is (a) the daemon did not serve within the 6 s wait in every one of the 8 failures of doctor test MEM-006 AC02, and (b) that test's total duration in each: 7.6 s, 8.3 s, 8.4 s, 8.9 s, 9.8 s, 11.0 s and 12.7 s before the 20 s poll was added, and 30.6 s after it (run 41274568215 attempt 1, job 124754017252). The worst bound for ONE start is 12.7 s (run 41244882353 attempt 1, job 124666127747: the whole test, which holds the vault creation, the 6 s wait and two onboarding runs, so the start itself took at most that, and more than 6 s). 2 x 12.7 s = 25.4 s, rounded up to the clean number 30 s. This is a bound, not a measured start time, and it is flagged: the measurements table in the pull request that adds this spec lists every value with its run and job. The ceiling is to be re-set from a real start-to-serving time as soon as one is logged (an open question in the pull request, not a criterion here)",
+        "the retry that doctor MEM-006 AC02 carries (pull request #372, a workaround for this item, comment pointing at SR-1.01 and SR-1.24) is removed by this task, and test/start-window-listen-error.test.mjs, which states why a wait cannot see the line, stays"
+      ],
+      "description": "",
+      "scope": {
+        "allow": [
+          "src/cli/daemon.mjs",
+          "src/cli/hooks.mjs",
+          "src/cli/main.mjs",
+          "test/daemon-start-wait.test.mjs",
+          "test/start-window-listen-error.test.mjs",
+          "test/doctor.test.mjs",
+          "test/helpers/**",
+          "docs/MODULES.md",
+          "changelog.d/SR-1.34.md"
+        ]
+      },
+      "criteria": [
+        {
+          "statement": "startDaemon called with no waitMs, with a spawn that starts src/server/main.mjs 8 s late, returns true and the daemon that answers is the one that was just started; the same call returns false at the base code, which waits 6000 ms (T1-c1)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/daemon-start-wait.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.34 late start' test/daemon-start-wait.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.34 late start$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With the same 8 s late spawn and MEMEV_BIND=192.0.2.1 (an address this machine does not have), startDaemon with no waitMs returns false after the daemon exits, .memev/daemon.log holds a line '[memev] cannot listen on 192.0.2.1:<port>: listen E...', and whyNotRunning returns 'the last start could not listen on 192.0.2.1:<port>: listen E...' (T1-c2)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/daemon-start-wait.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.34 late listen error' test/daemon-start-wait.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.34 late listen error$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A daemon that exits as soon as it starts makes startDaemon return within 2 s of the exit, not at the ceiling: exit code 5 (the vault is locked, held by a live pid the test starts), exit code 4 (the port is held by another program) and exit code 1 (an uncaught error at startup). Measured with Date.now() around the call, with a ceiling of 30 s (T1-c3)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/daemon-start-wait.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.34 early exit' test/daemon-start-wait.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([3-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.34 early exit$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A daemon that never starts (the spawn is replaced by a process that only sleeps) makes startDaemon return false only when its wait ends, and the process it began is dead afterwards, so none comes up unreported. The existing test 'a start that gives up stops the daemon it began' in test/daemon.test.mjs passes unchanged (T1-c4)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/daemon-start-wait.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.34 never starts' test/daemon-start-wait.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.34 never starts$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "src/cli/daemon.mjs exports START_WAIT_MS, it equals 30000, and it is the default wait of both ensureDaemon and startDaemon: the literal 6000 no longer appears in startDaemon or ensureDaemon. Rationale and measurements: the request of this contract (T1-c5)",
+          "verifier": {
+            "type": "command",
+            "cmd": "node -e \"import('./src/cli/daemon.mjs').then((m)=>{const s=require('fs').readFileSync('src/cli/daemon.mjs','utf8');const sig=s.split('\\n').filter((l)=>/export async function (startDaemon|ensureDaemon)/.test(l)).join('\\n');if(m.START_WAIT_MS!==30000||/6000/.test(sig)||(sig.match(/START_WAIT_MS/g)||[]).length!==2)process.exit(1);})\"",
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "src/cli/hooks.mjs defines HOOK_START_WAIT_MS = 4000 and passes it as waitMs to ensureDaemon on the hook path (hooks.mjs:84 at main b5932d3); mcp-stdio, the bus commands and memev start keep the long default (T1-c6)",
+          "verifier": {
+            "type": "command",
+            "cmd": "node -e \"const s=require('fs').readFileSync('src/cli/hooks.mjs','utf8');if(!/HOOK_START_WAIT_MS\\s*=\\s*4000/.test(s)||!/ensureDaemon\\(root,\\s*\\{[^}]*waitMs:\\s*HOOK_START_WAIT_MS/.test(s))process.exit(1);for(const f of ['src/cli/mcp-stdio.mjs','src/cli/bus-cli.mjs']){if(/HOOK_START_WAIT_MS/.test(require('fs').readFileSync(f,'utf8')))process.exit(1);}\"",
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "Hook path with the daemon 8 s late (late spawn through a test seam): a session-start hook and a prompt hook each return within HOOK_START_WAIT_MS plus 500 ms, exit 0, and write nothing to stderr. A hook's start that gives up does not stop the daemon it began: after the hook has returned, the daemon is still alive and, once it is up, answers /healthz with this vault's vault_id (T1-c7)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/daemon-start-wait.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.34 hook late daemon' test/daemon-start-wait.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([2-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.34 hook late daemon$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "When the daemon is still starting (daemon.lock names a live pid, so the daemon has been spawned and has not answered yet), the session-start card says 'starting' and names no error: the text contains 'Memev is starting' and does not contain 'not reachable', and the protocol text is still sent (T1-c8)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/daemon-start-wait.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.34 session card starting' test/daemon-start-wait.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.34 session card starting$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "When no daemon is starting (the spawn fails, or no live pid is named in daemon.lock), the session-start card keeps today's text 'Memev is not reachable right now (...)'; the two texts are never both shown (T1-c9)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/daemon-start-wait.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.34 session card not reachable' test/daemon-start-wait.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([1-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.34 session card not reachable$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "With the daemon 8 s late, memev start exits 0 and prints the running line, and memev init completes and reports the daemon running. With MEMEV_BIND=192.0.2.1, memev start exits 1 and prints the listen-error line, with no test-side retry (T1-c10)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/daemon-start-wait.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.34 start and init late' test/daemon-start-wait.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([2-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.34 start and init late$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "A start that is still waiting after 6 s prints one line to stderr, 'Memev is still starting; waiting up to 30 s (see <path of daemon.log>)', from memev start and from memev init; a start that answers within 6 s, and every quiet caller (hooks, mcp-stdio, the bus commands), print no such line (T1-c11)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/daemon-start-wait.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='SR-1.34 still starting line' test/daemon-start-wait.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -40; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -Eq '^# pass ([2-9]|[1-9][0-9]+)$' && printf '%s\\n' \"$out\" | awk -v pat='^SR-1.34 still starting line$' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }'"
+          }
+        },
+        {
+          "statement": "test/doctor.test.mjs MEM-006 AC02 no longer retries the start: the loop that asks for memev start again is gone, one init and the same assertions on the listen-error line and on ':undefined' remain, and the comment that points to the open start-wait item is removed (T1-c12)",
+          "verifier": {
+            "type": "command",
+            "cmd": "node -e \"const s=require('fs').readFileSync('test/doctor.test.mjs','utf8');const i=s.indexOf('MEM-006 AC02');const b=s.slice(i,s.indexOf('MEM-006 AC03'));if(/listen\\.test\\(out\\)/.test(b)||/Raise the daemon start wait/.test(b)||!/listen E\\[A-Z\\]\\+/.test(b)||!/:undefined/.test(b))process.exit(1);\"",
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "test/start-window-listen-error.test.mjs is kept and still passes: it states, with an explicit short waitMs, that a start which gives up before the daemon reaches listen leaves no listen-error line (T1-c13)",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/start-window-listen-error.test.mjs",
+            "cmd": "node --test test/start-window-listen-error.test.mjs"
+          }
+        },
+        {
+          "statement": "No mutant of the changed lines survives this task's test (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/daemon-start-wait.test.mjs\" --json",
+            "key": "survived",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run judged at least one mutant (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/daemon-start-wait.test.mjs\" --json",
+            "key": "mutants",
+            "op": ">",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The same run ignored no changed line (QL-1.02)",
+          "verifier": {
+            "type": "metric",
+            "cmd": "node scripts/gate/mutate.mjs --base \"$MEMEV_CONTRACT_BASE\" --test \"node --test test/daemon-start-wait.test.mjs\" --json",
+            "key": "ignored",
+            "op": "==",
+            "value": 0,
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "The full suite passes",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "One full run of test/daemon-start-wait.test.mjs passes every labelled subtest (T1-c1 to T1-c11) with nothing skipped and nothing todo.",
+          "verifier": {
+            "type": "command",
+            "cmd": "f=$(mktemp) && node --test --test-reporter=tap test/daemon-start-wait.test.mjs >\"$f\"; rc=$?; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && awk -v pat='^SR-1.34 late start|^SR-1.34 late listen error|^SR-1.34 early exit|^SR-1.34 never starts|^SR-1.34 hook late daemon|^SR-1.34 session card starting|^SR-1.34 session card not reachable|^SR-1.34 start and init late|^SR-1.34 still starting line' 'BEGIN { n = split(pat, alt, \"|\") } function flush(  i) { if (cand != \"\") for (i = 1; i <= n; i++) if (cand ~ alt[i]) hit[i] = 1; cand = \"\" } /^[[:space:]]*(not )?ok [0-9]+ - / { flush(); name = $0; sub(/^[[:space:]]*(not )?ok [0-9]+ - /, \"\", name); if ($0 ~ /^[[:space:]]*ok / && name !~ /# (SKIP|TODO)/ && name !~ /\\.test\\.m?js$/) cand = name; next } /^[[:space:]]*type: .suite./ { cand = \"\" } END { flush(); for (i = 1; i <= n; i++) if (!hit[i]) exit 1; exit 0 }' \"$f\"",
+            "timeout_s": 600
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line. Do not start the next task.",
+        "If the work needs a path outside scope: STOP and ask the owner to amend the contract. Never widen scope silently."
+      ]
+    }
+  ]
+}
