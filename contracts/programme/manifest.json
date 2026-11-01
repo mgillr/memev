@@ -340,7 +340,7 @@
       "tasks": 4,
       "criteria": 21,
       "spec": "specs/PGP-1.01-crdt-merge-four-correctness-bugs.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PGP-1.02",
@@ -361,7 +361,7 @@
       "tasks": 4,
       "criteria": 16,
       "spec": "specs/PGP-1.02-wire-project-engine-and-licence-guard.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PGP-1.03",
@@ -383,7 +383,7 @@
       "tasks": 4,
       "criteria": 22,
       "spec": "specs/PGP-1.03-memev-docs-tiers-reconciliation.json",
-      "status": "proposed: unsigned, signs after a clean red-team round",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
       "build_layer": "cites SO-A-11 as the owner of the overlapping part (see RECONCILIATION)"
     },
     {
@@ -401,7 +401,7 @@
       "tasks": 1,
       "criteria": 14,
       "spec": "specs/PGP-1.04-converge-fair-mem0-comparison.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PGP-1.05",
@@ -439,7 +439,7 @@
       "tasks": 2,
       "criteria": 19,
       "spec": "specs/PGP-1.06-memev-ops-sr3-engine-decision.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-01.1",
@@ -462,7 +462,7 @@
       "tasks": 3,
       "criteria": 10,
       "spec": "specs/PG-01.1-crdt-merge-correctness-fixes-for-the-agent-memor.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-02.1",
@@ -647,7 +647,7 @@
       "tasks": 4,
       "criteria": 24,
       "spec": "specs/PG-04.1-canonical-operation-envelope.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-05.1",
@@ -696,7 +696,7 @@
       "tasks": 4,
       "criteria": 22,
       "spec": "specs/PG-05.1-engine-integration-merge-semantics-mapping-bound.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-06.2",
@@ -730,7 +730,7 @@
       "tasks": 3,
       "criteria": 24,
       "spec": "specs/PG-06.2-replication-separate-from-acceptance.json",
-      "status": "proposed: unsigned, signs after a clean red-team round",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
       "supersedes": "PG-06.1",
       "supersedes_reason": "the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer; the signer decided to supersede the signed version"
     },
@@ -817,7 +817,7 @@
       "tasks": 2,
       "criteria": 13,
       "spec": "specs/PG-08.1-scope-one-lifecycle-gaps-intake-to-delivery.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-09.1",
@@ -863,7 +863,7 @@
       "tasks": 3,
       "criteria": 19,
       "spec": "specs/PG-09.1-identity-admission-and-acfa-boundary.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-09.2",
@@ -883,7 +883,7 @@
       "tasks": 1,
       "criteria": 9,
       "spec": "specs/PG-09.2-identity-admission-and-acfa-boundary.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-10.1",
@@ -927,7 +927,7 @@
       "tasks": 4,
       "criteria": 28,
       "spec": "specs/PG-10.1-evidence-knowledge-status-and-receipts.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-12.2",
@@ -961,7 +961,7 @@
       "tasks": 3,
       "criteria": 15,
       "spec": "specs/PG-12.2-multi-node-gossip-transport.json",
-      "status": "proposed: unsigned, signs after a clean red-team round",
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)",
       "supersedes": "PG-12.1",
       "supersedes_reason": "the owner's no-duplication rule and the owner delegation of 1 Nov 2026, under which the fold is the build layer; the signer decided to supersede the signed version"
     },
@@ -1059,7 +1059,7 @@
       "tasks": 5,
       "criteria": 28,
       "spec": "specs/PG-13.1-federation-sites-sharing-classes-disclosure.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-14.1",
@@ -1105,7 +1105,7 @@
       "tasks": 5,
       "criteria": 33,
       "spec": "specs/PG-14.1-federation-demonstrators-and-benchmark.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-15.1",
@@ -1132,7 +1132,7 @@
       "tasks": 1,
       "criteria": 9,
       "spec": "specs/PG-15.1-licensing-boundary.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-16.1",
@@ -1168,7 +1168,7 @@
       "tasks": 2,
       "criteria": 11,
       "spec": "specs/PG-16.1-positioning-tiers-public-claims-blueprint.json",
-      "status": "proposed: unsigned, signs after a clean red-team round"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
       "id": "PG-18.1",
