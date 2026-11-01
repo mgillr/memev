@@ -8,8 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { tmpdir, cleanup, PKG } from './helpers/tmp.mjs';
-import { ProjectStore, ProjectStoreError, SCHEMA_VERSION, ENTITY_KINDS } from '../src/engine/project-store.mjs';
-import { MERGE_CLASSES, semanticConflicts } from '../src/engine/project-state.mjs';
+import { ProjectStore, ProjectStoreError, SCHEMA_VERSION, ENTITY_KINDS, MERGE_CLASSES, semanticConflicts } from '../src/engine/project-store.mjs';
 import { SUBJECT_TYPES } from '../src/engine/identity.mjs';
 
 after(cleanup);
@@ -48,7 +47,8 @@ test('SO-F-02 AC02: the store refuses an entity of a type that has no merge clas
   const bad = { note: { file: 'notes.json', prefix: 'note', required: ['text'], authority: 'person', scopeVersionField: 'scope_version' } };
   const store = new ProjectStore(root, { id: 'p-class', kinds: bad }).open();
   assert.throws(() => store.put('note', { text: 'x' }), (e) => e instanceof ProjectStoreError && e.code === 'no_merge_class' && /note/.test(e.message));
-  assert.equal(readLog(dirOf(root, 'p-class')).some((r) => r.entity?.kind === 'note'), false, 'nothing was written');
+  const written = fs.existsSync(path.join(dirOf(root, 'p-class'), 'events.jsonl')) ? readLog(dirOf(root, 'p-class')) : [];
+  assert.equal(written.some((r) => r.entity?.kind === 'note'), false, 'nothing was written');
   store.close();
   for (const [name, patch] of [['an unknown class', { mergeClass: 'newest-wins' }], ['no authority', { mergeClass: 'append-only', authority: undefined }], ['an authority that is no subject type', { mergeClass: 'append-only', authority: 'robot' }]]) {
     const root2 = tmpdir();

@@ -6,28 +6,77 @@
 // processes appending to the same project serialize without interleaving a partial line.
 import fs from 'node:fs';
 import path from 'node:path';
-import { readJson, writeJson, now, randomToken, exists } from './util.mjs';
+import { readJson, writeJson, now, randomToken, exists, sha256 } from './util.mjs';
 import { findSecrets, redactSecrets } from './secrets.mjs';
 import { formatHlc, parseHlc, recordHash } from './oplog.mjs';
+import { SUBJECT_TYPES } from './identity.mjs';
 
 // The current schema version. A store at an older version is migrated forward on open; a store at a
 // newer version is refused (this Memev does not know its layout) and nothing is written.
 export const SCHEMA_VERSION = 2;
 const STATE = '.memev';
 
-// The handoff's minimum entities (section 7). Each kind has a snapshot file, an id prefix and the
-// required fields its validator enforces. `event` has no snapshot: it lives only in the log.
-const KINDS = {
-  project: { file: 'project.json', prefix: 'proj', required: ['name'] },
-  task: { file: 'tasks.json', prefix: 'task', required: ['title'] },
-  lease: { file: 'leases.json', prefix: 'lease', required: ['task_id'] },
-  attempt: { file: 'attempts.json', prefix: 'att', required: ['task_id'] },
-  evidence: { file: 'evidence.json', prefix: 'ev', required: ['task_id'] },
-  conflict: { file: 'conflicts.json', prefix: 'conf', required: ['task_id'] },
-  session: { file: 'sessions.json', prefix: 'sess', required: ['project_id'] },
-  approval: { file: 'approvals.json', prefix: 'appr', required: ['task_id'] },
-  event: { file: null, prefix: 'evt', required: ['type'] },
-};
+// The merge classes an entity type may declare (SO-F-02). The core only records which class a type has: it applies none
+// itself. The free path keeps both versions of a competing write, and the merge provider boundary (src/engine/merge.mjs)
+// is where a class would be applied. last-writer: the newest write stands. set-union: the elements of every write stand.
+// append-only: nothing is replaced, every write is kept. human-resolution: competing writes are surfaced and a person settles them.
+export const MERGE_CLASSES = Object.freeze(['last-writer', 'set-union', 'append-only', 'human-resolution']);
+
+/** The decisions an approval can record. Two different decisions on one task are incompatible. */
+export const APPROVAL_DECISIONS = Object.freeze(['approve', 'reject']);
+
+/**
+ * The semantic part of conflict detection that the version check (applyUpdate in project-state.mjs) does not catch: approvals on one task that
+ * say incompatible things, whatever version each was given on. Input is the approvals in log order, each
+ * { event, id, task_id, decision, task_version, resolves? } where `event` is the id of the log event that recorded it.
+ * An approval with no decision is ignored, and an approval that lists event ids in `resolves` takes those events out of
+ * the comparison (a person settling it). A task whose remaining approvals hold more than one decision gives one conflict
+ * record that names every one of those events and applies none of them. Pure: it changes nothing it is given.
+ */
+export function semanticConflicts(approvals) {
+  const decided = (approvals ?? []).filter((a) => a && APPROVAL_DECISIONS.includes(a.decision));
+  const settled = new Set(decided.flatMap((a) => (Array.isArray(a.resolves) ? a.resolves : [])));
+  const byTask = new Map();
+  for (const a of decided) {
+    if (settled.has(a.event)) continue;
+    if (!byTask.has(a.task_id)) byTask.set(a.task_id, []);
+    byTask.get(a.task_id).push(a);
+  }
+  const out = [];
+  for (const [task_id, list] of byTask) {
+    const decisions = [...new Set(list.map((a) => a.decision))];
+    if (decisions.length < 2) continue;
+    out.push({
+      kind: 'semantic',
+      task_id,
+      events: list.map((a) => a.event),
+      approvals: list.map((a) => a.id),
+      decisions: list.map((a) => a.decision),
+      task_versions: list.map((a) => a.task_version ?? null),
+      applied: [],
+      reason: `incompatible approvals on one task (${decisions.join(' and ')}): neither is applied, a person must resolve it`,
+    });
+  }
+  return out;
+}
+
+// The entity types (the handoff's section 7), each declared the way docs/schemas/project-v1.json declares it: a snapshot
+// file, an id prefix, the required fields its validator enforces, the authority owner (a subject type of the identity
+// model: whose word settles the entity when sources disagree), the scope version field it may carry, and its merge class
+// (SO-F-02). `event` has no snapshot: it lives only in the log. The store refuses an entity of a type that declares no
+// merge class. The declarations are frozen: a test holds them equal to the schema file.
+const declare = (file, prefix, required, authority, mergeClass) => Object.freeze({ file, prefix, required: Object.freeze(required), authority, scopeVersionField: 'scope_version', mergeClass });
+export const ENTITY_KINDS = Object.freeze({
+  project: declare('project.json', 'proj', ['name'], 'person', 'last-writer'),
+  task: declare('tasks.json', 'task', ['title'], 'person', 'human-resolution'),
+  lease: declare('leases.json', 'lease', ['task_id'], 'service', 'last-writer'),
+  attempt: declare('attempts.json', 'att', ['task_id'], 'agent', 'append-only'),
+  evidence: declare('evidence.json', 'ev', ['task_id'], 'service', 'append-only'),
+  conflict: declare('conflicts.json', 'conf', ['task_id'], 'person', 'human-resolution'),
+  session: declare('sessions.json', 'sess', ['project_id'], 'device', 'last-writer'),
+  approval: declare('approvals.json', 'appr', ['task_id'], 'person', 'human-resolution'),
+  event: declare(null, 'evt', ['type'], 'service', 'append-only'),
+});
 
 export class ProjectStoreError extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -41,7 +90,7 @@ function pidAlive(pid) {
 }
 
 export class ProjectStore {
-  constructor(root, { id, deviceId = null, fsync = true, allowSecrets = false } = {}) {
+  constructor(root, { id, deviceId = null, fsync = true, allowSecrets = false, kinds = {} } = {}) {
     if (!id || /[/\\]|\.\./.test(String(id)) || String(id).startsWith('.')) {
       throw new ProjectStoreError('bad_id', `not a project id: ${id}`);
     }
@@ -50,16 +99,18 @@ export class ProjectStore {
     this.deviceId = deviceId;
     this.fsync = fsync;
     this.allowSecrets = allowSecrets;
+    this.kinds = { ...ENTITY_KINDS, ...kinds };
     this.dir = path.join(this.root, STATE, 'projects', this.id);
     this._open = false;
     this._lockDepth = 0;
     this.seq = 0; this.generation = 0; this.entities = new Map(); this.eventKeys = new Map(); this.usedIds = new Set(); this.recovered = []; this.clock = { ms: 0, c: 0 };
+    this.approvals = new Map(); this._overlaid = [];
   }
 
   get eventsPath() { return path.join(this.dir, 'events.jsonl'); }
   get metaPath() { return path.join(this.dir, 'meta.json'); }
   get lockPath() { return path.join(this.dir, '.lock'); }
-  snapshotPath(kind) { return path.join(this.dir, KINDS[kind].file); }
+  snapshotPath(kind) { return path.join(this.dir, this.kinds[kind].file); }
 
   open() {
     const meta = readJson(this.metaPath, null);
@@ -80,7 +131,7 @@ export class ProjectStore {
   // record one migration event. The log becomes the source of truth, so a later open rebuilds from it.
   _migrate(from, meta) {
     let seq = 0;
-    for (const [kind, def] of Object.entries(KINDS)) {
+    for (const [kind, def] of Object.entries(this.kinds)) {
       if (!def.file) continue;
       const snapPath = this.snapshotPath(kind);
       if (!exists(snapPath)) continue;
@@ -104,6 +155,7 @@ export class ProjectStore {
   // torn or edited: it is skipped and reported, and every valid record after it is kept.
   _replay() {
     this.seq = 0; this.generation = 0; this.entities = new Map(); this.eventKeys = new Map(); this.usedIds = new Set(); this.recovered = []; this.clock = { ms: 0, c: 0 };
+    this.approvals = new Map(); this._overlaid = [];
     if (!exists(this.eventsPath)) return;
     let content = fs.readFileSync(this.eventsPath, 'utf8');
     if (content.length && !content.endsWith('\n')) {
@@ -118,6 +170,7 @@ export class ProjectStore {
       try { rec = JSON.parse(line); } catch { this.recovered.push('events.jsonl: unreadable record skipped'); continue; }
       this._applyRecord(rec);
     }
+    this._derive();
   }
 
   _applyRecord(rec) {
@@ -129,7 +182,10 @@ export class ProjectStore {
     if (rec.entity) {
       const { kind, id, data } = rec.entity;
       if (!this.entities.has(kind)) this.entities.set(kind, new Map());
+      // a write replaces whatever the derivation laid over this entity; the derivation is run again after it
+      if (this._overlaid.length) this._overlaid = this._overlaid.filter((o) => !(o.kind === kind && o.id === id));
       this.entities.get(kind).set(id, data);
+      if (kind === 'approval') { this.approvals.delete(id); this.approvals.set(id, { event: rec.id, id, data }); }
       if (id) this.usedIds.add(id);
     }
     this.generation = Math.max(this.generation, (rec.gen ?? 0) + 1);
@@ -181,21 +237,65 @@ export class ProjectStore {
     });
     this._writeLine(rec);
     this._applyRecord(rec);
-    if (entity) this._writeSnapshot(entity.kind);
+    this._derive();
+    if (entity) {
+      const kinds = new Set([entity.kind]);
+      if (['approval', 'task', 'conflict'].includes(entity.kind)) { kinds.add('task'); kinds.add('conflict'); }
+      for (const k of kinds) this._writeSnapshot(k);
+    }
     return rec;
   }
 
-  // Validate an entity: the kind must be known and every required field must be present. Returns the
+  // The semantic part of the project layer (SO-F-02), derived from the log and never written to it: approvals on one task
+  // that say incompatible things, whatever version each was given on, put the task in CONFLICTED with a conflict record
+  // that names every one of those log events. Neither approval is applied, and both stay in the log and as entities.
+  // A person settles it with an approval that lists the events it resolves. The stored task is laid over by a copy; the
+  // entities the log holds are not changed, so the next replay derives the same thing again.
+  _derive() {
+    for (const o of this._overlaid.splice(0)) {
+      const m = this.entities.get(o.kind);
+      if (!m) continue;
+      if (o.raw === undefined) m.delete(o.id); else m.set(o.id, o.raw);
+    }
+    const live = [...this.approvals.values()].map((a) => ({ event: a.event, id: a.id, task_id: a.data.task_id, decision: a.data.decision, task_version: a.data.task_version, resolves: a.data.resolves }));
+    const lay = (kind, id, data) => {
+      if (!this.entities.has(kind)) this.entities.set(kind, new Map());
+      const m = this.entities.get(kind);
+      this._overlaid.push({ kind, id, raw: m.get(id) });
+      m.set(id, data);
+    };
+    for (const c of semanticConflicts(live)) {
+      const raw = this.entities.get('task')?.get(c.task_id);
+      if (raw) {
+        const conflict = raw.conflict ? { ...c, prior: raw.conflict } : { ...c };
+        lay('task', c.task_id, { ...raw, status: 'CONFLICTED', prior_status: raw.status, conflict });
+      }
+      lay('conflict', `conf_sem_${sha256(c.events.join('|')).slice(0, 12)}`, { ...c });
+    }
+  }
+
+  // Validate an entity: the kind must be known and declare a merge class, every required field must be present, a scope
+  // version must be a positive whole number, and an approval's decision must be one the schema knows. Returns the
   // entity with an id assigned (or the caller's id kept) and the data, or null for a bare event.
   _validate(ent) {
     if (!ent) return null;
-    const def = KINDS[ent.kind];
+    const def = this.kinds[ent.kind];
     if (!def) throw new ProjectStoreError('invalid', `unknown entity kind: ${ent.kind}`);
+    if (!MERGE_CLASSES.includes(def.mergeClass)) throw new ProjectStoreError('no_merge_class', `refused: the entity type ${ent.kind} declares no merge class (one of ${MERGE_CLASSES.join(', ')})`);
+    if (!SUBJECT_TYPES.includes(def.authority)) throw new ProjectStoreError('bad_declaration', `refused: the entity type ${ent.kind} declares no authority owner (a subject type: ${SUBJECT_TYPES.join(', ')})`);
     const data = ent.data ?? {};
     for (const f of def.required) {
       if (data[f] === undefined || data[f] === null || data[f] === '') {
         throw new ProjectStoreError('invalid', `missing required field: ${f}`);
       }
+    }
+    const sv = def.scopeVersionField;
+    if (sv && Object.hasOwn(data, sv) && !(Number.isInteger(data[sv]) && data[sv] > 0)) {
+      throw new ProjectStoreError('invalid', `${sv} must be a positive whole number`);
+    }
+    if (ent.kind === 'approval') {
+      if (data.decision !== undefined && !APPROVAL_DECISIONS.includes(data.decision)) throw new ProjectStoreError('invalid', `decision must be one of ${APPROVAL_DECISIONS.join(', ')}`);
+      if (data.resolves !== undefined && !(Array.isArray(data.resolves) && data.resolves.every((x) => typeof x === 'string'))) throw new ProjectStoreError('invalid', 'resolves must be a list of event ids');
     }
     const id = ent.id || this._newId(ent.kind);
     return { kind: ent.kind, id, data };
@@ -243,12 +343,12 @@ export class ProjectStore {
   }
 
   _writeSnapshot(kind) {
-    const def = KINDS[kind];
+    const def = this.kinds[kind];
     if (!def?.file) return;
     const entities = Object.fromEntries(this.entities.get(kind)?.entries() ?? []);
     writeJson(this.snapshotPath(kind), { schema_version: SCHEMA_VERSION, entities }, 0o600);
   }
-  _writeAllSnapshots() { for (const kind of Object.keys(KINDS)) this._writeSnapshot(kind); }
+  _writeAllSnapshots() { for (const kind of Object.keys(this.kinds)) this._writeSnapshot(kind); }
 
   // compact() keeps every transition (the event log is untouched) and drops only superseded snapshots:
   // the .bak copies a migration left beside the live files.
@@ -328,7 +428,7 @@ export class ProjectStore {
     if (o.ms > this.clock.ms || (o.ms === this.clock.ms && o.c > this.clock.c)) this.clock = o;
   }
   _newId(kind) {
-    const prefix = KINDS[kind].prefix;
+    const prefix = this.kinds[kind].prefix;
     for (let i = 0; i < 100; i++) {
       const id = `${prefix}_${this._tick()}_${randomToken(4)}`;
       if (!this.usedIds.has(id)) { this.usedIds.add(id); return id; }

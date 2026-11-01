@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Memev canonical project schema, version 1",
+  "description": "The entity types of the project store, each with the authority owner whose word settles it when sources disagree, the field that carries its scope version, and its merge class. The core records the class and applies none; the free path keeps both versions of a competing write. Two approvals on one task that say incompatible things derive to a semantic conflict. See docs/PROJECTS.md. The store is src/engine/project-store.mjs.",
+  "type": "object",
+  "required": [
+    "schema",
+    "store_schema_version",
+    "entities"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "memev-project/1"
+    },
+    "store_schema_version": {
+      "const": 2
+    },
+    "entities": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/entityDeclaration"
+      }
+    }
+  },
+  "$defs": {
+    "mergeClass": {
+      "description": "last-writer: the newest write stands. set-union: the elements of every write stand. append-only: nothing is replaced. human-resolution: competing writes are surfaced and a person settles them.",
+      "enum": [
+        "last-writer",
+        "set-union",
+        "append-only",
+        "human-resolution"
+      ]
+    },
+    "authority": {
+      "description": "A subject type of the identity model (docs/schemas/identity-v1.json).",
+      "enum": [
+        "person",
+        "agent",
+        "device",
+        "node",
+        "operator",
+        "service"
+      ]
+    },
+    "entityDeclaration": {
+      "type": "object",
+      "required": [
+        "authority",
+        "scope_version_field",
+        "merge_class"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "authority": {
+          "$ref": "#/$defs/authority"
+        },
+        "scope_version_field": {
+          "type": "string",
+          "pattern": "^[a-z_]+$",
+          "description": "The field of the entity that carries its scope version, when it has one: a positive whole number."
+        },
+        "merge_class": {
+          "$ref": "#/$defs/mergeClass"
+        },
+        "file": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The snapshot file under .memev/projects/<id>/. null: the type lives only in the log."
+        },
+        "id_prefix": {
+          "type": "string"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "description": "The data of an approval. Two approvals on one task with different decisions are a semantic conflict; resolves lists the log events a person settles.",
+      "required": [
+        "task_id"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string"
+        },
+        "decision": {
+          "enum": [
+            "approve",
+            "reject"
+          ]
+        },
+        "task_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "resolves": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "store_schema_version": 2,
+  "entities": {
+    "project": {
+      "authority": "person",
+      "scope_version_field": "scope_version",
+      "merge_class": "last-writer",
+      "file": "project.json",
+      "id_prefix": "proj",
+      "required": [
+        "name"
+      ]
+    },
+    "task": {
+      "authority": "person",
+      "scope_version_field": "scope_version",
+      "merge_class": "human-resolution",
+      "file": "tasks.json",
+      "id_prefix": "task",
+      "required": [
+        "title"
+      ]
+    },
+    "lease": {
+      "authority": "service",
+      "scope_version_field": "scope_version",
+      "merge_class": "last-writer",
+      "file": "leases.json",
+      "id_prefix": "lease",
+      "required": [
+        "task_id"
+      ]
+    },
+    "attempt": {
+      "authority": "agent",
+      "scope_version_field": "scope_version",
+      "merge_class": "append-only",
+      "file": "attempts.json",
+      "id_prefix": "att",
+      "required": [
+        "task_id"
+      ]
+    },
+    "evidence": {
+      "authority": "service",
+      "scope_version_field": "scope_version",
+      "merge_class": "append-only",
+      "file": "evidence.json",
+      "id_prefix": "ev",
+      "required": [
+        "task_id"
+      ]
+    },
+    "conflict": {
+      "authority": "person",
+      "scope_version_field": "scope_version",
+      "merge_class": "human-resolution",
+      "file": "conflicts.json",
+      "id_prefix": "conf",
+      "required": [
+        "task_id"
+      ]
+    },
+    "session": {
+      "authority": "device",
+      "scope_version_field": "scope_version",
+      "merge_class": "last-writer",
+      "file": "sessions.json",
+      "id_prefix": "sess",
+      "required": [
+        "project_id"
+      ]
+    },
+    "approval": {
+      "authority": "person",
+      "scope_version_field": "scope_version",
+      "merge_class": "human-resolution",
+      "file": "approvals.json",
+      "id_prefix": "appr",
+      "required": [
+        "task_id"
+      ]
+    },
+    "event": {
+      "authority": "service",
+      "scope_version_field": "scope_version",
+      "merge_class": "append-only",
+      "file": null,
+      "id_prefix": "evt",
+      "required": [
+        "type"
+      ]
+    }
+  }
+}
