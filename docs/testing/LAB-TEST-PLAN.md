@@ -51,7 +51,7 @@ Have ready before you start:
 - gitleaks 8.30.1 for the security section (the CI workflow shows the pinned checksum).
 
 What is simulated and what isn't: the Business and Corporate parts that are planned (company server
-with user accounts and admin console, one AI provider per organisation, sign-in with Google or Entra
+with user accounts and admin console, the provider policy that restricts an organisation to one provider, sign-in with Google or Entra
 ID, org chart import, departments and roles, labels, egress log, high availability, the crdt-merge
 convergence engine) can't be tested yet. L3 and L4 test
 what exists today on that hardware: one vault on a server, many computers with their own
