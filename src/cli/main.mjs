@@ -352,7 +352,8 @@ async function run(argv, env) {
     case 'claims': {
       need(); const { Vault } = await import('../engine/vault.mjs');
       if (await healthy(root)) { const r = await fetchOut(`http://127.0.0.1:${daemonInfo(root).port}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${clientToken(root, 'cli')}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'memev_claims', arguments: { status: flags.status, subject: flags.subject } } }) }); console.log((await r.json()).result.content[0].text); return 0; }
-      const v = new Vault(root, { git: false }).open(); try { json(v.claims({ agent: 'cli', scopes: ['read'], paths: ['**'] }, { status: flags.status, subject: flags.subject })); } finally { v.close(); } return 0;
+      // not up (stopped, or starting and holding the lock): read what is on disk, taking no lock and writing nothing
+      const v = new Vault(root, { git: false, readOnly: true }).open(); try { json(v.claims({ agent: 'cli', scopes: ['read'], paths: ['**'] }, { status: flags.status, subject: flags.subject })); } finally { v.close(); } return 0;
     }
     case 'token': {
       need(); const ts = new TokenStore(path.join(root, '.memev', 'tokens.json')); const sub = pos[0] || 'list';
