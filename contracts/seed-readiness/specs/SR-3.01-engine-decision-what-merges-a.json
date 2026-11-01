@@ -1,22 +1,24 @@
 {
-  "title": "SR-3.01 Engine decision: what merges a note, where it lives, how it is licensed",
+  "title": "SR-3.01 Engine decision (superseded 31 Oct 2026): the engine stays in its own repository and is reached by call-out",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G30: crdt-merge is presented as the paid core but merges tensors and records, not Markdown; the engine has no design. Repository: memev. Depends on contracts: none.",
+  "request": "Closes G30, as superseded by the owner decision of 31 Oct 2026: the earlier decision record named a new Node text-merge engine (memev-merge); the owner decided instead that crdt-merge stays in its own repository (BSL 1.1 with its PATENTS file) and is reached only across the existing call-out and provider boundary (WO-05-A), never vendored, copied or ported into the Apache-2.0 core, so that inclusion cannot relicense it. This spec records that call-out decision; it replaces the memev-merge approach and builds no engine. The decision is recorded as ADR 6 in docs/scope-one/DECISIONS.md of memev. Open item, not changed here: a software licensing lawyer reviews the BSL change date of 2028-03-29. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
-      "title": "Decision record",
+      "title": "Decision record: call-out boundary, no second engine",
       "phase": "design",
       "depends_on": [],
       "requirements": [
-        "names the algorithm (section-aware three-way merge with a sequence CRDT fallback, or another, with reasons)",
-        "names the runtime (Node, no Python bridge) and the repository",
-        "states crdt-merge's actual role, if any, in words a buyer can check"
+        "records that crdt-merge stays in its own repository and is reached only across the call-out and provider boundary (source: owner decision 31 Oct 2026; src/engine/merge.mjs:2-7)",
+        "records that nothing from crdt-merge is vendored, copied or ported into Memev and that no memev-merge repository is created (source: owner decision 31 Oct 2026)",
+        "records the reason: the BSL-licensed, patented engine stays out of the Apache-2.0 core so that inclusion cannot relicense it (source: owner decision 31 Oct 2026)",
+        "records the open item: lawyer review of the BSL change date 2028-03-29, which is not changed (source: owner decision 31 Oct 2026)",
+        "states crdt-merge's role in words a buyer can check: it is an optional external component under its own licence, and the free core works without it (source: src/engine/merge.mjs:2-7)"
       ],
-      "description": "",
+      "description": "Supersedes the memev-merge decision record that this contract asked for before the owner decision.",
       "scope": [
-        "docs/decisions/**",
+        "docs/scope-one/DECISIONS.md",
         "docs/CONVERGENCE.md",
         "docs/PAID-CONVERGENCE.md",
         "README.md"
@@ -26,31 +28,39 @@
           "statement": "The decision record exists",
           "verifier": {
             "type": "file_exists",
-            "path": "docs/decisions/merge-engine.md"
+            "path": "docs/scope-one/DECISIONS.md"
           }
         },
         {
-          "statement": "The algorithm is named",
+          "statement": "The record is the ADR that keeps the engine in its own repository",
           "verifier": {
             "type": "grep",
-            "file": "docs/decisions/merge-engine.md",
-            "pattern": "Algorithm:"
+            "file": "docs/scope-one/DECISIONS.md",
+            "pattern": "ADR 6: the convergence engine stays in its own repository"
           }
         },
         {
-          "statement": "The runtime is Node",
+          "statement": "The record names the supersession of SR-3.01 and SR-3.03",
           "verifier": {
             "type": "grep",
-            "file": "docs/decisions/merge-engine.md",
-            "pattern": "Runtime:\\s*Node"
+            "file": "docs/scope-one/DECISIONS.md",
+            "pattern": "SR-3\\.01 and SR-3\\.03"
           }
         },
         {
-          "statement": "The README names the engine that ships",
+          "statement": "The record keeps the BSL change date and the open lawyer review",
           "verifier": {
             "type": "grep",
-            "file": "README.md",
-            "pattern": "memev-merge"
+            "file": "docs/scope-one/DECISIONS.md",
+            "pattern": "2028-03-29"
+          }
+        },
+        {
+          "statement": "No document in scope names memev-merge as an engine that ships",
+          "verifier": {
+            "type": "command",
+            "cmd": "! grep -Eqi 'memev-merge' README.md docs/CONVERGENCE.md docs/PAID-CONVERGENCE.md",
+            "expect_exit": 0
           }
         },
         {

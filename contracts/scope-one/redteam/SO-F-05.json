@@ -83,6 +83,52 @@
           }
         ]
       }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "bbc4ba2e8f42b58d766d6657b5144cc5d06643aab64e57d4a3470bd30fa62172",
+      "base_commit": "6be36f807b2251accfd48262f94eddfcd845c98e",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/graph.mjs",
+            "sha256": "f62490835d8e5f94e12875e7b35b6d4e8fab2b90da8d65339d4a10f80926e42a"
+          },
+          {
+            "path": "src/engine/index.mjs",
+            "sha256": "4fe2798c75ab648caecee244d6307bbb31253410bd8c81bab6c9d4379971d212"
+          },
+          {
+            "path": "src/engine/vault.mjs",
+            "sha256": "0ba848b4dc3f7e0d1ef477947269bc4528084c897a4b0e0ecad5d7e297253196"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Re-review of the same spec, unchanged (same spec hash as round 1), made against main at 6be36f807b22. Since the merge of #341 (cdab1ab) the only file of this spec's scope that changed is docs/README.md, and every listed input under src/ has the same hash at main as at cdab1ab. Why: docs/README.md is in this spec's scope and gained index rows after round 1 was read at fff993f5e244 (rows for the SO-2.02 to SO-2.06 decision records, from #329 and #330 before the signing merge #341, and from #333, #337 and #338 after it). Checks run, and the only checks made: the diff of docs/README.md from fff993f5e244 to 6be36f807b22 adds only index rows that link design records under docs/scope-one/design/ and removes or rewords nothing; no criterion, requirement or stop rule of this spec reads those rows or any row they sit beside (the one README criterion is a grep for a link this spec itself adds, and it is still red on main as it should be); the spec on disk equals the round 1 snapshot byte for byte; the listed inputs under src/ are unchanged; the leak scan is clean. All passed. I did not re-run any named test (its file does not exist yet) and I did not re-read the vault contracts the request names. The answers of round 1 stand with their dispositions. Nothing high, nothing new.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NTllZTZlNzA5MTUzZDAwYzc1ZTdmZmUyN2MyODA4ODNlZGUzYzE4YzVmOWVlODdiNzQ0MjQ3ZjcyM2I5ZTAzYg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "d5lQtvXjpO7GmVrmOILPwVzZxMKcinKkXxX5mZALLehrxfxe9TssvDi5eg+qq9mH6DBvtdvzX1i42W7hLwAeBQ=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "YmEwNjQzMDYzZTJjNmQ3M2Y2MzY0MTU4ZjkyNjMyYTAxNGI4YWMzMTMwNDU0MTUyZTQzZTg4M2FjYTIzZGQxNg==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "e3mM4VgUyWggsqldIy3MDCWOBTiq4gwpkSkXuWpv64WYa3C8AceiHLi/t7XPclUsY9AUC7TI/3+t38SaBkV7BA=="
+          }
+        ]
+      }
     }
   ]
 }

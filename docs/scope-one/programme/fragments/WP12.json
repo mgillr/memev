@@ -1,0 +1,170 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP12-01",
+      "title": "Transport adapter interface (send state, receive state, digests) with an in-memory implementation",
+      "phase": "implement",
+      "owner": "area-fed",
+      "depends_on": [
+        "WP04-02",
+        "WP05-03"
+      ],
+      "requirements": [
+        "MV-INT-06"
+      ],
+      "description": "Repo: memev. Keeps the gossip boundary: engine supplies state and digests, Memev supplies transport and lifecycle. Must not become a standalone merge service (BSL restriction; OQ-10).",
+      "scope": {
+        "allow": [
+          "src/engine/transport.mjs",
+          "test/transport.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP12-01-AC01",
+          "mandatory": true,
+          "statement": "transport tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/transport.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP12-01-AC02",
+          "mandatory": true,
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP12-01-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP12-01-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP12-02",
+      "title": "Relay-backed transport: reconnect, backoff, partition recovery",
+      "phase": "implement",
+      "owner": "area-fed",
+      "depends_on": [
+        "WP12-01"
+      ],
+      "requirements": [
+        "MV-INT-06"
+      ],
+      "description": "Repo: memev. Reuses the existing relay.",
+      "scope": {
+        "allow": [
+          "src/cli/relay.mjs",
+          "src/engine/transport.mjs",
+          "test/transport-relay.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP12-02-AC01",
+          "mandatory": true,
+          "statement": "relay transport tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/transport-relay.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP12-02-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP12-02-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP12-03",
+      "title": "Three-node local harness: three vaults with separate identities exchange envelopes through the transport",
+      "phase": "implement",
+      "owner": "area-fed",
+      "depends_on": [
+        "WP12-02",
+        "WP09-01"
+      ],
+      "requirements": [
+        "MV-INT-06",
+        "MV-DEM-01"
+      ],
+      "description": "Repo: memev.",
+      "scope": {
+        "allow": [
+          "scripts/federation-harness.mjs",
+          "test/federation-harness.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP12-03-AC01",
+          "mandatory": true,
+          "statement": "harness test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/federation-harness.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP12-03-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP12-03-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}

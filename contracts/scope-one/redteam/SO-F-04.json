@@ -75,6 +75,44 @@
           }
         ]
       }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "2809736f14e961a08cddf3e137b2d1ba441b9ab91ad133475e3dd6d4b51a9422",
+      "base_commit": "6be36f807b2251accfd48262f94eddfcd845c98e",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/agentid-bind.mjs",
+            "sha256": "ca2599b6e72edf680192a8c393d898fd2253ed5635a10d28d1403feefc42e9ff"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "INTERIM SOLO REVIEW by the author of the change, pending independent re-review: the reviewer seat is out (owner decision 31 Oct 2026). Re-review of the same spec, unchanged (same spec hash as round 1), made against main at 6be36f807b22. Since the merge of #341 (cdab1ab) the only file of this spec's scope that changed is docs/README.md, and every listed input under src/ has the same hash at main as at cdab1ab. Why: docs/README.md is in this spec's scope and gained index rows after round 1 was read at fff993f5e244 (rows for the SO-2.02 to SO-2.06 decision records, from #329 and #330 before the signing merge #341, and from #333, #337 and #338 after it). Checks run, and the only checks made: the diff of docs/README.md from fff993f5e244 to 6be36f807b22 adds only index rows that link design records under docs/scope-one/design/ and removes or rewords nothing; no criterion, requirement or stop rule of this spec reads those rows or any row they sit beside (the one README criterion is a grep for a link this spec itself adds, and it is still red on main as it should be); the spec on disk equals the round 1 snapshot byte for byte; the listed inputs under src/ are unchanged; the leak scan is clean. All passed. I did not re-run any named test (its file does not exist yet) and I did not re-read the vault contracts the request names. The answers of round 1 stand with their dispositions. Nothing high, nothing new.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MTlmMmIxYzhiZmU4MGVkODFjODhhN2QyZmJmMDZkODY3NGY0Y2JlZDViMDY0YjUzM2NiY2I5YTZjZjAyZjA5Yw==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "98Zh3KucrU/QFSEExwe+yeEp4j+ibqt9HhfFkqNOwWc7Euk3blPPVX0GfZB7mMdagXMzGQYHz1cXHphrflX6Cw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "MTg4ZTQ5ZDIxOWYyZTI5ODBmOTJhMzI5MGQzMWVlZGQzNmEzMGY2YWZhMWU3MjU1ZmY1ZjIxNWI3MzM2MTdjMQ==",
+        "signatures": [
+          {
+            "keyid": "ba7f5a5b8f8aa026",
+            "sig": "NAMFi3Sq4NYGno+5Z8DT2bexbj3RBRddWQ7fIUlwC8/tsrgCHvywy8QEPl2H2IAlorWA35zWoEZmk2u2sO4ECQ=="
+          }
+        ]
+      }
     }
   ]
 }

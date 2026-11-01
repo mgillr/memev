@@ -1,0 +1,279 @@
+{
+  "owner_rules": [],
+  "tasks": [
+    {
+      "id": "WP13-01",
+      "title": "Sharing classes enforced at the publish boundary: shared (approved state, decisions, handoffs, signed contributions, authorised knowledge) versus local-only (raw data, private memory, credentials, restricted documents)",
+      "phase": "implement",
+      "owner": "area-fed",
+      "depends_on": [
+        "WP09-01",
+        "WP10-01",
+        "WP04-02"
+      ],
+      "requirements": [
+        "MV-FED-02",
+        "MV-FED-01"
+      ],
+      "description": "Repo: memev. Prior art: the sibling programme docs/federation.md export-deny filter.",
+      "scope": {
+        "allow": [
+          "src/engine/publish-policy.mjs",
+          "test/publish-policy.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP13-01-AC01",
+          "mandatory": true,
+          "statement": "publish policy tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/publish-policy.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP13-01-AC02",
+          "mandatory": true,
+          "statement": "suite green",
+          "verifier": {
+            "type": "command",
+            "cmd": "npm test",
+            "expect_exit": 0,
+            "timeout_s": 1800
+          }
+        },
+        {
+          "id": "WP13-01-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP13-01-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP13-02",
+      "title": "Disclosure policy document: minimisation, secure aggregation, differential privacy per data class; states that redaction is not those guarantees",
+      "phase": "design",
+      "owner": "area-fed",
+      "depends_on": [
+        "WP13-01"
+      ],
+      "requirements": [
+        "MV-FED-03"
+      ],
+      "description": "Repo: memev. Answers OQ-06; counsel review recorded.",
+      "scope": {
+        "allow": [
+          "docs/DISCLOSURE.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP13-02-AC01",
+          "mandatory": true,
+          "statement": "doc exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/DISCLOSURE.md"
+          }
+        },
+        {
+          "id": "WP13-02-AC02",
+          "mandatory": true,
+          "statement": "doc says deltas are not automatically GDPR-compliant",
+          "verifier": {
+            "type": "grep",
+            "file": "docs/DISCLOSURE.md",
+            "pattern": "(?i)not automatically",
+            "must": "present"
+          }
+        },
+        {
+          "id": "WP13-02-AC03",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP13-02-AC04",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP13-03",
+      "title": "Site node identity, organisation membership and sovereignty policy per site",
+      "phase": "implement",
+      "owner": "area-fed",
+      "depends_on": [
+        "WP09-01"
+      ],
+      "requirements": [
+        "MV-FED-05",
+        "MV-FED-01"
+      ],
+      "description": "Repo: memev.",
+      "scope": {
+        "allow": [
+          "src/engine/site.mjs",
+          "test/site.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP13-03-AC01",
+          "mandatory": true,
+          "statement": "site tests fail before, pass after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/site.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP13-03-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP13-03-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP13-04",
+      "title": "Offline operation and reconcile on reconnect: a node keeps local authority during a partition and reconciles through acceptance",
+      "phase": "implement",
+      "owner": "area-fed",
+      "depends_on": [
+        "WP13-03",
+        "WP06-03",
+        "WP12-02"
+      ],
+      "requirements": [
+        "MV-FED-01"
+      ],
+      "description": "Repo: memev.",
+      "scope": {
+        "allow": [
+          "test/partition-reconcile.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP13-04-AC01",
+          "mandatory": true,
+          "statement": "partition test fails before, passes after",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/partition-reconcile.test.mjs",
+            "cmd": "node --test {test}"
+          }
+        },
+        {
+          "id": "WP13-04-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP13-04-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    },
+    {
+      "id": "WP13-05",
+      "title": "Intra- and inter-organisation trust: cross-organisation identity and trust-domain boundaries",
+      "phase": "design",
+      "owner": "area-fed",
+      "depends_on": [
+        "WP13-03",
+        "WP09-02"
+      ],
+      "requirements": [
+        "MV-FED-04"
+      ],
+      "description": "Repo: memev.",
+      "scope": {
+        "allow": [
+          "docs/TRUST-DOMAINS.md"
+        ]
+      },
+      "criteria": [
+        {
+          "id": "WP13-05-AC01",
+          "mandatory": true,
+          "statement": "doc exists",
+          "verifier": {
+            "type": "file_exists",
+            "path": "docs/TRUST-DOMAINS.md"
+          }
+        },
+        {
+          "id": "WP13-05-AC02",
+          "mandatory": true,
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        },
+        {
+          "id": "WP13-05-AC03",
+          "mandatory": true,
+          "statement": "Committed and pushed to main",
+          "verifier": {
+            "type": "pushed"
+          }
+        }
+      ],
+      "stop_rules": [
+        "No weakening of an existing test, no raised timeout, no skip, no widened scope; if blocked, report what blocks and continue with the next independent task."
+      ]
+    }
+  ]
+}

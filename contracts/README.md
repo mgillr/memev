@@ -159,3 +159,28 @@ shows where each sits is [docs/scope-one/WBS.md](../docs/scope-one/WBS.md).
 | [SO-F-09](scope-one/specs/SO-F-09.json) | [`k-so-f-09-finding-model-fo-768791`](signed/k-so-f-09-finding-model-fo-768791.json) | SO-2.04, SO-2.01 | Finding model for organisational intelligence: a finding is a graph claim capped at theory by evidence | SO-F-01, SO-F-02 |
 | [SO-F-13](scope-one/specs/SO-F-13.json) | [`k-so-f-13-cross-functional-c6f060`](signed/k-so-f-13-cross-functional-c6f060.json) | SO-2.05, SO-2.06 | Cross-functional conflict detection on a bounded programme: the seeded two-plan conflict detected | SO-F-09, SO-A-05 |
 | [SO-F-10](scope-one/specs/SO-F-10.json) | [`k-so-f-10-federated-comput-be4e45`](signed/k-so-f-10-federated-comput-be4e45.json) | SO-2.12 | Federated computation specification as an interface reservation: the work specification and receipt schemas | SO-F-03, SO-F-04 |
+
+## Build layer re-signed after a README re-review, 1 November 2026
+
+Thirteen of the build layer specs above have `docs/README.md` in their scope. Index rows for the SO-2.02 to SO-2.06 decision
+records landed there after the specs' round 1 was read, so the red-team gate reported `head_stale_src` for them. Each now has
+a round 2 in its record (an interim solo review by the author, pending independent re-review, on the unchanged spec hash)
+and is signed again by signer-2 (`keys/45c92c2850024872.pub`) as the next version, naming the one it supersedes, after that
+round was committed. No signed file was edited and the earlier versions stay, listed as superseded by
+`node scripts/gate/redteam-gate.mjs --report`.
+
+| Spec | Contract | Version | Supersedes |
+|---|---|---|---|
+| [SO-A-01](scope-one/specs/SO-A-01.json) | [`k-so-a-01-lead-agent-assig-861b14`](signed/k-so-a-01-lead-agent-assig-861b14.json) | 2 | [`k-so-a-01-lead-agent-assig-fe4345`](signed/k-so-a-01-lead-agent-assig-fe4345.json) |
+| [SO-A-07](scope-one/specs/SO-A-07.json) | [`k-so-a-07-connections-and--0fd80a`](signed/k-so-a-07-connections-and--0fd80a.json) | 2 | [`k-so-a-07-connections-and--af599b`](signed/k-so-a-07-connections-and--af599b.json) |
+| [SO-A-10](scope-one/specs/SO-A-10.json) | [`k-so-a-10-fault-injection--0b84bc`](signed/k-so-a-10-fault-injection--0b84bc.json) | 2 | [`k-so-a-10-fault-injection--399469`](signed/k-so-a-10-fault-injection--399469.json) |
+| [SO-F-01](scope-one/specs/SO-F-01.json) | [`k-so-f-01-identity-and-sco-2276e1`](signed/k-so-f-01-identity-and-sco-2276e1.json) | 2 | [`k-so-f-01-identity-and-sco-a635b7`](signed/k-so-f-01-identity-and-sco-a635b7.json) |
+| [SO-F-03](scope-one/specs/SO-F-03.json) | [`k-so-f-03-contribution-sig-2ba083`](signed/k-so-f-03-contribution-sig-2ba083.json) | 2 | [`k-so-f-03-contribution-sig-f6fdc0`](signed/k-so-f-03-contribution-sig-f6fdc0.json) |
+| [SO-F-04](scope-one/specs/SO-F-04.json) | [`k-so-f-04-federation-membe-8cc66d`](signed/k-so-f-04-federation-membe-8cc66d.json) | 2 | [`k-so-f-04-federation-membe-b99147`](signed/k-so-f-04-federation-membe-b99147.json) |
+| [SO-F-05](scope-one/specs/SO-F-05.json) | [`k-so-f-05-classification-m-b3c790`](signed/k-so-f-05-classification-m-b3c790.json) | 2 | [`k-so-f-05-classification-m-1a82cb`](signed/k-so-f-05-classification-m-1a82cb.json) |
+| [SO-F-07](scope-one/specs/SO-F-07.json) | [`k-so-f-07-federated-query--085a5f`](signed/k-so-f-07-federated-query--085a5f.json) | 2 | [`k-so-f-07-federated-query--4be6eb`](signed/k-so-f-07-federated-query--4be6eb.json) |
+| [SO-F-08](scope-one/specs/SO-F-08.json) | [`k-so-f-08-admission-adapte-1f2357`](signed/k-so-f-08-admission-adapte-1f2357.json) | 2 | [`k-so-f-08-admission-adapte-61bb48`](signed/k-so-f-08-admission-adapte-61bb48.json) |
+| [SO-F-09](scope-one/specs/SO-F-09.json) | [`k-so-f-09-finding-model-fo-cbe213`](signed/k-so-f-09-finding-model-fo-cbe213.json) | 2 | [`k-so-f-09-finding-model-fo-768791`](signed/k-so-f-09-finding-model-fo-768791.json) |
+| [SO-F-10](scope-one/specs/SO-F-10.json) | [`k-so-f-10-federated-comput-46e7e6`](signed/k-so-f-10-federated-comput-46e7e6.json) | 2 | [`k-so-f-10-federated-comput-be4e45`](signed/k-so-f-10-federated-comput-be4e45.json) |
+| [SO-F-12](scope-one/specs/SO-F-12.json) | [`k-so-f-12-replication-unit-156f69`](signed/k-so-f-12-replication-unit-156f69.json) | 2 | [`k-so-f-12-replication-unit-3feee3`](signed/k-so-f-12-replication-unit-3feee3.json) |
+| [SO-F-13](scope-one/specs/SO-F-13.json) | [`k-so-f-13-cross-functional-8c65b0`](signed/k-so-f-13-cross-functional-8c65b0.json) | 2 | [`k-so-f-13-cross-functional-c6f060`](signed/k-so-f-13-cross-functional-c6f060.json) |
