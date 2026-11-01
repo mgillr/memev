@@ -2,6 +2,8 @@
 
 **Status: closed preview. Not a general release.**
 
+[Documentation index](README.md)
+
 This guide is for invited testers evaluating the free, single-person, single-computer Memev core. The purpose of this cohort is to validate installation, day-to-day reliability, AI-tool integration, coordination, local contracts and recovery on real supported setups.
 
 Memev is operating infrastructure for human and AI work. It provides a local foundation for project context, tool coordination, governed work and evidence. The vault is one part of that foundation; this preview is not a claim that every planned team, multi-computer or federated capability is available.
@@ -35,7 +37,7 @@ Memev states that it has no telemetry by default. The network activity described
 You must have been granted access to the private GitHub repository by the Memev maintainer.
 
 ```sh
-git clone https://github.com/mgillr/memev.git
+git clone <clone-url-from-the-GitHub-Code-menu>
 cd memev
 node --version
 git --version
