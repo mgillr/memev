@@ -1475,6 +1475,51 @@
       "supersedes": "PG-03.5",
       "supersedes_reason": "owner delegation, 1 Nov 2026: pin crdt-merge main aab0099 (b92d0ef is an ancestor with byte-identical vectors) and check the three vector files by blob hash; everything else of PG-03.5 is kept",
       "kind": "evidence"
+    },
+    {
+      "id": "PG-W-21A",
+      "type": "programme work package",
+      "area": "PG-W",
+      "title": "Trust records, an eligibility gate and audit events for federated trust governance (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP21-01, WP21-02, WP21-03 (a gap named by work breakdown rows 4.3.7 and 4.3.8; proposed 1 Nov 2026; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "SO-F-08",
+          "boundary": "it owns the admission adapter and the rule that the admission path reads trust only as an eligibility input; PG-W-21A adds the check for the external hook and a composition rule, and no adapter"
+        },
+        {
+          "contract": "SO-F-04",
+          "boundary": "it owns the relationship record and the policy evaluation; a relationship is the edge between two nodes, and PG-W-21A records which subjects behind an edge are eligible for what"
+        },
+        {
+          "contract": "PG-09.1",
+          "boundary": "WP09-01 admission of nodes and agents to a site, WP09-02 the trust adapter boundary and WP09-03 exclusion are not repeated; PG-W-21A refuses nothing they accept and excludes nothing"
+        },
+        {
+          "contract": "PG-13.1",
+          "boundary": "WP13-05 (cross-organisation trust) stays deferred: ADR 8 question 2"
+        },
+        {
+          "contract": "SO-F-09.2",
+          "boundary": "it owns the finding model and resolveActor; PG-W-21A reads the actor and changes no finding code"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "SO-F-03.3 (Admission), SO-F-01 (subjects and scopes) and SO-F-09.2 (actor) are the build layer, cited by id; this spec adds only the trust record, the book, the gate and the tests",
+      "depends_on": [
+        "SO-F-01",
+        "SO-F-03.3",
+        "SO-F-04",
+        "SO-F-08",
+        "SO-F-09.2"
+      ],
+      "tasks": 3,
+      "criteria": 49,
+      "spec": "specs/PG-W-21A.json",
+      "status": "proposed, unsigned; the definition it builds is ADR 8, proposed, with ten open questions for the owner (docs/scope-one/design/trust-governance.md)",
+      "kind": "feature"
     }
   ],
   "mapping": [
@@ -1996,6 +2041,24 @@
       "task": "WP20-01",
       "title": "The scope verifier allows a spec's own change note: changelog.d/<id>.md and its base id, and nothing else beyond what it allows today",
       "contract": "PG-20.1",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP21-01",
+      "title": "Trust record, version 1: the grant and revocation records, their validator and schema, and a pure evaluation that denies by default, lets delegation only narrow, and cascades revocation",
+      "contract": "PG-W-21A",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP21-02",
+      "title": "The trust book over the operation log: grants and revocations written only with a resolved actor, authority held in one provisional table, events as the only store, and a frozen read-only reader",
+      "contract": "PG-W-21A",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP21-03",
+      "title": "Admission, findings and actors meet the trust book: an eligibility gate for the Admission external hook, one composition rule for checks on that hook, revalidation requests after a revocation, and boundary tests",
+      "contract": "PG-W-21A",
       "note": "specified in this set"
     }
   ]
