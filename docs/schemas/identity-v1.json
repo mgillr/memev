@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Memev identity and scopes, version 1",
+  "description": "Subjects (who a request is), scopes (where it may act) and memberships, with the field a token carries for its own identity scope. The validator is src/engine/identity.mjs. Enforcement beyond the resolution of a subject and a scope on each request and store write is planned; see docs/IDENTITY-AND-SCOPES.md.",
+  "type": "object",
+  "required": [
+    "schema",
+    "subjects",
+    "scopes",
+    "memberships"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "memev-identity/1"
+    },
+    "subjects": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/subject"
+      }
+    },
+    "scopes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/scope"
+      }
+    },
+    "memberships": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/membership"
+      }
+    }
+  },
+  "$defs": {
+    "key": {
+      "type": "object",
+      "required": [
+        "id",
+        "alg",
+        "public"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._@+-]+$"
+        },
+        "alg": {
+          "enum": [
+            "ed25519"
+          ]
+        },
+        "public": {
+          "type": "string",
+          "minLength": 1
+        },
+        "created": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revoked_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "description": "Every subject has an owner, and the owner is a person subject; a person is its own owner. An agent subject names a role, never a provider.",
+      "required": [
+        "id",
+        "type",
+        "owner"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(person|agent|device|node|operator|service):[A-Za-z0-9._@+-]+$"
+        },
+        "type": {
+          "enum": [
+            "person",
+            "agent",
+            "device",
+            "node",
+            "operator",
+            "service"
+          ]
+        },
+        "owner": {
+          "type": "string",
+          "pattern": "^person:[A-Za-z0-9._@+-]+$"
+        },
+        "role": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._@+-]+$"
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/key"
+          }
+        },
+        "expires": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revoked_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "agent"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "role"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "role"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "required": [
+        "id",
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._@+-]+$"
+        },
+        "type": {
+          "enum": [
+            "personal",
+            "team",
+            "department",
+            "project",
+            "programme",
+            "portfolio",
+            "site",
+            "organisation"
+          ]
+        },
+        "parent": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._@+-]+$"
+        }
+      }
+    },
+    "membership": {
+      "type": "object",
+      "required": [
+        "subject",
+        "scope",
+        "since"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "subject": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._@+-]+$"
+        },
+        "since": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revoked_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "tokenIdentity": {
+      "type": "object",
+      "description": "The identity fields of a token record in .memev/tokens.json. identity_scope is a field of its own: it is not one of the read, write and admin scopes of the token. A token without it resolves to the owner subject and the personal scope.",
+      "additionalProperties": true,
+      "properties": {
+        "identity_scope": {
+          "type": "object",
+          "required": [
+            "type",
+            "id"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "enum": [
+                "personal",
+                "team",
+                "department",
+                "project",
+                "programme",
+                "portfolio",
+                "site",
+                "organisation"
+              ]
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._@+-]+$"
+            }
+          }
+        },
+        "subject": {
+          "$ref": "#/$defs/subject"
+        }
+      },
+      "if": {
+        "properties": {
+          "identity_scope": {
+            "properties": {
+              "type": {
+                "not": {
+                  "const": "personal"
+                }
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        },
+        "required": [
+          "identity_scope"
+        ]
+      },
+      "then": {
+        "required": [
+          "subject"
+        ]
+      }
+    }
+  }
+}
