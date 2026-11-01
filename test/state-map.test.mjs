@@ -270,6 +270,18 @@ test('merge semantics table: the approve and reject set is PROVISIONAL against S
   for (const [name, r] of tableRows()) if (name !== 'approval') assert.doesNotMatch(r.status, /SO-A-05/, name);
 });
 
+test('merge semantics table: evidence and attempts are append-only, and the same id replaces the stored entity and keeps both events', () => {
+  const rows = tableRows();
+  for (const name of ['evidence', 'attempt']) {
+    const row = rows.get(name);
+    assert.equal(row.cls, CLASS.log, name);
+    assert.match(row.rationale, new RegExp(`on the same (${name} )?id, a later write replaces the stored entity and both events stay in the log`, 'i'), name);
+    assert.doesNotMatch(row.rationale, /does not overwrite|never overwrite|never replaced/i, `${name}: a later write on one id does replace the stored entity`);
+  }
+  // an event has no snapshot and the log refuses a taken id, so nothing in it is replaced
+  assert.match(rows.get('event').rationale, /none is replaced/);
+});
+
 test('merge semantics table: an external action is an append-only attempt entry with kind external, and the coordinator dedups by key', () => {
   const text = doc();
   const at = text.indexOf('## The object classes');
