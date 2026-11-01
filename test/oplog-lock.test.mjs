@@ -150,3 +150,30 @@ test('T1-c27: when the lock cannot be created the open fails with that error, no
   } finally { fs.chmodSync(dir, 0o700); }
   assert.deepEqual(tree(dir), before, 'no file under .memev/oplog changed');
 });
+
+test('T1-readonly: every writer of a read-only log refuses and nothing on disk changes', () => {
+  const { dir } = makeVault();
+  const before = tree(dir);
+  const log = new OPLOG.OpLog(dir, { readOnly: true }).open();
+  assert.equal(fs.existsSync(path.join(dir, 'LOCK')), false, 'a read-only open takes no lock');
+  for (const call of [() => log.append({ type: 'put', path: 'x', data: {} }), () => log.snapshot(), () => log.roll(), () => log.archiveSealed(), () => log._saveManifest()]) {
+    assert.throws(call, /read-only/i);
+  }
+  log.close();
+  assert.deepEqual(tree(dir), before);
+  assert.ok(log.verify().ok, 'a read-only log still reads and verifies');
+});
+
+test('T1-readonly: a read-only open of a vault with a torn tail reads it as absent and leaves it', () => {
+  const { root, dir } = makeVault();
+  const seg = path.join(dir, 'seg-000001.jsonl');
+  fs.appendFileSync(seg, '{"seq":99,"torn":');
+  const before = tree(dir);
+  const v = new Vault(root, { readOnly: true }).open();
+  assert.equal(v.log.seq, 3, 'the torn fragment is not a record');
+  v.close();
+  assert.deepEqual(tree(dir), before, 'the fragment was not truncated');
+  const w = openVault(root);
+  assert.equal(fs.readFileSync(seg, 'utf8').endsWith('"torn":'), false, 'a writable open still truncates it');
+  w.close();
+});
