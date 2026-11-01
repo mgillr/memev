@@ -46,20 +46,22 @@ Services, remote and onsite work, travel and response times are in [services.md]
 
 Planned add-ons and services, and the custom module use cases, are in [the add-ons roadmap](../roadmap/add-ons.md).
 
-## Several sites and federation (planned)
+## Several sites and federation (foundations partial; multi-node operation planned)
 
-Nothing in this section is built. The architectural target is a federation of independently
-operated site nodes: each site owns its node and its memory, sites converge the state they are
-authorised to share through the convergence engine under its contract, and no central coordinator
-sequences ordinary updates. The company vault and the main corporate vault above are the one-node
-case of that target, and the one-node case is what the first Business release ships.
+Some local federation foundations are implemented: signed contribution validation, two-step
+admission, relationship records and deny-by-default policy evaluation. These are local primitives,
+not an operational multi-node service. Cross-node transport, external admission, complete sender-node
+binding and production replay/recovery guarantees are not shipped. The architectural target remains
+a federation of independently operated site nodes: each site owns its node and its state, and sites
+share only what their policies and relationships authorise. The company vault and the main corporate
+vault above are the one-node case of that target, and the one-node case is what the first Business
+release is intended to ship.
 
 Federation across sites, and federated computation on top of it, are planned capabilities of
 Corporate, and of a Business licence whose services list includes the multi-site federation design
 ([services.md](services.md)). They are not a tier: the four tiers stand,
-and the planned rows in the tables on this page are where they appear. The trust service and the
-admission service that the federation pages name are planned adapter boundaries beside the merge
-boundary ([EXTENSION-POINTS.md](../EXTENSION-POINTS.md)). The pages:
+and the planned rows in the tables on this page are where they appear. The trust and admission
+integrations at the external service boundaries remain planned ([EXTENSION-POINTS.md](../EXTENSION-POINTS.md)). The pages:
 [FEDERATION.md](../FEDERATION.md), [ORGANISATIONAL-INTELLIGENCE.md](../ORGANISATIONAL-INTELLIGENCE.md),
 [FEDERATED-COMPUTATION.md](../FEDERATED-COMPUTATION.md) and
 [DATA-SOVEREIGNTY.md](../DATA-SOVEREIGNTY.md); the architecture chart is in
