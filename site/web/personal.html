@@ -21,31 +21,39 @@
   </div>
 </header>
 <main>
-  <h1>Personal</h1>
-  <p>For one person on one computer at a time. The core is complete, and it is never limited. You
-  set it up in a few minutes, with no account and no sign-up.</p>
+  <h1>Free Core</h1>
+  <p>For one person on one computer at a time. Memev is operating infrastructure for human and AI
+  work: shared project state, coordination across connected tools, governed execution, contracts
+  and evidence-based verification. The local vault is the durable state substrate, not the whole
+  product. The complete local core is free and has no account or subscription requirement.</p>
+  <p><strong>Availability:</strong> the Free Core is currently an invited preview, not a general
+  public release. Testers should use the isolated setup in the preview guide.</p>
   <h2>What is included</h2>
   <ul>
-    <li>The vault, recall, the knowledge graph, claims and provenance</li>
+    <li>Local project state and provenance: the vault, knowledge graph, claims and durable records</li>
     <li>Hooks in Claude Code, Codex and Gemini CLI, session-start hooks in Cursor, instructions in
     the other apps</li>
     <li>The quality check, review inbox, audit and <code>memev why</code></li>
-    <li>Signed contracts with local checks</li>
-    <li>The comms bus: every AI app on your computer gets a seat, and you can coordinate them from
-    one session</li>
+    <li>Work contracts that define obligations and acceptance criteria, with local checks and
+    retained verification evidence</li>
+    <li>The ProjectStore and Coordinator: task lifecycle, claims, leases, dispatch, recovery and
+    evidence-backed verification</li>
+    <li>The comms bus: every connected AI app on your computer gets a seat, and you can coordinate
+    them from one session</li>
     <li><code>memev doctor</code></li>
     <li>Several cloud AI apps side by side through the secure link, such as Claude and ChatGPT,
     next to your local coding tools over MCP (up to 5 connectors counted; nothing is refused)</li>
-    <li>Backup to your own private GitHub repository</li>
+    <li>Optional backup to your own private GitHub repository (configured by you)</li>
   </ul>
   <h2>Price</h2>
   <p>Free.</p>
   <h2>Limits</h2>
   <ul>
-    <li>One computer at a time, with no licence and no network needed. Adding a second computer to
-    the vault needs a licence.</li>
-    <li>Switching computers goes through your own GitHub backup: once the backup is set up on the
-    old computer, a new computer can join it.</li>
+    <li>One computer at a time, with no licence. Local workflows work offline; optional remote
+    connectors and GitHub backup require a network. Adding a second computer to the vault needs a
+    licence.</li>
+    <li>Switching computers can use your own GitHub backup after you explicitly configure it on
+    the old computer; a new computer can then join that backup.</li>
     <li>Git sync is single-writer backup, not a way to edit on two computers at once.</li>
     <li>No user accounts: whoever has a token reaches what that token allows.</li>
     <li>Recall is keyword search. Paraphrases with no shared words are missed; optional local
@@ -55,8 +63,8 @@
   <span class="tag">planned</span>
   <p>Edit on two machines at once, with nothing to resolve. One person, up to 3 computers and 10
   cloud AI connectors. The licence is for that person and cannot be passed on. The AI apps on all
-  the computers share one memory and one comms bus, over the secure link, with a key for each
-  computer.</p>
+  the computers share project state, coordination and knowledge context over the secure link, with
+  a key for each computer.</p>
   <p>The price is $12/month or $120/year. This is an early-supporter price: it stays the same for
   as long as your subscription runs.</p>
   <p>Planned, and not part of the price: merging concurrent edits through the convergence engine,

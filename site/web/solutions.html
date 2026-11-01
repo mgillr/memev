@@ -26,13 +26,20 @@
 
   <p>Part of the Memev documentation. Up: the README.</p>
 
-  <p>People who use AI memory tools complain about the same things again and again. We collected 205 public complaints about memory in ChatGPT, Claude, Gemini, Cursor, mem0, Zep, Basic Memory, Glean, Microsoft 365 Copilot and others, sorted them into 13 groups, and checked each group against Memev's code. This page lists every group: why it happens, what Memev does about it, which tier it belongs to, and the command that proves it works.</p>
+  <p>This page examines one supporting part of Memev: local knowledge continuity and recall across AI
+  tools. We collected 205 public complaints about memory in ChatGPT, Claude, Gemini, Cursor, mem0,
+  Zep, Basic Memory, Glean, Microsoft 365 Copilot and others, sorted them into 13 groups, and checked
+  each group against Memev's code. It is not a definition of the whole product: Memev is operating
+  infrastructure for human and AI work, including project state, coordination, governed execution,
+  contracts and evidence-based verification.</p>
 
   <p>The counts come from issue trackers, forums and review sites (about 70% from Hacker News and GitHub), so they show what those sources say, not how common each problem is everywhere.</p>
 
   <p>Status: "built" means the code and tests are in this repository. "Planned" means it is not built yet, and nothing on this page claims otherwise.</p>
 
-  <p>Many fixes here are things a careful memory tool should do anyway. Where a fix is ordinary, the "Why it matters for Memev" line says so. The parts that are hard for others to copy are listed at the end.</p>
+  <p>Many fixes here are basic hygiene for a local knowledge substrate. Where a fix is ordinary, the
+  "Why it matters for Memev" line says so. The wider product value comes from connecting that
+  substrate to coordination, project governance and evidence-based delivery.</p>
 
   <h2>Install</h2>
   <p>In a copy of the Memev repository, run the install command:</p>
@@ -69,7 +76,7 @@
 
   <p><strong>Planned.</strong> A published benchmark of how much each app keeps across a compaction, and a way to keep the current task visible in apps without hooks.</p>
 
-  <p><strong>Why it matters for Memev.</strong> One memory that every app reads at the right moments is the main reason to use Memev at all. Vendors have little reason to build memory that works across their competitors' apps.</p>
+  <p><strong>Why it matters for Memev.</strong> Continuity across AI tools is one part of the operating layer. The wider value is that authorised project state and obligations can travel into coordinated work, with evidence retained and verification kept distinct from an agent's report. Vendors have little reason to build infrastructure that works across their competitors' apps.</p>
 
   <p><strong>Tier.</strong> Personal.</p>
 
@@ -228,7 +235,7 @@
 
   <p>Most fixes above are ordinary. A few things would be hard for a competitor to copy.</p>
 
-  <p>It works across vendors: one memory for Claude Code, Codex, Gemini CLI, Cursor and the cloud apps. The model companies have every reason to keep memory inside their own products.</p>
+  <p>It works across vendors: supported tools can use the same authorised project state and coordination layer, while local knowledge and provenance support the wider work lifecycle. Model companies have every reason to keep their infrastructure inside their own products.</p>
 
   <p>The hooks are tested in each app, so context arrives at session start, on each prompt and after a compaction without the user asking.</p>
 

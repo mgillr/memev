@@ -2,11 +2,14 @@
 
 Part of the [Memev documentation](README.md). Up: the [README](../README.md).
 
-A project is a set of tasks that move through a fixed set of states, and the project itself
-shows one derived status at a time. The state machine lives in `src/engine/project-state.mjs`
-as pure functions over plain records: no persistence, no bus, no network, no model call, so
-the whole table can be tested in process. Later work adds the store and the bus hooks around
-it; this page is the one documentation page of the project layer.
+A project is a durable set of related entities and events: scope, plans, milestones,
+deliverables, work packages, tasks, artifacts, checks, evidence, approvals and blockers. The
+canonical `ProjectStore` persists and reconstructs project state from its append-only event log.
+The pure state machine in `src/engine/project-state.mjs` defines legal task transitions; the
+`Coordinator` adds claims, leases, generations, dispatch control, recovery and governed lifecycle
+operations. The vault wires these components together. This page describes the implemented local
+project layer; it does not imply that every planned user interface, external integration or federated
+workflow is shipped.
 
 ## Task states
 

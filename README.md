@@ -6,8 +6,8 @@
 
 <h1>Memev</h1>
 
-<p><strong>One shared, durable memory for the people, computers and AI agents working on a project.</strong><br>
-Context that survives every session, coordination between agents, and work that is checked against what was asked.</p>
+<p><strong>Operating infrastructure for human and AI work.</strong><br>
+Shared project state, coordination, governed execution and evidence-based verification.</p>
 
 <p>
 <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue">
@@ -22,6 +22,7 @@ Context that survives every session, coordination between agents, and work that 
 
 <p>
 <a href="docs/QUICKSTART.md">Quickstart</a> &middot;
+<a href="docs/FREE-CORE-PREVIEW.md">Free Core Preview</a> &middot;
 <a href="docs/README.md">Documentation</a> &middot;
 <a href="docs/ARCHITECTURE.md">Architecture</a> &middot;
 <a href="docs/tiers/README.md">Tiers</a> &middot;
@@ -33,17 +34,17 @@ Context that survives every session, coordination between agents, and work that 
 
 ## What Memev is, and why it matters
 
-AI work is spread across tools, sessions, computers and people, and each one starts from a blank page. A decision made in one app is unknown to the next. Two agents edit the same thing and one silently loses. A task is reported done and nobody can say what was checked.
+AI work is spread across tools, sessions, computers and people. Decisions become detached from execution, agents operate without shared authority, and reported completion is too easily mistaken for accepted work.
 
-Memev is the shared layer underneath. It keeps project knowledge as plain Markdown that you own, makes the relevant part of it available to every connected tool, lets those tools coordinate through a communications bus, and records what a piece of work had to deliver and what was checked. It works with the AI tools you already use, over MCP, and it does not replace them.
+Memev is operating infrastructure for human and AI work. It connects people, agents and tools to shared project state, coordination, governed execution, contracts, evidence and verification. Its local vault preserves the knowledge and provenance that work depends on; the communications bus supports coordination; and the project and contract layers distinguish assignment, execution, verification and acceptance. It works alongside the AI tools and systems people already use rather than replacing them.
 
-Three ideas run through everything:
+Three capabilities define the product:
 
-- **Shared, durable memory.** Decisions, constraints and prior work live in a vault on your own computer, written to a checksummed log first and kept in git. Any connected app can recall them. A new session starts from a resume card instead of from nothing.
-- **Merging that does not need a judge.** When several computers or agents change the same state, the convergence engine crdt-merge combines the copies with deterministic rules. The result does not depend on the order the changes arrive in, it works offline, deletes are explicit, and no language model is asked to decide what to keep. This is the direction for Memev state, and it is partly built: see [Plans and roadmap](#plans-and-roadmap) for what runs today.
-- **Work that is checked.** A work contract states the task, the deliverables, the acceptance criteria and the stop conditions. Memev keeps the outcome of the checks next to the work, so a task being assigned is not mistaken for a task being proven.
+- **Shared project state and provenance.** Decisions, constraints, obligations and work records live in a local vault, written through a checksummed log and kept in git. Connected tools can work from the same authorised context, while the underlying records remain inspectable and under the operator's control.
+- **Coordination across tools and agents.** The communications bus provides named seats, presence, messages and task hand-offs between connected AI applications. It transports coordination; it does not become the authority for project state or contractual acceptance.
+- **Governed execution and evidence.** Work contracts define obligations and acceptance criteria. The ProjectStore and Coordinator track task state, claims, leases, dispatch and recovery. A report of completion is not verification: evidence must be bound to the relevant scope and artifact before work can become verified.
 
-Federation, where independent sites each keep their own records and still reconcile, is the roadmap, not something Memev ships today. The decisions behind the plans are recorded in [docs/scope-one/DECISIONS.md](docs/scope-one/DECISIONS.md), and how the plans line up with the work breakdown is in [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md).
+Deterministic multi-writer convergence is a separate provider boundary, not a claim that the free single-computer core supports concurrent editing. The CRDT-Merge engine and its commercial boundary are described in [Convergence](docs/CONVERGENCE.md). Multi-computer editing and operational federation are not part of this Free Core preview. The decisions behind the wider roadmap are recorded in [docs/scope-one/DECISIONS.md](docs/scope-one/DECISIONS.md), with delivery reconciliation in [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md).
 
 ## Who it is for
 
@@ -63,21 +64,21 @@ The tier decision of 31 October 2026 is recorded in [docs/scope-one/DECISIONS.md
 |---|---|---|---|
 | For | one person, one computer at a time | one person, up to 3 computers | teams, organisations, and sites that want to federate |
 | Price | free, for good | $12/month or $120/year (CHF 10 or CHF 100), early-supporter price | contact us |
-| What it includes | the whole core: vault, recall, graph, hooks, contracts, comms bus, doctor, GitHub backup, several cloud AI apps side by side | everything in Free, with the same vault on up to 3 computers over the secure link, priority support | scoped with you: see below |
+| What it includes | the whole core: shared project state, vault, recall, graph, hooks, contracts, ProjectStore, Coordinator, evidence-backed task lifecycle, comms bus, doctor, GitHub backup and supported AI-tool integrations | everything in Free, with the same vault on up to 3 computers over the secure link, priority support | scoped with you: see below |
 | Trial | the free core is the trial | none | a Business trial and a sales-assisted pilot are planned ([docs/BUSINESS-TRIAL.md](docs/BUSINESS-TRIAL.md)) |
-| Status | available now | available now for what exists today; merging, hosted sync, backup and relay are planned | planned, no dates |
+| Status | closed preview, invite only | paid multi-computer tier; simultaneous editing and convergence remain planned | planned, no dates |
 
 The tier names in the app and the licence tooling today are Personal for the free core and Personal with more computers for the paid tier. [docs/PRICING.md](docs/PRICING.md) and [docs/tiers/README.md](docs/tiers/README.md) use those names and say what is built and what is planned for each. The free core is never limited ([CHARTER.md](CHARTER.md)).
 
 ## How it fits together
 
-Memev connects three parts of AI work that are usually handled separately:
+Memev connects the operating parts of human and AI work:
 
-- **Shared context:** keep project decisions, constraints and useful prior work available across supported tools and sessions.
-- **Coordination:** let connected sessions discover one another, check presence and hand off tasks through a shared communications bus.
-- **Defined work:** describe expected outcomes and acceptance criteria in work contracts, then retain verification results where those checks are available.
+- **Shared state:** project records, decisions, constraints, obligations and provenance are retained in a durable local store and exposed to authorised tools.
+- **Coordination:** connected people and agents can identify seats, exchange messages and hand off work through the communications bus.
+- **Governed execution:** contracts define what is required; the project lifecycle records assignment, claims, leases, execution, exceptions, evidence and verification. Verification is distinct from acceptance, and an agent's report is not proof.
 
-The vault and coordination bus provide the common working layer. What happens next depends on the connected AI client and workflow: Memev supplies the shared context and coordination mechanisms, while agents and people carry out the work.
+The local vault is the durable record substrate, not the product boundary. The client applications and people perform the work; Memev supplies the shared state, coordination and governance mechanisms around it.
 
 ```mermaid
 flowchart LR
@@ -173,6 +174,7 @@ Every line below says whether it exists. Nothing in the second and third lists i
 - The vault: Markdown notes in git, a checksummed log, project-aware recall, provenance and the entity graph. `memev import` brings in existing project folders, AI history and chat exports.
 - MCP access for the supported AI apps, with hooks where an app supports them, and optional cloud AI connectors over a secure link.
 - The communications bus: seats, roster, heartbeats, communications checks, task handoffs and holds.
+- Local project state and governed execution: ProjectStore, the task state machine and Coordinator, with claims, leases, dispatch control, recovery and evidence-bound verification. The broader workspace UI and some external integrations remain in progress.
 - Work contracts with signed, immutable specs and checks that run through `memev verify`.
 - Device keys, a licence checked offline, and the computer limit.
 - Backup to your own private GitHub repository.
@@ -180,7 +182,7 @@ Every line below says whether it exists. Nothing in the second and third lists i
 
 ### In progress
 
-- The project engine: the project store, the project state machine and the coordinator are merged and tested, and are being wired into one execution path. Tracked in the Scope One work breakdown (pull request #324) and in [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md).
+- The broader project workspace and end-to-end user workflows: the local ProjectStore, state machine and Coordinator are implemented; remaining work is to complete the workspace experience and integrations around them. Tracked in the Scope One work breakdown and [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md).
 - The paid-engine client behind a flag, off by default (pull request #201), with the trial licence and entitlement work (#154, #163, #177).
 - Correctness fixes in the crdt-merge engine itself, in its own repository.
 - The programme decomposition of the wider plan, as proposed and unsigned contracts: [docs/scope-one/programme/README.md](docs/scope-one/programme/README.md).

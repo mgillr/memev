@@ -3,9 +3,13 @@
 Part of the [tiers pages](README.md). Up: the [README](../../README.md). Architecture chart:
 [ARCHITECTURE.md](../ARCHITECTURE.md#personal).
 
-For one person on one computer at a time. Complete, and never limited ([CHARTER.md](../../CHARTER.md)).
-Switch computers, lose nothing: your notes are backed up to your own GitHub, and a new computer can
-join that backup.
+For one person on one computer at a time. The Free Core is the complete local operating layer for
+human and AI work, not a memory-only trial: it provides durable project state, coordination across
+connected tools, work contracts and evidence-based verification. The vault is the local state
+substrate. It is complete, and never limited ([CHARTER.md](../../CHARTER.md)).
+
+GitHub backup is optional: it starts only after you run `memev github setup`. It is a single-writer
+backup path, not concurrent multi-computer synchronisation.
 
 ```mermaid
 flowchart LR
@@ -28,21 +32,27 @@ flowchart LR
 - Hooks in Claude Code, Codex and Gemini CLI, session-start hooks in Cursor, instructions in the
   other apps
 - The quality check, review inbox, audit and `memev why`
-- Signed contracts with local checks
-- The comms bus: every AI app on your computer gets a seat, and you can coordinate them from one
-  session ([BUS.md](../BUS.md))
+- Work contracts that define obligations and acceptance criteria, with local checks and retained
+  verification evidence
+- The local ProjectStore and Coordinator: durable project records, task lifecycle, claims, leases,
+  dispatch and recovery. A completion report is not automatically verification or acceptance
+  ([PROJECTS.md](../PROJECTS.md))
+- The comms bus: every connected AI app on your computer gets a seat, and you can coordinate them
+  from one session ([BUS.md](../BUS.md))
 - `memev doctor`
 - Several cloud AI apps side by side through the secure link, such as Claude and ChatGPT, next to
   your local coding tools over MCP (up to 5 connectors counted; nothing is refused)
-- Backup to your own private GitHub repository
+- Optional backup to your own private GitHub repository
 
 ## Limits
 
-- One computer at a time, with no licence and no network needed. Adding a second computer to the
-  vault needs a licence: the vault refuses it with "This vault is licensed for 1 computer". Cloud AI
-  apps through the secure link are not computers and are not refused.
-- Switching computers goes through your own GitHub backup: once `memev github setup` has run on the
-  old computer, `memev init` on the new one offers to join that backup.
+- One computer at a time, with no licence. The local core works without a network; optional cloud
+  connectors and GitHub backup require a network. Adding a second computer to the vault needs a
+  licence: the vault refuses it with "This vault is licensed for 1 computer". Cloud AI apps through
+  the secure link are not computers and are not refused.
+- Switching computers can use your own GitHub backup: after `memev github setup` on the old
+  computer, `memev init` on the new one offers to join that backup. Backup is optional, not
+  pre-enabled.
 - Git sync is single-writer backup, not a way to edit on two computers at once. If a second computer
   also pushes the same vault, `memev doctor` shows a warning that concurrent edits can conflict.
   Nothing is blocked. A merge that conflicts is left as it is and reported by `memev doctor`. Edit on
@@ -73,8 +83,9 @@ link. `memev init --local-only` keeps the secure link off, and the backup stays 
 
 Edit on two machines at once, nothing to resolve. One person, up to 3 computers and 10 cloud AI
 connectors, for $12/month or $120/year. The licence is for that person and cannot
-be passed on. The AI apps on all three computers share one memory and one comms bus, over the secure
-link, with a key for each computer. The same mix of several cloud AI apps side by side and local coding
+be passed on. The AI apps on all three computers share project state, coordination and knowledge
+context over the secure link, with a key for each computer. The same comms bus coordinates the
+connected AI-tool seats across those computers. The same mix of several cloud AI apps side by side and local coding
 tools over MCP applies on each.
 
 The merging of concurrent edits is done by crdt-merge, the convergence engine. It lives in its own
