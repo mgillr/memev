@@ -126,7 +126,7 @@ There are four merge classes:
 
 | Entity type | Owner | Merge class | Status |
 |---|---|---|---|
-| `project` | `person` | `last-writer` | `scope_version` is the exception: it is monotonic and the highest value stands, never the newest write |
+| `project` | `person` | `last-writer` | `scope_version` is the exception: it is monotonic and the highest value stands, never the newest write. No contract enforces this yet |
 | `task` | `person` | `human-resolution` | declared, not surfaced yet |
 | `lease` | `service` | `human-resolution` | provisional: the class and the owner |
 | `attempt` | `agent` | `append-only` | declared, not surfaced yet |
@@ -138,7 +138,7 @@ There are four merge classes:
 
 No type uses `set-union` yet; the class is there for the types that come later.
 
-Only approvals are surfaced today. Every other class is declared and recorded, and nothing applies or surfaces it; that is the work of the merge provider (SO-F-06). `task` is declared `human-resolution` and a competing task write is not surfaced either: the version check of the state machine is what catches two updates of one task, not this table.
+Only approvals are surfaced today. Every other class is declared and recorded, and nothing applies or surfaces it; that is the work of the merge provider (SO-F-06). The monotonic `scope_version` is not in SO-F-06: no contract enforces it yet. `task` is declared `human-resolution` and a competing task write is not surfaced either: the version check of the state machine is what catches two updates of one task, not this table.
 
 Three entries are provisional, which means they wait on a decision and may change with it:
 

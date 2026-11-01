@@ -258,6 +258,7 @@ test('SO-F-02 AC05: docs/PROJECTS.md lists every entity type with its authority 
   assert.match(page, /newest in log order/);
   assert.match(page, /tie is broken by the merge provider/);
   assert.match(page, /Only approvals are surfaced today/);
+  assert.match(page, /monotonic and the highest value stands, never the newest write\. No contract enforces this yet/);
   assert.match(page, /ADR 3 \(lease semantics\)/);
   for (const [kind, d] of Object.entries(ENTITY_KINDS)) {
     if (Object.keys(d.provisional).length) assert.ok(new RegExp(`\\| \`${kind}\` \\|[^\\n]*provisional`).test(page), `${kind} is marked provisional in the table`);

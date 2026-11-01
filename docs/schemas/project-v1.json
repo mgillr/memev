@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$comment": "One file, two parts, because SO-F-02 names this file for both. The schema is the keys $schema, type, required, properties and $defs. The declarations are the keys schema, store_schema_version and entities, which are an instance of that schema: this file validates against itself. SO-F-06 derives its schemas from the declarations.",
   "title": "Memev canonical project schema, version 1",
-  "description": "The entity types of the project store, each with its declared owner (a subject type of the identity model), the field that carries its scope version, and its merge class. The owner is a declaration: it is not enforced here, it is not the memory authority of ADR 7 (proposed) and it is not the permission matrix of ADR 5 (open). The core records the class and applies none; the free path keeps both versions of a competing write. Only approvals are surfaced as a conflict today; applying the other classes is SO-F-06. Two approvals on one task that say incompatible things derive to a semantic conflict. See docs/PROJECTS.md. The store is src/engine/project-store.mjs.",
+  "description": "The entity types of the project store, each with its declared owner (a subject type of the identity model), the field that carries its scope version, and its merge class. The owner is a declaration: it is not enforced here, it is not the memory authority of ADR 7 (proposed) and it is not the permission matrix of ADR 5 (open). The core records the class and applies none; the free path keeps both versions of a competing write. Only approvals are surfaced as a conflict today; applying the other classes is SO-F-06, except the monotonic scope_version, which no contract enforces yet. Two approvals on one task that say incompatible things derive to a semantic conflict. See docs/PROJECTS.md. The store is src/engine/project-store.mjs.",
   "type": "object",
   "required": [
     "schema",
@@ -35,7 +35,7 @@
   },
   "$defs": {
     "mergeClass": {
-      "description": "last-writer: the newest write in log order stands; a tie is broken by the merge provider, not here; project scope_version is the exception, it is monotonic and the highest value stands. set-union: the elements of every write stand. append-only: nothing is replaced. human-resolution: competing writes are surfaced and a person settles them; never silently merged.",
+      "description": "last-writer: the newest write in log order stands; a tie is broken by the merge provider, not here; project scope_version is the exception: scope_version is monotonic, the highest value stands. No contract enforces this yet. set-union: the elements of every write stand. append-only: nothing is replaced. human-resolution: competing writes are surfaced and a person settles them; never silently merged.",
       "enum": [
         "last-writer",
         "set-union",
