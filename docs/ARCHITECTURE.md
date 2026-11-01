@@ -262,8 +262,10 @@ What the planned extension needs, beside the merge boundary that exists today
 - **A regional service (planned):** may help with routing, discovery or permitted caching. It is not
   a relay, which only forwards ([RELAY.md](RELAY.md)), and it never becomes the owner of a site's
   memory or the sequencer of ordinary updates.
-- **The project state machine (planned):** the code is present in `src/engine/project-state.mjs`,
-  and nothing imports it yet ([PROJECTS.md](PROJECTS.md)); the planned multi-site work wires it in.
+- **Project state and governed execution (implemented locally):** `ProjectStore`,
+  `project-state.mjs` and `Coordinator` persist project records, enforce legal task transitions,
+  coordinate claims and leases, and bind verification to evidence. See [PROJECTS.md](PROJECTS.md).
+  This local capability does not imply a complete federated deployment.
 - **Federated computation (planned):** authorised computational work coordinated across sites,
   with workload-specific algorithms; the engine converges supported state only and does not replace
   those algorithms.
