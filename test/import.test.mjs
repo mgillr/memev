@@ -113,6 +113,7 @@ test('MEM-105 AC12: non-TTY init does not ask the import question and writes no 
 
 test('MEM-105 AC12: the init offer defaults to no: Enter imports nothing, and the answer is kept', async () => {
   const { v } = newVault();
+  v.close();
   const proj = makeProj();
   const input = new PassThrough();
   const output = new PassThrough();
@@ -125,10 +126,12 @@ test('MEM-105 AC12: the init offer defaults to no: Enter imports nothing, and th
   assert.equal(r.result.imported, 0, 'nothing imported');
   assert.deepEqual(readJsonFile(path.join(v.root, '.memev', 'config.json')).import, { asked: true, accepted: false }, 'the answer is kept, so it is not asked again');
   v.close();
+  v.close();
 });
 
 test('MEM-105 AC12: the init offer reads its answer after an earlier question paused the input, and from a line split in two chunks', async () => {
   const { v } = newVault();
+  v.close();
   const proj = makeProj();
   const input = new PassThrough();
   const output = new PassThrough();
@@ -142,6 +145,7 @@ test('MEM-105 AC12: the init offer reads its answer after an earlier question pa
   assert.equal(r.accepted, true, 'yes imports');
   assert.ok(r.result.imported >= 1, 'items imported');
   assert.equal(input.isPaused(), true, 'the input is paused again, so init can exit');
+  v.close();
   v.close();
 });
 
@@ -193,6 +197,7 @@ test('MEM-105 AC12: the question memev import asks defaults to yes, so Enter imp
 
 test('MEM-105 AC12: offerImport with ask=true and a no answer does not import', async () => {
   const { v } = newVault();
+  v.close();
   const proj = makeProj();
   const input = new PassThrough();
   const output = new PassThrough();
@@ -203,10 +208,12 @@ test('MEM-105 AC12: offerImport with ask=true and a no answer does not import', 
   assert.equal(r.accepted, false, 'declined');
   assert.equal(r.result.imported, 0, 'nothing imported');
   v.close();
+  v.close();
 });
 
 test('MEM-105 AC12: offerImport failure never throws', async () => {
   const { v } = newVault();
+  v.close();
   const input = new PassThrough();
   const output = new PassThrough();
   input.end('\n');
@@ -218,6 +225,7 @@ test('MEM-105 AC12: offerImport failure never throws', async () => {
     threw = true;
   }
   assert.equal(threw, false, 'offerImport does not throw on bad path');
+  v.close();
   v.close();
 });
 
@@ -292,14 +300,16 @@ test('MEM-105 AC12: init --yes or --keep never imports: off a terminal nothing i
   const { offerImport } = await import('../src/cli/import.mjs');
   for (const flags of [{ yes: true }, { keep: '1,2' }]) {
     const { v } = newVault();
+    const root = v.root;
+    v.close();
     const proj = makeProj();
-    const off = await offerImport({ root: v.root, env: { HOME: tmpdir('home-') }, flags, cwd: proj, home: tmpdir('home-') });
+    const off = await offerImport({ root, env: { HOME: tmpdir('home-') }, flags, cwd: proj, home: tmpdir('home-') });
     assert.equal(off.asked, false, `${JSON.stringify(flags)} alone does not offer the import`);
     const input = new PassThrough(); const output = new PassThrough(); input.end('n\n');
-    const no = await offerImport({ root: v.root, env: { HOME: tmpdir('home-') }, flags, ask: true, input, output, cwd: proj, home: tmpdir('home-') });
+    const no = await offerImport({ root, env: { HOME: tmpdir('home-') }, flags, ask: true, input, output, cwd: proj, home: tmpdir('home-') });
     assert.equal(no.accepted, false, `${JSON.stringify(flags)} does not answer the question for the person`);
-    assert.equal(listImports(v).length, 0, 'nothing was imported');
-    v.close();
+    const importsDir = path.join(root, 'memory', 'imports');
+    assert.ok(!fs.existsSync(importsDir) || fs.readdirSync(importsDir).length === 0, 'nothing was imported');
   }
 });
 
