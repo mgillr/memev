@@ -37,8 +37,8 @@ Memev states that it has no telemetry by default. The network activity described
 You must have been granted access to the private GitHub repository by the Memev maintainer.
 
 ```sh
-# Replace OWNER and REPOSITORY with the values from the GitHub Code menu.
-git clone https://github.com/mgillr/memev.git
+# Replace the placeholder with the private clone URL supplied with your preview invitation.
+git clone <private-repository-url>
 cd memev
 node --version
 git --version
