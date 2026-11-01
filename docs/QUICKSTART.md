@@ -2,7 +2,7 @@
 
 Part of the [Memev documentation](README.md). Up: the [README](../README.md).
 
-You need Node 22 or newer and git.
+You need Node 22 or newer and git. **Free Core is currently a closed, invite-only preview:** the repository is private and `memev` is not published on npm. You must have repository access and the clone URL supplied by the maintainer before following this guide.
 
 In a copy of the Memev repository:
 
@@ -10,9 +10,7 @@ In a copy of the Memev repository:
 node bin/memev.mjs init   # or: npm install -g . && memev init
 ```
 
-`npx memev init` will work once Memev is on the npm registry (coming soon). Or ask an AI app that
-can run commands to do it: "Download the Memev repository, run `node bin/memev.mjs init` inside it,
-and show me the checklist it prints."
+`npx memev init` is not available because Memev is not on the npm registry. If you have preview access, ask an AI app that can run commands to do this: "Clone the private Memev repository using the URL supplied with my preview invitation, run `node bin/memev.mjs init` inside it, and show me the checklist it prints."
 
 `init`:
 
