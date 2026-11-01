@@ -168,8 +168,9 @@ For a global `memev` command, run `npm install -g . && memev init` there instead
 `docker compose up -d` builds the image on your machine; see [docs/DOCKER.md](docs/DOCKER.md).
 
 After setup, two things may need you: one browser sign-in for the GitHub backup
-(`memev github setup`), and a click in apps that ask before they trust a new tool. The checklist
-says which. Details are in [docs/QUICKSTART.md](docs/QUICKSTART.md).
+(`memev github setup`), and a click in apps that ask before they trust a new tool. If an AI ran init
+without a terminal, the first fresh session also asks which connected AI should lead; choose once
+and Memev records it. The checklist says which. Details are in [docs/QUICKSTART.md](docs/QUICKSTART.md).
 
 To see shared context working, run `memev ready` and open a new session in each app. It prints each
 app as it joins, then confirms that connected apps share project context when one recalls something
