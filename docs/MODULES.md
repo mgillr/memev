@@ -2,7 +2,7 @@
 
 Part of the [Memev documentation](README.md). Written by `node scripts/docs/module-graph.mjs` from the real imports in `bin/` and `src/`; do not edit it by hand. `node scripts/docs/module-graph.mjs --check` (and `test/docs-module-map.test.mjs`) fail when it is out of date. How the parts fit at a higher level: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-84 modules and 310 import edges (73 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
+85 modules and 312 import edges (74 of them are loaded on demand with `import()`, drawn dashed). Memev has no runtime dependencies: only Node built-ins and the code under `vendor/`.
 
 ## Layers
 
@@ -17,7 +17,7 @@ flowchart LR
   services["src/services"]
   vendor["vendor"]
   bin -->|"3"| cli
-  cli -->|"89"| engine
+  cli -->|"90"| engine
   cli -->|"1"| server
   cli -->|"1"| services
   cli -->|"2"| vendor
@@ -103,6 +103,7 @@ flowchart LR
     src_engine_mutation_gate["mutation-gate.mjs"]
     src_engine_net["net.mjs"]
     src_engine_oplog["oplog.mjs"]
+    src_engine_paid_merge["paid-merge.mjs"]
     src_engine_project_state["project-state.mjs"]
     src_engine_project_store["project-store.mjs"]
     src_engine_quality["quality.mjs"]
@@ -309,6 +310,7 @@ flowchart LR
   src_cli_sync --> src_engine_git
   src_cli_sync --> src_engine_license
   src_cli_sync --> src_engine_merge
+  src_cli_sync -.-> src_engine_paid_merge
   src_cli_sync -.-> src_engine_tuning
   src_cli_sync --> src_engine_util
   src_cli_sync -.-> src_services_providers
@@ -389,6 +391,7 @@ flowchart LR
   src_engine_oplog --> src_engine_envelope_adapters
   src_engine_oplog --> src_engine_envelope
   src_engine_oplog --> src_engine_util
+  src_engine_paid_merge --> src_engine_merge
   src_engine_project_store --> src_engine_evidence
   src_engine_project_store --> src_engine_identity
   src_engine_project_store --> src_engine_oplog
@@ -479,7 +482,7 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 | `src/cli/runner.mjs` | `memev runner`: an opt-in background runner per seat | `engine/bus.mjs`, `engine/util.mjs`, `engine/vault.mjs` | `cli/main.mjs` |
 | `src/cli/service.mjs` | Start Memev at login: a systemd user unit on Linux, a launchd plist on macOS, a per-user Task Scheduler entry on Windows | `cli/clients.mjs`, `cli/common.mjs`, `engine/util.mjs` | `cli/clients.mjs`, `cli/doctor.mjs`, `cli/main.mjs`, `cli/onboarding.mjs`, `cli/preflight.mjs` |
 | `src/cli/setup-remote.mjs` | Customer-side remote setup session: foreground, allowlisted, logged, revocable | `cli/clients.mjs`, `cli/common.mjs`, `engine/setup-channel.mjs` | `cli/main.mjs` |
-| `src/cli/sync.mjs` | Background jobs the daemon runs, so nothing needs a person to remember it: git sync every sync.interval_min: commit, pull (merge, never force),... | `cli/clients.mjs`, `cli/github.mjs`, `engine/devices.mjs`, `engine/git.mjs`, `engine/license.mjs`, `engine/merge.mjs`, `engine/tuning.mjs`, `engine/util.mjs`, `services/providers.mjs` | `cli/tunnel.mjs`, `server/main.mjs`, `services/providers.mjs` |
+| `src/cli/sync.mjs` | Background jobs the daemon runs, so nothing needs a person to remember it: git sync every sync.interval_min: commit, pull (merge, never force),... | `cli/clients.mjs`, `cli/github.mjs`, `engine/devices.mjs`, `engine/git.mjs`, `engine/license.mjs`, `engine/merge.mjs`, `engine/paid-merge.mjs`, `engine/tuning.mjs`, `engine/util.mjs`, `services/providers.mjs` | `cli/tunnel.mjs`, `server/main.mjs`, `services/providers.mjs` |
 | `src/cli/transcript.mjs` | Read a session transcript (JSON lines) to recover progress: the latest todo list, files edited, the last user request and the last assistant reply | `engine/oplog.mjs` | `cli/hooks.mjs` |
 | `src/cli/tunnel.mjs` | Remote access for cloud AI apps, off by default, one command to switch on (`memev cloud on`) | `cli/common.mjs`, `cli/relay.mjs`, `cli/sync.mjs`, `engine/entitlements.mjs`, `engine/license.mjs`, `engine/net.mjs`, `engine/tokens.mjs`, `engine/util.mjs`, `vendor/qr.mjs` | `cli/main.mjs`, `cli/onboarding.mjs`, `cli/preflight.mjs`, `server/main.mjs` |
 | `src/cli/update.mjs` | `memev update` installs the newest version from a local tarball into a new runtime folder and points the launcher at it | `cli/common.mjs`, `cli/daemon.mjs`, `cli/main.mjs`, `engine/util.mjs`, `engine/vault.mjs` | `cli/doctor.mjs`, `cli/main.mjs` |
@@ -510,11 +513,12 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 | `src/engine/index.mjs` | The recall index: BM25 over note sections (a section = a heading and the text under it) | `engine/envelope.mjs`, `engine/oplog.mjs`, `engine/util.mjs` | `engine/graph.mjs`, `engine/quality.mjs`, `engine/vault.mjs` |
 | `src/engine/jsonc.mjs` | Settings files that hold comments or trailing commas (JSONC: VS Code, Zed, often Gemini CLI) | `vendor/jsonc` | `cli/clients.mjs` |
 | `src/engine/license.mjs` | Offline licence files | `engine/util.mjs` | `cli/agentid.mjs`, `cli/doctor.mjs`, `cli/invite.mjs`, `cli/licensing.mjs`, `cli/relay.mjs`, `cli/sync.mjs`, `cli/tunnel.mjs`, `engine/merge.mjs`, `server/http.mjs` |
-| `src/engine/merge.mjs` | The engine call gate | `engine/license.mjs` | `cli/sync.mjs` |
+| `src/engine/merge.mjs` | The engine call gate | `engine/license.mjs` | `cli/sync.mjs`, `engine/paid-merge.mjs` |
 | `src/engine/milestones.mjs` | Activation milestones, worked out on this computer from what the vault already keeps: its operation log, the comms bus and the invites file | `engine/oplog.mjs`, `engine/util.mjs` | `cli/onboarding.mjs` |
 | `src/engine/mutation-gate.mjs` | The mutation gate breaks each line a change added or edited, one mutant at a time, and fails when the tests still pass | none | none |
 | `src/engine/net.mjs` | Every request Memev makes goes through fetchOut, except a hook process's calls to the daemon on this computer, which use node:http (cli/common.mjs) | none | `cli/common.mjs`, `cli/doctor.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/mcp-stdio.mjs`, `cli/onboarding.mjs`, `cli/remote.mjs`, `cli/tunnel.mjs` |
 | `src/engine/oplog.mjs` | The operation log: append-only, segmented, snapshotted, streamed | `engine/envelope-adapters.mjs`, `engine/envelope.mjs`, `engine/util.mjs` | `cli/transcript.mjs`, `engine/index.mjs`, `engine/milestones.mjs`, `engine/project-store.mjs`, `engine/vault.mjs` |
+| `src/engine/paid-merge.mjs` | The paid merge client | `engine/merge.mjs` | `cli/sync.mjs` |
 | `src/engine/project-state.mjs` | The project and task state machine: the eleven task states, the seven derived project statuses, one transition table, and the invariants of the... | none | `engine/coordinator.mjs` |
 | `src/engine/project-store.mjs` | The project store: one canonical project state per project, under the vault's .memev directory | `engine/evidence.mjs`, `engine/identity.mjs`, `engine/oplog.mjs`, `engine/relationships.mjs`, `engine/secrets.mjs`, `engine/util.mjs` | `engine/vault.mjs` |
 | `src/engine/quality.mjs` | The write gate for memories | `engine/index.mjs` | `engine/vault.mjs` |
