@@ -160,7 +160,7 @@
           }
         },
         {
-          "statement": "no line of the five files that said per sender still says it: none of docs/FEDERATION.md (the field table row of sequence at line 206 and the paragraph at line 224 at the base), docs/schemas/contribution-v1.json (line 65), src/engine/federation/contribution.mjs (line 5), src/engine/federation/admission.mjs (the head comment, lines 9 and 13) and docs/OPERATION-ENVELOPE.md (line 98) has a line that holds per-sender, the high-water mark of the sender, of that sender or of each sender (the phrase mark of the, that or each sender), or each sender is kept; the command exits 0 when none does, and it exits 1 on the base",
+          "statement": "no line of the five files that said per sender still says it: none of docs/FEDERATION.md (the field table row of sequence at line 206 and the paragraph at line 224 at the base), docs/schemas/contribution-v1.json (line 65), src/engine/federation/contribution.mjs (line 5), src/engine/federation/admission.mjs (the head comment, lines 9 and 13) and docs/OPERATION-ENVELOPE.md (the bullet of What other contracts add that says the per-sender sequence, cited by its text because its line moves with other pull requests) has a line that holds per-sender, the high-water mark of the sender, of that sender or of each sender (the phrase mark of the, that or each sender), or each sender is kept; the command exits 0 when none does, and it exits 1 on the base",
           "verifier": {
             "type": "command",
             "cmd": "! grep -nEi 'per-sender|mark of (the|that|each) sender|each sender is kept' docs/FEDERATION.md docs/schemas/contribution-v1.json src/engine/federation/contribution.mjs src/engine/federation/admission.mjs docs/OPERATION-ENVELOPE.md",
