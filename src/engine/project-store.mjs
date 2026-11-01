@@ -275,21 +275,38 @@ export class ProjectStore {
   // dead one (or our own leftover) is stale and is taken over. Reentrant within one process.
   _tryAcquireLock() {
     if (this._lockDepth > 0) { this._lockDepth++; return false; }
-    if (exists(this.lockPath)) {
-      const pid = parseInt(fs.readFileSync(this.lockPath, 'utf8').trim(), 10);
+    // The holder can release between any two of these calls, so a vanished lock file means free, never an error.
+    let held = null;
+    try { held = fs.readFileSync(this.lockPath, 'utf8'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    if (held !== null) {
+      const pid = parseInt(held.trim(), 10);
       if (pid !== process.pid && pidAlive(pid)) return true;
-      try { fs.unlinkSync(this.lockPath); } catch {}
+      // a lock file with no pid in it is a writer caught between creating and filling it: busy, not stale
+      if (!Number.isInteger(pid)) {
+        let age = Infinity;
+        try { age = Date.now() - fs.statSync(this.lockPath).mtimeMs; } catch {}
+        if (age < 5000) return true;
+      }
+      // remove it only if it is still the stale lock read above, not a live one taken over in the meantime
+      try { if (fs.readFileSync(this.lockPath, 'utf8') === held) fs.unlinkSync(this.lockPath); } catch {}
     }
+    // The lock appears whole or not at all: the pid is written to a private file, which is then linked to the lock
+    // name (atomic, and refused when the name exists). Creating the lock and then writing the pid left a moment in
+    // which a second process read an empty file, took it for stale and removed a live lock.
+    const tmp = `${this.lockPath}.${process.pid}.${randomToken(3)}`;
     try {
-      const fd = fs.openSync(this.lockPath, 'wx', 0o600);
-      fs.writeSync(fd, String(process.pid));
-      fs.closeSync(fd);
+      fs.writeFileSync(tmp, String(process.pid), { mode: 0o600 });
+      try { fs.linkSync(tmp, this.lockPath); }
+      catch (e) {
+        if (e.code === 'EEXIST') return true;
+        if (!['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'EXDEV'].includes(e.code)) throw e;
+        // a file system with no hard links: the exclusive create, with the pid written in the same call
+        try { fs.writeFileSync(this.lockPath, String(process.pid), { flag: 'wx', mode: 0o600 }); }
+        catch (e2) { if (e2.code === 'EEXIST') return true; throw e2; }
+      }
       this._lockDepth = 1;
       return false;
-    } catch (e) {
-      if (e.code === 'EEXIST') return true;
-      throw e;
-    }
+    } finally { try { fs.unlinkSync(tmp); } catch {} }
   }
   _releaseLock() {
     if (this._lockDepth <= 0) return;

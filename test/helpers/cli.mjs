@@ -34,6 +34,13 @@ export function freePort({ span = 1 } = {}) {
   }
   throw new Error('no free port for the test daemon');
 }
+// Run init, and while it reports that the daemon did not start (a slow first start on a busy machine) ask for the start again,
+// up to `tries` runs in all. A failure of any other kind is returned at once.
+export function initWithRetry(sb, args, { tries = 3 } = {}) {
+  let r = sb.run(args);
+  for (let i = 1; i < tries && r.code !== 0 && /did not start/.test(`${r.out}${r.err}`); i++) r = sb.run(['start']);
+  return r;
+}
 // The sandbox has the launcher folder on PATH, as a person who ran memev path add does; a test of the other case sets PATH itself.
 export function sandbox({ ports = 1 } = {}) {
   const home = tmpdir('home-');

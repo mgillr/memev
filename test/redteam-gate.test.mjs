@@ -11,6 +11,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { evaluate, gate, RULES, REVIEWER_KEYS, GRANDFATHERED } from '../scripts/gate/redteam-gate.mjs';
 import * as G from '../scripts/gate/redteam-gate.mjs';
+import { DEFAULT_SPEC_DIRS, defaultSpecs } from '../src/engine/redteam-gate.mjs';
 import { canonicalHash, sign, keyId, generateKeyPair } from '../vendor/attest/signature.mjs';
 import { makeTask, skeleton } from '../vendor/attest/contract.mjs';
 import { HERE, ROOT, KEYS, TEST_PRIV, TEST_PUB, FIXTURE_PUB, GIT_ENV, scenario, fresh, specV1, specV2, baseRounds, clone, specHash, stopDecision, contractKey, git, FILES, signRecord, closingBody, roundBody, signAs, STOP_PAYLOAD } from './fixtures/redteam/lib.mjs';
@@ -369,6 +370,21 @@ test('T1-c14: with no arguments the gate reads both default spec directories; a 
   const re = cli(empty, []);
   assert.notEqual(re.status, 0);
   assert.match(re.stderr, /no specs found/);
+});
+
+test('G1: the default spec directories include the programme specs, so a plain run and --report read them', () => {
+  assert.ok(DEFAULT_SPEC_DIRS.includes('contracts/programme/specs'));
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'redteam-programme-')); made.push(d);
+  fs.mkdirSync(path.join(d, 'contracts/programme/specs'), { recursive: true });
+  fs.writeFileSync(path.join(d, 'contracts/programme/specs/PG-01.1-example.json'), `${JSON.stringify({ title: 'PG-01.1 example', project: 'memev', workdir: null, tasks: [{ id: 'T1', title: 'a', phase: 'design', criteria: [{ statement: 'x', verifier: { type: 'file_exists', path: 'a' } }] }] }, null, 2)}\n`);
+  assert.deepEqual(defaultSpecs(d), ['contracts/programme/specs/PG-01.1-example.json']);
+  const plain = cli(d, []);
+  assert.match(plain.stdout, /contracts\/programme\/specs\/PG-01\.1-example\.json: NO RECORD/);
+  const rep = cli(d, ['--report']);
+  assert.match(rep.stdout, /contracts\/programme\/specs\/PG-01\.1-example\.json: NO RECORD/);
+  assert.match(rep.stdout, /examined 1 specs/);
+  // a signed contract of a programme spec is found by title when the directory is read; without the directory it is an orphan
+  assert.equal(path.posix.basename(DEFAULT_SPEC_DIRS.at(-1)), 'specs');
 });
 
 test('T1-c16: rounds are DSSE envelopes by a reviewer key that is not a contract key; unsigned rounds, contract-key rounds and edits after signing are refused with review_sig', () => {

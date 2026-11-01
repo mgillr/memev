@@ -9,25 +9,26 @@ Reconciled 31 October 2026 against main at `4823064`. The requirement register a
 - One tree, numbered. A leaf is one thing that has to be delivered, decided or settled. Each leaf has one owner line; an owner is named once on its own leaf and cited from the others, so no work is described twice.
 - A leaf has one of four statuses. **delivered**: on main and a test proves it. **covered**: an existing contract, an open pull request, merged work or a task of the programme decomposition owns what is left (a programme task is proposed and unsigned until its contract is signed). **new**: a contract added with this page (SO-1.01 to SO-1.11 and SO-2.01 to SO-2.14) owns it. **blocked**: it cannot be contracted or built until the named decision or fact exists.
 - A dagger (†) after an id marks a contract signed in the owner's vault that the review of PR #222 names (issuecomment-6534383323). It is not in this repository and cannot be checked from here, so every leaf that rests on one is flagged and counted apart.
+- The build layer: SO-A-01 to SO-A-12, SO-R-E and SO-F-01 to SO-F-13 are the unsigned fold of 30 Oct 2026, adapted to this repository and listed in section 9 (SO-F-11 is dropped, see 9.3). They build what the design records of SO-1.x and SO-2.x decide. A leaf that rested on a dagger contract and now has one of them as its build contract is covered; a leaf with no dagger keeps its status and names the build layer in its note.
 - Sections 1 to 3, 5, 6, 7 and 8 are different lenses on the same work, so a total across all of them counts a thing once per lens. Section 9 lists each owner once.
 - Source names: "baseline" is the master traceability and target architecture baseline of 31 October 2026 (main at `aa3af6c`), "addendum" is the Scope One addendum of PR #222, and "review" is its review table.
 - Recorded statuses of requirements are the register's own. "On main" is the status the evidence of 31 October supports; it moves only where a test on main shows it, and says which.
 
 ## Summary
 
-Leaves: 276. delivered 21, covered 198, new 41, blocked 16. Of the covered leaves, 82 rest wholly or partly on a contract that only the owner's vault holds and this repository cannot check.
+Leaves: 276. delivered 21, covered 212, new 27, blocked 16. Of the covered leaves, 96 rest wholly or partly on a contract that only the owner's vault holds and this repository cannot check.
 
 | Section | Leaves | delivered | covered | new | blocked |
 | --- | --- | --- | --- | --- | --- |
 | 1 Control and decisions | 19 | 1 | 12 | 2 | 4 |
 | 2 Platform contracts | 57 | 0 | 57 | 0 | 0 |
 | 3 Requirements | 98 | 4 | 86 | 5 | 3 |
-| 4 Addendum | 23 | 0 | 4 | 13 | 6 |
-| 5 Delivery families | 52 | 0 | 29 | 21 | 2 |
+| 4 Addendum | 23 | 0 | 13 | 4 | 6 |
+| 5 Delivery families | 52 | 0 | 34 | 16 | 2 |
 | 6 Pull requests | 7 | 0 | 6 | 0 | 1 |
 | 7 Branches | 7 | 3 | 4 | 0 | 0 |
 | 8 Merged foundations | 13 | 13 | 0 | 0 | 0 |
-| Total | 276 | 21 | 198 | 41 | 16 |
+| Total | 276 | 21 | 212 | 27 | 16 |
 
 The sections are lenses on the same work, so the total counts a thing once per lens; the requirement lens (98 leaves) is the one that must reach "delivered".
 
@@ -325,17 +326,17 @@ Each of the thirteen recommendations of the addendum, classified in the review t
 | WBS | Rec | Subject | Review | Owner of what exists | New contract | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | 4.1.1 | 1 | Establish one trustworthy baseline | agree | SO-T-A (delivered) | SO-1.02 | new |
-| 4.1.2 | 2 | State machine, store and coordinator as the execution authority | agree | SO-04-A, SO-07-A, SO-08-A (delivered); SO-08-B†, SO-L-A† | SO-1.01 (integration); SO-1.03 (assignment preference) | new |
-| 4.1.3 | 3 | Provider-neutral agent adapter contract | agree | SO-05-B† | SO-1.04 | new |
+| 4.1.2 | 2 | State machine, store and coordinator as the execution authority | agree | SO-04-A, SO-07-A, SO-08-A (delivered); SO-08-B†, SO-L-A† | SO-1.01 (integration); SO-1.03 (assignment preference); build layer SO-A-01, SO-A-02 | covered |
+| 4.1.3 | 3 | Provider-neutral agent adapter contract | agree | SO-05-B† | SO-1.04; build layer SO-A-03 | covered |
 | 4.1.4 | 4 | Intake, planning, execution, policy and verification kept separate | agree | SO-02-A†, SO-03-A†, SO-05-D†, SO-07-A | none, covered | covered |
-| 4.1.5 | 5 | The workspace as a product surface | needs evidence | SO-C-A to SO-C-C† | SO-1.05 | new |
-| 4.1.6 | 6 | Connections and access | agree | SO-O-A to SO-O-C† | SO-1.06 | new |
-| 4.1.7 | 7 | A factual, interdependent model | agree | SO-07-A, SO-05-C†, SO-05-D† | SO-1.07 | new |
-| 4.1.8 | 8 | Blockers and decisions as a workflow | agree | SO-03-A†, SO-C-C† | SO-1.08 | new |
-| 4.1.9 | 9 | Inspectable artefacts | agree | SO-05-D†, SO-02-B† | SO-1.09 | new |
+| 4.1.5 | 5 | The workspace as a product surface | needs evidence | SO-C-A to SO-C-C† | SO-1.05; build layer SO-A-08, SO-A-09, SO-A-12 | covered |
+| 4.1.6 | 6 | Connections and access | agree | SO-O-A to SO-O-C† | SO-1.06; build layer SO-A-07 | covered |
+| 4.1.7 | 7 | A factual, interdependent model | agree | SO-07-A, SO-05-C†, SO-05-D† | SO-1.07; build layer SO-A-04 | covered |
+| 4.1.8 | 8 | Blockers and decisions as a workflow | agree | SO-03-A†, SO-C-C† | SO-1.08; build layer SO-A-05 | covered |
+| 4.1.9 | 9 | Inspectable artefacts | agree | SO-05-D†, SO-02-B† | SO-1.09; build layer SO-A-06 | covered |
 | 4.1.10 | 10 | Core path separate from commercial infrastructure | agree | SR-3.01, SR-3.05 (the engine decision and its licence, which close the documentation task the review asks for); D-SO-MEMORY-AUTHORITY† open | none, covered | covered |
-| 4.1.11 | 11 | Recovery and security as acceptance | agree | SO-11-A†, SO-09-A† | SO-1.10 | new |
-| 4.1.12 | 12 | The whole user journey | agree | SO-11-A† | SO-1.11 | new |
+| 4.1.11 | 11 | Recovery and security as acceptance | agree | SO-11-A†, SO-09-A† | SO-1.10; build layer SO-A-10 | covered |
+| 4.1.12 | 12 | The whole user journey | agree | SO-11-A† | SO-1.11; build layer SO-A-10 | covered |
 | 4.1.13 | 13 | Final-state architecture | needs evidence and decisions | nothing signed | none; see 4.3 | blocked |
 
 ### 4.2 The addendum's thirteen fault classes against F01 to F20
@@ -365,13 +366,13 @@ Real inventory of the failure tests, from the code on main. The register records
 | WBS | Subject | Owner of what exists | Status | Evidence or remaining |
 | --- | --- | --- | --- | --- |
 | 4.3.1 | 13.1 Personal deployment, one or several machines | SR-3.04; SR-1.25; SR-1.30 | covered | owner decision 31 Oct 2026: Personal covers up to 3 computers; SR-3.04 owns concurrent editing of one vault |
-| 4.3.2 | 13.2 Small business shared memory | SO-2.01; SO-2.02; SO-2.14 | new | the organisational knowledge model (SO-2.01), the permission model (SO-2.02) and multi-person project permissions (SO-2.14) are design-record contracts released by the owner on 31 October 2026; the records are not yet written |
+| 4.3.2 | 13.2 Small business shared memory | SO-2.01; SO-2.02; SO-2.14 | new | the organisational knowledge model (SO-2.01), the permission model (SO-2.02) and multi-person project permissions (SO-2.14) are design-record contracts released by the owner on 31 October 2026; the records are not yet written; build layer SO-F-01, SO-F-02 |
 | 4.3.3 | 13.3 Larger businesses and offices | none | blocked | depends on 13.2 and on the node-identity task (5.5.5), which the programme decomposition proposes as WP09-01 and WP13-03 |
 | 4.3.4 | 13.4 Enterprise and international federation | #224 (draft) | blocked | the federation architecture of #224 is not yet accepted |
-| 4.3.5 | 13.5 Governed shared memory | SO-2.02; SO-2.03 | new | permission-aware access (SO-2.02) and provenance, retention and invalidation (SO-2.03); the status lattice of a note is WP10-01 and WP10-02 of the programme decomposition |
-| 4.3.6 | 13.6 Cross-project intelligence | SO-2.04; SO-2.05; SO-2.06 | new | findings (SO-2.04), cross-functional routing (SO-2.05) and the acceptance tests (SO-2.06); a prototype is WP08-04 of the programme decomposition and consumes these records |
-| 4.3.7 | 13.6.1 Federated site memory | none | blocked | owner decision 31 Oct 2026 settles local-first with the cloud only a relay and a backup; the review also asks for the two named integrations to be defined, and the trust-governance one is undefined in this repository |
-| 4.3.8 | 13.7 Convergence, accountable admission and trust governance | SR-3.01, SR-3.02, SR-3.05 (convergence engine boundary); WO-05-D (#206, specification merged) | blocked | the admission and trust-governance integrations have no contract and no definition in this repository |
+| 4.3.5 | 13.5 Governed shared memory | SO-2.02; SO-2.03 | new | permission-aware access (SO-2.02) and provenance, retention and invalidation (SO-2.03); the status lattice of a note is WP10-01 and WP10-02 of the programme decomposition; build layer SO-F-01, SO-F-03, SO-F-05 |
+| 4.3.6 | 13.6 Cross-project intelligence | SO-2.04; SO-2.05; SO-2.06 | new | findings (SO-2.04), cross-functional routing (SO-2.05) and the acceptance tests (SO-2.06); a prototype is WP08-04 of the programme decomposition and consumes these records; build layer SO-F-09, SO-F-13 |
+| 4.3.7 | 13.6.1 Federated site memory | none | blocked | owner decision 31 Oct 2026 settles local-first with the cloud only a relay and a backup; the review also asks for the two named integrations to be defined, and the trust-governance one is undefined in this repository; build layer SO-F-05, SO-F-07, SO-F-12 |
+| 4.3.8 | 13.7 Convergence, accountable admission and trust governance | SR-3.01, SR-3.02, SR-3.05 (convergence engine boundary); WO-05-D (#206, specification merged) | blocked | the admission and trust-governance integrations have no contract and no definition in this repository; build layer SO-F-03, SO-F-06, SO-F-08 |
 | 4.3.9 | 13.8 Deployment profiles | owner decision 31 Oct 2026 on tiers | covered | illustrative profiles, not thresholds; the tier set is decided |
 | 4.3.10 | 13.9 Acceptance tests for the final state | none | blocked | cannot be written before the contracts above exist |
 
@@ -397,28 +398,28 @@ Section 8 of the baseline lists proposed contract families and says their ids ar
 | 5.2.1 | Canonical execution integration | SO-1.01 | new | code evidence in section 3 |
 | 5.2.2 | Project intake and scope resolution | SO-02-A† | covered |  |
 | 5.2.3 | Project decomposition and planning | SO-02-A† | covered | the review lists SO-02-A with the intake and planning separation (row 4) |
-| 5.2.4 | Resource and capability registry | SO-1.06; SO-05-B† | new | the internal readiness registry is the gap the review names (row 6) |
+| 5.2.4 | Resource and capability registry | SO-1.06; SO-05-B†; build layer SO-A-07 | covered | the internal readiness registry is the gap the review names (row 6) |
 | 5.2.5 | Agent adapter specification | SO-05-B†; SO-1.04 | covered |  |
 | 5.2.6 | Agent adapter implementations | SO-05-B†; SR-2.03; MEM-146 (#215, delivered) | covered | which clients come first is product-owner question 1; it has a safe default |
 | 5.2.7 | Lead-agent authority | SO-L-A†; SO-1.03 | covered |  |
 | 5.2.8 | Execution policy and human approval | SO-03-A† | covered | defaults wait on ADR 4 and ADR 5 |
 | 5.2.9 | Evidence and acceptance integration | SO-05-D†; SR-0.03; SR-1.27; SR-1.30 | covered |  |
-| 5.2.10 | Canonical workspace projections | SO-05-C†; SO-1.05; SO-1.07 | new |  |
-| 5.2.11 | Connections and access settings | SO-O-A to SO-O-C†; SO-1.06 | new |  |
-| 5.2.12 | Blocker and decision workflow | SO-03-A†; SO-1.08 | new |  |
-| 5.2.13 | Artefact and deliverable management | SO-02-B†; SO-1.09 | new |  |
+| 5.2.10 | Canonical workspace projections | SO-05-C†; SO-1.05; SO-1.07; build layer SO-A-04, SO-A-08 | covered |  |
+| 5.2.11 | Connections and access settings | SO-O-A to SO-O-C†; SO-1.06; build layer SO-A-07 | covered |  |
+| 5.2.12 | Blocker and decision workflow | SO-03-A†; SO-1.08; build layer SO-A-05 | covered |  |
+| 5.2.13 | Artefact and deliverable management | SO-02-B†; SO-1.09; build layer SO-A-06 | covered |  |
 | 5.2.14 | End-to-end delivery demonstration | SO-1.11 | new |  |
 
 ### 5.3 Organisational intelligence and memory
 
 | WBS | Family | Owner | Status | Evidence or remaining |
 | --- | --- | --- | --- | --- |
-| 5.3.1 | Organisational knowledge model | SO-2.01 | new | owner release of 8.3 on 31 October 2026; the vault graph and retrieval modules are foundations only |
-| 5.3.2 | Permission-aware knowledge access | SO-2.02 | new | retrieval and action time; sharing classes at a site boundary are WP13-01 of the programme decomposition |
-| 5.3.3 | Provenance and retention | SO-2.03 | new | retention, deletion, invalidation and derived-record provenance; the status lattice of a note is WP10-01 and WP10-02 |
-| 5.3.4 | Cross-project intelligence | SO-2.04 | new | the design record; the prototype is WP08-04 and consumes it |
-| 5.3.5 | Cross-functional issue discovery | SO-2.05 | new | routing and access rules; WP08-04 and WP14-04 build on it |
-| 5.3.6 | Organisational intelligence acceptance | SO-2.06 | new | the acceptance tests of the organisational-intelligence demonstrator in WP14-04 |
+| 5.3.1 | Organisational knowledge model | SO-2.01 | new | owner release of 8.3 on 31 October 2026; the vault graph and retrieval modules are foundations only; build layer SO-F-02 |
+| 5.3.2 | Permission-aware knowledge access | SO-2.02 | new | retrieval and action time; sharing classes at a site boundary are WP13-01 of the programme decomposition; build layer SO-F-01, SO-F-03, SO-F-04, SO-F-05 |
+| 5.3.3 | Provenance and retention | SO-2.03 | new | retention, deletion, invalidation and derived-record provenance; the status lattice of a note is WP10-01 and WP10-02; build layer SO-F-12 |
+| 5.3.4 | Cross-project intelligence | SO-2.04 | new | the design record; the prototype is WP08-04 and consumes it; build layer SO-F-09 |
+| 5.3.5 | Cross-functional issue discovery | SO-2.05 | new | routing and access rules; WP08-04 and WP14-04 build on it; build layer SO-F-13 |
+| 5.3.6 | Organisational intelligence acceptance | SO-2.06 | new | the acceptance tests of the organisational-intelligence demonstrator in WP14-04; build layer SO-F-13 |
 
 ### 5.4 Ecosystem integrations
 
@@ -447,7 +448,7 @@ Section 8 of the baseline lists proposed contract families and says their ids ar
 | 5.5.8 | Partition and recovery | SR-3.04 (personal scale only); WP12-02, WP13-04 (programme decomposition, proposed and unsigned) | covered |  |
 | 5.5.9 | Multi-site administration | WP13-03 (programme decomposition, proposed and unsigned) | covered | site identity, organisation membership and sovereignty policy |
 | 5.5.10 | Cross-organisation projects | WP13-05 (programme decomposition, proposed and unsigned) | covered | cross-organisation identity and trust-domain boundaries |
-| 5.5.11 | Federated computation | SO-2.12 | new | owner release of 8.5 row 11 on 31 October 2026; behind the provider boundary |
+| 5.5.11 | Federated computation | SO-2.12 | new | owner release of 8.5 row 11 on 31 October 2026; behind the provider boundary; build layer SO-F-10 |
 
 ### 5.6 Commercial and distribution
 
@@ -542,6 +543,32 @@ Each new contract, with what it was checked against so that it does not repeat e
 | SO-2.12 | Federated computation behind the provider boundary | none | baseline 8.5 and 10; WO-05-A; WP09-02, WP12, WP13 | WP09-02, WP12 and WP13 are prerequisites and are not repeated; no overlap with a task of the programme decomposition |
 | SO-2.13 | Commercial integration services that keep the open-core boundary neutral | none | baseline 8.6; addendum 10 and 13.7; WP15-01, WP15-02, WP16-07 | WP15 holds the licence boundary and WP16-07 the pricing dimensions; this is the service boundary only |
 | SO-2.14 | Business deployment: multi-person project permissions and team administration | none | baseline 8.6; SR-5.02, SR-5.04, MEM-069; ADR 5; WP16-01 | SR-5.02, SR-5.04 and MEM-069 stay with their owners; WP16-01 decides tier names and takes none of this |
+| SO-A-01 | Lead agent: assignment preferences and overrides in ordinary language | SO-1.01 | SO-02-A†; SO-03-A†; SO-05-A; SO-08-A; SO-C-A†; SO-L-A†; main at d1c65ef | build layer of SO-1.03; valid with fixes (build layer, see its provenance) |
+| SO-A-02 | Default agent suitability analysis: capability requirements per task | SO-1.01 | SO-02-A†; SO-03-A†; SO-05-B†; SO-08-A; SO-L-A†; main at d1c65ef | build layer of SO-1.03; valid with fixes (build layer, see its provenance) |
+| SO-A-03 | Requested | SO-1.01 | SO-04-A; SO-05-D†; SO-07-A; SO-08-A; SO-C-C†; main at d1c65ef | build layer of SO-1.04; valid with fixes (build layer, see its provenance) |
+| SO-A-04 | Relationship model and change propagation: milestones | SO-1.01 | SO-02-A†; SO-05-C†; SO-05-D†; SO-07-A; SO-C-C†; main at d1c65ef | build layer of SO-1.07; valid with fixes (build layer, see its provenance) |
+| SO-A-05 | Decision and blocker queue as a workflow: seven states | SO-A-04, SO-1.01 | SO-03-A†; SO-08-B†; SO-C-A†; SO-C-C†; SO-L-A†; main at d1c65ef | build layer of SO-1.08; valid with fixes (build layer, see its provenance) |
+| SO-A-06 | Artifact registry: every material artifact linked to its requirement | SO-A-04, SO-1.01 | SO-02-B†; SO-05-C†; SO-05-D†; SO-C-C†; SO-O-A†; main at d1c65ef | build layer of SO-1.09; valid as the fold left it (build layer, see its provenance) |
+| SO-A-07 | Connections and access: one table over the folder grants | SO-1.01 | MEM-145; SO-05-B†; SO-09-A†; SO-C-A†; SO-C-C†; SO-O-A†; SO-O-B†; main at d1c65ef | build layer of SO-1.06; valid with fixes (build layer, see its provenance) |
+| SO-A-08 | Workspace | SO-A-01, SO-A-03, SO-A-04, SO-A-05, SO-A-06, SO-1.01 | SO-05-C†; SO-C-A†; SO-C-B†; SO-C-C†; main at d1c65ef | build layer of SO-1.05; valid with fixes (build layer, see its provenance) |
+| SO-A-09 | Workspace | SO-A-04, SO-A-08 | SO-C-C†; main at d1c65ef | build layer of SO-1.05; valid as the fold left it (build layer, see its provenance) |
+| SO-A-12 | Workspace | SO-A-06, SO-A-09 | SO-C-C†; main at d1c65ef | build layer of SO-1.05, SO-1.09; valid as the fold left it (build layer, see its provenance) |
+| SO-A-10 | Fault injection and the reference journey: the failure matrix extended to F31 | SO-A-01, SO-A-02, SO-A-03, SO-A-06, SO-A-07, SO-A-08 | SO-09-A†; SO-11-A†; main at d1c65ef | build layer of SO-1.10, SO-1.11; valid as the fold left it (build layer, see its provenance) |
+| SO-A-11 | Baseline reconciliation: a register check over the takeover record with implemented | none | SO-T-A; WO-05-A; WO-05-B; main at d1c65ef | build layer of SO-1.02; valid with fixes (build layer, see its provenance) |
+| SO-R-E | Publish the versioned container image by a maintainer-run script after the Docker smoke passes: the registry account read from the environment or the origin remote | none | SO-R-B; WO-01-A; main at d1c65ef | build layer of none (WBS only); valid with fixes (build layer, see its provenance) |
+| SO-F-01 | Identity and scopes model | none | MEM-134; MEM-145; MEM-146; SO-09-A†; main at d1c65ef | build layer of SO-2.02, SO-2.14; valid with fixes (build layer, see its provenance) |
+| SO-F-02 | Canonical project schema | SO-F-01, SO-1.01 | SO-04-A; SO-07-A; WO-05-A; main at d1c65ef | build layer of SO-1.07, SO-2.01; valid with fixes (build layer, see its provenance) |
+| SO-F-03 | Contribution signature and two-step admission: a signed | SO-F-01, SO-F-02 | MEM-145; main at d1c65ef | build layer of SO-2.02, SO-2.03; valid with fixes (build layer, see its provenance) |
+| SO-F-03.2 | Contribution signature and two-step admission, built after the operation envelope | SO-F-01, SO-F-02, PG-04.1 | MEM-145; main at d1c65ef | supersedes SO-F-03 (owner delegation, 1 Nov 2026); build layer of SO-2.02, SO-2.03 |
+| SO-F-04 | Federation membership and policy exchange specification: the relationship record | SO-F-01, SO-F-03 | main at d1c65ef | build layer of SO-2.02, SO-2.14; valid with fixes (build layer, see its provenance) |
+| SO-F-05 | Classification model: six replication classes on notes and entities | SO-F-02, SO-F-04 | main at d1c65ef | build layer of SO-2.02, SO-2.03; valid with fixes (build layer, see its provenance) |
+| SO-F-12 | Replication unit: per-scope operation-log streams carrying classification and causal context | SO-F-05, SO-F-03 | main at d1c65ef | build layer of SO-2.03; valid with fixes (build layer, see its provenance) |
+| SO-F-06 | Structured-state convergence contract for the engine: input and output schemas per merge class validated in the single boundary | SO-F-02, SO-1.01 | MEM-131; WO-05-A; WO-05-B; main at d1c65ef | build layer of SO-2.01; valid with fixes (build layer, see its provenance) |
+| SO-F-07 | Federated query and continuity specification: an authorised view with provenance and freshness | SO-F-04, SO-F-12 | main at d1c65ef | build layer of SO-2.02, SO-2.12; valid with fixes (build layer, see its provenance) |
+| SO-F-08 | Admission adapter boundary: the admission service behind an adapter beside the merge boundary | SO-F-03 | WO-05-A; WO-05-D; main at d1c65ef | build layer of SO-2.13; valid with fixes (build layer, see its provenance) |
+| SO-F-09 | Finding model for organisational intelligence: a finding is a graph claim capped at theory by evidence | SO-F-01, SO-F-02 | main at d1c65ef | build layer of SO-2.04, SO-2.01; valid with fixes (build layer, see its provenance) |
+| SO-F-13 | Cross-functional conflict detection on a bounded programme: the seeded two-plan conflict detected | SO-F-09, SO-A-05 | main at d1c65ef | build layer of SO-2.05, SO-2.06; valid as the fold left it (build layer, see its provenance) |
+| SO-F-10 | Federated computation specification as an interface reservation: the work specification and receipt schemas | SO-F-03, SO-F-04 | main at d1c65ef | build layer of SO-2.12; valid with fixes (build layer, see its provenance) |
 
 ### 9.1 Overlap with the programme decomposition
 
@@ -564,3 +591,27 @@ Rows of section 5 owned by the programme decomposition are marked covered with i
 
 Ids with a dagger that this page cites and that cannot be checked here: D-SO-MEMORY-AUTHORITY, SO-02-A, SO-02-B, SO-03-A, SO-05-B, SO-05-C, SO-05-D, SO-08-B, SO-09-A, SO-11-A, SO-C-A, SO-C-C, SO-L-A, SO-MEMORY-AUTHORITY, SO-O-A, SO-O-B, SO-O-C, SO-R-C. They are exactly the ones the review table names.
 
+### 9.2 The build layer against the programme decomposition
+
+The build layer (SO-A-01 to SO-A-12, SO-R-E, SO-F-01 to SO-F-13) was read against the programme specs of PR #325 (contracts/programme/specs, PG-01.1 to PG-18.1). Where the two touch, one owns the thing and the other cites it; neither copies the other.
+
+| Contract | Programme task | Overlap | Disposition |
+| --- | --- | --- | --- |
+| SO-F-01 | WP09-01, WP13-03 | subjects, delegation, revocation, node identity and membership per site | SO-F-01 owns the subject and scope model and the resolution at the request boundary; WP09-01 builds admission on it and WP13-03 reuses it; both should cite SO-F-01 |
+| SO-F-02 | WP05-01, WP05-04 | merge semantics per object class | WP05-01 owns the semantics table and its rationale; SO-F-02 owns the declaration on each entity type and its enforcement in the store; the class names must equal the table |
+| SO-F-03 | WP04-01 to WP04-04, WP09-01, WP09-03 | the operation envelope and admission | PG-04.1 owns the one envelope; SO-F-03 adds only the signature and admission block, the per-sender sequence and the rejected event; test/envelope.test.mjs is PG-04.1 and is not used here; SO-F-03.2 supersedes SO-F-03, is built after WP04-01 and WP04-02, and names the envelope specification, implementation and tests in its scope so a reviewer reads them |
+| SO-F-04 | WP13-03, WP13-05 | membership and trust domains | SO-F-04 is the two-party relationship record and policy exchange; WP13-03 owns membership inside a site and reads the record |
+| SO-F-05 | WP13-01 | sharing classes | SO-F-05 owns the six-class classification and inheritance by derived data; WP13-01 enforces at the publish boundary using these classes |
+| SO-F-06 | WP05-04, WP05-06, WP01-07 | state mapping, round trip and gossip boundary | those map and exercise state; SO-F-06 validates the payload at the one boundary src/engine/merge.mjs |
+| SO-F-07 | WP13-04, WP12-01 | offline operation, transport | SO-F-07 is the read side (authorised view, last-known label); WP13-04 owns reconcile on reconnect; WP12-01 owns transport |
+| SO-F-08 | WP09-02 | the trust adapter boundary | WP09-02 owns the trust adapter; SO-F-08 owns the admission adapter and the rule that the admission path reads trust only as an eligibility input |
+| SO-F-09 | WP10-01, WP10-02 | knowledge status | WP10-01 owns the status lattice; SO-F-09 defines a finding and its cap and maps the cap into the lattice once it lands |
+| SO-F-12 | WP04-03, WP06-01 to WP06-03, WP12-01 | stream record, acceptance, transport | the stream record is the PG-04.1 envelope with scope and classification; acceptance is WP06; transport is WP12-01 and is not built by SO-F-12 |
+| SO-A-03 | WP06-01 | the word accepted | dispatch.accepted is a dispatch event; the acceptance state of WP06-01 is for replicated operations; the two vocabularies stay apart |
+| SO-A-10 | WP08-03 | a lifecycle test from intake to delivery | as for SO-1.11 in 9.1: one of the two should own the gate; SO-A-10 is the reference journey with two stub sessions |
+| SO-A-11 | WP08-01, WP17-01, WP17-02, PGP-1.03 | register and inventory refresh | PGP-1.03 writes the reconciliation pages by hand; SO-A-11 adds the script that checks them |
+| SO-R-E | SR-6.03 | publishing the image | SR-6.03 owns the automated publish from the release workflow; SO-R-E is the maintainer-run script for the first public image and does not touch the workflow |
+
+### 9.3 Dropped from the fold
+
+SO-F-11 (architecture invariants as guards) is dropped: the pages it edits are not on main and the SO-06-A guard tests it maps to are not in this repository. Its two new guards are absorbed where they have something to guard: the federation import guard into SO-F-03 and the planned-label rule into the status checks of SO-F-03, SO-F-04, SO-F-07 and SO-F-10; the no-dispatch-command guard into SO-F-10.
