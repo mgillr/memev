@@ -185,7 +185,7 @@ export async function watch({ root, seat, pollMs = 250, stop = () => false, run 
   let v = null;
   try {
     const { Vault } = await import('../engine/vault.mjs');
-    v = new Vault(root, { git: false }).open();
+    v = new Vault(root, { git: false, readOnly: true }).open();
     const rec = v.bus.seat(seat);
     if (!rec) throw new Error(`no seat ${seat}; memev bus roster lists them`);
     const e = entry(root, seat);
@@ -208,7 +208,7 @@ export async function command(cmd, pos, flags, { root, env }) {
   const sub = pos[0] || 'status';
   const seat = pos[1];
   const { Vault } = await import('../engine/vault.mjs');
-  const v = new Vault(root, { git: false }).open();
+  const v = new Vault(root, { git: false, readOnly: true }).open();
   try {
     if (sub === 'on') {
       if (!seat) throw new Error('memev runner on <seat> --max-runs-per-day N');
