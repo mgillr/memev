@@ -175,6 +175,56 @@ export function resolveBinding({ role, principal, key } = {}, { scope = PERSONAL
   return { ok: true, subject: agent, owner: person, scope: { type: scope.type, id: scope.id } };
 }
 
+// ---- the actor behind a credential (SO-F-09): who acted, for a caller that sets `by` from it
+
+const ACTORS = new WeakSet();
+/** Whether `x` is a result resolveActor made. A caller cannot build one: an object of the same shape is not one. */
+export const isResolvedActor = (x) => ACTORS.has(x);
+
+/**
+ * Resolve a credential to the actor behind it: the subject that may be named as `by` on an event, and the scope it acts in.
+ * `credential` is what tokens.verify returned for a request that is already verified, or a role binding ({ role, principal, key })
+ * that agentid-bind.mjs verified, with `scope` for the scope that binding was issued for. `target` holds the scope against the scope
+ * the request reaches for. This does not check the credential: whatever calls it has verified the token or the binding.
+ * resolveRequest maps every token with no identity scope to the owner person, an agent's included; it is left as it is, and this
+ * resolves the same token to the agent it names:
+ * - a credential of the personal scope that names an agent resolves, through resolveBinding, to the agent subject agent:<name>, owned by
+ *   person:owner, never to person:owner;
+ * - a credential of the personal scope that carries a subject resolves to that subject, a person or an agent;
+ * - any other scope resolves as resolveRequest does, to the subject the credential names.
+ * Returns a frozen { ok: true, subject, owner (the person's id), scope, credential } that isResolvedActor knows, or { ok: false, code, reason }.
+ */
+export function resolveActor(credential, { target, at = Date.now(), scope } = {}) {
+  if (!isObj(credential)) return refuse('no_identity', 'no credential was presented, so no actor can be resolved');
+  let r;
+  if (present(credential.role) || present(credential.principal)) {
+    r = resolveBinding(credential, { ...(scope ? { scope } : {}), ...(target !== undefined ? { target } : {}) });
+    if (!r.ok) return r;
+    r = { ...r, credential: `agent:${credential.role}` };
+  } else {
+    const named = credential.identity_scope;
+    const personal = named === undefined || named === null || named.type === 'personal';
+    if (!personal) r = resolveRequest(credential, { target, at });
+    else {
+      const base = resolveRequest(credential, { target, at });
+      if (!base.ok) return base;
+      const subject = credential.subject;
+      if (isObj(subject) && !validateSubject(subject).length && ['person', 'agent'].includes(subject.type)) r = { ...base, subject: { ...subject }, owner: subject.owner };
+      else if (subject !== undefined && subject !== null) return refuse('no_subject', `the credential names a subject that is not valid: ${isObj(subject) ? validateSubject(subject)[0] : 'not an object'}`);
+      else {
+        const b = resolveBinding({ role: credential.agent, principal: OWNER_SUBJECT.id.slice('person:'.length) }, { scope: base.scope });
+        if (!b.ok) return refuse('no_subject', 'a credential of the personal scope acts as the agent it names, and this one names none');
+        r = { ...b, scope: base.scope, credential: base.credential };
+      }
+    }
+    if (!r.ok) return r;
+  }
+  const owner = isObj(r.owner) ? r.owner.id : r.owner ?? r.subject.owner;
+  const actor = Object.freeze({ ok: true, subject: Object.freeze({ ...r.subject }), owner, scope: Object.freeze({ ...r.scope }), credential: r.credential ?? null });
+  ACTORS.add(actor);
+  return actor;
+}
+
 /**
  * The subjects the bindings of an agents directory give: one agent subject per role whose binding verifies, and the person
  * subject that vouched for it. A binding that is unbound, invalid or could not be checked is not a subject; it is listed in skipped.

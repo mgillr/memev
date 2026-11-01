@@ -24,12 +24,12 @@
 // Raising, dismissing, correcting, adjudicating and verifying a finding are operations in the same log.
 // A reader is shown a finding only as far as the scope of each source lets them read, and a partial view withholds
 // everything drawn from the whole of the sources (the statement, id, status, confidence, context).
-// Who acted comes from a credential: Graph.readerFor resolves one (identity.mjs) into a reader that only this module can
-// make, and bindFinding and bindEvent set `by` from it and ignore any value the caller passes. The log is replayed as
-// written, so a record that did not come through them is as trusted as the log file itself.
+// Who acted comes from a credential: resolveActor (identity.mjs) resolves one to an actor, and Graph.bindFindingEvent sets `by`
+// from that actor's subject and ignores any value the caller passes. The same result is the reader viewFinding and listFindings
+// take. The log is replayed as written, so a record that did not come through bindFindingEvent is as trusted as the log file itself.
 import { slug, truncate } from './util.mjs';
 import { sections, own } from './index.mjs';
-import { SUBJECT_TYPES, OWNER_SUBJECT, validateScope, authorizeScope, resolveRequest, resolveBinding } from './identity.mjs';
+import { SUBJECT_TYPES, validateScope, authorizeScope, isResolvedActor } from './identity.mjs';
 
 const noisyOr = (xs) => 1 - xs.reduce((p, x) => p * (1 - Math.max(0, Math.min(1, x))), 1);
 export const FINDING_EVENTS = Object.freeze(['claim.finding.dismiss', 'claim.finding.correct', 'claim.finding.adjudicate', 'claim.finding.verify']);
@@ -40,13 +40,18 @@ const subjectType = (id) => (typeof id === 'string' && SUBJECT_RE.test(id) ? id.
 const isTime = (t) => typeof t === 'string' && /^\d{4}-\d\d-\d\d/.test(t) && !Number.isNaN(Date.parse(t));
 const isText = (t, max) => typeof t === 'string' && t.length > 0 && t.length <= max;
 const CORRECTABLE = ['subject', 'predicate', 'object', 'confidence', 'context', 'entities', 'owners'];
-// Provisional (ADR 5, the permission matrix, is open): who may adjudicate, verify, correct and dismiss is what is written here and
-// nothing more. An adjudication counts from a person, a verification from a person, an operator or a service (the service and
-// operator subjects cannot be issued yet), and a dismissal or a correction from any subject. The confirm and reject outcomes
-// are provisional too: they stand in for the seven decision states of SO-A-05 and SO-1.08, which are not in code yet.
-const VERIFIER_TYPES = ['person', 'operator', 'service'];
-// the readers this module has made: a reader is a credential resolved here, never an object a caller built
-const READERS = new WeakSet();
+// Provisional (ADR 5, the permission matrix, is open; SO-A-05, the decision workflow, is not built): who may adjudicate, verify and
+// dismiss, and the confirm and reject outcomes, are this one table and nothing else. Each of the three reads its rule from here, so
+// deciding them changes one place. The outcomes stand in for the seven decision states of SO-A-05 and SO-1.08, which are not in code.
+// The operator and service subjects cannot be issued yet. Correcting a finding is not in the table: any subject may, which is
+// provisional too. A subject outside a rule is recorded in the history and changes nothing.
+const freeze = (o) => Object.freeze(Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Array.isArray(v) ? Object.freeze([...v]) : v])));
+export const FINDING_AUTHORITY = Object.freeze({
+  provisional: 'until ADR 5 (the permission matrix) and SO-A-05 (the decision workflow) are decided',
+  adjudicate: freeze({ subjects: ['person'], outcomes: ['confirm', 'reject'], provisional: true }),
+  verify: freeze({ subjects: ['person', 'operator', 'service'], provisional: true }),
+  dismiss: freeze({ subjects: ['person', 'operator'], provisional: true }),
+});
 export const EDGE_TYPES = ['related', 'causes', 'depends_on', 'contradicts', 'derived_from', 'part_of', 'supersedes'];
 
 /** Entities named in a section: [[wikilinks]], Project: lines, #tags, `code names`, Capitalised Multi Words. */
@@ -254,7 +259,7 @@ export class Graph {
     if (!d || typeof d !== 'object') return { ok: false, code: 'invalid', errors: ['an event must be an object'] };
     if (!subjectType(d.by)) errors.push('by must be a subject id such as person:name');
     if (d.why !== undefined && d.why !== null && !isText(d.why, 500)) errors.push('why must be short text');
-    if (type === 'claim.finding.adjudicate' && !['confirm', 'reject'].includes(d.outcome)) errors.push('outcome must be confirm or reject');
+    if (type === 'claim.finding.adjudicate' && !FINDING_AUTHORITY.adjudicate.outcomes.includes(d.outcome)) errors.push('outcome must be confirm or reject');
     if (type === 'claim.finding.verify') {
       const r = d.record;
       if (!r || r.kind !== 'outcome.verified' || typeof r.event !== 'string' || !EVENT_ID.test(r.event) || !['pass', 'fail'].includes(r.result)) errors.push('record must be an outcome.verified record naming its event and a pass or fail result');
@@ -280,7 +285,11 @@ export class Graph {
     if (!this.checkFindingEvent(rec.type, d).ok) return;
     const c = this.claims.get(d.id); const f = c.finding;
     const entry = { kind: rec.type.slice('claim.finding.'.length), by: d.by, why: d.why ?? null, seq: rec.seq, ts: rec.ts, effective: true };
-    if (rec.type === 'claim.finding.dismiss') { if (!f.dismissed) f.dismissed = { by: d.by, why: d.why ?? null, seq: rec.seq, ts: rec.ts }; }
+    if (rec.type === 'claim.finding.dismiss') {
+      // a dismissal from a subject the table does not name is recorded and does not stop the finding being raised again
+      entry.effective = FINDING_AUTHORITY.dismiss.subjects.includes(subjectType(d.by));
+      if (entry.effective && !f.dismissed) f.dismissed = { by: d.by, why: d.why ?? null, seq: rec.seq, ts: rec.ts };
+    }
     else if (rec.type === 'claim.finding.correct') {
       entry.changed = {};
       for (const k of CORRECTABLE.filter((x) => x in d.changes)) {
@@ -293,12 +302,12 @@ export class Graph {
       if (!Object.keys(entry.changed).length) return;
     } else if (rec.type === 'claim.finding.adjudicate') {
       entry.outcome = d.outcome;
-      entry.effective = subjectType(d.by) === 'person';
+      entry.effective = FINDING_AUTHORITY.adjudicate.subjects.includes(subjectType(d.by));
       if (entry.effective) f.decision = { kind: 'adjudicate', outcome: d.outcome, by: d.by, seq: rec.seq };
     } else {
       entry.record = { kind: d.record.kind, event: d.record.event, result: d.record.result };
       // a verification is recorded but never replaces a person's standing decision: only a person can change that
-      entry.effective = d.record.result === 'pass' && VERIFIER_TYPES.includes(subjectType(d.by)) && f.decision?.kind !== 'adjudicate';
+      entry.effective = d.record.result === 'pass' && FINDING_AUTHORITY.verify.subjects.includes(subjectType(d.by)) && f.decision?.kind !== 'adjudicate';
       if (entry.effective) f.decision = { kind: 'verify', outcome: 'confirm', by: d.by, seq: rec.seq };
     }
     f.history.push(entry);
@@ -306,66 +315,29 @@ export class Graph {
   }
 
   /**
-   * Resolve a credential into a reader, and a reader only comes from here: viewFinding, listFindings, bindFinding and bindEvent refuse any
-   * other object. `identity` is what tokens.verify returned for a request that is already verified, and `binding` is a role binding
-   * that agentid-bind.mjs verified ({ role, principal, key }, with `scope` for the scope it was issued for). Both go through
-   * resolveRequest or resolveBinding (identity.mjs), and `target` holds the credential's scope against the scope it reaches for.
-   * resolveRequest maps every token with no identity scope to the owner subject, an agent's included, so a token of that kind does not
-   * become a person here: it is the agent subject named by the token, which an adjudication from does nothing. A person subject comes only
-   * from an organisational credential that names one. Returns the reader, or { ok: false, code, reason }.
+   * The one credential-bound entry point for a finding's operations: `actor` is what resolveActor (identity.mjs) returned, and `by` is its
+   * subject. Any `by` in `data` is replaced, so a caller cannot name a person or a service it is not. `type` is 'claim.finding' (raise) or
+   * one of FINDING_EVENTS. Returns { ok: true, type, data } for a writer to append, or { ok: false, code, errors }: no_credential when
+   * `actor` is not a result of resolveActor (one that did not resolve included), scope_mismatch when a finding is raised in a scope the
+   * actor does not reach, and not_found for a finding it does not reach, the same as for a missing one.
+   * A verification must name one of the finding's own source events. Nothing in the product writes these operations yet.
    */
-  static readerFor({ identity, binding, scope, target } = {}) {
-    if ((identity === undefined) === (binding === undefined)) return { ok: false, code: 'no_identity', reason: 'give a verified token identity or a verified role binding, one of them' };
-    let r; let subject;
-    if (binding !== undefined) {
-      r = resolveBinding(binding, { ...(scope ? { scope } : {}), ...(target !== undefined ? { target } : {}) });
-      if (!r.ok) return r;
-      subject = r.subject;
-    } else {
-      r = resolveRequest(identity, { target });
-      if (!r.ok) return r;
-      subject = r.subject;
-      const named = identity.identity_scope;
-      if (named === undefined || named === null || named.type === 'personal') {
-        const id = `agent:${identity.agent ?? ''}`;
-        if (!subjectType(id)) return { ok: false, code: 'no_subject', reason: 'a personal-scope credential acts as the agent it names, and this one names none' };
-        subject = { id, type: 'agent', owner: OWNER_SUBJECT.id };
-      }
+  bindFindingEvent(actor, type, data) {
+    if (!isResolvedActor(actor)) return { ok: false, code: 'no_credential', errors: ['a finding operation is made with an actor from resolveActor'] };
+    const d = { ...(data && typeof data === 'object' && !Array.isArray(data) ? data : {}), by: actor.subject.id };
+    if (type === 'claim.finding') {
+      if (!validateScope(d.scope).length && !authorizeScope(actor.scope, d.scope).ok) return { ok: false, code: 'scope_mismatch', errors: ['the credential does not reach the scope of this finding'] };
+      const r = this.admitFinding(d);
+      return r.ok ? { ok: true, type, data: d } : r;
     }
-    const reader = Object.freeze({ ok: true, subject: Object.freeze({ ...subject }), scope: Object.freeze({ ...r.scope }), credential: r.credential ?? null });
-    READERS.add(reader);
-    return reader;
-  }
-
-  /**
-   * The operation that raises a finding, for a writer to append: `by` is the reader's subject and any `by` in `fields` is replaced. The
-   * reader's scope must be the finding's scope. The scopes of the sources are what the raiser declares, and they are held against a reader
-   * only when it is shown. Returns { ok: true, type, data } or { ok: false, code, errors }.
-   */
-  bindFinding(reader, fields) {
-    if (!READERS.has(reader)) return { ok: false, code: 'no_credential', errors: ['a finding is raised with a reader made by Graph.readerFor'] };
-    const d = { ...(fields && typeof fields === 'object' ? fields : {}), by: reader.subject.id };
-    if (!validateScope(d.scope).length && !authorizeScope(reader.scope, d.scope).ok) return { ok: false, code: 'scope_mismatch', errors: ['the credential does not reach the scope of this finding'] };
-    const r = this.admitFinding(d);
-    return r.ok ? { ok: true, type: 'claim.finding', data: d } : r;
-  }
-
-  /**
-   * The operation that dismisses, corrects, adjudicates or verifies a finding, for a writer to append: `by` is the reader's subject and any
-   * `by` in `fields` is replaced. A finding the credential does not reach is reported as not found, the same as a missing one.
-   * Returns { ok: true, type, data } or { ok: false, code, errors }.
-   */
-  bindEvent(reader, type, fields) {
-    if (!READERS.has(reader)) return { ok: false, code: 'no_credential', errors: ['a finding event is made with a reader made by Graph.readerFor'] };
-    const d = { ...(fields && typeof fields === 'object' ? fields : {}), by: reader.subject.id };
     const c = typeof d.id === 'string' ? this.claims.get(d.id) : null;
-    if (c?.finding && !authorizeScope(reader.scope, c.finding.scope).ok) return { ok: false, code: 'not_found', errors: [`no finding ${d.id.slice(0, 64)}`] };
+    if (c?.finding && !authorizeScope(actor.scope, c.finding.scope).ok) return { ok: false, code: 'not_found', errors: [`no finding ${d.id.slice(0, 64)}`] };
     const r = this.checkFindingEvent(type, d);
     return r.ok ? { ok: true, type, data: d } : r;
   }
 
   /**
-   * One finding as `reader` may see it, or null when the reader is not one made by readerFor, its scope does not reach the finding's scope,
+   * One finding as `reader` may see it, or null when the reader is not an actor from resolveActor, its scope does not reach the finding's scope,
    * or the id names no finding. A source is shown only when the reader may read its scope. When every source is readable the view is whole.
    * When any is withheld it is a partial view and fails closed: the id (which the raiser chose and may describe the statement), the
    * statement, status, capped and overridden flags, confidence, time context and dismissed flag are all null, and the history keeps only the
@@ -374,7 +346,7 @@ export class Graph {
    */
   viewFinding(id, reader) {
     const c = this.claims.get(id);
-    if (!c?.finding || !READERS.has(reader) || !authorizeScope(reader.scope, c.finding.scope).ok) return null;
+    if (!c?.finding || !isResolvedActor(reader) || !authorizeScope(reader.scope, c.finding.scope).ok) return null;
     const f = c.finding;
     const readable = f.sources.map((s) => authorizeScope(reader.scope, s.scope).ok);
     const full = readable.every(Boolean);
