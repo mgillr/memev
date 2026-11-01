@@ -2,11 +2,11 @@
 import { test, after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { sandbox, mcpClient, transcript, user, assistant, todos } from './helpers/cli.mjs';
+import { sandbox, initWithRetry, mcpClient, transcript, user, assistant, todos } from './helpers/cli.mjs';
 import { cleanup } from './helpers/tmp.mjs';
 
 let sb;
-before(() => { sb = sandbox(); const r = sb.run(['init', '--port', String(sb.port), '--local-only', '--no-connect']); assert.equal(r.code, 0, r.err + r.out); });
+before(() => { sb = sandbox(); const r = initWithRetry(sb, ['init', '--port', String(sb.port), '--local-only', '--no-connect']); assert.equal(r.code, 0, r.err + r.out); });
 after(() => { sb.stop(); cleanup(); });
 const ctx = (r) => { assert.equal(r.code, 0, r.err); return r.out ? JSON.parse(r.out).hookSpecificOutput?.additionalContext || '' : ''; };
 
