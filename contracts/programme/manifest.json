@@ -1230,7 +1230,7 @@
       "repo": "memev",
       "supersedes": "SR-0.03",
       "supersedes_signed_contract": "k-sr-0-03-verify-runs-ever-2259f2 (version 2; the spec file contracts/seed-readiness/specs/SR-0.03-verify-runs-every-verifier-type.json is unchanged)",
-      "supersedes_reason": "owner delegation, 1 Nov 2026: pin a current base and the workdir (base 3989c80), name in the scope of T3 every file of pull request #336, and state that verify returns BLOCKED for the scope criterion of T1, T3 and T4 until T2 lands; no scope beyond those files",
+      "supersedes_reason": "owner delegation, 1 Nov 2026: pin a current base and the workdir (base 3989c80), name in the scope of T3 every file of pull request #336, add changelog.d/SR-0.03.md and docs/MODULES.md (also touched by pull request #347) to the scope of T2, and state that verify returns BLOCKED for the scope criterion of T1, T3 and T4 until T2 lands; no scope beyond those files, and no criterion changes",
       "related_pull_request": "#336",
       "depends_on": [],
       "tasks": 5,
