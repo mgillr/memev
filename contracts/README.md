@@ -130,7 +130,7 @@ shows where each sits is [docs/scope-one/WBS.md](../docs/scope-one/WBS.md).
 
 ## Programme contracts, 1 November 2026
 
-`programme/` holds what the Scope One contracts do not already cover, plus one contract per pull request that closes programme work: 28 specs in all. Twenty-six have an interim red-team record under `programme/redteam/` (an interim solo review, pending independent re-review; the record cites the owner confirmation of the engine decision, t542u, 31 Oct 2026). All twenty-six passed and are signed by signer-2, in two passes: eight in the first, of which PG-03.2, PG-03.3, PG-06.1 and PG-12.1 are since superseded (the signed files stay unchanged and the manifest marks them superseded), and eighteen in the second, among them PG-06.2 and PG-12.2, which supersede PG-06.1 and PG-12.1. PG-03.4 and PG-03.5, which supersede PG-03.2 and PG-03.3, wait for the next commit of their specs, have no record yet and are not signed.
+`programme/` holds what the Scope One contracts do not already cover, plus one contract per pull request that closes programme work: 28 specs in all. Twenty-six have an interim red-team record under `programme/redteam/` (an interim solo review, pending independent re-review; the record cites the owner confirmation of the engine decision, t542u, 31 Oct 2026). All twenty-six passed and are signed by signer-2, in two passes: eight in the first, of which PG-03.2, PG-03.3, PG-06.1 and PG-12.1 are since superseded (the signed files stay unchanged and the manifest marks them superseded), and eighteen in the second, among them PG-06.2 and PG-12.2, which supersede PG-06.1 and PG-12.1. PG-03.4 and PG-03.6, and SR-0.03.3 (version 3 of SR-0.03), are signed in a third pass, listed below; PG-03.6 supersedes PG-03.5, which superseded PG-03.3, and PG-03.5 is not signed and stays on record.
 
 | Spec | Contract | Title | Depends on |
 |---|---|---|---|
@@ -160,6 +160,14 @@ shows where each sits is [docs/scope-one/WBS.md](../docs/scope-one/WBS.md).
 | [PGP-1.03](programme/specs/PGP-1.03-memev-docs-tiers-reconciliation.json) | [`k-pgp-1-03-memev-engine-de-11cd89`](signed/k-pgp-1-03-memev-engine-de-11cd89.json) | memev: engine decision recorded, tier docs aligned, README rewritten, reconciliation against the work breakdown | SO-1.02 |
 | [PGP-1.04](programme/specs/PGP-1.04-converge-fair-mem0-comparison.json) | [`k-pgp-1-04-converge-the-me-2441f7`](signed/k-pgp-1-04-converge-the-me-2441f7.json) | converge: the Mem0 comparison states Mem0's published design and what converge does differently | none |
 | [PGP-1.06](programme/specs/PGP-1.06-memev-ops-sr3-engine-decision.json) | [`k-pgp-1-06-memev-ops-sr-3-d345d7`](signed/k-pgp-1-06-memev-ops-sr-3-d345d7.json) | memev-ops: SR-3.01 and SR-3.03 superseded by the call-out engine decision, SR-3.05 states the licences once | none |
+
+Third pass, 1 November 2026. Each has an interim red-team record under `programme/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1. The signed contracts they replace in intent (PG-03.2, and the signed SR-0.03 version 2) stay unchanged and are not marked superseded in the signed files; the manifest records the supersession.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [SR-0.03.3](programme/specs/SR-0.03.3-verify-runs-every-verifier-type.json) | [`k-sr-0-03-3-verify-runs-ev-02455e`](signed/k-sr-0-03-3-verify-runs-ev-02455e.json) | Verify runs every verifier type, version 3 of SR-0.03 (memev) | none |
+| [PG-03.4](programme/specs/PG-03.4-cross-language-protocol-vectors.json) | [`k-pg-03-4-cross-language-p-b395d6`](signed/k-pg-03-4-cross-language-p-b395d6.json) | Cross-language protocol vectors (crdt-merge-ts), supersedes PG-03.2 | PG-03.1 |
+| [PG-03.6](programme/specs/PG-03.6-cross-language-protocol-vectors.json) | [`k-pg-03-6-cross-language-p-ead304`](signed/k-pg-03-6-cross-language-p-ead304.json) | Cross-language protocol vectors (crdt-merge-rs), supersedes PG-03.5 | PG-03.1 |
 
 ## Scope One build layer, 1 November 2026
 
