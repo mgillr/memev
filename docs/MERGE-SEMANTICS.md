@@ -70,6 +70,27 @@ nothing merged. If ADR 3 decides on something else, the class of `lease` follows
 Nothing checks the owner on a write, and nothing here says who may settle a competing write. A person settling one is the
 meaning of `human-resolution`, and which person may do so is ADR 5's question.
 
+## The object classes of MV-ARCH-05
+
+The requirement is that merge semantics are chosen per object class, never one rule for everything. The table above is per
+entity type, because SO-F-02 declares the class on entity types. This section says where each object class of the requirement
+sits. It declares no class: where SO-F-02 has no entity type for an object class, nothing here assigns one.
+
+| Object class | Where it sits |
+| --- | --- |
+| observations | No entity type of SO-F-02 yet. The state map below shows the lines of a note as a set, which is a shape for a provider shim to use, not a class declared here. |
+| metadata | The fields of `project` and `session`, which are `last-writer`. `scope_version` is the exception, as above. |
+| membership | No entity type of SO-F-02 yet. |
+| counters | No entity type of SO-F-02 yet. |
+| task ownership | `lease`, `human-resolution` and PROVISIONAL, pending ADR 3. |
+| task state | `task`, `human-resolution`. |
+| contracts | Not an entity type of the project store. Contracts are never silently merged: a signed contract is not changed, and an amendment is a new version. |
+| approvals | `approval`, `human-resolution`. Approvals are never silently merged. |
+| external actions | No entity type of its own in SO-F-02 yet. |
+
+When SO-F-02 adds an entity type for an object class that has none, its owner and class are declared there first, and this
+page then gives its row and rationale.
+
 ## What the engine can and cannot do with a note
 
 The engine has no three-way text merge. The call-out boundary sends it one JSON line, `{a, b, base}`, of text, and expects
