@@ -16,6 +16,8 @@ Shared project state, coordination, governed execution and evidence-based verifi
 <img alt="No runtime dependencies" src="https://img.shields.io/badge/runtime%20dependencies-none-success">
 </p>
 
+<p><strong>Closed preview — invite only.</strong> The repository is private and the npm package is not published. You need repository access and the clone URL supplied by the Memev maintainer before you can install.</p>
+
 <p>
 <code>npm install -g . && memev init</code>
 </p>
@@ -145,8 +147,8 @@ what differs.
 
 | Path | Who it's for | What happens on its own |
 |---|---|---|
-| Ask your AI app to do it | anyone already using Claude Code, Codex, Gemini CLI or Cursor | the app downloads Memev and runs the setup; you read the checklist it shows you |
-| One command in a download | anyone comfortable with a terminal | the same setup, run by you |
+| Ask your AI app to do it | invited testers who have access to the private repository and already use Claude Code, Codex, Gemini CLI or Cursor | the app clones the repository URL supplied with the invitation and runs setup; you read the checklist it shows you |
+| One command in a download | invited testers with repository access and a terminal | the same setup, run by you |
 | npm, from a download | people who like a global `memev` command | the same, plus `memev` on your PATH |
 | Docker | an always-on server or a home lab | Memev runs in a container; you connect apps by hand |
 | `npx memev init` | everyone | coming soon (not on the npm registry yet) |
@@ -154,8 +156,7 @@ what differs.
 
 To have your AI app do it, paste this into a session:
 
-> Download the Memev repository, run `node bin/memev.mjs init` inside it, and show me the checklist
-> it prints.
+> Clone the private Memev repository using the URL supplied with my preview invitation, run `node bin/memev.mjs init` inside it, and show me the checklist it prints.
 
 To do it yourself, run this in the folder you downloaded:
 
