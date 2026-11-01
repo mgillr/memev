@@ -60,7 +60,7 @@
           }
         },
         {
-          "statement": "no module under src/engine/federation imports child_process, node:net, node:http, node:https or node:dgram after the change, and the test scans the files read-only; the composition uses no timer, no clock and no store of its own",
+          "statement": "no module under src/engine/federation imports child_process, node:net, node:http, node:https or node:dgram after the change, and the test scans the files read-only, after asserting that composeExternal exists so that it is red on the base; the composition uses no timer, no clock and no store of its own",
           "verifier": {
             "type": "test_red_green",
             "test_file": "test/admission-external.test.mjs",
