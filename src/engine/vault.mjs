@@ -22,6 +22,7 @@ import { attach as attachContracts, installVaultHooks } from './contracts.mjs';
 import { assess, DEFAULT_GATE } from './quality.mjs';
 import { STATE, isVault } from './vault-marker.mjs';
 import { ProjectStore } from './project-store.mjs';
+import { Coordinator } from './coordinator.mjs';
 
 export const VERSION = readJson(new URL('../../package.json', import.meta.url), {}).version;
 export { STATE, isVault };
@@ -92,7 +93,7 @@ export class Vault extends EventEmitter {
     } catch {}
   }
 
-  close() { this.commits.flush(); this.index.save(); this._saveGraph(); this.devices?.saveSoon(); this.log.close(); }
+  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.index.save(); this._saveGraph(); this.devices?.saveSoon(); this.log.close(); }
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }
@@ -404,9 +405,178 @@ export class Vault extends EventEmitter {
     return { path: p, checkpoints: cps.length, at: last.split('\n')[0].replace(/^### /, ''), task: pick(/^Task: (.+)$/m), doing: pick(/^Doing: (.+)$/m), next, done: [...done.values()], files: pick(/^Files: (.+)$/m) };
   }
 
-  /** The canonical project store for one project, under this vault's .memev directory. One writer at a time. */
+  /**
+   * The canonical project store for one project, under this vault's .memev directory. One store object per project
+   * for the life of the vault (the options apply to the first open), so there is never a second writer in a process;
+   * across processes the store's own lock serialises them.
+   */
   projectStore(projectId, opts = {}) {
-    return new ProjectStore(this.root, { id: projectId, deviceId: this.host?.id ?? null, fsync: this.opts.fsync ?? true, ...opts }).open();
+    const id = String(projectId);
+    this._projectStores ??= new Map();
+    let st = this._projectStores.get(id);
+    if (!st) {
+      st = new ProjectStore(this.root, { id, deviceId: this.host?.id ?? null, fsync: this.opts.fsync ?? true, ...opts }).open();
+      this._projectStores.set(id, st);
+    }
+    return st;
+  }
+
+  /** The one coordinator for a project, over that project's store, moving tasks only through project-state's table. */
+  coordinator(projectId) {
+    const id = String(projectId);
+    this._coordinators ??= new Map();
+    let c = this._coordinators.get(id);
+    if (!c) { c = new Coordinator(this.projectStore(id), { lifecycle: true }); this._coordinators.set(id, c); }
+    return c;
+  }
+
+  _projectId(project) {
+    if (!project) throw new VaultError('bad_request', 'a project name is needed');
+    return slug(project);
+  }
+
+  /** Plan tasks for a project: each is accepted, and ready when it has no unmet dependency. Idempotent per task id. */
+  tasksPlan(identity, { project, tasks, client = null }) {
+    this._need(identity, 'write', null);
+    if (!Array.isArray(tasks) || !tasks.length) throw new VaultError('bad_request', 'tasks must be a non-empty list');
+    const id = this._projectId(project);
+    const specs = tasks.map((t) => ({ id: String(t.id), title: t.title, deps: t.deps || [], resources: t.resources || [], artifacts: t.artifacts || [], criteria: t.criteria || [], artifact_hash: t.artifact_hash ?? null, ...(t.contract ? { contract: { id: String(t.contract.id), task: String(t.contract.task) } } : {}) }));
+    if (specs.some((t) => !t.id || t.id === 'undefined')) throw new VaultError('bad_request', 'every task needs an id');
+    for (const spec of specs) {
+      if (!spec.contract) continue;
+      // a task linked to a signed contract task takes its criteria from the contract, and only that contract's verify can verify it
+      const sig = this.contractCheckSignature(spec.contract.id);
+      if (!sig.ok || !sig.contract) throw new VaultError('bad_request', `task ${spec.id} names contract ${spec.contract.id}, which is not signed or does not verify`);
+      if (slug(sig.contract.project || '') !== id) throw new VaultError('bad_request', `contract ${spec.contract.id} belongs to project ${sig.contract.project}, not ${id}`);
+      const ct = (sig.contract.tasks || []).find((x) => x.id === spec.contract.task);
+      if (!ct) throw new VaultError('bad_request', `contract ${spec.contract.id} has no task ${spec.contract.task}`);
+      spec.criteria = (ct.criteria || []).map((c) => ({ id: c.id, mandatory: c.mandatory !== false }));
+    }
+    return { ...this.coordinator(id).plan(id, specs, { actor: client || identity.agent }), project: id };
+  }
+
+  tasksClaim(identity, { project, task, ttl_s = 900, client = null }) {
+    this._need(identity, 'write', null);
+    this.coordinator(this._projectId(project)).sweep();   // a lease past its expiry blocks its task (owner lost) before anyone claims
+    return this.coordinator(this._projectId(project)).claim(String(task), client ? `${identity.agent}/${client}` : identity.agent, (Number(ttl_s) > 0 ? Number(ttl_s) : 900) * 1000);
+  }
+  tasksHeartbeat(identity, { project, lease, checkpoint = null }) {
+    this._need(identity, 'write', null);
+    return this.coordinator(this._projectId(project)).heartbeat({ id: String(lease) }, { checkpoint });
+  }
+  tasksReport(identity, { project, lease, output = null, artifacts = [], artifact_hash = null }) {
+    this._need(identity, 'write', null);
+    const id = this._projectId(project);
+    const co = this.coordinator(id);
+    // a contract-linked task's artifact hash is computed here from the files, never taken from the reporter
+    const task = this._taskOfLease(id, lease);
+    let hash = artifact_hash;
+    if (task?.contract_id) hash = this._artifactHash(task.contract_id, [...(task.artifacts || []), ...(Array.isArray(artifacts) ? artifacts : [])]);
+    return co.report({ id: String(lease) }, { output, artifacts, ...(hash ? { artifact_hash: hash } : {}) });
+  }
+  _taskOfLease(project, lease) {
+    const st = this.projectStore(project);
+    const l = st.snapshot('lease')[String(lease)];
+    return l ? st.snapshot('task')[l.task_id] ?? null : null;
+  }
+  /** The hash the evidence of a contract-linked task binds to: its artifact files in the contract's workdir, or, with none, the contract as signed. */
+  _artifactHash(contractId, files) {
+    const sig = this.contractCheckSignature(contractId);
+    const wd = path.resolve(sig.contract?.workdir || this.root);
+    const lines = [...new Set(files.map(String))].sort().map((f) => {
+      const abs = path.resolve(wd, f); const rel = path.relative(wd, abs);
+      if (rel.startsWith('..') || path.isAbsolute(rel)) return `${f}\0outside`;
+      try { return `${rel.split(path.sep).join('/')}\0${sha256(fs.readFileSync(abs))}`; } catch { return `${rel.split(path.sep).join('/')}\0missing`; }
+    });
+    return sha256(lines.length ? lines.join('\n') : `contract:${sha256(this._read(`contracts/signed/${contractId}.json`) ?? contractId)}`);
+  }
+  tasksRelease(identity, { project, lease, reason = null }) {
+    this._need(identity, 'write', null);
+    return this.coordinator(this._projectId(project)).release({ id: String(lease) }, reason);
+  }
+  /** The operator step that makes a task VERIFIED: evidence bound to its scope version and artifact hash, or a refusal. */
+  tasksVerify(identity, { project, task, evidence = [] }) {
+    this._need(identity, 'admin', null);
+    const id = this._projectId(project);
+    const t = this.projectStore(id).snapshot('task')[String(task)];
+    // a task tied to a signed contract is verified only by that contract's verify (SR-1.27), never by hand
+    if (t?.contract_id) return { ok: false, code: 'CONTRACT_LINKED', reason: `task ${task} is verified by memev_contract_verify of ${t.contract_id}, not by hand` };
+    return this.coordinator(id).verify(String(task), { actor: identity.agent, evidence });
+  }
+
+  /** Tasks of this contract's project that are VERIFYING now, with the scope version and artifact hash a verify that starts now binds to. */
+  tasksBindings(contractId, contract) {
+    const id = slug(contract?.project || '');
+    if (!id || !fs.existsSync(path.join(this.root, STATE, 'projects', id, 'events.jsonl'))) return [];
+    return Object.entries(this.projectStore(id).snapshot('task'))
+      .filter(([, t]) => t.project === id && t.contract_id === contractId && t.status === 'VERIFYING')
+      .map(([task, t]) => ({ project: id, task, contractTask: t.contract_task, scopeVersion: t.scope_version ?? 1, artifactHash: this._artifactHash(contractId, [...(t.artifacts || [])]) }));
+  }
+
+  /** What a finished contract verify does to the tasks it was bound to: a pass verifies them with bound evidence, a failure fails them. */
+  tasksFeedVerify(contractId, bindings, tasks, { verified }) {
+    const out = [];
+    for (const b of bindings) {
+      const ct = tasks.find((x) => x.id === b.contractTask);
+      if (!ct) continue;
+      const co = this.coordinator(b.project);
+      if (ct.status === 'PASS') {
+        const evidence = ct.criteria.filter((c) => c.mandatory).map((c) => ({ criterion: c.id, scope_version: b.scopeVersion, artifact_hash: b.artifactHash, ref: `contract:${contractId}@${verified}` }));
+        const r = co.verify(b.task, { actor: 'contract-verify', evidence, reason: `contract ${contractId} verify passed` });
+        out.push({ task: b.task, ok: r.ok === true, ...(r.code ? { code: r.code, reason: r.reason } : {}) });
+      } else if (ct.status === 'FAIL') {
+        const r = co.fail(b.task, { actor: 'contract-verify', reason: `contract ${contractId} verify failed for ${ct.id}` });
+        out.push({ task: b.task, ok: false, failed: r.ok === true, ...(r.code ? { code: r.code } : {}) });
+      }
+    }
+    return out;
+  }
+
+  tasksPause(identity, { project, reason = 'paused' }) {
+    this._need(identity, 'admin', null);
+    return this.coordinator(this._projectId(project)).pause(this._projectId(project), { actor: identity.agent, reason });
+  }
+  tasksResume(identity, { project, reason = 'resumed' }) {
+    this._need(identity, 'admin', null);
+    return this.coordinator(this._projectId(project)).resume(this._projectId(project), { actor: identity.agent, reason });
+  }
+  /** A scope change: operator action. Evidence bound to the old scope version goes stale and the affected tasks are replanned. */
+  tasksAmendScope(identity, { project, paths, reason = 'scope amended' }) {
+    this._need(identity, 'admin', null);
+    if (!Array.isArray(paths) || !paths.length) throw new VaultError('bad_request', 'a scope change names the paths it changes');
+    const id = this._projectId(project);
+    return this.coordinator(id).amendScope(id, { paths }, { actor: identity.agent, reason });
+  }
+  /** Cancel a task. Confirming an in-flight cancellation needs the lease holder or an admin; anyone with write may ask for one. */
+  tasksCancel(identity, { project, task, reason = 'cancelled', outcome = 'requested' }) {
+    this._need(identity, 'write', null);
+    const id = this._projectId(project);
+    if (!['requested', 'confirmed', 'unsupported'].includes(outcome)) throw new VaultError('bad_request', 'outcome is requested, confirmed or unsupported');
+    if (outcome !== 'requested') {
+      const st = this.projectStore(id);
+      const t = st.snapshot('task')[String(task)];
+      const l = t?.lease_id ? st.snapshot('lease')[t.lease_id] : null;
+      const holder = l && (l.agent === identity.agent || String(l.agent).startsWith(`${identity.agent}/`));
+      if (!holder && !allowed(identity, 'admin', null)) throw new VaultError('forbidden', 'only the session that holds the task, or an admin, can report how its cancellation went');
+    }
+    return this.coordinator(id).cancel(String(task), { actor: identity.agent, reason, adapter: outcome });
+  }
+  tasksReassign(identity, { project, task, to, reason = 'reassigned', override = false }) {
+    this._need(identity, 'admin', null);
+    if (!to) throw new VaultError('bad_request', 'reassignment names the new holder');
+    return this.coordinator(this._projectId(project)).reassign(String(task), { to: String(to), actor: identity.agent, reason, override: override === true });
+  }
+  tasksUpdate(identity, { project, task, patch, base_version, generation, source = null, client = null }) {
+    this._need(identity, 'write', null);
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new VaultError('bad_request', 'patch is an object of fields');
+    return this.coordinator(this._projectId(project)).update(String(task), { patch, base_version, generation, source: source || (client ? `${identity.agent}/${client}` : identity.agent) });
+  }
+  /** The tasks of a project, the derived project status and what may be claimed now. Read-only; null for a project with no store. */
+  tasksStatus(identity, project, { history = false } = {}) {
+    this._need(identity, 'read', null);
+    const id = this._projectId(project);
+    if (!fs.existsSync(path.join(this.root, STATE, 'projects', id, 'events.jsonl'))) return null;
+    return this.coordinator(id).status(id, { history });
   }
 
   /** Record one turn of a session (continuous recording). */
@@ -586,7 +756,7 @@ export class Vault extends EventEmitter {
     const relevant = task ? this.recall(identity, { query: `${task} ${proj || ''}`, project: proj, limit: 6, client, session }) : [];
     const contracts = this._openContracts();
     const active = this.allNotes('work/active').map((p) => ({ path: p, state: this.projectState(path.posix.basename(p, '.md')) })).filter((x) => x.state?.checkpoints).sort((a, b) => String(b.state.at).localeCompare(String(a.state.at))).slice(0, 5).map((x) => ({ project: path.posix.basename(x.path, '.md'), at: x.state.at, task: x.state.task, doing: x.state.doing }));
-    return { vault: path.basename(this.root), project: proj, north_star: ns && !ns.includes('Write a few lines about yourself') ? truncate(ns.replace(/^---[\s\S]*?\n---\n/, ''), 1500) : null, project_state: state, active_projects: active, recent_decisions: decisions, last_session: lastSession, relevant, open_contracts: contracts };
+    return { vault: path.basename(this.root), project: proj, north_star: ns && !ns.includes('Write a few lines about yourself') ? truncate(ns.replace(/^---[\s\S]*?\n---\n/, ''), 1500) : null, project_state: state, project_tasks: proj ? this.tasksStatus(identity, proj) : null, active_projects: active, recent_decisions: decisions, last_session: lastSession, relevant, open_contracts: contracts };
   }
   _recentEntries(dir, n) {
     const files = this.allNotes(dir.replace(/\/$/, '')).slice(-2); const out = [];
