@@ -31,11 +31,21 @@ These parts of the model are defined by the schema and the validator but are **p
 
 - Memberships and scope parents: no request is checked against a membership, and a team or project scope does not yet reach into the scope it sits in. Today two organisational scopes meet only when they are identical.
 - Subject keys: the keys of a subject are described, not yet checked against a request signature, and a subject's own expiry and revocation are read only from the subject a token carries.
-- The node, operator and service subjects: no feature issues one yet; federation, admission and delegation (see the federation pages) build on this model later.
+- The node, operator and service subjects: no feature issues one yet; federation, admission and trust (see the federation pages) build on this model later.
+- Trust records ([ADR 8](scope-one/DECISIONS.md), decided 1 Nov 2026): a person or an operator subject grants and revokes trust, and no agent, service, device or node does. An operator subject holds a site's root and an optional organisation co-root. Nothing enforces this yet.
 - Issuing an organisational token from the command line, and the page where an operator manages subjects and memberships.
 - A role by action matrix: it is not introduced here, and no role grants anything.
 - The command line and the importers use identities that are not tokens; on a vault that names an organisational scope they are treated as personal and refused. An operator subject for the local command line is planned.
 - A role binding as a credential on a request: today a binding vouches for a role offline, and does not authenticate a call.
+
+## Trust is not identity
+
+A trust record says whether a subject is eligible for a purpose in a scope. It never creates a subject, a membership or a token scope, and it never reads as access ([the definition](scope-one/design/trust-governance.md)). Two rules of ADR 8 touch this model:
+
+- A person's new device gets no trust record in a personal scope, because a personal scope is never shared. In that person's organisation scopes it gets low trust, which is contribute only at a required verification level of 1, and never above its owner. One tap by the person on an already trusted device raises it, and that tap is the person's signed act that records the approving device. A device that is lost is recovered by the owner's recovery key, or by a new grant from an operator.
+- A subject that is revoked or expired in the identity document stays refused whatever a trust record says.
+
+All of this is decided and none of it is built.
 
 ## Where each part lives
 
