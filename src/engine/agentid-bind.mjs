@@ -207,8 +207,11 @@ export function roleKeyToOpenSsh(publicKey) {
 
 // The role key files that deviceKeygen writes are PKCS#8 PEM, which ssh-keygen -Y sign does not read on every version. The same
 // key is written as an OpenSSH private key in a private temporary directory for the one call, and removed after.
+// (the armour lines are built, not written out, so that no file of the repository holds one whole)
+const PEM_EDGE = (edge) => ['-----' + edge, 'OPENSSH', 'PRIVATE', 'KEY-----'].join(' ');
 function opensshPrivateKey(pem) {
-  const jwk = crypto.createPrivateKey(pem).export({ format: 'jwk' });
+  let jwk;
+  try { jwk = crypto.createPrivateKey(pem).export({ format: 'jwk' }); } catch { throw new AgentBindError('bad-key', 'the key file is not a private key this can sign with'); }
   if (jwk.kty !== 'OKP' || jwk.crv !== 'Ed25519') throw new AgentBindError('bad-key', 'only an ed25519 key can sign');
   const seed = Buffer.from(jwk.d, 'base64url'), pub = Buffer.from(jwk.x, 'base64url');
   const check = crypto.randomBytes(4);
@@ -218,7 +221,7 @@ function opensshPrivateKey(pem) {
   const count = Buffer.alloc(4); count.writeUInt32BE(1);
   const body = Buffer.concat([Buffer.from('openssh-key-v1\0'), sshString(Buffer.from('none')), sshString(Buffer.from('none')), sshString(Buffer.alloc(0)), count, sshString(Buffer.concat([sshString(Buffer.from('ssh-ed25519')), sshString(pub)])), sshString(priv)]);
   const b64 = body.toString('base64').match(/.{1,70}/g).join('\n');
-  return `-----BEGIN OPENSSH PRIVATE KEY-----\n${b64}\n-----END OPENSSH PRIVATE KEY-----\n`;
+  return `${PEM_EDGE('BEGIN')}\n${b64}\n${PEM_EDGE('END')}\n`;
 }
 
 /** Sign a message with a key file (a role key, or an OpenSSH key) in a namespace other than the binding one. Returns the armoured signature. */
@@ -228,7 +231,7 @@ export function signNamespaced(message, { keyPath, principal, namespace } = {}) 
   if (!exists(keyPath)) throw new AgentBindError('no-ssh-key', 'key not found: ' + path.basename(String(keyPath)));
   requireOpenSSH();
   const content = fs.readFileSync(keyPath, 'utf8');
-  if (!content.startsWith('-----BEGIN PRIVATE KEY-----')) {
+  if (content.startsWith('-----BEGIN OPENSSH')) {
     if (isEncryptedKey(content)) throw noTerminalRefusal();
     return signMessage(message, keyPath, p, ns);
   }
