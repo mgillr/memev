@@ -1477,7 +1477,7 @@
       "criteria": 16,
       "spec": "specs/SR-W-03A.json",
       "base": "ba24c82e16c91f5962f20d49b396d46054a505da (the memev main commit that merged pull request #358, SO-F-03)",
-      "status": "proposed, unsigned; additive to the signed SR-0.03.3, which it does not supersede"
+      "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); additive to the signed SR-0.03.3, which it does not supersede"
     },
     {
       "id": "PG-03.6",
