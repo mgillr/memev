@@ -110,3 +110,4 @@ The record a builder takes over with: what exists, what is missing, and the orde
 | [scope-one/design/provenance-retention-invalidation.md](scope-one/design/provenance-retention-invalidation.md) | the SO-2.03 decision record: provenance, retention and invalidation, with its open owner decisions |
 | [scope-one/design/cross-project-intelligence.md](scope-one/design/cross-project-intelligence.md) | the SO-2.04 decision record: cross-project intelligence, with its open owner decisions |
 | [scope-one/design/cross-functional-issue-discovery.md](scope-one/design/cross-functional-issue-discovery.md) | the SO-2.05 decision record: cross-functional issue discovery, with its open owner decisions |
+| [scope-one/design/organisational-intelligence-acceptance.md](scope-one/design/organisational-intelligence-acceptance.md) | the SO-2.06 decision record: acceptance tests and measures for organisational intelligence, with its open owner decisions |
