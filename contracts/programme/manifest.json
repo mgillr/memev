@@ -1400,6 +1400,32 @@
       "kind": "feature"
     },
     {
+      "id": "QL-W-01A",
+      "kind": "feature",
+      "type": "programme work package",
+      "area": "QL-W",
+      "title": "Signing refuses a contract with a test_red_green criterion when no base revision can be recorded (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP23-01 (builds on the base recording of the signed SR-0.03.3 T1; proposed 1 Nov 2026; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "SR-0.03.3",
+          "boundary": "T1 of the signed contract records a base at signing when a base is named or the workdir is a git checkout, and verify is BLOCKED without one; QL-W-01A adds only the refusal at signing for a contract with a test_red_green criterion, and changes neither verify nor any signed body"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "SR-0.03.3 T1 (base recorded at signing) is the build layer, cited by id; this spec changes only contractSign in src/engine/contracts.mjs and the Base revision section of docs/CONTRACTS.md",
+      "depends_on": [
+        "SR-0.03.3"
+      ],
+      "tasks": 1,
+      "criteria": 18,
+      "spec": "specs/QL-W-01A.json",
+      "base": "ba24c82e16c91f5962f20d49b396d46054a505da (the memev main commit that merged pull request #358, SO-F-03)",
+      "status": "proposed, unsigned; builds on the signed SR-0.03.3 and changes no signed body"
+    },
+    {
       "id": "PG-18.1",
       "type": "programme work package",
       "area": "PG-18",
@@ -2075,6 +2101,12 @@
       "task": "WP20-01",
       "title": "The scope verifier allows a spec's own change note: changelog.d/<id>.md and its base id, and nothing else beyond what it allows today",
       "contract": "PG-20.1",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP23-01",
+      "title": "Signing refuses a contract with a test_red_green criterion when no base revision can be recorded, and a spec names its base revision",
+      "contract": "QL-W-01A",
       "note": "specified in this set"
     },
     {
