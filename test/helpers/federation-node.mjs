@@ -38,7 +38,7 @@ export function sandboxNode(name, role = 'writer') {
   const dir = tmpdir(`memev-${name}-`);
   const key = makeRole(path.join(dir, 'agents'), role);
   const open = () => new OpLog(path.join(dir, 'oplog'), { fsync: false, deviceId: `dev-${name}` }).open();
-  const node = { name, dir, key, log: open(), reopen() { node.log = open(); return node.log; } };
+  const node = { name, dir, key, log: open(), reopen() { node.log.close(); node.log = open(); return node.log; } };
   return node;
 }
 
