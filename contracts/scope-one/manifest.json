@@ -379,6 +379,482 @@
    "criteria": 8,
    "spec": "specs/SO-2.14-business-team-administration.json",
    "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
+  },
+  {
+   "id": "SO-A-01",
+   "area": "SO-A",
+   "title": "Lead agent: assignment preferences and overrides in ordinary language, recorded as inputs to the plan, never as direct mutations of execution state",
+   "repo": "memev",
+   "closes": "Build layer of the design record SO-1.03: the fold contract SO-A-01 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-1.01"
+   ],
+   "implements": [
+    "SO-1.03"
+   ],
+   "tasks": 1,
+   "criteria": 10,
+   "spec": "specs/SO-A-01.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-A-02",
+   "area": "SO-A",
+   "title": "Default agent suitability analysis: capability requirements per task, suitability records per eligible resource, the default assignment recorded with reasons, the user never asked to match",
+   "repo": "memev",
+   "closes": "Build layer of the design record SO-1.03: the fold contract SO-A-02 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-1.01"
+   ],
+   "implements": [
+    "SO-1.03"
+   ],
+   "tasks": 1,
+   "criteria": 9,
+   "spec": "specs/SO-A-02.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-A-03",
+   "area": "SO-A",
+   "title": "Requested, accepted, observed, verified: four distinct event kinds in the execution history, and the guard that an observed execution precedes verification",
+   "repo": "memev",
+   "closes": "Build layer of the design record SO-1.04: the fold contract SO-A-03 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-1.01"
+   ],
+   "implements": [
+    "SO-1.04"
+   ],
+   "tasks": 1,
+   "criteria": 8,
+   "spec": "specs/SO-A-03.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-A-04",
+   "area": "SO-A",
+   "title": "Relationship model and change propagation: milestones, deliverables and work packages as store entities, explicit links from scope to tasks, artifacts and evidence, stale marking on change and provenance on every projection",
+   "repo": "memev",
+   "closes": "Build layer of the design record SO-1.07: the fold contract SO-A-04 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-1.01"
+   ],
+   "implements": [
+    "SO-1.07"
+   ],
+   "tasks": 1,
+   "criteria": 10,
+   "spec": "specs/SO-A-04.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-A-05",
+   "area": "SO-A",
+   "title": "Decision and blocker queue as a workflow: seven states, severity and consequence of waiting, routine recoveries never become decisions, recommendations are never answers, answers recalculate dependents",
+   "repo": "memev",
+   "closes": "Build layer of the design record SO-1.08: the fold contract SO-A-05 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-A-04",
+    "SO-1.01"
+   ],
+   "implements": [
+    "SO-1.08"
+   ],
+   "tasks": 1,
+   "criteria": 11,
+   "spec": "specs/SO-A-05.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-A-06",
+   "area": "SO-A",
+   "title": "Artifact registry: every material artifact linked to its requirement, revisions, scope version and verification state, with history, comparison and previews served within the workspace grants, and the files kept in the user's workspace",
+   "repo": "memev",
+   "closes": "Build layer of the design record SO-1.09: the fold contract SO-A-06 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-A-04",
+    "SO-1.01"
+   ],
+   "implements": [
+    "SO-1.09"
+   ],
+   "tasks": 1,
+   "criteria": 10,
+   "spec": "specs/SO-A-06.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-A-07",
+   "area": "SO-A",
+   "title": "Connections and access: one table over the folder grants, the GitHub connection, the client registry and remote computers, least privilege and revocation, and an internal readiness registry that feeds the coordinator and never shows unknown as ready",
+   "repo": "memev",
+   "closes": "Build layer of the design record SO-1.06: the fold contract SO-A-07 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-1.01"
+   ],
+   "implements": [
+    "SO-1.06"
+   ],
+   "tasks": 1,
+   "criteria": 10,
+   "spec": "specs/SO-A-07.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-A-08",
+   "area": "SO-A",
+   "title": "Workspace, first slice: brief and scope, work breakdown and activity views beside the roadmap and decisions views, the persistent lead-agent area with context, the advanced view, five-view reconstruction after restart, and scope changes as proposals",
+   "repo": "memev",
+   "closes": "Build layer of the design record SO-1.05: the fold contract SO-A-08 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-A-01",
+    "SO-A-03",
+    "SO-A-04",
+    "SO-A-05",
+    "SO-A-06",
+    "SO-1.01"
+   ],
+   "implements": [
+    "SO-1.05"
+   ],
+   "tasks": 1,
+   "criteria": 11,
+   "spec": "specs/SO-A-08.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-A-09",
+   "area": "SO-A",
+   "title": "Workspace, second slice: plan and architecture entities in the store and the delivery plan, development plan, system and subsystem architecture views over them",
+   "repo": "memev",
+   "closes": "Build layer of the design record SO-1.05: the fold contract SO-A-09 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-A-04",
+    "SO-A-08"
+   ],
+   "implements": [
+    "SO-1.05"
+   ],
+   "tasks": 1,
+   "criteria": 11,
+   "spec": "specs/SO-A-09.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-A-12",
+   "area": "SO-A",
+   "title": "Workspace, third slice: RAID entities and view, and the artifact canvas with previews and verification state",
+   "repo": "memev",
+   "closes": "Build layer of the design records SO-1.05, SO-1.09: the fold contract SO-A-12 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-A-06",
+    "SO-A-09"
+   ],
+   "implements": [
+    "SO-1.05",
+    "SO-1.09"
+   ],
+   "tasks": 1,
+   "criteria": 9,
+   "spec": "specs/SO-A-12.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-A-10",
+   "area": "SO-A",
+   "title": "Fault injection and the reference journey: the failure matrix extended to F31, the fifteen-step journey as one scenario, recovery checked by the acceptance invariant checker, and the single-machine journey proven with no network path",
+   "repo": "memev",
+   "closes": "Build layer of the design records SO-1.10, SO-1.11: the fold contract SO-A-10 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-A-01",
+    "SO-A-02",
+    "SO-A-03",
+    "SO-A-06",
+    "SO-A-07",
+    "SO-A-08"
+   ],
+   "implements": [
+    "SO-1.10",
+    "SO-1.11"
+   ],
+   "tasks": 1,
+   "criteria": 9,
+   "spec": "specs/SO-A-10.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-A-11",
+   "area": "SO-A",
+   "title": "Baseline reconciliation: a register check over the takeover record with implemented, merged, integrated and verified kept apart and twins closed explicitly",
+   "repo": "memev",
+   "closes": "Build layer of the design record SO-1.02: the fold contract SO-A-11 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [],
+   "implements": [
+    "SO-1.02"
+   ],
+   "tasks": 1,
+   "criteria": 6,
+   "spec": "specs/SO-A-11.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-R-E",
+   "area": "SO-R",
+   "title": "Publish the versioned container image by a maintainer-run script after the Docker smoke passes: the registry account read from the environment or the origin remote, image name memev, tags the version and the sha, a published-image smoke, and the owner's go for the first public image",
+   "repo": "memev",
+   "closes": "Build layer with no design record: the fold contract SO-R-E adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [],
+   "implements": [],
+   "tasks": 1,
+   "criteria": 8,
+   "spec": "specs/SO-R-E.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-F-01",
+   "area": "SO-F",
+   "title": "Identity and scopes model, version 1: subjects, keys, expiry and revocation; scope types from personal to organisation; every authenticated request resolves to a subject and a scope; personal and organisational scopes never mix",
+   "repo": "memev",
+   "closes": "Build layer of the design records SO-2.02, SO-2.14: the fold contract SO-F-01 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [],
+   "implements": [
+    "SO-2.02",
+    "SO-2.14"
+   ],
+   "tasks": 1,
+   "criteria": 12,
+   "spec": "specs/SO-F-01.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-F-02",
+   "area": "SO-F",
+   "title": "Canonical project schema, version 1, with authority and merge classes: every entity type declares its owner authority, scope version and merge class, and two incompatible approvals derive to a semantic conflict, never to an applied state",
+   "repo": "memev",
+   "closes": "Build layer of the design records SO-1.07, SO-2.01: the fold contract SO-F-02 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-F-01",
+    "SO-1.01"
+   ],
+   "implements": [
+    "SO-1.07",
+    "SO-2.01"
+   ],
+   "tasks": 1,
+   "criteria": 8,
+   "spec": "specs/SO-F-02.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-F-03",
+   "area": "SO-F",
+   "title": "Contribution signature and two-step admission: a signed, scoped, classified contribution built on the operation envelope, admission into the node's own operation log, replay refused across restarts, and authority checked apart from the signature",
+   "repo": "memev",
+   "closes": "Build layer of the design records SO-2.02, SO-2.03: the fold contract SO-F-03 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-F-01",
+    "SO-F-02"
+   ],
+   "implements": [
+    "SO-2.02",
+    "SO-2.03"
+   ],
+   "tasks": 1,
+   "criteria": 11,
+   "spec": "specs/SO-F-03.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-F-04",
+   "area": "SO-F",
+   "title": "Federation membership and policy exchange specification: the relationship record, the policy document, a deny-by-default evaluation function, personal scopes refused as parties, and two sandbox nodes that establish and revoke a scoped relationship",
+   "repo": "memev",
+   "closes": "Build layer of the design records SO-2.02, SO-2.14: the fold contract SO-F-04 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-F-01",
+    "SO-F-03"
+   ],
+   "implements": [
+    "SO-2.02",
+    "SO-2.14"
+   ],
+   "tasks": 1,
+   "criteria": 10,
+   "spec": "specs/SO-F-04.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-F-05",
+   "area": "SO-F",
+   "title": "Classification model: six replication classes on notes and entities, local-only by default, refused only on the federation path, and derived data in the index and graph that inherits the source classification",
+   "repo": "memev",
+   "closes": "Build layer of the design records SO-2.02, SO-2.03: the fold contract SO-F-05 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-F-02",
+    "SO-F-04"
+   ],
+   "implements": [
+    "SO-2.02",
+    "SO-2.03"
+   ],
+   "tasks": 1,
+   "criteria": 8,
+   "spec": "specs/SO-F-05.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-F-12",
+   "area": "SO-F",
+   "title": "Replication unit: per-scope operation-log streams carrying classification and causal context, a replayable and reversible split of the single operation log, git kept as the whole-vault backup, and a two-node conformance test that a local-only item never leaves",
+   "repo": "memev",
+   "closes": "Build layer of the design record SO-2.03: the fold contract SO-F-12 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-F-05",
+    "SO-F-03"
+   ],
+   "implements": [
+    "SO-2.03"
+   ],
+   "tasks": 1,
+   "criteria": 10,
+   "spec": "specs/SO-F-12.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-F-06",
+   "area": "SO-F",
+   "title": "Structured-state convergence contract for the engine: input and output schemas per merge class validated in the single boundary, forbidden states rejected, human-resolution items never auto-merged, and one doctor check when the engine is unavailable",
+   "repo": "memev",
+   "closes": "Build layer of the design record SO-2.01: the fold contract SO-F-06 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-F-02",
+    "SO-1.01"
+   ],
+   "implements": [
+    "SO-2.01"
+   ],
+   "tasks": 1,
+   "criteria": 10,
+   "spec": "specs/SO-F-06.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-F-07",
+   "area": "SO-F",
+   "title": "Federated query and continuity specification: an authorised view with provenance and freshness, last-known state labelled when delivery stops, no invented status, and recovery checked against the declared objectives per data class",
+   "repo": "memev",
+   "closes": "Build layer of the design records SO-2.02, SO-2.12: the fold contract SO-F-07 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-F-04",
+    "SO-F-12"
+   ],
+   "implements": [
+    "SO-2.02",
+    "SO-2.12"
+   ],
+   "tasks": 1,
+   "criteria": 9,
+   "spec": "specs/SO-F-07.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-F-08",
+   "area": "SO-F",
+   "title": "Admission adapter boundary: the admission service behind an adapter beside the merge boundary, trust consumed only as an eligibility input of the admission path, external admission before the node's own, degraded mode reported, and both services named generically",
+   "repo": "memev",
+   "closes": "Build layer of the design record SO-2.13: the fold contract SO-F-08 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-F-03"
+   ],
+   "implements": [
+    "SO-2.13"
+   ],
+   "tasks": 1,
+   "criteria": 9,
+   "spec": "specs/SO-F-08.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-F-09",
+   "area": "SO-F",
+   "title": "Finding model for organisational intelligence: a finding is a graph claim capped at theory by evidence, promoted to fact only by a person or a verification, with dismissal, correction and adjudication events and no disclosure beyond the reader's permissions",
+   "repo": "memev",
+   "closes": "Build layer of the design records SO-2.04, SO-2.01: the fold contract SO-F-09 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-F-01",
+    "SO-F-02"
+   ],
+   "implements": [
+    "SO-2.04",
+    "SO-2.01"
+   ],
+   "tasks": 1,
+   "criteria": 8,
+   "spec": "specs/SO-F-09.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-F-13",
+   "area": "SO-F",
+   "title": "Cross-functional conflict detection on a bounded programme: the seeded two-plan conflict detected, linked and routed as a decision, precision at least 0.9 and recall at least 0.8 on the fixture, and neither plan changed",
+   "repo": "memev",
+   "closes": "Build layer of the design records SO-2.05, SO-2.06: the fold contract SO-F-13 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-F-09",
+    "SO-A-05"
+   ],
+   "implements": [
+    "SO-2.05",
+    "SO-2.06"
+   ],
+   "tasks": 1,
+   "criteria": 7,
+   "spec": "specs/SO-F-13.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
+  },
+  {
+   "id": "SO-F-10",
+   "area": "SO-F",
+   "title": "Federated computation specification as an interface reservation: the work specification and receipt schemas, a pure local evaluation function over the node's policy, every page labelled planned, and no command or module that dispatches or runs work on another node",
+   "repo": "memev",
+   "closes": "Build layer of the design record SO-2.12: the fold contract SO-F-10 adapted to memev main, as the unsigned fold of 30 Oct 2026 left it unsignable",
+   "depends_on": [
+    "SO-F-03",
+    "SO-F-04"
+   ],
+   "implements": [
+    "SO-2.12"
+   ],
+   "tasks": 1,
+   "criteria": 10,
+   "spec": "specs/SO-F-10.json",
+   "adapted_from": "unsigned fold of 30 Oct 2026",
+   "status": "adapted from the unsigned fold of 30 Oct 2026; not yet signed"
   }
  ]
 }
