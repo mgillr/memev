@@ -2,7 +2,7 @@
 
 **Status: closed preview. Not a general release.**
 
-[Documentation index](README.md)
+[Documentation index](README.md) · [Known issues and preview limits](KNOWN-ISSUES.md)
 
 This guide is for invited testers evaluating the free, single-person, single-computer Memev core. The purpose of this cohort is to validate installation, day-to-day reliability, AI-tool integration, coordination, local contracts and recovery on real supported setups.
 
@@ -37,16 +37,17 @@ Memev states that it has no telemetry by default. The network activity described
 You must have been granted access to the private GitHub repository by the Memev maintainer.
 
 ```sh
-git clone <clone-url-from-the-GitHub-Code-menu>
+# Replace OWNER and REPOSITORY with the values from the GitHub Code menu.
+git clone https://github.com/OWNER/REPOSITORY.git
 cd memev
 node --version
 git --version
 git rev-parse HEAD
 npm install -g .
-memev init --local-only
+memev init --local-only --no-service
 ```
 
-Use a new, empty vault location if the installer offers a choice. Do not point it at another vault.
+Use a new, empty vault location if the installer offers a choice. Do not point it at another vault. This starts the daemon for the test session but does not register a login service. The standard init flow may configure detected AI clients; use a dedicated test OS account, or add `--no-connect` if you want to connect one client manually after inspecting the setup. See [AI app integrations](CLIENTS.md).
 
 Then run:
 
@@ -94,6 +95,8 @@ If you choose to test backup:
 5. Test recovery only into a separate empty directory or disposable environment.
 
 Git backup is a single-writer backup path. Do not use it to edit the same vault concurrently from multiple computers.
+
+Read [Known issues and preview limits](KNOWN-ISSUES.md) before testing.
 
 ## What is not in scope for this cohort
 
