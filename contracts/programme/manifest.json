@@ -70,7 +70,7 @@
     {
       "id": "PG-19.1",
       "manifest": "this manifest (contracts/programme/specs, signed 1 Nov 2026; the file is unchanged)",
-      "reason": "owner delegation, 1 Nov 2026: PG-19.1 says src/cli/work-store.mjs returns the real project store, which SO-1.01 requirement 3 forbids (only the vault, the coordinator and the project store reach the store); PG-19.2 routes openStore through one read-only vault method, workImpactView, that returns plain data and no ProjectStore instance, adds task WP19-03 with scope src/engine/vault.mjs and docs/MODULES.md, and keeps every PG-19.1 criterion",
+      "reason": "owner delegation, 1 Nov 2026: PG-19.1 says src/cli/work-store.mjs returns the real project store, which SO-1.01 requirement 3 forbids (only the vault, the coordinator and the project store reach the store); PG-19.2 routes openStore through one read-only vault method, Vault#tasksReader(identity, project), whose frozen reader has one member, snapshot(kind), that returns copies, with no ProjectStore instance and no write path; it adds task WP19-03 with scope src/engine/vault.mjs, test/cli-work.test.mjs and docs/MODULES.md, and keeps every PG-19.1 criterion",
       "superseded_by": "PG-19.2"
     },
     {
@@ -78,6 +78,12 @@
       "manifest": "this manifest (contracts/programme/specs, signed 1 Nov 2026; the file is unchanged)",
       "reason": "owner delegation, 1 Nov 2026: pull request #364 changes docs/CONVERGENCE.md (a link to docs/MERGE-SEMANTICS.md only), docs/MODULES.md (generated; src/engine/state-map.mjs is a new module) and changelog.d/PG-05.1.md, which PG-05.1 does not list in a scope; PG-05.2 adds docs/CONVERGENCE.md to the scope of WP05-01 and docs/MODULES.md and changelog.d/PG-05.1.md to the scope of WP05-04, and changes no criterion",
       "superseded_by": "PG-05.2"
+    },
+    {
+      "id": "PG-04.2",
+      "manifest": "this manifest (contracts/programme/specs; the file is unchanged)",
+      "reason": "owner delegation, 1 Nov 2026: pull request #366 (WP04-03 and WP04-04, draft, stacked on #357) changes docs/MODULES.md, which scripts/docs/module-graph.mjs generates and a docs test checks, and PG-04.2 lists docs/MODULES.md only in the scope of WP04-02; PG-04.3 adds docs/MODULES.md to the scope of WP04-03 and WP04-04 and changes nothing else: no other scope entry, requirement, criterion or stop rule",
+      "superseded_by": "PG-04.3"
     }
   ],
   "resolved_without_contract": [
@@ -181,7 +187,7 @@
       "decided_by": "owner delegation, 1 Nov 2026",
       "decision": "the fold is the build layer; the programme specs cite the fold ids per task and keep only what the fold does not cover",
       "overlaps": {
-        "PG-04.2": [
+        "PG-04.3": [
           "SO-F-03",
           "SO-F-12"
         ],
@@ -220,7 +226,7 @@
         ]
       },
       "by_task": {
-        "PG-04.2": {
+        "PG-04.3": {
           "WP04-01": [
             "SO-F-03",
             "SO-F-12"
@@ -732,7 +738,61 @@
       "spec": "specs/PG-04.2-canonical-operation-envelope.json",
       "status": "proposed and unsigned; no red-team record",
       "supersedes": "PG-04.1",
-      "supersedes_reason": "owner delegation, 1 Nov 2026: pull request #357 must map src/engine/envelope.mjs into docs/MODULES.md, so docs/MODULES.md is added to the scope of WP04-02; no other scope entry, requirement or criterion changes"
+      "supersedes_reason": "owner delegation, 1 Nov 2026: pull request #357 must map src/engine/envelope.mjs into docs/MODULES.md, so docs/MODULES.md is added to the scope of WP04-02; no other scope entry, requirement or criterion changes",
+      "superseded_by": "PG-04.3"
+    },
+    {
+      "id": "PG-04.3",
+      "type": "superseding spec (version 3 of PG-04)",
+      "area": "PG-04",
+      "title": "Canonical operation envelope (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP04-01, WP04-02, WP04-03, WP04-04",
+      "requirements": [
+        "MV-INT-02",
+        "MV-INT-03"
+      ],
+      "cross_references": [
+        {
+          "contract": "SO-1.04 and SO-1.01",
+          "boundary": "WP04 depends on both: the envelope carries the four-way event distinction of SO-1.04 requirement 3 and does not define the adapter contract (SO-1.04 requirement 1) or own the store or coordinator (SO-1.01)"
+        },
+        {
+          "contract": "SO-2.07 to SO-2.11",
+          "boundary": "their adapter layers must use canonical operation contracts: the WP04 envelope is that contract, and these specs do not define any adapter for those systems"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "the fold (SO-F-03, SO-F-12) is the build layer (owner delegation, 1 Nov 2026); the tasks listed in fold_tasks cite their fold id and keep only what the fold does not cover (trimmed)",
+      "fold_tasks": {
+        "WP04-01": [
+          "SO-F-03",
+          "SO-F-12"
+        ],
+        "WP04-02": [
+          "SO-F-03"
+        ],
+        "WP04-03": [
+          "SO-F-03",
+          "SO-F-12"
+        ],
+        "WP04-04": [
+          "SO-F-03",
+          "SO-F-12"
+        ]
+      },
+      "depends_on": [
+        "SO-1.01",
+        "SO-1.04"
+      ],
+      "tasks": 4,
+      "criteria": 24,
+      "spec": "specs/PG-04.3-canonical-operation-envelope.json",
+      "status": "proposed and unsigned; no red-team record",
+      "supersedes": "PG-04.2",
+      "supersedes_reason": "owner delegation, 1 Nov 2026: pull request #366 (WP04-03 and WP04-04, draft, stacked on #357) changes docs/MODULES.md, which scripts/docs/module-graph.mjs generates and a docs test checks, and PG-04.2 lists docs/MODULES.md only in the scope of WP04-02; PG-04.3 adds docs/MODULES.md to the scope of WP04-03 and WP04-04 and changes nothing else: no other scope entry, requirement, criterion or stop rule",
+      "kind": "feature",
+      "supersedes_signed_contract": "k-pg-04-1-canonical-operat-b77c7c is the signed PG-04.1; PG-04.2 is being signed; the PG-04.1 and PG-04.2 spec files are unchanged"
     },
     {
       "id": "PG-05.1",
@@ -1348,11 +1408,11 @@
       "cross_references": [
         {
           "contract": "SO-A-03",
-          "boundary": "it defines runWork and memev work status in src/cli/work.mjs; PG-19.1 wires them and does not change them"
+          "boundary": "it defines runWork and memev work status in src/cli/work.mjs; PG-19.2 wires them and does not change them"
         },
         {
           "contract": "SO-08-B",
-          "boundary": "it stays recovery and control under WP08-02; PG-19.1 adds no recovery or control command"
+          "boundary": "it stays recovery and control under WP08-02; PG-19.2 adds no recovery or control command"
         }
       ],
       "vault_contracts": [],
@@ -1362,11 +1422,11 @@
         "SO-A-03"
       ],
       "tasks": 3,
-      "criteria": 24,
+      "criteria": 27,
       "spec": "specs/PG-19.2-memev-work-command-wired-to-runwork.json",
       "status": "proposed and unsigned; no red-team record",
       "supersedes": "PG-19.1",
-      "supersedes_reason": "owner delegation, 1 Nov 2026: PG-19.1 says src/cli/work-store.mjs returns the real project store, which SO-1.01 requirement 3 forbids (only the vault, the coordinator and the project store reach the store); PG-19.2 routes openStore through one read-only vault method, workImpactView, that returns plain data and no ProjectStore instance, adds task WP19-03 with scope src/engine/vault.mjs and docs/MODULES.md, and keeps every PG-19.1 criterion",
+      "supersedes_reason": "owner delegation, 1 Nov 2026: PG-19.1 says src/cli/work-store.mjs returns the real project store, which SO-1.01 requirement 3 forbids (only the vault, the coordinator and the project store reach the store); PG-19.2 routes openStore through one read-only vault method, Vault#tasksReader(identity, project), whose frozen reader has one member, snapshot(kind), that returns copies, with no ProjectStore instance and no write path; it adds task WP19-03 with scope src/engine/vault.mjs, test/cli-work.test.mjs and docs/MODULES.md, and keeps every PG-19.1 criterion",
       "kind": "feature"
     },
     {
@@ -1559,25 +1619,25 @@
     {
       "task": "WP04-01",
       "title": "Envelope specification: fields, versioning, deterministic serialisation, hash rules",
-      "contract": "PG-04.2",
+      "contract": "PG-04.3",
       "note": "specified in this set"
     },
     {
       "task": "WP04-02",
       "title": "Envelope module: build, canonical-serialise, hash and validate an envelope",
-      "contract": "PG-04.2",
+      "contract": "PG-04.3",
       "note": "specified in this set"
     },
     {
       "task": "WP04-03",
       "title": "Adapters: the oplog record, the bus message and project-store events convert to and from the envelope without loss",
-      "contract": "PG-04.2",
+      "contract": "PG-04.3",
       "note": "specified in this set"
     },
     {
       "task": "WP04-04",
       "title": "Envelope is reachable from the real write path (oplog append), not only from tests",
-      "contract": "PG-04.2",
+      "contract": "PG-04.3",
       "note": "specified in this set"
     },
     {
@@ -1970,7 +2030,7 @@
     },
     {
       "task": "WP19-01",
-      "title": "memev work dispatches to runWork from main.mjs, with a production openStore port that opens the real project store",
+      "title": "memev work dispatches to runWork from main.mjs, with a production openStore port that reaches project state only through a read-only vault method",
       "contract": "PG-19.2",
       "note": "specified in this set"
     },
@@ -1982,7 +2042,7 @@
     },
     {
       "task": "WP19-03",
-      "title": "A narrow read-only vault method serves memev work impact: no ProjectStore instance and no write path leave the vault",
+      "title": "A narrow read-only vault method, Vault#tasksReader, serves memev work impact: a frozen reader with one member, snapshot, and no ProjectStore or write path leave the vault",
       "contract": "PG-19.2",
       "note": "specified in this set"
     },

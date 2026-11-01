@@ -2,7 +2,7 @@
   "title": "PG-19.2 memev work command wired to runWork with a production openStore (memev)",
   "project": "memev",
   "workdir": null,
-  "request": "Version 2 of PG-19: it supersedes PG-19.1 (signed 1 Nov 2026; the PG-19.1 file is unchanged and stays on record, and the manifest and RECONCILIATION mark it superseded by this contract; owner delegation, 1 Nov 2026). Reason: PG-19.1 says that src/cli/work-store.mjs returns the real project store. SO-1.01 requirement 3 (checked by 'SO-1.01 req 3' in test/project-wiring.test.mjs) lets only the vault, the coordinator and the project store reach the store, so a store handed to the CLI would break that rule. In this version openStore in src/cli/work-store.mjs goes through one narrow read-only vault method, workImpactView, in src/engine/vault.mjs, which serves memev work impact and returns plain data: no ProjectStore instance and no write path. Every criterion of PG-19.1 is kept; the task title, the description and one requirement that said the CLI gets the real store are reworded; task WP19-03 is added for the facade, with scope additions src/engine/vault.mjs (that one method only) and docs/MODULES.md. The boundaries with SO-A-03 and SO-08-B below are kept as they were. The work is claimed and stacked on pull request #361, which adds the work case in src/cli/main.mjs that this contract reuses. Programme contract for work package WP19 in memev: wire the work command into the CLI and give runWork a production openStore. Proposed and unsigned; the signer signs it after the red-team gate. WP19 is a new gap found after the programme decomposition of 31 Oct 2026 and decided under owner delegation, 1 Nov 2026; it is not in docs/scope-one/programme/fragments/. Depends on contracts: SO-A-03 (defines runWork and memev work status; signed fold contract, cited by id), SO-1.01 (the store, the state machine and the coordinator as one authority). Searched before drafting: no spec under contracts/*/specs names runWork or openStore, and none has a criterion for the work dispatch in src/cli/main.mjs; SO-A-01 lists main.mjs in its scope for memev work prefer only. Boundary with SO-08-B: it stays recovery and control under WP08-02; this contract adds no recovery or control command, only the dispatch, the port and the tests. Boundary with SO-A-03: src/cli/work.mjs and runWork belong to it; this contract changes neither. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
+  "request": "Version 2 of PG-19: it supersedes PG-19.1 (signed 1 Nov 2026; the PG-19.1 file is unchanged and stays on record, and the manifest and RECONCILIATION mark it superseded by this contract; owner delegation, 1 Nov 2026). Reason: PG-19.1 says that src/cli/work-store.mjs returns the real project store. SO-1.01 requirement 3 (checked by 'SO-1.01 req 3' in test/project-wiring.test.mjs) lets only the vault, the coordinator and the project store reach the store, so a store handed to the CLI would break that rule. In this version openStore in src/cli/work-store.mjs goes through one narrow read-only vault method, Vault#tasksReader(identity, project) in src/engine/vault.mjs, which serves memev work impact and returns a frozen reader whose only member is snapshot(kind), which returns copies of the records: no ProjectStore instance and no write path. Every criterion of PG-19.1 is kept; the task title, the description and one requirement that said the CLI gets the real store are reworded; task WP19-03 is added for the facade, with the scope addition src/engine/vault.mjs (that one method only) and the tests in test/cli-work.test.mjs, and docs/MODULES.md for WP19-01. Pull request #365 builds this version (draft, head bcb1020) and its names and paths match: Vault#tasksReader in src/engine/vault.mjs, openStore in src/cli/work-store.mjs, the work case in src/cli/main.mjs and the tests in test/cli-work.test.mjs and test/cli-work-e2e.test.mjs. The boundaries with SO-A-03 and SO-08-B below are kept as they were. The work is claimed and stacked on pull request #361, which adds the work case in src/cli/main.mjs that this contract reuses. Programme contract for work package WP19 in memev: wire the work command into the CLI and give runWork a production openStore. Proposed and unsigned; the signer signs it after the red-team gate. WP19 is a new gap found after the programme decomposition of 31 Oct 2026 and decided under owner delegation, 1 Nov 2026; it is not in docs/scope-one/programme/fragments/. Depends on contracts: SO-A-03 (defines runWork and memev work status; signed fold contract, cited by id), SO-1.01 (the store, the state machine and the coordinator as one authority). Searched before drafting: no spec under contracts/*/specs names runWork or openStore, and none has a criterion for the work dispatch in src/cli/main.mjs; SO-A-01 lists main.mjs in its scope for memev work prefer only. Boundary with SO-08-B: it stays recovery and control under WP08-02; this contract adds no recovery or control command, only the dispatch, the port and the tests. Boundary with SO-A-03: src/cli/work.mjs and runWork belong to it; this contract changes neither. Owner decisions of 31 Oct 2026 apply: crdt-merge stays in its own repository and is reached only across the WO-05-A call-out boundary (never vendored, no memev-merge); tiers are free core, Personal at $12/month or $120/year for up to 3 computers, and contact us above that; there is no Federated tier.",
   "tasks": [
     {
       "id": "WP19-01",
@@ -15,9 +15,9 @@
         "SR-1.15: no code without a caller (source: docs/scope-one/WBS.md leaf 2.2.15; owner delegation, 1 Nov 2026)",
         "SO-A-03 (signed fold contract, cited by id; pull request #341) defines runWork and memev work status in src/cli/work.mjs; this spec wires them into the CLI and does not restate them (source: pull request #341, owner delegation, 1 Nov 2026)",
         "SO-08-B (signed vault contract, cited by id) stays recovery and control under WP08-02; this spec adds no recovery or control command (source: owner delegation, 1 Nov 2026)",
-        "SO-1.01 (canonical execution integration) keeps the store, the state machine and the coordinator as one authority, and requirement 3 lets only the vault, the coordinator and the project store reach the store; the port reaches project state only through the read-only vault method workImpactView (src/engine/vault.mjs), which returns plain data and no project store and adds no second path (source: contracts/scope-one/specs/SO-1.01-canonical-execution-integration.json; test/project-wiring.test.mjs)"
+        "SO-1.01 (canonical execution integration) keeps the store, the state machine and the coordinator as one authority, and requirement 3 lets only the vault, the coordinator and the project store reach the store; the port reaches project state only through the read-only vault method Vault#tasksReader (src/engine/vault.mjs), which returns a frozen reader with one member, snapshot(kind), that returns copies, and no project store, and adds no second path (source: contracts/scope-one/specs/SO-1.01-canonical-execution-integration.json; test/project-wiring.test.mjs)"
       ],
-      "description": "Repo: memev. The gap: src/cli/main.mjs does not dispatch memev work impact, and runWork has no production way to read the project data it needs. The work case for status, pause, resume and cancel is added by pull request #361, which this task builds on and reuses; this task adds to that case the openStore port argument. It adds one port module, src/cli/work-store.mjs, that exports openStore: openStore calls the read-only vault method workImpactView (src/engine/vault.mjs), which returns plain data and no project store for the vault at the resolved root. It never returns, imports or names the project store or the coordinator, because SO-1.01 requirement 3 lets only the vault, the coordinator and the project store reach the store. No test double is used in a production path: a test injects its own view only through the same port argument that main.mjs fills with openStore. src/cli/work.mjs is owned by SO-A-03 and is not changed here; if runWork needs a port argument, that change is made in SO-A-03 first.",
+      "description": "Repo: memev. The gap: src/cli/main.mjs does not dispatch memev work impact, and runWork has no production way to read the project data it needs. The work case for status, pause, resume and cancel is added by pull request #361, which this task builds on and reuses; this task adds to that case the openStore port argument. It adds one port module, src/cli/work-store.mjs, that exports openStore: openStore calls the read-only vault method tasksReader (src/engine/vault.mjs), which returns a frozen reader with one member, snapshot(kind), and no project store for the vault at the resolved root. It never returns, imports or names the project store or the coordinator, because SO-1.01 requirement 3 lets only the vault, the coordinator and the project store reach the store. No test double is used in a production path: a test injects its own view only through the same port argument that main.mjs fills with openStore. src/cli/work.mjs is owned by SO-A-03 and is not changed here; if runWork needs a port argument, that change is made in SO-A-03 first.",
       "scope": [
         "src/cli/main.mjs",
         "src/cli/work-store.mjs",
@@ -77,7 +77,7 @@
           "statement": "openStore calls the vault facade and never names the store: work-store.mjs and main.mjs hold no ProjectStore, projectStore or project-store text",
           "verifier": {
             "type": "command",
-            "cmd": "grep -q workImpactView src/cli/work-store.mjs && ! grep -Eq 'ProjectStore|projectStore|project-store|[Cc]oordinator' src/cli/work-store.mjs src/cli/main.mjs",
+            "cmd": "grep -q tasksReader src/cli/work-store.mjs && ! grep -Eq 'ProjectStore|projectStore|project-store|[Cc]oordinator' src/cli/work-store.mjs src/cli/main.mjs",
             "expect_exit": 0,
             "timeout_s": 60
           }
@@ -172,48 +172,72 @@
     },
     {
       "id": "WP19-03",
-      "title": "A narrow read-only vault method serves memev work impact: no ProjectStore instance and no write path leave the vault",
+      "title": "A narrow read-only vault method, Vault#tasksReader, serves memev work impact: a frozen reader with one member, snapshot, and no ProjectStore or write path leave the vault",
       "phase": "implement",
       "depends_on": [],
       "requirements": [
         "SO-1.01 requirement 3 (test 'SO-1.01 req 3' in test/project-wiring.test.mjs): only the vault, the coordinator and the project store reach the store; a module of the CLI gets project data only from one vault method (source: contracts/scope-one/specs/SO-1.01-canonical-execution-integration.json; owner delegation, 1 Nov 2026)",
-        "the vault method is read-only and returns plain data: it has no write methods, and no ProjectStore instance, directly or through a property or a prototype (source: owner delegation, 1 Nov 2026)",
+        "Vault#tasksReader(identity, project) is read-only: it needs a credential that may read, returns null for a project with no store, and otherwise returns a frozen object whose only member is snapshot(kind), which returns a copy of the records of that kind; the reader has no write method and no ProjectStore instance, directly or through a property or a prototype (source: owner delegation, 1 Nov 2026)",
         "SO-A-03 (signed fold contract, cited by id; pull request #341) and SO-08-B (signed vault contract, cited by id) keep their boundaries: this task adds one read method and no recovery or control command (source: owner delegation, 1 Nov 2026)"
       ],
-      "description": "Repo: memev. The vault is the only module that may hand project data to the CLI. This task adds one method to src/engine/vault.mjs, workImpactView(project, query), for memev work impact. It reads through the store the vault already owns and returns a frozen, plain data view (objects, arrays, strings and numbers): no ProjectStore instance, no function, no handle on the store and no write method. Only that one method is added to src/engine/vault.mjs; no other line of the file changes. The test builds a real vault and project with relationships, calls the method and checks the result. docs/MODULES.md is the generated module graph that a docs test checks.",
+      "description": "Repo: memev. The vault is the only module that may hand project data to the CLI. This task adds one method to src/engine/vault.mjs, Vault#tasksReader(identity, project), for memev work impact. It checks that the credential may read, returns null when the project has no store, and otherwise returns Object.freeze({ snapshot }) where snapshot(kind) returns a structured copy of the records of that kind from the store the vault already owns. The reader has exactly one member, snapshot; it has no write method, no handle on the store and no ProjectStore instance, and mutating a record it returned changes nothing in the store. Only that one method is added to src/engine/vault.mjs; no other line of the file changes. The tests build a real vault and project with relationships, call the method and check the result; they live in test/cli-work.test.mjs, which pull request #365 already holds for the work tests. docs/MODULES.md is the generated module graph that a docs test checks.",
       "scope": [
         "src/engine/vault.mjs",
         "docs/MODULES.md",
-        "test/work-facade.test.mjs",
+        "test/cli-work.test.mjs",
         "test/helpers/**"
       ],
       "criteria": [
         {
-          "statement": "the facade cannot write: the returned view has no append, put, withWrite, close or other write method, and an attempt to assign to it, add a key to it or call a write on it fails; the event log bytes of the project are the same before and after the call; the test fails on the current code, where the method does not exist, and passes after",
+          "statement": "the reader is frozen: Object.isFrozen is true for it, and in strict mode assigning to snapshot, adding a key and deleting snapshot each throw and change nothing; the test fails on the current code, where tasksReader does not exist, and passes after",
           "verifier": {
             "type": "test_red_green",
-            "test_file": "test/work-facade.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-19.2 WP19-03 AC01:' test/work-facade.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-19.2 WP19-03 AC01:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+            "test_file": "test/cli-work.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-19.2 WP19-03 AC01:' test/cli-work.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-19.2 WP19-03 AC01:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
           }
         },
         {
-          "statement": "the facade does not expose the ProjectStore object: no value reachable from the returned view, through its properties, its symbol keys or its prototype chain, is an instance of ProjectStore or has its constructor, and the view survives structuredClone and a JSON round trip unchanged",
+          "statement": "the reader has exactly one member: Reflect.ownKeys(reader) is exactly ['snapshot'], snapshot is a function, and the prototype of the reader is Object.prototype or null with no member of its own",
           "verifier": {
             "type": "test_red_green",
-            "test_file": "test/work-facade.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-19.2 WP19-03 AC02:' test/work-facade.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-19.2 WP19-03 AC02:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+            "test_file": "test/cli-work.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-19.2 WP19-03 AC02:' test/cli-work.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-19.2 WP19-03 AC02:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
           }
         },
         {
-          "statement": "the facade serves what memev work impact needs: for a real project with relationships the view lists the items a change affects, the same items that the store's own impact read returns; for a project that does not exist it returns null",
+          "statement": "the records it returns are copies: after snapshot('task') the test mutates a returned record, a nested value of it and the returned collection, and a second snapshot('task') and the store's own snapshot are unchanged; two calls return different objects",
           "verifier": {
             "type": "test_red_green",
-            "test_file": "test/work-facade.test.mjs",
-            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-19.2 WP19-03 AC03:' test/work-facade.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-19.2 WP19-03 AC03:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+            "test_file": "test/cli-work.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-19.2 WP19-03 AC03:' test/cli-work.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-19.2 WP19-03 AC03:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
           }
         },
         {
-          "statement": "the vault change is one added method: src/engine/vault.mjs has no removed line and exactly one added method definition against origin/main",
+          "statement": "the reader cannot write: it has no append, put, withWrite, close or other write method, a write attempted through a returned record or the snapshot function reaches no event, and the bytes of the project's event log are the same before and after every call of the test",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-work.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-19.2 WP19-03 AC04:' test/cli-work.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-19.2 WP19-03 AC04:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "the reader does not expose the ProjectStore: no value reachable from the reader or from a returned record, through properties, symbol keys or prototype chains, is an instance of ProjectStore or has its constructor, and what snapshot returns survives structuredClone and a JSON round trip unchanged",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-work.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-19.2 WP19-03 AC05:' test/cli-work.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-19.2 WP19-03 AC05:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "the reader serves what memev work impact needs: for a real project with relationships, snapshot returns the records that the store's own snapshot returns for the same kinds; for a project that has no store tasksReader returns null and creates no project; a credential that may not read is refused",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/cli-work.test.mjs",
+            "cmd": "out=$(node --test --test-reporter=tap --test-name-pattern='^PG-19.2 WP19-03 AC06:' test/cli-work.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\" | tail -30; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*ok [0-9]+ - PG-19.2 WP19-03 AC06:' && ! printf '%s\\n' \"$out\" | grep -Eq '^[[:space:]]*not ok'"
+          }
+        },
+        {
+          "statement": "the vault change is one added method: src/engine/vault.mjs has no removed line and exactly one added method definition, tasksReader, against origin/main",
           "verifier": {
             "type": "command",
             "cmd": "[ -z \"$(git diff -U0 origin/main -- src/engine/vault.mjs | grep -E '^-[^-]')\" ] && [ \"$(git diff -U0 origin/main -- src/engine/vault.mjs | grep -cE '^\\+  (async )?[A-Za-z_]+\\(.*\\) \\{')\" = 1 ]",
