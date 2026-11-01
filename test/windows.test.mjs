@@ -4,7 +4,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { sandbox } from './helpers/cli.mjs';
+import { sandbox, initWithRetry } from './helpers/cli.mjs';
 import { tmpdir, cleanup } from './helpers/tmp.mjs';
 import { fileChecks } from '../src/cli/doctor.mjs';
 import { firstRun } from '../src/cli/onboarding.mjs';
@@ -24,7 +24,7 @@ function openModes() {
 
 before(() => {
   sb = sandbox();
-  const r = sb.run(['init', '--port', String(sb.port), '--no-connect']);
+  const r = initWithRetry(sb, ['init', '--port', String(sb.port), '--no-connect']);
   assert.equal(r.code, 0, r.out + r.err);
   openModes();
 });

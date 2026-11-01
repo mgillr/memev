@@ -130,7 +130,7 @@ shows where each sits is [docs/scope-one/WBS.md](../docs/scope-one/WBS.md).
 
 ## Programme contracts, 1 November 2026
 
-`programme/` holds what the Scope One contracts do not already cover, plus one contract per pull request that closes programme work: 28 specs in all. Twenty-six have an interim red-team record under `programme/redteam/` (an interim solo review, pending independent re-review; the record cites the owner confirmation of the engine decision, t542u, 31 Oct 2026). All twenty-six passed and are signed by signer-2, in two passes: eight in the first, of which PG-03.2, PG-03.3, PG-06.1 and PG-12.1 are since superseded (the signed files stay unchanged and the manifest marks them superseded), and eighteen in the second, among them PG-06.2 and PG-12.2, which supersede PG-06.1 and PG-12.1. PG-03.4 and PG-03.5, which supersede PG-03.2 and PG-03.3, wait for the next commit of their specs, have no record yet and are not signed.
+`programme/` holds what the Scope One contracts do not already cover, plus one contract per pull request that closes programme work: 28 specs in all. Twenty-six have an interim red-team record under `programme/redteam/` (an interim solo review, pending independent re-review; the record cites the owner confirmation of the engine decision, t542u, 31 Oct 2026). All twenty-six passed and are signed by signer-2, in two passes: eight in the first, of which PG-03.2, PG-03.3, PG-06.1 and PG-12.1 are since superseded (the signed files stay unchanged and the manifest marks them superseded), and eighteen in the second, among them PG-06.2 and PG-12.2, which supersede PG-06.1 and PG-12.1. PG-03.4 and PG-03.6, and SR-0.03.3 (version 3 of SR-0.03), are signed in a third pass, listed below; PG-03.6 supersedes PG-03.5, which superseded PG-03.3, and PG-03.5 is not signed and stays on record.
 
 | Spec | Contract | Title | Depends on |
 |---|---|---|---|
@@ -160,6 +160,20 @@ shows where each sits is [docs/scope-one/WBS.md](../docs/scope-one/WBS.md).
 | [PGP-1.03](programme/specs/PGP-1.03-memev-docs-tiers-reconciliation.json) | [`k-pgp-1-03-memev-engine-de-11cd89`](signed/k-pgp-1-03-memev-engine-de-11cd89.json) | memev: engine decision recorded, tier docs aligned, README rewritten, reconciliation against the work breakdown | SO-1.02 |
 | [PGP-1.04](programme/specs/PGP-1.04-converge-fair-mem0-comparison.json) | [`k-pgp-1-04-converge-the-me-2441f7`](signed/k-pgp-1-04-converge-the-me-2441f7.json) | converge: the Mem0 comparison states Mem0's published design and what converge does differently | none |
 | [PGP-1.06](programme/specs/PGP-1.06-memev-ops-sr3-engine-decision.json) | [`k-pgp-1-06-memev-ops-sr-3-d345d7`](signed/k-pgp-1-06-memev-ops-sr-3-d345d7.json) | memev-ops: SR-3.01 and SR-3.03 superseded by the call-out engine decision, SR-3.05 states the licences once | none |
+
+Third pass, 1 November 2026. Each has an interim red-team record under `programme/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1. The signed contracts they replace in intent (PG-03.2, and the signed SR-0.03 version 2) stay unchanged and are not marked superseded in the signed files; the manifest records the supersession.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [SR-0.03.3](programme/specs/SR-0.03.3-verify-runs-every-verifier-type.json) | [`k-sr-0-03-3-verify-runs-ev-02455e`](signed/k-sr-0-03-3-verify-runs-ev-02455e.json) | Verify runs every verifier type, version 3 of SR-0.03 (memev) | none |
+| [PG-03.4](programme/specs/PG-03.4-cross-language-protocol-vectors.json) | [`k-pg-03-4-cross-language-p-b395d6`](signed/k-pg-03-4-cross-language-p-b395d6.json) | Cross-language protocol vectors (crdt-merge-ts), supersedes PG-03.2 | PG-03.1 |
+| [PG-03.6](programme/specs/PG-03.6-cross-language-protocol-vectors.json) | [`k-pg-03-6-cross-language-p-ead304`](signed/k-pg-03-6-cross-language-p-ead304.json) | Cross-language protocol vectors (crdt-merge-rs), supersedes PG-03.5 | PG-03.1 |
+
+Fourth pass, 1 November 2026. `PG-19.1` has an interim red-team record under `programme/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [PG-19.1](programme/specs/PG-19.1-memev-work-command-wired-to-runwork.json) | [`k-pg-19-1-memev-work-comma-565912`](signed/k-pg-19-1-memev-work-comma-565912.json) | memev work command wired to runWork with a production openStore (memev) | SO-1.01, SO-A-03 |
 
 ## Scope One build layer, 1 November 2026
 
@@ -217,3 +231,9 @@ round was committed. No signed file was edited and the earlier versions stay, li
 | [SO-F-10](scope-one/specs/SO-F-10.json) | [`k-so-f-10-federated-comput-46e7e6`](signed/k-so-f-10-federated-comput-46e7e6.json) | 2 | [`k-so-f-10-federated-comput-be4e45`](signed/k-so-f-10-federated-comput-be4e45.json) |
 | [SO-F-12](scope-one/specs/SO-F-12.json) | [`k-so-f-12-replication-unit-156f69`](signed/k-so-f-12-replication-unit-156f69.json) | 2 | [`k-so-f-12-replication-unit-3feee3`](signed/k-so-f-12-replication-unit-3feee3.json) |
 | [SO-F-13](scope-one/specs/SO-F-13.json) | [`k-so-f-13-cross-functional-8c65b0`](signed/k-so-f-13-cross-functional-8c65b0.json) | 2 | [`k-so-f-13-cross-functional-c6f060`](signed/k-so-f-13-cross-functional-c6f060.json) |
+
+`SO-F-03.2` supersedes the signed `SO-F-03` (owner delegation, 1 November 2026): it adds PG-04.1 as a predecessor and names the operation envelope files in its scope, and keeps every criterion. It has an interim red-team record under `scope-one/redteam/` (an interim solo review by the signer, pending independent re-review) and is signed by signer-2 (`keys/45c92c2850024872.pub`) after it, as version 1 of its own contract. The signed `SO-F-03` contracts are unchanged and the manifest records `superseded_by` on `SO-F-03`.
+
+| Spec | Contract | Title | Depends on |
+|---|---|---|---|
+| [SO-F-03.2](scope-one/specs/SO-F-03.2.json) | [`k-so-f-03-2-contribution-s-bc1be8`](signed/k-so-f-03-2-contribution-s-bc1be8.json) | Contribution signature and two-step admission, built after the operation envelope; supersedes SO-F-03 | SO-F-01, SO-F-02, PG-04.1 |
