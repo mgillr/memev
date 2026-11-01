@@ -15,9 +15,9 @@ Contracts cited by id. None is in this repository; each is held in the owner's v
 
 | Id | Status | Vault bundle and file | Cited for |
 | --- | --- | --- | --- |
-| SO-A-05 | fold contract, unsigned, proposed | `memev-fold-addendum-2026-10-30`, `set-fold/proofline.json` | the decision entity, its states, fields and rules |
-| SO-A-04 | fold contract, unsigned, proposed | same bundle and file | milestone entities, stale markers on approvals |
-| SO-A-07 | fold contract, unsigned, proposed | same bundle and file | rerouting when a resource becomes unavailable (AC04) |
+| SO-A-05 | fold contract, signed by pull request #341 | `memev-fold-addendum-2026-10-30`, `set-fold/proofline.json` | the decision entity, its states, fields and rules |
+| SO-A-04 | fold contract, signed by pull request #341 | same bundle and file | milestone entities, stale markers on approvals |
+| SO-A-07 | fold contract, signed by pull request #341 | same bundle and file | rerouting when a resource becomes unavailable (AC04) |
 | SO-03-A | signed | `memev-pi17-2026-10-29`, `set-work/proofline.json` | risk classes, approvals, the user-only gate, decision events, `pending()` |
 | SO-C-A | signed | same bundle and file | the decisions endpoint (AC04) |
 | SO-C-C | signed | same bundle and file | outstanding work (AC02), sparse notifications (AC05) |
@@ -25,7 +25,7 @@ Contracts cited by id. None is in this repository; each is held in the owner's v
 | SO-05-D | signed | same bundle and file | failed checks retry within policy, then FAILED or BLOCKED (AC05) |
 | SO-08-B | signed | same bundle and file | `recover()` and its plan: resume, reassign or ask the user (AC01) |
 
-Because SO-A-05, SO-A-04 and SO-A-07 are unsigned, what they decide is a proposal until the owner signs them. This record cites them as the intended owner and does not treat them as settled.
+Because SO-A-05, SO-A-04 and SO-A-07 are signed (pull request #341) and the fold is the build layer (owner delegation, 1 Nov 2026), this record cites them as the owner of the parts they cover.
 
 Queue states: raised, awaiting user, answered, approved, rejected, deferred, resolved. The names are fixed by the spec (`contracts/scope-one/specs/SO-1.08-decision-queue.json:16`) and by SO-A-05 AC01. The table of moves between them is not defined by either: open, needs owner decision (requirement 4).
 
@@ -86,4 +86,4 @@ Each needs an owner decision before a build contract is written. The rest of the
 6. Whether an item may be discarded, and by whom (requirement 7).
 7. The action-to-risk-class assignments and limits, and the retention of decision history (requirements 4 and 7; ADR 4 and ADR 5).
 8. The dependency mismatch between the spec, the WBS and SO-A-05 (requirement 6).
-9. SO-A-05, SO-A-04 and SO-A-07 are unsigned; the owner decides whether SO-1.08 is built against them (all requirements).
+9. Resolved: SO-A-05, SO-A-04 and SO-A-07 are signed (pull request #341) and are the build layer, so SO-1.08 is built against them (all requirements; owner delegation, 1 Nov 2026).

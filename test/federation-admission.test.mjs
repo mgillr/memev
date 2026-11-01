@@ -489,7 +489,8 @@ test('SO-F-03 AC13: no module under src/engine/federation imports child_process,
 test('SO-F-03 docs: docs/FEDERATION.md names the contribution schema and the two-step admission, and labels them planned', () => {
   const page = fs.readFileSync(path.join(PKG, 'docs/FEDERATION.md'), 'utf8');
   assert.match(page, /## Contribution and admission[\s\S]*contribution-v1\.json[\s\S]*two-step admission[\s\S]*planned/);
-  assert.match(page, /^## Status\n\nPlanned\./m);
+  assert.match(page, /^## Contribution and admission\n\nPlanned\./m);
+  assert.match(page, /^## Status\n/m);
   assert.ok(fs.existsSync(path.join(PKG, 'docs/schemas/contribution-v1.json')));
   // every field of the block is on the page
   for (const f of CONTRIBUTION_FIELDS) assert.ok(page.includes(`\`${f}\``), f);

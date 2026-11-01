@@ -31,9 +31,9 @@
   <p>Every member's computer runs Memev and the member's local AI tools, which reach it over MCP.
   The work data of all members syncs into one company vault. The company can see and search
   everything in it through the company admin console. Members keep private work outside Memev.</p>
-  <p>The organisation connects to one AI provider: either one cloud AI service or a local model the
-  organisation runs itself. The connection is over MCP. It is one provider for the whole
-  organisation, not one per member.</p>
+  <p>Members use the AI providers and tools the organisation's policy allows, cloud AI services or a
+  local model the organisation runs itself, over MCP. An organisation may restrict itself to one
+  provider by policy, with egress rules and labels (planned).</p>
   <h2>What is included</h2>
   <ul>
     <li>Everything in Personal on every computer</li>
@@ -41,8 +41,9 @@
     down to members' apps <span class="tag">planned</span></li>
     <li>A company admin console that sees and searches everything in the company vault
     <span class="tag">planned</span></li>
-    <li>One AI provider for the organisation, a cloud AI service or a local model the organisation
-    runs itself, connected over MCP <span class="tag">planned</span></li>
+    <li>A provider policy for the organisation: the AI providers and tools members may use, cloud AI
+    services or a local model the organisation runs itself, over MCP, with the option to restrict to
+    one provider <span class="tag">planned</span></li>
     <li>Merging of members' edits by the convergence engine, which lives in its own repository and
     is called as an external dependency <span class="tag">planned</span></li>
     <li>Invites from an org admin into the company vault <span class="tag">planned</span></li>
@@ -70,7 +71,7 @@
   organisation. You run the server; nothing of yours runs on a host you do not control. The vault
   server runs on your own servers, and any internal model stays inside your environment. Memev
   holds no provider keys and makes no model calls. You run the vault server in a container with
-  the image and compose file in this repository. In an air-gapped install the one AI provider is
+  the image and compose file in this repository. In an air-gapped install the provider policy names
   a model inside your environment, and only licence information passes between your install and
   ours, never vault data.</p>
   <h2>Corporate</h2>
