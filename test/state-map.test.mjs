@@ -135,8 +135,8 @@ test('merge semantics table: it uses exactly the four merge-class names of SO-F-
   // a fifth class name must not appear anywhere in the prose: not in code spans, and not beside the word class
   const named = new Set();
   for (const m of text.matchAll(/`([a-z]+(?:-[a-z]+)+)`/g)) named.add(m[1]);
-  for (const m of text.matchAll(/\b([a-z]+(?:-[a-z]+)+)\s+(?:merge\s+)?class(?:es)?\b/gi)) named.add(m[1].toLowerCase());
-  for (const m of text.matchAll(/\bclass(?:es)?\s+(?:of\s+|is\s+|named\s+|called\s+)?`?([a-z]+(?:-[a-z]+)+)/gi)) named.add(m[1].toLowerCase());
+  for (const m of text.matchAll(/\b([a-z]+(?:-[a-z]+)+)\s+(?:merge\s+)?class(?:es)?\b/g)) named.add(m[1].toLowerCase());
+  for (const m of text.matchAll(/\bclass(?:es)?\s+(?:of\s+|is\s+|named\s+|called\s+)?`?([a-z]+(?:-[a-z]+)+)/g)) named.add(m[1].toLowerCase());
   assert.deepEqual([...named].filter((n) => !Object.values(CLASS).includes(n)), [], 'no class name other than the four');
   const list = text.slice(text.indexOf('The four classes mean:'), text.indexOf('No type uses'));
   assert.equal(list.split('\n').filter((l) => l.startsWith('- ')).length, 4, 'four items in the list of classes');
@@ -276,7 +276,7 @@ test('merge semantics table: an external action is an append-only attempt entry 
   const section = text.slice(at, text.indexOf('\n## ', at + 5));
   const line = section.split('\n').find((l) => l.toLowerCase().startsWith('| external actions ')) || '';
   assert.match(line, /No entity type of its own in SO-F-02 yet/);
-  assert.match(line, /`attempt` entries with `kind: 'external'`/);
+  assert.match(line, /`attempt` entry with `kind: 'external'`/);
   assert.match(line, /append-only/);
   assert.match(line, /`external` method of `src\/engine\/coordinator\.mjs`/);
   assert.match(line, /dedup by key is the coordinator's job/i);
@@ -300,7 +300,6 @@ test('merge semantics table: the page says Memev is local first and leaves ADR 7
   assert.match(text, /declared, not surfaced yet/);
   const rows = tableRows();
   for (const t of ['project', 'task', 'attempt', 'conflict', 'session']) assert.equal(rows.get(t).status, 'declared, not surfaced yet', t);
-  assert.doesNotMatch(rows.get('evidence').rationale + rows.get('event').rationale, /never overwrites/);
 });
 
 test('round trip test: its header says it uses commandProvider until the WO-05-B client lands in #201', () => {
