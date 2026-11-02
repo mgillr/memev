@@ -4,15 +4,21 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md).
 
 You need Node 22 or newer and git.
 
-In a copy of the Memev repository:
+For a new installation, clone the repository and start with `--no-connect` so no AI
+application configuration is changed until you approve each connection:
 
 ```sh
-node bin/memev.mjs init   # or: npm install -g . && memev init
+git clone https://github.com/mgillr/memev.git
+cd memev
+npm install -g .
+memev init --no-connect
 ```
 
-`npx memev init` will work once Memev is on the npm registry (coming soon). Or ask an AI app that
-can run commands to do it: "Download the Memev repository, run `node bin/memev.mjs init` inside it,
-and show me the checklist it prints."
+Without a global command, run `node bin/memev.mjs init --no-connect` from the repository instead.
+The checksum-verifying release installers are `scripts/install.sh` (macOS/Linux) and
+`scripts/install.ps1` (Windows PowerShell). They require a published release tarball URL and its
+matching `.sha256` file; no GitHub release is published yet, so use the source install above for
+the current preview. For AI-agent setup, follow [INSTALL-FOR-AI.md](INSTALL-FOR-AI.md).
 
 `init`:
 
