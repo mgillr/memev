@@ -11,6 +11,8 @@ Coordinate people, AI systems and organisations around governed work and verifia
 
 <p><strong>Development preview — actively under development.</strong> The Free Core is available for testing; this is not yet a production release. Interfaces and behaviour may change. Business, Corporate, Federated and full distributed-convergence capabilities remain under development unless explicitly marked as available below.</p>
 
+<p><code>npm install -g . && memev init --no-connect</code></p>
+
 <p align="center">
 <img src="docs/assets/connective-infrastructure.svg" alt="Memev connects people and their work across AI providers, agents, business applications and data systems. Independent organisations retain local vaults, authority and policies while bilateral agreements allow selected work, evidence and computation to contribute to shared programme intelligence." width="900">
 </p>
@@ -24,10 +26,6 @@ Coordinate people, AI systems and organisations around governed work and verifia
 <img alt="Node 22 or newer" src="https://img.shields.io/badge/node-%3E%3D22-brightgreen">
 <img alt="Speaks MCP" src="https://img.shields.io/badge/protocol-MCP-informational">
 <img alt="No runtime dependencies" src="https://img.shields.io/badge/runtime%20dependencies-none-success">
-</p>
-
-<p>
-<code>git clone https://github.com/mgillr/memev.git && cd memev && npm install -g . && memev init --no-connect</code>
 </p>
 
 <p>
