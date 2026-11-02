@@ -17,29 +17,29 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 ## Tiers (draft)
 
 | | Personal | Personal with more computers | Business | Corporate | Federated |
-|---|---|---|---|---|
-| Price | free | $12/month or $120/year | contact us | contact us |
-| People | 1 | 1, non-transferable | contact us | contact us |
+|---|---|---|---|---|---|
+| Price | free | $12/month or $120/year | contact us | contact us | contact us |
+| People | 1 | 1, non-transferable | contact us | contact us | contact us |
 | Computers using one vault | 1 | up to 3 | contact us | contact us | contact us |
 | Participating organisations | 1 person | 1 person | 1 | 1 | multiple independent organisations |
-| Local AI apps on a computer | unlimited | unlimited | unlimited | unlimited |
-| Cloud AI connectors | 5 | 10 | based on your requirements | based on your requirements |
-| Trial | no Personal trial | no Personal trial | time-limited trial: 5 members and 10 computers, 14 days with one 14-day extension (planned), see [BUSINESS-TRIAL.md](BUSINESS-TRIAL.md) | sales-assisted pilot (planned) |
-| Vault, recall, graph, contracts, doctor, your own tunnel | ✓ | ✓ | ✓ | ✓ |
-| Backup to your own GitHub (one writer) | ✓ | ✓ | ✓ | ✓ |
-| One memory for every AI app, and the comms bus between them | ✓ | ✓ | ✓ | ✓ |
-| Several computers on one vault over the secure link, provenance | | ✓ | ✓ | ✓ |
-| Automatic merge when several computers edit at once (crdt-merge) | | planned | planned | planned |
-| Hosted end-to-end encrypted sync between computers | | planned | | planned, or self-hosted |
-| Hosted encrypted backup and a stable relay address | | planned | | planned, or self-hosted |
-| Member keys: one key per person, covering their computers | | | planned | planned |
-| One company vault that all members' work data syncs into, with an admin console that sees and searches it | | | planned | planned |
-| Provider policy: restrict to one provider, egress rules | | | planned | planned |
-| Company server, departments and roles from an org chart | | | planned | planned |
-| Sign-in with Google Workspace or Microsoft Entra ID | | | planned | planned |
-| Rules for what reaches the AI provider, egress log | | | planned | planned |
-| SCIM, SIEM and audit export, retention, legal hold, high availability | | | | planned | planned |
-| Multiple sites within one organisation | | | service-scoped, planned | planned | as agreed for participants |
+| Local AI apps on a computer | unlimited | unlimited | unlimited | unlimited | unlimited within each participant's policy |
+| Cloud AI connectors | 5 | 10 | based on your requirements | based on your requirements | based on participant and workload requirements |
+| Trial | no Personal trial | no Personal trial | time-limited Business trial (planned) | sales-assisted pilot (planned) | scoped multi-party pilot (planned; no offer until acceptance criteria pass) |
+| Vault, recall, graph, contracts, doctor, your own tunnel | ✓ | ✓ | planned | planned | planned per participant |
+| Backup to your own GitHub (one writer) | ✓ | ✓ | planned | planned | participant-controlled backup policy (planned) |
+| One memory for every AI app, and the comms bus between them | ✓ | ✓ | planned | planned | local memory per participant plus scoped inter-node communications (planned) |
+| Several computers on one vault over the secure link, provenance | | ✓ | planned | planned | per-node device model (planned) |
+| Automatic merge when several computers edit at once (crdt-merge) | | planned | planned | planned | planned for supported replicated state |
+| Hosted end-to-end encrypted sync between computers | | planned | | planned, or self-hosted | deployment-specific; no shared global vault |
+| Hosted encrypted backup and a stable relay address | | planned | | planned, or self-hosted | participant-controlled or agreed relay services (planned) |
+| Member keys: one key per person, covering their computers | | | planned | planned | participant identity and node keys (planned) |
+| One company vault that all members' work data syncs into, with an admin console that sees and searches it | | | planned | planned | no: each organisation retains its own vault and authority |
+| Provider policy: restrict to one provider, egress rules | | | planned | planned | each participant governs its own provider and egress policy |
+| Company server, departments and roles from an org chart | | | planned | planned | each participant controls its own organisation and roles |
+| Sign-in with Google Workspace or Microsoft Entra ID | | | planned | planned | participant-specific identity integration (planned) |
+| Rules for what reaches the AI provider, egress log | | | planned | planned | local policy and auditable cross-org exchange (planned) |
+| SCIM, SIEM and audit export, retention, legal hold, high availability | | | | planned | participant-specific and federation-level operational controls (planned) |
+| Multiple sites within one organisation | | | service-scoped, planned | planned | supported where participants need multi-site nodes |
 | Bilateral cross-organisation trust and scoped work exchange | | | | | planned |
 | Cross-organisation programme and portfolio intelligence | | | | | planned |
 | Federated computation across independent participants | | | | planned | planned, workload-specific |
