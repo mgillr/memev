@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
+<title id="title">Memev connection registry</title>
+<desc id="desc">Memev's connection registry provides discovery, configuration, identity, permissions, health and lifecycle management across AI providers, memory providers, agent platforms and business services. Common communications and context interfaces enable inference, business intelligence and data sovereignty under consistent access and exchange rules.</desc>
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4f7fb"/><stop offset="1" stop-color="#e8eff6"/></linearGradient>
+ <linearGradient id="core" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#132b45"/><stop offset="1" stop-color="#315c80"/></linearGradient>
+ <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="7" stdDeviation="10" flood-color="#18344d" flood-opacity=".12"/></filter>
+ <style>
+ .h{font:700 34px system-ui,-apple-system,Segoe UI,sans-serif;fill:#172f46}.subhead{font:17px system-ui,-apple-system,Segoe UI,sans-serif;fill:#536a7d}
+ .cardtitle{font:700 23px system-ui,-apple-system,Segoe UI,sans-serif;fill:#19344c}.body{font:17px system-ui,-apple-system,Segoe UI,sans-serif;fill:#506579}
+ .coretitle{font:700 31px system-ui,-apple-system,Segoe UI,sans-serif;fill:#fff}.corebody{font:18px system-ui,-apple-system,Segoe UI,sans-serif;fill:#e6f0f8}
+ .eyebrow{font:700 14px system-ui,-apple-system,Segoe UI,sans-serif;letter-spacing:2px;fill:#60788d}
+ .foot{font:600 16px system-ui,-apple-system,Segoe UI,sans-serif;fill:#34516a}
+ .link{stroke:#89a2b7;stroke-width:3;fill:none;stroke-linecap:round}
+ .card{fill:#fff;stroke:#cfdae4;stroke-width:2}
+ </style>
+</defs>
+<rect width="1440" height="900" rx="30" fill="url(#bg)"/>
+<text x="720" y="55" text-anchor="middle" class="eyebrow">THE CONNECTIVE INFRASTRUCTURE FOR AI</text>
+<text x="720" y="101" text-anchor="middle" class="h">Memev connection registry</text>
+<text x="720" y="134" text-anchor="middle" class="subhead">Discovery · configuration · identity · permissions · health · lifecycle</text>
+<g class="link">
+ <path d="M720 310 V350"/><path d="M355 310 L515 382"/><path d="M1085 310 L925 382"/>
+ <path d="M355 550 L515 480"/><path d="M1085 550 L925 480"/>
+ <path d="M720 525 V605"/>
+</g>
+<g filter="url(#shadow)">
+ <rect class="card" x="95" y="180" width="520" height="165" rx="22"/>
+ <rect class="card" x="825" y="180" width="520" height="165" rx="22"/>
+ <rect class="card" x="95" y="515" width="520" height="165" rx="22"/>
+ <rect class="card" x="825" y="515" width="520" height="165" rx="22"/>
+ <rect x="475" y="350" width="490" height="175" rx="26" fill="url(#core)"/>
+ <rect x="220" y="730" width="1000" height="100" rx="20" fill="#fff" stroke="#b9cad8" stroke-width="2"/>
+</g>
+<g>
+ <text x="135" y="228" class="cardtitle">AI providers</text>
+ <text x="135" y="264" class="body">Models, inference, sessions, capabilities and tools</text>
+ <text x="135" y="296" class="body">Hosted and local inference · routing · model choice</text>
+ <text x="865" y="228" class="cardtitle">Memory providers</text>
+ <text x="865" y="264" class="body">Read, write, search, update and provenance</text>
+ <text x="865" y="296" class="body">Personal stores · vector systems · knowledge graphs</text>
+ <text x="135" y="563" class="cardtitle">Agent platforms</text>
+ <text x="135" y="599" class="body">Runtimes, tasks, handoffs and status</text>
+ <text x="135" y="631" class="body">Frameworks · tools · autonomous and human-led agents</text>
+ <text x="865" y="563" class="cardtitle">Business services</text>
+ <text x="865" y="599" class="body">CRM, ERP, collaboration and development systems</text>
+ <text x="865" y="631" class="body">Operational data · workflows · enterprise applications</text>
+</g>
+<g text-anchor="middle">
+ <text x="720" y="410" class="coretitle">Common Memev interfaces</text>
+ <text x="720" y="449" class="corebody">Shared communications and context</text>
+ <text x="720" y="482" class="corebody">Consistent identity, access and exchange rules</text>
+ <text x="720" y="770" class="cardtitle">Business intelligence and inference</text>
+ <text x="720" y="801" class="body">Connect operational data to analysis, insight, decision support and model inference</text>
+</g>
+<rect x="95" y="850" width="1250" height="34" rx="10" fill="#dce7f0"/>
+<text x="720" y="873" text-anchor="middle" class="foot">Data sovereignty and governance across every connection: ownership · residency · policy · permissions · audit · provenance</text>
+<text x="720" y="710" text-anchor="middle" class="subhead">One consistent connection layer — from personal systems to teams and federated organisations</text>
+</svg>
