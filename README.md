@@ -100,7 +100,7 @@ Memev grows by the scope of coordination required. The first four tiers serve an
 | **Personal with more computers** | One person, up to 3 computers | The same personal vault and AI context across the person's computers | $12/month or $120/year (CHF 10 or CHF 100), early-supporter price; available for current capabilities |
 | **Business** | One organisation, initially one node | Connect members, AI tools and company work under organisational identity, policy and administration | Contact us; planned |
 | **Corporate** | One large organisation, multiple sites and jurisdictions | Coordinate departments, programmes and portfolios across independently operated sites within one corporate trust domain | Contact us; planned |
-| **Federated** | Multiple independent organisations | Connect customers, suppliers, partners, contractors, research institutions and public/private participants around shared programmes, projects, evidence and computation | Contact us; planned |
+| [**Federated**](docs/tiers/federated.md) | Multiple independent organisations | Connect customers, suppliers, partners, contractors, research institutions and public/private participants around shared programmes, projects, evidence and computation | Contact us; planned |
 
 Business and Corporate describe coordination inside one organisation. **Federated is a distinct fifth tier** for coordination between organisations that retain separate ownership, operators, trust roots, policies and legal responsibilities. It is not a requirement to merge participants into one company vault.
 
@@ -108,7 +108,7 @@ The Federated tier is intended to include scoped federation membership, bilatera
 
 **Availability is not implied by the tier name.** The Federated tier is a product and commercial target, not a currently purchasable or operational service. Node-to-node transport, cross-organisation admission, trust exchange, sovereign policy enforcement, federated reasoning and computation require implementation and end-to-end validation. See [Federation](docs/FEDERATION.md), [Data sovereignty](docs/DATA-SOVEREIGNTY.md), [Federated computation](docs/FEDERATED-COMPUTATION.md) and [pricing](docs/PRICING.md).
 
-The tier names in the app and licence tooling today still cover the current Personal and Personal-with-more-computers offers. Business, Corporate and Federated licensing, entitlements and service delivery must be implemented before those tiers are sold. The free core remains free ([CHARTER.md](CHARTER.md)).
+Business and Corporate are recognised by the licence metadata but their services remain planned. Federated is listed in the product catalogue, while licence issuance is deliberately disabled until its service entitlements and acceptance criteria are implemented. No cross-organisation capability is implied to be operational. The free core remains free ([CHARTER.md](CHARTER.md)).
 ## How it fits together
 
 Memev is the connective layer between people, their work, the systems they use and the AI capabilities they authorise. The illustration shows the intended product boundary: Memev connects existing systems and relates their work; it is not itself the model provider, memory vendor, agent framework, CRM, ERP or business application.
