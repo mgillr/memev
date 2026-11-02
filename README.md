@@ -222,7 +222,7 @@ The repository also contains checksum-verifying installers:
 After a tagged release is published, download its `memev-X.Y.Z.tgz` asset and matching `.sha256` file from [GitHub Releases](https://github.com/mgillr/memev/releases), then run the installer with the release tarball URL:
 
 ```sh
-bash scripts/install.sh "https://github.com/mgillr/memev/releases/download/vX.Y.Z/memev-X.Y.Z.tgz"
+bash scripts/install.sh "https://github.com/mgillr/memev/releases/download/vX.Y.Z/memev-X.Y.Z.tgz" --no-connect
 ```
 
 PowerShell:
@@ -231,7 +231,7 @@ PowerShell:
 .\scripts\install.ps1 "https://github.com/mgillr/memev/releases/download/vX.Y.Z/memev-X.Y.Z.tgz"
 ```
 
-The installer fetches the checksum file beside the tarball, verifies SHA-256 before extraction, uses Node 22+ already on the machine or downloads the pinned Node runtime with its own SHA-256 verification, then runs setup. Replace `X.Y.Z` with a real published version; the example is not a live download URL.
+The installer fetches the checksum file beside the tarball, verifies SHA-256 before extraction, uses Node 22+ already on the machine or downloads the pinned Node runtime with its own SHA-256 verification, then runs setup. The `--no-connect` argument is passed to `memev init`, so client configuration remains untouched until the user approves individual connections. Replace `X.Y.Z` with a real published version; the example is not a live download URL.
 
 **Release status:** no GitHub release has been published yet. Until the first tagged release and its tarball/checksum assets exist, use the repository installation in section 1. The installer scripts are present in the repository, but they do not contain a built-in release URL.
 
