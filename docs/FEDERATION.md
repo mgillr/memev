@@ -357,13 +357,7 @@ forwarded revocation notice is applied only on the authority of the notice's own
 
 ## Relationship to the tiers
 
-See [tiers](tiers/README.md). The four tiers stand: Personal remains local-first and complete;
-Personal with more computers extends the same vault to the person's other computers; Business is
-one company vault that members' work data syncs into (coming), the one-node case and the first
-release; Corporate is the same model at larger scale with stricter control (coming). Federation
-across sites, and federated computation on top of it, are planned capabilities of Corporate, and
-of a Business licence whose services list includes the multi-site federation design
-([tiers/services.md](tiers/services.md)). Federation is not a tier and not a different core.
+See [tiers](tiers/README.md). Personal remains local-first and complete; Personal with more computers extends the same vault across the person's computers; Business serves one organisation with an initial one-node company vault; Corporate extends that organisation across sites and jurisdictions; and **Federated** connects independent organisations through explicit bilateral agreements. Federation is part of the Corporate target for multi-site operation and is the defining capability of the fifth Federated tier for cross-organisation networks. It extends the same core; it is not a separate core.
 
 ## Acceptance criteria for a federation implementation
 
