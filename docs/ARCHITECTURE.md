@@ -207,11 +207,7 @@ Details: [tiers/corporate.md](tiers/corporate.md).
 Nothing in this section is built. The architectural target is a federation of independently
 operated site nodes: each site owns its node and its memory, sites converge the state they are
 authorised to share through the convergence engine under its contract, and no central coordinator
-sequences ordinary updates. The company vault and the main corporate vault above are the one-node
-case of that target, and the one-node case is what the first Business release ships. Federation
-across sites, and federated computation on top of it, are planned capabilities of Corporate, and
-of a Business licence whose services list includes the multi-site federation design
-([tiers/services.md](tiers/services.md)); they are not a tier.
+sequences ordinary updates. The company vault is the one-node Business case. Corporate extends federation across sites within one organisation; Business may scope a multi-site service. The separate Federated tier connects independent organisations through bilateral, scoped agreements.
 
 ```mermaid
 flowchart LR
@@ -270,12 +266,13 @@ keys, no grants, mounts or mixing
 
 ## Where each tier is documented
 
-| | Personal | Business | Corporate |
+| | Personal | Business | Corporate | Federated |
 |---|---|---|---|
-| Overview | [tiers/free.md](tiers/free.md) | [tiers/business.md](tiers/business.md) | [tiers/corporate.md](tiers/corporate.md) |
-| Price and licence | [PRICING.md](PRICING.md) | contact us | contact us |
-| Services | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) |
-| Several sites (planned) | | with the multi-site federation design in [tiers/services.md](tiers/services.md): [FEDERATION.md](FEDERATION.md) | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) |
+| Overview | [tiers/free.md](tiers/free.md) | [tiers/business.md](tiers/business.md) | [tiers/corporate.md](tiers/corporate.md) | [FEDERATION.md](FEDERATION.md) |
+| Price and licence | [PRICING.md](PRICING.md) | contact us | contact us | contact us |
+| Services | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) |
+| Several sites (planned) | | service-scoped option | [FEDERATION.md](FEDERATION.md) | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) | [FEDERATION.md](FEDERATION.md) |
+| Independent organisations | | | | | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) |
 
 
 ### Federated tier (planned)
