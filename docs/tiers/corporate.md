@@ -137,3 +137,8 @@ All data can stay inside your network, and in the air-gapped package nothing lea
 cloud AI service, what is sent to it is out of Memev's control once sent; rules decide what may
 go, and the SIEM records what did. Only licence information passes between your install and ours,
 never vault data.
+
+
+## Independent organisations: the Federated tier
+
+Corporate is for sites, departments and jurisdictions within one organisation. Where the work crosses into suppliers, customers, research institutions, contractors or other independent organisations, the separate fifth **Federated** tier provides the intended commercial and governance model. Each organisation retains its own node, vault, trust root, policies and legal responsibilities, and shares only what bilateral agreements and local policy permit. See [FEDERATION.md](../FEDERATION.md) and [Federated computation](../FEDERATED-COMPUTATION.md). This is planned, not shipped end to end.
