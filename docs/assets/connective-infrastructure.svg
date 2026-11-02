@@ -1,72 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1050" viewBox="0 0 1440 1050" role="img" aria-labelledby="title desc">
-<title id="title">Memev connects work to organisational intelligence</title>
-<desc id="desc">People do work across AI applications, agent platforms, business systems and data services. Authorised work flows into governed personal, team and site vaults and an evidence-linked Memev brain. Permissioned AI and business-intelligence systems analyse cross-project effects and produce organisational insight, while identity, provenance, access policy and data sovereignty govern every exchange.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1180" viewBox="0 0 1600 1180" role="img" aria-labelledby="title desc">
+<title id="title">Memev connects work and intelligence across independent organisations</title>
+<desc id="desc">People, AI agents, business applications and data systems contribute authorised work to independent organisation nodes. Each node keeps its own vault, authority, policies and trust root. Bilateral federated relationships connect only approved work, evidence, programme context and computation. Authorised AI and analytics produce cross-organisation insight under sovereignty and provenance controls.</desc>
 <defs>
  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4f7fb"/><stop offset="1" stop-color="#e8eff6"/></linearGradient>
  <linearGradient id="core" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#132b45"/><stop offset="1" stop-color="#315c80"/></linearGradient>
- <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="6" stdDeviation="9" flood-color="#18344d" flood-opacity=".12"/></filter>
+ <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#18344d" flood-opacity=".12"/></filter>
  <style>
  .h{font:700 34px system-ui,-apple-system,Segoe UI,sans-serif;fill:#172f46}.sub{font:17px system-ui,-apple-system,Segoe UI,sans-serif;fill:#536a7d}
- .ct{font:700 21px system-ui,-apple-system,Segoe UI,sans-serif;fill:#19344c}.body{font:16px system-ui,-apple-system,Segoe UI,sans-serif;fill:#506579}
- .coretitle{font:700 30px system-ui,-apple-system,Segoe UI,sans-serif;fill:#fff}.corebody{font:17px system-ui,-apple-system,Segoe UI,sans-serif;fill:#e6f0f8}
- .eyebrow{font:700 14px system-ui,-apple-system,Segoe UI,sans-serif;letter-spacing:2px;fill:#60788d}.foot{font:600 15px system-ui,-apple-system,Segoe UI,sans-serif;fill:#34516a}
+ .ct{font:700 20px system-ui,-apple-system,Segoe UI,sans-serif;fill:#19344c}.body{font:15px system-ui,-apple-system,Segoe UI,sans-serif;fill:#506579}
+ .coretitle{font:700 27px system-ui,-apple-system,Segoe UI,sans-serif;fill:#fff}.corebody{font:16px system-ui,-apple-system,Segoe UI,sans-serif;fill:#e6f0f8}
+ .eyebrow{font:700 14px system-ui,-apple-system,Segoe UI,sans-serif;letter-spacing:2px;fill:#60788d}
  .card{fill:#fff;stroke:#cfdae4;stroke-width:2}.line{stroke:#89a2b7;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+ .dash{stroke:#64839d;stroke-width:3;stroke-dasharray:9 8;fill:none}
  </style>
 </defs>
-<rect width="1440" height="1050" rx="28" fill="url(#bg)"/>
-<text x="720" y="48" text-anchor="middle" class="eyebrow">THE CONNECTIVE INFRASTRUCTURE FOR AI</text>
-<text x="720" y="91" text-anchor="middle" class="h">From people's work to organisational intelligence</text>
-<text x="720" y="122" text-anchor="middle" class="sub">Connect the systems. Govern the work. Understand the whole.</text>
+<rect width="1600" height="1180" rx="28" fill="url(#bg)"/>
+<text x="800" y="48" text-anchor="middle" class="eyebrow">THE CONNECTIVE INFRASTRUCTURE FOR AI</text>
+<text x="800" y="91" text-anchor="middle" class="h">From people's work to industry-wide intelligence</text>
+<text x="800" y="122" text-anchor="middle" class="sub">Connect the systems. Govern the work. Coordinate across organisational boundaries.</text>
 <g filter="url(#shadow)">
- <rect class="card" x="65" y="160" width="310" height="155" rx="18"/>
- <rect class="card" x="405" y="160" width="310" height="155" rx="18"/>
- <rect class="card" x="745" y="160" width="310" height="155" rx="18"/>
- <rect class="card" x="1085" y="160" width="290" height="155" rx="18"/>
- <rect x="220" y="405" width="1000" height="235" rx="24" fill="url(#core)"/>
- <rect class="card" x="95" y="735" width="560" height="150" rx="20"/>
- <rect class="card" x="785" y="735" width="560" height="150" rx="20"/>
- <rect x="95" y="920" width="1250" height="72" rx="16" fill="#dce7f0"/>
+ <rect class="card" x="65" y="160" width="340" height="145" rx="18"/><rect class="card" x="440" y="160" width="340" height="145" rx="18"/><rect class="card" x="815" y="160" width="340" height="145" rx="18"/><rect class="card" x="1190" y="160" width="345" height="145" rx="18"/>
+ <rect x="75" y="365" width="455" height="250" rx="22" fill="#fff" stroke="#9eb2c3" stroke-width="2"/><rect x="572" y="365" width="456" height="250" rx="22" fill="#fff" stroke="#9eb2c3" stroke-width="2"/><rect x="1070" y="365" width="455" height="250" rx="22" fill="#fff" stroke="#9eb2c3" stroke-width="2"/>
+ <rect x="235" y="715" width="1130" height="220" rx="24" fill="url(#core)"/><rect class="card" x="95" y="980" width="680" height="115" rx="18"/><rect class="card" x="825" y="980" width="680" height="115" rx="18"/>
 </g>
 <g>
- <text x="95" y="202" class="ct">People and their work</text>
- <text x="95" y="238" class="body">Plans · documents · decisions</text>
- <text x="95" y="266" class="body">Tasks · schedules · budgets</text>
- <text x="95" y="294" class="body">Specifications · delivery updates</text>
- <text x="435" y="202" class="ct">AI providers and agents</text>
- <text x="435" y="238" class="body">Models · inference · sessions</text>
- <text x="435" y="266" class="body">Agent runtimes · tools · handoffs</text>
- <text x="435" y="294" class="body">AI applications contribute and consume</text>
- <text x="775" y="202" class="ct">Business applications</text>
- <text x="775" y="238" class="body">CRM · ERP · finance · procurement</text>
- <text x="775" y="266" class="body">Engineering · development · operations</text>
- <text x="775" y="294" class="body">Collaboration · project systems</text>
- <text x="1115" y="202" class="ct">Data and memory</text>
- <text x="1115" y="238" class="body">Knowledge stores · databases</text>
- <text x="1115" y="266" class="body">Analytics · business intelligence</text>
- <text x="1115" y="294" class="body">References · permitted data views</text>
-</g>
-<g class="line">
- <path d="M220 315 V360 H720 V405"/>
- <path d="M560 315 V405"/>
- <path d="M900 315 V360 H720"/>
- <path d="M1230 315 V360 H720"/>
- <path d="M720 640 V690 H375 V735"/>
- <path d="M720 690 H1065 V735"/>
+ <text x="95" y="202" class="ct">People and their work</text><text x="95" y="238" class="body">Plans · documents · decisions · tasks</text><text x="95" y="266" class="body">Schedules · budgets · specifications</text>
+ <text x="470" y="202" class="ct">AI providers and agents</text><text x="470" y="238" class="body">Models · inference · sessions · tools</text><text x="470" y="266" class="body">Contribute work and consume context</text>
+ <text x="845" y="202" class="ct">Business applications</text><text x="845" y="238" class="body">CRM · ERP · finance · procurement</text><text x="845" y="266" class="body">Engineering · operations · collaboration</text>
+ <text x="1220" y="202" class="ct">Data and memory systems</text><text x="1220" y="238" class="body">Knowledge stores · databases · BI</text><text x="1220" y="266" class="body">References · permitted data views</text>
 </g>
 <g text-anchor="middle">
- <text x="720" y="455" class="coretitle">Memev vaults + shared brain</text>
- <text x="720" y="495" class="corebody">Governed personal · team · company · site context</text>
- <text x="720" y="535" class="corebody">Work graph: people · projects · programmes · portfolios</text>
- <text x="720" y="575" class="corebody">Decisions · dependencies · risks · evidence · provenance</text>
- <text x="720" y="612" class="corebody">Discovery · identity · permissions · health · lifecycle</text>
- <text x="375" y="780" class="ct">Authorised AI and analytical systems</text>
- <text x="375" y="817" class="body">Inference · comparison · forecasting · decision support</text>
- <text x="375" y="848" class="body">Cross-functional reasoning with evidence and uncertainty</text>
- <text x="1065" y="780" class="ct">Organisational and executive insight</text>
- <text x="1065" y="817" class="body">Project state · programme health · portfolio risks</text>
- <text x="1065" y="848" class="body">Clashes · dependencies · owners · actions required</text>
- <text x="720" y="950" class="ct">Governed at every boundary: ownership · residency · purpose · permissions · audit · provenance</text>
- <text x="720" y="977" class="body">Source data can remain at its site; only authorised references, views, results or state are shared</text>
+ <text x="302" y="405" class="ct">Organisation A</text><text x="302" y="438" class="body">Local node · private vault · own policy</text><text x="302" y="475" class="body">People · projects · systems · AI</text><text x="302" y="512" class="body">Independent operator and trust root</text><text x="302" y="566" class="body">Only authorised contributions leave</text>
+ <text x="800" y="405" class="ct">Organisation B</text><text x="800" y="438" class="body">Local node · private vault · own policy</text><text x="800" y="475" class="body">People · projects · systems · AI</text><text x="800" y="512" class="body">Independent operator and trust root</text><text x="800" y="566" class="body">Only authorised contributions leave</text>
+ <text x="1297" y="405" class="ct">Organisation C</text><text x="1297" y="438" class="body">Local node · private vault · own policy</text><text x="1297" y="475" class="body">People · projects · systems · AI</text><text x="1297" y="512" class="body">Independent operator and trust root</text><text x="1297" y="566" class="body">Only authorised contributions leave</text>
 </g>
-<text x="720" y="710" text-anchor="middle" class="sub">Work flows in · context is related · intelligence flows back</text>
+<g class="dash"><path d="M530 490 H572"/><path d="M1028 490 H1070"/><path d="M302 615 V670 H800 V715"/><path d="M800 615 V715"/><path d="M1297 615 V670 H800"/></g>
+<g text-anchor="middle">
+ <text x="800" y="760" class="coretitle">Memev federated coordination and shared programme context</text><text x="800" y="802" class="corebody">Bilateral trust · scoped work exchange · evidence · dependencies · commitments</text><text x="800" y="842" class="corebody">Distributed programme view; participants retain source authority</text><text x="800" y="882" class="corebody">Authorised AI analysis · workload-specific computation · accountable findings</text>
+ <text x="435" y="1025" class="ct">Cross-organisation intelligence</text><text x="435" y="1060" class="body">Programme health · supply-chain dependencies · risks · changes · actions</text>
+ <text x="1165" y="1025" class="ct">Sovereignty and trust at every boundary</text><text x="1165" y="1060" class="body">Ownership · jurisdiction · purpose · permissions · audit · provenance</text>
+</g>
+<g class="line"><path d="M235 305 V335 H302 V365"/><path d="M610 305 V335 H800 V365"/><path d="M985 305 V335 H1297 V365"/><path d="M1360 305 V345 H1297 V365"/><path d="M800 935 V958 H435 V980"/><path d="M800 958 H1165 V980"/></g>
+<text x="800" y="1140" text-anchor="middle" class="sub">No shared global vault · no transitive trust · no central ownership of participant data</text>
 </svg>

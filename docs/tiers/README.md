@@ -1,43 +1,32 @@
 # Tiers: how each one is set up
 
-Part of the [Memev documentation](../README.md). Up: the [README](../../README.md). Charts for all
-three tiers: [ARCHITECTURE.md](../ARCHITECTURE.md#the-three-tiers).
+Part of the [Memev documentation](../README.md). Up: the [README](../../README.md). Architecture overview: [ARCHITECTURE.md](../ARCHITECTURE.md#personal-business-and-corporate).
 
-> **DRAFT.** Packages and services on these pages are proposals, not offers. A licence sets one
-> thing, how many computers can join a vault ([CHARTER.md](../../CHARTER.md)). The Memev core is
-> free. Personal with more computers has a set price. Business and Corporate are coming and have no
-> public price: contact us. See [PRICING.md](../PRICING.md).
+> **DRAFT.** Packages and services on these pages are proposals, not offers. The Memev core is free;
+> Personal with more computers has a set price. Business, Corporate and the fifth **Federated** tier
+> are planned contact-us offers. Licence and service entitlements for those tiers require implementation.
+> See [PRICING.md](../PRICING.md).
 
-The tier decision of 31 October 2026 ([DECISIONS.md](../scope-one/DECISIONS.md)): the free core, Personal at
-$12/month or $120/year for up to 3 computers, and contact us for anything above. There is no Federated tier.
-The columns below keep the names the app and the licence use today: Personal is the free core, and
-Personal with more computers is the paid Personal tier. Business and Corporate are the contact-us tiers.
+The owner explicitly superseded the 31 October tier decision on 2 November 2026: the four existing offers remain, and **Federated is added as a fifth named tier** for cross-organisation networks. The original decision remains in the record as historical context; the superseding decision is appended in [DECISIONS.md](../scope-one/DECISIONS.md).
 
-There are four columns: Personal (one computer), Personal with more computers, Business and Corporate.
-There is no Team tier. Teammates belong on the business side: an org admin invites members into the
-company vault.
+There are five tiers: Personal (one computer), Personal with more computers, Business, Corporate and Federated. Business and Corporate are recognised by the licence metadata but their services remain planned. Federated appears in the product catalogue and upgrade plan, but the licence issuer deliberately refuses it until its service entitlements and acceptance criteria are implemented.
 
-| | [Personal](free.md) | [Personal with more computers](free.md#personal-with-more-computers-draft) | [Business](business.md) | [Corporate](corporate.md) |
-|---|---|---|---|---|
-| For | one person, one computer at a time | one person, several computers at once | a company: all members' work data in one company vault that the company can see and search | the same model as Business, at larger scale, with one main corporate vault |
-| How it is counted | one computer | up to 3 computers | contact us | contact us |
-| Where Memev runs | your computer, backed up to your own GitHub | your computers | a server in your office or your cloud account, or cloud-hosted on a host the operator manages ([deploy-cloud.md](../deploy-cloud.md), [deploy-on-prem.md](../deploy-on-prem.md); both coming) | your data centre or private cloud, more than one server (coming) |
-| Who can see what | you | you | the company, through the admin console, sees and searches everything in the company vault (coming) | the same, plus your identity provider's groups (coming) |
-| AI apps and models | several cloud AI apps side by side (Claude, ChatGPT; more coming soon) and local coding tools via MCP | the same, on each computer | the AI providers and tools the organisation's policy allows, cloud AI services or an on-premises LLM, over MCP; a policy may restrict the organisation to one provider (planned) | the same, with an air-gapped on-premises option (coming) |
-| Two computers | one at a time: you switch computers through your own GitHub. Git sync is single-writer backup, so a second computer that pushes gets a warning that concurrent edits can conflict | at once: edit on two machines, nothing to resolve. The crdt-merge convergence engine, in its own repository and called as an external dependency, does the merging (planned) | coming | coming |
-| Several sites | | | one company vault is the first release; several sites come with the multi-site federation design in [services.md](services.md) (planned; [FEDERATION.md](../FEDERATION.md)) | federation of independently operated site nodes, and federated computation on top of it (planned; [FEDERATION.md](../FEDERATION.md), [FEDERATED-COMPUTATION.md](../FEDERATED-COMPUTATION.md)) |
-| Price | free | $12/month or $120/year, early-supporter price | contact us | contact us |
-| Trial | no Personal trial | no Personal trial | time-limited trial: 5 members and 10 computers, 14 days with one 14-day extension; self-serve for hosted AI providers or a mix, a sales-assisted pilot for on-premises, air-gapped or compliance-led organisations (planned); the terms: [BUSINESS-TRIAL.md](../BUSINESS-TRIAL.md) | a sales-assisted pilot (planned) |
-| Setup | you, in minutes | you, in minutes on each computer | remote, 2 to 4 weeks | remote or onsite, 6 to 12 weeks |
-| Support | GitHub issues | priority support | business hours by priority (support plan quoted with the tier) | named or embedded engineer |
-| Status | built | built; the convergence engine, hosted sync, backup and relay planned | coming | coming |
+| | [Personal](free.md) | [Personal with more computers](free.md#personal-with-more-computers-draft) | [Business](business.md) | [Corporate](corporate.md) | [Federated](federated.md) |
+|---|---|---|---|---|---|
+| For | one person, one computer at a time | one person, several computers at once | one organisation; one company vault | one organisation across multiple sites and jurisdictions | multiple independent organisations working together |
+| How it is counted | one computer | up to 3 computers | contact us | contact us | contact us; participant organisations and scope |
+| Where Memev runs | your computer, backed up to your own GitHub | your computers | company server or managed host (coming) | data centre or private cloud, multiple sites (coming) | participant-controlled nodes and approved federation services (planned) |
+| Who can see what | you | you | company members and administrators under company policy (coming) | corporate roles and site policies (coming) | only what each participant's agreement and local policy permits (planned) |
+| AI apps and models | supported cloud AI apps and local coding tools via MCP | same, on each computer | providers and tools allowed by organisation policy | same, including on-premises/air-gapped option | each participant chooses permitted providers; cross-org context is policy-scoped |
+| Two computers | one at a time; git backup is single-writer | simultaneous multi-computer merge planned | coming | coming | per-node convergence and state exchange planned |
+| Several sites | | | one company vault is first release; multi-site service can be scoped | independently operated sites within one organisation (planned) | multiple autonomous organisations with bilateral federation agreements (planned) |
+| Price | free | $12/month or $120/year, early-supporter price | contact us | contact us | contact us |
+| Trial | no Personal trial | no Personal trial | Business trial planned | sales-assisted pilot planned | scoped pilot planned; no offer until acceptance criteria pass |
+| Setup | you, in minutes | you, in minutes on each computer | remote, 2 to 4 weeks | remote or onsite, 6 to 12 weeks | multi-party discovery, policy and integration plan; scoped |
+| Support | GitHub issues | priority support | business-hours support | named or embedded engineer | agreed federation operations and support model |
+| Status | built | built for current capabilities; convergence and hosted services planned | coming | coming | planned; not operational end to end |
 
-Business and Corporate are one model at two scales. Every member's computer syncs its work data into
-one vault: the company vault for Business, the main corporate vault for Corporate. The company sees
-and searches everything in it, and company knowledge comes down to each member's apps. Every tier is
-provider-neutral: members use the AI providers and tools the organisation's policy allows, and an
-organisation may restrict itself to one provider by policy, with egress rules and labels (planned).
-Members keep private work outside Memev. Both are marked coming.
+Business and Corporate address work within one organisation: Business begins with one company node; Corporate extends that organisation across sites, programmes and jurisdictions. Federated is different: participants remain independent organisations with separate authorities, and share only what their bilateral agreements and local policies permit. Every tier is provider-neutral. Members use the AI providers and tools their organisation's policy allows. All three organisational tiers are planned.
 
 The paid parts all rest on one engine, crdt-merge, which is not in this repository:
 see [CONVERGENCE.md](../CONVERGENCE.md).
@@ -54,10 +43,7 @@ authorised to share through the convergence engine under its contract, and no ce
 sequences ordinary updates. The company vault and the main corporate vault above are the one-node
 case of that target, and the one-node case is what the first Business release ships.
 
-Federation across sites, and federated computation on top of it, are planned capabilities of
-Corporate, and of a Business licence whose services list includes the multi-site federation design
-([services.md](services.md)). They are not a tier: the four tiers stand,
-and the planned rows in the tables on this page are where they appear. The trust service and the
+Corporate covers federation across sites within one organisation. Business may separately scope a multi-site service. Cross-organisation federation is the fifth tier, Federated, and is not interchangeable with either of those offers. The trust service and the
 admission service that the federation pages name are planned adapter boundaries beside the merge
 boundary ([EXTENSION-POINTS.md](../EXTENSION-POINTS.md)). The pages:
 [FEDERATION.md](../FEDERATION.md), [ORGANISATIONAL-INTELLIGENCE.md](../ORGANISATIONAL-INTELLIGENCE.md),
@@ -120,8 +106,8 @@ copied outside Memev.
 | High-availability servers, air-gapped package | planned | |
 | SIEM and audit export, retention rules, legal hold | planned | |
 | Project state machine | planned | the code is present in `src/engine/project-state.mjs` and nothing imports it yet ([PROJECTS.md](../PROJECTS.md)) |
-| Federation of independently operated site nodes | planned | Corporate, and a Business licence whose services list includes the multi-site federation design ([services.md](services.md)); the company vault is the one-node case and the first release ([FEDERATION.md](../FEDERATION.md)) |
-| Federated computation across sites | planned | Corporate, and a Business licence whose services list includes the multi-site federation design; workload-specific algorithms, the engine converges supported state only ([FEDERATED-COMPUTATION.md](../FEDERATED-COMPUTATION.md)) |
+| Federation of independently operated site nodes | planned | Corporate within one organisation; Federated across independent organisations; Business may scope a multi-site service ([FEDERATION.md](../FEDERATION.md)) |
+| Federated computation across sites and organisations | planned | Federated tier, and Corporate where the workload spans its sites; workload-specific algorithms, the engine converges supported state only ([FEDERATED-COMPUTATION.md](../FEDERATED-COMPUTATION.md)) |
 | The trust service and the admission service | planned | two adapter boundaries beside the merge boundary, named generically until they are published ([EXTENSION-POINTS.md](../EXTENSION-POINTS.md)) |
 
 Nothing on these pages is sold before it is built. A planned part goes into an offer only with a

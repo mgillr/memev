@@ -3,10 +3,7 @@
 Part of the [Memev documentation](README.md). Up: the [README](../README.md). Down: [tiers/](tiers/README.md),
 [CHECKOUT.md](CHECKOUT.md), [REFERRAL.md](REFERRAL.md), [CONVERGENCE.md](CONVERGENCE.md).
 
-> **Tier decision (owner, 31 October 2026).** The tiers are the free core,
-> Personal at $12/month or $120/year for up to 3 computers, and contact us for anything above.
-> There is no Federated tier, and no per-computer price for Business or Corporate.
-> The free core is the trial. The record is [DECISIONS.md](scope-one/DECISIONS.md). Until the names in the app and the licence are changed, this page calls the free core Personal and the paid tier Personal with more computers.
+> **Superseding owner decision (2 November 2026).** Keep the free core and Personal with more computers, and retain Business and Corporate. Add **Federated** as a fifth named tier for independent organisations that need governed cross-organisation collaboration and intelligence. Business, Corporate and Federated remain contact-us, planned offers; no tier is sold before its required capabilities and licence enforcement exist. The 31 October decision is retained as historical context and superseded by the entry in [DECISIONS.md](scope-one/DECISIONS.md). The free core is the trial. Business and Corporate are recognised by the licence metadata but their services remain planned. Federated is displayed in the product catalogue, but licence issuance remains disabled until its service entitlements and acceptance criteria are implemented.
 >
 > **DRAFT. Not an offer and not in force.** The list below is the current table (decided 28 October
 > 2026). The Memev core is free. Self-serve checkout is Personal only, through Stripe, in test mode
@@ -19,28 +16,33 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 
 ## Tiers (draft)
 
-| | Personal | Personal with more computers | Business | Corporate |
-|---|---|---|---|---|
-| Price | free | $12/month or $120/year | contact us | contact us |
-| People | 1 | 1, non-transferable | contact us | contact us |
-| Computers using one vault | 1 | up to 3 | contact us | contact us |
-| Local AI apps on a computer | unlimited | unlimited | unlimited | unlimited |
-| Cloud AI connectors | 5 | 10 | based on your requirements | based on your requirements |
-| Trial | no Personal trial | no Personal trial | time-limited trial: 5 members and 10 computers, 14 days with one 14-day extension (planned), see [BUSINESS-TRIAL.md](BUSINESS-TRIAL.md) | sales-assisted pilot (planned) |
-| Vault, recall, graph, contracts, doctor, your own tunnel | ✓ | ✓ | ✓ | ✓ |
-| Backup to your own GitHub (one writer) | ✓ | ✓ | ✓ | ✓ |
-| One memory for every AI app, and the comms bus between them | ✓ | ✓ | ✓ | ✓ |
-| Several computers on one vault over the secure link, provenance | | ✓ | ✓ | ✓ |
-| Automatic merge when several computers edit at once (crdt-merge) | | planned | planned | planned |
-| Hosted end-to-end encrypted sync between computers | | planned | | planned, or self-hosted |
-| Hosted encrypted backup and a stable relay address | | planned | | planned, or self-hosted |
-| Member keys: one key per person, covering their computers | | | planned | planned |
-| One company vault that all members' work data syncs into, with an admin console that sees and searches it | | | planned | planned |
-| Provider policy: restrict to one provider, egress rules | | | planned | planned |
-| Company server, departments and roles from an org chart | | | planned | planned |
-| Sign-in with Google Workspace or Microsoft Entra ID | | | planned | planned |
-| Rules for what reaches the AI provider, egress log | | | planned | planned |
-| SCIM, SIEM and audit export, retention, legal hold, high availability | | | | planned |
+| | Personal | Personal with more computers | Business | Corporate | [Federated](tiers/federated.md) |
+|---|---|---|---|---|---|
+| Price | free | $12/month or $120/year | contact us | contact us | contact us |
+| People | 1 | 1, non-transferable | contact us | contact us | contact us |
+| Computers using one vault | 1 | up to 3 | contact us | contact us | contact us |
+| Participating organisations | 1 person | 1 person | 1 | 1 | multiple independent organisations |
+| Local AI apps on a computer | unlimited | unlimited | unlimited | unlimited | unlimited within each participant's policy |
+| Cloud AI connectors | 5 | 10 | based on your requirements | based on your requirements | based on participant and workload requirements |
+| Trial | no Personal trial | no Personal trial | time-limited Business trial (planned) | sales-assisted pilot (planned) | scoped multi-party pilot (planned; no offer until acceptance criteria pass) |
+| Vault, recall, graph, contracts, doctor, your own tunnel | ✓ | ✓ | planned | planned | planned per participant |
+| Backup to your own GitHub (one writer) | ✓ | ✓ | planned | planned | participant-controlled backup policy (planned) |
+| One memory for every AI app, and the comms bus between them | ✓ | ✓ | planned | planned | local memory per participant plus scoped inter-node communications (planned) |
+| Several computers on one vault over the secure link, provenance | | ✓ | planned | planned | per-node device model (planned) |
+| Automatic merge when several computers edit at once (crdt-merge) | | planned | planned | planned | planned for supported replicated state |
+| Hosted end-to-end encrypted sync between computers | | planned | | planned, or self-hosted | deployment-specific; no shared global vault |
+| Hosted encrypted backup and a stable relay address | | planned | | planned, or self-hosted | participant-controlled or agreed relay services (planned) |
+| Member keys: one key per person, covering their computers | | | planned | planned | participant identity and node keys (planned) |
+| One company vault that all members' work data syncs into, with an admin console that sees and searches it | | | planned | planned | no: each organisation retains its own vault and authority |
+| Provider policy: restrict to one provider, egress rules | | | planned | planned | each participant governs its own provider and egress policy |
+| Company server, departments and roles from an org chart | | | planned | planned | each participant controls its own organisation and roles |
+| Sign-in with Google Workspace or Microsoft Entra ID | | | planned | planned | participant-specific identity integration (planned) |
+| Rules for what reaches the AI provider, egress log | | | planned | planned | local policy and auditable cross-org exchange (planned) |
+| SCIM, SIEM and audit export, retention, legal hold, high availability | | | | planned | participant-specific and federation-level operational controls (planned) |
+| Multiple sites within one organisation | | | service-scoped, planned | planned | supported where participants need multi-site nodes |
+| Bilateral cross-organisation trust and scoped work exchange | | | | | planned |
+| Cross-organisation programme and portfolio intelligence | | | | | planned |
+| Federated computation across independent participants | | | | planned | planned, workload-specific |
 
 Personal with more computers is sold for what exists today: the free core on up to 3 computers, so the
 AI apps on all of them share one memory and one comms bus. A person can connect several cloud AI apps
@@ -61,15 +63,7 @@ by policy, with egress rules and labels (planned). Business has one company vaul
 data syncs into it and the company can see and search everything in it. Members keep private work
 outside Memev. Corporate has one main corporate vault.
 
-**Several sites and federation (planned).** The architectural target is a federation of
-independently operated site nodes, each owning its node and its memory and converging authorised
-state through the convergence engine under its contract. The company vault above is the one-node
-case of that target, and it is what the first Business release ships. Federation across sites, and
-federated computation on top of it, are planned capabilities of Corporate, and of a Business
-licence whose services list includes the multi-site federation design
-([tiers/services.md](tiers/services.md)). They are not a tier, they have no column and no price cell in the table
-above, and they are not sold before they are built. See [tiers/README.md](tiers/README.md),
-[FEDERATION.md](FEDERATION.md) and [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).
+**Federation and the Federated tier (planned).** Corporate federation connects sites and jurisdictions within one organisation. The fifth, Federated tier connects independent organisations through bilateral, scoped agreements. Each participant retains its own node, memory, trust root, policies and legal responsibilities. Only authorised work, evidence, state, queries or computation results cross the boundary. Federated computation is workload-specific and is not an automatic privacy guarantee. Business customers may separately scope a multi-site service where appropriate. None of these cross-node capabilities is shipped end to end or sold today. See [tiers/README.md](tiers/README.md), [FEDERATION.md](FEDERATION.md), [DATA-SOVEREIGNTY.md](DATA-SOVEREIGNTY.md) and [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).
 
 **Licences above Personal are agreed with you: contact us.** Today the vault counts computers only. There is no
 per-computer table for Business or Corporate.
@@ -117,7 +111,7 @@ response times are in [tiers/services.md](tiers/services.md).
 
 ## Services for Business and Corporate
 
-These are for Business and Corporate. Each price is quoted.
+These services support Business, Corporate and Federated engagements. Each price is quoted.
 
 **Service agreements**
 
@@ -183,6 +177,5 @@ licence restores the rest at once.
 ## Source licence
 
 The Memev core is **Apache-2.0** and stays that way. The convergence engine, crdt-merge, is a separate
-project in its own repository under its own licence, never vendored into Memev. Memev reaches it only across the external call-out boundary. There is no
-Federated tier: federation across sites is planned and is not available. See
+project in its own repository under its own licence, never vendored into Memev. Memev reaches it only across the external call-out boundary. Federated is the fifth named tier in the product direction, but its capabilities and licence enforcement are planned and are not available today. See
 [LICENSING-NOTICE.md](LICENSING-NOTICE.md) and [CONVERGENCE.md](CONVERGENCE.md).

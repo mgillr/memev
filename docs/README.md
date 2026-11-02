@@ -17,7 +17,7 @@ this folder links back here, and this page links down to every page.
 
 | Page | What it holds |
 |---|---|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | what runs today, and the Personal, Business and Corporate charts |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | what runs today, the organisational deployment models and the planned Federated tier |
 | [MODULES.md](MODULES.md) | the module interdependency map, generated from the real imports |
 | [DESIGN.md](DESIGN.md) | the log, the index, recall, memory quality, the graph, scale |
 | [MAPPING.md](MAPPING.md) | everything Memev does without being asked |
@@ -50,10 +50,11 @@ this folder links back here, and this page links down to every page.
 
 | Page | What it holds |
 |---|---|
-| [tiers/README.md](tiers/README.md) | the four tiers side by side, what is built and what is planned |
+| [tiers/README.md](tiers/README.md) | the five tiers side by side, what is built and what is planned |
 | [tiers/free.md](tiers/free.md) | Personal, one computer, free; Personal with more computers |
 | [tiers/business.md](tiers/business.md) | Business (coming) |
 | [tiers/corporate.md](tiers/corporate.md) | Corporate (coming) |
+| [tiers/federated.md](tiers/federated.md) | Federated (planned): independent organisations, commercial scope and governance boundaries |
 | [tiers/services.md](tiers/services.md) | services, support plans, response times |
 | [CONVERGENCE.md](CONVERGENCE.md) | the paid core: the crdt-merge convergence engine |
 | [PAID-CONVERGENCE.md](PAID-CONVERGENCE.md) | the specification of the paid convergence service: what the engine does, and the boundary it is called across |

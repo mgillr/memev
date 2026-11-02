@@ -3,12 +3,7 @@
 Part of the [Memev documentation](README.md). Up: the [README](../README.md). Down: the
 [module map](MODULES.md) (generated from the real imports) and the per-topic pages linked below.
 
-This page has two parts. The first shows what is built and running today, module by module. The
-second shows the three tiers side by side with one diagram each: [Personal](#personal),
-[Business](#business-coming) and [Corporate](#corporate-coming). Business and Corporate are coming; their
-diagrams show the design, not shipped code. A last section shows the planned extension of the same
-design to [several sites and federation](#several-sites-and-federation-planned); nothing in it is
-built.
+This page shows what is built today, then explains the Personal, Business and Corporate deployment models and the planned [Federated tier](#federated-tier-planned) for independent organisations. Business, Corporate and Federated are coming; their descriptions show the design, not shipped code. The final sections cover [several sites and federation](#several-sites-and-federation-planned).
 
 ## What runs today
 
@@ -75,9 +70,9 @@ sequenceDiagram
 Every write is appended to the checksummed operation log before the Markdown file changes; see
 [DESIGN.md](DESIGN.md).
 
-## The three tiers
+## Personal, Business and Corporate
 
-All three tiers use the same engine. Personal on one computer is the free core and is complete
+These deployment models use the same core architecture. Personal on one computer is the free core and is complete
 ([CHARTER.md](../CHARTER.md)). Anything marked *coming* or *planned* is not built, and nothing is
 sold before it is built ([tiers/README.md](tiers/README.md#what-is-built-and-what-is-planned)).
 
@@ -212,11 +207,7 @@ Details: [tiers/corporate.md](tiers/corporate.md).
 Nothing in this section is built. The architectural target is a federation of independently
 operated site nodes: each site owns its node and its memory, sites converge the state they are
 authorised to share through the convergence engine under its contract, and no central coordinator
-sequences ordinary updates. The company vault and the main corporate vault above are the one-node
-case of that target, and the one-node case is what the first Business release ships. Federation
-across sites, and federated computation on top of it, are planned capabilities of Corporate, and
-of a Business licence whose services list includes the multi-site federation design
-([tiers/services.md](tiers/services.md)); they are not a tier.
+sequences ordinary updates. The company vault is the one-node Business case. Corporate extends federation across sites within one organisation; Business may scope a multi-site service. The separate Federated tier connects independent organisations through bilateral, scoped agreements.
 
 ```mermaid
 flowchart LR
@@ -275,9 +266,18 @@ keys, no grants, mounts or mixing
 
 ## Where each tier is documented
 
-| | Personal | Business | Corporate |
-|---|---|---|---|
-| Overview | [tiers/free.md](tiers/free.md) | [tiers/business.md](tiers/business.md) | [tiers/corporate.md](tiers/corporate.md) |
-| Price and licence | [PRICING.md](PRICING.md) | contact us | contact us |
-| Services | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) |
-| Several sites (planned) | | with the multi-site federation design in [tiers/services.md](tiers/services.md): [FEDERATION.md](FEDERATION.md) | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) |
+| | Personal | Personal with more computers | Business | Corporate | Federated |
+|---|---|---|---|---|---|
+| Overview | [tiers/free.md](tiers/free.md) | [tiers/free.md](tiers/free.md#personal-with-more-computers-draft) | [tiers/business.md](tiers/business.md) | [tiers/corporate.md](tiers/corporate.md) | [tiers/federated.md](tiers/federated.md) |
+| Price and licence | [PRICING.md](PRICING.md) | [PRICING.md](PRICING.md) | contact us | contact us | contact us |
+| Services | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) |
+| Several sites (planned) | | | service-scoped option | [FEDERATION.md](FEDERATION.md) | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) |
+| Independent organisations | | | | | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) |
+
+### Federated tier (planned)
+
+The Federated tier connects independent organisations, not merely additional sites belonging to one corporate owner. Each participant retains its own node, source systems, operator, identity, trust root, policies and legal responsibilities. Relationships are bilateral, scoped, signed, time-bounded and revocable; trust is not transitive.
+
+A shared programme may include a manufacturer, engineering partner, supplier, contractor, logistics provider and research institution. Each contributes only the plans, specifications, delivery commitments, dependencies, evidence, risks, permitted query results or computational outputs authorised by its own policy and agreement. Memev's intended shared context relates those contributions across the programme and lets authorised AI and analytical systems identify possible downstream effects with provenance, freshness, uncertainty and accountable owners.
+
+**Status:** this is a planned product tier. Cross-organisation transport, trust and admission workflows, policy enforcement, shared programme intelligence and federated computation are not shipped end to end. See [FEDERATION.md](FEDERATION.md), [DATA-SOVEREIGNTY.md](DATA-SOVEREIGNTY.md) and [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md).

@@ -5,12 +5,12 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Re
 [Federated computation](FEDERATED-COMPUTATION.md), [Data sovereignty](DATA-SOVEREIGNTY.md),
 [Convergence](CONVERGENCE.md), [Threat model](THREAT-MODEL.md).
 
-> **Planned. Architectural target, not shipped code.** Nothing on this page is built. The first
-> Business release is the one-node case that the tier pages call the company vault: one
-> organisation node that members' work data syncs into and that the company can see and search
-> ([tiers/business.md](tiers/business.md)). Every multi-site statement on this page is planned, and
-> federation is a planned capability of Corporate, and of a Business licence whose services list
-> includes the multi-site federation design ([tiers/services.md](tiers/services.md)), not a tier ([tiers/README.md](tiers/README.md#several-sites-and-federation-planned)).
+> **Planned. Architectural target, not shipped code.** The first Business release is the one-node
+> company-vault case. Corporate extends coordination across sites within one organisation. The
+> **Federated tier** is the fifth tier and extends the same principles across independent
+> organisations with separate operators, trust roots, policies and legal responsibilities. No
+> cross-organisation federation or multi-site federation is currently shipped end to end. See
+> [tiers](tiers/README.md), [pricing](PRICING.md) and [services](tiers/services.md).
 
 ## Purpose
 
@@ -78,12 +78,10 @@ them to the deployment scopes of the target.
 | Personal with more computers | desktop, laptop and other computers, each with its own device key | the person's one vault (built); the automatic merge is planned |
 | Business, one node | one office or a distributed small team | members' work data in one company vault that the company can see and search (coming); the first release |
 | Business, several sites (planned, with the multi-site federation design) | several offices, workshops or operating locations | independently operated site nodes and selected shared work |
-| Corporate (planned) | departments, programmes, portfolios and international offices | multiple sites, trust domains and jurisdiction policies |
-| Cross-organisation federation (planned) | partners working on a shared programme or portfolio | only the commitments, evidence, work products and computations explicitly authorised by each organisation |
+| Corporate (planned) | departments, programmes, portfolios and international offices inside one organisation | multiple sites, trust domains and jurisdiction policies under one corporate authority |
+| **Federated tier (planned)** | independent organisations working on shared programmes, supply chains, research or industry initiatives | bilateral trust agreements and only the commitments, evidence, work products, queries and computations each organisation explicitly authorises |
 
-A small organisation may need several site nodes; a large organisation may choose one node.
-Federation is a planned capability of Corporate, and of a Business licence whose services list
-includes the multi-site federation design ([tiers/services.md](tiers/services.md)), not a tier.
+A small organisation may need several site nodes; a large organisation may choose one node. Corporate is intended for multi-site coordination inside one organisation. The Federated tier is for relationships between independent organisations. A Business customer may separately commission a multi-site design where appropriate, but that does not turn Business into the cross-organisation Federated offer.
 
 ## Topology
 
@@ -359,13 +357,7 @@ forwarded revocation notice is applied only on the authority of the notice's own
 
 ## Relationship to the tiers
 
-See [tiers](tiers/README.md). The four tiers stand: Personal remains local-first and complete;
-Personal with more computers extends the same vault to the person's other computers; Business is
-one company vault that members' work data syncs into (coming), the one-node case and the first
-release; Corporate is the same model at larger scale with stricter control (coming). Federation
-across sites, and federated computation on top of it, are planned capabilities of Corporate, and
-of a Business licence whose services list includes the multi-site federation design
-([tiers/services.md](tiers/services.md)). Federation is not a tier and not a different core.
+See [tiers](tiers/README.md). Personal remains local-first and complete; Personal with more computers extends the same vault across the person's computers; Business serves one organisation with an initial one-node company vault; Corporate extends that organisation across sites and jurisdictions; and **Federated** connects independent organisations through explicit bilateral agreements. Federation is part of the Corporate target for multi-site operation and is the defining capability of the fifth Federated tier for cross-organisation networks. It extends the same core; it is not a separate core.
 
 ## Acceptance criteria for a federation implementation
 
@@ -385,6 +377,24 @@ A release claiming a federation capability must demonstrate, at minimum:
     other site unreachable, a site's local work and its recovery from its own permitted state continue;
 12. when the convergence, admission or trust service is unavailable, the node reports degraded
     capability, keeps local history and claims no guarantee it could not establish.
+
+## Federated tier: what participants are buying (target model)
+
+The Federated tier is not a shared global database and does not make participants subsidiaries of a common Memev operator. Each organisation operates or controls its own node, source systems, identities, policies and trust root. A federation relationship is a specific agreement between named parties, for named purposes and scopes, with expiry, revocation and explicit permissions.
+
+A programme may include a manufacturer in Germany, an engineering partner in Switzerland, a component supplier in Japan, a logistics provider in the UK and a research institution in the US. Each participant keeps its own internal work, commercial terms, personnel records, models and source data. They may agree to share a component specification, delivery commitment, quality evidence, capacity window, dependency, risk notice or approved computation result. Memev's intended shared programme view relates those contributions, identifies possible downstream effects and shows the evidence and authority behind each finding. It does not expose every participant's internal vault or turn an inferred relationship into an approved fact.
+
+The Federated tier is intended to provide:
+
+- named participant nodes and bilateral, scoped federation agreements;
+- separate trust roots, explicit grants, expiry, revocation and freshness handling;
+- policy-controlled discovery, contribution, query, replication, retention and computation;
+- cross-organisation project, programme and portfolio context with provenance and accountable owners;
+- visibility into contribution status, freshness, rejected work, policy decisions and degraded connectivity;
+- optional workload-specific federated analysis, optimisation, simulation, model evaluation or learning, each with its own contract and privacy model;
+- deployment and support arrangements appropriate to jurisdiction, risk, criticality and participant count.
+
+The tier does **not** imply unrestricted access to partner data, transitive trust, universal legal compliance, privacy merely because data stays local, or guaranteed correctness from convergence. Those require explicit policy, threat modelling, workload-specific controls and acceptance tests.
 
 ## Status
 

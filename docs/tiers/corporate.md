@@ -59,7 +59,7 @@ flowchart LR
     custom --> hubA & hubB
 ```
 
-The same chart, next to Personal and Business, is in [ARCHITECTURE.md](../ARCHITECTURE.md#corporate-coming).
+The architecture overview, including the Federated tier, is in [ARCHITECTURE.md](../ARCHITECTURE.md#personal-business-and-corporate).
 
 ## What's included (planned)
 
@@ -74,14 +74,18 @@ The same chart, next to Personal and Business, is in [ARCHITECTURE.md](../ARCHIT
 - A named engineer, or an engineer embedded with your team
 - Source escrow and a written succession plan, on request
 
+
+## Cross-organisation work: the Federated tier
+
+Corporate is for sites, departments and jurisdictions within one organisation. Where work crosses into suppliers, customers, research institutions, contractors or other independent organisations, the separate fifth **Federated** tier provides the intended commercial and governance model. Each participant retains its own node, vault, trust root, policies and legal responsibilities, and shares only what bilateral agreements and local policy permit. See [FEDERATION.md](../FEDERATION.md) and [Federated computation](../FEDERATED-COMPUTATION.md). This is planned, not shipped end to end.
+
 ## Several sites and federation (planned)
 
 The main corporate vault above is one node, and the one-node case is what ships first. The
 architectural target behind it is a federation of independently operated site nodes: each site
 owns its node and its memory, sites converge the state they are authorised to share through the
 convergence engine under its contract, and no central coordinator sequences ordinary updates.
-Federation across sites, and federated computation on top of it, are planned capabilities of
-Corporate; they are not a tier and are not sold before they are built.
+Federation across sites within one organisation, and federated computation for its workloads, are planned Corporate capabilities. They are not a separate tier in that intra-organisation context; the fifth Federated tier is for independent organisations. Neither is sold before it is built.
 
 What the planned extension adds, each part planned: node identity and membership between sites;
 per-scope operation-log streams as the replication unit, each entry carrying its classification
@@ -137,3 +141,8 @@ All data can stay inside your network, and in the air-gapped package nothing lea
 cloud AI service, what is sent to it is out of Memev's control once sent; rules decide what may
 go, and the SIEM records what did. Only licence information passes between your install and ours,
 never vault data.
+
+
+## Independent organisations: the Federated tier
+
+Corporate is for sites, departments and jurisdictions within one organisation. Where the work crosses into suppliers, customers, research institutions, contractors or other independent organisations, the separate fifth **Federated** tier provides the intended commercial and governance model. Each organisation retains its own node, vault, trust root, policies and legal responsibilities, and shares only what bilateral agreements and local policy permit. See [FEDERATION.md](../FEDERATION.md) and [Federated computation](../FEDERATED-COMPUTATION.md). This is planned, not shipped end to end.

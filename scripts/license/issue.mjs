@@ -25,6 +25,7 @@ const day = /^\d{4}-\d{2}-\d{2}$/;
 if (argv.includes('--help') || !argv.length) fail('usage: issue.mjs --key FILE --tier personal_more|business|corporate|founder --seats N [--exp DATE|none] [--grace DAYS] [--out FILE]');
 const tier = String(arg('tier', ''));
 if (tier === 'free') fail('Personal needs no licence');
+if (tier === 'federated') fail('Federated is a planned tier and cannot be licensed yet');
 if (!TIER_NAMES.includes(tier)) fail('--tier must be one of personal_more, business, corporate or founder (the older ids personal, team, office and enterprise are still accepted)');
 const keyFile = arg('key'); if (!keyFile) fail('--key is required');
 if (inside(keyFile)) fail(`refusing to read a private key from inside the repository (${path.resolve(keyFile)}); keep it outside`);

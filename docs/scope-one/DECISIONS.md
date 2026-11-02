@@ -168,14 +168,9 @@ current code already uses, so no contract is blocked on a guess.
 - Safe default: deny by default and local records only, as before. Nothing in the code changes by this record, so until a
   contract lands a behaviour, that behaviour is not available.
 
-### Tiers (decided, owner decision 31 Oct 2026)
+### Tiers (historical decision, owner decision 31 Oct 2026 — superseded)
 
-The free core, Personal at $12/month or $120/year for up to 3 computers, and contact us for
-anything above. There is no Federated tier, no per-computer price for Business or Corporate, and no
-separate Personal trial. Every tier and pricing page follows this ([PRICING.md](../PRICING.md),
-[tiers](../tiers/README.md)). The names the app, the licence tooling and their tests use today are
-Personal for the free core and Personal with more computers for the paid tier; renaming them is a code
-and contract change that this record does not make.
+The owner decision on 31 October was the free core, Personal at $12/month or $120/year for up to 3 computers, and contact us for anything above, with no Federated tier. This was the decision in force on that date. It is explicitly superseded by the owner decision of 2 November 2026 below. The names the app and licence tooling use today remain Personal for the free core and Personal with more computers for the paid tier; the higher tiers still require code and contract work.
 
 ## Owner decisions of 31 October 2026
 
@@ -228,3 +223,28 @@ product owner closes each by choosing an option; until then the safe default hol
 - A product-owner question is removed from this list when the answer is recorded and the
   blocked contracts proceed. The safe default is what the code does until that moment, so
   removing a row never changes behaviour on its own.
+
+
+## Owner decision of 2 November 2026: add the Federated tier
+
+This decision explicitly reverses and supersedes the 31 October 2026 decision that there would be no Federated tier. The earlier record remains above as historical context; it is no longer the current product decision.
+
+**Decision:** Memev has five named tiers:
+
+1. **Personal** — one person, one computer; the free core.
+2. **Personal with more computers** — one person, up to three computers; the current paid Personal offer.
+3. **Business** — one organisation, initially a single company node.
+4. **Corporate** — one organisation across multiple sites, departments, programmes, portfolios and jurisdictions.
+5. **Federated** — multiple independent organisations coordinating shared projects, programmes, portfolios, supply chains, research or industry work while retaining separate ownership, operators, trust roots, policies and legal responsibilities.
+
+Business and Corporate concern coordination within one organisation. Federated is the distinct cross-organisation tier. It is not a shared global vault, a central authority over participants, or an assumption that one organisation can see another's internal records.
+
+**Commercial placement:** Federated is a contact-us tier. Scope and price are determined by participating organisations, trust relationships, sites, jurisdictions, work scopes, integrations, computation workloads, governance, deployment and support. Business customers may separately commission multi-site services, but that does not substitute for the Federated tier.
+
+**Architecture:** the existing local-first architecture, vault, communications bus, work contracts, provenance, convergence call-out boundary, identity and trust decisions remain in force. The new tier extends those foundations; it does not replace them. Cross-organisation relationships require explicit bilateral agreements, separate trust roots, narrow scopes, expiry, revocation and local policy approval. There is no transitive trust.
+
+**Availability:** the Federated tier is a product and commercial target, not an assertion of shipped capability. The upgrade catalogue may display the tier, but the licence issuer must refuse Federated licences until the entitlement model is specified. Cross-node transport, federation membership, admission, trust exchange, sovereign policy enforcement, federated queries/reasoning and federated computation require implementation and end-to-end validation. No Federated offer may be sold as operational until its applicable acceptance criteria pass.
+
+**Documentation:** README, tiers, pricing, services, architecture and federation documentation must describe the five-tier model consistently and distinguish Business (one organisation), Corporate (multi-site within one organisation) and Federated (independent organisations).
+
+**Owner confirmation:** explicit in the conversation on 2 November 2026.

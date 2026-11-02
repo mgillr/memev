@@ -192,3 +192,8 @@ A first useful implementation should focus on a bounded project or programme: in
 sources, map explicit dependencies, identify a real change impact, show its evidence and obtain
 human validation. Expansion to cross-functional and cross-site reasoning should follow demonstrated
 accuracy and safe authority handling.
+
+
+## Relationship to the Federated tier
+
+The fifth, Federated tier is the intended commercial deployment for organisational intelligence that crosses independent organisational boundaries. Corporate covers sites and jurisdictions within one organisation; Federated connects separate organisations, each retaining its own authority, vaults, trust roots and policies. Shared programme and portfolio intelligence is assembled only from authorised contributions, references, query results and evidence. It must preserve provenance, source versions, freshness, uncertainty and accountable owners. The cross-organisation reasoning described here is a target capability, not a shipped end-to-end service; see [FEDERATION.md](FEDERATION.md) and [PRICING.md](PRICING.md).
