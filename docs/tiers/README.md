@@ -1,7 +1,6 @@
 # Tiers: how each one is set up
 
-Part of the [Memev documentation](../README.md). Up: the [README](../../README.md). Charts for all
-three tiers: [ARCHITECTURE.md](../ARCHITECTURE.md#the-three-tiers).
+Part of the [Memev documentation](../README.md). Up: the [README](../../README.md). Architecture overview: [ARCHITECTURE.md](../ARCHITECTURE.md#personal-business-and-corporate).
 
 > **DRAFT.** Packages and services on these pages are proposals, not offers. The Memev core is free;
 > Personal with more computers has a set price. Business, Corporate and the fifth **Federated** tier
@@ -107,8 +106,8 @@ copied outside Memev.
 | High-availability servers, air-gapped package | planned | |
 | SIEM and audit export, retention rules, legal hold | planned | |
 | Project state machine | planned | the code is present in `src/engine/project-state.mjs` and nothing imports it yet ([PROJECTS.md](../PROJECTS.md)) |
-| Federation of independently operated site nodes | planned | Corporate, and a Business licence whose services list includes the multi-site federation design ([services.md](services.md)); the company vault is the one-node case and the first release ([FEDERATION.md](../FEDERATION.md)) |
-| Federated computation across sites | planned | Corporate, and a Business licence whose services list includes the multi-site federation design; workload-specific algorithms, the engine converges supported state only ([FEDERATED-COMPUTATION.md](../FEDERATED-COMPUTATION.md)) |
+| Federation of independently operated site nodes | planned | Corporate within one organisation; Federated across independent organisations; Business may scope a multi-site service ([FEDERATION.md](../FEDERATION.md)) |
+| Federated computation across sites and organisations | planned | Federated tier, and Corporate where the workload spans its sites; workload-specific algorithms, the engine converges supported state only ([FEDERATED-COMPUTATION.md](../FEDERATED-COMPUTATION.md)) |
 | The trust service and the admission service | planned | two adapter boundaries beside the merge boundary, named generically until they are published ([EXTENSION-POINTS.md](../EXTENSION-POINTS.md)) |
 
 Nothing on these pages is sold before it is built. A planned part goes into an offer only with a
