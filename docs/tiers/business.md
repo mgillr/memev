@@ -58,7 +58,7 @@ flowchart LR
     cv -.->|"licence only"| lic
 ```
 
-The same chart, with all three tiers, is in [ARCHITECTURE.md](../ARCHITECTURE.md#the-three-tiers). The merge
+The architecture overview, including the Federated tier, is in [ARCHITECTURE.md](../ARCHITECTURE.md#personal-business-and-corporate). The merge
 engine is crdt-merge, in its own repository and never part of Memev; see
 [CONVERGENCE.md](../CONVERGENCE.md). An org admin invites members into the company vault. There is no Team
 tier: teammates belong here, on the business side.
