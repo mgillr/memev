@@ -13,7 +13,7 @@ Part of the [tiers pages](README.md). Up: the [README](../../README.md). Archite
 For a company that wants one memory for its members and their AI apps, on its own server, with the
 company able to see and search what its members' AI apps have learned.
 
-Corporate is the same model at larger scale and with stricter control: see [Corporate](corporate.md).
+Corporate extends this model across multiple sites within one organisation. Federated is the separate fifth tier for independent organisations that need governed cross-organisation work and intelligence; participants do not merge into one company vault. See [Corporate](corporate.md) and [Federation](../FEDERATION.md).
 
 ## How it works
 
@@ -98,7 +98,7 @@ The company vault above is one node, and the one-node case is what the first Bus
 ships. The architectural target behind it is a federation of independently operated site nodes,
 each owning its node and its memory and converging authorised state through the convergence
 engine under its contract. A Business with several sites can have that by agreement, as planned
-work; it is a planned capability, not a tier, and it is not sold before it is built. See
+work; it is a planned capability of Corporate, or a separately scoped Business service; cross-organisation relationships belong to the Federated tier. None is sold before it is built. See
 [FEDERATION.md](../FEDERATION.md) and the
 [architecture chart](../ARCHITECTURE.md#several-sites-and-federation-planned).
 
