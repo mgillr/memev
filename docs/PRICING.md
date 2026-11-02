@@ -34,12 +34,12 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 | Hosted encrypted backup and a stable relay address | | planned | | planned, or self-hosted | participant-controlled or agreed relay services (planned) |
 | Member keys: one key per person, covering their computers | | | planned | planned | participant identity and node keys (planned) |
 | One company vault that all members' work data syncs into, with an admin console that sees and searches it | | | planned | planned | no: each organisation retains its own vault and authority |
-| Provider policy: restrict to one provider, egress rules | | | planned | planned | each participant governs its own provider and egress policy |
-| Company server, departments and roles from an org chart | | | planned | planned | each participant controls its own organisation and roles |
+| Provider policy: restrict to one provider, egress rules | | | planned | planned | each participant governs its own provider and egress policy (planned) |
+| Company server, departments and roles from an org chart | | | planned | planned | each participant controls its own organisation and roles (planned) |
 | Sign-in with Google Workspace or Microsoft Entra ID | | | planned | planned | participant-specific identity integration (planned) |
 | Rules for what reaches the AI provider, egress log | | | planned | planned | local policy and auditable cross-org exchange (planned) |
 | SCIM, SIEM and audit export, retention, legal hold, high availability | | | | planned | participant-specific and federation-level operational controls (planned) |
-| Multiple sites within one organisation | | | service-scoped, planned | planned | supported where participants need multi-site nodes |
+| Multiple sites within one organisation | | | service-scoped, planned | planned | supported where participants need multi-site nodes (planned) |
 | Bilateral cross-organisation trust and scoped work exchange | | | | | planned |
 | Cross-organisation programme and portfolio intelligence | | | | | planned |
 | Federated computation across independent participants | | | | planned | planned, workload-specific |
