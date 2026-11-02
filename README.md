@@ -9,6 +9,8 @@
 <p><strong>The operating infrastructure for distributed AI work.</strong><br>
 Coordinate people, AI systems and organisations around governed work and verifiable outcomes.</p>
 
+<p><strong>Development preview — actively under development.</strong> The Free Core is available for testing; this is not yet a production release. Interfaces and behaviour may change. Business, Corporate, Federated and full distributed-convergence capabilities remain under development unless explicitly marked as available below.</p>
+
 <p align="center">
 <img src="docs/assets/connective-infrastructure.svg" alt="Memev connects people and their work across AI providers, agents, business applications and data systems. Independent organisations retain local vaults, authority and policies while bilateral agreements allow selected work, evidence and computation to contribute to shared programme intelligence." width="900">
 </p>
@@ -25,7 +27,7 @@ Coordinate people, AI systems and organisations around governed work and verifia
 </p>
 
 <p>
-<code>npm install -g . && memev init</code>
+<code>git clone https://github.com/mgillr/memev.git && cd memev && npm install -g . && memev init --no-connect</code>
 </p>
 
 <p>
@@ -183,50 +185,75 @@ Memev keeps project context available without making you copy the same backgroun
 
 ## Install
 
-You need Node 22 or newer and git. Every path below sets up the same thing: it creates your notes
-folder, starts Memev, connects the AI apps it finds on your computer and runs a self-test. The
-command at the top of this page installs Memev from this folder with npm; run it in a copy of this
-repository. The rest of this section covers the other paths.
+Memev requires **Node.js 22 or newer** and **Git**. The supported, immediately usable path for a new tester is to clone the public repository and install from source. Start with `--no-connect`: this installs and starts Memev without changing any AI application's configuration. You then choose which clients to connect, one at a time.
 
-Memev runs on macOS and Linux. **Windows (preview):** setup, app connections, hooks and the doctor
-have Windows code paths and tests, and a Windows job runs them on every change to `main`, but
-Windows has not had a full lab run yet. Memev starts at login there through a per-user Task Scheduler
-entry that `memev service install` creates. [docs/QUICKSTART.md](docs/QUICKSTART.md#windows-preview) says
-what differs.
+### 1. Install from the repository
 
-### All the install paths
-
-| Path | Who it's for | What happens on its own |
-|---|---|---|
-| Ask your AI app to do it | anyone already using Claude Code, Codex, Gemini CLI or Cursor | the app downloads Memev and runs the setup; you read the checklist it shows you |
-| One command in a download | anyone comfortable with a terminal | the same setup, run by you |
-| npm, from a download | people who like a global `memev` command | the same, plus `memev` on your PATH |
-| Docker | an always-on server or a home lab | Memev runs in a container; you connect apps by hand |
-| `npx memev init` | everyone | coming soon (not on the npm registry yet) |
-| One-line installer for macOS, Linux and Windows | everyone | coming soon |
-
-To have your AI app do it, paste this into a session:
-
-> Download the Memev repository, run `node bin/memev.mjs init` inside it, and show me the checklist
-> it prints.
-
-To do it yourself, run this in the folder you downloaded:
+macOS, Linux, or Windows PowerShell with Node 22+ and Git:
 
 ```sh
-node bin/memev.mjs init
+git clone https://github.com/mgillr/memev.git
+cd memev
+npm install -g .
+memev init --no-connect
 ```
 
-For a global `memev` command, run `npm install -g . && memev init` there instead. For Docker,
-`docker compose up -d` builds the image on your machine; see [docs/DOCKER.md](docs/DOCKER.md).
+If you do not want a global command, replace the last two commands with:
 
-After setup, two things may need you: one browser sign-in for the GitHub backup
-(`memev github setup`), and a click in apps that ask before they trust a new tool. The checklist
-says which. Details are in [docs/QUICKSTART.md](docs/QUICKSTART.md).
+```sh
+node bin/memev.mjs init --no-connect
+```
 
-To see shared context working, run `memev ready` and open a new session in each app. It prints each
-app as it joins, then confirms that connected apps share project context when one recalls something
-another saved. For coordination, see [docs/BUS.md](docs/BUS.md); for defined work and verification,
-see [docs/CONTRACTS.md](docs/CONTRACTS.md).
+The setup creates the local vault (default: `~/memev`), installs a stable runtime and launcher, starts the local daemon, installs the per-user login service where supported, and prints a setup checklist. It does not connect AI clients when `--no-connect` is used; that setting also disables background auto-connection.
+
+### 2. Let an AI agent install it
+
+In Claude Code, Codex, Gemini CLI, Cursor or another agent that can run local terminal commands, ask:
+
+> Read `docs/INSTALL-FOR-AI.md` in the official Memev repository and follow it exactly. Install Memev from the public source repository using `memev init --no-connect`. Inspect the machine first, preserve existing data and configuration, show me the exact actions, and ask me separately before connecting each detected AI client. Do not connect every client automatically. Run the documented health checks and report only verified results.
+
+The AI agent must follow the consent and recovery rules in [docs/INSTALL-FOR-AI.md](docs/INSTALL-FOR-AI.md). In particular, it must never run `memev connect` without a client name: that connects every detected client.
+
+### 3. Install from a verified release tarball
+
+The repository also contains checksum-verifying installers:
+
+- macOS/Linux: `scripts/install.sh`
+- Windows PowerShell: `scripts/install.ps1`
+
+After a tagged release is published, download its `memev-X.Y.Z.tgz` asset and matching `.sha256` file from [GitHub Releases](https://github.com/mgillr/memev/releases), then run the installer with the release tarball URL:
+
+```sh
+bash scripts/install.sh "https://github.com/mgillr/memev/releases/download/vX.Y.Z/memev-X.Y.Z.tgz"
+```
+
+PowerShell:
+
+```powershell
+.\scripts\install.ps1 "https://github.com/mgillr/memev/releases/download/vX.Y.Z/memev-X.Y.Z.tgz"
+```
+
+The installer fetches the checksum file beside the tarball, verifies SHA-256 before extraction, uses Node 22+ already on the machine or downloads the pinned Node runtime with its own SHA-256 verification, then runs setup. Replace `X.Y.Z` with a real published version; the example is not a live download URL.
+
+**Release status:** no GitHub release has been published yet. Until the first tagged release and its tarball/checksum assets exist, use the repository installation in section 1. The installer scripts are present in the repository, but they do not contain a built-in release URL.
+
+### 4. Docker
+
+For an always-on server or home lab, `docker compose up -d` builds and starts the container locally. AI clients are connected manually. See [docs/DOCKER.md](docs/DOCKER.md).
+
+### 5. Connect the AI clients you choose
+
+After installation:
+
+1. Run `memev clients` to see which supported clients are detected.
+2. Choose one client and run `memev connect <client>` only after you have decided to connect it.
+3. Repeat for each client you want to use. Some apps require you to approve or trust the new MCP server or hooks.
+4. Open a new session in each connected app.
+5. Test shared context by asking one client to remember a harmless test fact and another to recall it; run `memev ready --json --timeout 120` during the test.
+
+See [docs/CLIENTS.md](docs/CLIENTS.md) for exactly what Memev changes in each app and which integrations are instructions-only or not yet supported. Cloud AI access is separate and remains off until you explicitly enable it. GitHub backup is also separate: run `memev github setup` only if you want it.
+
+Memev runs on macOS and Linux. **Windows is a preview:** it has code paths and CI tests, but has not had a full lab run. See [docs/QUICKSTART.md](docs/QUICKSTART.md#windows-preview).
 
 ## Plans and roadmap
 
