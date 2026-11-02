@@ -3,7 +3,7 @@
 Part of the [Memev documentation](README.md). Up: the [README](../README.md). Down: [tiers/](tiers/README.md),
 [CHECKOUT.md](CHECKOUT.md), [REFERRAL.md](REFERRAL.md), [CONVERGENCE.md](CONVERGENCE.md).
 
-> **Superseding owner decision (2 November 2026).** Keep the free core and Personal with more computers, and retain Business and Corporate. Add **Federated** as a fifth named tier for independent organisations that need governed cross-organisation collaboration and intelligence. Business, Corporate and Federated remain contact-us, planned offers; no tier is sold before its required capabilities and licence enforcement exist. The 31 October decision is retained as historical context and superseded by the entry in [DECISIONS.md](scope-one/DECISIONS.md). The free core is the trial. Until the app and licence tooling are extended, only the Personal offers are implemented.
+> **Superseding owner decision (2 November 2026).** Keep the free core and Personal with more computers, and retain Business and Corporate. Add **Federated** as a fifth named tier for independent organisations that need governed cross-organisation collaboration and intelligence. Business, Corporate and Federated remain contact-us, planned offers; no tier is sold before its required capabilities and licence enforcement exist. The 31 October decision is retained as historical context and superseded by the entry in [DECISIONS.md](scope-one/DECISIONS.md). The free core is the trial. Business and Corporate are recognised by the licence metadata but their services remain planned. Federated is displayed in the product catalogue, but licence issuance remains disabled until its service entitlements and acceptance criteria are implemented.
 >
 > **DRAFT. Not an offer and not in force.** The list below is the current table (decided 28 October
 > 2026). The Memev core is free. Self-serve checkout is Personal only, through Stripe, in test mode
@@ -16,7 +16,7 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 
 ## Tiers (draft)
 
-| | Personal | Personal with more computers | Business | Corporate | Federated |
+| | Personal | Personal with more computers | Business | Corporate | [Federated](tiers/federated.md) |
 |---|---|---|---|---|---|
 | Price | free | $12/month or $120/year | contact us | contact us | contact us |
 | People | 1 | 1, non-transferable | contact us | contact us | contact us |
