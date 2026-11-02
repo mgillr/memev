@@ -7,10 +7,10 @@
 <h1>Memev</h1>
 
 <p><strong>The connective infrastructure for AI.</strong><br>
-Connect every AI. Share context. Coordinate intelligence.</p>
+Connect the work. Share context. Coordinate intelligence.</p>
 
 <p align="center">
-<img src="docs/assets/connective-infrastructure.svg" alt="Memev connection registry: AI providers, memory providers, agent platforms and business services connect through common communications and context interfaces, supporting business intelligence, inference and data sovereignty." width="900">
+<img src="docs/assets/connective-infrastructure.svg" alt="Memev connects people and their work across AI providers, agents, business applications and data systems. Authorised work enters governed personal, team and site vaults and an evidence-linked organisational brain; AI and business intelligence analyse cross-project effects under permissions and data-sovereignty policies." width="900">
 </p>
 
 <p><strong>Memev is the connective infrastructure for AI.</strong> It enables individuals, teams and organisations to connect their AI providers, memory systems, agents, services, people and machines through shared communications, context and federated infrastructure.</p>
@@ -50,9 +50,31 @@ The product has two equally important dimensions:
 - **A valuable personal product from day one.** The Free Core gives an individual a practical local-first way to connect supported AI tools, preserve and retrieve context, and coordinate sessions. Personal use is not merely a trial of an enterprise product: it is a complete and worthwhile starting point.
 - **An architecture that scales.** The same connective foundations are intended to extend across multiple computers, teams, departments, offices and organisations, with identity, permissions, provenance, policy and federation appropriate to each boundary.
 
-Memev's own vault, context retrieval, communications bus and work-contract mechanisms are important parts of that foundation. They are not the product boundary. The wider connector ecosystem is intended to include external AI providers, memory services, agent platforms, collaboration tools and business systems through provider-neutral interfaces. The planned connection registry covers discovery, configuration, identity, permissions, health and lifecycle, with consistent interfaces for reading, writing, searching, updating, handoffs and provenance. It also brings business intelligence and inference into the connection model: authorised operational data can feed analysis, decision support and model inference without making Memev itself the CRM, ERP, data warehouse or model provider. Data sovereignty is a cross-cutting requirement, covering ownership, residency, policy enforcement, permissions, auditability and provenance across local, team and federated boundaries. Each integration and governance path must be implemented and validated before it is described as supported.
+Memev's own vault, context retrieval, communications bus and work-contract mechanisms are important parts of that foundation, but they are not the product boundary. The wider connector ecosystem is intended to include AI providers, external memory systems, agent platforms, collaboration tools, operational applications, data services and business-intelligence systems through provider-neutral interfaces. The planned connection registry covers discovery, configuration, identity, permissions, health and lifecycle, with consistent interfaces for reading, writing, searching, updating, handoffs and provenance. It connects the systems people use with the work they produce in them.
 
-**The boundary between current capability and product direction matters.** The Free Core currently provides local-first context, supported AI-client integrations, the communications bus, work contracts and the other capabilities listed under [Plans and roadmap](#plans-and-roadmap). A universal connector registry, organisation-wide operation and operational federation are not yet shipped. Federation, where independent sites retain local control while exchanging authorised state, remains planned. See [docs/FEDERATION.md](docs/FEDERATION.md), [docs/scope-one/DECISIONS.md](docs/scope-one/DECISIONS.md) and [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md) for the current design and delivery boundaries.
+## From individual work to organisational intelligence
+
+Memev is intended to connect not only the applications an organisation uses, but also the work its people and systems produce. Project plans, specifications, documents, decisions, tasks, schedules, budgets, procurement changes, operational updates, engineering artefacts and delivery commitments can contribute to the relevant personal, team, company or site vault. AI applications and agents are both participants in this process: they can contribute work and decisions, and retrieve the authorised context needed to continue or analyse that work.
+
+The **Memev brain** is the evolving, evidence-linked understanding built from that authorised work. It relates people, departments, projects, programmes, portfolios, systems, decisions, requirements, milestones, dependencies, risks, changes and commitments. It is not simply a transcript store or a chatbot. The vault provides the governed information foundation; the graph, project state, provenance and shared context connect the information; connected AI and analytical systems apply inference to it.
+
+The intended flow is:
+
+1. **People and systems do the work** in the applications they already use.
+2. **Memev captures or references authorised work** through integrations and adapters, preserving source identity, versions, provenance and applicable policy.
+3. **The vault and shared context relate the work** across projects, teams and sites, subject to each participant's permissions and data-sovereignty rules.
+4. **Authorised AI models, agents and business-intelligence systems analyse that context**, identify relationships and infer possible downstream effects.
+5. **People receive an organisation-wide view** of project and programme state, cross-functional clashes, dependencies, emerging risks, decisions required and recommended actions, with evidence and accountable owners.
+
+For example, imagine five offices working on one international programme. An engineering team changes a component specification; procurement in another office is still ordering against the previous version; manufacturing has scheduled around the old dimensions; finance has forecast the old cost; and the programme office is reporting the original delivery date. Memev's intended organisational-intelligence layer would relate those authorised work records, identify the potential clash and trace its effects across procurement, manufacturing, cost and delivery. Executives could see the programme's current state and the evidence behind the issue instead of relying on five disconnected status reports.
+
+Important findings must show their source records, versions, provenance, uncertainty, freshness and affected owners. An AI-inferred relationship is a lead to investigate, not automatically an established fact; consequential findings require authorised validation or a defined verification process. Memev is intended to surface conflicts and support decisions, not silently approve changes or rewrite commitments.
+
+This does not require every source document or database to be copied into one central repository. Depending on policy, a vault or site node may hold the source, a permitted projection, a reference, a verified summary or a query interface. Source data, derived information, model context, indexes, caches, backups and computation all need appropriate governance. A user's personal vault does not automatically become company property, and an organisation's authorised shared view does not grant every user, agent or site unrestricted access.
+
+The wider connector model also brings business intelligence and inference into the same governed system: operational data can support analysis, decision support, forecasting and model inference without making Memev itself the CRM, ERP, data warehouse or model provider. Data sovereignty is cross-cutting, covering ownership, residency, purpose, policy enforcement, permissions, auditability and provenance across local, team and federated boundaries. Each integration and governance path must be implemented and validated before it is described as supported.
+
+**The boundary between current capability and product direction matters.** The Free Core currently provides local-first context, supported AI-client integrations, the communications bus, work contracts and the other capabilities listed under [Plans and roadmap](#plans-and-roadmap). The personal vault, recall, graph, import and coordination foundations exist today. The universal connection registry, broad ingestion from business systems, company-wide knowledge view, automated cross-project detection, organisation-wide executive intelligence and operational multi-site federation are not yet shipped as an end-to-end capability. The architecture and staged design are documented in [Organisational intelligence](docs/ORGANISATIONAL-INTELLIGENCE.md), [Projects](docs/PROJECTS.md), [Federation](docs/FEDERATION.md), [Data sovereignty](docs/DATA-SOVEREIGNTY.md) and [Federated computation](docs/FEDERATED-COMPUTATION.md).
 
 ## Who it is for
 
@@ -82,15 +104,17 @@ The tier names in the app and the licence tooling today are Personal for the fre
 
 ## How it fits together
 
-Memev is the connection layer between the systems that make up an individual's or organisation's AI environment. The illustration above shows the product boundary: Memev connects existing systems; it is not itself the model provider, memory vendor, agent framework or business application.
+Memev is the connective layer between people, their work, the systems they use and the AI capabilities they authorise. The illustration shows the intended product boundary: Memev connects existing systems and relates their work; it is not itself the model provider, memory vendor, agent framework, CRM, ERP or business application.
 
-- **Connect:** integrate AI providers, memory systems, agents, services, people and machines through supported interfaces.
-- **Share context:** make authorised information, decisions and useful prior work available across connected systems.
+- **Connect:** integrate AI providers, memory systems, agents, business services, people and machines through supported interfaces.
+- **Capture work:** ingest, reference or query authorised plans, documents, decisions, tasks, operational updates and other work products from the systems people already use.
+- **Build shared context:** relate that work to people, projects, programmes, portfolios, decisions, requirements, dependencies and evidence in the appropriate vault and graph.
 - **Communicate and coordinate:** let connected participants exchange messages, discover peers and hand off work through a shared communications bus.
-- **Control and verify:** apply identity, permissions, provenance and work-contract checks at the boundaries where those capabilities are implemented.
-- **Federate:** extend authorised exchange across computers, teams, departments and independent sites as the federation capabilities are delivered.
+- **Analyse and infer:** make permissioned context available to authorised AI models, agents and business-intelligence systems to identify possible clashes, dependencies, risks and downstream effects.
+- **Control and verify:** apply identity, permissions, provenance, data-sovereignty rules and work-contract checks; keep inferred findings distinct from verified facts.
+- **Federate:** extend authorised exchange and computation across computers, teams, departments and independent sites as those capabilities are delivered.
 
-The local vault and communications bus provide important parts of the current personal foundation. The broader architecture is provider-neutral: connected systems retain their own specialist capabilities, while Memev supplies the connective mechanisms. What is available today versus planned is stated explicitly below; the illustration describes the intended product boundary, not a claim that every connector or federation path is already operational.
+The local vault, recall, graph, communications bus and work-contract mechanisms provide important parts of the current personal foundation. The broader architecture is provider-neutral: connected systems retain their specialist capabilities, while Memev supplies the connective mechanisms and governed context. The organisation-wide work ingestion, cross-project reasoning and federated views are product direction, not a claim that every connector or workflow is already operational.
 
 ```mermaid
 flowchart LR
@@ -111,6 +135,8 @@ flowchart LR
 ```
 
 ## How shared context and coordination work
+
+The diagram below shows the current personal workflow: supported AI sessions use the local vault and communications bus. The wider organisational work-to-intelligence flow described above is an architectural target and is delivered in stages.
 
 ```mermaid
 flowchart TD
@@ -234,6 +260,9 @@ up. The main pages:
 |---|---|
 | [Quickstart](docs/QUICKSTART.md) | install, first session, everyday commands |
 | [Architecture](docs/ARCHITECTURE.md) | what runs today, and the Personal, Business and Corporate charts |
+| [Organisational intelligence](docs/ORGANISATIONAL-INTELLIGENCE.md) | work graph, cross-functional reasoning, evidence and findings |
+| [Federation](docs/FEDERATION.md) and [data sovereignty](docs/DATA-SOVEREIGNTY.md) | site boundaries, permissions, residency and governed exchange |
+| [Federated computation](docs/FEDERATED-COMPUTATION.md) | distributed analysis, inference, optimisation and execution |
 | [Module map](docs/MODULES.md) | every module and what imports what, generated from the code |
 | [AI apps](docs/CLIENTS.md) | what is changed in each app, hooks vs instructions, undoing it |
 | [Cloud access](docs/CLOUD.md) | the secure link, connector URLs, other computers, turning it on |
