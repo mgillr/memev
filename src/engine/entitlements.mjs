@@ -13,7 +13,7 @@ export const ENFORCEMENT = 'computers';
 /** Everything local is free and unlimited, for everyone. */
 export const CORE_FEATURES = ['vault', 'recall', 'graph', 'contracts', 'doctor', 'local_clients', 'own_tunnel', 'git_backup', 'cloud_connectors'];
 /** Paid add-ons: hosted services and multi-computer or team use. Only extra computers exist so far. */
-export const PAID_FEATURES = ['sync_hosted', 'backup_hosted', 'relay_hosted', 'extra_computers', 'team_vault', 'sso', 'audit_export', 'agent_binding'];
+export const PAID_FEATURES = ['sync_hosted', 'backup_hosted', 'relay_hosted', 'extra_computers', 'team_vault', 'sso', 'audit_export', 'agent_binding', 'federation', 'federated_compute'];
 
 /** Draft limits per tier (docs/PRICING.md). A licence's own seats and connectors win.
  * personal_more and corporate are the ids new licences use; personal and enterprise are the ids
@@ -27,9 +27,11 @@ export const TIERS = {
   business: { computers: null, connectors: null, local_clients: null, services: ['team'] },
   enterprise: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team', 'sso', 'audit'] },
   corporate: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team', 'sso', 'audit'] },
+  // Catalogue metadata only. Federated licences remain disabled until cross-org service contracts pass acceptance.
+  federated: { computers: null, connectors: null, local_clients: null, services: [] },
 };
 
-/** The names the tiers go by in what people read, the four names of the docs (docs/tiers/README.md).
+/** The names the tiers go by in what people read, the five names of the docs (docs/tiers/README.md).
  * The ids of older licences read as the name of the tier they are. */
 export const TIER_LABELS = {
   free: 'Personal',
@@ -40,6 +42,7 @@ export const TIER_LABELS = {
   business: 'Business',
   enterprise: 'Corporate',
   corporate: 'Corporate',
+  federated: 'Federated',
   founder: 'Founder',
 };
 
@@ -47,7 +50,7 @@ export const TIER_LABELS = {
 export const tierLabel = (id) => TIER_LABELS[id] || String(id);
 
 /**
- * The plans and what each adds, for `memev upgrade`, in the four tier names the docs use. The
+ * The plans and what each adds, for `memev upgrade`, in the five tier names the docs use. The
  * one-computer tier is one computer at a time through your own GitHub. The paid difference is
  * using several computers at once, with automatic merge from a separately licensed engine. The
  * comms bus and multi-app memory are in the one-computer tier and are never shown as paid. The
@@ -71,6 +74,7 @@ export const PLANS = [
   ]) },
   { name: 'Business', tier: 'business', adds: 'Contact us.' },
   { name: 'Corporate', tier: 'enterprise', adds: 'Contact us.' },
+  { name: 'Federated', tier: 'federated', adds: 'Planned. Contact us when federation services are available.' },
 ];
 
 /** Free-tier behaviour for features: core yes, hosted services no (they do not exist yet). */
