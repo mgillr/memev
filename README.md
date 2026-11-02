@@ -6,8 +6,8 @@
 
 <h1>Memev</h1>
 
-<p><strong>The infrastructure that turns an organisation's individual AI systems into one collective intelligence.</strong><br>
-From a single computer to a global enterprise. From isolated intelligence to coordinated organisational reasoning.</p>
+<p><strong>The infrastructure for collective intelligence across people, AI systems and organisations.</strong><br>
+From one person's AI tools to multi-office enterprises and independent organisations working together.</p>
 
 <p>
 <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue">
@@ -37,110 +37,172 @@ From a single computer to a global enterprise. From isolated intelligence to coo
 
 ## What Memev is
 
-Organisations are adopting AI in many places at once: individual employees, departments, business applications, internal platforms and external providers. Those systems often operate in isolation. They have different context, permissions and views of the organisation. A decision in one department may never reach the systems that need it elsewhere; agents can duplicate work, contradict one another or act on stale assumptions.
+Organisations are adopting AI across individuals, teams, departments, business applications and external providers. But adding more AI systems does not automatically make an organisation more intelligent. Each system can hold a different picture of the work. Decisions become detached from execution, dependencies are missed, effort is duplicated and nobody has a reliable view of what has actually been agreed, completed or verified.
 
-**Memev is being built as the organisational intelligence infrastructure that connects those systems.** It is intended to let an organisation's AI systems share authorised context, establish a consistent view of important state, reason across departmental boundaries and coordinate work — while each system keeps its specialist model, tools and responsibilities.
+**Memev is the connective operating infrastructure that lets those systems contribute to a shared, governed picture of work.** It connects people, AI applications, agents, projects, programmes, business systems and, in the planned architecture, independently operated sites and organisations. The systems keep their specialist models and tools. Memev supplies the shared state, coordination, authority and evidence that allow their work to fit together.
 
-The ambition scales from several AI tools on one computer, to many computers in one office, multiple departments, offices in different countries and, ultimately, independent organisations. The number and location of connected systems should not fragment the organisation's collective intelligence.
+The local vault is a foundation, not the product boundary. The product is the wider system built around it: a structured model of work, a communications and hand-off layer, a project state machine, a lead-agent and coordination model, contracts, verification, identity, trust, policy, convergence and federation.
 
-This is the product direction, not a claim that the full organisational platform ships today. The current product is the **Free Core**: a complete, local-first foundation for one person on one computer at a time, connecting supported AI apps through shared project state, a coordination bus and governed work. It is free for good, not a time-limited trial or a feature-restricted teaser; the core capabilities that work today remain free under the [Memev Charter](CHARTER.md). The repository is currently in a closed, invite-only preview. Multi-user company operation, cross-department organisational inference and multi-office federation are planned extensions. The boundary between what exists and what is planned is explicit below and in the [architecture](docs/ARCHITECTURE.md).
+### The capabilities that work together
 
-The architecture is built around six connected responsibilities:
+- **Connect.** Bring supported AI clients and agents into the same working environment. Connectors for additional agent frameworks, business applications and external systems are part of the planned integration programme.
+- **Understand the work.** Relate people, agents, teams, projects, programmes, portfolios, tasks, requirements, decisions, artefacts, dependencies, risks and commitments. The intended model follows work and its relationships, not just conversations or files.
+- **Share authorised state.** Give each connected participant the context and project records it is permitted to use, with source, version and provenance retained. Personal and organisational scopes remain separate.
+- **Coordinate execution.** Let a person choose a lead AI, see connected seats, exchange messages, hand work between agents and manage task state. The local ProjectStore and Coordinator provide claims, leases, dispatch control, recovery and lifecycle rules; agents and people execute in their own tools.
+- **Govern authority and access.** Bind actions to identities, scopes, credentials, permissions and policy. At larger scales, the design adds site relationships, data classifications, jurisdiction rules and explicit trust between independent participants.
+- **Verify outcomes.** Define obligations and acceptance criteria in work contracts. Bind evidence to the relevant scope and artefact. Keep requested, accepted, observed and verified work distinct. A completion message is not proof, and a converged record is not automatically a true or authorised decision.
+- **Converge and federate.** The architecture is designed to reconcile supported structured state across computers and independently operated nodes without asking a language model to choose which record wins. The separate crdt-merge engine is reached through a defined provider boundary. Multi-writer convergence and operational federation are not shipped in the current Free Core.
 
-- **Connectivity:** connect existing AI clients, agents, models, business systems and services rather than replacing them.
-- **Shared organisational state:** make authorised information, decisions, relationships and operational context available where it is needed.
-- **Coordination:** let connected AI systems discover peers, exchange messages, hand off work and coordinate dependencies.
-- **Consensus and conflict handling:** distinguish agreed state from uncertainty or disagreement; preserve evidence and authority rather than forcing superficial agreement.
-- **Trust and control:** enforce identity, scope, delegated authority, provenance and policy at the relevant boundaries.
-- **Verification:** retain the work specification, evidence and checks needed to distinguish a reported result from an accepted one.
+### What collective intelligence means here
 
-Memev is provider-neutral in its direction: it should connect the AI systems and business applications an organisation already chooses. It is not intended to be another chat interface, project-management suite, model provider or agent runtime.
+Collective intelligence is not one large model, a shared chat room or a central database containing everything. It is the result of many specialist systems and people working against a connected, permission-aware view of the work, while retaining their own tools, responsibilities and control.
 
-Federation and cross-organisation operation are planned, not shipped. The decisions behind the plans are recorded in [docs/scope-one/DECISIONS.md](docs/scope-one/DECISIONS.md), with delivery reconciliation in [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md).
+A change made in one project can matter somewhere else. A decision can affect a dependency, a delivery commitment, a supplier, a risk or a programme milestone. Memev's intended organisational intelligence layer will connect those relationships, identify possible downstream effects, show the evidence and uncertainty, and route the necessary decision to an authorised person. It must not turn an inference into an accepted fact or silently change an approved commitment.
+
+For example, a battery-system project may change a module's dimensions or thermal limits while a separate mechanical integration project still relies on the previous interface. Procurement, installation and programme milestones may also depend on that earlier specification. The intended Memev workflow is to identify the changed source and version, surface affected work and its owners, show why the dependency may matter, mark affected work for review and route a decision. The source records remain attributable and the approved state changes only through the authorised process.
+
+**That cross-project discovery is a planned capability, not a feature available in this preview.** The local graph and finding model provide foundations, but automatic discovery, impact analysis and decision routing still require implementation and end-to-end validation.
+
+### One architecture, increasing reach
+
+The same principles are intended to apply at each scale:
+
+1. **One person:** several AI tools share one person's project context and coordinate on one computer.
+2. **One office:** a company connects its people and AI systems to one governed company environment and a shared view of company work.
+3. **Many offices and countries:** independently operated site nodes exchange the state they are authorised to share, with local policy, ownership and continuity.
+4. **Independent enterprises:** customers, suppliers, contractors, partners or research organisations coordinate selected work under explicit agreements without merging their private organisational records.
+
+The first level is the current Free Core. The larger organisational and federated levels are the product direction and are labelled as planned below. See [Architecture](docs/ARCHITECTURE.md), [Organisational intelligence](docs/ORGANISATIONAL-INTELLIGENCE.md), [Federation](docs/FEDERATION.md) and [Data sovereignty](docs/DATA-SOVEREIGNTY.md).
 
 ## Who it is for
 
-Memev is one architecture with different entry points. The Free Core is useful on its own; the larger team and business capabilities extend the same foundations rather than replacing the individual product.
+Memev is designed to grow with the scope of work being coordinated. The Free Core is useful on its own; business and federation capabilities extend the same architecture rather than replacing the individual product.
 
-| If you are | What is available or planned | Why it matters |
+| Scope | What Memev is intended to provide | Availability |
 |---|---|---|
-| An individual developer or professional | **Free Core, closed preview:** one person, one computer, supported AI apps sharing local project context, recall, graph, hooks, contracts, communications bus, diagnostics and GitHub backup | Your AI tools can work from the same durable context and coordinate instead of operating as separate silos |
-| A developer building AI systems or agents | **Free Core, closed preview:** local MCP integration, agent communications primitives, project lifecycle and signed work contracts | Build and test AI workflows on an inspectable, open-source foundation without paying for the core |
-| A small team or engineering team | **Today:** each person can use the Free Core independently. **Planned Business capability:** a shared company environment, team identity, permissions, shared organisational context and administration | Move from individually connected AI tools to team-wide coordination without forcing everyone onto one AI provider |
-| A business with AI in multiple departments | **Business, planned:** organisational context and state, cross-department coordination, policy and administration | Connect departmental AI so the organisation can reason and coordinate across functional boundaries |
-| A large or regulated enterprise | **Corporate, planned:** private deployment, stronger identity and audit integrations, controlled organisational boundaries and higher-availability operation | Extend the same architecture across business units and operating environments |
-| An organisation with several offices or countries | **Multi-site federation, planned:** independently operated nodes and authorised exchange of state and computation | Extend organisational intelligence across locations while preserving local control |
+| **Individual professional or developer** | Supported AI tools share one person's project context, local state, communications bus and governed task workflow | Free Core, one person on one computer; closed preview |
+| **AI and agent developers** | An inspectable MCP and coordination foundation for connecting tools, recording project state, defining work and checking outcomes | Free Core capabilities in closed preview; broader adapters planned |
+| **One-office business** | One company environment for members, AI systems and company projects, with shared organisational context, identity, administration and policy | Business, planned |
+| **Multi-office or international organisation** | Coordination across departments, sites and countries, with local ownership, controlled replication, jurisdiction-aware policy and continuity during network partitions | Corporate and agreed multi-site services, planned |
+| **Independent enterprises working together** | A governed connection between separate organisations for a shared programme, project, supply chain, delivery or research effort. Each organisation retains its own identity, data, operators and policies; only agreed information and work cross the boundary | Cross-organisation federation under a Business or Corporate agreement, planned |
+
+A small team can start with each person using the Free Core independently. That is not yet a shared company workspace. Business is the planned step that introduces one company environment and administration; multi-site and cross-enterprise operation add separate trust and sovereignty boundaries.
 
 ## Plans by tier
 
-The tier decision of 31 October 2026 is recorded in [docs/scope-one/DECISIONS.md](docs/scope-one/DECISIONS.md). There is no Federated tier: everything above Personal is a conversation.
+The tier decision of 31 October 2026 is recorded in [docs/scope-one/DECISIONS.md](docs/scope-one/DECISIONS.md). There is no separate Federated tier. Federation is a planned service capability agreed within Business or Corporate scope, not another self-serve plan.
 
-| | Free (core) | Personal | Contact us |
-|---|---|---|---|
-| For | one person, one computer at a time | one person, up to 3 computers | teams, organisations, and sites that want to federate |
-| Price | free, for good | $12/month or $120/year (CHF 10 or CHF 100), early-supporter price | contact us |
-| What it includes | the whole core: shared project state, vault, recall, graph, hooks, contracts, ProjectStore, Coordinator, evidence-backed task lifecycle, comms bus, doctor, GitHub backup and supported AI-tool integrations | everything in Free, with the same vault on up to 3 computers over the secure link, priority support | scoped with you: see below |
-| Trial | the free core is the trial | none | a Business trial and a sales-assisted pilot are planned ([docs/BUSINESS-TRIAL.md](docs/BUSINESS-TRIAL.md)) |
-| Status | closed preview, invite only | paid multi-computer tier; simultaneous editing and convergence remain planned | planned, no dates |
+| | Free Core | Personal with more computers | Business | Corporate |
+|---|---|---|---|---|
+| **Scope** | One person, one computer at a time | One person, up to 3 computers | One organisation; first release is one company node and vault | One large organisation, with multi-site and jurisdictional requirements |
+| **Price** | Free, for good | $12/month or $120/year (CHF 10 or CHF 100), early-supporter price | Contact us | Contact us |
+| **Includes** | The complete local core: vault, recall, graph, supported AI integrations, hooks, contracts, project state, Coordinator, evidence-backed task lifecycle, communications bus, diagnostics and GitHub backup | Free Core on the person's additional computers over the secure link, with device credentials and priority support | Planned company environment, member identity, shared company vault, administration, policy and support | Planned controlled deployment, stronger identity and audit integration, and the multi-site architecture |
+| **Status** | Closed preview, invite only | Paid multi-computer capability for current supported use; simultaneous multi-writer convergence remains planned | Planned; not available to buy today | Planned; not available to buy today |
 
-The tier names in the app and the licence tooling today are Personal for the free core and Personal with more computers for the paid tier. [docs/PRICING.md](docs/PRICING.md) and [docs/tiers/README.md](docs/tiers/README.md) use those names and say what is built and what is planned for each. The free core is never limited ([CHARTER.md](CHARTER.md)).
+The names in the application and licence tooling are Personal for the free core and Personal with more computers for the paid tier. [docs/PRICING.md](docs/PRICING.md) and [docs/tiers/README.md](docs/tiers/README.md) explain the current names and boundaries. The Free Core remains free for good under the [Memev Charter](CHARTER.md).
+
+### Federation is a service scope, not a separate tier
+
+A Business or Corporate agreement may include a multi-site federation design or cross-organisation collaboration once those capabilities are built and validated. The scope is defined by the participating organisations, nodes, trust relationships, jurisdictions, data classes, workloads, governance and support requirements. It is not priced as a simple extra computer or a generic sixth tier.
+
+This distinction is deliberate:
+
+- **Business, one node:** the first company deployment is one company vault. Members' company work is shared into that environment under the company's rules; personal vaults remain separate.
+- **Business with several sites / Corporate:** sites can operate their own nodes and exchange permitted state under an agreed federation design. Corporate adds the stronger deployment and governance requirements of a large organisation.
+- **Independent organisations:** each enterprise keeps its own node, operator, identity, policy and source records. A bilateral or multi-party agreement defines exactly what can be discovered, read, replicated, computed, retained or exported.
+
+These are planned capabilities. The existence of a tier name, service description, schema or signed contract does not mean a complete operational service is available. See [Federation](docs/FEDERATION.md), [Data sovereignty](docs/DATA-SOVEREIGNTY.md), [Federated computation](docs/FEDERATED-COMPUTATION.md) and [pricing](docs/PRICING.md).
 
 ## How it fits together
 
-The target architecture connects an organisation's existing AI systems and business applications through a common infrastructure. It does not require one model, one agent framework or one centralised application to do everything.
+Memev has a local foundation today and a wider distributed architecture as its target. The two should not be confused.
 
-At organisational scale, Memev is intended to provide:
+### The Free Core running today
 
-- **Connections** to AI clients, agents, models, business applications and external services.
-- **An organisational context and state layer** that makes authorised information and decisions available across departments.
-- **Coordination and reasoning** so specialist systems can identify dependencies, exchange work and contribute to cross-functional outcomes.
-- **Consensus, trust and verification** so shared state, authority, evidence and unresolved disagreement remain explicit.
-- **Distributed operation** across computers, departments, offices and, eventually, independently operated organisations.
-
-The diagram below shows the **Free Core deployment that exists today**, not the future multi-office architecture. The wider organisational and federation architecture is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ORGANISATIONAL-INTELLIGENCE.md](docs/ORGANISATIONAL-INTELLIGENCE.md) and [docs/FEDERATION.md](docs/FEDERATION.md).
+The current Free Core runs as a local service around one person's vault. Supported AI applications connect through MCP and hooks. The daemon, local project engine, vault, graph and communications bus provide the shared working environment. Optional remote access and GitHub backup are under the operator's control.
 
 ```mermaid
 flowchart LR
-    subgraph computer["Your computer"]
-        apps["AI apps<br/>Claude Code, Codex, Gemini CLI,<br/>Cursor, Claude Desktop and more"]
-        vault[("Shared context<br/>Markdown vault, decisions,<br/>project state and recall")]
-        bus["Coordination bus<br/>presence, messages,<br/>task handoffs"]
-        apps <--> vault
-        apps <--> bus
-        bus --- vault
+    subgraph computer["One person's computer"]
+        apps["Supported AI tools and sessions"]
+        mcp["MCP and supported hooks"]
+        daemon["Memev local daemon"]
+        engine["Vault, graph, project state, Coordinator and bus"]
+        vault[("Local vault and operation log")]
+        apps <--> mcp
+        mcp <--> daemon
+        daemon <--> engine
+        engine <--> vault
     end
-    github[("Your private GitHub repository<br/>backup and history")]
-    cloud["Cloud AI apps side by side<br/>Claude, ChatGPT, more coming soon"]
-    laptop["Your other computers<br/>each with its own key"]
-    vault -- "backup every few minutes" --> github
-    cloud -. "optional secure link,<br/>off until you switch it on" .-> vault
-    laptop -. "the same secure link" .-> vault
+    gh[("The person's private GitHub backup")]
+    cloud["Optional cloud AI apps"]
+    gh <-->|"single-writer backup"| vault
+    cloud <-->|"optional secure link, enabled by the user"| daemon
 ```
+
+This is the current single-person deployment, not a company or federation diagram.
+
+### The intended organisational and federated architecture
+
+At organisational scale, Memev is intended to connect the work of many people and AI systems without requiring one model, one agent framework or one central memory service to own everything.
+
+```mermaid
+flowchart LR
+    subgraph personal["Personal scope"]
+        papps["One person's AI tools"]
+        pvault[("Personal vault")]
+        papps <--> pvault
+    end
+    subgraph orgA["Organisation A"]
+        subgraph siteA1["Office / site A"]
+            a1["People, agents and systems"]
+            av1[("Site A node and local state")]
+            a1 <--> av1
+        end
+        subgraph siteA2["Office / site B"]
+            a2["People, agents and systems"]
+            av2[("Site B node and local state")]
+            a2 <--> av2
+        end
+        av1 <-->|"authorised state and work, planned"| av2
+    end
+    subgraph orgB["Independent organisation B"]
+        b1["People, agents and systems"]
+        bv1[("Organisation B node and local state")]
+        b1 <--> bv1
+    end
+    av2 <-->|"agreement-scoped exchange, planned"| bv1
+```
+
+The personal vault does not silently become part of a company vault. A company can begin with one node. A multi-site organisation can add independently operated site nodes. Independent enterprises can establish a separate relationship for a defined programme or workload. In each case, the receiving node checks identity, relationship, scope and policy before accepting a contribution.
+
+The target is not unrestricted replication. It is **controlled participation**: source ownership stays visible, local policy remains authoritative, and each participant shares only the state or computation it has agreed to share. A regional service may assist with discovery or routing, but the federation design does not make one central coordinator the owner of every site's memory or the sequencer of ordinary updates.
+
+The organisational and federated diagrams describe planned deployment models. They are not available in the current release. See [Architecture](docs/ARCHITECTURE.md) and [Federation](docs/FEDERATION.md).
 
 ## How governed work moves through Memev
 
+A project workflow is more than a prompt followed by an agent's claim that it is done. Memev's local project engine provides the structure for work to move through defined states, with contracts and evidence keeping the result accountable.
+
 ```mermaid
 flowchart TD
-    a["Define project scope and obligations"] --> b["Plan work, dependencies and acceptance criteria"]
-    b --> c["Assign and coordinate people and agent seats"]
-    c --> d["People and agents execute in their own tools"]
-    d --> e["Record outputs, artifacts and evidence"]
-    e --> f["Verify evidence against scope and requirements"]
-    f --> g["Update project state and retain provenance"]
-    g --> h["Coordinate the next action or hand-off"]
+    a["Person states the goal and scope"] --> b["Break work into tasks, dependencies and deliverables"]
+    b --> c["Define contract, acceptance criteria and stop conditions"]
+    c --> d["Select the lead and suitable agent seats"]
+    d --> e["Coordinate dispatch and hand-offs"]
+    e --> f["People and agents execute in their own tools"]
+    f --> g["Record outputs, versions and evidence"]
+    g --> h["Verify evidence against scope and criteria"]
+    h --> i["Update project state and preserve provenance"]
+    i --> j["Coordinate the next action"]
+    j --> k["Where authorised, exchange selected state with other nodes"]
 ```
 
-Memev does not replace the people, agents or tools doing the work, and it does not treat an agent's
-completion report as proof. Its local ProjectStore and Coordinator provide the project state,
-task lifecycle, claims, leases, dispatch control and recovery; contracts define obligations; and
-verification binds evidence to the relevant scope and artifact. Verification and operator
-acceptance remain distinct. The local engine is implemented, while the broader workspace UI and
-some end-to-end integrations are still in progress.
+The local ProjectStore and Coordinator enforce task transitions, dependencies, claims, leases, dispatch control and recovery. Contracts define what is required. Verification binds evidence to the relevant scope and artefact; operator acceptance remains a separate decision. The communications bus gives connected sessions a way to exchange status and hand-offs. The exact execution of a hand-off still depends on the connected client and workflow.
 
-Shared context is one supporting capability: connected tools can work from authorised project
-records instead of repeatedly reconstructing the background. The local vault keeps those records
-inspectable, and the communications bus carries coordination between connected seats. The small
-example below shows context continuity across two tools; it is not the whole product.
+At larger scales, the same discipline is intended to extend across teams and sites: a change is attributable to its source, dependent work can be identified, permissions are checked at the boundary, and an unresolved semantic conflict is surfaced rather than silently overwritten. Cross-project discovery and cross-node workflows remain planned.
+
+Shared context is one visible example of the foundation, not the whole product:
 
 <p align="center">
 <img src="docs/assets/demo.gif" alt="One AI tool saves project context and another connected tool can retrieve it; an example of Memev's shared-state layer" width="480">
@@ -195,34 +257,37 @@ see [docs/CONTRACTS.md](docs/CONTRACTS.md).
 
 ## Plans and roadmap
 
-Every line below says whether it exists. Nothing in the second and third lists is available to use today.
+The product vision is broader than the current preview. The status below separates implemented local capabilities, work still being integrated and the organisational architecture that remains planned. A signed contract or a documented schema is not, by itself, a shipped feature.
 
-### Available now
+### Available in the current local foundation
 
-- The vault: Markdown notes in git, a checksummed log, project-aware recall, provenance and the entity graph. `memev import` brings in existing project folders, AI history and chat exports.
-- MCP access for the supported AI apps, with hooks where an app supports them, and optional cloud AI connectors over a secure link.
-- The communications bus: seats, roster, heartbeats, communications checks, task handoffs and holds.
-- Local project state and governed execution: ProjectStore, the task state machine and Coordinator, with claims, leases, dispatch control, recovery and evidence-bound verification. The broader workspace UI and some external integrations remain in progress.
-- Work contracts with signed, immutable specs and checks that run through `memev verify`.
-- Device keys, a licence checked offline, and the computer limit.
-- Backup to your own private GitHub repository.
-- The call-out boundary to a separately licensed convergence engine (WO-05-A, [docs/CONVERGENCE.md](docs/CONVERGENCE.md)). The engine itself is not in this repository and no released Memev merges through it yet.
+- **Durable project records:** Markdown vault, checksummed operation log, git history, project-aware recall, provenance and the local entity graph. `memev import` can bring in project folders, AI history and chat exports.
+- **Supported AI connectivity:** MCP access for supported applications, hooks where a client supports them, and optional cloud AI connectors over a secure link.
+- **Agent coordination:** communications-bus seats, roster, heartbeats, messages, communications checks, task hand-offs and holds. The person chooses the lead; Memev does not silently appoint one.
+- **Local project lifecycle:** ProjectStore, task state machine and Coordinator, including claims, leases, dispatch control, recovery and evidence-bound verification. The broader workspace UI and some end-to-end integrations remain in progress.
+- **Defined and checked work:** signed work specifications, acceptance criteria, stop conditions and checks through `memev verify`.
+- **Identity and operator control:** device credentials, offline licence checks, optional remote access and backup to the operator's own private GitHub repository.
+- **Federation foundations only:** contribution validation, local admission, relationship records and deny-by-default policy evaluation have code and tests. They are not connected to an inter-node transport or an operational federation service.
+- **A separate convergence boundary:** the call-out boundary to crdt-merge exists. The engine is in its own repository and no released Memev build currently merges through it.
 
 ### In progress
 
-- The broader project workspace and end-to-end user workflows: the local ProjectStore, state machine and Coordinator are implemented; remaining work is to complete the workspace experience and integrations around them. Tracked in the Scope One work breakdown and [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md).
-- The paid-engine client behind a flag, off by default (pull request #201), with the trial licence and entitlement work (#154, #163, #177).
-- Correctness fixes in the crdt-merge engine itself, in its own repository.
-- The programme decomposition of the wider plan, as proposed and unsigned contracts: [docs/scope-one/programme/README.md](docs/scope-one/programme/README.md).
-- Documentation and tier alignment to the owner decisions of 31 October 2026.
+- Completing the persistent project workspace and end-to-end user journey around the local project engine, including the lead area, plans, architecture views, decisions, blockers, artefacts and recovery paths.
+- Completing the secure single-writer behaviour around the vault daemon and CLI.
+- Completing the paid-engine client, licence validation and entitlement paths. The client is behind a flag and off by default; multi-writer convergence is not enabled in the Free Core.
+- Resolving the remaining signed-contract implementation gaps, independent review and release checks.
+- Completing the invited preview's automated known-issues inventory and 72-hour Free Core soak before any wider release.
 
-### Planned
+### Planned organisational capabilities
 
-- Automatic merging when several computers edit one vault at once, through crdt-merge (Personal).
-- Hosted end-to-end encrypted sync, hosted encrypted backup and a stable relay address.
-- A company vault with an admin console, one AI provider per organisation, sign-in with Google Workspace or Microsoft Entra ID, roles, an egress log, and a Business trial.
-- A single replicated event model across the log, the bus and project state, and evidence receipts for accepted work.
-- Federation across independent sites. It is specified in [docs/FEDERATION.md](docs/FEDERATION.md) and is being built in the SO-F contracts, one part at a time. It is not available in any release.
+- **Business, one office:** one company vault and server, member identity, administration, roles, provider policy, data labels and an egress record.
+- **Corporate and multi-site operation:** independently operated site nodes, scoped relationships, controlled replication, local policy, jurisdiction-aware data handling, partition tolerance and tested recovery.
+- **Organisational intelligence:** a canonical work graph across people, projects, programmes, portfolios, artefacts, decisions and commitments; permission-aware retrieval; cross-project and cross-functional impact discovery with evidence and measurable accuracy.
+- **External-enterprise federation:** explicit trust and agreements between independent organisations, scoped exchange of work and evidence, and clear ownership at every boundary.
+- **Federated computation:** authorised parallel work, analytics, optimisation, model evaluation and, where separately designed and validated, federated learning. Data-local execution is not automatically a privacy guarantee.
+- **Broader integrations:** agent frameworks, software delivery systems, business communication tools and enterprise systems through explicit adapters and data contracts.
+
+These capabilities are specified in the architecture and work programme, but they are not available in this preview. Follow delivery status through [Scope One reconciliation](docs/scope-one/RECONCILIATION.md), the [work breakdown](docs/scope-one/WBS.md) and the relevant architecture pages.
 
 ## What you get in the Free Core
 
