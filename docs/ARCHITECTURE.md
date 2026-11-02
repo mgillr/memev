@@ -268,7 +268,7 @@ keys, no grants, mounts or mixing
 
 | | Personal | Personal with more computers | Business | Corporate | Federated |
 |---|---|---|---|---|---|
-| Overview | [tiers/free.md](tiers/free.md) | [tiers/free.md](tiers/free.md#personal-with-more-computers-draft) | [tiers/business.md](tiers/business.md) | [tiers/corporate.md](tiers/corporate.md) | [FEDERATION.md](FEDERATION.md) |
+| Overview | [tiers/free.md](tiers/free.md) | [tiers/free.md](tiers/free.md#personal-with-more-computers-draft) | [tiers/business.md](tiers/business.md) | [tiers/corporate.md](tiers/corporate.md) | [tiers/federated.md](tiers/federated.md) |
 | Price and licence | [PRICING.md](PRICING.md) | [PRICING.md](PRICING.md) | contact us | contact us | contact us |
 | Services | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) |
 | Several sites (planned) | | | service-scoped option | [FEDERATION.md](FEDERATION.md) | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) |
