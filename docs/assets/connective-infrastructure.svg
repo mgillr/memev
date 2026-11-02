@@ -36,10 +36,10 @@
 </g>
 <g class="dash"><path d="M530 490 H572"/><path d="M1028 490 H1070"/><path d="M302 615 V670 H800 V715"/><path d="M800 615 V715"/><path d="M1297 615 V670 H800"/></g>
 <g text-anchor="middle">
- <text x="800" y="760" class="coretitle">Memev federated coordination and shared programme context</text><text x="800" y="802" class="corebody">Bilateral trust · scoped work exchange · evidence · dependencies · commitments</text><text x="800" y="842" class="corebody">Cross-organisation project, programme and portfolio relationships</text><text x="800" y="882" class="corebody">Authorised AI analysis · workload-specific computation · accountable findings</text>
+ <text x="800" y="760" class="coretitle">Memev federated coordination and shared programme context</text><text x="800" y="802" class="corebody">Bilateral trust · scoped work exchange · evidence · dependencies · commitments</text><text x="800" y="842" class="corebody">Distributed programme view; participants retain source authority</text><text x="800" y="882" class="corebody">Authorised AI analysis · workload-specific computation · accountable findings</text>
  <text x="435" y="1025" class="ct">Cross-organisation intelligence</text><text x="435" y="1060" class="body">Programme health · supply-chain dependencies · risks · changes · actions</text>
  <text x="1165" y="1025" class="ct">Sovereignty and trust at every boundary</text><text x="1165" y="1060" class="body">Ownership · jurisdiction · purpose · permissions · audit · provenance</text>
 </g>
-<g class="line"><path d="M235 305 V330 H800 V365"/><path d="M610 305 V365"/><path d="M985 305 V330 H800"/><path d="M1360 305 V330 H800"/><path d="M800 935 V958 H435 V980"/><path d="M800 958 H1165 V980"/></g>
+<g class="line"><path d="M235 305 V335 H302 V365"/><path d="M610 305 V335 H800 V365"/><path d="M985 305 V335 H1297 V365"/><path d="M1360 305 V345 H1297 V365"/><path d="M800 935 V958 H435 V980"/><path d="M800 958 H1165 V980"/></g>
 <text x="800" y="1140" text-anchor="middle" class="sub">No shared global vault · no transitive trust · no central ownership of participant data</text>
 </svg>
