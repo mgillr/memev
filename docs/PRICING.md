@@ -7,9 +7,9 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 >
 > **DRAFT. Not an offer and not in force.** The list below is the current table (decided 28 October
 > 2026). The Memev core is free. Self-serve checkout is Personal only, through Stripe, in test mode
-> first. The checkout program reads product ids, prices and the computer cap from config. Business and
-> Corporate have no public price: contact us. Hosted features are planned, with no date. There is no
-> Personal trial; Business has a time-limited trial (planned, see below). What the licence enforces
+> first. The checkout program reads product ids, prices and the computer cap from config. Business,
+> Corporate and Federated have no public price: contact us. Hosted features are planned, with no date.
+> There is no Personal trial; Business has a time-limited trial (planned, see below). What the licence enforces
 > today is how many computers can use one
 > vault. One computer with no licence gets the Personal tier ([CHARTER.md](../CHARTER.md)). The Memev core
 > is licensed under Apache-2.0 and stays that way ([LICENSING-NOTICE.md](LICENSING-NOTICE.md)).
