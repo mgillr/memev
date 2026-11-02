@@ -10,7 +10,7 @@
 Connect the work. Share context. Coordinate intelligence.</p>
 
 <p align="center">
-<img src="docs/assets/connective-infrastructure.svg" alt="Memev connects people and their work across AI providers, agents, business applications and data systems. Authorised work enters governed personal, team and site vaults and an evidence-linked organisational brain; AI and business intelligence analyse cross-project effects under permissions and data-sovereignty policies." width="900">
+<img src="docs/assets/connective-infrastructure.svg" alt="Memev connects people and their work across AI providers, agents, business applications and data systems. Independent organisations retain local vaults, authority and policies while bilateral agreements allow selected work, evidence and computation to contribute to shared programme intelligence." width="900">
 </p>
 
 <p><strong>Memev is the connective infrastructure for AI.</strong> It enables individuals, teams and organisations to connect their AI providers, memory systems, agents, services, people and machines through shared communications, context and federated infrastructure.</p>
