@@ -267,13 +267,12 @@ keys, no grants, mounts or mixing
 ## Where each tier is documented
 
 | | Personal | Business | Corporate | Federated |
-|---|---|---|---|
+|---|---|---|---|---|
 | Overview | [tiers/free.md](tiers/free.md) | [tiers/business.md](tiers/business.md) | [tiers/corporate.md](tiers/corporate.md) | [FEDERATION.md](FEDERATION.md) |
 | Price and licence | [PRICING.md](PRICING.md) | contact us | contact us | contact us |
 | Services | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) |
-| Several sites (planned) | | service-scoped option | [FEDERATION.md](FEDERATION.md) | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) | [FEDERATION.md](FEDERATION.md) |
+| Several sites (planned) | | service-scoped option | [FEDERATION.md](FEDERATION.md) | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) |
 | Independent organisations | | | | | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) |
-
 
 ### Federated tier (planned)
 
