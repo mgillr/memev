@@ -4,12 +4,12 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Re
 [Federation](FEDERATION.md), [Organisational intelligence](ORGANISATIONAL-INTELLIGENCE.md),
 [Data sovereignty](DATA-SOVEREIGNTY.md), [Convergence](CONVERGENCE.md).
 
-> **Planned. Architectural target, not shipped code.** Nothing on this page is built. Federated
-> computation rests on the planned federation of independently operated site nodes
-> ([FEDERATION.md](FEDERATION.md)) and is a planned capability of Corporate, and of a Business
-> licence whose services list includes the multi-site federation design
-> ([tiers/services.md](tiers/services.md)); it is not a tier
-> ([tiers/README.md](tiers/README.md#several-sites-and-federation-planned)).
+> **Planned. Architectural target, not shipped code.** Federated computation is intended for
+> Corporate workloads across sites within one organisation and for the fifth **Federated** tier
+> across independent organisations. Business may separately scope a multi-site design service.
+> Participant, workload and privacy models determine the scope; this is not a claim of a shipped
+> compute service. See [tiers](tiers/README.md), [Federation](FEDERATION.md) and
+> [services](tiers/services.md).
 
 ## Purpose
 
