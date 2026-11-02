@@ -1,4 +1,4 @@
-// MEM-137: the tier names people read are the four names from the docs, the licence tooling
+// MEM-137: the tier names people read are the five names from the docs, the licence tooling
 // takes the new ids, and the older ids still verify with the same limits.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +9,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { TIERS, TIER_LABELS, tierLabel, limitsFor, seatPolicy, report } from '../src/engine/entitlements.mjs';
+import { TIERS, TIER_LABELS, tierLabel, limitsFor, seatPolicy, report, PLANS, can } from '../src/engine/entitlements.mjs';
 import { TIER_NAMES, canonicalTier, verifyLicense, signLicense } from '../src/engine/license.mjs';
 import { FIXTURE_KID, FIXTURE_PUBLIC_KEY, FIXTURE_LICENSES } from './helpers/tier-fixtures.mjs';
 import { command } from '../src/cli/licensing.mjs';
@@ -19,7 +19,7 @@ import { sandbox } from './helpers/cli.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (p) => fs.readFileSync(path.join(here, p), 'utf8');
-const DOCS_NAMES = ['Personal', 'Personal with more computers', 'Business', 'Corporate'];
+const DOCS_NAMES = ['Personal', 'Personal with more computers', 'Business', 'Corporate', 'Federated'];
 const OLD_IDS = ['personal', 'team', 'office', 'business', 'enterprise', 'founder'];
 const captureLog = async (fn) => {
   const lines = [];
@@ -37,12 +37,16 @@ const initSandbox = () => {
   return sb;
 };
 
-test('MEM-137 AC01: TIER_LABELS and tierLabel read the four tier names from the docs table header', () => {
+test('MEM-137 AC01: TIER_LABELS and tierLabel read the five tier names from the docs table header', () => {
   const docs = read('../docs/tiers/README.md');
   const header = docs.split('\n').find((l) => l.startsWith('| |'));
   assert.ok(header, 'the docs table header line');
   assert.deepEqual([...header.matchAll(/\[([^\]]+)\]\(/g)].map((m) => m[1]), DOCS_NAMES);
-  assert.deepEqual([TIER_LABELS.free, TIER_LABELS.personal_more, TIER_LABELS.business, TIER_LABELS.corporate], DOCS_NAMES);
+  assert.deepEqual([TIER_LABELS.free, TIER_LABELS.personal_more, TIER_LABELS.business, TIER_LABELS.corporate, TIER_LABELS.federated], DOCS_NAMES);
+  assert.equal(PLANS.at(-1).name, 'Federated');
+  assert.equal(PLANS.at(-1).tier, 'federated');
+  assert.equal(can('federation'), false);
+  assert.equal(can('federated_compute'), false);
   assert.equal(TIER_LABELS.personal, TIER_LABELS.personal_more);
   assert.equal(TIER_LABELS.team, TIER_LABELS.business);
   assert.equal(TIER_LABELS.office, TIER_LABELS.business);
@@ -53,6 +57,7 @@ test('MEM-137 AC01: TIER_LABELS and tierLabel read the four tier names from the 
 
 test('MEM-137 AC02: TIER_NAMES takes the new ids, canonicalTier maps the old ones, and the signed fixtures still verify', () => {
   for (const id of [...OLD_IDS, 'personal_more', 'corporate']) assert.ok(TIER_NAMES.includes(id), id);
+  assert.equal(TIER_NAMES.includes('federated'), false, 'Federated must not be licence-issuable before service acceptance');
   assert.equal(canonicalTier('personal'), 'personal_more');
   assert.equal(canonicalTier('team'), 'business');
   assert.equal(canonicalTier('office'), 'business');
@@ -96,6 +101,9 @@ test('MEM-137 AC03: personal_more and corporate match their existing entries, an
     assert.equal(l.local_clients, null, id);
   }
   assert.deepEqual(limitsFor(null), { tier: 'free', ...TIERS.free });
+  assert.equal(TIERS.federated.computers, null);
+  assert.equal(TIERS.federated.connectors, null);
+  assert.deepEqual(TIERS.federated.services, []);
 });
 
 test('MEM-137 AC04: no old tier names in the printed strings, the over-limit note uses the label, and the JSON keeps ids with tier_label added', () => {
@@ -137,6 +145,7 @@ test('MEM-137 AC06: issue.mjs and license-dev.mjs show the new names in usage an
   assert.match(issue, /usage: issue\.mjs --key FILE --tier personal_more\|business\|corporate\|founder/);
   assert.match(issue, /--tier must be one of personal_more, business, corporate or founder \(the older ids personal, team, office and enterprise are still accepted\)/);
   assert.match(issue, /Personal needs no licence/);
+  assert.match(issue, /Federated is a planned tier and cannot be licensed yet/);
   assert.match(issue, /new licences for this tier use the id \${newer}/);
   assert.match(read('../scripts/license-dev.mjs'), /--tier personal_more\|business\|corporate\|founder/);
   const run = (file, args) => {
@@ -150,6 +159,9 @@ test('MEM-137 AC06: issue.mjs and license-dev.mjs show the new names in usage an
   const noargs = run('../scripts/license/issue.mjs', []);
   assert.equal(noargs.code, 2);
   assert.match(noargs.err, /--tier personal_more\|business\|corporate\|founder/);
+  const federated = run('../scripts/license/issue.mjs', ['--tier', 'federated', '--seats', '1']);
+  assert.equal(federated.code, 2);
+  assert.match(federated.err, /Federated is a planned tier and cannot be licensed yet/);
   const free = run('../scripts/license/issue.mjs', ['--tier', 'free', '--seats', '1']);
   assert.equal(free.code, 2);
   assert.match(free.err, /Personal needs no licence/);
