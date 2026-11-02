@@ -45,6 +45,7 @@ test('the price row matches the decided tiers', () => {
     '$12/month or $120/year',
     'contact us',
     'contact us',
+    'contact us',
   ]);
   assert.match(read('docs/PRICING.md'), /up to 3/);
   assert.doesNotMatch(read('docs/PRICING.md'), /\| (Office|Team|Enterprise) \|/);
