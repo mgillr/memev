@@ -272,7 +272,7 @@ keys, no grants, mounts or mixing
 | Price and licence | [PRICING.md](PRICING.md) | contact us | contact us | contact us |
 | Services | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) | [tiers/services.md](tiers/services.md) |
 | Several sites (planned) | | service-scoped option | [FEDERATION.md](FEDERATION.md) | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) |
-| Independent organisations | | | | | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) |
+| Independent organisations | | | | [FEDERATION.md](FEDERATION.md), [FEDERATED-COMPUTATION.md](FEDERATED-COMPUTATION.md) |
 
 ### Federated tier (planned)
 
