@@ -9,7 +9,7 @@ Part of the [Memev documentation](../README.md). Up: the [README](../../README.m
 
 The owner explicitly superseded the 31 October tier decision on 2 November 2026: the four existing offers remain, and **Federated is added as a fifth named tier** for cross-organisation networks. The original decision remains in the record as historical context; the superseding decision is appended in [DECISIONS.md](../scope-one/DECISIONS.md).
 
-There are five tiers: Personal (one computer), Personal with more computers, Business, Corporate and Federated. Business and Corporate are recognised by the licence metadata but their services remain planned. Federated appears in the product catalogue, but licence issuance is deliberately disabled until its service entitlements and acceptance criteria are implemented.
+There are five tiers: Personal (one computer), Personal with more computers, Business, Corporate and Federated. Business and Corporate are recognised by the licence metadata but their services remain planned. Federated appears in the product catalogue and upgrade plan, but the licence issuer deliberately refuses it until its service entitlements and acceptance criteria are implemented.
 
 | | [Personal](free.md) | [Personal with more computers](free.md#personal-with-more-computers-draft) | [Business](business.md) | [Corporate](corporate.md) | [Federated](federated.md) |
 |---|---|---|---|---|---|
