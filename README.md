@@ -228,7 +228,7 @@ bash scripts/install.sh "https://github.com/mgillr/memev/releases/download/vX.Y.
 PowerShell:
 
 ```powershell
-.\scripts\install.ps1 "https://github.com/mgillr/memev/releases/download/vX.Y.Z/memev-X.Y.Z.tgz"
+.\scripts\install.ps1 "https://github.com/mgillr/memev/releases/download/vX.Y.Z/memev-X.Y.Z.tgz" --no-connect
 ```
 
 The installer fetches the checksum file beside the tarball, verifies SHA-256 before extraction, uses Node 22+ already on the machine or downloads the pinned Node runtime with its own SHA-256 verification, then runs setup. The `--no-connect` argument is passed to `memev init`, so client configuration remains untouched until the user approves individual connections. Replace `X.Y.Z` with a real published version; the example is not a live download URL.
