@@ -86,7 +86,7 @@ Memev is designed to grow with the scope of work being coordinated. The Free Cor
 | **Multi-office or international organisation** | Coordination across departments, sites and countries, with local ownership, controlled replication, jurisdiction-aware policy and continuity during network partitions | Corporate and agreed multi-site services, planned |
 | **Independent enterprises working together** | A governed connection between separate organisations for a shared programme, project, supply chain, delivery or research effort. Each organisation retains its own identity, data, operators and policies; only agreed information and work cross the boundary | Cross-organisation federation under a Business or Corporate agreement, planned |
 
-A small team can start with each person using the Free Core independently. That is not yet a shared company workspace. Business is the planned step that introduces one company environment and administration; multi-site and cross-enterprise operation add separate trust and sovereignty boundaries.
+A small team can start with each person using the Free Core independently. That is not yet a shared company workspace. Business is the planned step that introduces one company environment and administration. In the first Business design, members' company work is shared into one company vault that the company can see and search through its administration interface; personal work stays outside it. Multi-site and cross-enterprise operation add separate trust and sovereignty boundaries.
 
 ## Plans by tier
 
