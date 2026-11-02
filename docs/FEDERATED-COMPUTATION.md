@@ -149,7 +149,7 @@ failure semantics and measurable acceptance tests before it is represented as im
 4. **Federated learning:** select a concrete algorithm and threat model, then validate data locality,
    privacy, convergence, model quality, reproducibility and failure recovery.
 5. **Portfolio-scale operation:** multi-project scheduling, capacity coordination, policy delegation
-   and multi-organisation participation.
+   and multi-organisation participation through the Federated tier.
 
 Do not claim a generic federated compute platform or federated learning implementation until the
 relevant end-to-end tests have passed.
