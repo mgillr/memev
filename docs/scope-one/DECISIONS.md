@@ -243,7 +243,7 @@ Business and Corporate concern coordination within one organisation. Federated i
 
 **Architecture:** the existing local-first architecture, vault, communications bus, work contracts, provenance, convergence call-out boundary, identity and trust decisions remain in force. The new tier extends those foundations; it does not replace them. Cross-organisation relationships require explicit bilateral agreements, separate trust roots, narrow scopes, expiry, revocation and local policy approval. There is no transitive trust.
 
-**Availability:** the Federated tier is a product and commercial target, not an assertion of shipped capability. Cross-node transport, federation membership, admission, trust exchange, sovereign policy enforcement, federated queries/reasoning and federated computation require implementation and end-to-end validation. No Federated offer may be sold as operational until its applicable acceptance criteria pass.
+**Availability:** the Federated tier is a product and commercial target, not an assertion of shipped capability. The upgrade catalogue may display the tier, but the licence issuer must refuse Federated licences until the entitlement model is specified. Cross-node transport, federation membership, admission, trust exchange, sovereign policy enforcement, federated queries/reasoning and federated computation require implementation and end-to-end validation. No Federated offer may be sold as operational until its applicable acceptance criteria pass.
 
 **Documentation:** README, tiers, pricing, services, architecture and federation documentation must describe the five-tier model consistently and distinguish Business (one organisation), Corporate (multi-site within one organisation) and Federated (independent organisations).
 
