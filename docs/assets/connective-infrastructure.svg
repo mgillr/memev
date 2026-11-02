@@ -1,59 +1,72 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc">
-<title id="title">Memev connection registry</title>
-<desc id="desc">Memev's connection registry provides discovery, configuration, identity, permissions, health and lifecycle management across AI providers, memory providers, agent platforms and business services. Common communications and context interfaces enable inference, business intelligence and data sovereignty under consistent access and exchange rules.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1050" viewBox="0 0 1440 1050" role="img" aria-labelledby="title desc">
+<title id="title">Memev connects work to organisational intelligence</title>
+<desc id="desc">People do work across AI applications, agent platforms, business systems and data services. Authorised work flows into governed personal, team and site vaults and an evidence-linked Memev brain. Permissioned AI and business-intelligence systems analyse cross-project effects and produce organisational insight, while identity, provenance, access policy and data sovereignty govern every exchange.</desc>
 <defs>
  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4f7fb"/><stop offset="1" stop-color="#e8eff6"/></linearGradient>
  <linearGradient id="core" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#132b45"/><stop offset="1" stop-color="#315c80"/></linearGradient>
- <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="7" stdDeviation="10" flood-color="#18344d" flood-opacity=".12"/></filter>
+ <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="6" stdDeviation="9" flood-color="#18344d" flood-opacity=".12"/></filter>
  <style>
- .h{font:700 34px system-ui,-apple-system,Segoe UI,sans-serif;fill:#172f46}.subhead{font:17px system-ui,-apple-system,Segoe UI,sans-serif;fill:#536a7d}
- .cardtitle{font:700 23px system-ui,-apple-system,Segoe UI,sans-serif;fill:#19344c}.body{font:17px system-ui,-apple-system,Segoe UI,sans-serif;fill:#506579}
- .coretitle{font:700 31px system-ui,-apple-system,Segoe UI,sans-serif;fill:#fff}.corebody{font:18px system-ui,-apple-system,Segoe UI,sans-serif;fill:#e6f0f8}
- .eyebrow{font:700 14px system-ui,-apple-system,Segoe UI,sans-serif;letter-spacing:2px;fill:#60788d}
- .foot{font:600 16px system-ui,-apple-system,Segoe UI,sans-serif;fill:#34516a}
- .link{stroke:#89a2b7;stroke-width:3;fill:none;stroke-linecap:round}
- .card{fill:#fff;stroke:#cfdae4;stroke-width:2}
+ .h{font:700 34px system-ui,-apple-system,Segoe UI,sans-serif;fill:#172f46}.sub{font:17px system-ui,-apple-system,Segoe UI,sans-serif;fill:#536a7d}
+ .ct{font:700 21px system-ui,-apple-system,Segoe UI,sans-serif;fill:#19344c}.body{font:16px system-ui,-apple-system,Segoe UI,sans-serif;fill:#506579}
+ .coretitle{font:700 30px system-ui,-apple-system,Segoe UI,sans-serif;fill:#fff}.corebody{font:17px system-ui,-apple-system,Segoe UI,sans-serif;fill:#e6f0f8}
+ .eyebrow{font:700 14px system-ui,-apple-system,Segoe UI,sans-serif;letter-spacing:2px;fill:#60788d}.foot{font:600 15px system-ui,-apple-system,Segoe UI,sans-serif;fill:#34516a}
+ .card{fill:#fff;stroke:#cfdae4;stroke-width:2}.line{stroke:#89a2b7;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round}
  </style>
 </defs>
-<rect width="1440" height="900" rx="30" fill="url(#bg)"/>
-<text x="720" y="55" text-anchor="middle" class="eyebrow">THE CONNECTIVE INFRASTRUCTURE FOR AI</text>
-<text x="720" y="101" text-anchor="middle" class="h">Memev connection registry</text>
-<text x="720" y="134" text-anchor="middle" class="subhead">Discovery · configuration · identity · permissions · health · lifecycle</text>
-<g class="link">
- <path d="M720 310 V350"/><path d="M355 310 L515 382"/><path d="M1085 310 L925 382"/>
- <path d="M355 550 L515 480"/><path d="M1085 550 L925 480"/>
- <path d="M720 525 V605"/>
-</g>
+<rect width="1440" height="1050" rx="28" fill="url(#bg)"/>
+<text x="720" y="48" text-anchor="middle" class="eyebrow">THE CONNECTIVE INFRASTRUCTURE FOR AI</text>
+<text x="720" y="91" text-anchor="middle" class="h">From people's work to organisational intelligence</text>
+<text x="720" y="122" text-anchor="middle" class="sub">Connect the systems. Govern the work. Understand the whole.</text>
 <g filter="url(#shadow)">
- <rect class="card" x="95" y="180" width="520" height="165" rx="22"/>
- <rect class="card" x="825" y="180" width="520" height="165" rx="22"/>
- <rect class="card" x="95" y="515" width="520" height="165" rx="22"/>
- <rect class="card" x="825" y="515" width="520" height="165" rx="22"/>
- <rect x="475" y="350" width="490" height="175" rx="26" fill="url(#core)"/>
- <rect x="220" y="730" width="1000" height="100" rx="20" fill="#fff" stroke="#b9cad8" stroke-width="2"/>
+ <rect class="card" x="65" y="160" width="310" height="155" rx="18"/>
+ <rect class="card" x="405" y="160" width="310" height="155" rx="18"/>
+ <rect class="card" x="745" y="160" width="310" height="155" rx="18"/>
+ <rect class="card" x="1085" y="160" width="290" height="155" rx="18"/>
+ <rect x="220" y="405" width="1000" height="235" rx="24" fill="url(#core)"/>
+ <rect class="card" x="95" y="735" width="560" height="150" rx="20"/>
+ <rect class="card" x="785" y="735" width="560" height="150" rx="20"/>
+ <rect x="95" y="920" width="1250" height="72" rx="16" fill="#dce7f0"/>
 </g>
 <g>
- <text x="135" y="228" class="cardtitle">AI providers</text>
- <text x="135" y="264" class="body">Models, inference, sessions, capabilities and tools</text>
- <text x="135" y="296" class="body">Hosted and local inference · routing · model choice</text>
- <text x="865" y="228" class="cardtitle">Memory providers</text>
- <text x="865" y="264" class="body">Read, write, search, update and provenance</text>
- <text x="865" y="296" class="body">Personal stores · vector systems · knowledge graphs</text>
- <text x="135" y="563" class="cardtitle">Agent platforms</text>
- <text x="135" y="599" class="body">Runtimes, tasks, handoffs and status</text>
- <text x="135" y="631" class="body">Frameworks · tools · autonomous and human-led agents</text>
- <text x="865" y="563" class="cardtitle">Business services</text>
- <text x="865" y="599" class="body">CRM, ERP, collaboration and development systems</text>
- <text x="865" y="631" class="body">Operational data · workflows · enterprise applications</text>
+ <text x="95" y="202" class="ct">People and their work</text>
+ <text x="95" y="238" class="body">Plans · documents · decisions</text>
+ <text x="95" y="266" class="body">Tasks · schedules · budgets</text>
+ <text x="95" y="294" class="body">Specifications · delivery updates</text>
+ <text x="435" y="202" class="ct">AI providers and agents</text>
+ <text x="435" y="238" class="body">Models · inference · sessions</text>
+ <text x="435" y="266" class="body">Agent runtimes · tools · handoffs</text>
+ <text x="435" y="294" class="body">AI applications contribute and consume</text>
+ <text x="775" y="202" class="ct">Business applications</text>
+ <text x="775" y="238" class="body">CRM · ERP · finance · procurement</text>
+ <text x="775" y="266" class="body">Engineering · development · operations</text>
+ <text x="775" y="294" class="body">Collaboration · project systems</text>
+ <text x="1115" y="202" class="ct">Data and memory</text>
+ <text x="1115" y="238" class="body">Knowledge stores · databases</text>
+ <text x="1115" y="266" class="body">Analytics · business intelligence</text>
+ <text x="1115" y="294" class="body">References · permitted data views</text>
+</g>
+<g class="line">
+ <path d="M220 315 V360 H720 V405"/>
+ <path d="M560 315 V405"/>
+ <path d="M900 315 V360 H720"/>
+ <path d="M1230 315 V360 H720"/>
+ <path d="M720 640 V690 H375 V735"/>
+ <path d="M720 690 H1065 V735"/>
 </g>
 <g text-anchor="middle">
- <text x="720" y="410" class="coretitle">Common Memev interfaces</text>
- <text x="720" y="449" class="corebody">Shared communications and context</text>
- <text x="720" y="482" class="corebody">Consistent identity, access and exchange rules</text>
- <text x="720" y="770" class="cardtitle">Business intelligence and inference</text>
- <text x="720" y="801" class="body">Connect operational data to analysis, insight, decision support and model inference</text>
+ <text x="720" y="455" class="coretitle">Memev vaults + shared brain</text>
+ <text x="720" y="495" class="corebody">Governed personal · team · company · site context</text>
+ <text x="720" y="535" class="corebody">Work graph: people · projects · programmes · portfolios</text>
+ <text x="720" y="575" class="corebody">Decisions · dependencies · risks · evidence · provenance</text>
+ <text x="720" y="612" class="corebody">Discovery · identity · permissions · health · lifecycle</text>
+ <text x="375" y="780" class="ct">Authorised AI and analytical systems</text>
+ <text x="375" y="817" class="body">Inference · comparison · forecasting · decision support</text>
+ <text x="375" y="848" class="body">Cross-functional reasoning with evidence and uncertainty</text>
+ <text x="1065" y="780" class="ct">Organisational and executive insight</text>
+ <text x="1065" y="817" class="body">Project state · programme health · portfolio risks</text>
+ <text x="1065" y="848" class="body">Clashes · dependencies · owners · actions required</text>
+ <text x="720" y="950" class="ct">Governed at every boundary: ownership · residency · purpose · permissions · audit · provenance</text>
+ <text x="720" y="977" class="body">Source data can remain at its site; only authorised references, views, results or state are shared</text>
 </g>
-<rect x="95" y="850" width="1250" height="34" rx="10" fill="#dce7f0"/>
-<text x="720" y="873" text-anchor="middle" class="foot">Data sovereignty and governance across every connection: ownership · residency · policy · permissions · audit · provenance</text>
-<text x="720" y="710" text-anchor="middle" class="subhead">One consistent connection layer — from personal systems to teams and federated organisations</text>
+<text x="720" y="710" text-anchor="middle" class="sub">Work flows in · context is related · intelligence flows back</text>
 </svg>
