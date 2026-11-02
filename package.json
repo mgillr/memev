@@ -1,16 +1,42 @@
 {
   "name": "memev",
   "version": "0.1.0",
-  "description": "One local memory shared by every AI session you run: an MCP server over a git-backed Markdown vault you own.",
+  "description": "Operating infrastructure for distributed AI work: governed coordination, shared state, contracts and verification.",
   "license": "Apache-2.0",
   "type": "module",
-  "bin": { "memev": "bin/memev.mjs" },
-  "engines": { "node": ">=22" },
-  "files": ["bin/", "src/", "templates/", "vendor/", "docs/", "!docs/BENCH.md", "LICENSE", "NOTICE", "README.md", "SECURITY.md", "CHARTER.md"],
+  "bin": {
+    "memev": "bin/memev.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "templates/",
+    "vendor/",
+    "docs/",
+    "!docs/BENCH.md",
+    "LICENSE",
+    "NOTICE",
+    "README.md",
+    "SECURITY.md",
+    "CHARTER.md"
+  ],
   "scripts": {
     "test": "node --test --test-concurrency=4 test/*.test.mjs",
     "leak-scan": "node scripts/leak-scan.mjs",
     "bench": "node scripts/bench/run.mjs"
   },
-  "keywords": ["mcp", "memory", "ai-agents", "claude-code", "markdown", "git"]
+  "keywords": [
+    "mcp",
+    "ai-agents",
+    "claude-code",
+    "markdown",
+    "git",
+    "distributed-ai",
+    "agent-coordination",
+    "convergence",
+    "verification"
+  ]
 }
