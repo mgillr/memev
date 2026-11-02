@@ -17,18 +17,21 @@ Node version, git, the port, and a folder it can write to, and stops with the fi
 
 Ask the person which path fits, and explain the one you choose before you run it:
 
-- From a copy of the repository: `node bin/memev.mjs init --no-connect`, run in the folder the person
-  downloaded.
-- npm, from a copy of the repository: `npm install -g . && memev init --no-connect`, which also puts
-  `memev` on the PATH.
-- Docker, for an always-on server or a home lab: `docker compose up -d`; the apps are connected by hand.
-- `npx memev init` is not published yet (it is not on the npm registry). Do not look for it.
-- The one-line installer is coming soon. Do not look for it.
+- From the public repository (recommended for the current preview): clone
+  `https://github.com/mgillr/memev.git`, then run `npm install -g .` and
+  `memev init --no-connect` from the checkout. Without a global command, run
+  `node bin/memev.mjs init --no-connect`.
+- From a verified release tarball: on macOS/Linux run
+  `bash scripts/install.sh <tarball-url>`; on Windows PowerShell run
+  `./scripts/install.ps1 <tarball-url>`. The installer requires the matching `.sha256` file beside
+  the tarball URL and verifies it before extraction. Use only a release asset the person selected.
+- Docker, for an always-on server or a home lab: `docker compose up -d`; apps are connected by hand.
+- `npx memev init` is not published; do not use it.
 
-Every path sets up the same thing: it creates the notes folder, starts Memev and runs a self-test.
-`--no-connect` keeps Memev from connecting the AI apps it finds, at init and afterwards: it also turns
-off the background connect that would otherwise connect each app a few seconds after Memev starts. The person already has a copy of the repository, or names the release to install; there
-is no other source.
+No GitHub release is published yet, so the release-installer path is available in the source but has
+no published tarball to install at present. Use the repository path for this preview. Every install
+path creates the notes folder, starts Memev and runs its setup checks. `--no-connect` prevents both
+initial and background client connections, so the person can approve apps individually.
 
 ## Ask permission before each privileged action
 
