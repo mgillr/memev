@@ -183,12 +183,12 @@ flowchart LR
 
 ## The technology behind convergence and trust
 
-Memev's product architecture is supported by a wider technology programme. These components have distinct responsibilities and are not all integrated into the released Memev build.
+Memev's product architecture is being developed alongside a wider technology programme. These components have distinct responsibilities and are not all integrated into the released Memev build.
 
 | Technology | Architectural role | Current relationship to Memev |
 |---|---|---|
 | **CRDT-Merge** | Collects independent contributions in a convergent structure and applies deterministic resolution over the common contribution set. This is intended to support convergence of structured state across independently operated participants without making a language model the conflict-resolution authority. | A separate convergence engine with a defined provider boundary. The released Memev build does not yet perform full distributed state convergence through it. Integration, licensing and end-to-end validation remain work. |
-| **E4** | A separate trust and integrity technology family concerned with the dimensions of evidence, causality and cryptographic verification defined by its technical specification. | A related technology programme, not a claim that E4 is currently integrated throughout Memev's execution or federation paths. |
+| **E4** | A separate trust and integrity technology family structured around data, trust, causal-clock and hash dimensions, as defined by its technical specification. | A related technology programme, not a claim that E4 is currently integrated throughout Memev's execution or federation paths. |
 | **ACFA-RS** | Deterministic fixed-point aggregation and reproducible computation, with receipts intended to support independent checking of results. | A separate implementation foundation. Its capabilities should not be represented as part of the released Memev runtime until integrated and tested at the relevant boundary. |
 | **Memev** | Connects participants and work; governs identity, scope and policy; coordinates execution; records provenance; and verifies outcomes against defined obligations and evidence. | The product layer that is being developed to bring these responsibilities together in usable personal, organisational and federated offerings. |
 
@@ -301,6 +301,7 @@ Memev's product direction is broader than the current release. Every line below 
 - The vault: Markdown notes in git, a checksummed log, project-aware recall, provenance and the entity graph. `memev import` brings in existing project folders, AI history and chat exports.
 - MCP access for the supported AI apps, with hooks where an app supports them, and optional cloud AI connectors over a secure link.
 - The communications bus: seats, roster, heartbeats, communications checks, task handoffs and holds.
+- The local project lifecycle: a project store and coordinator with atomic task claims, leases, heartbeats, reporting, pause/resume, scope amendment, reassignment and evidence-bound verification. This is local lifecycle coordination, not yet distributed multi-writer convergence.
 - Work contracts with signed, immutable specs and checks that run through `memev verify`.
 - Device keys, a licence checked offline, and the computer limit.
 - Backup to your own private GitHub repository.
