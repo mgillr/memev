@@ -6,8 +6,8 @@
 
 <h1>Memev</h1>
 
-<p><strong>The connective infrastructure for AI.</strong><br>
-Connect the work. Share context. Coordinate intelligence.</p>
+<p><strong>The operating infrastructure for distributed AI work.</strong><br>
+Coordinate people, AI systems and organisations around governed work and verifiable outcomes.</p>
 
 <p align="center">
 <img src="docs/assets/connective-infrastructure.svg" alt="Memev connects people and their work across AI providers, agents, business applications and data systems. Independent organisations retain local vaults, authority and policies while bilateral agreements allow selected work, evidence and computation to contribute to shared programme intelligence." width="900">
@@ -41,41 +41,42 @@ Connect the work. Share context. Coordinate intelligence.</p>
 
 ## What Memev is, and why it matters
 
-AI is spreading across personal tools, teams, departments and business systems. But the systems people choose often remain isolated: providers do not share the same context, agents cannot reliably communicate across environments, and useful knowledge is trapped in individual applications or machines.
+AI is spreading across personal tools, teams, departments and business systems. But adding more AI does not automatically make work more coordinated. Different providers, agents, people and applications can hold different versions of a project's state. Decisions become detached from execution, dependencies are missed, work is duplicated and it becomes difficult to establish what was agreed, what changed and what has actually been verified.
 
-**Memev connects that landscape.** It provides shared communications and context so authorised AI providers, memory systems, agents, services, people and machines can exchange information and coordinate without requiring everyone to use the same model, agent framework or business application. Memev works alongside those systems; it does not replace them.
+**Memev is the operating infrastructure that lets independent people and AI systems contribute to coordinated work.** It connects AI providers, agents, people, computers, projects and business systems through shared operational context, communications, work coordination, authority and evidence. It works alongside the systems people already use; it does not require them to adopt one model, agent framework or business application.
 
-The product has two equally important dimensions:
+Memev is not an AI memory product or simply an agent orchestration framework. Its local vault and context retrieval are foundations. The product is the wider operating environment that relates work, coordinates execution, governs access and records whether outcomes have been demonstrated.
 
-- **A valuable personal product from day one.** The Free Core gives an individual a practical local-first way to connect supported AI tools, preserve and retrieve context, and coordinate sessions. Personal use is not merely a trial of an enterprise product: it is a complete and worthwhile starting point.
-- **An architecture that scales.** The same connective foundations are intended to extend across multiple computers, teams, departments, offices and organisations, with identity, permissions, provenance, policy and federation appropriate to each boundary.
+The offering has two connected dimensions:
 
-Memev's own vault, context retrieval, communications bus and work-contract mechanisms are important parts of that foundation, but they are not the product boundary. The wider connector ecosystem is intended to include AI providers, external memory systems, agent platforms, collaboration tools, operational applications, data services and business-intelligence systems through provider-neutral interfaces. The planned connection registry covers discovery, configuration, identity, permissions, health and lifecycle, with consistent interfaces for reading, writing, searching, updating, handoffs and provenance. It connects the systems people use with the work they produce in them.
+- **A useful personal product today.** The Free Core gives one person a local-first environment for connecting supported AI clients, sharing project context, coordinating sessions and agents, managing defined work, and retaining evidence and provenance. It is a complete starting point, not merely a trial of an enterprise service.
+- **An architecture that scales across organisational boundaries.** The same product direction extends through multiple computers, teams, departments and sites to independent organisations. Identity, authority, policy, evidence and convergence become increasingly important as participants and trust boundaries multiply.
 
-## From individual work to organisational intelligence
+### From individual work to organisational intelligence
 
-Memev is intended to connect not only the applications an organisation uses, but also the work its people and systems produce. Project plans, specifications, documents, decisions, tasks, schedules, budgets, procurement changes, operational updates, engineering artefacts and delivery commitments can contribute to the relevant personal, team, company or site vault. AI applications and agents are both participants in this process: they can contribute work and decisions, and retrieve the authorised context needed to continue or analyse that work.
+Memev is designed to relate the work people and systems produce: plans, specifications, decisions, tasks, schedules, budgets, procurement changes, operational updates, engineering artefacts, dependencies and delivery commitments. The aim is to build a shared, evidence-linked operational understanding across the appropriate personal, team, company, site or federated scope.
 
-The **Memev brain** is the evolving, evidence-linked understanding built from that authorised work. It relates people, departments, projects, programmes, portfolios, systems, decisions, requirements, milestones, dependencies, risks, changes and commitments. It is not simply a transcript store or a chatbot. The vault provides the governed information foundation; the graph, project state, provenance and shared context connect the information; connected AI and analytical systems apply inference to it.
+That understanding is more than a transcript store or a chatbot. It relates people, agents, projects, programmes, portfolios, systems, decisions, requirements, milestones, dependencies, risks, changes and commitments. Authorised AI and analytical systems can use that context to identify relationships, investigate impacts and support decisions. Memev coordinates and governs that work; it does not claim that every inference is automatically true or every proposed action is automatically approved.
 
-The intended flow is:
+For example, imagine an engineering team changes a battery-system specification while a separate mechanical team is designing the fitting around it. Procurement may still be ordering the previous component, manufacturing may have scheduled against the old dimensions, and another project may depend on the same interface. Memev's intended organisational-intelligence capability is to relate those separate workstreams, surface the potential conflict, show the affected dependencies and trace the evidence and owners needed to resolve it. The value is not simply remembering the change; it is helping the organisation understand what that change means elsewhere.
 
-1. **People and systems do the work** in the applications they already use.
-2. **Memev captures or references authorised work** through integrations and adapters, preserving source identity, versions, provenance and applicable policy.
-3. **The vault and shared context relate the work** across projects, teams and sites, subject to each participant's permissions and data-sovereignty rules.
-4. **Authorised AI models, agents and business-intelligence systems analyse that context**, identify relationships and infer possible downstream effects.
-5. **People receive an organisation-wide view** of project and programme state, cross-functional clashes, dependencies, emerging risks, decisions required and recommended actions, with evidence and accountable owners.
+The same principle extends beyond one organisation. A supplier, customer, contractor or research partner may need to contribute selected information or evidence to a shared programme without transferring ownership of its systems or exposing its entire data estate. Memev's Federated tier is designed for that distinct boundary: participants retain their own operators, trust roots, policies and legal responsibilities while exchanging authorised contributions under explicit agreements.
 
-For example, imagine five offices working on one international programme. An engineering team changes a component specification; procurement in another office is still ordering against the previous version; manufacturing has scheduled around the old dimensions; finance has forecast the old cost; and the programme office is reporting the original delivery date. Memev's intended organisational-intelligence layer would relate those authorised work records, identify the potential clash and trace its effects across procurement, manufacturing, cost and delivery. Executives could see the programme's current state and the evidence behind the issue instead of relying on five disconnected status reports.
+### How the architecture creates a common operational understanding
 
-Important findings must show their source records, versions, provenance, uncertainty, freshness and affected owners. An AI-inferred relationship is a lead to investigate, not automatically an established fact; consequential findings require authorised validation or a defined verification process. Memev is intended to surface conflicts and support decisions, not silently approve changes or rewrite commitments.
+The intended architecture combines several responsibilities that must not be confused:
 
-This does not require every source document or database to be copied into one central repository. Depending on policy, a vault or site node may hold the source, a permitted projection, a reference, a verified summary or a query interface. Source data, derived information, model context, indexes, caches, backups and computation all need appropriate governance. A user's personal vault does not automatically become company property, and an organisation's authorised shared view does not grant every user, agent or site unrestricted access.
+1. **Coordination:** people and agents communicate, hand work between tools, follow task lifecycles and work against defined scope.
+2. **Authority and governance:** identities, credentials, relationships, policies and permissions determine who may contribute, access or act.
+3. **Evidence and verification:** provenance, contracts, acceptance criteria and receipts distinguish a request or completion claim from an outcome that has been checked.
+4. **Convergence:** independently produced, authorised contributions can be collected and deterministically resolved into a common state, rather than relying on an LLM to choose which record wins.
+5. **Deterministic computation and trust:** reproducible computation and integrity mechanisms provide a basis for independently checking relevant operations and their results.
 
-The wider connector model also brings business intelligence and inference into the same governed system: operational data can support analysis, decision support, forecasting and model inference without making Memev itself the CRM, ERP, data warehouse or model provider. Data sovereignty is cross-cutting, covering ownership, residency, purpose, policy enforcement, permissions, auditability and provenance across local, team and federated boundaries. Each integration and governance path must be implemented and validated before it is described as supported.
+Convergence does not itself establish truth, permission or agreement. A technically converged record can still contain a mistaken or disputed contribution. Memev's architecture therefore pairs contribution handling with identity, policy, provenance, evidence, validation and accountable decision-making.
 
-**The boundary between current capability and product direction matters.** The Free Core currently provides local-first context, supported AI-client integrations, the communications bus, work contracts and the other capabilities listed under [Plans and roadmap](#plans-and-roadmap). The personal vault, recall, graph, import and coordination foundations exist today. The universal connection registry, broad ingestion from business systems, company-wide knowledge view, automated cross-project detection, organisation-wide executive intelligence and operational multi-site federation are not yet shipped as an end-to-end capability. The architecture and staged design are documented in [Organisational intelligence](docs/ORGANISATIONAL-INTELLIGENCE.md), [Projects](docs/PROJECTS.md), [Federation](docs/FEDERATION.md), [Data sovereignty](docs/DATA-SOVEREIGNTY.md) and [Federated computation](docs/FEDERATED-COMPUTATION.md).
+This does not mean every source document or database must be copied into one central repository. Depending on policy, a participant may share a source record, a permitted projection, a reference, a verified summary or a query result. Source data, derived information, model context, indexes, caches, backups and computation all require appropriate governance. Personal and organisational scopes must remain distinct, and one participant's access must not imply unrestricted access for another.
 
+**The boundary between current capability and product direction matters.** The Free Core already has a local vault, supported AI-client integrations, communications-bus foundations, work contracts and a local project lifecycle. The wider connection registry, broad ingestion from business systems, company-wide operational view, automated cross-project impact discovery and end-to-end multi-organisation federation are not shipped as one complete service. The roadmap below distinguishes the current local product from work in progress and future organisational capabilities.
 ## Who it is for
 
 Memev starts with the individual because personal AI connectivity is valuable in its own right. Teams and organisations extend the same architecture with additional identity, policy, administration and federation requirements.
@@ -92,7 +93,7 @@ Memev starts with the individual because personal AI connectivity is valuable in
 
 ## Five tiers, one connective architecture
 
-Memev grows by the scope of coordination required. The first four tiers serve an individual, a multi-device individual, a single organisation and a large multi-site organisation. The fifth tier connects **independent organisations** that need to work together without becoming one organisation or placing all of their data under one authority.
+Memev grows by the scope of coordination required. The first two tiers serve an individual across one or more computers; Business and Corporate serve one organisation at increasing scale. The fifth tier connects **independent organisations** that need to work together without becoming one organisation or placing all of their data under one authority.
 
 | Tier | Scope | What it is for | Commercial position |
 |---|---|---|---|
@@ -140,6 +141,23 @@ flowchart LR
     cloud -. "optional secure link,<br/>off until you switch it on" .-> vault
     laptop -. "the same secure link" .-> vault
 ```
+
+## The technology behind convergence and trust
+
+Memev's product architecture is supported by a wider technology programme. These components have distinct responsibilities and are not all integrated into the released Memev build.
+
+| Technology | Architectural role | Current relationship to Memev |
+|---|---|---|
+| **CRDT-Merge** | Collects independent contributions in a convergent structure and applies deterministic resolution over the common contribution set. This is intended to support convergence of structured state across independently operated participants without making a language model the conflict-resolution authority. | A separate convergence engine with a defined provider boundary. The released Memev build does not yet perform full distributed state convergence through it. Integration, licensing and end-to-end validation remain work. |
+| **E4** | A separate trust and integrity technology family concerned with the dimensions of evidence, causality and cryptographic verification defined by its technical specification. | A related technology programme, not a claim that E4 is currently integrated throughout Memev's execution or federation paths. |
+| **ACFA-RS** | Deterministic fixed-point aggregation and reproducible computation, with receipts intended to support independent checking of results. | A separate implementation foundation. Its capabilities should not be represented as part of the released Memev runtime until integrated and tested at the relevant boundary. |
+| **Memev** | Connects participants and work; governs identity, scope and policy; coordinates execution; records provenance; and verifies outcomes against defined obligations and evidence. | The product layer that is being developed to bring these responsibilities together in usable personal, organisational and federated offerings. |
+
+The distinction between these layers is important. CRDT convergence can make replicas resolve the same accepted contribution set consistently, but it does not decide whether a contribution is truthful, authorised or semantically correct. Identity and policy govern admission; provenance records origin; evidence and validation support decisions; deterministic computation supports reproducibility where applicable.
+
+The broader research direction includes convergence of operational state and, where separately designed and validated, computational or model contributions. These are not interchangeable capabilities. The README does not claim that Memev currently merges model weights, runs federated computation across organisations or offers a complete distributed multi-writer service.
+
+See [Convergence](docs/CONVERGENCE.md), [Federation](docs/FEDERATION.md), [Federated computation](docs/FEDERATED-COMPUTATION.md), [Data sovereignty](docs/DATA-SOVEREIGNTY.md) and the [Scope One reconciliation](docs/scope-one/RECONCILIATION.md) for the implementation boundaries and outstanding work.
 
 ## How shared context and coordination work
 
@@ -226,19 +244,19 @@ Memev's product direction is broader than the current release. Every line below 
 
 ### In progress
 
-- The project engine: the project store, the project state machine and the coordinator are merged and tested, and are being wired into one execution path. Tracked in the Scope One work breakdown (pull request #324) and in [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md).
+- The local project lifecycle: the project store, state machine and coordinator provide task claims, leases, heartbeats, reporting, evidence-bound verification, pause/resume, scope amendment, cancellation and reassignment. Remaining work is tracked in [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md); local lifecycle support should not be confused with distributed multi-writer convergence.
 - The paid-engine client behind a flag, off by default (pull request #201), with the trial licence and entitlement work (#154, #163, #177).
 - Correctness fixes in the crdt-merge engine itself, in its own repository.
 - The programme decomposition of the wider plan, as proposed and unsigned contracts: [docs/scope-one/programme/README.md](docs/scope-one/programme/README.md).
-- Documentation and tier alignment to the owner decisions of 31 October 2026.
+- Documentation and tier alignment to the superseding owner decisions of 2 November 2026.
 
 ### Planned
 
-- Automatic merging when several computers edit one vault at once, through crdt-merge (Personal).
+- Multi-writer convergence across computers and independent participants through the separate CRDT-Merge engine, following integration, licensing, correctness and end-to-end acceptance work. This is broader than synchronising simultaneous edits to one personal vault.
 - Hosted end-to-end encrypted sync, hosted encrypted backup and a stable relay address.
 - A company vault with an admin console, one AI provider per organisation, sign-in with Google Workspace or Microsoft Entra ID, roles, an egress log, and a Business trial.
 - A single replicated event model across the log, the bus and project state, and evidence receipts for accepted work.
-- Federation across independent sites. It is specified in [docs/FEDERATION.md](docs/FEDERATION.md) and is being built in the SO-F contracts, one part at a time. It is not available in any release.
+- Operational federation across independently operated sites and organisations. Executable primitives and specifications exist, but node-to-node transport, complete admission and revocation paths, sovereign policy enforcement, recovery and end-to-end acceptance remain implementation work. It is not available as an operational service in any release.
 
 ## What you get
 
@@ -295,9 +313,7 @@ up. The main pages:
 ## For developers
 
 Memev is a local MCP server and coordination layer built around a Markdown vault. Each session starts with a resume card, supported prompts can receive relevant project context (in apps with hooks), and state is saved before a compaction. The same core exposes the communications bus and work-contract mechanisms, bringing context, coordination and verification into one project workflow.
-The graph holds entities, links and claims with a status (fact, theory, conjecture) and provenance.
-Recall is BM25 over note sections, filtered by project and permissions before ranking. Node 22,
-nothing else. See [docs/DESIGN.md](docs/DESIGN.md), the [module map](docs/MODULES.md) and
+The graph holds entities, links and claims with a status (fact, theory, conjecture) and provenance. The local project lifecycle separates assignment, execution observations and evidence-bound verification; a participant's completion message alone does not make work verified. Recall is BM25 over note sections, filtered by project and permissions before ranking. Node 22, nothing else. See [docs/DESIGN.md](docs/DESIGN.md), the [module map](docs/MODULES.md) and
 [docs/DEVELOPING.md](docs/DEVELOPING.md).
 
 ## Licensing
