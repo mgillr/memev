@@ -59,7 +59,7 @@ flowchart LR
     custom --> hubA & hubB
 ```
 
-The same chart, next to Personal and Business, is in [ARCHITECTURE.md](../ARCHITECTURE.md#corporate-coming).
+The architecture overview, including the Federated tier, is in [ARCHITECTURE.md](../ARCHITECTURE.md#personal-business-and-corporate).
 
 ## What's included (planned)
 
@@ -73,6 +73,11 @@ The same chart, next to Personal and Business, is in [ARCHITECTURE.md](../ARCHIT
 - Custom connectors to internal systems
 - A named engineer, or an engineer embedded with your team
 - Source escrow and a written succession plan, on request
+
+
+## Cross-organisation work: the Federated tier
+
+Corporate is for sites, departments and jurisdictions within one organisation. Where work crosses into suppliers, customers, research institutions, contractors or other independent organisations, the separate fifth **Federated** tier provides the intended commercial and governance model. Each participant retains its own node, vault, trust root, policies and legal responsibilities, and shares only what bilateral agreements and local policy permit. See [FEDERATION.md](../FEDERATION.md) and [Federated computation](../FEDERATED-COMPUTATION.md). This is planned, not shipped end to end.
 
 ## Several sites and federation (planned)
 
