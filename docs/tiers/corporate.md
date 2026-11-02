@@ -80,8 +80,7 @@ The main corporate vault above is one node, and the one-node case is what ships 
 architectural target behind it is a federation of independently operated site nodes: each site
 owns its node and its memory, sites converge the state they are authorised to share through the
 convergence engine under its contract, and no central coordinator sequences ordinary updates.
-Federation across sites, and federated computation on top of it, are planned capabilities of
-Corporate; they are not a tier and are not sold before they are built.
+Federation across sites within one organisation, and federated computation for its workloads, are planned Corporate capabilities. They are not a separate tier in that intra-organisation context; the fifth Federated tier is for independent organisations. Neither is sold before it is built.
 
 What the planned extension adds, each part planned: node identity and membership between sites;
 per-scope operation-log streams as the replication unit, each entry carrying its classification
