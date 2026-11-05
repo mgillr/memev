@@ -1064,7 +1064,7 @@
    ],
    "implements": [],
    "tasks": 1,
-   "criteria": 17,
+   "criteria": 19,
    "spec": "specs/SO-F-04C.json",
    "adapted_from": "none; written from the review of pull request #368 (merged)",
    "base": "2f24e942e2b80649487829ed021c1f0b78b6bccb (the main commit that merged pull request #368)",

@@ -79,22 +79,57 @@
         {
           "n": 1,
           "severity": "high",
-          "how": "No criterion has a node that is a party of a relationship of another scope. Requirement 1 limits the relationships considered to those valid for the scope, but every fixture of c1 to c5 holds one scope: c1 has one relationship, c2 has two live relationships of the same scope, c3 has a live relationship of the same scope beside the refused one, and c5 has no node. A build whose party match ignores the scope, so that it admits a node that is a party only of another scope's relationship whenever some relationship covers the scope, passes all five subtests and c7. That is the authorisation check this contract adds. A criterion that catches it: with a live relationship of node-a and node-b for scope S1 and a live relationship of node-x and node-y for scope S2, a contribution for S1 from node-x is refused with deny.not_a_party, and a contribution from node-x for a scope S3 that no relationship covers is refused with deny.no_relationship; the test fails before the change on an assertion and passes after. Round 1 recorded this as its builder note 1 and raised no answer."
+          "how": "No criterion has a node that is a party of a relationship of another scope. Requirement 1 limits the relationships considered to those valid for the scope, but every fixture of c1 to c5 holds one scope: c1 has one relationship, c2 has two live relationships of the same scope, c3 has a live relationship of the same scope beside the refused one, and c5 has no node. A build whose party match ignores the scope, so that it admits a node that is a party only of another scope's relationship whenever some relationship covers the scope, passes all five subtests and c7. That is the authorisation check this contract adds. A criterion that catches it: with a live relationship of node-a and node-b for scope S1 and a live relationship of node-x and node-y for scope S2, a contribution for S1 from node-x is refused with deny.not_a_party, and a contribution from node-x for a scope S3 that no relationship covers is refused with deny.no_relationship; the test fails before the change on an assertion and passes after. Round 1 recorded this as its builder note 1 and raised no answer.",
+          "disposition": "added",
+          "reason": "folded by the builder, 5 Nov 2026",
+          "folded_as": {
+            "task": "T1",
+            "statement": "A node that is a party only of another scope's relationship is not a party of this scope: with a live relationship of node-a and node-b for scope S1 and a live relationship of node-x and node-y for scope S2 (the subject a member of both), a contribution for S1 from node-x is refused with ok false and the code deny.not_a_party while node-a and node-b are admitted for S1, node-x is admitted for S2, and a contribution from node-x for a scope S3 that no relationship covers is refused with deny.no_relationship. The test fails before the change on an assertion and passes after",
+            "verifier": {
+              "type": "test_red_green",
+              "test_file": "test/relationship-gate-origin.test.mjs",
+              "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c18:' test/relationship-gate-origin.test.mjs"
+            }
+          }
         },
         {
           "n": 2,
           "severity": "medium",
-          "how": "Requirement 1 says a node must be a non-empty text, otherwise deny.bad_request. A party node is an id of 1 to 128 characters of letters, digits and . _ : - (ID_RE in src/engine/federation/membership.mjs). The spec does not say which refusal a node gets that is a non-empty text and not a valid id, such as one of 129 characters or one holding a space, and no criterion has one. By the letter of requirement 1 it is not deny.bad_request, so it is deny.not_a_party or deny.no_relationship; a build that answers deny.bad_request for it passes every subtest. The refusal code is what other nodes will code against. Say which refusal it is and pin one such node in c4 or c1."
+          "how": "Requirement 1 says a node must be a non-empty text, otherwise deny.bad_request. A party node is an id of 1 to 128 characters of letters, digits and . _ : - (ID_RE in src/engine/federation/membership.mjs). The spec does not say which refusal a node gets that is a non-empty text and not a valid id, such as one of 129 characters or one holding a space, and no criterion has one. By the letter of requirement 1 it is not deny.bad_request, so it is deny.not_a_party or deny.no_relationship; a build that answers deny.bad_request for it passes every subtest. The refusal code is what other nodes will code against. Say which refusal it is and pin one such node in c4 or c1.",
+          "disposition": "added",
+          "reason": "folded by the builder, 5 Nov 2026",
+          "folded_as": {
+            "task": "T1",
+            "statement": "A node that is a non-empty text and not a node id is no party's node: against a live relationship of node-a and node-b for the scope (the subject a member), a node of 129 characters and a node holding a space are each refused with ok false and the code deny.not_a_party, never deny.bad_request, and the refusal holds neither node; for a scope that no relationship covers each is refused with deny.no_relationship. The test fails before the change on an assertion and passes after",
+            "verifier": {
+              "type": "test_red_green",
+              "test_file": "test/relationship-gate-origin.test.mjs",
+              "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c19:' test/relationship-gate-origin.test.mjs"
+            }
+          }
         },
         {
           "n": 3,
           "severity": "low",
-          "how": "Criterion 4 lists 'null, undefined or a string' after the bad nodes. It means an envelope that is null, undefined or a string. As written it reads as a node that is a string, which requirement 1 accepts. Say 'an envelope that is null, undefined or a string'."
+          "how": "Criterion 4 lists 'null, undefined or a string' after the bad nodes. It means an envelope that is null, undefined or a string. As written it reads as a node that is a string, which requirement 1 accepts. Say 'an envelope that is null, undefined or a string'.",
+          "disposition": "added",
+          "reason": "folded by the builder, 5 Nov 2026",
+          "folded_as": {
+            "task": "T1",
+            "statement": "An envelope with no origin, an origin with no node, a node that is not a text or an empty node, and an envelope that is itself null, undefined or a string, is refused with ok false and the code deny.bad_request, the refusal holds no payload, and the gate does not throw. The test fails before the change (the contribution passes) on an assertion and passes after",
+            "verifier": {
+              "type": "test_red_green",
+              "test_file": "test/relationship-gate-origin.test.mjs",
+              "cmd": "node --test --test-reporter=tap --test-name-pattern='^T1-c04:' test/relationship-gate-origin.test.mjs"
+            }
+          }
         },
         {
           "n": 4,
           "severity": "low",
-          "how": "The request ends 'Owner decisions of 31 Oct 2026 apply: ... there is no Federated tier.' Pull request 403 of 2 November 2026 introduced the Federated tier as a planned fifth tier, so main now contradicts the clause. It decides nothing in this contract. Remove it, or date it so the spec does not state as current something main has changed."
+          "how": "The request ends 'Owner decisions of 31 Oct 2026 apply: ... there is no Federated tier.' Pull request 403 of 2 November 2026 introduced the Federated tier as a planned fifth tier, so main now contradicts the clause. It decides nothing in this contract. Remove it, or date it so the spec does not state as current something main has changed.",
+          "disposition": "rejected",
+          "reason": "No criterion is added, because no criterion checks the request. The clause is removed from the request in this fold, as the answer asks."
         }
       ],
       "notes": "INDEPENDENT RE-REVIEW by the reviewer seat, signed with the reviewer key 1f6b4e7c00729bc7, of the spec as it is on main at 6fba2fa38eff41bc328b6c747483dd92c22032c2. It re-reviews round 1, the interim solo record. This is a re-issue of round 2 before landing: its first version (commit 1e9dbec9d35c88ac883e5bd0505c35734796c7c5 on the review branch, never landed) raised no answer and did not rule on the seven builder notes of round 1, and the lead's review of it showed that the first of those notes is a way for a broken build to pass. 1. Why this round: round 1 reviewed at 2f24e942, and docs/FEDERATION.md, which is in the scope, then changed in 1df013d (pull request 388, before the signing commit 461d4834), 080eedd and 8d418db, so the gate reported head_stale_src and the suite's T2-c01 failed on main. 2. What was read: the whole spec (request, T1, its six requirements and seventeen criteria), the snapshot of round 1 and the notes of round 1 in full. The spec is unchanged since round 1 (canonical hash af608dcd529b). The three source inputs of round 1 (policy.mjs, membership.mjs, admission.mjs) are byte-identical at 6fba2fa3. docs/FEDERATION.md was read in full at 6fba2fa3, together with its diff from 2f24e942. 3. The FEDERATION.md drift does not touch what the spec asks for: requirement 5 and c8 need the page to name deny.not_a_party and to lose the line 'Binding the sending node in the gate' and the policy.mjs comment 'does not yet bind the sending node'; both are still present at 6fba2fa3, so c8 is red before the build as it should be, and the lines added since round 1 match neither of c8's patterns. 4. Rulings on the seven builder notes that round 1 recorded. Its first note is answer 1, high. Its third note is answer 2, medium. Its second note is answer 3, low. Its fourth note (deny.not_a_party against deny.no_relationship tells whoever sees a refusal whether a relationship covers the scope) stays a note: a correct build has this property, no criterion in this task's scope can check what a transport returns, and Admission returns a refusal to its local caller today; it wants an open row in the register so the transport contract takes it up. Its fifth note (c10 and the scope criterion hold only on a branch cut from the pinned base that has not merged main) stays a note: the spec pins the base in c11, and seven files of src and scripts changed on main after it (scripts/license/issue.mjs, src/cli/main.mjs, src/cli/sync.mjs, src/cli/work-store.mjs, src/engine/entitlements.mjs, src/engine/paid-merge.mjs, src/engine/vault.mjs), so the builder cuts the branch from 2f24e942 and verifies before any merge of main. Its sixth note (c6 needs OpenSSH 8.0 or later) stays a note about the machine. Its seventh note (a node key that is present and undefined) stays a note: c4 pins the gate's refusal of an envelope with no origin.node whichever way evaluate reads an undefined node, so no broken gate passes on it. 5. Answer 4 is new in this round: the request's closing sentence on the tiers. 6. Requirements against criteria: requirement 1 is checked by c1, c2, c3 and c5 except for its restriction to the scope, which is answer 1; requirement 2 by c4 and c2; requirement 3 by c1; requirement 4 by c2 and c3; requirement 5 by c8; requirement 6 by c10. Each red-green criterion (c1 to c4) runs only its own labelled subtest of its own test file. Verdict: findings.",
