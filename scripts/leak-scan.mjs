@@ -26,6 +26,7 @@ const OK_EMAIL = /(@(example\.(com|org|net)|[a-z0-9-]+\.invalid|localhost|users\
 const OK_IP = (ip) => /^(127\.|0\.0\.0\.0$|10\.|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.|255\.)/.test(ip) || ip.split('.').some((x) => Number(x) > 255);
 const OK_HOME = new Set(['you', 'me', 'user', 'username', 'name', 'runner', 'example', 'alice', 'bob', 'node', '<name>', '<user>', 'ubuntu', 'shared', 'memev']);
 
+const REPO_URL = /github\.com\/([a-z0-9-]+)\/memev(?=\.git(?![a-z0-9])|[/\s"'`)>]|$)/g;
 const ROOT_HOME = new RegExp(`(^|[\\s"'(])/${'root'}/`);
 const findings = [];
 function scanText(where, text, file = '') {
@@ -33,7 +34,11 @@ function scanText(where, text, file = '') {
   const lines = text.split('\n');
   lines.forEach((line, i) => {
     if (ALLOW_LINE.some((a) => a.file.test(file) && a.line.test(line))) return;
-    const lower = line.toLowerCase();
+    // The repository is public at github.com/<owner>/memev, so its owner's name in that exact URL, in a tracked file, is not a
+    // leak. Only that owner segment is blanked, and only when the path is this repository (memev, then .git, a slash, a quote, a
+    // closing parenthesis, an angle bracket, a space or the end of the line). The same word anywhere else on the line, in another
+    // repository's URL, on another host, in a file path or in a commit message is still found.
+    const lower = file ? line.toLowerCase().replace(REPO_URL, (m, owner) => (deny.has(h(owner)) ? m.replace(`/${owner}/`, '//') : m)) : line.toLowerCase();
     const words = new Set();
     for (const w of lower.split(/[^a-z0-9@._+-]+/)) { if (!w) continue; words.add(w); words.add(w.replace(/^[._-]+|[._-]+$/g, '')); for (const p of w.split(/[._@+-]+/)) if (p) words.add(p); }
     for (const w of lower.split(/[^a-z0-9]+/)) if (w) words.add(w);
