@@ -24,7 +24,7 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 | Participating organisations | 1 person | 1 person | 1 | 1 | multiple independent organisations |
 | Local AI apps on a computer | unlimited | unlimited | unlimited | unlimited | unlimited within each participant's policy |
 | Cloud AI connectors | 5 | 10 | based on your requirements | based on your requirements | based on participant and workload requirements |
-| Trial | no Personal trial | no Personal trial | time-limited Business trial (planned) | sales-assisted pilot (planned) | scoped multi-party pilot (planned; no offer until acceptance criteria pass) |
+| Trial | no Personal trial | no Personal trial | time-limited trial (planned) | sales-assisted pilot (planned) | scoped multi-party pilot (planned; no offer until acceptance criteria pass) |
 | Vault, recall, graph, contracts, doctor, your own tunnel | ✓ | ✓ | planned | planned | planned per participant |
 | Backup to your own GitHub (one writer) | ✓ | ✓ | planned | planned | participant-controlled backup policy (planned) |
 | One memory for every AI app, and the comms bus between them | ✓ | ✓ | planned | planned | local memory per participant plus scoped inter-node communications (planned) |
