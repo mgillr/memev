@@ -13,7 +13,7 @@
       "tasks": 5,
       "criteria": 51,
       "spec": "specs/SR-0.03-verify-runs-every-verifier-type.json",
-      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop; SR-0.03.3 in the programme manifest is its version 3 in intent"
     },
     {
       "id": "SR-1.01",
@@ -27,7 +27,8 @@
       ],
       "tasks": 3,
       "criteria": 62,
-      "spec": "specs/SR-1.01-one-writer-enforced-an-exclusive.json"
+      "spec": "specs/SR-1.01-one-writer-enforced-an-exclusive.json",
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop"
     },
     {
       "id": "SR-1.02",
@@ -51,7 +52,8 @@
       "depends_on": [],
       "tasks": 1,
       "criteria": 35,
-      "spec": "specs/SR-1.03-replay-protection-that-survives-a.json"
+      "spec": "specs/SR-1.03-replay-protection-that-survives-a.json",
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop"
     },
     {
       "id": "SR-1.04",
@@ -75,7 +77,8 @@
       "depends_on": [],
       "tasks": 1,
       "criteria": 40,
-      "spec": "specs/SR-1.05-a-bounded-rate-limiter.json"
+      "spec": "specs/SR-1.05-a-bounded-rate-limiter.json",
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop"
     },
     {
       "id": "SR-1.06",
@@ -87,7 +90,8 @@
       "depends_on": [],
       "tasks": 1,
       "criteria": 43,
-      "spec": "specs/SR-1.06-one-licence-schema-validated-everywhere.json"
+      "spec": "specs/SR-1.06-one-licence-schema-validated-everywhere.json",
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop"
     },
     {
       "id": "SR-1.07",
@@ -281,7 +285,7 @@
       "tasks": 1,
       "criteria": 41,
       "spec": "specs/SR-1.21-a-missing-note-is-never-silent.json",
-      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop"
     },
     {
       "id": "SR-1.22",
@@ -298,7 +302,7 @@
       "tasks": 1,
       "criteria": 41,
       "spec": "specs/SR-1.22-an-interrupted-write-recovers-from-the-log.json",
-      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop"
     },
     {
       "id": "SR-1.23",
@@ -330,7 +334,7 @@
       "tasks": 1,
       "criteria": 38,
       "spec": "specs/SR-1.24-no-cli-write-beside-a-live-daemon.json",
-      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop"
     },
     {
       "id": "SR-1.25",
@@ -346,7 +350,7 @@
       "tasks": 1,
       "criteria": 41,
       "spec": "specs/SR-1.25-a-cloud-seat-addresses-one-local-seat.json",
-      "status": "proposed: owner's go 31 Oct, signs after a clean red-team round"
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop"
     },
     {
       "id": "SR-1.26",
@@ -362,7 +366,7 @@
       "tasks": 2,
       "criteria": 51,
       "spec": "specs/SR-1.26-one-write-can-never-make-the-vault-unopenable.json",
-      "status": "proposed: owner's go pending, signs after a clean red-team round"
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop"
     },
     {
       "id": "SR-1.27",
@@ -377,7 +381,7 @@
       "tasks": 1,
       "criteria": 22,
       "spec": "specs/SR-1.27-done-comes-only-from-a-passing-verify.json",
-      "status": "proposed: owner's go pending, signs after a clean red-team round"
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop"
     },
     {
       "id": "SR-1.28",
@@ -394,7 +398,7 @@
       "tasks": 2,
       "criteria": 56,
       "spec": "specs/SR-1.28-the-bus-writes-its-own-routing-files.json",
-      "status": "proposed: owner's go pending, signs after a clean red-team round"
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop"
     },
     {
       "id": "SR-1.29",

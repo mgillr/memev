@@ -44,19 +44,19 @@ Setup
   memev github setup [--host H]    back the vault up to your own private GitHub repository (--host for GitHub Enterprise)
   memev backup set <git-url>       back the vault up to any private git remote (GitHub Enterprise, self-hosted, file)
   memev service install|remove     start Memev at login (systemd or launchd)
-  memev devices [enroll|remove|rotate|rename|keygen]   computers and apps using this vault, each with its own credential
+  memev devices [list [--json]|enroll|remove|rotate|rename|keygen]   computers and apps using this vault, each with its own credential
   memev invite [--ttl SECONDS] [--local]   print a one-time code, link and QR code so another computer can join
                                        (refuses without a reachable address: turn the secure link on with memev cloud on; --local mints the
                                        loopback address for a computer that shares this machine, and says so)
   memev join <code>                make a key, enrol this computer and connect its apps
   memev join <url> --token T       the same, with a key and a token made ahead of time
   memev join --refresh             fetch the vault's current address from the signed record in the backup
-  memev license status|activate <key>|install <file>|remove   the licence: how many computers may use this vault
+  memev license status [--json]|activate <key>|install <file>|remove   the licence: how many computers may use this vault
   memev upgrade                    the plans and what each adds, and how to buy
-  memev plan                       what this vault uses: computers used and allowed, connectors counted
+  memev plan [--json]              what this vault uses: computers used and allowed, connectors counted
   memev agentid bind|verify|setup  bind an agent role to a person, verify a binding, or set one up
                                    (Business and Corporate; verify is free)
-  memev report [on|off|show|send]  the anonymous milestone report: off unless you turn it on; show prints what would be sent
+  memev report [status [--json]|on|off|show|send]  the anonymous milestone report: off unless you turn it on; show prints what would be sent
   memev bus roster|check|send|tail|tasks|watch <seat>|operator <seat>   the comms bus between your AI apps
   memev runner on|off|watch|status <seat> [--max-runs-per-day N] [--command CMD]   an opt-in background runner: a headless turn of the
                                     seat's app when the operator posts it a task, at most N runs a day (you give N; there is no default)
@@ -68,9 +68,9 @@ Daily
                                    set <name> pins a name for this repository or folder
   memev remember <text> [--kind decision] [--why W] [--review-by DATE|DAYS] [--force]
   memev why <query> [--item path#heading] [--project P]   why recall returned what it did
-  memev review [list|keep|drop|reset] [items] [--days N]  the inbox of flagged and short-lived memories
+  memev review [list|keep|drop|reset] [items] [--days N] [--json]  the inbox of flagged and short-lived memories
   memev audit [--json]             a read-only report on junk, duplicates and stale memories
-  memev compact [--dry-run]        measure and shrink the vault: archive sealed op-log segments and move old
+  memev compact [--dry-run] [--json]  measure and shrink the vault: archive sealed op-log segments and move old
                                     journal sessions out of the index; --dry-run only prints the size report
   memev import [--path DIR ...] [--ai-history] [--export FILE.zip ...] [--preview] [--yes] [--keep ID,ID]
   memev import list                list previous imports
