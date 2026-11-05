@@ -44,6 +44,16 @@ export function issuedServices(named = null) {
   return String(named).split(',').map((s) => s.trim()).filter(Boolean);
 }
 
+/** Days after a paid period ends before the vault goes on hold (the owner's decision of 5 Nov 2026).
+ * Licences issued from now on carry it; a licence that states no grace_days still gets 14 (verifyLicense). */
+export const ISSUED_GRACE_DAYS = 3;
+
+/** The grace days to put in a licence being issued: the number named with --grace, or ISSUED_GRACE_DAYS. */
+export function issuedGraceDays(named = null) {
+  if (named === null || named === undefined || named === true) return ISSUED_GRACE_DAYS;
+  return Number(named);
+}
+
 /** The only fields a licence may carry. Anything else (a name, an e-mail, a machine) is identity and is refused. */
 export const LICENSE_FIELDS = ['v', 'lid', 'tier', 'services', 'seats', 'connectors', 'iat', 'exp', 'grace_days', 'kid', 'sig'];
 

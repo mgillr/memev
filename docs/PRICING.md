@@ -169,7 +169,8 @@ leaves no file, and the command prints why. After that the licence is checked of
 - **Above Personal:** terms set in the agreement with you: contact us.
 
 When a licence lapses, its grace period (14 days unless the licence says otherwise) keeps
-everything working, and computers can still be added. After the grace period no computer can be
+everything working, and computers can still be added. Paid licences are issued with a grace period
+of 3 days after the paid period ends. After the grace period no computer can be
 added and the added ones can read but not write. The vault's own computer keeps reading and
 writing, hosted services stop, and the vault can fall back to git backup. Installing a renewed
 licence restores the rest at once.
