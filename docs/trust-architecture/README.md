@@ -21,10 +21,10 @@ flowchart LR
 
 ## The problem
 
-Every team is adding AI. Nothing connects it.
+Every team is adding AI. Leaders still cannot see what is real.
 
-- **Islands of AI.** Each tool, team and site holds its own version of the work.
-- **Decisions drift.** What is agreed in one place never reaches the people and agents acting elsewhere.
+- **AI in silos.** Each person's AI helps with their own work. None of it connects.
+- **Filtered numbers.** What reaches leadership is reported status, shaped at every level on the way up.
 - **No proof.** Nobody can show who was allowed to act, what was done, or whether it was checked.
 
 More AI does not make an organisation smarter. Connected AI that everyone can trust does.
@@ -46,6 +46,30 @@ The layer stays the same at each step. What grows is the trust boundary it has t
 person's computers, to one company, to sites in different countries, to independent organisations that keep
 their own owners, rules and data.
 
+## Business inference intelligence
+
+Today a person can ask an AI about their own work. Nothing lets an executive team ask across the whole
+business. The aim is that leaders ask the business from the top down, and get answers that show their evidence.
+
+```mermaid
+flowchart LR
+    work["<b>The work itself</b><br/>Plans, decisions, tasks, changes<br/>and results, as they happen"]
+    record["<b>One record</b><br/>Each item linked to who did it,<br/>when, and on what evidence"]
+    ask["<b>A question from the top</b><br/>Is this programme<br/>really on track?"]
+    answer["<b>An answer you can check</b><br/>Verified facts and AI inference,<br/>each labelled, with sources"]
+    work --> record --> ask --> answer
+```
+
+- **Drawn from the work, not from status reports.** The answer rests on the record of the work as it happens.
+- **Every answer shows its sources**, their versions and when they were last confirmed.
+- **AI inference stays labelled.** An inferred link stays a hypothesis until an authorised person or an approved
+  check confirms it.
+
+This is planned: it is the organisational intelligence that [ORGANISATIONAL-INTELLIGENCE.md](../ORGANISATIONAL-INTELLIGENCE.md)
+describes. One part is built as a data model and not yet used by the product: a finding that rests on evidence
+alone stops short of a fact until a person confirms it or a verification passes, and an AI agent cannot confirm
+its own finding.
+
 ## The solution: an infrastructure layer
 
 Memev is infrastructure, not another AI application. It sits beneath whichever AI an organisation uses and
@@ -53,6 +77,7 @@ above the people, projects and systems that do the work.
 
 ```mermaid
 flowchart TB
+    exec["<b>Executive view (planned)</b><br/>Organisational inference from the top down, with evidence"]
     ai["<b>Any AI application</b><br/>Assistants, coding tools, your own agents"]
     subgraph memev["Memev: the infrastructure layer"]
         direction LR
@@ -63,6 +88,7 @@ flowchart TB
         conv["<b>Convergence</b><br/>One agreed result,<br/>by CRDT-Merge (planned)"]
     end
     org["<b>Your organisation</b><br/>People, projects, decisions and business systems"]
+    exec <--> ai
     ai <--> memev
     memev <--> org
 ```
@@ -150,16 +176,35 @@ mistaken or unauthorised contribution. A trust architecture needs four things to
 
 Memev is the product layer that brings the four together.
 
+## Keeping AI inside the rules
+
+A leader's first worry about AI in the business is control: an action outside the law, a leak, money lost.
+In Memev, AI gets authority the way people do: scoped, checked and on the record.
+
+| | What holds | Status |
+|---|---|---|
+| **What AI may see** | Access is scoped to read, write or admin, can be limited to parts of the record, and can be revoked for one credential or one computer. Cloud access is off until you switch it on, and there is no telemetry by default. | Built |
+| | A company policy on what reaches an AI provider, with a log of what did. Sign-in and roles for an organisation. | Planned |
+| **What AI may do** | With work contracts switched on, AI works to signed tasks that carry acceptance checks and stop rules, and the work counts as done only when its checks pass. | Built |
+| | An AI finding is not a fact until a person confirms it or a verification passes, and an AI agent cannot confirm it. | Built as a data model, not yet used by the product |
+| **What can be proved** | Every change is written to an append-only, checksummed log, and can be seen and undone. A signed contract changes only by a new signed amendment. By default a cloud AI can post only to the operator. | Built |
+| | Rules for which data may cross a site or a jurisdiction. | Planned |
+
+The limits matter. Memev governs what connected AI can see and do through it, and proves what happened. It does
+not control the AI applications themselves or the services they connect to, and it does not claim legal
+compliance. The detail is in [SECURITY-BRIEF.md](../SECURITY-BRIEF.md), [THREAT-MODEL.md](../THREAT-MODEL.md),
+[CONTRACTS.md](../CONTRACTS.md) and [DATA-SOVEREIGNTY.md](../DATA-SOVEREIGNTY.md).
+
 ## Where we are
 
 | Available now, in preview | Planned, in stages |
 |---|---|
-| The free core, for one person: one shared context across the AI tools they connect, a coordination bus between AI sessions, and work contracts with checks (off until switched on). | CRDT-Merge integrated into the released product, then Business (one company), Corporate (many sites and countries) and Federated (many organisations). |
+| The free core, for one person: one shared context across the AI tools they connect, a coordination bus between AI sessions, and work contracts with checks (off until switched on). | CRDT-Merge integrated into the released product, then Business (one company), Corporate (many sites and countries) and Federated (many organisations). Business inference intelligence for leaders is part of that planned work. |
 
 The tier names describe targets, not services available today. The [README](../../README.md) and
 [the five tiers](../tiers/README.md) state what each one holds and what is planned.
 
 ## The slides
 
-The same story as eleven slides is in the `deck` folder beside this page: one file per slide, in the order
+The same story as thirteen slides is in the `deck` folder beside this page: one file per slide, in the order
 listed in its index file. Each file is a single slide on a 1920 by 1080 canvas, with speaker notes at the end.

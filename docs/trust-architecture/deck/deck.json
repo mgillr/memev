@@ -4,10 +4,10 @@
   "lists": "css",
   "title": "Memev: Trust Architecture for AI",
   "cover": "cover",
-  "order": ["cover", "problem", "shift", "vision", "layer", "value", "crdt", "tech", "trust", "status", "close"],
+  "order": ["cover", "problem", "shift", "vision", "insight", "layer", "value", "crdt", "tech", "trust", "guard", "status", "close"],
   "sections": {
     "problem": { "description": "Why adding more AI does not make an organisation more coordinated.", "start": "cover" },
-    "vision": { "description": "Connected intelligence at every scale, from one person to many organisations.", "start": "vision" },
+    "vision": { "description": "Connected intelligence at every scale, and business inference intelligence: leaders asking the business from the top down.", "start": "vision" },
     "solution": { "description": "Memev as the infrastructure layer, its value at each scale, CRDT-Merge as its convergence engine, the three technologies underneath with their references, and what trust needs beyond convergence.", "start": "layer" },
     "status": { "description": "What is available today, what is planned, and the summary.", "start": "status" }
   },
