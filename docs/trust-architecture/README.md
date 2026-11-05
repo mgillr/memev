@@ -35,7 +35,7 @@ One infrastructure layer for connected intelligence, at every scale.
 
 ```mermaid
 flowchart LR
-    person["<b>One person</b><br/>Every AI tool they use works<br/>from one shared context"]
+    person["<b>One person</b><br/>The AI tools they connect work<br/>from one shared context"]
     company["<b>One company</b><br/>Teams, agents and company systems<br/>work under one set of rules"]
     sites["<b>Many sites</b><br/>Offices in many countries.<br/>Each site keeps its own authority"]
     firms["<b>Many organisations</b><br/>Partners, suppliers and customers<br/>share only what they agree to"]
@@ -77,9 +77,9 @@ The same layer is worth something different to each kind of customer.
 
 | Who | What the layer gives them | Status |
 |---|---|---|
-| **A single user** | Every AI tool they use works from the same context. No re-explaining a project to each tool, and the record stays on their own computer. | Preview today |
+| **A single user** | The AI tools they connect work from the same context. No re-explaining a project to each tool, and the record stays on their own computer. | Preview today |
 | **A small business** | One company record that the team and its AI tools share, under company rules. Knowledge outlasts staff changes and changes of AI vendor. | Planned |
-| **A global business** | Sites in many countries run one programme. Each site keeps its own authority, and data stays where the law requires. | Planned |
+| **A global business** | Sites in many countries run one programme. Each site keeps its own authority and can keep its data in its own jurisdiction. | Planned |
 | **A federation** | Separate businesses, suppliers and vendors share only what each agreement permits. Nobody hands over its systems or its data. | Planned |
 
 ## Why CRDT-Merge
@@ -117,18 +117,19 @@ that will never place their data under one owner. CRDT-Merge is a separate proje
 
 ## The technology underneath
 
-Three technologies sit under the layer. Each is a separate project with its own licence and its own published
-reference. None of them is part of the released Memev runtime yet, and the [README](../../README.md) states
-the boundary for each.
+Three technologies sit under the layer. CRDT-Merge, which contains E4, and ACFA-RS are projects separate from
+Memev, each under its own licence, and each of the three has a published reference. None of them is part of
+the released Memev runtime yet, and the [README](../../README.md) states the boundary for each.
 
 | Technology | Its place in the layer | What it is designed to make possible | Reference |
 |---|---|---|---|
-| **CRDT-Merge** | Convergence | Independent contributions resolve to the same result in any order, with no coordinator. | Paper: [arXiv:2605.19373](https://arxiv.org/abs/2605.19373), *Conflict-Free Replicated Data Types for Neural Network Model Merging: A Two-Layer Architecture Enabling CRDT-Compliant Model Merging Across 26 Strategies* (May 2026). Patent pending. |
-| **E4** | Authority and evidence, carried in the record | Trust becomes a dimension of the data itself, beside its causal history and its cryptographic hash, so who is trusted and what happened travel with every record. | Specification: *E4 Recursive Trust-Delta Entanglement, Master Architecture Specification*, in the crdt-merge repository. It has no arXiv paper. Patent pending. |
+| **CRDT-Merge** | Convergence | Independent contributions resolve to the same result in any order, with no coordinator. | Paper: [arXiv:2605.19373](https://arxiv.org/abs/2605.19373), *Conflict-Free Replicated Data Types for Neural Network Model Merging: A Two-Layer Architecture Enabling CRDT-Compliant Model Merging Across 26 Strategies* (May 2026). |
+| **E4** | Authority and evidence, carried in the record | Trust becomes a dimension of the data itself, beside its causal history and its cryptographic hash, so who is trusted and what happened travel with every record. | Specification: *E4 Recursive Trust-Delta Entanglement, Master Architecture Specification*, in the crdt-merge repository. It has no arXiv paper. |
 | **ACFA-RS** | Evidence: results anyone can recompute | Every party computes the identical result from the same contributions, with no coordinator. A contributor that sends conflicting versions leaves proof that anyone can check. | Paper: [arXiv:2607.10305](https://arxiv.org/abs/2607.10305), *Byzantine Accountability Without Consensus: Strong Eventual Consistency for Non-Associative, Stochastic, Robust Aggregation* (July 2026). |
 
-**Patent pending.** CRDT-Merge, with E4 inside it, is the subject of two UK patent applications, 2607132.4 and
-GB2608127.3, listed in the PATENTS file of the crdt-merge repository. An application is not a granted patent.
+The CRDT-Merge paper addresses the merging of neural-network models. Using the engine for organisational
+records is the planned extension that [CONVERGENCE.md](../CONVERGENCE.md) describes. The engine carries patents
+(see the PATENTS file in its repository).
 
 **What the three are designed to make possible together.** Independent organisations reach one agreed result,
 the record carries its own trust, and anyone can recompute the outcome, with no central coordinator and no AI
@@ -153,7 +154,7 @@ Memev is the product layer that brings the four together.
 
 | Available now, in preview | Planned, in stages |
 |---|---|
-| The free core, for one person: one shared context across their AI tools, a coordination bus between AI sessions, and work contracts with checks (off until switched on). | CRDT-Merge integrated into the released product, then Business (one company), Corporate (many sites and countries) and Federated (many organisations). |
+| The free core, for one person: one shared context across the AI tools they connect, a coordination bus between AI sessions, and work contracts with checks (off until switched on). | CRDT-Merge integrated into the released product, then Business (one company), Corporate (many sites and countries) and Federated (many organisations). |
 
 The tier names describe targets, not services available today. The [README](../../README.md) and
 [the five tiers](../tiers/README.md) state what each one holds and what is planned.
