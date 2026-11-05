@@ -221,7 +221,17 @@
           "to": "f=$(mktemp) && node --test --test-reporter=tap test/relationship-gate-origin.test.mjs > \"$f\" 2>&1; rc=$?; cat \"$f\"; [ \"$rc\" -eq 0 ] && grep -Eq '^# skipped 0$' \"$f\" && grep -Eq '^# todo 0$' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c01:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c02:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c03:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c04:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c05:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c18:' \"$f\" && grep -Eq '^[[:space:]]*ok [0-9]+ - T1-c19:' \"$f\"",
           "note": "2.4"
         }
-      ]
+      ],
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZTU3YWYxZjkyMzVjZDc0MmVmMmJlZjA0M2Y4M2ZmOGY4ZmI4NTliYTk0ZGMyYmFlMzAzNWJlODIzYWZjMzIwZQ==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "MbYZRp3LTyaKbhnC51JAf0KnNFftrrqz9SqO6CYLDLvLi1dI6D0iItJinrQ4uv87r7Islpwhp6oEBFGmopTICQ=="
+          }
+        ]
+      }
     }
   ]
 }
