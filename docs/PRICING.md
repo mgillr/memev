@@ -7,9 +7,9 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 >
 > **DRAFT. Not an offer and not in force.** The list below is the current table (decided 28 October
 > 2026). The Memev core is free. Self-serve checkout is Personal only, through Stripe, in test mode
-> first. The checkout program reads product ids, prices and the computer cap from config. Business and
-> Corporate have no public price: contact us. Hosted features are planned, with no date. There is no
-> Personal trial; Business has a time-limited trial (planned, see below). What the licence enforces
+> first. The checkout program reads product ids, prices and the computer cap from config. Business,
+> Corporate and Federated have no public price: contact us. Hosted features are planned, with no date.
+> There is no Personal trial; Business has a time-limited trial (planned, see below). What the licence enforces
 > today is how many computers can use one
 > vault. One computer with no licence gets the Personal tier ([CHARTER.md](../CHARTER.md)). The Memev core
 > is licensed under Apache-2.0 and stays that way ([LICENSING-NOTICE.md](LICENSING-NOTICE.md)).
@@ -24,7 +24,7 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 | Participating organisations | 1 person | 1 person | 1 | 1 | multiple independent organisations |
 | Local AI apps on a computer | unlimited | unlimited | unlimited | unlimited | unlimited within each participant's policy |
 | Cloud AI connectors | 5 | 10 | based on your requirements | based on your requirements | based on participant and workload requirements |
-| Trial | no Personal trial | no Personal trial | time-limited Business trial (planned) | sales-assisted pilot (planned) | scoped multi-party pilot (planned; no offer until acceptance criteria pass) |
+| Trial | no Personal trial | no Personal trial | time-limited trial (planned) | sales-assisted pilot (planned) | scoped multi-party pilot (planned; no offer until acceptance criteria pass) |
 | Vault, recall, graph, contracts, doctor, your own tunnel | ✓ | ✓ | planned | planned | planned per participant |
 | Backup to your own GitHub (one writer) | ✓ | ✓ | planned | planned | participant-controlled backup policy (planned) |
 | One memory for every AI app, and the comms bus between them | ✓ | ✓ | planned | planned | local memory per participant plus scoped inter-node communications (planned) |
@@ -34,12 +34,12 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md). Do
 | Hosted encrypted backup and a stable relay address | | planned | | planned, or self-hosted | participant-controlled or agreed relay services (planned) |
 | Member keys: one key per person, covering their computers | | | planned | planned | participant identity and node keys (planned) |
 | One company vault that all members' work data syncs into, with an admin console that sees and searches it | | | planned | planned | no: each organisation retains its own vault and authority |
-| Provider policy: restrict to one provider, egress rules | | | planned | planned | each participant governs its own provider and egress policy |
-| Company server, departments and roles from an org chart | | | planned | planned | each participant controls its own organisation and roles |
+| Provider policy: restrict to one provider, egress rules | | | planned | planned | each participant governs its own provider and egress policy (planned) |
+| Company server, departments and roles from an org chart | | | planned | planned | each participant controls its own organisation and roles (planned) |
 | Sign-in with Google Workspace or Microsoft Entra ID | | | planned | planned | participant-specific identity integration (planned) |
 | Rules for what reaches the AI provider, egress log | | | planned | planned | local policy and auditable cross-org exchange (planned) |
 | SCIM, SIEM and audit export, retention, legal hold, high availability | | | | planned | participant-specific and federation-level operational controls (planned) |
-| Multiple sites within one organisation | | | service-scoped, planned | planned | supported where participants need multi-site nodes |
+| Multiple sites within one organisation | | | service-scoped, planned | planned | supported where participants need multi-site nodes (planned) |
 | Bilateral cross-organisation trust and scoped work exchange | | | | | planned |
 | Cross-organisation programme and portfolio intelligence | | | | | planned |
 | Federated computation across independent participants | | | | planned | planned, workload-specific |

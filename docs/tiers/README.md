@@ -15,7 +15,7 @@ There are five tiers: Personal (one computer), Personal with more computers, Bus
 |---|---|---|---|---|---|
 | For | one person, one computer at a time | one person, several computers at once | one organisation; one company vault | one organisation across multiple sites and jurisdictions | multiple independent organisations working together |
 | How it is counted | one computer | up to 3 computers | contact us | contact us | contact us; participant organisations and scope |
-| Where Memev runs | your computer, backed up to your own GitHub | your computers | company server or managed host (coming) | data centre or private cloud, multiple sites (coming) | participant-controlled nodes and approved federation services (planned) |
+| Where Memev runs | your computer, backed up to your own GitHub | your computers | a server in your office or your cloud account (coming; [cloud-hosted](../deploy-cloud.md) or [on-prem](../deploy-on-prem.md)) | data centre or private cloud, multiple sites (coming) | participant-controlled nodes and approved federation services (planned) |
 | Who can see what | you | you | company members and administrators under company policy (coming) | corporate roles and site policies (coming) | only what each participant's agreement and local policy permits (planned) |
 | AI apps and models | supported cloud AI apps and local coding tools via MCP | same, on each computer | providers and tools allowed by organisation policy | same, including on-premises/air-gapped option | each participant chooses permitted providers; cross-org context is policy-scoped |
 | Two computers | one at a time; git backup is single-writer | simultaneous multi-computer merge planned | coming | coming | per-node convergence and state exchange planned |

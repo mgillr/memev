@@ -11,7 +11,7 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const cells = (line) => line.split('|').slice(1, -1).map((c) => c.trim());
 // the rows of the pricing table that are limits, not features
-const LIMITS = ['Price', 'People', 'Computers using one vault', 'Local AI apps on a computer', 'Cloud AI connectors', 'Trial'];
+const LIMITS = ['Price', 'People', 'Computers using one vault', 'Participating organisations', 'Local AI apps on a computer', 'Cloud AI connectors', 'Trial'];
 // each feature row of the pricing table, and the parts of the status table it sells (matched by their start)
 const SELLS = {
   'Vault, recall, graph, contracts, doctor, your own tunnel': ['Vault, recall, graph, hooks, contracts, doctor', 'Secure link for cloud AI apps'],
@@ -28,6 +28,10 @@ const SELLS = {
   'Sign-in with Google Workspace or Microsoft Entra ID': ['Sign-in with Google Workspace or Microsoft Entra ID'],
   'Rules for what reaches the AI provider, egress log': ['Labels on notes and rules for what reaches the AI provider', 'Egress log of what reached the AI provider'],
   'SCIM, SIEM and audit export, retention, legal hold, high availability': ['Sign-in with Google Workspace or Microsoft Entra ID, SCIM', 'SIEM and audit export', 'High-availability servers'],
+  'Multiple sites within one organisation': ['Federation of independently operated site nodes'],
+  'Bilateral cross-organisation trust and scoped work exchange': ['Federation of independently operated site nodes'],
+  'Cross-organisation programme and portfolio intelligence': ['Federation of independently operated site nodes'],
+  'Federated computation across independent participants': ['Federated computation across sites and organisations'],
 };
 
 /** Part -> 'built' or 'planned', from the "What is built and what is planned" table. */
@@ -55,7 +59,12 @@ export function problems(pricing, status) {
     const states = parts.map((p) => [...status].find(([part]) => part.startsWith(p))?.[1]);
     if (states.includes(undefined)) { found.push(`${row}: a part it sells is missing from the status table`); continue; }
     if (!states.includes('planned')) continue;
-    values.forEach((v, i) => { if (v && !/\bplanned\b/.test(v)) found.push(`${row} / ${tiers[i]}: "${v}" sells a planned feature`); });
+    values.forEach((v, i) => {
+      if (!v || /\bplanned\b/.test(v)) return;
+      // These cells explicitly exclude a shared company vault in the Federated tier.
+      if (tiers[i].includes('Federated') && /^(?:no:|deployment-specific; no shared global vault)/i.test(v)) return;
+      found.push(`${row} / ${tiers[i]}: "${v}" sells a planned feature`);
+    });
   }
   return found;
 }

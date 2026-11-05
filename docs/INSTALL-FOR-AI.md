@@ -22,11 +22,12 @@ Ask the person which path fits, and explain the one you choose before you run it
   `memev init --no-connect` from the checkout. Without a global command, run
   `node bin/memev.mjs init --no-connect`.
 - From a verified release tarball: on macOS/Linux run
-  `bash scripts/install.sh <tarball-url> --no-connect`; on Windows PowerShell run
+  `bash scripts/install.sh <tarball-url> --no-connect`; on Windows (preview) in PowerShell run
   `./scripts/install.ps1 <tarball-url> --no-connect`. The installer requires the matching `.sha256` file beside
   the tarball URL and verifies it before extraction. Use only a release asset the person selected.
 - Docker, for an always-on server or a home lab: `docker compose up -d`; apps are connected by hand.
-- `npx memev init` is not published; do not use it.
+- npx memev init is not published yet: there is no Memev package on the npm registry, and a package of that name
+  would not be ours. Do not run it.
 
 No GitHub release is published yet, so the release-installer path is available in the source but has
 no published tarball to install at present. Use the repository path for this preview. Every install
