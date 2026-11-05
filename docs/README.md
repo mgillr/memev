@@ -7,6 +7,7 @@ this folder links back here, and this page links down to every page.
 
 | Page | What it holds |
 |---|---|
+| [trust-architecture/README.md](trust-architecture/README.md) | the overview in plain language: the problem, the vision, the solution, where CRDT-Merge fits, and the same story as slides |
 | [QUICKSTART.md](QUICKSTART.md) | install, first session, everyday commands, the vault layout, Windows (preview) |
 | [OFFICE.md](OFFICE.md) | one vault, inviting teammates, the lead, the roster and what is shared |
 | [INSTALL-FOR-AI.md](INSTALL-FOR-AI.md) | the install steps written for an AI app to follow |
