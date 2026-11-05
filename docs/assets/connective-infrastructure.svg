@@ -1,45 +1,137 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1180" viewBox="0 0 1600 1180" role="img" aria-labelledby="title desc">
-<title id="title">Memev connects work and intelligence across independent organisations</title>
-<desc id="desc">People, AI agents, business applications and data systems contribute authorised work to independent organisation nodes. Each node keeps its own vault, authority, policies and trust root. Bilateral federated relationships connect only approved work, evidence, programme context and computation. Authorised AI and analytics produce cross-organisation insight under sovereignty and provenance controls.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1216" viewBox="0 0 1200 1216" role="img" aria-labelledby="title desc">
+<title id="title">Memev system diagram: a personal side and an organisation side that never mix</title>
+<desc id="desc">A system diagram in two separate parts. The personal side: AI apps and agents connect over MCP to the Memev app, which reads and writes the personal vault; the vault is backed up to your own private git remote. That is the free core, on one computer, built today. Personal with more computers, the paid tier, adds up to three of your own computers that reach the same vault over the secure link, each with its own key; merging simultaneous edits is planned. A bar separates the two sides: personal vaults and company vaults have separate identities and keys and nothing crosses. The organisation side is planned. Business: members' computers and business systems feed one company vault, which has an admin console and an executive view for business inference intelligence. Corporate: site nodes, each keeping its own memory and authority, exchange authorised state with the company vault. Federated: other organisations share only what each agreement permits. Underneath sits the CRDT-Merge convergence engine, a separate engine each vault and node calls to merge edits.</desc>
 <defs>
- <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4f7fb"/><stop offset="1" stop-color="#e8eff6"/></linearGradient>
- <linearGradient id="core" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#132b45"/><stop offset="1" stop-color="#315c80"/></linearGradient>
- <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#18344d" flood-opacity=".12"/></filter>
- <style>
- .h{font:700 34px system-ui,-apple-system,Segoe UI,sans-serif;fill:#172f46}.sub{font:17px system-ui,-apple-system,Segoe UI,sans-serif;fill:#536a7d}
- .ct{font:700 20px system-ui,-apple-system,Segoe UI,sans-serif;fill:#19344c}.body{font:15px system-ui,-apple-system,Segoe UI,sans-serif;fill:#506579}
- .coretitle{font:700 27px system-ui,-apple-system,Segoe UI,sans-serif;fill:#fff}.corebody{font:16px system-ui,-apple-system,Segoe UI,sans-serif;fill:#e6f0f8}
- .eyebrow{font:700 14px system-ui,-apple-system,Segoe UI,sans-serif;letter-spacing:2px;fill:#60788d}
- .card{fill:#fff;stroke:#cfdae4;stroke-width:2}.line{stroke:#89a2b7;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round}
- .dash{stroke:#64839d;stroke-width:3;stroke-dasharray:9 8;fill:none}
- </style>
+<marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1 L9 5 L0 9 z" fill="#57606a"/></marker>
+<style>
+text{font-family:system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif}
+.h{font-weight:700;font-size:30px;fill:#1f2328}
+.sub{font-size:17px;fill:#57606a}
+.side{font-weight:700;font-size:15px;letter-spacing:2.5px;fill:#1f2328}
+.sidesub{font-size:15px;fill:#57606a}
+.tier{font-weight:700;font-size:14px;letter-spacing:1.6px;fill:#0969da}
+.tiersub{font-size:14.5px;fill:#57606a}
+.bt{font-weight:650;font-size:18px;fill:#1f2328}
+.bs{font-size:15px;fill:#57606a}
+.lab{font-size:14px;fill:#57606a}
+.leg{font-size:14.5px;fill:#57606a}
+.wall{font-weight:700;font-size:14.5px;letter-spacing:1.2px;fill:#a40e26}
+.panel{fill:#f6f8fa;stroke:#d1d9e0;stroke-width:1.2}
+.memev{fill:#ddf4ff;stroke:#0969da;stroke-width:1.6}
+.ext{fill:#ffffff;stroke:#57606a;stroke-width:1.6}
+.engine{fill:#eaeef2;stroke:#57606a;stroke-width:1.6}
+.planned{stroke-dasharray:7 5}
+.c{fill:none;stroke:#57606a;stroke-width:1.8}
+.cp{fill:none;stroke:#57606a;stroke-width:1.8;stroke-dasharray:3 5}
+</style>
 </defs>
-<rect width="1600" height="1180" rx="28" fill="url(#bg)"/>
-<text x="800" y="48" text-anchor="middle" class="eyebrow">THE CONNECTIVE INFRASTRUCTURE FOR AI</text>
-<text x="800" y="91" text-anchor="middle" class="h">From people's work to industry-wide intelligence</text>
-<text x="800" y="122" text-anchor="middle" class="sub">Connect the systems. Govern the work. Coordinate across organisational boundaries.</text>
-<g filter="url(#shadow)">
- <rect class="card" x="65" y="160" width="340" height="145" rx="18"/><rect class="card" x="440" y="160" width="340" height="145" rx="18"/><rect class="card" x="815" y="160" width="340" height="145" rx="18"/><rect class="card" x="1190" y="160" width="345" height="145" rx="18"/>
- <rect x="75" y="365" width="455" height="250" rx="22" fill="#fff" stroke="#9eb2c3" stroke-width="2"/><rect x="572" y="365" width="456" height="250" rx="22" fill="#fff" stroke="#9eb2c3" stroke-width="2"/><rect x="1070" y="365" width="455" height="250" rx="22" fill="#fff" stroke="#9eb2c3" stroke-width="2"/>
- <rect x="235" y="715" width="1130" height="220" rx="24" fill="url(#core)"/><rect class="card" x="95" y="980" width="680" height="115" rx="18"/><rect class="card" x="825" y="980" width="680" height="115" rx="18"/>
-</g>
-<g>
- <text x="95" y="202" class="ct">People and their work</text><text x="95" y="238" class="body">Plans · documents · decisions · tasks</text><text x="95" y="266" class="body">Schedules · budgets · specifications</text>
- <text x="470" y="202" class="ct">AI providers and agents</text><text x="470" y="238" class="body">Models · inference · sessions · tools</text><text x="470" y="266" class="body">Contribute work and consume context</text>
- <text x="845" y="202" class="ct">Business applications</text><text x="845" y="238" class="body">CRM · ERP · finance · procurement</text><text x="845" y="266" class="body">Engineering · operations · collaboration</text>
- <text x="1220" y="202" class="ct">Data and memory systems</text><text x="1220" y="238" class="body">Knowledge stores · databases · BI</text><text x="1220" y="266" class="body">References · permitted data views</text>
-</g>
-<g text-anchor="middle">
- <text x="302" y="405" class="ct">Organisation A</text><text x="302" y="438" class="body">Local node · private vault · own policy</text><text x="302" y="475" class="body">People · projects · systems · AI</text><text x="302" y="512" class="body">Independent operator and trust root</text><text x="302" y="566" class="body">Only authorised contributions leave</text>
- <text x="800" y="405" class="ct">Organisation B</text><text x="800" y="438" class="body">Local node · private vault · own policy</text><text x="800" y="475" class="body">People · projects · systems · AI</text><text x="800" y="512" class="body">Independent operator and trust root</text><text x="800" y="566" class="body">Only authorised contributions leave</text>
- <text x="1297" y="405" class="ct">Organisation C</text><text x="1297" y="438" class="body">Local node · private vault · own policy</text><text x="1297" y="475" class="body">People · projects · systems · AI</text><text x="1297" y="512" class="body">Independent operator and trust root</text><text x="1297" y="566" class="body">Only authorised contributions leave</text>
-</g>
-<g class="dash"><path d="M530 490 H572"/><path d="M1028 490 H1070"/><path d="M302 615 V670 H800 V715"/><path d="M800 615 V715"/><path d="M1297 615 V670 H800"/></g>
-<g text-anchor="middle">
- <text x="800" y="760" class="coretitle">Memev federated coordination and shared programme context</text><text x="800" y="802" class="corebody">Bilateral trust · scoped work exchange · evidence · dependencies · commitments</text><text x="800" y="842" class="corebody">Distributed programme view; participants retain source authority</text><text x="800" y="882" class="corebody">Authorised AI analysis · workload-specific computation · accountable findings</text>
- <text x="435" y="1025" class="ct">Cross-organisation intelligence</text><text x="435" y="1060" class="body">Programme health · supply-chain dependencies · risks · changes · actions</text>
- <text x="1165" y="1025" class="ct">Sovereignty and trust at every boundary</text><text x="1165" y="1060" class="body">Ownership · jurisdiction · purpose · permissions · audit · provenance</text>
-</g>
-<g class="line"><path d="M235 305 V335 H302 V365"/><path d="M610 305 V335 H800 V365"/><path d="M985 305 V335 H1297 V365"/><path d="M1360 305 V345 H1297 V365"/><path d="M800 935 V958 H435 V980"/><path d="M800 958 H1165 V980"/></g>
-<text x="800" y="1140" text-anchor="middle" class="sub">No shared global vault · no transitive trust · no central ownership of participant data</text>
+<rect width="1200" height="1216" rx="18" fill="#ffffff" stroke="#d1d9e0"/>
+<text x="30" y="52" class="h">Memev system diagram</text>
+<text x="30" y="82" class="sub">Two separate sides. Personal vaults and company vaults never mix.</text>
+<rect class="memev" x="700" y="38" width="30" height="20" rx="5"/>
+<text x="738" y="54" class="leg">Memev</text>
+<rect class="ext" x="800" y="38" width="30" height="20" rx="5"/>
+<text x="838" y="54" class="leg">yours or third party</text>
+<rect class="ext planned" x="1005" y="38" width="30" height="20" rx="5"/>
+<text x="1043" y="54" class="leg">planned</text>
+<path class="c" d="M700 78 H730" marker-end="url(#a)"/>
+<text x="738" y="83" class="leg">built today</text>
+<path class="cp" d="M850 78 H880" marker-end="url(#a)"/>
+<text x="888" y="83" class="leg">planned</text>
+<rect class="panel" x="30" y="112" width="1140" height="340" rx="14"/>
+<text x="56" y="146" class="side">PERSONAL SIDE</text>
+<text x="214" y="146" class="sidesub">one person, their own vault and keys</text>
+<text x="60" y="184" class="tier">FREE CORE</text>
+<text x="160" y="184" class="tiersub">one computer, built today</text>
+<rect class="ext" x="60" y="198" width="220" height="92" rx="10"/>
+<text x="170" y="230" class="bt" text-anchor="middle">AI apps and agents</text>
+<text x="170" y="252" class="bs" text-anchor="middle">any provider,</text>
+<text x="170" y="272" class="bs" text-anchor="middle">local or cloud</text>
+<rect class="memev" x="350" y="198" width="220" height="92" rx="10"/>
+<text x="460" y="230" class="bt" text-anchor="middle">Memev</text>
+<text x="460" y="252" class="bs" text-anchor="middle">on your computer: tokens,</text>
+<text x="460" y="272" class="bs" text-anchor="middle">comms bus, work contracts</text>
+<path class="memev" d="M640 209 a110 11 0 0 1 220 0 v70 a110 11 0 0 1 -220 0 z"/>
+<path class="memev" style="fill:none" d="M640 209 a110 11 0 0 0 220 0"/>
+<text x="750" y="239" class="bt" text-anchor="middle">Personal vault</text>
+<text x="750" y="261" class="bs" text-anchor="middle">Markdown + git,</text>
+<text x="750" y="281" class="bs" text-anchor="middle">append-only log</text>
+<path class="ext" d="M930 209 a110 11 0 0 1 220 0 v70 a110 11 0 0 1 -220 0 z"/>
+<path class="ext" style="fill:none" d="M930 209 a110 11 0 0 0 220 0"/>
+<text x="1040" y="249" class="bt" text-anchor="middle">Private git remote</text>
+<text x="1040" y="271" class="bs" text-anchor="middle">your own backup</text>
+<path d="M286 244 H344" class="c" marker-start="url(#a)" marker-end="url(#a)"/>
+<text x="315" y="234" class="lab" text-anchor="middle">MCP</text>
+<path d="M576 244 H634" class="c" marker-start="url(#a)" marker-end="url(#a)"/>
+<path d="M866 244 H924" class="c" marker-end="url(#a)"/>
+<text x="895" y="234" class="lab" text-anchor="middle">backup</text>
+<rect class="memev" x="640" y="340" width="220" height="92" rx="10"/>
+<text x="750" y="372" class="bt" text-anchor="middle">Your other computers</text>
+<text x="750" y="394" class="bs" text-anchor="middle">up to 2 more, 3 in all,</text>
+<text x="750" y="414" class="bs" text-anchor="middle">a key each</text>
+<path d="M750 296 V334" class="c" marker-start="url(#a)" marker-end="url(#a)"/>
+<text x="762" y="320" class="lab">secure link</text>
+<text x="616" y="370" class="tier" text-anchor="end">PERSONAL WITH MORE COMPUTERS</text>
+<text x="616" y="392" class="tiersub" text-anchor="end">paid (draft pricing)</text>
+<text x="616" y="412" class="tiersub" text-anchor="end">merging simultaneous edits is planned (CRDT-Merge)</text>
+<rect x="30" y="476" width="1140" height="8" rx="4" fill="#a40e26"/>
+<rect x="250" y="462" width="700" height="36" rx="18" fill="#ffffff" stroke="#a40e26" stroke-width="1.6"/>
+<text x="600" y="485" class="wall" text-anchor="middle">NEVER MIX · SEPARATE IDENTITIES AND KEYS · NOTHING CROSSES</text>
+<rect class="panel" x="30" y="508" width="1140" height="678" rx="14"/>
+<text x="56" y="542" class="side">ORGANISATION SIDE</text>
+<text x="256" y="542" class="sidesub">planned: company vaults with their own identities and keys</text>
+<rect x="46" y="568" width="792" height="464" rx="14" fill="none" stroke="#57606a" stroke-width="1.4" stroke-dasharray="2 5"/>
+<rect x="64" y="557" width="176" height="22" fill="#f6f8fa"/>
+<text x="74" y="573" class="tier" style="fill:#1f2328">ONE ORGANISATION</text>
+<text x="66" y="606" class="tier">BUSINESS</text>
+<text x="66" y="626" class="tiersub">one company vault</text>
+<text x="606" y="606" class="tier">CORPORATE</text>
+<text x="606" y="626" class="tiersub">many sites and jurisdictions</text>
+<text x="940" y="606" class="tier">FEDERATED</text>
+<text x="940" y="626" class="tiersub">independent organisations</text>
+<rect class="memev planned" x="66" y="646" width="210" height="92" rx="10"/>
+<text x="171" y="688" class="bt" text-anchor="middle">Members' computers</text>
+<text x="171" y="710" class="bs" text-anchor="middle">Memev and AI tools</text>
+<rect class="ext planned" x="306" y="646" width="210" height="92" rx="10"/>
+<text x="411" y="688" class="bt" text-anchor="middle">Business systems</text>
+<text x="411" y="710" class="bs" text-anchor="middle">CRM, ERP, finance, data</text>
+<path class="memev planned" d="M66 797 a225 11 0 0 1 450 0 v70 a225 11 0 0 1 -450 0 z"/>
+<path class="memev planned" style="fill:none" d="M66 797 a225 11 0 0 0 450 0"/>
+<text x="291" y="837" class="bt" text-anchor="middle">Company vault</text>
+<text x="291" y="859" class="bs" text-anchor="middle">one record of the organisation's work</text>
+<rect class="memev planned" x="66" y="926" width="210" height="92" rx="10"/>
+<text x="171" y="958" class="bt" text-anchor="middle">Admin console</text>
+<text x="171" y="980" class="bs" text-anchor="middle">sign-in, roles, policy,</text>
+<text x="171" y="1000" class="bs" text-anchor="middle">egress log, decisions</text>
+<rect class="memev planned" x="306" y="926" width="210" height="92" rx="10"/>
+<text x="411" y="958" class="bt" text-anchor="middle">Executive view</text>
+<text x="411" y="980" class="bs" text-anchor="middle">business inference</text>
+<text x="411" y="1000" class="bs" text-anchor="middle">intelligence</text>
+<rect class="memev planned" x="614" y="778" width="210" height="92" rx="10"/>
+<rect class="memev planned" x="606" y="786" width="210" height="92" rx="10"/>
+<text x="711" y="818" class="bt" text-anchor="middle">Site nodes</text>
+<text x="711" y="840" class="bs" text-anchor="middle">each keeps its own</text>
+<text x="711" y="860" class="bs" text-anchor="middle">memory and authority</text>
+<rect class="memev planned" x="948" y="778" width="210" height="92" rx="10"/>
+<rect class="memev planned" x="940" y="786" width="210" height="92" rx="10"/>
+<text x="1045" y="818" class="bt" text-anchor="middle">Other organisations</text>
+<text x="1045" y="840" class="bs" text-anchor="middle">share only what each</text>
+<text x="1045" y="860" class="bs" text-anchor="middle">agreement permits</text>
+<path d="M171 744 V780" class="cp" marker-start="url(#a)" marker-end="url(#a)"/>
+<text x="183" y="767" class="lab">work in, knowledge back</text>
+<path d="M411 744 V780" class="cp" marker-end="url(#a)"/>
+<text x="423" y="767" class="lab">authorised work</text>
+<path d="M171 884 V920" class="cp" marker-start="url(#a)" marker-end="url(#a)"/>
+<path d="M411 884 V920" class="cp" marker-start="url(#a)" marker-end="url(#a)"/>
+<text x="399" y="907" class="lab" text-anchor="end">questions in, evidence out</text>
+<path d="M522 832 H600" class="cp" marker-start="url(#a)" marker-end="url(#a)"/>
+<text x="561" y="820" class="lab" text-anchor="middle">authorised</text>
+<text x="561" y="856" class="lab" text-anchor="middle">state</text>
+<path d="M844 832 H934" class="cp" marker-start="url(#a)" marker-end="url(#a)"/>
+<text x="889" y="820" class="lab" text-anchor="middle">scoped</text>
+<text x="889" y="856" class="lab" text-anchor="middle">agreements</text>
+<rect class="engine planned" x="66" y="1070" width="1084" height="100" rx="10"/>
+<text x="608" y="1106" class="bt" text-anchor="middle">CRDT-Merge convergence engine</text>
+<text x="608" y="1128" class="bs" text-anchor="middle">a separate engine each vault and node calls for its own merges; it links nothing across the two sides</text>
+<text x="608" y="1148" class="bs" text-anchor="middle">designed so every copy reaches the same result, with no central coordinator</text>
 </svg>
