@@ -1,8 +1,8 @@
 <div align="center">
 
-<a href="media/memev-tiers.mp4"><img src="media/memev-tiers-poster.png" alt="Memev demo video, 4 min 55 s: current product flows. The Federated tier is a planned fifth tier described below. Click to watch." width="720"></a>
+<a href="media/memev-tiers.mp4"><img src="media/memev-tiers-poster.png" alt="Memev: the infrastructure layer for connected AI work. Any AI application, governed work, every scale. Click to watch the demo video, 4 min 55 s." width="720"></a>
 
-<sub><a href="media/memev-tiers.mp4">Watch the current demo video</a> (4 min 55 s): current product flows. The Federated tier is a planned fifth tier described below.</sub>
+<sub><a href="media/memev-tiers.mp4">Watch the demo video</a> (4 min 55 s). It was recorded before the five-tier model: it shows four tiers and a Business trial, which are planned as described below, and it does not show the Federated tier.</sub>
 
 <h1>Memev</h1>
 
@@ -14,7 +14,7 @@ Coordinate people, AI systems and organisations around governed work and verifia
 <p><code>npm install -g . && memev init --no-connect</code></p>
 
 <p align="center">
-<img src="docs/assets/connective-infrastructure.svg" alt="Memev connects people and their work across AI providers, agents, business applications and data systems. Independent organisations retain local vaults, authority and policies while bilateral agreements allow selected work, evidence and computation to contribute to shared programme intelligence." width="900">
+<img src="docs/assets/connective-infrastructure.svg" alt="Memev is the infrastructure layer between any AI application and an organisation's work. A planned executive view lets leaders ask across the organisation from the top down and get answers that show their evidence. The layer supplies shared context, coordination, authority, evidence and planned convergence. Connected AI is kept inside the rules by scoped access, signed work with checks, an append-only record and cloud access that is off by default. One person can use it today in preview; one company, many sites and many organisations are planned." width="900">
 </p>
 
 <p><strong>Memev is the connective infrastructure for AI.</strong> It enables individuals, teams and organisations to connect their AI providers, memory systems, agents, services, people and machines through shared communications, context and federated infrastructure.</p>
