@@ -310,7 +310,7 @@ Memev's product direction is broader than the current release. Every line below 
 ### In progress
 
 - The local project lifecycle: the project store, state machine and coordinator provide task claims, leases, heartbeats, reporting, evidence-bound verification, pause/resume, scope amendment, cancellation and reassignment. Remaining work is tracked in [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md); local lifecycle support should not be confused with distributed multi-writer convergence.
-- The paid-engine client is merged behind a flag, off by default (pull request #201). The trial licence and entitlement work continues (#154, #163, #177).
+- The paid-engine client is merged behind a flag, off by default (pull request #201). The trial licence and entitlement work is parked and tracked in issue #416.
 - Correctness fixes in the crdt-merge engine itself, in its own repository.
 - The programme decomposition of the wider plan, as proposed and unsigned contracts: [docs/scope-one/programme/README.md](docs/scope-one/programme/README.md).
 - Documentation and tier alignment to the superseding owner decisions of 2 November 2026.
