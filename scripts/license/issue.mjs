@@ -6,14 +6,14 @@
 //
 //   node scripts/license/issue.mjs --key /path/outside/repo/memev-license-ed25519.pem \
 //        --tier personal_more --seats 12 [--exp 2027-11-15|none] [--grace 14] [--iat 2026-11-01] \
-//        [--services sync,backup,relay] [--connectors N] [--lid lic_…] [--out FILE]
+//        [--services sync,backup,relay,merge] [--connectors N] [--lid lic_…] [--out FILE]
 //
 // The key must live outside this repository (the script refuses a path inside it), and it is never
 // printed. Personal needs no licence, so the script does not issue one for it.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { signLicense, verifyLicense, LICENSE_KEYS, TIER_NAMES, canonicalTier } from '../../src/engine/license.mjs';
+import { signLicense, verifyLicense, LICENSE_KEYS, TIER_NAMES, canonicalTier, ISSUED_SERVICES } from '../../src/engine/license.mjs';
 
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 const argv = process.argv.slice(2);
@@ -44,7 +44,7 @@ if (exp && exp !== 'none' && !day.test(exp)) fail('--exp must be YYYY-MM-DD or n
 if (!day.test(iat)) fail('--iat must be YYYY-MM-DD');
 const fields = {
   v: 1, lid: arg('lid', `lic_${crypto.randomBytes(6).toString('hex')}`), tier,
-  services: String(arg('services', 'sync,backup,relay')).split(',').filter(Boolean), seats,
+  services: String(arg('services', ISSUED_SERVICES.join(','))).split(',').filter(Boolean), seats,
   ...(arg('connectors') ? { connectors: Number(arg('connectors')) } : {}),
   iat, exp: !exp || exp === 'none' ? null : exp, grace_days: Number(arg('grace', 14)),
 };

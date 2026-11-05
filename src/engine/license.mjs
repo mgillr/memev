@@ -34,6 +34,10 @@ const SKEW_MS = DAY; // a licence issued "tomorrow" by a clock a little ahead st
 export const licenseFile = (env = process.env) => path.join(configDir(env), 'license.json');
 
 /** The only fields a licence may carry. Anything else (a name, an e-mail, a machine) is identity and is refused. */
+/** The services a paid licence carries unless the issuer names others. `merge` is the paid engine: the
+ * merge boundary calls the engine only for a licence that lists it (src/engine/merge.mjs, engineAllowed). */
+export const ISSUED_SERVICES = Object.freeze(['sync', 'backup', 'relay', 'merge']);
+
 export const LICENSE_FIELDS = ['v', 'lid', 'tier', 'services', 'seats', 'connectors', 'iat', 'exp', 'grace_days', 'kid', 'sig'];
 
 /** Names of the fields in a licence object that a licence is not allowed to carry. */
