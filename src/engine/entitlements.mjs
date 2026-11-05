@@ -20,13 +20,13 @@ export const PAID_FEATURES = ['sync_hosted', 'backup_hosted', 'relay_hosted', 'e
  * older licences carry, and they keep exactly these limits. */
 export const TIERS = {
   free: { computers: 1, connectors: 5, local_clients: null, services: [] },
-  personal: { computers: 3, connectors: 10, local_clients: null, services: ['sync', 'backup', 'relay'] },
-  personal_more: { computers: 3, connectors: 10, local_clients: null, services: ['sync', 'backup', 'relay'] },
-  team: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team'] },
-  office: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team'] },
-  business: { computers: null, connectors: null, local_clients: null, services: ['team'] },
-  enterprise: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team', 'sso', 'audit'] },
-  corporate: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team', 'sso', 'audit'] },
+  personal: { computers: 3, connectors: 10, local_clients: null, services: ['sync', 'backup', 'relay', 'merge'] },
+  personal_more: { computers: 3, connectors: 10, local_clients: null, services: ['sync', 'backup', 'relay', 'merge'] },
+  team: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team', 'merge'] },
+  office: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team', 'merge'] },
+  business: { computers: null, connectors: null, local_clients: null, services: ['team', 'merge'] },
+  enterprise: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team', 'sso', 'audit', 'merge'] },
+  corporate: { computers: null, connectors: null, local_clients: null, services: ['sync', 'backup', 'relay', 'team', 'sso', 'audit', 'merge'] },
   // Catalogue metadata only. Federated licences remain disabled until cross-org service contracts pass acceptance.
   federated: { computers: null, connectors: null, local_clients: null, services: [] },
 };

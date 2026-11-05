@@ -8,12 +8,12 @@
 //
 //   node scripts/license-dev.mjs keygen [--out DIR]
 //   node scripts/license-dev.mjs sign --key DIR/license-ed25519.pem --tier personal_more --seats 4 \
-//        [--connectors 10] [--services sync,backup,relay] [--exp 2027-11-15|none] [--grace 14] [--kid ID]
+//        [--connectors 10] [--services sync,backup,relay,merge] [--exp 2027-11-15|none] [--grace 14] [--kid ID]
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { signLicense, verifyLicense } from '../src/engine/license.mjs';
+import { signLicense, verifyLicense, issuedServices } from '../src/engine/license.mjs';
 
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const argv = process.argv.slice(2); const cmd = argv[0];
@@ -34,7 +34,7 @@ if (cmd === 'keygen') {
   const keyFile = arg('key'); if (!keyFile) { console.error('--key is required'); process.exit(2); }
   const pem = fs.readFileSync(keyFile, 'utf8');
   const exp = arg('exp', null);
-  const fields = { v: 1, lid: arg('lid', `lic_${crypto.randomBytes(6).toString('hex')}`), tier: arg('tier', 'personal_more'), services: String(arg('services', 'sync,backup,relay')).split(',').filter(Boolean), seats: Number(arg('seats', 4)), connectors: Number(arg('connectors', 10)), iat: arg('iat', new Date().toISOString().slice(0, 10)), exp: !exp || exp === 'none' ? null : exp, grace_days: Number(arg('grace', 14)) };
+  const fields = { v: 1, lid: arg('lid', `lic_${crypto.randomBytes(6).toString('hex')}`), tier: arg('tier', 'personal_more'), services: issuedServices(arg('services')), seats: Number(arg('seats', 4)), connectors: Number(arg('connectors', 10)), iat: arg('iat', new Date().toISOString().slice(0, 10)), exp: !exp || exp === 'none' ? null : exp, grace_days: Number(arg('grace', 14)) };
   const pub = crypto.createPublicKey(pem).export({ type: 'spki', format: 'der' }).toString('base64');
   const kid = arg('kid', `dev-${crypto.createHash('sha256').update(pub).digest('hex').slice(0, 8)}`);
   const lic = signLicense(fields, pem, kid);

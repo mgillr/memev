@@ -13,7 +13,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { signLicense, verifyLicense, LICENSE_KEYS, TIER_NAMES, canonicalTier, ISSUED_SERVICES } from '../../src/engine/license.mjs';
+import { signLicense, verifyLicense, LICENSE_KEYS, TIER_NAMES, canonicalTier, issuedServices } from '../../src/engine/license.mjs';
 
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 const argv = process.argv.slice(2);
@@ -44,7 +44,7 @@ if (exp && exp !== 'none' && !day.test(exp)) fail('--exp must be YYYY-MM-DD or n
 if (!day.test(iat)) fail('--iat must be YYYY-MM-DD');
 const fields = {
   v: 1, lid: arg('lid', `lic_${crypto.randomBytes(6).toString('hex')}`), tier,
-  services: String(arg('services', ISSUED_SERVICES.join(','))).split(',').filter(Boolean), seats,
+  services: issuedServices(arg('services')), seats,
   ...(arg('connectors') ? { connectors: Number(arg('connectors')) } : {}),
   iat, exp: !exp || exp === 'none' ? null : exp, grace_days: Number(arg('grace', 14)),
 };
