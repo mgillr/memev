@@ -1283,6 +1283,46 @@
       "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review)"
     },
     {
+      "id": "PG-W-21E",
+      "type": "programme work package",
+      "area": "PG-W",
+      "title": "Entitlement gate for trust governance: local trust is free, multi-site and cross-organisation trust need a licence services entry, and a lapsed licence never invalidates existing trust (memev)",
+      "repo": "memev",
+      "programme_tasks": "WP21-E1 (a gap named by the owner's answers on ADR 8 of 1 Nov 2026; proposed 1 Nov 2026; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "cross_references": [
+        {
+          "contract": "SR-1.06",
+          "boundary": "owns the licence schema; PG-W-21E reads only the state and the services of what verifyLicense returns and ignores trial, org and trial_ext; the SR-1.06 build must be in the tree first"
+        },
+        {
+          "contract": "SR-5.02.1",
+          "boundary": "the Business trial guards (pull request #384) change src/cli/invite.mjs, src/cli/licensing.mjs and src/engine/devices.mjs; PG-W-21E adds nothing there and reads no trial semantics"
+        },
+        {
+          "contract": "PG-W-21A.2",
+          "boundary": "owns the trust record and the roots; their evaluation takes no licence"
+        },
+        {
+          "contract": "PG-W-21B",
+          "boundary": "owns the trust book and the eligibility reader; they take no licence"
+        }
+      ],
+      "vault_contracts": [],
+      "build_layer": "src/engine/entitlements.mjs (limitsFor and the live test of seatPolicy) is the build layer; this spec adds one pure function there, one new module and their test, and changes no licence field, tier, price or term",
+      "depends_on": [
+        "SR-1.06",
+        "PG-W-21A.2",
+        "PG-W-21B"
+      ],
+      "tasks": 1,
+      "criteria": 23,
+      "spec": "specs/PG-W-21E.json",
+      "base": "4db303071c67c32e2e5b3ecd508a10748b5b5a34 (the memev main commit this spec was written against)",
+      "status": "proposed, unsigned; no red-team record; the base is recorded; depends on the build of SR-1.06; the topology of work breakdown row 1.3.6, ADR 3, ADR 5, ADR 7 and SO-A-05 stay open",
+      "kind": "feature"
+    },
+    {
       "id": "PG-16.1",
       "type": "programme work package",
       "area": "PG-16",
