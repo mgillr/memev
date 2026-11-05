@@ -1064,11 +1064,12 @@
    ],
    "implements": [],
    "tasks": 1,
-   "criteria": 17,
+   "criteria": 19,
    "spec": "specs/SO-F-04C.json",
    "adapted_from": "none; written from the review of pull request #368 (merged)",
    "base": "2f24e942e2b80649487829ed021c1f0b78b6bccb (the main commit that merged pull request #368)",
-   "status": "signed 1 Nov 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); an additive spec delta of SO-F-04; the base is recorded"
+   "status": "signed 5 Nov 2026 as version 2 with memev's own contract key after the independent re-review (rounds 2 and 3 of the record, reviewer key 1f6b4e7c00729bc7); version 1 was signed 1 Nov 2026 by signer-2 after an interim red-team record; an additive spec delta of SO-F-04; the base is recorded",
+   "supersedes_signed_contract": "k-so-f-04c-the-relationshi-49a1e8 (version 1; the fold of the independent re-review added criteria T1-c18 and T1-c19 to the spec)"
   }
  ]
 }
