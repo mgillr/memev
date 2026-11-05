@@ -182,7 +182,7 @@ test('MEM-140 AC04: video page embeds the film with controls, preload none, scen
   assert.ok(!/<script[\s>]/i.test(html), 'no player script');
   assert.ok(!/youtube|vimeo|wistia|cloudflare/i.test(html), 'no third-party embed');
   const list = (html.match(/<li>[\s\S]*?<\/li>/g) || []).map((l) => lower(strip(l)));
-  for (const scene of ['personal', 'business', 'corporate', 'trial', 'engine', 'tiers connect']) {
+  for (const scene of ['personal', 'business', 'corporate', 'federated', 'inside the rules', 'executive view']) {
     assert.ok(list.some((l) => l.includes(scene)), `a scene description covers ${scene}`);
   }
   assert.ok(fs.existsSync(REPO_VIDEO), 'the demo film is in the repository');

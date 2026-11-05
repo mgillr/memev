@@ -1,8 +1,8 @@
 <div align="center">
 
-<a href="media/memev-tiers.mp4"><img src="media/memev-tiers-poster.png" alt="Memev: the infrastructure layer for connected AI work. Any AI application, governed work, every scale. Click to watch the demo video, 4 min 55 s." width="720"></a>
+<a href="media/memev-tiers.mp4"><img src="media/memev-tiers-poster.png" alt="Memev: the infrastructure layer for connected AI. Connect the AI you already use, govern what it may see and do, ask the whole organisation. Click to watch the overview video, 4 min 38 s." width="720"></a>
 
-<sub><a href="media/memev-tiers.mp4">Watch the demo video</a> (4 min 55 s). It was recorded before the five-tier model: it shows four tiers and a Business trial, which are planned as described below, and it does not show the Federated tier.</sub>
+<sub><a href="media/memev-tiers.mp4">Watch the overview video</a> (4 min 38 s, narrated): the problem, the infrastructure layer, how connected AI is kept inside the rules, the planned executive view, the five tiers and the technology underneath. Every part that is not built yet is marked planned.</sub>
 
 <h1>Memev</h1>
 
