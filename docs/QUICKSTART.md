@@ -87,9 +87,10 @@ Everything is Markdown. Edit it in any editor: Memev notices and records the cha
 
 ## Windows (preview)
 
-Windows has its own code paths and tests but has not had a full lab run yet. Install Node 22 from
-nodejs.org and Git for Windows, then run the same command in PowerShell or Windows Terminal. What
-differs:
+Windows has its own code paths and tests but has not had a full lab run yet. Install Node 22 or
+newer and Git first: `winget install --id OpenJS.NodeJS.LTS -e` and `winget install --id Git.Git -e`
+(or the installers from nodejs.org and git-scm.com). Then open a new PowerShell or Windows Terminal
+window, so both are on your PATH, and run the same command there. What differs:
 
 - Settings and the `memev.cmd` launcher live in `%APPDATA%\memev`; the vault is `%USERPROFILE%\memev`.
 - On a terminal, init offers to add the launcher folder to your user PATH. Open a new terminal
