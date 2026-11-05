@@ -226,7 +226,7 @@ export async function command(cmd, pos, flags, { root, env, license = null }) {
       if (!r.ok) { out.bad(`not activated: ${r.reason}`); return 1; }
       out.ok(`activated licence ${r.license.lid} (${r.state}) in ${r.file}; it is checked on this computer from now on, with no network`); return 0;
     }
-    if (sub === 'remove') { fs.rmSync(licenseFile(env), { force: true }); out.ok('licence removed; nothing changes for Personal'); return 0; }
+    if (sub === 'remove') { fs.rmSync(licenseFile(env), { force: true }); out.ok('licence removed; this computer keeps Personal, and computers added to this vault can still read but can no longer write'); return 0; }
     throw new Error('memev license status [--json] | activate <key> | install <file> | remove');
   }
   // devices
