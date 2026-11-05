@@ -62,6 +62,18 @@ For example, imagine an engineering team changes a battery-system specification 
 
 The same principle extends beyond one organisation. A supplier, customer, contractor or research partner may need to contribute selected information or evidence to a shared programme without transferring ownership of its systems or exposing its entire data estate. Memev's Federated tier is designed for that distinct boundary: participants retain their own operators, trust roots, policies and legal responsibilities while exchanging authorised contributions under explicit agreements.
 
+### Inference from the top down: business inference intelligence (planned)
+
+Today AI helps each person infer on their own work: an email, a document, a task. The people accountable for the whole organisation get something else: reports written by the people being reported on, drawn from systems that do not share a picture of the work.
+
+Memev's direction is to let an executive team ask its questions of the organisation's own work record: what was decided, what was committed, what changed and what has been checked. We call this **business inference intelligence**. Three rules are what make its answers worth relying on:
+
+- **Every figure carries its basis.** An important relationship holds its sources, versions, provenance and the identity or process that accepted it, so a number on a leadership view can be traced back to the work it came from.
+- **An inference is not a fact.** An inferred dependency stays a hypothesis until an authorised person or an approved verification confirms it. A model-generated explanation is not evidence by itself.
+- **Reported is not verified.** A completion message does not close work. Work under a contract is done only when its verification passes.
+
+The foundation for this runs today at one-person scale: provenance on the vault's notes, claims held as fact, theory or conjecture, and work contracts whose completion comes only from a passing verification. The company-wide view, the findings that would raise a conflict or a dependency across projects, and organisation-level metrics are planned. The finding model is built and tested as a data model, and nothing raises a finding yet. See [Organisational intelligence](docs/ORGANISATIONAL-INTELLIGENCE.md).
+
 ### How the architecture creates a common operational understanding
 
 The intended architecture combines several responsibilities that must not be confused:
@@ -87,6 +99,7 @@ Memev starts with the individual because personal AI connectivity is valuable in
 | One person on several computers | The same vault on up to 3 computers over the secure link, each computer with its own key (Personal) | Your work follows you. Automatic merging of simultaneous edits is planned, and today git sync is single-writer backup |
 | A developer building agents | An MCP server, a communications bus with seats, heartbeats and task handoffs, and work contracts with checks | A shared place for agents to coordinate, and a record that separates "assigned" from "verified" |
 | A team or an organisation | A conversation with us about a company vault, one AI provider for the organisation, sign-in and roles, services and support (contact us) | These are planned. We scope them with you rather than sell them before they exist |
+| A CEO or an executive team | Questions asked of the organisation's own work record, with every figure traceable to its source (planned) | You see what was verified, not only what was reported |
 | An organisation with several sites | Corporate multi-site federation (planned) | Each site keeps its own authority and shares only authorised state |
 | Independent organisations on a shared programme | Federated tier (planned) | Partners connect through explicit, bilateral trust and scope without surrendering their local systems or data |
 | An industry or research network | Federated tier (planned) | Multiple organisations coordinate selected work, evidence and computation under their own policies |
@@ -103,6 +116,16 @@ Memev grows by the scope of coordination required. The first two tiers serve an 
 | **Corporate** | One large organisation, multiple sites and jurisdictions | Coordinate departments, programmes and portfolios across independently operated sites within one corporate trust domain | Contact us; planned |
 | [**Federated**](docs/tiers/federated.md) | Multiple independent organisations | Connect customers, suppliers, partners, contractors, research institutions and public/private participants around shared programmes, projects, evidence and computation | Contact us; planned |
 
+What each tier is worth to the people who use it:
+
+| Tier | What it gives | Status |
+|---|---|---|
+| **Personal** | The AI tools one person connects work from the same context. No re-explaining a project to each tool, and the record stays on their own computer. | Preview today |
+| **Personal with more computers** | The same context on up to 3 of that person's computers, each with its own key. | Available for current capabilities; automatic merging of simultaneous edits is planned |
+| **Business** | One company record that the team and its AI tools share, under company rules. Knowledge outlasts staff changes and changes of AI vendor, and leadership can ask questions of the same record the teams work from. | Planned |
+| **Corporate** | Sites in many countries run one programme. Each site keeps its own authority and can keep its data in its own jurisdiction. | Planned |
+| **Federated** | Separate businesses, suppliers and vendors share only what each agreement permits. Nobody hands over its systems or its data. | Planned |
+
 Business and Corporate describe coordination inside one organisation. **Federated is a distinct fifth tier** for coordination between organisations that retain separate ownership, operators, trust roots, policies and legal responsibilities. It is not a requirement to merge participants into one company vault.
 
 The Federated tier is intended to include scoped federation membership, bilateral agreements, identity and trust between participants, authorised work and evidence exchange, cross-organisation project/programme context, policy-aware queries, operational visibility, and (where separately specified and validated) federated computation. The commercial scope will be defined by the number and type of participating organisations, trust relationships, sites, jurisdictions, workloads, governance requirements, support and deployment model—not by a simple per-computer price.
@@ -110,6 +133,22 @@ The Federated tier is intended to include scoped federation membership, bilatera
 **Availability is not implied by the tier name.** The Federated tier is a product and commercial target, not a currently purchasable or operational service. Node-to-node transport, cross-organisation admission, trust exchange, sovereign policy enforcement, federated reasoning and computation require implementation and end-to-end validation. See [Federation](docs/FEDERATION.md), [Data sovereignty](docs/DATA-SOVEREIGNTY.md), [Federated computation](docs/FEDERATED-COMPUTATION.md) and [pricing](docs/PRICING.md).
 
 Business and Corporate are recognised by the licence metadata but their services remain planned. Federated is listed in the product catalogue, while licence issuance is deliberately disabled until its service entitlements and acceptance criteria are implemented. No cross-organisation capability is implied to be operational. The free core remains free ([CHARTER.md](CHARTER.md)).
+## Keeping AI inside the rules
+
+The first question a business asks about AI is how it is kept from doing damage. Memev's answer is to govern what a connected AI may see, change and claim, and to keep a record of all three.
+
+**Enforced today, in the free core:**
+
+- **Scoped access.** Every token is scoped to read, write or admin, can be limited to paths, and is stored hashed. Each one expires, except the admin token made at setup, which lasts until you revoke it. Each computer has its own device key, and one token or one computer can be cut off alone ([security brief](docs/SECURITY-BRIEF.md)).
+- **Nothing is changed in silence.** The log is append-only. Every change can be seen and undone from it and from git, and a delete is a record, not an erasure ([threat model](docs/THREAT-MODEL.md)).
+- **Another AI's text is data, not instructions.** By default a cloud AI seat may post only to the operator. In the text Memev's hooks put into an AI app's context, a message from any other seat and memory recalled into the session are quoted as untrusted data.
+- **Done is checked, not claimed.** A work contract is signed and immutable, and it changes only by a new signed amendment. The work is done only when its verification passes. Contracts are off by default for new installs and are switched on per vault ([contracts](docs/CONTRACTS.md)).
+- **Nothing leaves by default.** No telemetry. The secure link for cloud AI is off until you switch it on. The only default traffic is the backup push to your own remote and one lookup at setup for an existing backup.
+
+**Planned for organisations:** a company admin console, sign-in and roles, a one-provider policy with egress rules, an egress log, and approvals with a [decision queue](docs/scope-one/design/decision-queue.md) for the actions that need a person. None of these is built yet ([Business](docs/tiers/business.md)).
+
+**What this does not claim.** Memev governs and records what flows through it. It does not control the behaviour of the AI apps themselves or the security of the services they connect to, and it does not claim legal compliance. Those limits are stated in the [threat model](docs/THREAT-MODEL.md) and on the [data sovereignty](docs/DATA-SOVEREIGNTY.md) page.
+
 ## How it fits together
 
 Memev is the connective layer between people, their work, the systems they use and the AI capabilities they authorise. The illustration shows the intended product boundary: Memev connects existing systems and relates their work; it is not itself the model provider, memory vendor, agent framework, CRM, ERP or business application.
@@ -270,7 +309,7 @@ Memev's product direction is broader than the current release. Every line below 
 ### In progress
 
 - The local project lifecycle: the project store, state machine and coordinator provide task claims, leases, heartbeats, reporting, evidence-bound verification, pause/resume, scope amendment, cancellation and reassignment. Remaining work is tracked in [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md); local lifecycle support should not be confused with distributed multi-writer convergence.
-- The paid-engine client behind a flag, off by default (pull request #201), with the trial licence and entitlement work (#154, #163, #177).
+- The paid-engine client is merged behind a flag, off by default (pull request #201). The trial licence and entitlement work continues (#154, #163, #177).
 - Correctness fixes in the crdt-merge engine itself, in its own repository.
 - The programme decomposition of the wider plan, as proposed and unsigned contracts: [docs/scope-one/programme/README.md](docs/scope-one/programme/README.md).
 - Documentation and tier alignment to the superseding owner decisions of 2 November 2026.
