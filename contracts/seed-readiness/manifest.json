@@ -692,7 +692,9 @@
       ],
       "tasks": 1,
       "criteria": 3,
-      "spec": "specs/SR-5.02-the-business-trial-can-actually.json"
+      "spec": "specs/SR-5.02-the-business-trial-can-actually.json",
+      "superseded_by": "SR-5.02.1",
+      "superseded_reason": "SR-5.02 is unsigned and its spec file is unchanged; SR-5.02.1 re-specifies the Business trial guards of MEM-134 (pull request #177) with the trial detected by the signed trial field and the business identity resolved by SO-F-01"
     },
     {
       "id": "SR-5.04",

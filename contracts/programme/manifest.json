@@ -1848,6 +1848,30 @@
       "spec": "../seed-readiness/specs/SR-1.34-a-daemon-start-waits-long-enough-for-a-slow-machine.json",
       "status": "proposed 1 Nov 2026; unsigned; red-team review and signing by the signer, after SR-1.01 T1, T3 and SR-1.24 have merged; builder Claim F; no code until signed",
       "kind": "feature"
+    },
+    {
+      "id": "SR-5.02.1",
+      "type": "superseding spec (supersedes the unsigned SR-5.02)",
+      "area": "SR-5",
+      "title": "The Business trial guards, re-specifying MEM-134: a trial is the signed trial field, a business identity is a resolved organisation actor of SO-F-01, every guard is reached through the command (memev)",
+      "repo": "memev",
+      "supersedes": "SR-5.02",
+      "supersedes_reason": "SR-5.02 is unsigned (three criteria, no red-team record, no signed body), so nothing signed is edited: it names MEM-129, MEM-130 and MEM-134 and leaves trialAvailable a stub; SR-5.02.1 re-specifies the guards of MEM-134 (pull request #177, which stays open and unmodified) with the trial detected by the signed trial field and the business identity resolved by SO-F-01, and drops the guards that no production path reaches",
+      "related_pull_request": "#177",
+      "programme_tasks": "WP24-01 (a gap found at the review of pull request #177; not in docs/scope-one/programme/fragments)",
+      "requirements": [],
+      "vault_contracts": [],
+      "build_layer": "SR-1.06 (signed) makes trial, org and trial_ext licence fields; SO-F-01 (built) resolves an actor; this spec adds only the trial guards, the credential channel of the command line and the tests",
+      "depends_on": [
+        "SR-1.06",
+        "SO-F-01"
+      ],
+      "tasks": 1,
+      "criteria": 23,
+      "spec": "specs/SR-5.02.1-business-trial-guards.json",
+      "base": "TBD: a main commit that holds the SR-1.06 build (license.mjs lists trial, org and trial_ext); recorded here and in the request before signing",
+      "status": "proposed and unsigned; no red-team record; not to be signed until the SR-1.06 build is on main and the base is recorded",
+      "kind": "feature"
     }
   ],
   "mapping": [
@@ -2345,6 +2369,12 @@
       "task": "WP18-04",
       "title": "Payment after verified acceptance: agentic payment protocol adapters and a Stripe adapter, idempotency, reconciliation; a payment receipt is never taken as proof of delivery",
       "contract": "PG-18.1",
+      "note": "specified in this set"
+    },
+    {
+      "task": "WP24-01",
+      "title": "The Business trial guards: the trial is the signed field, the business identity is a resolved organisation actor, and install, member invite, trial availability and device removal are reached through the command",
+      "contract": "SR-5.02.1",
       "note": "specified in this set"
     },
     {
