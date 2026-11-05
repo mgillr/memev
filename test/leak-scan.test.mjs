@@ -45,7 +45,11 @@ test('a denylisted word passes only as the owner in the public repository URL gi
       'https://github.com/zebracorn/memev.git by zebracorn\n', 'https://gitlab.com/zebracorn/memev.git\n', 'https://github.com/zebracorn/memevx\n',
       '[link](https://github.com/zebracorn/memev]\n',
       // a host that only ends in github.com is another host
-      'https://gist.github.com/zebracorn/memev\n', 'https://evilgithub.com/zebracorn/memev.git\n', 'https://not-github.com/zebracorn/memev/\n']) {
+      'https://gist.github.com/zebracorn/memev\n', 'https://evilgithub.com/zebracorn/memev.git\n', 'https://not-github.com/zebracorn/memev/\n',
+      'https://x_github.com/zebracorn/memev\n',
+      // github.com inside a path, or with no scheme, is not the repository URL
+      'https://evil.example/github.com/zebracorn/memev\n', '/tmp/go/src/github.com/zebracorn/memev/\n', 'github.com/zebracorn/memev\n',
+      'git+https://github.com/zebracorn/memev.git\n']) {
       assert.equal(scan(bad, env).code, 1, bad);
     }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
