@@ -16,7 +16,7 @@
       "tasks": 2,
       "criteria": 74,
       "spec": "specs/QL-1.01-red-team-gate-no-signing.json",
-      "status": "proposed: owner's quality-loop order of 30 Oct, signs after a clean red-team round"
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 3, superseding version 2 (the amendment of task 1), which superseded the version signed that day at the three-round stop"
     },
     {
       "id": "QL-1.02",
@@ -31,7 +31,7 @@
       "tasks": 2,
       "criteria": 65,
       "spec": "specs/QL-1.02-mutation-gate-on-changed-lines.json",
-      "status": "proposed: owner's quality-loop order of 30 Oct, signs after a clean red-team round"
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop"
     },
     {
       "id": "QL-1.03",
@@ -44,7 +44,7 @@
       "tasks": 2,
       "criteria": 37,
       "spec": "specs/QL-1.03-sensitive-path-checklist-before-merge.json",
-      "status": "proposed: owner's quality-loop order of 30 Oct, signs after a clean red-team round"
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop"
     },
     {
       "id": "QL-1.04",
@@ -59,7 +59,7 @@
       "tasks": 1,
       "criteria": 28,
       "spec": "specs/QL-1.04-claims-ledger-check-in-every-repository.json",
-      "status": "proposed: owner's quality-loop order of 30 Oct, signs after a clean red-team round"
+      "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop"
     },
     {
       "id": "QL-1.05",
