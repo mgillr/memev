@@ -49,7 +49,9 @@ test('a denylisted word passes only as the owner in the public repository URL gi
       'https://x_github.com/zebracorn/memev\n',
       // github.com inside a path, or with no scheme, is not the repository URL
       'https://evil.example/github.com/zebracorn/memev\n', '/tmp/go/src/github.com/zebracorn/memev/\n', 'github.com/zebracorn/memev\n',
-      'git+https://github.com/zebracorn/memev.git\n']) {
+      'git+https://github.com/zebracorn/memev.git\n',
+      // inside another URL's query string
+      'https://evil.example/?u=https://github.com/zebracorn/memev\n', 'https://evil.example/?a=1&u=https://github.com/zebracorn/memev.git\n']) {
       assert.equal(scan(bad, env).code, 1, bad);
     }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }

@@ -28,7 +28,9 @@ const OK_HOME = new Set(['you', 'me', 'user', 'username', 'name', 'runner', 'exa
 
 // The public repository URL https://github.com/<owner>/memev: the scheme must sit right before the host,
 // so a host ending in github.com, github.com inside a path, or a bare github.com/<owner>/memev is not it.
-const REPO_URL = /(?<![a-z0-9._/:+-])https:\/\/github\.com\/([a-z0-9-]+)\/memev(?=\.git(?![a-z0-9])|[/\s"'`)>]|$)/g;
+// Only the start of a line, a space, a quote, a backtick or an opening bracket may come before it, so the
+// URL inside another URL (after = or ?) is not it either.
+const REPO_URL = /(?<=^|[\s"'`(<\[])https:\/\/github\.com\/([a-z0-9-]+)\/memev(?=\.git(?![a-z0-9])|[/\s"'`)>]|$)/g;
 const ROOT_HOME = new RegExp(`(^|[\\s"'(])/${'root'}/`);
 const findings = [];
 function scanText(where, text, file = '') {
