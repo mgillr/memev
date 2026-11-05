@@ -85,6 +85,7 @@ current code already uses, so no contract is blocked on a guess.
 - Open item: a software licensing lawyer reviews the BSL change date of 2028-03-29 and the combined
   distribution against the BSL use restriction. The change date is not changed by this record.
 - Safe default: keep the call-out boundary as it is; do not build or re-sign the superseded contracts.
+- Amended by the owner decision of 5 Nov 2026 (below): one private repository, `memev-merge`, is allowed as the package around crdt-merge. It holds no merge algorithm. Everything else in this ADR stands: SR-3.01 and SR-3.03 stay superseded, and nothing from crdt-merge enters Memev.
 
 ### ADR 7: memory and project-state authority
 
@@ -248,3 +249,14 @@ Business and Corporate concern coordination within one organisation. Federated i
 **Documentation:** README, tiers, pricing, services, architecture and federation documentation must describe the five-tier model consistently and distinguish Business (one organisation), Corporate (multi-site within one organisation) and Federated (independent organisations).
 
 **Owner confirmation:** explicit in the conversation on 2 November 2026.
+
+## Owner decisions of 5 November 2026: the paid engine
+
+These are the owner's decisions of 5 November 2026 on the engine. They add to ADR 6 and change one line of it. They do not change the call-out boundary, and all of this is planned: no released Memev calls the engine yet.
+
+- **One engine for every paid tier.** Personal with more computers uses the same engine integration as planned for Business and Corporate, and Federated when it can be licensed. The free core stays git: one computer at a time, with a single-writer backup.
+- **Each paid computer keeps its own copy.** The computers may be in different places, and their copies converge through the engine. A computer that only uses another computer's vault over the secure link keeps no copy.
+- **The engine stays crdt-merge, outside Memev.** ADR 6 and D-LIC-B stand: Memev reaches it only across the call-out boundary (`src/engine/merge.mjs`), and nothing from it is vendored, copied or ported into this repository.
+- **The package around it is `memev-merge`.** This replaces ADR 6's "no new merge-engine repository". One private repository, under a commercial licence, holds the provider shim that [MERGE-SEMANTICS.md](../MERGE-SEMANTICS.md) places outside the core, the integration of E4, and the signed program for each operating system. It holds no merge algorithm of its own, and the docs go on calling the engine crdt-merge. The program is delivered only with a paid licence and checks the licence itself.
+- **E4 is in the paid path.** It runs on the engine's side of the boundary ([PAID-TRUST.md](../PAID-TRUST.md)).
+- **ACFA-RS is not in paid Personal at launch.** It stays for numeric contributions only, as signed in PG-09.1 WP09-02, and joins when a feed of figures from five or more bots exists.
