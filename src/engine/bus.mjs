@@ -47,6 +47,30 @@ export class BusError extends Error { constructor(code, message) { super(message
 export const fileOf = (seat) => seat.replace(/[^a-z0-9._-]/g, (c) => (c === '@' ? '~' : c === '/' ? '+' : '_'));
 export const label = (s) => String(s || 'computer').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'computer';
 const order = (a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : a.device < b.device ? -1 : a.device > b.device ? 1 : a.dseq - b.dseq);
+// A line someone wrote by hand can carry its own seq, or a time or device that is not text. It is read as it always was, but
+// the view then gives up the short cuts that rely on seq being the place in the order. Memev itself never writes one.
+const ownSeq = new WeakSet();
+/** What leaves the class: a message of its own, with seq first. A line that carries its own seq keeps it, as the spread always did. */
+const copyOut = (m) => ({ seq: m.seq, ...m });
+const newView = (files, exotic) => ({ files, exotic, place: null, msgs: [], firstById: new Map(), byFrom: new Map(), claimsBy: new Map(), statusBy: new Map(), byRef: new Map(), tasks: [], holds: [], verdicts: new Set(), runs: new Map() });
+const listIn = (map, key) => { let l = map.get(key); if (!l) { l = []; map.set(key, l); } return l; };
+/** Add a message to a list kept in the bus order; nearly always that is the end. */
+const putInOrder = (list, m, atEnd) => { if (atEnd) { list.push(m); return; } let i = list.length; while (i > 0 && order(list[i - 1], m) > 0) i--; if (i === list.length) list.push(m); else list.splice(i, 0, m); };
+/** Where a message sits in the order: its seq, except beside a line that carries its own. */
+const placeOf = (v, m) => (v.place ? v.place.get(m) : m.seq);
+function addToView(v, m, atEnd) {
+  const had = v.firstById.get(m.id); if (!had || (!atEnd && order(m, had) < 0)) v.firstById.set(m.id, m);
+  putInOrder(listIn(v.byFrom, m.from), m, atEnd);
+  if (m.ref !== null && m.ref !== undefined) putInOrder(listIn(v.byRef, m.ref), m, atEnd);
+  if (m.type === 'claim') putInOrder(listIn(v.claimsBy, m.from), m, atEnd);
+  else if (m.type === 'status') { if (!m.check) putInOrder(listIn(v.statusBy, m.from), m, atEnd); }
+  else if (m.type === 'task') putInOrder(v.tasks, m, atEnd);
+  else if (m.type === 'verdict') v.verdicts.add(m.ref);
+  else if (m.type === 'hold' && m.operator) putInOrder(v.holds, m, atEnd);
+  const run = listIn(v.runs, m.device); let i = run.length; while (i > 0 && (run[i - 1].dseq > m.dseq)) i--; if (i === run.length) run.push(m); else run.splice(i, 0, m);
+}
+/** The last message in bus order across several lists kept in that order. */
+const lastOf = (v, map, names) => { let best = null; for (const n of names) { const m = map.get(n)?.at(-1); if (m && (!best || placeOf(v, m) > placeOf(v, best))) best = m; } return best; };
 const ago = (ts, at) => Math.round((at - Date.parse(ts)) / 60e3);
 
 export class Bus {
@@ -299,16 +323,42 @@ export class Bus {
     const full = this._p('log', file); let st; try { st = fs.statSync(full); } catch { return []; }
     const c = this._cache.get(file);
     if (c && c.size === st.size && c.mtimeMs === st.mtimeMs) return c.msgs;
-    const msgs = []; let bad = 0;
-    for (const line of fs.readFileSync(full, 'utf8').split('\n')) { if (!line.trim()) continue; try { const m = JSON.parse(line); if (m?.id && m.device && Number.isInteger(m.dseq)) msgs.push(m); else bad++; } catch { bad++; } }
-    this._cache.set(file, { size: st.size, mtimeMs: st.mtimeMs, msgs, bad });
+    const msgs = []; let bad = 0; let exotic = false;
+    const text = fs.readFileSync(full, 'utf8');
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const m = JSON.parse(line);
+        if (m?.id && m.device && Number.isInteger(m.dseq)) { msgs.push(m); if (Object.hasOwn(m, 'seq')) { ownSeq.add(m); exotic = true; } else if (typeof m.ts !== 'string' || typeof m.device !== 'string') exotic = true; } else bad++;
+      } catch { bad++; }
+    }
+    this._cache.set(file, { size: st.size, mtimeMs: st.mtimeMs, msgs, bad, exotic, endsLine: !text || text.endsWith('\n') });
     return msgs;
   }
-  /** Every message, in the one order every computer agrees on, numbered from 1. */
-  all() {
-    const out = []; for (const f of this._logFiles()) out.push(...this._readLog(f));
+  /** Every message, in the one order every computer agrees on, numbered from 1. The caller owns what it gets back. */
+  all() { return this._view().msgs.map(copyOut); }
+  /**
+   * The messages in order and what roster, tasks and unread need from them, kept until a log file changes on disk. Every
+   * call checks each file's size and modified time, as _readLog does, so sync, a merge or another process is seen at once.
+   * The message objects are shared and their seq can move, so nothing outside this class may hold one: copyOut first.
+   */
+  _view() {
+    const files = this._logFiles(); const v = this._viewNow;
+    if (v && v.files.length === files.length && files.every((f, i) => f === v.files[i].file && this._unchanged(v.files[i]))) return v;
+    const out = []; const stamps = []; let exotic = false;
+    for (const f of files) { const msgs = this._readLog(f); const c = this._cache.get(f); exotic ||= c?.exotic; stamps.push({ file: f, cached: c || null }); for (const m of msgs) out.push(m); }
     out.sort(order);
-    return out.map((m, i) => ({ seq: i + 1, ...m }));
+    const next = newView(stamps, exotic);
+    if (exotic) next.place = new Map(out.map((m, i) => [m, i]));
+    for (let i = 0; i < out.length; i++) { if (!exotic || !ownSeq.has(out[i])) out[i].seq = i + 1; addToView(next, out[i], true); }
+    next.msgs = out;
+    this._viewNow = next;
+    return next;
+  }
+  _unchanged(stamp) {
+    const c = this._cache.get(stamp.file); if (!c || c !== stamp.cached) return false;
+    let st; try { st = fs.statSync(this._p('log', stamp.file)); } catch { return false; }
+    return c.size === st.size && c.mtimeMs === st.mtimeMs;
   }
   _visible(who, m) {
     if (who.operator || !who.project) return true;
@@ -330,12 +380,12 @@ export class Bus {
       if (!toOperator && !(this.cloudTasks && type === 'task')) throw new BusError('forbidden', 'a cloud seat may post only to the operator; to let a cloud app assign a task to a seat, the person turns on the bus cloud_tasks setting');
     }
     if (to !== 'all' && to !== OPERATOR && !this.seat(to)) throw new BusError('not_found', `no seat ${to}; bus_roster lists them`);
-    const all = this.all();
     if (['claim', 'restate'].includes(type)) {
-      const task = all.find((m) => m.id === ref && m.type === 'task');
+      const view = this._view();
+      const task = view.tasks.find((m) => m.id === ref);
       if (!task) throw new BusError('bad_request', `${type} needs ref: the id of a task`);
       if (task.to !== 'all' && task.to !== who.seat) throw new BusError('forbidden', `task ${ref} is assigned to ${task.to}`);
-      const claim = all.find((m) => m.type === 'claim' && m.ref === ref);
+      const claim = (view.byRef.get(ref) || []).find((m) => m.type === 'claim');
       if (type === 'claim' && claim && claim.from !== who.seat) throw new BusError('conflict', `task ${ref} is already claimed by ${claim.from}`);
       if (type === 'restate' && claim?.from !== who.seat) throw new BusError('bad_request', `claim task ${ref} before restating it`);
     }
@@ -371,20 +421,23 @@ export class Bus {
     fs.appendFileSync(this._p('log', file), `${JSON.stringify(msg)}\n`);
     this._last.set(file, msg);
     this.commit(this._rel('log', file));
-    return { seq: this.all().find((m) => m.id === msg.id)?.seq ?? null, ...msg };
+    return { seq: this._view().firstById.get(msg.id)?.seq ?? null, ...msg };
   }
 
   since(ctx, { seq = 0, limit = 50, seat = null } = {}) {
     const who = this.resolve(ctx, { seat }); this.pulse(ctx, { who });
     const lim = Math.min(Math.max(1, Math.floor(Number(limit)) || SINCE_MAX), SINCE_MAX);
-    const matched = this.all().filter((m) => m.seq > Number(seq || 0) && this._visible(who, m));
-    return { messages: matched.slice(0, lim), more: Math.max(0, matched.length - lim) };
+    const view = this._view(); const after = Number(seq || 0); const msgs = view.msgs;
+    // seq is the place in the order, so the scan starts where the answer starts; a line with its own seq means reading them all
+    const start = view.exotic ? 0 : Math.min(msgs.length, Math.max(0, Math.floor(after) || 0));
+    const matched = []; for (let i = start; i < msgs.length; i++) if (msgs[i].seq > after && this._visible(who, msgs[i])) matched.push(msgs[i]);
+    return { messages: matched.slice(0, lim).map(copyOut), more: Math.max(0, matched.length - lim) };
   }
   tail(ctx, { n = 20, seat = null, type = null } = {}) {
     const who = this.resolve(ctx, { seat });
     const lim = Math.min(Math.max(1, Math.floor(Number(n)) || 20), TAIL_MAX);
-    const matched = this.all().filter((m) => this._visible(who, m) && (!type || m.type === type));
-    return { messages: matched.slice(-lim), more: Math.max(0, matched.length - lim) };
+    const matched = this._view().msgs.filter((m) => this._visible(who, m) && (!type || m.type === type));
+    return { messages: matched.slice(-lim).map(copyOut), more: Math.max(0, matched.length - lim) };
   }
   /** The read state for a device: the contiguous prefix from read and the counters read beyond a gap from read_extra. */
   _readUpTo(st, device) {
@@ -421,7 +474,7 @@ export class Bus {
     this._storeRead(st, m.device, newUp, rest);
   }
   /** One message in the capped view: body cut to BODY_CUT unless it is a priority type. */
-  _view(m, { cut = true } = {}) {
+  _viewOne(m, { cut = true } = {}) {
     const doCut = cut && m.body.length > BODY_CUT;
     return { seq: m.seq, id: m.id, from: m.from, to: m.to, type: m.type, ref: m.ref, operator: m.operator, ts: m.ts, body: doCut ? m.body.slice(0, BODY_CUT) + CUT_MARK : m.body, cut: doCut };
   }
@@ -434,7 +487,7 @@ export class Bus {
   unread(ctx, { seat = null, peek = false, limit = null, capped = false } = {}) {
     const who = this.resolve(ctx, { seat });
     const p = this._pulse(who.seat); const st = readState(p);
-    const all = this.all();
+    const view = this._view(); const all = view.msgs;
     const names = this._names(who.seat);
     const fresh = all.filter((m) => !this._isRead(st, m) && this._toMe(who, m, names) && this._visible(who, m));
     const cap = capped || limit != null;
@@ -464,18 +517,20 @@ export class Bus {
         for (const m of all) if (this._toMe(who, m, names) || names.includes(m.from)) this._markAllRead(st, m);
       }
     }
+    // these are answered as of the start of the call, whatever the heartbeat or an ack below adds to the bus
+    const messages = cap ? shownMsgs.map((m) => this._viewOne(m, { cut: !isPriority(m) })) : fresh.map(copyOut);
+    const hold = this.holdOn(who.seat, view);
+    const toAck = who.operator && who.seat === OPERATOR ? [] : fresh.filter((x) => x.check && !(view.byRef.get(x.id) || []).some((a) => a.type === 'ack' && names.includes(a.from)));
+    const ackOf = toAck.map((m) => ({ id: m.id, from: m.from }));
     // what this call saw: the bus position and, per device, the highest counter
     const frontier = all.length ? all[all.length - 1].seq : (p.seen_seq || 0);
     const seenDseq = {}; for (const m of all) seenDseq[m.device] = Math.max(seenDseq[m.device] || 0, m.dseq);
     this.pulse(ctx, { who, read: peek ? null : st.read, readExtra: peek ? null : st.extra, seen: peek ? null : frontier, seenDseq: peek ? null : seenDseq });
     const acked = [];
-    if (!(who.operator && who.seat === OPERATOR)) {
-      for (const m of fresh.filter((x) => x.check)) if (!all.some((a) => a.type === 'ack' && a.ref === m.id && names.includes(a.from))) {
-        try { if (!ctx.identity?.read_only) { this._append(who, { to: m.from, type: 'ack', body: 'comms check: here', ref: m.id, project: null }); acked.push(m.id); } } catch {}
-      }
+    for (const m of ackOf) {
+      try { if (!ctx.identity?.read_only) { this._append(who, { to: m.from, type: 'ack', body: 'comms check: here', ref: m.id, project: null }); acked.push(m.id); } } catch {}
     }
-    const messages = cap ? shownMsgs.map((m) => this._view(m, { cut: !isPriority(m) })) : fresh;
-    return { seat: who.seat, operator: who.operator, hold: this.holdOn(who.seat, all), messages, ...(cap ? { not_shown: notShown } : {}), acked, ...(this.operator() ? {} : { lead_needed: LEAD_NEEDED }) };
+    return { seat: who.seat, operator: who.operator, hold, messages, ...(cap ? { not_shown: notShown } : {}), acked, ...(this.operator() ? {} : { lead_needed: LEAD_NEEDED }) };
   }
 
   // ---- pulse
@@ -499,25 +554,26 @@ export class Bus {
     return rec;
   }
 
-  holdOn(seat, all = this.all()) {
-    const names = this._names(seat);
-    const h = all.filter((m) => m.type === 'hold' && m.operator && (names.includes(m.to) || m.to === 'all')).at(-1);
+  holdOn(seat, view = this._view()) {
+    const names = this._names(seat); const holds = view.holds;
+    let h = null; for (let i = holds.length - 1; i >= 0 && !h; i--) if (names.includes(holds[i].to) || holds[i].to === 'all') h = holds[i];
     return h && !h.release ? { since: h.ts, by: h.from, reason: h.body, id: h.id } : null;
   }
 
   // ---- roster and comms check
   roster({ at = Date.now() } = {}) {
-    const all = this.all(); const op = this.operator();
+    const view = this._view(); const op = this.operator();
     const rows = this.seats().map((s) => {
       const dev = this.devices.get(s.device); const p = this._pulse(s.seat);
       const names = [s.seat, ...(s.renamed_from || [])];
-      const last = all.filter((m) => names.includes(m.from)).at(-1);
+      const last = lastOf(view, view.byFrom, names);
       let state = 'never joined';
       if (s.removed || !dev || dev.status !== 'active') state = 'removed';
       else if (s.joined && p.last_seen) state = ago(p.last_seen, at) <= this.liveMin ? 'live' : 'stale';
-      const claims = all.filter((m) => m.type === 'claim' && names.includes(m.from) && !all.some((v) => v.type === 'verdict' && v.ref === m.ref)).map((m) => m.ref);
-      const status = all.filter((m) => m.type === 'status' && names.includes(m.from) && !m.check).at(-1);
-      return { seat: s.seat, client: s.client, device: s.device, device_label: dev?.label || s.device_label, device_kind: dev?.kind || s.device_kind, teammate: dev?.teammate || null, state, operator: op === s.seat, last_seen: p.last_seen || null, minutes_since: p.last_seen ? ago(p.last_seen, at) : null, last_message: last ? { seq: last.seq, type: last.type, ts: last.ts, body: last.body.slice(0, 120) } : null, hold: this.holdOn(s.seat, all), claims, status: status ? status.body.slice(0, 160) : null, project: s.project };
+      const claimed = names.length > 1 ? [...new Set(names)].flatMap((n) => view.claimsBy.get(n) || []).sort((a, b) => placeOf(view, a) - placeOf(view, b)) : view.claimsBy.get(names[0]) || [];
+      const claims = claimed.filter((m) => !view.verdicts.has(m.ref)).map((m) => m.ref);
+      const status = lastOf(view, view.statusBy, names);
+      return { seat: s.seat, client: s.client, device: s.device, device_label: dev?.label || s.device_label, device_kind: dev?.kind || s.device_kind, teammate: dev?.teammate || null, state, operator: op === s.seat, last_seen: p.last_seen || null, minutes_since: p.last_seen ? ago(p.last_seen, at) : null, last_message: last ? { seq: last.seq, type: last.type, ts: last.ts, body: last.body.slice(0, 120) } : null, hold: this.holdOn(s.seat, view), claims, status: status ? status.body.slice(0, 160) : null, project: s.project };
     });
     // licensed computers with no app on the bus yet
     const seated = new Set(rows.map((r) => r.device));
@@ -538,7 +594,7 @@ export class Bus {
     const targets = this.roster().seats.filter((r) => r.seat !== msg.from && (to === 'all' || r.seat === to));
     const start = Date.now(); let acks = [];
     for (;;) {
-      acks = this.all().filter((m) => m.type === 'ack' && m.ref === msg.id);
+      acks = (this._view().byRef.get(msg.id) || []).filter((m) => m.type === 'ack').map(copyOut);
       const waiting = targets.filter((r) => r.seat && r.state === 'live' && !acks.some((a) => a.from === r.seat));
       if (!waiting.length || Date.now() - start >= ms) break;
       await new Promise((r) => setTimeout(r, 200));
@@ -557,12 +613,13 @@ export class Bus {
   /** Tasks with who claimed them, the restatement, the latest status and the verdict. An unclaimed
    * task to a live seat that has not read it yet waits for that seat's next turn. */
   tasks(ctx, { open = false } = {}) {
-    const who = this.resolve(ctx); const all = this.all().filter((m) => this._visible(who, m));
+    const who = this.resolve(ctx); const view = this._view();
     const live = new Set(this.roster().seats.filter((r) => r.seat && r.state === 'live').map((r) => r.seat));
-    return all.filter((m) => m.type === 'task').map((t) => {
-      const rel = all.filter((m) => m.ref === t.id);
+    const pulses = new Map(); const pulseOf = (seat) => { let p = pulses.get(seat); if (p === undefined) { p = this._pulse(seat); pulses.set(seat, p); } return p; };
+    return view.tasks.filter((m) => this._visible(who, m)).map((t) => {
+      const rel = (view.byRef.get(t.id) || []).filter((m) => this._visible(who, m));
       const claim = rel.find((m) => m.type === 'claim'); const verdict = rel.filter((m) => m.type === 'verdict').at(-1);
-      const state = verdict ? 'done' : claim ? 'claimed' : live.has(t.to) && this.unreadFor(t.to, t) ? 'waiting for next turn' : 'open';
+      const state = verdict ? 'done' : claim ? 'claimed' : live.has(t.to) && !hasRead(pulseOf(t.to), t) ? 'waiting for next turn' : 'open';
       return { id: t.id, seq: t.seq, from: t.from, operator: t.operator, to: t.to, body: t.body, claimed_by: claim?.from || null, restated: rel.filter((m) => m.type === 'restate').at(-1)?.body || null, status: rel.filter((m) => m.type === 'status').at(-1)?.body || null, verdict: verdict?.body || null, state };
     }).filter((t) => !open || t.state !== 'done');
   }
@@ -571,7 +628,7 @@ export class Bus {
   health({ at = Date.now() } = {}) {
     const files = this._logFiles(); let bad = 0; for (const f of files) { this._readLog(f); bad += this._cache.get(f)?.bad || 0; }
     const r = this.roster({ at });
-    return { seats: r.seats.filter((s) => s.seat).length, live: r.seats.filter((s) => s.state === 'live').length, stale: r.seats.filter((s) => s.state === 'stale').map((s) => `${s.seat} (${s.minutes_since} min)`), never: r.seats.filter((s) => s.state === 'never joined').length, operator: r.operator, bad_lines: bad, messages: this.all().length };
+    return { seats: r.seats.filter((s) => s.seat).length, live: r.seats.filter((s) => s.state === 'live').length, stale: r.seats.filter((s) => s.state === 'stale').map((s) => `${s.seat} (${s.minutes_since} min)`), never: r.seats.filter((s) => s.state === 'never joined').length, operator: r.operator, bad_lines: bad, messages: this._view().msgs.length };
   }
 }
 
