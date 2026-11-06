@@ -8,7 +8,7 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
-const CODE = arg('code', path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..', '..')); const INDEX = arg('index'), WORK = arg('work'); const REPEATS = Number(arg('repeats', 3)); const SIZES = arg('sizes', '500,5000,16000').split(',').map(Number);
+const CODE = arg('code', path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..', '..')); const INDEX = arg('index'), WORK = arg('work'); const REPEATS = Number(arg('repeats', 3)); const SIZES = arg('sizes', '500,5000,16000').split(',').map(Number); const LAB = arg('lab') ? JSON.parse(arg('lab')) : null; if (LAB?.gated) LAB.gate = new Int32Array(new SharedArrayBuffer(4));
 const { SegIndex } = await import(`${CODE}/src/engine/segindex.mjs`);
 const stat = (a) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); const q = (p) => Number(s[Math.min(s.length - 1, Math.floor((s.length - 1) * p))].toFixed(1)); return { n: s.length, p50: q(0.5), p95: q(0.95), max: q(1) }; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -23,7 +23,7 @@ let wi = 0; const body = (extra = '') => { const i = wi++; return `# turn ${i}\n
 const PROMPTS = ['database migration timeout', 'how do we handle retries for webhook delivery in billing', 'write a unit test for parse_date', 'what did we decide about the deploy pipeline and the staging rollback when the health check fails twice', 'token rotation schedule for the api gateway'];
 let bad = 0; const rows = [];
 for (let rep = 0; rep < REPEATS; rep++) for (const size of SIZES) {
-  restore(); const ix = new SegIndex(file); if (!ix.load()) throw new Error('segment did not load'); const out = { rep, overlay: size };
+  restore(); const ix = new SegIndex(file); if (!ix.load()) throw new Error('segment did not load'); ix.lab = LAB; const out = { rep, overlay: size };
   const n0 = ix.docs.size; const seg = ix.seg; out.sections = n0; out.open_columns_ms = timed(() => { ix.query('database migration timeout', { limit: 4, boosts: {} }); });
   out.first_write_ms = timed(() => ix.update('notes/bench/first.md', body())); let added = ix.docs.size - n0; let i = 0;
   // Grow the overlay the way writes do, in saves of 20, keeping it under the fold threshold where the size asks for that.

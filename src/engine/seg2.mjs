@@ -5,8 +5,8 @@
 //   head.json   counts, every 64th dictionary word with its byte offset; written last, so a folder without it is unfinished
 //   dict.txt    word, df, row of its first posting; sorted by JavaScript string order
 //   ids.bin     u32 section number per posting; tfs.bin u16 count per posting; the same row in both
-//   cols.bin    ROW u32 per section: len, meta offset (low, high), meta length, path id, project id, heading offset, review date
-//   heads.bin   headings as UTF-8, so a heading never costs a read and a parse per scored section
+//   cols.bin    ROW u32 per section: len, meta offset (low, high), meta length, path id, project id, heading offset, review date, key signature
+//   heads.bin   headings as UTF-16, the only encoding that returns any JavaScript string unchanged, and fast to decode
 //   meta.jsonl  one line per section: line, mtime, snippet, flags. Read only for what is returned
 //   names.json  the paths and projects the ids refer to
 import fs from 'node:fs';
@@ -15,8 +15,10 @@ import { Worker, isMainThread, parentPort, workerData } from 'node:worker_thread
 import { fileURLToPath } from 'node:url';
 
 export const SEG_VERSION = 3;
-export const ROW = 8; export const C_LEN = 0, C_MLO = 1, C_MHI = 2, C_MLEN = 3, C_PATH = 4, C_PROJ = 5, C_HEAD = 6, C_RB = 7;
+export const ROW = 9; export const C_LEN = 0, C_MLO = 1, C_MHI = 2, C_MLEN = 3, C_PATH = 4, C_PROJ = 5, C_HEAD = 6, C_RB = 7, C_SIG = 8;
 const NO_HEADING = 0x80000000, HAS_FL = 0x80000000; const FLUSH = 1 << 20;
+/** A signature of an item key (path#heading). A key absent from a small bitmap of signatures needs no heading. */
+export const keySig = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 const encodeRb = (rb) => (rb ? Number(rb.replace(/-/g, '')) : 0);
 const decodeRb = (v) => { if (!v) return null; const s = String(v).padStart(8, '0'); return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6)}`; };
 const metaLine = (d) => `${JSON.stringify({ line: d.line, mtime: d.mtime, snippet: d.snippet, fl: d.fl || null })}\n`;
@@ -27,28 +29,31 @@ function syncClose(fd) { fs.fsyncSync(fd); fs.closeSync(fd); }
 function syncFile(file) { const fd = fs.openSync(file, 'r+'); syncClose(fd); }
 
 // Appends fixed-width values through one buffer, so a whole segment is a few hundred writes rather than one per word.
+let PACE = 0, GATE = null, sinceFlush = 0;
+// Flushing little and often keeps the disk's queue short, so a flush on the other thread does not wait behind a whole segment.
+function paced(fd, n) { if (GATE) Atomics.wait(GATE, 0, 1, 200); if (PACE) { sinceFlush += n; if (sinceFlush >= PACE) { fs.fdatasyncSync(fd); sinceFlush = 0; } } }
 class Out {
   constructor(file, Type) { this.fd = fs.openSync(file, 'w', 0o600); this.Type = Type; this.a = new Type(FLUSH / Type.BYTES_PER_ELEMENT); this.n = 0; }
   push(v) { this.a[this.n++] = v; if (this.n === this.a.length) this.flush(); }
-  flush() { if (this.n) { fs.writeSync(this.fd, new Uint8Array(this.a.buffer, 0, this.n * this.Type.BYTES_PER_ELEMENT)); this.n = 0; } }
+  flush() { if (this.n) { const b = this.n * this.Type.BYTES_PER_ELEMENT; fs.writeSync(this.fd, new Uint8Array(this.a.buffer, 0, b)); this.n = 0; paced(this.fd, b); } }
   close() { this.flush(); syncClose(this.fd); }
 }
 class TextOut {
   constructor(file) { this.fd = fs.openSync(file, 'w', 0o600); this.parts = []; this.size = 0; this.bytes = 0; }
   write(b) { this.parts.push(b); this.size += b.length; this.bytes += b.length; if (this.size >= FLUSH) this.flush(); }
-  flush() { if (this.size) { fs.writeSync(this.fd, Buffer.concat(this.parts, this.size)); this.parts = []; this.size = 0; } }
+  flush() { if (this.size) { const n = this.size; fs.writeSync(this.fd, Buffer.concat(this.parts, this.size)); this.parts = []; this.size = 0; paced(this.fd, n); } }
   close() { this.flush(); syncClose(this.fd); }
 }
 
 // The section columns and text files, shared by a first write and a fold.
 class SectionWriter {
   constructor(dir, cols) { this.dir = dir; this.cols = cols; this.meta = new TextOut(path.join(dir, 'meta.jsonl')); this.heads = new TextOut(path.join(dir, 'heads.bin')); this.P = new Map(); this.J = new Map(); this.n = 0; this.totalLen = 0; }
-  row(len, line, heading, pid, jid, rbv) {
+  row(len, line, heading, pid, jid, rbv, sig) {
     const ml = line.length, at = this.meta.bytes; const c = this.cols; const o = this.n * ROW; c[o + C_LEN] = len; c[o + C_MLO] = at % 4294967296; c[o + C_MHI] = Math.floor(at / 4294967296); c[o + C_MLEN] = ml; c[o + C_PATH] = pid; c[o + C_PROJ] = jid;
-    c[o + C_HEAD] = heading === null ? (this.heads.bytes | NO_HEADING) >>> 0 : this.heads.bytes; c[o + C_RB] = rbv; this.meta.write(line); if (heading) this.heads.write(heading); this.totalLen += len; return this.n++;
+    c[o + C_HEAD] = heading === null ? (this.heads.bytes | NO_HEADING) >>> 0 : this.heads.bytes; c[o + C_RB] = rbv; c[o + C_SIG] = sig; this.meta.write(line); if (heading) this.heads.write(heading); this.totalLen += len; return this.n++;
   }
-  doc(d) { const fl = d.fl ? HAS_FL : 0; return this.row(d.len, Buffer.from(metaLine(d)), d.heading === null || d.heading === undefined ? null : Buffer.from(d.heading), idOf(this.P, d.path), idOf(this.J, d.project), (encodeRb(d.rb) | fl) >>> 0); }
-  finish() { this.meta.close(); this.heads.close(); fs.writeFileSync(path.join(this.dir, 'cols.bin'), new Uint8Array(this.cols.buffer, 0, this.n * ROW * 4), { mode: 0o600 }); syncFile(path.join(this.dir, 'cols.bin')); fs.writeFileSync(path.join(this.dir, 'names.json'), JSON.stringify({ paths: [...this.P.keys()], projects: [...this.J.keys()] }), { mode: 0o600 }); syncFile(path.join(this.dir, 'names.json')); }
+  doc(d) { const fl = d.fl ? HAS_FL : 0; return this.row(d.len, Buffer.from(metaLine(d)), d.heading === null || d.heading === undefined ? null : Buffer.from(d.heading, 'utf16le'), idOf(this.P, d.path), idOf(this.J, d.project), (encodeRb(d.rb) | fl) >>> 0, keySig(`${d.path}#${d.heading || ''}`)); }
+  finish() { this.meta.close(); this.heads.close(); fs.writeFileSync(path.join(this.dir, 'cols.bin'), Buffer.from(this.cols.buffer, 0, this.n * ROW * 4), { mode: 0o600 }); syncFile(path.join(this.dir, 'cols.bin')); fs.writeFileSync(path.join(this.dir, 'names.json'), JSON.stringify({ paths: [...this.P.keys()], projects: [...this.J.keys()] }), { mode: 0o600 }); syncFile(path.join(this.dir, 'names.json')); }
 }
 class DictWriter {
   constructor(dir) { this.dir = dir; this.ids = new Out(path.join(dir, 'ids.bin'), Uint32Array); this.tfs = new Out(path.join(dir, 'tfs.bin'), Uint16Array); this.dict = new TextOut(path.join(dir, 'dict.txt')); this.sparse = []; this.row = 0; this.terms = 0; }
@@ -68,13 +73,13 @@ export function writeSeg(dir, docs) {
 }
 
 export class Seg {
-  constructor(dir) {
+  constructor(dir, cols = null) {
     this.dir = dir; this.head = JSON.parse(fs.readFileSync(path.join(dir, 'head.json'), 'utf8')); if (this.head.version !== SEG_VERSION) throw new Error(`segment version ${this.head.version}`);
-    this.fdD = fs.openSync(path.join(dir, 'dict.txt'), 'r'); this.fdI = fs.openSync(path.join(dir, 'ids.bin'), 'r'); this.fdT = fs.openSync(path.join(dir, 'tfs.bin'), 'r'); this.fdM = fs.openSync(path.join(dir, 'meta.jsonl'), 'r'); this.c = null; this.h = null; this.byPath = null;
+    this.fdD = fs.openSync(path.join(dir, 'dict.txt'), 'r'); this.fdI = fs.openSync(path.join(dir, 'ids.bin'), 'r'); this.fdT = fs.openSync(path.join(dir, 'tfs.bin'), 'r'); this.fdM = fs.openSync(path.join(dir, 'meta.jsonl'), 'r'); this.c = cols; this.h = null; this.byPath = null; this.paths = null;
   }
   close() { for (const f of [this.fdD, this.fdI, this.fdT, this.fdM]) fs.closeSync(f); }
   /** The section columns as one typed array, read once on first use. */
-  cols() { if (!this.c) { const b = readAligned(path.join(this.dir, 'cols.bin')); this.c = new Uint32Array(b.buffer, b.byteOffset, b.length / 4); const nm = JSON.parse(fs.readFileSync(path.join(this.dir, 'names.json'), 'utf8')); this.paths = nm.paths; this.projects = nm.projects; } return this.c; }
+  cols() { if (!this.paths) { if (!this.c) { const b = readAligned(path.join(this.dir, 'cols.bin')); this.c = new Uint32Array(b.buffer, b.byteOffset, b.length / 4); } const nm = JSON.parse(fs.readFileSync(path.join(this.dir, 'names.json'), 'utf8')); this.paths = nm.paths; this.projects = nm.projects; } return this.c; }
   lookup(w) {
     const s = this.head.sparse; let lo = 0, hi = s.length - 1, at = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (s[m][0] <= w) { at = m; lo = m + 1; } else hi = m - 1; }
     if (at < 0) return null; const st = s[at][1], en = at + 1 < s.length ? s[at + 1][1] : this.head.dictBytes; const b = Buffer.allocUnsafe(en - st); fs.readSync(this.fdD, b, 0, b.length, st);
@@ -83,7 +88,8 @@ export class Seg {
   }
   ids(e) { const a = new Uint32Array(e.df); fs.readSync(this.fdI, a, 0, e.df * 4, e.row * 4); return a; }
   tfs(e) { const a = new Uint16Array(e.df); fs.readSync(this.fdT, a, 0, e.df * 2, e.row * 2); return a; }
-  heading(i) { const c = this.cols(), v = c[i * ROW + C_HEAD]; if (v & NO_HEADING) return null; if (!this.h) this.h = readAligned(path.join(this.dir, 'heads.bin')); const e = i + 1 < this.head.n ? (c[(i + 1) * ROW + C_HEAD] & 0x7fffffff) : this.head.headBytes; return this.h.utf8Slice(v, e); }
+  projectId(p) { this.cols(); if (!this.projIds) this.projIds = new Map(this.projects.map((x, k) => [x, k + 1])); return this.projIds.get(p) || 0; }
+  heading(i) { const c = this.cols(), v = c[i * ROW + C_HEAD]; if (v & NO_HEADING) return null; if (!this.h) this.h = readAligned(path.join(this.dir, 'heads.bin')); const e = i + 1 < this.head.n ? (c[(i + 1) * ROW + C_HEAD] & 0x7fffffff) : this.head.headBytes; return this.h.ucs2Slice(v, e); }
   rb(i) { return decodeRb(this.cols()[i * ROW + C_RB] & 0x7fffffff); }
   hasFl(i) { return (this.cols()[i * ROW + C_RB] & HAS_FL) !== 0; }
   meta(i) { const c = this.cols(), o = i * ROW; const b = Buffer.allocUnsafe(c[o + C_MLEN]); fs.readSync(this.fdM, b, 0, b.length, c[o + C_MHI] * 4294967296 + c[o + C_MLO]); return JSON.parse(b.toString('utf8')); }
@@ -111,14 +117,14 @@ export function foldFiles(oldDir, newDir, logFile, logEnd) {
   const { docs, retired } = readLog(logFile, logEnd);
   const pathId = new Map(nm.paths.map((p, i) => [p, i + 1])); const deadPath = new Uint8Array(nm.paths.length + 1); for (const p of retired) { const k = pathId.get(p); if (k) deadPath[k] = 1; }
   const remap = new Int32Array(h.n).fill(-1); let keep = 0; for (let i = 0; i < h.n; i++) if (!deadPath[old[i * ROW + C_PATH]]) remap[i] = keep++;
-  const w = new SectionWriter(newDir, new Uint32Array((keep + docs.length) * ROW)); w.P = pathId; w.J = new Map(nm.projects.map((p, i) => [p, i + 1]));
+  const w = new SectionWriter(newDir, new Uint32Array(new SharedArrayBuffer((keep + docs.length) * ROW * 4))); w.P = pathId; w.J = new Map(nm.projects.map((p, i) => [p, i + 1]));
   // Live sections are copied by offset; a mostly unchanged file costs a few large reads.
   const mo = fs.openSync(path.join(oldDir, 'meta.jsonl'), 'r'); const ho = fs.openSync(path.join(oldDir, 'heads.bin'), 'r'); const mbuf = Buffer.allocUnsafe(FLUSH * 16); const hbuf = Buffer.allocUnsafe(FLUSH * 4);
   const pull = (fd, buf, st, want, pos) => { if (pos >= st.at && pos + want <= st.at + st.len) return pos - st.at; const n = fs.readSync(fd, buf, 0, buf.length, pos); st.at = pos; st.len = n; return 0; }; const ms = { at: 0, len: 0 }, hs = { at: 0, len: 0 };
   for (let i = 0; i < h.n; i++) {
     if (remap[i] < 0) continue; const o = i * ROW; const at = old[o + C_MHI] * 4294967296 + old[o + C_MLO], ml = old[o + C_MLEN]; const big = ml > mbuf.length ? Buffer.allocUnsafe(ml) : mbuf; let line; if (big !== mbuf) { fs.readSync(mo, big, 0, ml, at); line = big; } else { const k = pull(mo, mbuf, ms, ml, at); line = mbuf.subarray(k, k + ml); }
     const hv = old[o + C_HEAD]; let head = null; if (!(hv & NO_HEADING)) { const e = i + 1 < h.n ? (old[o + ROW + C_HEAD] & 0x7fffffff) : h.headBytes; const hl = e - hv; if (hl > hbuf.length) { const x = Buffer.allocUnsafe(hl); fs.readSync(ho, x, 0, hl, hv); head = x; } else { const k = pull(ho, hbuf, hs, hl, hv); head = hbuf.subarray(k, k + hl); } }
-    w.row(old[o + C_LEN], Buffer.from(line), head && Buffer.from(head), old[o + C_PATH], old[o + C_PROJ], old[o + C_RB]);
+    w.row(old[o + C_LEN], Buffer.from(line), head && Buffer.from(head), old[o + C_PATH], old[o + C_PROJ], old[o + C_RB], old[o + C_SIG]);
   }
   fs.closeSync(mo); fs.closeSync(ho);
   const add = new Map(); for (const d of docs) { const i = w.doc(d); for (let k = 0; k < d.t.length; k++) { let a = add.get(d.t[k]); if (!a) add.set(d.t[k], a = []); a.push(i, d.f[k]); } }
@@ -140,10 +146,10 @@ export function foldFiles(oldDir, newDir, logFile, logEnd) {
   }
   while (ai < addWords.length) fromAdd(addWords[ai++]);
   fs.closeSync(io); fs.closeSync(to); dw.close(w.n, w.totalLen, w.heads.bytes);
-  return { n: w.n, terms: dw.terms };
+  return { n: w.n, terms: dw.terms, cols: w.cols };
 }
 
-export function foldInWorker(oldDir, newDir, logFile, logEnd) {
-  return new Promise((res, rej) => { const w = new Worker(fileURLToPath(import.meta.url), { workerData: { segFold: true, oldDir, newDir, logFile, logEnd } }); w.on('message', res); w.on('error', rej); w.on('exit', (c) => rej(new Error(`fold worker exited ${c}`))); w.unref(); });
+export function foldInWorker(oldDir, newDir, logFile, logEnd, tune = {}) {
+  return new Promise((res, rej) => { const w = new Worker(fileURLToPath(import.meta.url), { workerData: { segFold: true, oldDir, newDir, logFile, logEnd, tune } }); w.on('message', res); w.on('error', rej); w.on('exit', (c) => rej(new Error(`fold worker exited ${c}`))); w.unref(); });
 }
-if (!isMainThread && workerData?.segFold) parentPort.postMessage(foldFiles(workerData.oldDir, workerData.newDir, workerData.logFile, workerData.logEnd));
+if (!isMainThread && workerData?.segFold) { PACE = workerData.tune.pace || 0; GATE = workerData.tune.gate || null; parentPort.postMessage(foldFiles(workerData.oldDir, workerData.newDir, workerData.logFile, workerData.logEnd)); }

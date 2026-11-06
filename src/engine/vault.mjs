@@ -388,7 +388,7 @@ export class Vault extends EventEmitter {
     const p = `memory/${KINDS[k]}/${new Date().toISOString().slice(0, 7)}.md`;
     this._need(identity, 'write', p); this._guard(p, text, allow_secrets, false); // permissions and the secrets check come before the quality check
     const gate = { ...DEFAULT_GATE, ...(this.config.memory || {}) };
-    const similar = this.index.query(text, { limit: 5, prefix: 'memory/', filter: (d) => this.reviews.get(`${d.path}#${d.heading || ''}`)?.action !== 'drop' });
+    const similar = this.index.query(text, { limit: 5, prefix: 'memory/', filter: (d) => (d.lookup ? d.lookup(this.reviews) : this.reviews.get(`${d.path}#${d.heading || ''}`))?.action !== 'drop' });
     const a = assess(text, { similar, gate: gate.enabled === false ? { ...gate, min_words: 0 } : gate, review_by });
     if (a.verdict === 'duplicate') return { duplicate: true, saved: false, path: a.duplicate_of.path, heading: a.duplicate_of.heading, reasons: a.reasons };
     if (gate.enabled === false) { a.flags = []; if (!review_by) a.review_by = null; }
@@ -662,7 +662,7 @@ export class Vault extends EventEmitter {
     const today = new Date().toISOString().slice(0, 10);
     const pc = new Map(), ac = new Map();
     const fn = (d) => {
-      const r = this.reviews.size ? this.reviews.get(`${d.path}#${d.heading || ''}`) : null;
+      const r = this.reviews.size ? (d.lookup ? d.lookup(this.reviews) : this.reviews.get(`${d.path}#${d.heading || ''}`)) : null;
       if (r?.action === 'drop') return false;
       const until = r?.action === 'keep' ? r.until : d.rb;
       if (until && until < today) return false;

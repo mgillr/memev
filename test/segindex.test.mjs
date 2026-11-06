@@ -78,6 +78,22 @@ test('headings: none, empty and repeated stay apart; review dates and flags surv
 });
 
 
+test('a heading with half a surrogate pair comes back unchanged, and its review still applies', (t) => {
+  const d = tmp(t); const orc = new RecallIndex(path.join(d, 'o.jsonl')); const body = '## bad \ud83d\nwords surrogate here\n'; orc.update('notes/s.md', body, { mtime: 1 }); for (let i = 0; i < 5; i++) orc.update(`notes/f${i}.md`, `## f\nfiller ${i}\n`, { mtime: 1 }); const file = path.join(d, 'index.jsonl'); orc.file = file; orc.dirty = true; orc.save(); const ix = new SegIndex(file); ix.load();
+  assert.equal(ix.query('surrogate', { limit: 1 })[0].heading, 'bad \ud83d'); const reviews = new Map([['notes/s.md#bad \ud83d', { action: 'drop' }]]); assert.equal(ix.query('surrogate', { limit: 1, filter: filterOf(reviews)(open, {}) }).length, 0);
+});
+
+test('a save has the change in the file when it returns, and a flush follows', async (t) => {
+  const d = tmp(t); const { ix, file } = seeded(d, 50); let flushes = 0; const f = fs.fdatasync; fs.fdatasync = function (...a) { flushes++; return f.apply(fs, a); }; t.after(() => { fs.fdatasync = f; });
+  ix.update('notes/now.md', '## now\nsaved right now\n', { mtime: 1 }); ix.save(); assert.equal(flushes, 1, 'a flush was asked for'); const read = new SegIndex(file); assert.equal(read.load(), true); assert.equal(read.query('saved right now', { limit: 1 })[0].path, 'notes/now.md');
+  await settle(new Promise((r) => setTimeout(r, 50)));
+});
+
+test('a line in the middle of the log that does not parse: the index asks to be rebuilt', (t) => {
+  const d = tmp(t); const { ix, file } = seeded(d, 50); ix.update('notes/a.md', '## a\nwords\n', { mtime: 1 }); ix.save(); ix.update('notes/b.md', '## b\nwords\n', { mtime: 1 }); ix.save(); const log = ix._log(ix.gen); const text = fs.readFileSync(log, 'utf8'); fs.writeFileSync(log, `${text.slice(0, 40)}XXXX${text.slice(44)}`);
+  const again = new SegIndex(file); assert.equal(again.load(), false);
+});
+
 test('an append under work/active in a subfolder inherits the stored project, as in the oracle', (t) => {
   const d = tmp(t); const orc = new RecallIndex(path.join(d, 'o.jsonl')); orc.update('work/active/sub/y.md', '## first\nProject: billing\nwords here\n', { mtime: 1 }); for (let i = 0; i < 5; i++) orc.update(`notes/f${i}.md`, `## f\nfiller ${i}\n`, { mtime: 1 }); const file = path.join(d, 'index.jsonl'); orc.file = file; orc.dirty = true; orc.save(); const ix = new SegIndex(file); ix.load();
   const x = '## added\nappended words\n'; orc.appendSections('work/active/sub/y.md', x, { lineOffset: 9, mtime: 2 }); ix.appendSections('work/active/sub/y.md', x, { lineOffset: 9, mtime: 2 }); assert.deepEqual(ix.docsOf('work/active/sub/y.md', 'added').map((q) => q.project), ['billing']);
