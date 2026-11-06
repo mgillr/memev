@@ -1,6 +1,6 @@
 # Tiers: how each one is set up
 
-Part of the [Memev documentation](../README.md). Up: the [README](../../README.md). Architecture overview: [ARCHITECTURE.md](../ARCHITECTURE.md#personal-business-and-corporate).
+Part of the [Memev documentation](../README.md). Up: the [README](../../README.md). Architecture overview: [ARCHITECTURE.md](../ARCHITECTURE.md#personal-business-and-corporate). Strategic mapping: [AI economy strategy](../AI-ECONOMY-STRATEGY.md).
 
 > **DRAFT.** Packages and services on these pages are proposals, not offers. The Memev core is free;
 > Personal with more computers has a set price. Business, Corporate and the fifth **Federated** tier
