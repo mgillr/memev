@@ -31,9 +31,11 @@ async function call(method, route, body) {
 }
 
 async function runOne(src, label, rep) {
-  const c = spawn(process.execPath, ['--max-old-space-size=7000', path.join(src, 'src', 'server', 'main.mjs'), '--root', root, '--port', String(port)], { stdio: 'ignore', env: { ...process.env, MEMEV_RIG_SEG: process.env.MEMEV_RIG_SEG ?? '1', MEMEV_PORT: String(port) } });
+  const c = spawn(process.execPath, ['--max-old-space-size=7000', path.join(src, 'src', 'server', 'main.mjs'), '--root', root, '--port', String(port)], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, MEMEV_PORT: String(port) } });
+  let err = ''; c.stderr.on('data', (d) => { if (err.length < 4000) err += d; });
   const t0 = Date.now(); let up = false;
-  while (Date.now() - t0 < 400000) { try { if ((await fetch(`${base}/healthz`)).ok) { up = true; break; } } catch { /* not up yet */ } await sleep(50); }
+  // A daemon that has exited will never answer, so say why at once and do not wait out the limit.
+  while (Date.now() - t0 < 400000) { if (c.exitCode !== null) throw new Error(`${label}: the daemon exited ${c.exitCode} before it answered: ${err.slice(-1000)}`); try { if ((await fetch(`${base}/healthz`, { signal: AbortSignal.timeout(800) })).ok) { up = true; break; } } catch { /* not up yet */ } await sleep(50); }
   if (!up) { c.kill('SIGKILL'); throw new Error(`${label}: no health`); }
   const upMs = Date.now() - t0;
   await sleep(1500);
