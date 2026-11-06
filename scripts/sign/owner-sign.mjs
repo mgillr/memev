@@ -46,6 +46,8 @@ try {
     ...(opt.supersedes ? { supersedes: opt.supersedes, version: opt.version } : {}),
     base: opt.base, provenance: { record: opt.record, review: opt.review }, spec: specAbs,
   });
+  const drafted = JSON.parse(fs.readFileSync(path.join(v.root, d.path), 'utf8'));
+  if ((drafted.request ?? null) !== (spec.request ?? null)) throw new Error('the drafted request is not the spec\'s request, so nothing was signed');
   const s = v.contractSign(ID, { id: d.id, local: true });
   const bodyAt = path.join(signedDir, `${d.id}.json`);
   const chk = v.contractCheckSignature(d.id);

@@ -92,6 +92,8 @@ export function projectTestCommand(wd) {
   return null;
 }
 
+/** A signed body carries the whole request or the draft is refused: a reader of the body alone must see what was asked and what was left out. */
+export const REQUEST_MAX = 16000;
 export class ContractError extends Error { constructor(code, m) { super(m); this.code = code; } }
 const SIGNED = 'contracts/signed', KEYS = 'contracts/keys';
 
@@ -312,10 +314,11 @@ export function attach(Vault) {
   P.contractDraft = function (identity, { title, project = null, workdir = null, tasks = [], supersedes = null, client = null, request = null, provenance = null, version = null, base = null, spec = null }) {
     if (!title) throw new ContractError('bad_request', 'a contract needs a title');
     if (!Array.isArray(tasks) || !tasks.length) throw new ContractError('bad_request', 'a contract needs at least one task');
+    if (request && String(request).length > REQUEST_MAX) throw new ContractError('bad_request', `the request is ${String(request).length} characters and a contract holds ${REQUEST_MAX}: nothing was drafted, as a signed body carries the whole request or none`);
     // an explicit base is checked before anything is written: only a 40-hex sha, never a ref or anything git could read as an option
     const baseSha = explicitBase(base);
     const id = `k-${slug(title, 24)}-${randomToken(3)}`;
-    const c = { ...A.skeleton(project || 'memev'), id, title, workdir, created: now(), version: version || 1, ...(baseSha ? { base: baseSha } : {}), ...(supersedes ? { supersedes } : {}), ...(request ? { request: truncate(String(request), 4000) } : {}), ...(provenance ? { provenance } : {}), tasks: tasks.map((t, i) => A.makeTask({ id: t.id || `T${i + 1}`, title: t.title, phase: t.phase || 'implement', depends_on: t.depends_on || [], requirements: t.requirements || [], description: t.description || '', scope: t.scope || ['**'], criteria: t.criteria || [], stop_rules: t.stop_rules || [] })) };
+    const c = { ...A.skeleton(project || 'memev'), id, title, workdir, created: now(), version: version || 1, ...(baseSha ? { base: baseSha } : {}), ...(supersedes ? { supersedes } : {}), ...(request ? { request: String(request) } : {}), ...(provenance ? { provenance } : {}), tasks: tasks.map((t, i) => A.makeTask({ id: t.id || `T${i + 1}`, title: t.title, phase: t.phase || 'implement', depends_on: t.depends_on || [], requirements: t.requirements || [], description: t.description || '', scope: t.scope || ['**'], criteria: t.criteria || [], stop_rules: t.stop_rules || [] })) };
     const errs = A.validate(c);
     if (errs.length) throw new ContractError('invalid', `the contract is not valid: ${errs.slice(0, 5).join('; ')}`);
     // the red-team gate, before anything is written: wherever the repository holds red-team records (or contracts.redteam_required is on)
