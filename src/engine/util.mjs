@@ -23,15 +23,36 @@ export function linkedUnder(root, abs) {
 }
 export const pidAlive = (pid) => { if (!pid) return false; try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
 /**
- * True when this pid is a running Memev daemon. A pid in a state file can outlive what wrote it and come back as anything, so a live pid alone
- * must not hold up a start or be stopped. Where the system cannot say what the process is (Windows has no ps), a live pid counts, as it always did.
+ * The command line of a process, as a list of arguments when the system gives them apart, or null when it cannot say. Linux needs no ps: the
+ * image is Alpine, whose ps knows no -p and exits 1. Anything but a successful answer with output is no answer: a process cannot be told
+ * apart by a tool that failed.
  */
-export function isDaemonPid(pid) {
+export function commandOf(pid, { platform = process.platform, readProc = (f) => fs.readFileSync(f, 'utf8'), ps = () => spawnSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', timeout: 2000 }) } = {}) {
+  if (platform === 'win32') return null;
+  if (platform === 'linux') { try { const args = readProc(`/proc/${pid}/cmdline`).split('\0').filter(Boolean); if (args.length) return args; } catch { /* hidden, or no /proc: ps may still know */ } }
+  const r = ps(); if (r.error || r.status !== 0 || !String(r.stdout || '').trim()) return null;
+  return String(r.stdout).trim();
+}
+const samePath = (a, b) => { const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } }; return real(a) === real(b); };
+/** Does this command line belong to a daemon, of this vault where it names one? A command line may not name its vault: then it counts. */
+export function isDaemonCommand(cmd, root = null) {
+  const line = Array.isArray(cmd) ? cmd.join(' ') : cmd;
+  if (!/(^|[\\/\s])server[\\/]main\.mjs(\s|$)|memev(\.mjs)?\s(.*\s)?serve(\s|$)/.test(line)) return false;
+  if (!root) return true;
+  let named = null;
+  if (Array.isArray(cmd)) { const i = cmd.indexOf('--root'); if (i >= 0 && i + 1 < cmd.length) named = cmd[i + 1]; else named = cmd.find((x) => x.startsWith('--root='))?.slice(7) ?? null; }
+  else { const m = /(?:^|\s)--root[= ]\s*(.+?)(?=\s--|$)/.exec(line); named = m ? m[1].trim() : null; }
+  return named === null || samePath(named, root);
+}
+/**
+ * True when this pid is a running Memev daemon, of this vault when `root` is given. A pid in a state file can outlive what wrote it and come
+ * back as anything, so a live pid alone must not hold up a start or be stopped. Where the system cannot say what the process is, a live pid
+ * counts, as it always did: two daemons on one vault are worse than a stale file.
+ */
+export function isDaemonPid(pid, root = null, how = {}) {
   if (!pidAlive(pid)) return false;
-  if (process.platform === 'win32') return true;
-  const r = spawnSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', timeout: 2000 });
-  if (r.error || r.status === null) return true;
-  return /(^|[\\/\s])server[\\/]main\.mjs(\s|$)|memev(\.mjs)?\s(.*\s)?serve(\s|$)/.test(r.stdout);
+  const cmd = commandOf(pid, how);
+  return cmd === null || isDaemonCommand(cmd, root);
 }
 export const now = () => new Date().toISOString();
 export const stamp = (d = new Date()) => d.toISOString().slice(0, 16).replace('T', ' ') + 'Z';

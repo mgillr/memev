@@ -40,9 +40,9 @@ const PROTECTED = [/^contracts\/signed\//i, /^contracts\/keys\//i, /^contracts\/
 const DEFAULT_CONFIG = { version: 1, port: 7787, remote: { enabled: false, provider: 'auto', rate_per_min: 120 }, sync: { interval_min: 5 }, recall: { per_prompt: true, max_chars: 1500, min_score: 1.0, scope: 'project' }, memory: { ...DEFAULT_GATE }, journal: { enabled: true, max_chars: 2000 }, contracts: { enabled: false, exec_local_only: true } };
 
 /** The pid of a daemon, not this process, still opening this vault, or null. */
-function loadingDaemon(state) {
+function loadingDaemon(root, state) {
   const pid = readJson(path.join(state, 'daemon.loading'), null)?.pid;
-  return Number.isSafeInteger(pid) && pid !== process.pid && isDaemonPid(pid) ? pid : null;
+  return Number.isSafeInteger(pid) && pid !== process.pid && isDaemonPid(pid, root) ? pid : null;
 }
 
 export class VaultError extends Error { constructor(code, message) { super(message); this.code = code; } }
@@ -108,7 +108,7 @@ export class Vault extends EventEmitter {
     const opening = performance.now(); this.health = new Health();
     if (!isVault(this.root)) throw new VaultError('not_a_vault', `${this.root} is not a Memev vault (memev init)`);
     // A daemon opening this vault is importing or converting, and a second open would do the same work against it.
-    const loader = loadingDaemon(this.state);
+    const loader = loadingDaemon(this.root, this.state);
     if (loader) throw new VaultError('loading', `the daemon (pid ${loader}) is still loading this vault; try again when it answers`);
     const fileCfg = readJson(path.join(this.state, 'config.json'), {});
     this.config = { ...DEFAULT_CONFIG, ...fileCfg };

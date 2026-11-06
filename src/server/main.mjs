@@ -24,7 +24,7 @@ if (fs.existsSync(cfgFile)) {
 
 function takeLock() {
   try { fs.writeFileSync(lock, String(process.pid), { flag: 'wx', mode: 0o600 }); return true; }
-  catch { const pid = Number(fs.readFileSync(lock, 'utf8')); if (pid !== process.pid && isDaemonPid(pid)) return false; fs.rmSync(lock, { force: true }); return takeLock(); }
+  catch { const pid = Number(fs.readFileSync(lock, 'utf8')); if (pid !== process.pid && isDaemonPid(pid, root)) return false; fs.rmSync(lock, { force: true }); return takeLock(); }
 }
 if (!takeLock()) { console.error(`[memev] another daemon already serves ${root}`); process.exit(3); }
 

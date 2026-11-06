@@ -15,6 +15,7 @@ import { SegIndex } from '../src/engine/segment-index.mjs';
 import { SEG_FILES } from '../src/engine/segment.mjs';
 import { NoteState } from '../src/engine/notestate.mjs';
 import { fileChecks } from '../src/cli/doctor.mjs';
+import { commandOf, isDaemonCommand, isDaemonPid } from '../src/engine/util.mjs';
 import { createServer } from '../src/server/http.mjs';
 import { TokenStore } from '../src/engine/tokens.mjs';
 
@@ -34,9 +35,7 @@ const COUNT = 60; const CHECK = [1, 7, 8, 11, 17, 21, 33, 40];
 function seeded(n = COUNT) {
   const root = fresh(); const v = open(root);
   for (let i = 0; i < n; i++) v.write(ME, { path: `notes/n${i}.md`, body: `# Note ${i}\nthe body holds ${WORD(i)} and common words alpha beta\n\n## Part\nmore text here\n` });
-  v.close();
-  // a save over the fold's size starts a fold of its own and a compact then waits on nothing, so the compact gets a vault with nothing unsaved
-  const again = open(root); again.compact(); again.close(); return root;
+  v.compact(); v.close(); return root;
 }
 const segDir = (root) => path.join(root, '.memev/index.seg');
 const genDir = (root) => path.join(segDir(root), `gen-${fs.readFileSync(path.join(segDir(root), 'CURRENT'), 'utf8')}`);
@@ -387,6 +386,67 @@ test('the prompt hook says the index is rebuilding, not that nothing was recorde
 
 test('an index worker failure is said in status and doctor, not left as a rebuild that never ends', async () => {
   const root = seeded(12); fs.writeFileSync(F(root, 'cols.bin'), Buffer.alloc(fs.statSync(F(root, 'cols.bin')).size)); const v = open(root); const real = v.index.rebuildFromNotes; v.index.rebuildFromNotes = () => Promise.reject(new Error('the disk is full'));
-  assert.throws(() => v.recall(ME, { query: WORD(1), log: false, all_projects: true }), (e) => e.code === 'index_rebuilding'); assert.ok(await until(() => /failed/.test(v.status().index.damage?.state || ''))); assert.match(v.status().index.damage.state, /the disk is full/); v.index.rebuildFromNotes = real; v.close();
-  const v2 = open(root); assert.deepEqual(v2.recall(ME, { query: WORD(1), log: false, all_projects: true }).map((h) => h.path), ['notes/n1.md'], 'the next start builds it'); v2.close();
+  assert.throws(() => v.recall(ME, { query: WORD(1), log: false, all_projects: true }), (e) => e.code === 'index_rebuilding'); assert.ok(await until(() => /failed/.test(v.status().index.damage?.state || ''))); assert.match(v.status().index.damage.state, /the disk is full/); assert.equal(v.status().index.state, 'failed');
+  // once it has failed, recall says that and the way out, and nothing goes on promising a rebuild
+  assert.throws(() => v.recall(ME, { query: WORD(1), log: false, all_projects: true }), (e) => { assert.equal(e.code, 'index_rebuild_failed'); assert.match(e.message, /could not be rebuilt/); assert.match(e.message, /memev restart/); assert.doesNotMatch(e.message, /being rebuilt/); return true; });
+  const c = fileChecks({ root, vault: v }).find((x) => x.id === 'index-files'); assert.equal(c.status, 'fail'); assert.match(c.detail, /run memev restart/);
+  v.write(ME, { path: 'notes/after.md', body: '# A\nafterfailword\n' }); assert.ok(v.remember(ME, { text: 'A decision worth keeping about a rebuild that failed on this disk', kind: 'decision' }), 'writes still land'); v.index.rebuildFromNotes = real; v.close();
+  const v2 = open(root); assert.deepEqual(v2.recall(ME, { query: WORD(1), log: false, all_projects: true }).map((h) => h.path), ['notes/n1.md'], 'the next start builds it'); assert.deepEqual(v2.recall(ME, { query: 'afterfailword', log: false, all_projects: true }).map((h) => h.path), ['notes/after.md']); v2.close();
 });
+
+const ps1 = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-ps-')); made.push(d); fs.writeFileSync(path.join(d, 'ps'), '#!/bin/sh\necho "ps: unrecognized option: p" >&2\nexit 1\n', { mode: 0o755 }); return d; };
+const memev = (root, args, env = {}) => spawnSync(process.execPath, [path.join(PKG, 'bin/memev.mjs'), ...args, '--root', root], { encoding: 'utf8', timeout: 60000, env: { ...process.env, MEMEV_NO_SERVICE: '1', MEMEV_ROOT: root, ...env } });
+
+test('a process is told apart only by a tool that answered: anything else is unknown, and unknown counts as a daemon', () => {
+  const proc = (text) => ({ platform: 'linux', readProc: () => text, ps: () => { throw new Error('Linux needs no ps'); } });
+  assert.deepEqual(commandOf(1, proc('node\0/x/server/main.mjs\0--root\0/v\0')), ['node', '/x/server/main.mjs', '--root', '/v']);
+  const none = (r) => ({ platform: 'darwin', ps: () => r });
+  for (const r of [{ status: 1, stdout: '' }, { status: 1, stdout: 'usage' }, { status: 0, stdout: '  \n' }, { status: null, stdout: '' }, { error: new Error('no ps'), status: null }]) assert.equal(commandOf(1, none(r)), null, JSON.stringify(r));
+  assert.equal(commandOf(1, none({ status: 0, stdout: 'node x\n' })), 'node x'); assert.equal(commandOf(1, { platform: 'win32' }), null);
+  assert.equal(commandOf(1, { platform: 'linux', readProc: () => { throw new Error('hidden'); }, ps: () => ({ status: 1, stdout: '' }) }), null, 'no /proc and a ps that fails');
+  assert.equal(isDaemonPid(process.pid, null, none({ status: 1, stdout: '' })), true, 'unknown counts as a daemon'); assert.equal(isDaemonPid(process.pid, null, none({ status: 0, stdout: 'vim notes.txt' })), false); assert.equal(isDaemonPid(2147483000, null, none({ status: 1, stdout: '' })), false, 'a dead pid is never a daemon');
+  const v = fresh(); const other = fresh(); const link = `${v}-link`; made.push(link); fs.symlinkSync(v, link);
+  for (const [cmd, want] of [[`node /a/src/server/main.mjs --root ${v}`, true], [`node /a/src/server/main.mjs --root ${v} --port 1`, true], [`node /a/src/server/main.mjs --root ${link}`, true], [`node /a/src/server/main.mjs --root=${v}`, true], [`node /a/src/server/main.mjs --root ${other}`, false], [`node /a/bin/memev.mjs serve --root ${other}`, false], ['node /a/src/server/main.mjs', true], ['node /a/bin/memev.mjs serve', true], ['node /a/server/main.mjs.bak', false], ['/bin/sleep 100', false], [['node', '/a/server/main.mjs', '--root', v], true], [['node', '/a/server/main.mjs', '--root', other], false], [['node', '/a/server/main.mjs', `--root=${other}`], false]]) assert.equal(isDaemonCommand(cmd, v), want, String(cmd));
+});
+
+test('with a ps that exits 1, as busybox does: memev stop stops the daemon, a second daemon does not start, and compact beside a load refuses', { skip: process.platform === 'win32' }, async () => {
+  const root = seeded(12); const env = { PATH: `${ps1()}${path.delimiter}${process.env.PATH}` };
+  assert.equal(spawnSync('ps', ['-o', 'command=', '-p', String(process.pid)], { env, encoding: 'utf8' }).status, 1, 'the stand-in is the one found');
+  const start = () => spawn(process.execPath, [path.join(PKG, 'src/server/main.mjs'), '--root', root, '--port', '0'], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, ...env, MEMEV_NO_SERVICE: '1' } });
+  const c = start(); let err = ''; c.stderr.on('data', (d) => { err += d; });
+  try {
+    assert.ok(await until(() => err.includes('serving'), 60000), err);
+    const second = start(); let e2 = ''; second.stderr.on('data', (d) => { e2 += d; }); const code = await new Promise((r) => second.once('exit', r)); assert.equal(code, 3, `a second daemon on one vault: ${e2}`); assert.match(e2, /another daemon/);
+    const r = memev(root, ['stop'], env); assert.match(r.stdout, /Stopped/, r.stdout + r.stderr); assert.equal(r.status, 0); assert.ok(await until(() => c.exitCode !== null, 15000), 'the daemon was left running'); assert.equal(fs.existsSync(path.join(root, '.memev/daemon.lock')), false);
+  } finally { if (c.exitCode === null) { c.kill('SIGKILL'); await new Promise((r) => c.once('exit', r)); } }
+  const stub = stubDaemon(root); await new Promise((r) => stub.once('spawn', r));
+  try { fs.writeFileSync(path.join(root, '.memev/daemon.loading'), JSON.stringify({ pid: stub.pid })); const r = memev(root, ['compact'], env); assert.equal(r.status, 1, r.stdout + r.stderr); assert.match(r.stdout + r.stderr, /still loading/); } finally { stub.kill('SIGKILL'); }
+});
+
+test('another vault\'s daemon named in a state file is not waited on or stopped', { skip: process.platform === 'win32' }, async () => {
+  const { loadingPid, stopDaemon } = await import('../src/cli/daemon.mjs'); const root = seeded(12); const other = fresh(); const stub = stubDaemon(other); await new Promise((r) => stub.once('spawn', r));
+  try {
+    fs.writeFileSync(path.join(root, '.memev/daemon.loading'), JSON.stringify({ pid: stub.pid })); assert.equal(loadingPid(root), null); assert.equal(isDaemonPid(stub.pid, other), true, 'the control: it is that vault\'s daemon'); open(root).close();
+    fs.rmSync(path.join(root, '.memev/daemon.loading')); fs.writeFileSync(path.join(root, '.memev/daemon.json'), JSON.stringify({ pid: stub.pid, port: 1 })); await stopDaemon(root); assert.equal(stub.exitCode, null); assert.ok(process.kill(stub.pid, 0), 'another vault\'s daemon was stopped');
+  } finally { stub.kill('SIGKILL'); }
+});
+
+
+const hits = (v, q) => v.recall(ME, { query: q, log: false, all_projects: true }).map((h) => h.path);
+/** Five new notes, an edit and a delete on a compacted vault, clean stop; `before` runs on the vault as it stood. */
+function changedAfter(before) {
+  const root = seeded(12); const b = before(root); const v = open(root);
+  for (let i = 0; i < 5; i++) v.write(ME, { path: `fresh/f${i}.md`, body: `# F\nfreshword${'abcde'[i]}x here\n` });
+  v.write(ME, { path: 'notes/n2.md', body: '# E\neditedword now\n' }); v.delete(ME, { path: 'notes/n3.md' }); v.close(); return { root, b };
+}
+function whatWasLeftIsServed(root, label) {
+  for (let round = 0; round < 2; round++) {
+    const v = open(root);
+    assert.deepEqual(hits(v, 'freshwordax'), ['fresh/f0.md'], `${label}: a new note`); assert.deepEqual(hits(v, 'freshwordex'), ['fresh/f4.md'], `${label}: a new note`); assert.deepEqual(hits(v, 'editedword'), ['notes/n2.md'], `${label}: the edit`);
+    assert.equal(hits(v, WORD(2)).length, 0, `${label}: old text served`); assert.equal(hits(v, WORD(3)).length, 0, `${label}: a deleted note served`); assert.deepEqual(hits(v, WORD(5)), ['notes/n5.md'], label); assert.equal(v.index.stats().notes, v.allNotes().length, label);
+    if (round === 0) assert.ok(v.status().index.damage, `${label}: said in status`); v.close();
+  }
+}
+
+const failing = (name, code, times = 1) => { const real = fs.openSync; let left = times; fs.openSync = function injected(f, ...a) { if (left > 0 && String(f).endsWith(name)) { left--; const e = new Error(`${code}: injected, open '${f}'`); e.code = code; e.syscall = 'open'; throw e; } return real.call(this, f, ...a); }; return () => { fs.openSync = real; }; };
+

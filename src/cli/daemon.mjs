@@ -20,7 +20,7 @@ export async function healthy(root, port = null) {
 
 // The pid of a daemon still opening this vault, or null. It removes the file when it listens, and a dead pid or one that is now some other program is no daemon.
 export function loadingPid(root) {
-  try { const { pid } = JSON.parse(fs.readFileSync(path.join(root, '.memev', 'daemon.loading'), 'utf8')); return isDaemonPid(pid) ? pid : null; } catch { return null; }
+  try { const { pid } = JSON.parse(fs.readFileSync(path.join(root, '.memev', 'daemon.loading'), 'utf8')); return isDaemonPid(pid, root) ? pid : null; } catch { return null; }
 }
 // A loading daemon moves its file's time as it goes (Vault._tick), and a step of a load is minutes at the very most. Past this it has stopped.
 export const LOAD_STALL_MS = 10 * 60e3;
@@ -135,7 +135,7 @@ export async function stopDaemon(root, { waitMs = 5000 } = {}) {
     return true;
   }
   const info = daemonInfo(root);
-  if (!info || !isDaemonPid(info.pid)) { try { fs.rmSync(path.join(root, '.memev', 'daemon.json'), { force: true }); fs.rmSync(path.join(root, '.memev', 'daemon.lock'), { force: true }); } catch {} return false; }
+  if (!info || !isDaemonPid(info.pid, root)) { try { fs.rmSync(path.join(root, '.memev', 'daemon.json'), { force: true }); fs.rmSync(path.join(root, '.memev', 'daemon.lock'), { force: true }); } catch {} return false; }
   process.kill(info.pid, 'SIGTERM');
   const until = Date.now() + waitMs;
   while (Date.now() < until && pidAlive(info.pid)) await new Promise((r) => setTimeout(r, 100));
