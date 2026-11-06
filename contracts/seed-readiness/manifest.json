@@ -26,7 +26,7 @@
         "SR-1.35"
       ],
       "tasks": 13,
-      "criteria": 146,
+      "criteria": 147,
       "spec": "specs/SR-0.04-receipts-match-signatures.json",
       "status": "proposed and unsigned; signs after its red-team round"
     },
