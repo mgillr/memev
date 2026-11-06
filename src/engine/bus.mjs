@@ -355,6 +355,26 @@ export class Bus {
     this._viewNow = next;
     return next;
   }
+  /**
+   * The line just appended goes into what is already in memory, so a message costs nothing per message already on the bus.
+   * Only when the file is now exactly what was known plus this line: anything else (another writer got in between, or a crash
+   * left half a line that this one ran into) leaves the stale record, and the next read sees the size differ and reads the file.
+   */
+  _tookOwnLine(file, line) {
+    const c = this._cache.get(file); if (!c || !c.endsLine || c.exotic) return;
+    let st; try { st = fs.statSync(this._p('log', file)); } catch { return; }
+    if (st.size !== c.size + Buffer.byteLength(line)) return;
+    const m = JSON.parse(line);
+    c.size = st.size; c.mtimeMs = st.mtimeMs; c.msgs.push(m);
+    const v = this._viewNow;
+    if (!v) return;
+    if (v.exotic || !v.files.some((x) => x.cached === c)) { this._viewNow = null; return; }
+    // nearly always the new message is the last; one that lands before a computer whose clock is ahead moves those after it
+    const msgs = v.msgs; let i = msgs.length; while (i > 0 && order(msgs[i - 1], m) > 0) i--;
+    if (i === msgs.length) msgs.push(m); else msgs.splice(i, 0, m);
+    for (let k = i; k < msgs.length; k++) msgs[k].seq = k + 1;
+    addToView(v, m, false);
+  }
   _unchanged(stamp) {
     const c = this._cache.get(stamp.file); if (!c || c !== stamp.cached) return false;
     let st; try { st = fs.statSync(this._p('log', stamp.file)); } catch { return false; }
@@ -418,9 +438,11 @@ export class Bus {
     const msg = { id: `${who.device.id.slice(4, 12)}-${dseq}`, dseq, ts, device: who.device.id, from: who.seat, operator: !!who.operator, ...fields };
     this._w(this._p('log', file));
     fs.mkdirSync(this._p('log'), { recursive: true });
-    fs.appendFileSync(this._p('log', file), `${JSON.stringify(msg)}\n`);
+    const line = `${JSON.stringify(msg)}\n`;
+    fs.appendFileSync(this._p('log', file), line);
     this._last.set(file, msg);
     this.commit(this._rel('log', file));
+    this._tookOwnLine(file, line);
     return { seq: this._view().firstById.get(msg.id)?.seq ?? null, ...msg };
   }
 
