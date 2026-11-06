@@ -103,7 +103,7 @@ export class Vault extends EventEmitter {
     } catch {}
   }
 
-  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.index.save(); this._rigSeq(); this._saveGraph(); if (process.env.MEMEV_RIG_SEG === '1') { try { this._rigSaveCold(); } catch {} } this.devices?.saveSoon(); this.log.close(); }
+  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.index.save(); this.index.syncNow?.(); this._rigSeq(); this._saveGraph(); if (process.env.MEMEV_RIG_SEG === '1') { try { this._rigSaveCold(); } catch {} } this.devices?.saveSoon(); this.log.close(); }
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }
@@ -319,8 +319,8 @@ export class Vault extends EventEmitter {
     this._indexSaveSoon();
     this.emit('change', { path: p, type: rec.type, seq: rec.seq, client });
   }
-  _rigSeq() { if (process.env.MEMEV_RIG_STOPPED === '1' || process.env.MEMEV_RIG_SEG === '1') { try { fs.writeFileSync(path.join(this.state, 'index.seq'), String(this.log.seq)); } catch {} } }
-  _indexSaveSoon() { clearTimeout(this._ist); this._ist = setTimeout(() => { this.index.save(); this._rigSeq(); this._saveGraphBehind(); }, 3000); this._ist.unref?.(); }
+  _rigSeq(seq = this.log.seq) { if (process.env.MEMEV_RIG_STOPPED === '1' || process.env.MEMEV_RIG_SEG === '1') { try { fs.writeFileSync(path.join(this.state, 'index.seq'), String(seq)); } catch {} } }
+  _indexSaveSoon() { clearTimeout(this._ist); this._ist = setTimeout(() => { this.index.save(); const seq = this.log.seq; if (this.index.whenSynced) this.index.whenSynced(() => this._rigSeq(seq)); else this._rigSeq(seq); this._saveGraphBehind(); }, 3000); this._ist.unref?.(); }
 
   // ---- note operations
   get(identity, p) { p = checkPath(p); this._need(identity, 'read', p); const b = this._read(p); if (b === null) throw new VaultError('not_found', `no note ${p}`); return { path: p, body: b }; }

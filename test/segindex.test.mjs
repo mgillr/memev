@@ -89,6 +89,12 @@ test('a save has the change in the file when it returns, and a flush follows', a
   await settle(new Promise((r) => setTimeout(r, 50)));
 });
 
+test('the log position waits for the flush, so it is never ahead of the index on the disk', async (t) => {
+  const d = tmp(t); const { ix } = seeded(d, 50); const f = fs.fdatasync; let release = null; fs.fdatasync = function (fd, cb) { release = () => f.call(fs, fd, cb); }; t.after(() => { fs.fdatasync = f; }); let told = 0;
+  ix.update('notes/p.md', '## p\nposition words\n', { mtime: 1 }); ix.save(); ix.whenSynced(() => { told++; }); assert.equal(told, 0, 'not before the flush'); assert.ok(release, 'a flush was asked for'); for (let k = 0; k < 3 && !told; k++) { release(); await settle(new Promise((r) => setTimeout(r, 60))); assert.ok(k > 0 || told <= 1); } assert.equal(told, 1, 'after the flush');
+  let again = 0; fs.fdatasync = f; ix.whenSynced(() => { again++; }); assert.equal(again, 1, 'at once when nothing waits');
+});
+
 test('a line in the middle of the log that does not parse: the index asks to be rebuilt', (t) => {
   const d = tmp(t); const { ix, file } = seeded(d, 50); ix.update('notes/a.md', '## a\nwords\n', { mtime: 1 }); ix.save(); ix.update('notes/b.md', '## b\nwords\n', { mtime: 1 }); ix.save(); const log = ix._log(ix.gen); const text = fs.readFileSync(log, 'utf8'); fs.writeFileSync(log, `${text.slice(0, 40)}XXXX${text.slice(44)}`);
   const again = new SegIndex(file); assert.equal(again.load(), false);

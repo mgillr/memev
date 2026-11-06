@@ -55,7 +55,7 @@ class FilterDoc extends SegDoc {
 
 export class SegIndex {
   constructor(file) { this.file = file; this.base = file.replace(/\.jsonl$/, ''); this.root = `${this.base}.seg`; this._clear(); }
-  _clear() { this.seg = null; this.ov = new RecallIndex('/nonexistent'); this.dead = null; this.deadCount = 0; this.deadPaths = new Set(); this.deadLen = 0; this.gen = 0; this.logFd = null; this.logEnd = 0; this.pending = []; this.dirty = false; this.foldP = null; this.foldFailed = 0; this.lastGen = 0; this.score = null; this.syncing = false; this.syncAgain = false; this.oldLog = null; }
+  _clear() { this.seg = null; this.ov = new RecallIndex('/nonexistent'); this.dead = null; this.deadCount = 0; this.deadPaths = new Set(); this.deadLen = 0; this.gen = 0; this.logFd = null; this.logEnd = 0; this.pending = []; this.dirty = false; this.foldP = null; this.foldFailed = 0; this.lastGen = 0; this.score = null; this.syncing = false; this.syncAgain = false; this.oldLog = null; this.waiters = []; }
   reset() { this._closeFiles(); this._clear(); fs.rmSync(this.root, { recursive: true, force: true }); }
   _closeFiles() { if (this.logFd !== null) { fs.closeSync(this.logFd); this.logFd = null; } if (this.seg) { this.seg.close(); this.seg = null; } }
   _dir(g) { return path.join(this.root, `gen-${g}`); }
@@ -100,9 +100,17 @@ export class SegIndex {
     this.logEnd += b.length; this.pending = []; this._syncLog();
   }
   _syncLog() {
-    if (this.syncing) { this.syncAgain = true; return; } this.syncing = true; const fd = this.logFd;
-    fs.fdatasync(fd, () => { this.syncing = false; if (this.oldLog === fd) { this.oldLog = null; fs.close(fd, () => {}); } if (this.syncAgain) { this.syncAgain = false; if (this.logFd !== null) this._syncLog(); } });
+    if (this.syncing) { this.syncAgain = true; return; } this.syncing = true; const fd = this.logFd; const waiting = this.waiters; this.waiters = [];
+    fs.fdatasync(fd, (e) => {
+      this.syncing = false; if (this.oldLog === fd) { this.oldLog = null; fs.close(fd, () => {}); }
+      if (!e) for (const f of waiting) f();
+      if ((this.syncAgain || this.waiters.length) && this.logFd !== null) { this.syncAgain = false; this._syncLog(); }
+    });
   }
+  /** Call back once everything saved so far is on the disk. The vault writes its log position here, so that position is never ahead of the index. */
+  whenSynced(f) { if (!this.syncing && !this.waiters.length && !this.syncAgain) { f(); return; } this.waiters.push(f); if (!this.syncing) this._syncLog(); else this.syncAgain = true; }
+  /** The same, waiting here: for a stop. */
+  syncNow() { if (this.logFd !== null) fs.fdatasyncSync(this.logFd); }
   save() {
     if (!this.dirty) return;
     if (!this.seg) { this._writeFromOverlay(); return; }
@@ -119,13 +127,14 @@ export class SegIndex {
   // writes that arrive meanwhile are copied in the last step, which is the only one that changes anything and ends with CURRENT.
   async _swap(g, sealed, built) {
     const fd = fs.openSync(this._log(g), 'w+', 0o600); const cur = path.join(this.root, 'CURRENT'), tmp = `${cur}.tmp`; let copied = sealed, at = 0; const tail = [];
-    const copy = () => { this._flush(); const n = this.logEnd - copied; if (!n) return; const b = Buffer.allocUnsafe(n); fs.readSync(this.logFd, b, 0, n, copied); fs.writeSync(fd, b, 0, n, at); at += n; copied += n; tail.push(b); };
+    const copy = () => { const n = this.logEnd - copied; if (!n) return 0; const b = Buffer.allocUnsafe(n); fs.readSync(this.logFd, b, 0, n, copied); fs.writeSync(fd, b, 0, n, at); at += n; copied += n; tail.push(b); return n; };
     const done = (f, ...x) => new Promise((res, rej) => f(...x, (e) => (e ? rej(e) : res())));
     try {
-      copy(); await done(fs.fdatasync, fd);
+      this._flush(); copy(); await done(fs.fdatasync, fd);
       const t = fs.openSync(tmp, 'w', 0o600); fs.writeSync(t, String(g)); await done(fs.fsync, t); fs.closeSync(t);
       const seg = new Seg(this._dir(g), built.cols, built.byPath); seg.cols(); await new Promise((res) => setImmediate(res));
-      copy(); const st = this._state(seg); this._replay(st, Buffer.concat(tail).toString('utf8')); fs.renameSync(tmp, cur);
+      while (copy()) await done(fs.fdatasync, fd); // a save that finished is durable in the new log before CURRENT moves
+      this._flush(); copy(); const st = this._state(seg); this._replay(st, Buffer.concat(tail).toString('utf8')); fs.renameSync(tmp, cur);
       const was = this.gen; const oldLog = this.logFd, oldSeg = this.seg; Object.assign(this, st); this.gen = g; this.logFd = fd; this.logEnd = at; this.foldP = null;
       if (this.syncing) this.oldLog = oldLog; else fs.close(oldLog, () => {}); oldSeg.close(); this._syncLog(); // the last bytes copied
       fs.open(this.root, 'r', (e, dfd) => { const rm = () => fs.rm(this._dir(was), { recursive: true, force: true }, () => {}); if (e) return rm(); return fs.fsync(dfd, () => fs.close(dfd, rm)); }); // a folder cannot be synced on Windows; the error is not checked for that reason
