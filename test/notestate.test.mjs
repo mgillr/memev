@@ -168,7 +168,7 @@ test('the journal folds on a worker, a crash in the fold replays cleanly, and th
   const root = fresh(); let v = open(root);
   for (let i = 0; i < 40; i++) v.write(ME, { path: `notes/f${i}.md`, body: `# f${i}\nFold Entity${i} Name here\n` });
   v.close(); v = open(root);
-  for (let i = 0; i < 12; i++) v.append(ME, { path: 'notes/f1.md', text: `## Added ${i}\nAppended Thing${i} Here\n` });
+  for (let i = 0; i < 12; i++) v.append(ME, { path: 'notes/f1.md', text: `## Added ${i}\nsome Appended Thing and Other Name here\n` });
   const jf = path.join(root, '.memev', 'notes.journal'); v.notes.flush(); const lines = fs.readFileSync(jf, 'utf8');
   v.notes.foldAt = () => 10; v.write(ME, { path: 'notes/one.md', body: '# one\nOne More\n' }); v.notes.flush();
   assert.ok(await until(() => !fs.existsSync(`${jf}.old`) && !v.notes.folding), 'the fold ended');
@@ -176,9 +176,10 @@ test('the journal folds on a worker, a crash in the fold replays cleanly, and th
   v.close();
   const { readState } = await import('../src/engine/notestate.mjs'); const clean = readState(path.join(root, '.memev'));
   assert.ok(lines.includes('["a","notes/f1.md"'), 'the control: the journal holds appends, the lines a second replay could double');
-  fs.writeFileSync(`${jf}.old`, lines); // a crash after the fold's rename and before it removed the old journal: the same lines come again
+  fs.writeFileSync(`${jf}.old`, `${lines.split('\n').filter((l) => /^\["[ea]"/.test(l)).join('\n')}\n`); // a crash after the fold's rename and before it removed the old journal: the same appends come again
   const onceMore = readState(path.join(root, '.memev')); assert.equal(clean.recs.get('notes/f1.md').secs.length, onceMore.recs.get('notes/f1.md').secs.length, 'appended sections are not doubled');
   assert.deepEqual(onceMore.recs.get('notes/f1.md'), clean.recs.get('notes/f1.md'));
+  assert.ok(clean.recs.get('notes/f1.md').secs.length >= 12, 'the control: the appends are in the record');
   fs.rmSync(`${jf}.old`, { force: true });
   const live = graphOf(open(root));
   for (const f of ['notes.state', 'notes.journal']) fs.rmSync(path.join(root, '.memev', f), { force: true });
@@ -203,7 +204,7 @@ test('memev start leaves a daemon that says it is loading, and stops one that sa
   const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
   let child; const keep = (f) => (...a) => { child = f(...a); return child; };
   assert.equal(await startDaemon(root, { quiet: true, waitMs: 700, spawn: keep(stub(true)) }), false);
-  assert.ok(alive(child.pid), 'a loading daemon is left to finish'); assert.equal(loadingPid(root), child.pid);
+  await new Promise((r) => setTimeout(r, 500)); assert.ok(alive(child.pid), 'a loading daemon is left to finish'); assert.equal(loadingPid(root), child.pid);
   await stopDaemon(root); assert.ok(await until(() => !alive(child.pid), 6000), 'memev stop reaches a daemon that is still loading');
   assert.equal(loadingPid(root), null);
   assert.equal(await startDaemon(root, { quiet: true, waitMs: 400, spawn: keep(stub(false)) }), false);
