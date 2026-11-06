@@ -160,6 +160,7 @@ test('a note the old index never saw reaches recall through the conversion, as a
 test('the daemon reports what it measured, and says what it did not', async () => {
   const { v } = newVault();
   const empty = v.status().health;
+  assert.ok(empty, 'status carries health');
   assert.ok(empty.start_ms >= 0); assert.equal(empty.recall.p50_ms, null, 'no recall yet, so no figure'); assert.equal(empty.longest_save_block_ms, null);
   assert.equal(empty.prompts.skipped_for_time, null); assert.deepEqual(empty.not_measured, ['prompts.skipped_for_time']);
   v.remember(OWNER, { text: 'The nightly export runs on the warehouse replica at two.', kind: 'fact', force: true });
