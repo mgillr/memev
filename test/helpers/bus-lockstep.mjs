@@ -52,7 +52,7 @@ const sortKeys = (v) => (Array.isArray(v) ? v.map(sortKeys) : v && typeof v === 
  * One history. A and B are Bus classes. Returns null when every answer and every file agreed, or a description of the first
  * difference. compareLog 'bytes' wants the same files; 'lines' wants the same lines whichever file holds them.
  */
-export async function lockstep({ A, B, seed, steps = 120, compareLog = 'bytes', optionsA = {}, optionsB = {} }) {
+export async function lockstep({ A, B, seed, steps = 120, compareLog = 'bytes', optionsA = {}, optionsB = {}, skipHalfLine = false }) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-bus-lockstep-'));
   const roots = [path.join(base, 'a'), path.join(base, 'b')];
   const r = prng(seed);
@@ -131,10 +131,11 @@ export async function lockstep({ A, B, seed, steps = 120, compareLog = 'bytes', 
         const ts = new Date(device === OFFLINE ? at - Math.floor(r() * 3600e3) : at + Math.floor(r() * 3600e3)).toISOString();
         label = `foreign line on ${device}`; appendRaw(device, foreign(device, ts));
       } else if (x < 91) { label = 'bad line'; appendRaw(OFFLINE, '{not json\n'); }
+      else if (x < 91.6 && skipHalfLine) { label = 'nothing'; }
       else if (x < 91.6) {
         // a crash left half a line at the end of this computer's own file; the next message runs into it
         label = 'half a line on own file';
-        both((root) => { const f = buses[roots.indexOf(root)]._activeFileForTest?.(HOST.id) || `${HOST.id}.jsonl`; fs.appendFileSync(path.join(root, 'bus', 'log', f), '{"id":"half'); });
+        both((root) => { const f = `${HOST.id}.jsonl`; fs.appendFileSync(path.join(root, 'bus', 'log', f), '{"id":"half'); });
       } else if (x < 92.2) {
         label = 'a line with its own seq, or a time that is not text';
         appendRaw(OFFLINE2, r() < 0.5 ? foreign(OFFLINE2, new Date(at).toISOString(), { seq: 7 }) : foreign(OFFLINE2, 1234));

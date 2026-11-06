@@ -30,6 +30,12 @@ const BROKEN = [
   ['the newest hold is not the one that counts', 'let h = null; for (let i = holds.length - 1; i >= 0 && !h; i--)', 'let h = null; for (let i = 0; i < holds.length && !h; i++)'],
   ['the last message picks the wrong name', 'placeOf(v, m) > placeOf(v, best)', 'placeOf(v, m) < placeOf(v, best)'],
   ['a comms check is answered twice', "!(view.byRef.get(x.id) || []).some((a) => a.type === 'ack' && names.includes(a.from))", 'true'],
+  ['a message that lands before others does not move them', 'for (let k = i; k < msgs.length; k++) msgs[k].seq = k + 1;', ''],
+  ['a line that ran into half a line still counts', 'if (!c.endsLine || c.exotic) return;', 'if (c.exotic) return;'],
+  ['the read position is off by one', 'if (run[mid].dseq <= upTo) lo = mid + 1;', 'if (run[mid].dseq < upTo) lo = mid + 1;'],
+  ['a message read beyond a gap shows again', 'if (!skip || !skip.has(run[i].dseq)) out.push(run[i]);', 'out.push(run[i]);'],
+  ['several computers are not put back in order', 'out.sort((a, b) => placeOf(view, a) - placeOf(view, b));\n    return out;', 'return out;'],
+  ['read marks stop at the first computer', "{ this._markAllRead(st, run[i]); break; }\n        }\n      }", "{ this._markAllRead(st, run[i]); break; }\n          break;\n        }\n      }"],
   ['a task\'s related messages ignore who may see them', '(view.byRef.get(t.id) || []).filter((m) => this._visible(who, m))', '(view.byRef.get(t.id) || [])'],
 ];
 

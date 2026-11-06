@@ -3,7 +3,10 @@
 //
 // Everything lives in the vault under bus/ and travels with it: through git to your own backup
 // repository, and through the secure link to computers that joined. Nothing goes anywhere else.
-//   bus/log/<device>.jsonl   messages, one append-only file per computer, so git never conflicts
+//   bus/log/<device>.jsonl   messages, append-only and written by one computer, so git never conflicts; when it reaches
+//                            SEGMENT_BYTES the computer goes on in <device>.2.jsonl, <device>.3.jsonl and so on, and the
+//                            full file is never touched again. Every reader takes every *.jsonl here, so a computer on an
+//                            older version reads them too
 //   bus/seats/<seat>.json    one seat per AI app (or session) on a computer
 //   bus/pulse/<seat>.json    the seat's last heartbeat and what it has read
 //   bus/operator.json        which seat speaks for you
@@ -26,6 +29,10 @@ export const LEAD_NEEDED = 'No lead AI is set for this vault. Ask the user which
 const SEAT_RE = /^[a-z0-9][a-z0-9._-]{0,40}@[a-z0-9][a-z0-9._-]{0,40}(\/[a-z0-9._-]{1,24})?$/;
 const REF_RE = /^[A-Za-z0-9._:-]{1,64}$/;
 const PULSE_COMMIT_MS = 5 * 60e3;
+// git stores each new version of a file whole until it next packs, and refuses a blob over 100 MiB for good. So a message file
+// stops growing here: small enough that a commit stays cheap (scripts/bench/speed/lab/bus-git-cost.mjs), and two of them merged by
+// sync stay far under the limit. A message is at most some 24 KB, so a file ends at most that far over this.
+export const SEGMENT_BYTES = 4 * 1048576;
 // What a seat has read, per device counter: pulse.read[device] is the contiguous prefix, kept a plain number so older
 // code still reads it, and pulse.read_extra[device] lists the counters read beyond a gap, which older code ignores (it
 // shows those once more, which is harmless). hasRead is the one rule; the bus and memev bus hello both use it.
@@ -57,7 +64,6 @@ const listIn = (map, key) => { let l = map.get(key); if (!l) { l = []; map.set(k
 /** Add a message to a list kept in the bus order; nearly always that is the end. */
 const putInOrder = (list, m, atEnd) => { if (atEnd) { list.push(m); return; } let i = list.length; while (i > 0 && order(list[i - 1], m) > 0) i--; if (i === list.length) list.push(m); else list.splice(i, 0, m); };
 /** Where a message sits in the order: its seq, except beside a line that carries its own. */
-const isSortedByPlace = (l) => { for (let i = 1; i < l.length; i++) if (l[i - 1].seq > l[i].seq) return false; return true; };
 const placeOf = (v, m) => (v.place ? v.place.get(m) : m.seq);
 function addToView(v, m, atEnd) {
   const had = v.firstById.get(m.id); if (!had || (!atEnd && order(m, had) < 0)) v.firstById.set(m.id, m);
@@ -80,6 +86,7 @@ export class Bus {
     this.root = root; this.devices = devices; this.commit = commit;
     this.liveMin = config.live_min ?? 15;
     this.cloudTasks = !!config.cloud_tasks;
+    this.segmentBytes = config.segment_bytes ?? SEGMENT_BYTES;
     this.dir = path.join(root, BUS_DIR);
     this._cache = new Map(); this._pulseCommitted = new Map(); this._last = new Map();
   }
@@ -93,7 +100,7 @@ export class Bus {
   /** Seed bus/ (the caller commits it) so the bus is part of the vault from the first commit: the layout, no operator yet, and this computer's own (empty) message file. */
   ensure(deviceId) {
     const files = [
-      ['config.json', () => writeJson(this._p('config.json'), { format: 1, log: 'log/<device>.jsonl, one append-only file per computer', seats: 'seats/<seat>.json', pulse: 'pulse/<seat>.json', operator: 'operator.json' })],
+      ['config.json', () => writeJson(this._p('config.json'), { format: 1, log: 'log/<device>.jsonl, then log/<device>.<n>.jsonl once that is full; append-only, written by one computer each', seats: 'seats/<seat>.json', pulse: 'pulse/<seat>.json', operator: 'operator.json' })],
       ['operator.json', () => writeJson(this._p('operator.json'), { seat: null, set: null })],
       ...(deviceId ? [[`log/${deviceId}.jsonl`, () => fs.writeFileSync(this._p('log', `${deviceId}.jsonl`), '')]] : []),
     ];
@@ -336,6 +343,23 @@ export class Bus {
     this._cache.set(file, { size: st.size, mtimeMs: st.mtimeMs, msgs, bad, exotic, endsLine: !text || text.endsWith('\n') });
     return msgs;
   }
+  /**
+   * Where this computer's next message goes, and its last message so far. Its counter runs on across its files: an empty or
+   * unreadable newest file falls back to the one before, so a counter is never used twice by losing sight of an older file.
+   */
+  _writeTo(id) {
+    const plain = `${id}.jsonl`; const prefix = `${id}.`; let high = 1;
+    for (const f of this._logFiles()) {
+      if (!f.startsWith(prefix) || f === plain) continue;
+      const n = /^(\d+)\.jsonl$/.exec(f.slice(prefix.length))?.[1];
+      if (n && Number(n) > high) high = Number(n);
+    }
+    const nameOf = (n) => (n === 1 ? plain : `${id}.${n}.jsonl`);
+    let last = null;
+    for (let n = high; n >= 1 && !last; n--) last = this._readLog(nameOf(n)).at(-1) || null;
+    let size = 0; try { size = fs.statSync(this._p('log', nameOf(high))).size; } catch {}
+    return { file: nameOf(size >= this.segmentBytes ? high + 1 : high), last };
+  }
   /** Every message, in the one order every computer agrees on, numbered from 1. The caller owns what it gets back. */
   all() { return this._view().msgs.map(copyOut); }
   /**
@@ -345,9 +369,9 @@ export class Bus {
    */
   _view() {
     const files = this._logFiles(); const v = this._viewNow;
-    if (v && v.files.length === files.length && files.every((f, i) => f === v.files[i].file && this._unchanged(v.files[i]))) return v;
-    const out = []; const stamps = []; let exotic = false;
-    for (const f of files) { const msgs = this._readLog(f); const c = this._cache.get(f); exotic ||= c?.exotic; stamps.push({ file: f, cached: c || null }); for (const m of msgs) out.push(m); }
+    if (v && v.files.size === files.length && files.every((f) => v.files.has(f) && this._unchanged(f, v.files.get(f)))) return v;
+    const out = []; const stamps = new Map(); let exotic = false;
+    for (const f of files) { const msgs = this._readLog(f); const c = this._cache.get(f); exotic ||= c?.exotic; stamps.set(f, c || null); for (const m of msgs) out.push(m); }
     out.sort(order);
     const next = newView(stamps, exotic);
     if (exotic) next.place = new Map(out.map((m, i) => [m, i]));
@@ -362,23 +386,29 @@ export class Bus {
    * left half a line that this one ran into) leaves the stale record, and the next read sees the size differ and reads the file.
    */
   _tookOwnLine(file, line) {
-    const c = this._cache.get(file); if (!c || !c.endsLine || c.exotic) return;
+    let c = this._cache.get(file);
+    // a file that did not exist before this line: a computer's first, or the next one after a full file
+    if (!c) { c = { size: 0, mtimeMs: 0, msgs: [], bad: 0, exotic: false, endsLine: true }; }
+    if (!c.endsLine || c.exotic) return;
     let st; try { st = fs.statSync(this._p('log', file)); } catch { return; }
     if (st.size !== c.size + Buffer.byteLength(line)) return;
     const m = JSON.parse(line);
     c.size = st.size; c.mtimeMs = st.mtimeMs; c.msgs.push(m);
+    this._cache.set(file, c);
     const v = this._viewNow;
     if (!v) return;
-    if (v.exotic || !v.files.some((x) => x.cached === c)) { this._viewNow = null; return; }
+    if (v.exotic) { this._viewNow = null; return; }
+    if (v.files.has(file) && v.files.get(file) !== c) { this._viewNow = null; return; }
+    v.files.set(file, c);
     // nearly always the new message is the last; one that lands before a computer whose clock is ahead moves those after it
     const msgs = v.msgs; let i = msgs.length; while (i > 0 && order(msgs[i - 1], m) > 0) i--;
     if (i === msgs.length) msgs.push(m); else msgs.splice(i, 0, m);
     for (let k = i; k < msgs.length; k++) msgs[k].seq = k + 1;
     addToView(v, m, false);
   }
-  _unchanged(stamp) {
-    const c = this._cache.get(stamp.file); if (!c || c !== stamp.cached) return false;
-    let st; try { st = fs.statSync(this._p('log', stamp.file)); } catch { return false; }
+  _unchanged(file, cached) {
+    const c = this._cache.get(file); if (!c || c !== cached) return false;
+    let st; try { st = fs.statSync(this._p('log', file)); } catch { return false; }
     return c.size === st.size && c.mtimeMs === st.mtimeMs;
   }
   _visible(who, m) {
@@ -431,9 +461,8 @@ export class Bus {
     return to_.map((t) => this._append(who, { to: t, type: 'transition', body, ref: null, project: project ?? null }));
   }
   _append(who, fields) {
-    const file = `${who.device.id}.jsonl`;
-    const mine = this._readLog(file);
-    const last = this._last.get(file) || mine.at(-1) || null;
+    const { file, last: lastInFiles } = this._writeTo(who.device.id);
+    const last = this._last.get(who.device.id) || lastInFiles;
     let ts = now(); if (last && ts <= last.ts) ts = new Date(Date.parse(last.ts) + 1).toISOString();
     const dseq = (last?.dseq || 0) + 1;
     const msg = { id: `${who.device.id.slice(4, 12)}-${dseq}`, dseq, ts, device: who.device.id, from: who.seat, operator: !!who.operator, ...fields };
@@ -441,7 +470,7 @@ export class Bus {
     fs.mkdirSync(this._p('log'), { recursive: true });
     const line = `${JSON.stringify(msg)}\n`;
     fs.appendFileSync(this._p('log', file), line);
-    this._last.set(file, msg);
+    this._last.set(who.device.id, msg);
     this.commit(this._rel('log', file));
     this._tookOwnLine(file, line);
     return { seq: this._view().firstById.get(msg.id)?.seq ?? null, ...msg };
@@ -482,8 +511,7 @@ export class Bus {
       let lo = 0; let hi = run.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (run[mid].dseq <= upTo) lo = mid + 1; else hi = mid; }
       for (let i = lo; i < run.length; i++) if (!skip || !skip.has(run[i].dseq)) out.push(run[i]);
     }
-    if (view.runs.size > 1 || view.exotic) out.sort((a, b) => placeOf(view, a) - placeOf(view, b));
-    else if (!isSortedByPlace(out)) out.sort((a, b) => a.seq - b.seq);
+    out.sort((a, b) => placeOf(view, a) - placeOf(view, b));
     return out;
   }
   /** Mark one message read, keeping the contiguous prefix and the extras. */

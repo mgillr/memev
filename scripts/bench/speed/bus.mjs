@@ -62,6 +62,8 @@ const q = (a, p) => { const s = [...a].sort((x, y) => x - y); return s[Math.min(
 const round = (x) => Math.round(x * 100) / 100;
 const time = (fn) => { const t = performance.now(); fn(); return performance.now() - t; };
 const series = (fn, n) => { const out = []; for (let i = 0; i < n; i++) out.push(time(fn)); return out; };
+// thread CPU per call as well, because on a shared machine wall time mostly measures the neighbours
+const both = (r, key, fn, n) => { const c = process.cpuUsage(); const s = series(fn, n); const u = process.cpuUsage(c); r[`${key}_ms`] = q(s, 0.5); r[`${key}_cpu_ms`] = (u.user + u.system) / 1000 / n; return s; };
 
 async function measure(file, base, log) {
   const { Bus } = await import(pathToFileURL(path.resolve(file)).href);
@@ -69,18 +71,19 @@ async function measure(file, base, log) {
   const bus = new Bus({ root, devices });
   const unreadSeat = { identity: ID, client: 'bot1', device }; const caughtUp = { identity: ID, client: 'bot2', device };
   const r = {};
-  r.first_ms = time(() => bus.all());
-  r.all_ms = q(series(() => bus.all(), 5), 0.5);
-  r.unread_all_unread_capped_ms = q(series(() => bus.unread(unreadSeat, { seat: 'bot1@fleet', peek: true, capped: true }), 5), 0.5);
-  r.unread_caught_up_ms = q(series(() => bus.unread(caughtUp, { seat: 'bot2@fleet', peek: true }), 5), 0.5);
-  r.send_ms = q(series(() => bus.send(caughtUp, { seat: 'bot2@fleet', to: 'all', type: 'status', body: 'bench message' }), 5), 0.5);
+  both(r, 'first', () => bus.all(), 1);
+  both(r, 'all', () => bus.all(), 5);
+  both(r, 'unread_all_unread_capped', () => bus.unread(unreadSeat, { seat: 'bot1@fleet', peek: true, capped: true }), 5);
+  both(r, 'unread_caught_up', () => bus.unread(caughtUp, { seat: 'bot2@fleet', peek: true }), 5);
+  both(r, 'send', () => bus.send(caughtUp, { seat: 'bot2@fleet', to: 'all', type: 'status', body: 'bench message' }), 5);
   // the first roster tells how many more this module can afford; p95 needs twenty
   const one = time(() => bus.roster());
-  const roster = [one, ...series(() => bus.roster(), one > 2000 ? 2 : 19)];
+  const roster = [one, ...both(r, 'roster', () => bus.roster(), one > 2000 ? 2 : 19)];
   r.roster_ms = q(roster, 0.5); r.roster_ms_p95 = q(roster, 0.95);
-  r.tail_ms = q(series(() => bus.tail(caughtUp, { seat: 'bot2@fleet', n: 20 }), 5), 0.5);
-  r.since_ms = q(series(() => bus.since(caughtUp, { seat: 'bot2@fleet', seq: M - 10, limit: 50 }), 5), 0.5);
-  r.tasks_ms = time(() => bus.tasks(caughtUp));
+  both(r, 'tail', () => bus.tail(caughtUp, { seat: 'bot2@fleet', n: 20 }), 5);
+  both(r, 'since', () => bus.since(caughtUp, { seat: 'bot2@fleet', seq: M - 10, limit: 50 }), 5);
+  both(r, 'tasks', () => bus.tasks(caughtUp), 1);
+  globalThis.gc?.();
   r.heap_mb = Math.round(process.memoryUsage().heapUsed / 1048576);
   fs.rmSync(root, { recursive: true, force: true });
   return r;
