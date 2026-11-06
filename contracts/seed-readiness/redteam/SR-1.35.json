@@ -1,0 +1,64 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SR-1.35",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "95318486fbd3a287fcda189922f01beda66331083093a03333518fe152dbeb36",
+      "base_commit": "3fa865c3a1ec30ed2cc7be6c2d04f9dbf17b218c",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "fef5139ba1222068699f08e3d2d75a5fda18bdad8c75181ca007bded9edc84ee"
+          },
+          {
+            "path": "src/engine/redteam-gate.mjs",
+            "sha256": "28ec9c1f6ddb69a3d4c87dfb65f19712be1094f7394ae8d60dfba53ceea10759"
+          },
+          {
+            "path": "scripts/bench/speed/targets.mjs",
+            "sha256": "db4e463921cf42010b4a8a4d54679c6b5250ef4356fdc400e25534767827f05d"
+          },
+          {
+            "path": "docs/testing/SPEED-RESULTS.md",
+            "sha256": "d1baa7ddd3769135bf488f491284f50414fb025556fde209288bd9ade31090e1"
+          },
+          {
+            "path": "docs/BUS.md",
+            "sha256": "7c14e4d7e31520d6e2715eb916534d713ec0659563e813fa1d79d15dc02af232"
+          },
+          {
+            "path": "package.json",
+            "sha256": "df0a33344e4d35bdb39ce4d9d2fbecc02f1d44b6037fd181a27740fe80195606"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "second seat on the same machine; some of the criteria run, as listed here. This is not an independent review: both seats are AI on one machine. The lead wrote this spec and its generator, and the code it covers landed before it, by PR 437, on the owner's word to integrate. The second seat attacked that code three times and found more each time (first-trial/REDTEAM-B-speed-fixes.md in the team's private bundle, S1 to S9 and T1 to T3), and read this spec against the running verifier's steps (first-trial/REDTEAM-B-SR-1.35.md there). Run by the second seat on this machine, with the verifier's own red and green steps copied into a script, since the draft gate refuses a contract with no record: every test_red_green and every whole-file command, on main dbedadb1 against base 93d97329, and T7-c01 again after PR 440. Two of the second seat's own test changes are in what is reviewed, PRs 439 and 440, and the lead read them. Not run by the second seat: T1-c00, the full suite, kept off this machine; T6-c02 and T6-c03, the runs at 50,000 notes, whose figures are the lead's; the contract as a whole through memev contract verify. The scope criterion was checked only by matching the changed files against the allow list. The reason each red run fails on the base was read for all of them: T6-c00 proves only that a file was absent, and T6-c03 carries that task's weight. Known and stated in the request: two processes writing at once, a bus limit on going back to older code, a later commit failing scope on a later verify. Not covered by any review: power loss, a real vault at scale, two computers through git, Windows.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NGNiYThmZmFmZTkwMGVmYWQ0M2QwYmVlZjg0ZjEwNTg5ZWFlNzU0MTU5Y2I1Nzk1ZGRmMGQ4ZThjMDRhOTg1OA==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "BZ9ixBzrVpOZs1arthGNu1BDhbTyfMArZ+IF0VICYTmGoQkRCP893KllVgaHcoiUIuTIIt2JWhrw+ui4ht2tAQ=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ODA0ZjUwZGYyMTQ2ODdiYjZjZWQ5YmE4YjQ3MGQ4OWI5OTY2MjY2OTEzZGYwM2U0MzdhMTM4ODk0YmVkNjM1MQ==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "TMB97nlKMTpeBwIH3KJ5b8yPtQfn5UAsnSZDIG879E4fZFBH0b9/rizhpCjC0fVSMFwcHNBGomnD/VjC+38oAw=="
+          }
+        ]
+      }
+    }
+  ]
+}
