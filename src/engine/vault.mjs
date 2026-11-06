@@ -12,7 +12,7 @@ import { sha256, readJson, writeJson, writePrivateJson, replacePrivate, readPriv
 import { OpLog } from './oplog.mjs';
 import { tokenize, sections } from './index.mjs';
 import { SegIndex } from './segment-index.mjs';
-import { SegDamage, IndexBusy } from './segment.mjs';
+import { SegDamage, IndexBusy, isPassing } from './segment.mjs';
 import { Health } from './health.mjs';
 import { Worker } from 'node:worker_threads';
 import { NoteState, scanNotes, short } from './notestate.mjs';
@@ -144,10 +144,10 @@ export class Vault extends EventEmitter {
     const rebuild = !loaded || this.index.isEmpty();
     // a first run reads each note once: the import indexes what it just read, in the path order a rebuild uses, when every note is new
     const allNew = rebuild && ![...scan.keys()].some((p) => this.log.heads.has(p));
-    if (allNew) { this.imported = []; this.recovered = []; this.skipped = []; this.log.group(() => this.index.buildFrom(this._firstRunNotes(scan))); }
+    if (allNew) { this.imported = []; this.recovered = []; this.skipped = []; try { this.log.group(() => this.index.buildFrom(this._firstRunNotes(scan))); } catch (e) { this._noIndexAtOpen(e, scan); } }
     else {
       this.recover(scan);
-      if (rebuild) this.index.buildFrom(this._rebuildNotes(scan));
+      if (rebuild) { try { this.index.buildFrom(this._rebuildNotes(scan)); } catch (e) { this._noIndexAtOpen(e, scan); } }
       else this._restoreGraph(scan);
     }
     this.graph.bulkLoad = false;
@@ -173,6 +173,16 @@ export class Vault extends EventEmitter {
     } catch {}
   }
 
+  /**
+   * The index cannot be written here, a disk gone read-only say. The notes are fine, so the vault still opens: every note is logged and in the
+   * graph, writes work, and recall says the rebuild failed. A machine short of something, or a fault in this code, is no such thing and is thrown.
+   */
+  _noIndexAtOpen(e, scan) {
+    if (isPassing(e) || !e.syscall) throw e;
+    this.recover(scan); for (const p of [...scan.keys()].sort()) { try { this._graphNote(p, this._read(p)); } catch { /* skipped, as a start skips it */ } }
+    this.index.rebuildFailed(e.code || e.message); this.index.damage ||= { why: this.index.loadDamage || 'the index folder cannot be written', at: now() };
+    this._recordIndexDamage(this.index.damage.why, `failed: ${e.code || e.message}`);
+  }
   /** A load that takes a while says it is still moving, so a load that has stopped can be told from one that is slow. */
   _tick() { const t = Date.now(); if (this.opts.onProgress && t - (this._ticked || 0) >= 1000) { this._ticked = t; try { this.opts.onProgress(); } catch { /* only a report */ } } }
   close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); clearTimeout(this._ist); this.index.save(); this.index.syncNow(); this.index.stopWork(); this._saveIndexSeq(); this._saveGraph(); clearTimeout(this._idle); this.notes?.close(); try { this._sweepWorker?.terminate(); } catch {} this.devices?.saveSoon(); this.log.close(); }
@@ -309,7 +319,7 @@ export class Vault extends EventEmitter {
     }).catch((e) => { this.index.rebuildFailed(e.message); this._recordIndexDamage(why, `failed: ${e.message}`); });
   }
   /** Where the index stands in the log. It is written only once the index holds that much on the disk; an older value only means a longer catch-up. */
-  _saveIndexSeq(seq = this.log.seq, at = this.index.position()) { if (this.index.retrying()) return; try { replacePrivate(path.join(this.state, 'index.seq'), at ? `${seq} ${at.gen} ${at.end}` : String(seq)); } catch { /* the next save writes it again */ } }
+  _saveIndexSeq(seq = this.log.seq, at = this.index.position()) { if (this.index.retrying() || this.index.rebuilding) return; try { replacePrivate(path.join(this.state, 'index.seq'), at ? `${seq} ${at.gen} ${at.end}` : String(seq)); } catch { /* the next save writes it again */ } }
   _scanNotes() { return scanNotes(this.root); }
   /** A folder's first open: each note is logged and taken into the graph as it passes on its way to the index. */
   *_firstRunNotes(scan) {

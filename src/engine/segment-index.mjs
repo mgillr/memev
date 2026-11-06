@@ -129,7 +129,9 @@ export class SegIndex {
     }
   }
   /** Give up on what is on the disk. Only the generations nobody is writing go; the next build takes the next number. */
-  _discard() { fs.rmSync(path.join(this.root, 'CURRENT'), { force: true }); this._sweep(0); }
+  _discard() { this._forget(); this._sweep(0); }
+  /** CURRENT goes where it can. On a folder that cannot be written it stays, every read of that generation still finds what is wrong, and the rebuild fails the same way and says so. */
+  _forget() { try { fs.rmSync(path.join(this.root, 'CURRENT'), { force: true }); } catch { /* see above */ } }
 
   /** Replay log bytes into a generation's state: the same steps a write took, so ids and their order come out the same. */
   _replay(st, text) { for (let s = 0; s < text.length;) { const e = text.indexOf('\n', s); if (e < 0) throw new SegDamage('overlay.log: a line with no end'); const r = readOverlayLine(text.slice(s, e)); s = e + 1; if (r.rm !== undefined) { this._retireIn(st, r.rm); st.ov.remove(r.rm); } else { st.ov._addLine(r); } } }
@@ -185,7 +187,7 @@ export class SegIndex {
       this._closeFiles(); const { lastGen, onDamage } = this; this._clear(); this.lastGen = lastGen; this.onDamage = onDamage; if (this.load()) return;
     }
     this.damage = { why, at: new Date().toISOString() }; this.rebuilding = { state: 'waiting' }; this.epoch++;
-    this._closeFiles(); fs.rmSync(path.join(this.root, 'CURRENT'), { force: true }); this.dead = null; this.deadCount = 0; this.deadPaths = new Set(); this.deadLen = 0; this.ov = new RecallIndex('/nonexistent'); this.pending = []; this.dirty = false; this.waiters = []; this.syncAgain = false; this.foldP = null; this.gen = 0; this.retry = []; this._sweep(0);
+    try { this._closeFiles(); } catch { this.logFd = null; this.seg = null; } this._forget(); this.dead = null; this.deadCount = 0; this.deadPaths = new Set(); this.deadLen = 0; this.ov = new RecallIndex('/nonexistent'); this.pending = []; this.dirty = false; this.waiters = []; this.syncAgain = false; this.foldP = null; this.gen = 0; this.retry = []; this._sweep(0);
     this.onDamage?.(why);
   }
   /** Build the new generation from the notes on a worker. Resolves when it serves; what was written meanwhile is the caller's to apply. */

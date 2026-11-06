@@ -543,6 +543,25 @@ test('the same with the real mode 000', { skip: process.platform === 'win32' || 
 });
 
 const readOnly = { skip: process.platform === 'win32' || process.getuid?.() === 0 };
+test('damage found on an index folder that cannot be written: the process lives and the rebuild says it failed', readOnly, async () => {
+  const root = seeded(12); const b = fs.readFileSync(F(root, 'meta.jsonl')); const i = b.length >> 1; b[i] ^= 1; fs.writeFileSync(F(root, 'meta.jsonl'), b); fs.chmodSync(segDir(root), 0o500);
+  const v = open(root);
+  try {
+    const sw = v.startSweep(); assert.ok(await until(() => sw.state !== 'running' && v.index.state().state === 'failed'), `the state is ${v.index.state().state}`); assert.equal(sw.index_files, 'damaged');
+    assert.throws(() => hits(v, WORD(1)), (e) => { assert.equal(e.code, 'index_rebuild_failed'); assert.match(e.message, /memev restart/); return true; }); v.write(ME, { path: 'notes/after.md', body: '# A\nreadonlyword\n' }); assert.match(v.status().index.damage.state, /failed: EACCES/);
+  } finally { fs.chmodSync(segDir(root), 0o700); v.close(); }
+  const again = open(root); const w = again.startSweep(); assert.ok(await until(() => w.state !== 'running' && again.index.state().state === 'ok')); assert.deepEqual(hits(again, 'readonlyword'), ['notes/after.md']); assert.deepEqual(hits(again, WORD(1)), ['notes/n1.md']); again.close();
+});
+test('a start that finds damage on a folder that cannot be written still opens, and writes work', readOnly, () => {
+  const root = seeded(12); editHead(root, (j) => { j.n = 3; }); const graph = (x) => [...x.graph.entities.keys()].sort(); const good = (() => { const r = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-g-')); made.push(r); fs.cpSync(root, r, { recursive: true }); fs.rmSync(path.join(r, '.memev/index.seg'), { recursive: true }); const x = open(r); const g = graph(x); x.close(); return g; })();
+  fs.chmodSync(segDir(root), 0o500); let v; try { v = open(root); assert.equal(v.index.state().state, 'failed'); assert.deepEqual(graph(v), good, 'the graph is whole'); assert.throws(() => hits(v, WORD(1)), (e) => e.code === 'index_rebuild_failed'); v.write(ME, { path: 'notes/after.md', body: '# A\nreadonlyword\n' }); assert.equal(fileChecks({ root, vault: v }).find((x) => x.id === 'index-files').status, 'fail'); v.close(); } finally { fs.chmodSync(segDir(root), 0o700); }
+  v = open(root); assert.deepEqual(hits(v, 'readonlyword'), ['notes/after.md']); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md']); v.close();
+});
+test('a first open on a folder that cannot take an index logs every note and opens', readOnly, () => {
+  const root = fresh(); fs.mkdirSync(path.join(root, 'notes'), { recursive: true }); fs.writeFileSync(path.join(root, 'notes/one.md'), '# O\nfirstrunword here\n'); fs.mkdirSync(segDir(root), { recursive: true, mode: 0o700 }); fs.chmodSync(segDir(root), 0o500);
+  let v; try { v = open(root); assert.equal(v.index.state().state, 'failed'); assert.ok(v.log.heads.has('notes/one.md'), 'the note is logged'); v.close(); } finally { fs.chmodSync(segDir(root), 0o700); }
+  v = open(root); assert.deepEqual(hits(v, 'firstrunword'), ['notes/one.md']); v.close();
+});
 
 test('a write met by a read that fails in passing lands, reaches recall on the retry, and holds the saved position back until it has', () => {
   const root = seeded(12); const v = open(root); hits(v, WORD(9)); const seqFile = path.join(root, '.memev/index.seq'); const was = fs.readFileSync(seqFile, 'utf8'); const undo = failing('bypath.bin', 'EMFILE', 1000);
