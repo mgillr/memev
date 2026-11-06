@@ -63,4 +63,5 @@ test('against old code: every ceiling meant to catch it must fail there, and one
   const guard = Object.keys(CEILINGS).filter((k) => !CAUGHT.includes(k));
   assert.equal(judgeOld({ ...over, ...Object.fromEntries(guard.map((k) => [k, 0])) }).ok, true, 'a guard the old code passes is no failure');
   for (const name of CAUGHT) assert.ok(name in CEILINGS, name);
+  for (const name of ['a3_recall_p95_ms', 'a6_send_ms', 'a4_new_note_p50_ms', 'a8_stop_ms']) assert.ok(guard.includes(name), `${name} is a guard: the old code is under twice its ceiling, or passes it`);
 });
