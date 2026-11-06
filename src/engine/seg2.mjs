@@ -2,6 +2,7 @@
 // The on-disk segment behind the recall index: immutable files in one folder, read by offset, never parsed whole.
 // Fixed-width columns are little-endian typed arrays, so a query reads them without building objects.
 // All Node targets (x64 and arm64 on macOS, Linux, Windows) are little-endian; a big-endian host would have to swap.
+// Bump SEG_VERSION with any change of these files: an index of another version is rebuilt from the notes.
 //   head.json   counts, every 64th dictionary word with its byte offset; written last, so a folder without it is unfinished
 //   dict.txt    word, df, row of its first posting; sorted by JavaScript string order
 //   ids.bin     u32 section number per posting; tfs.bin u16 count per posting; the same row in both
@@ -15,7 +16,7 @@ import path from 'node:path';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
 
-export const SEG_VERSION = 3;
+export const SEG_VERSION = 4;
 export const ROW = 9; export const C_LEN = 0, C_MLO = 1, C_MHI = 2, C_MLEN = 3, C_PATH = 4, C_PROJ = 5, C_HEAD = 6, C_RB = 7, C_SIG = 8;
 const NO_HEADING = 0x80000000, HAS_FL = 0x80000000; const FLUSH = 1 << 20;
 /** A signature of an item key (path#heading). A key absent from a small bitmap of signatures needs no heading. */

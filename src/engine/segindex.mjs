@@ -55,13 +55,14 @@ class FilterDoc extends SegDoc {
 
 export class SegIndex {
   constructor(file) { this.file = file; this.base = file.replace(/\.jsonl$/, ''); this.root = `${this.base}.seg`; this._clear(); }
-  _clear() { this.seg = null; this.ov = new RecallIndex('/nonexistent'); this.dead = null; this.deadCount = 0; this.deadPaths = new Set(); this.deadLen = 0; this.gen = 0; this.logFd = null; this.logEnd = 0; this.pending = []; this.dirty = false; this.foldP = null; this.foldFailed = 0; this.score = null; this.syncing = false; this.syncAgain = false; this.oldLog = null; }
+  _clear() { this.seg = null; this.ov = new RecallIndex('/nonexistent'); this.dead = null; this.deadCount = 0; this.deadPaths = new Set(); this.deadLen = 0; this.gen = 0; this.logFd = null; this.logEnd = 0; this.pending = []; this.dirty = false; this.foldP = null; this.foldFailed = 0; this.lastGen = 0; this.score = null; this.syncing = false; this.syncAgain = false; this.oldLog = null; }
   reset() { this._closeFiles(); this._clear(); fs.rmSync(this.root, { recursive: true, force: true }); }
   _closeFiles() { if (this.logFd !== null) { fs.closeSync(this.logFd); this.logFd = null; } if (this.seg) { this.seg.close(); this.seg = null; } }
   _dir(g) { return path.join(this.root, `gen-${g}`); }
   _log(g) { return path.join(this._dir(g), 'overlay.log'); }
   _publish(g) { const cur = path.join(this.root, 'CURRENT'), t = `${cur}.tmp`; const fd = fs.openSync(t, 'w', 0o600); fs.writeSync(fd, String(g)); fs.fsyncSync(fd); fs.closeSync(fd); fs.renameSync(t, cur); try { const d = fs.openSync(this.root, 'r'); fs.fsyncSync(d); fs.closeSync(d); } catch { /* a folder cannot be synced on Windows */ } }
-  _sweep(keep) { let list = []; try { list = fs.readdirSync(this.root); } catch { return; } for (const e of list) if (e.startsWith('gen-') && e !== `gen-${keep}`) fs.rm(path.join(this.root, e), { recursive: true, force: true }, () => {}); }
+  // Old folders go in the background, so a generation's number is never used twice: a removal still running cannot touch a new folder.
+  _sweep(keep) { let list = []; try { list = fs.readdirSync(this.root); } catch { return; } this.lastGen = Math.max(this.lastGen, keep); for (const e of list) if (e.startsWith('gen-') && e !== `gen-${keep}`) { this.lastGen = Math.max(this.lastGen, Number(e.slice(4)) || 0); fs.rm(path.join(this.root, e), { recursive: true, force: true }, () => {}); } }
 
   /** Replay log bytes into a generation's state: the same steps a write took, so ids and their order come out the same. */
   _replay(st, text) { for (let s = 0; s < text.length;) { const e = text.indexOf('\n', s); const r = JSON.parse(text.slice(s, e)); s = e + 1; if (r.rm !== undefined) { this._retireIn(st, r.rm); st.ov.remove(r.rm); } else { st.ov._addLine(r); } } }
@@ -86,7 +87,7 @@ export class SegIndex {
     return true;
   }
   _writeFromOverlay() {
-    fs.mkdirSync(this.root, { recursive: true, mode: 0o700 }); const g = this.gen + 1; fs.rmSync(this._dir(g), { recursive: true, force: true }); const ov = this.ov;
+    fs.mkdirSync(this.root, { recursive: true, mode: 0o700 }); this._sweep(this.gen); const g = ++this.lastGen; const ov = this.ov;
     writeSeg(this._dir(g), (function* () { for (const d of ov.docs.values()) { const terms = []; for (let i = 0; i < d.tids.length; i++) terms.push([ov.termList[d.tids[i]], d.tfs[i]]); yield { ...d, terms }; } })());
     this._closeFiles(); const log = this._log(g); fs.writeFileSync(log, '', { mode: 0o600 }); const seg = new Seg(this._dir(g)); this._publish(g); Object.assign(this, this._state(seg)); this.gen = g; this.logFd = fs.openSync(log, 'r+'); this.logEnd = 0; this.pending = []; this.dirty = false; this._sweep(g);
   }
@@ -110,8 +111,8 @@ export class SegIndex {
   }
   /** Start a fold of the log as it stands. Reads and writes go on against this generation until the new one is ready. */
   foldSoon() {
-    if (this.foldP || !this.seg) return this.foldP; this._flush(); const g = this.gen + 1; fs.rmSync(this._dir(g), { recursive: true, force: true }); const sealed = this.logEnd;
-    this.foldP = foldInWorker(this._dir(this.gen), this._dir(g), this._log(this.gen), sealed).then((r) => this._swap(g, sealed, r)).catch(() => { this.foldP = null; this.foldFailed = Date.now(); fs.rm(this._dir(g), { recursive: true, force: true }, () => {}); });
+    if (this.foldP || !this.seg) return this.foldP; this._flush(); const g = ++this.lastGen; const sealed = this.logEnd;
+    this.foldP = foldInWorker(this._dir(this.gen), this._dir(g), this._log(this.gen), sealed).then((r) => this._swap(g, sealed, r)).catch((e) => { this.foldP = null; this.foldFailed = Date.now(); this.foldError = e; fs.rm(this._dir(g), { recursive: true, force: true }, () => {}); });
     return this.foldP;
   }
   // What was written after the seal moves to the new generation. Every wait for the disk is on the thread pool, between steps;
@@ -132,7 +133,7 @@ export class SegIndex {
   }
   /** memev compact: the daemon is stopped, so the fold runs here and the old generation is gone when this returns. */
   compact() {
-    if (!this.seg || this.foldP) return; this._flush(); if (!this.logEnd) return; const g = this.gen + 1, was = this.gen; fs.rmSync(this._dir(g), { recursive: true, force: true }); foldFiles(this._dir(was), this._dir(g), this._log(was), this.logEnd); fs.writeFileSync(this._log(g), '', { mode: 0o600 });
+    if (!this.seg || this.foldP) return; this._flush(); if (!this.logEnd) return; const g = ++this.lastGen, was = this.gen; foldFiles(this._dir(was), this._dir(g), this._log(was), this.logEnd); fs.writeFileSync(this._log(g), '', { mode: 0o600 });
     const seg = new Seg(this._dir(g)); this._publish(g); this._closeFiles(); Object.assign(this, this._state(seg)); this.gen = g; this.logFd = fs.openSync(this._log(g), 'r+'); this.logEnd = 0; fs.rmSync(this._dir(was), { recursive: true, force: true });
   }
   _retire(p) { if (this.seg) this._retireIn(this, p); }

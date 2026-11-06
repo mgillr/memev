@@ -146,6 +146,14 @@ test('a fold frees the files of the old generation', async (t) => {
   for (let i = 0; i < 100 && fs.existsSync(oldDir); i++) await new Promise((r) => setTimeout(r, 10)); assert.equal(fs.existsSync(oldDir), false, 'the old generation is removed');
 });
 
+test('a generation number left by a kill is not used again', async (t) => {
+  const d = tmp(t); const { orc, ix, file } = seeded(d, 100); writes(orc, ix, 81, 5); ix.save(); const base = `${file.replace(/\.jsonl$/, '')}.seg`; const next = path.join(base, `gen-${ix.gen + 1}`); fs.mkdirSync(next); fs.writeFileSync(path.join(next, 'leftover'), 'x'); const again = new SegIndex(file); assert.equal(again.load(), true); await settle(again.foldSoon()); assert.ok(again.gen > ix.gen + 1, `generation ${again.gen}`); agree(orc, again, 'after');
+});
+
+test('a segment of another version asks for a rebuild', (t) => {
+  const d = tmp(t); const { ix, file } = seeded(d, 40); const head = path.join(ix._dir(ix.gen), 'head.json'); const j = JSON.parse(fs.readFileSync(head, 'utf8')); j.version -= 1; fs.writeFileSync(head, JSON.stringify(j)); assert.equal(new SegIndex(file).load(), false);
+});
+
 test('a failed fold leaves the index serving and does not retry on every save', async (t) => {
   const d = tmp(t); const { orc, ix } = seeded(d, 200); writes(orc, ix, 41, 10); ix.save(); const dir = ix._dir(ix.gen); const seg = ix.seg; seg.cols(); fs.renameSync(path.join(dir, 'cols.bin'), path.join(dir, 'cols.moved')); await settle(ix.foldSoon()); fs.renameSync(path.join(dir, 'cols.moved'), path.join(dir, 'cols.bin')); assert.equal(ix.seg, seg, 'still the old segment'); assert.equal(ix.foldP, null); assert.ok(ix.foldFailed > 0); agree(orc, ix, 'after a failed fold');
 });
