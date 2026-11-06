@@ -22,7 +22,27 @@
       "manifest_kind": "docs",
       "verdict": "clean",
       "answers": [],
-      "notes": "Review by the lead seat of a draft written by the second seat, so the reviewer is not the author. The lead's four changes to the earlier draft (T2 requirement 1 and the SR-3.05 wording; the request listing every change; a T1 criterion that fails if the old SR-3.03 text stays; the 31 Oct tiers marked superseded) were folded before this round, and the lead agreed the text on the team bus. Signed with the interim key because the independent reviewer key belongs to the author of this draft. The new criteria were run red at memev-ops a08e0a04 and green at b6698659, on the second seat's runner over the grep and command criteria only."
+      "notes": "NOT AN INDEPENDENT REVIEW. The second seat wrote this draft and signs this round with its reviewer key under the owner's decision of 6 Nov 2026, a one-off for PGP-1.06.2 only, because the interim key was unavailable on this Mac. The lead reviewed the draft and folded four changes before this round: T2 requirement 1 and the SR-3.05 wording; the request listing every change; a T1 criterion that fails if the old SR-3.03 text stays; the 31 Oct tiers marked superseded. The lead's review covers: the snapshot is byte-identical to the spec at 64325d2d, nothing is removed from version 1, 4 criteria are added, 2 requirements are changed, and the request lists every change. The red-then-green run was the second seat's own runner over the grep and command criteria, not the lead's: red at memev-ops a08e0a04, green at b6698659.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZjE4YTlkODBkMTdhMGFjYzg1ZjEzMzUwNWViOWE3MzU1MTc1N2QwMTUwMTdhYmZjMmNjZjk3MzVjNGQwNTg3MA==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "MC47Xys3torlAcs9mJd8w2iFLkFBvOKdsCgJb6TYmYpb0l42w+/cjXukbzJhAIpvDf6RWOn54ELu9RrLSbHnAg=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZTcyOTRkYWQ5MTFmNDM0ZGJiZDlkNzkwMWE0NGQ4ODUwODc4MWJkNWNlZjIxZWJiOWE3Y2FiMDY5Mzk4ZjFhNA==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "qBiIrDaSueDhMffi8ZN5CpKAJQ19qDl+G+1FTtFwHKNua/BekOy95PkWm4jyNOe7c7/0VAkGtJtN/ax4IbTeDQ=="
+          }
+        ]
+      }
     }
   ]
 }
