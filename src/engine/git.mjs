@@ -3,7 +3,7 @@
 import { MessageChannel, SHARE_ENV, Worker, receiveMessageOnPort } from 'node:worker_threads';
 import fs from 'node:fs';
 import path from 'node:path';
-import { run } from './util.mjs';
+import { run, replacePrivate, readPrivate } from './util.mjs';
 
 // Every git command in this process waits for the commit queue's running batch, so nothing here ever races it.
 export function git(root, args, opts = {}) {
@@ -138,7 +138,7 @@ export class CommitQueue {
     if (!this.pending.size) { this._markCommitted(this.log?.seq); return null; }
     const seq = this.log?.seq;
     const paths = [...this.pending.keys()]; const clients = [...new Set([...this.pending.values()].flatMap((s) => [...s]))];
-    const r = commitBatch((args) => git(this.root, args), paths, clients, (p) => !fs.existsSync(path.join(this.root, ...p.split('/'))));
+    const r = commitBatch((args) => git(this.root, args), paths, clients, (p) => !fs.existsSync(path.join(this.root, ...p.split('/')))); this.flushedAt = Date.now();
     if (r === null) { this.pending.clear(); this._markCommitted(seq); return null; }
     // keep the paths pending on failure so the next flush retries them; only a committed flush drops them
     if (r.ok) { this.pending.clear(); this.commits++; this._markCommitted(seq); }
@@ -153,17 +153,25 @@ export class CommitQueue {
   catchUp(log, file) {
     if (!this.enabled) return;
     this.log = log; this.markFile = file;
-    let saved = null;
-    try { saved = Number(fs.readFileSync(file, 'utf8').trim()); } catch { /* no record yet: nothing to compare with */ }
-    if (saved === null || !Number.isSafeInteger(saved)) { this._markCommitted(log.seq); return; }
-    if (log.seq <= saved) return;
+    const text = readPrivate(file); const saved = text === null ? NaN : Number(text.trim()); // no record yet: nothing to compare with
+    if (text === null || !Number.isSafeInteger(saved) || saved < 0 || saved > log.seq) { this._markCommitted(log.seq); return; }
     const late = []; for (const [p, h] of log.heads) if (h.seq > saved) late.push(p);
     // past the command line's room (Windows has the least), name the top folders
     const names = late.length > 400 ? [...new Set(late.map((p) => p.split('/')[0]))] : late;
-    for (const p of [...names, 'bus']) this.add(p, null);
+    for (const p of names) this.add(p, null);
+    if (late.length || this._busSince(file)) this.add('bus', null);
+  }
+  /** A bus file newer than the commit record. The bus is not in the op log, so its message before a hard kill shows only here. A pulse is committed at its own pace and does not count. */
+  _busSince(markFile) {
+    let mark; try { mark = fs.statSync(markFile).mtimeMs; } catch { return false; }
+    mark = Math.max(mark, this.flushedAt || 0); // the bus's own seed commit, made just before this
+    const bus = path.join(this.root, 'bus'); const newer = (f) => { try { return fs.statSync(f).mtimeMs > mark; } catch { return false; } };
+    if (newer(path.join(bus, 'operator.json'))) return true;
+    for (const d of ['log', 'seats']) { let names = []; try { names = fs.readdirSync(path.join(bus, d)); } catch { /* none yet */ } for (const n of names) if (newer(path.join(bus, d, n))) return true; }
+    return false;
   }
   _markCommitted(seq) {
     if (!this.markFile || seq === undefined) return;
-    try { const tmp = `${this.markFile}.tmp`; fs.writeFileSync(tmp, String(seq)); fs.renameSync(tmp, this.markFile); } catch { /* the next commit writes it again */ }
+    try { replacePrivate(this.markFile, String(seq)); } catch { /* the next commit writes it again */ }
   }
 }

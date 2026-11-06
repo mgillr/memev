@@ -317,6 +317,23 @@ test('the control: two files with different names, and a new note with no twin, 
   v = open(root); assert.equal(v.log.heads.get('notes/one.md').deleted, undefined); assert.equal(v.recall(ME, { query: 'theoneword', log: false, all_projects: true }).length, 1); assert.equal(v.recall(ME, { query: 'thetwoword', log: false, all_projects: true }).length, 1); v.close();
 });
 
+test('a link in the state folder is never written through, read through or cut', { skip: process.platform === 'win32' }, async () => {
+  const OUT = 'precious line without newline';
+  const CASES = {
+    'index.seq': (r, l) => l(path.join(r, '.memev/index.seq')), 'notes.journal': (r, l) => l(path.join(r, '.memev/notes.journal')), 'notes.state': (r, l) => l(path.join(r, '.memev/notes.state')), 'overlay.log': (r, l) => l(F(r, 'overlay.log')),
+    'CURRENT': (r, l) => { const g = fs.readFileSync(path.join(segDir(r), 'CURRENT'), 'utf8'); void g; l(path.join(segDir(r), 'CURRENT')); }, 'CURRENT.tmp': (r, l) => l(path.join(segDir(r), 'CURRENT.tmp')), 'head.json': (r, l) => l(F(r, 'head.json')), 'cols.bin': (r, l) => l(F(r, 'cols.bin')), 'names.json': (r, l) => l(F(r, 'names.json')), 'meta.jsonl': (r, l) => l(F(r, 'meta.jsonl')),
+  };
+  for (const [name, plant] of Object.entries(CASES)) {
+    const root = seeded(12); const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'memev-out-'))); made.push(out); const target = path.join(out, 'target'); fs.writeFileSync(target, OUT);
+    plant(root, (f) => { fs.rmSync(f, { force: true }); fs.symlinkSync(target, f); });
+    for (let round = 0; round < 2; round++) {
+      const v = open(root); v.write(ME, { path: `new/r${round}.md`, body: `# N\nnewword${round}x here\n` }); v.index.save(); v.index.compact(); v.append(ME, { path: 'notes/n1.md', text: '\n## More\nAda Lovelace again\n' }); v.notes.flush();
+      try { for (const i of [1, 2, 3]) assert.ok(v.recall(ME, { query: WORD(i), log: false, all_projects: true }).some((h) => h.path === `notes/n${i}.md`), `${name}: word ${i}`); } catch (e) { assert.equal(e.code, 'index_rebuilding', `${name}: ${e.stack}`); }
+      assert.ok(await until(() => v.index.state().state === 'ok')); assert.ok(v.recall(ME, { query: WORD(2), log: false, all_projects: true }).length, `${name}: found after`); v.index.save(); v.close();
+    }
+    assert.equal(fs.readFileSync(target, 'utf8'), OUT, `${name}: the file outside was changed`);
+  }
+});
 
 test('a linked index folder or generation folder is not used or written through', { skip: process.platform === 'win32' }, async () => {
   for (const which of ['index.seg', 'generation', 'empty index.seg']) {

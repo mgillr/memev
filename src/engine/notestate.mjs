@@ -132,7 +132,7 @@ export class NoteState {
   /** Write out what changed. */
   flush() {
     if (!this.pending.length) return;
-    fs.appendFileSync(this.journal, `${this.pending.join('\n')}\n`, { mode: 0o600 }); this.lines += this.pending.length; this.pending = [];
+    appendPrivate(this.journal, `${this.pending.join('\n')}\n`); this.lines += this.pending.length; this.pending = [];
     if (!this.folding && this.lines > this.foldAt()) this._foldSoon();
   }
   /** Move the journal aside and let a worker merge it. An old journal still there means a fold is unfinished; it waits for the next start. */

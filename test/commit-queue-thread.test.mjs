@@ -172,6 +172,23 @@ test('a hard kill loses no acknowledged write, and the reopened vault commits wh
   assert.ok(leftDirty > 0, 'no kill left anything uncommitted, so this proved nothing');
 });
 
+test('a stop with nothing pending still moves the commit record to where the log stands', () => {
+  const root = path.join(tmpdir(), 'q'); fs.mkdirSync(root); const file = path.join(root, 'commit.seq');
+  const log = { seq: 5, heads: new Map() }; const q = new CommitQueue(root, { delayMs: 60000 }); q.catchUp(log, file); assert.equal(fs.readFileSync(file, 'utf8'), '5');
+  log.seq = 9; assert.equal(q.pending.size, 0); assert.equal(q.flush(), null); assert.equal(fs.readFileSync(file, 'utf8'), '9', 'the empty path of a flush left the record behind');
+  if (process.platform !== 'win32') assert.equal(fs.statSync(file).mode & 0o077, 0, 'the commit record is private, like every state file');
+});
+
+test('a bus message before a hard kill is committed by the next open, and a clean stop leaves nothing for it', async () => {
+  const root = path.join(tmpdir(), 'vault'); initVault(root, { template: path.join(PKG, 'templates', 'vault') });
+  const code = `const { Vault } = await import(${JSON.stringify(path.join(PKG, 'src/engine/vault.mjs'))}); const v = new Vault(process.argv[1], { commitDelayMs: 60000, fsync: true, keyDir: process.argv[1] + '/../keys' }).open(); const host = v.devices.get(v.devices.hostId); v.write({ id: 't', agent: 't', scopes: ['read', 'write'], paths: ['**'] }, { path: 'notes/a.md', body: '# a\\n' }); v.commits.flush(); v.bus.send({ identity: { id: 't', agent: 't', scopes: ['read', 'write'], paths: ['**'] }, client: 'cli', cli: true, local: true, device: host }, { to: 'all', type: 'status', body: 'before the kill' }); process.stdout.write('sent'); setInterval(() => {}, 1000);`;
+  const c = spawn(process.execPath, ['--input-type=module', '-e', code, root], { stdio: ['ignore', 'pipe', 'inherit'] }); let out = ''; c.stdout.on('data', (d) => { out += d; });
+  const t = Date.now(); while (!out.includes('sent') && Date.now() - t < 30000) await sleep(5); assert.ok(out.includes('sent'), 'the writer did not send'); c.kill('SIGKILL'); await new Promise((r) => c.on('close', r));
+  assert.match(dirty(root), /bus\/log/, 'the kill left the message uncommitted, or this proves nothing');
+  const v = new Vault(root, { commitDelayMs: 5, fsync: false, keyDir: path.join(root, '..', 'keys') }).open(); const w = Date.now(); while (dirty(root) && Date.now() - w < 15000) await sleep(20); assert.equal(dirty(root), '', 'the bus message stayed uncommitted'); await untilLanded(v.commits); v.close();
+  const again = new Vault(root, { commitDelayMs: 60000, fsync: false, keyDir: path.join(root, '..', 'keys') }).open(); try { assert.equal(again.commits.pending.size, 0, 'a clean stop leaves nothing to queue'); } finally { again.close(); }
+});
+
 test('a clean stop writes the commit record, so the next open queues nothing', () => {
   const { root, v } = newVault({ commitDelayMs: 60000 });
   v.write(OWNER, { path: 'notes/a.md', body: '# a\n' });
