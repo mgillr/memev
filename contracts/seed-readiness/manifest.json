@@ -16,6 +16,21 @@
       "status": "signed 31 Oct 2026 by signer-2 after an interim red-team record (interim solo review, pending independent re-review); version 2, superseding the version signed that day at the three-round stop; SR-0.03.3 in the programme manifest is its version 3 in intent"
     },
     {
+      "id": "SR-0.04",
+      "gap": "N01, N03, N06, N08, N09",
+      "area": "SR-0",
+      "title": "Receipts match signatures, and what is claimed is in the tree",
+      "repo": "memev",
+      "closes": "Asked for by the owner on 6 Nov 2026 on the outside seed analysis of that date. The gap ids are that analysis's new gaps (N01 pages disagree on the tier set, N03 builds parked after signing, N06 verification cannot run, N08 review that is independent in name only, N09 ssh-keygen as a new requirement); no G number was given. It found 146 signed bodies and 1 receipt. N02, N04, N05 and N07 are on the owner's list in the spec's request and are not in scope",
+      "depends_on": [
+        "SR-1.35"
+      ],
+      "tasks": 13,
+      "criteria": 146,
+      "spec": "specs/SR-0.04-receipts-match-signatures.json",
+      "status": "proposed and unsigned; signs after its red-team round"
+    },
+    {
       "id": "SR-1.01",
       "gap": "G01",
       "area": "SR-1",

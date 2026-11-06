@@ -1,0 +1,150 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SR-0.04",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "b234b0d893418377cb9fd6f34020031af86a0ef4155f77ac3056a450d795d4b1",
+      "base_commit": "d597366052ac48d890fea92ce41f0f1e98f6a328",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "fef5139ba1222068699f08e3d2d75a5fda18bdad8c75181ca007bded9edc84ee"
+          },
+          {
+            "path": "src/engine/redteam-gate.mjs",
+            "sha256": "28ec9c1f6ddb69a3d4c87dfb65f19712be1094f7394ae8d60dfba53ceea10759"
+          },
+          {
+            "path": "docs/scope-one/DECISIONS.md",
+            "sha256": "3307322f2c70781f4362f95243bcd1905e86e8214abf604ed965ca540aa9c696"
+          },
+          {
+            "path": ".github/workflows/ci.yml",
+            "sha256": "f41a022de450edb6ca7f055b5f0418479a2e1093d21a4aef598a108a1e65e810"
+          },
+          {
+            "path": "package.json",
+            "sha256": "df0a33344e4d35bdb39ce4d9d2fbecc02f1d44b6037fd181a27740fe80195606"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "second seat on the same machine; only read the criteria. This is not an independent review: both seats are AI on one machine. The lead wrote this spec. The second seat read all of it, found findings over three rounds outside this record (first-trial/REDTEAM-B-SR-0.04.md in the team's private bundle: B1 to B9, S1 to S7, M1 to M9, O9 to O12, R1 to R3) and folded the last of them into the spec itself, so part of what is signed here is the second seat's own text. The lead read that fold by diff against the second seat's pre-fold copy and agreed it on the team bus, saying nothing was weakened; that reading is the lead's. None of the 146 criteria was run, since most need work not yet built. Probed by running, by the second seat, on a prototype branch and on main: a derived base resolves for all 107 live bodies with no base; 113 of 114 live bodies hold a scope criterion and a later unrelated commit fails it; the NOT JUDGED rule works in the verifier on a fixture and an own-base body still fails; live bodies hold 1,381 commands, 814 red-green and 93 full-suite runs. Not exercised: a real verify of a real contract, the runner, the owner's key, or the workflow. The analysis's own figures that neither seat checked are named in the request.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OWM4NmY4NTAyNjk5ZjQ5ZTRiZDY1MzhlMWY2ZGMyNGI3YzdlYTY1YWVlM2RkZDVhZGE4ZjY3Mjk4OTBjN2E3NA==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "rnsl20Oq/f3SIYcII+uj/yeqt1X4xbTYgdGNWaNW59T7JmKjAsIXAeuac4mMVOn4WFU7kV6pZh4bKQ7itLooCg=="
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "3a37e93ec42f99c1a8ba15df69f4d438c397ee1bba2c3f8063749e08dd16202c",
+      "base_commit": "0091fc005793751e0f409841304a4ee9ad1b602d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "fef5139ba1222068699f08e3d2d75a5fda18bdad8c75181ca007bded9edc84ee"
+          },
+          {
+            "path": "src/engine/redteam-gate.mjs",
+            "sha256": "28ec9c1f6ddb69a3d4c87dfb65f19712be1094f7394ae8d60dfba53ceea10759"
+          },
+          {
+            "path": "docs/scope-one/DECISIONS.md",
+            "sha256": "3307322f2c70781f4362f95243bcd1905e86e8214abf604ed965ca540aa9c696"
+          },
+          {
+            "path": ".github/workflows/ci.yml",
+            "sha256": "f41a022de450edb6ca7f055b5f0418479a2e1093d21a4aef598a108a1e65e810"
+          },
+          {
+            "path": "package.json",
+            "sha256": "df0a33344e4d35bdb39ce4d9d2fbecc02f1d44b6037fd181a27740fe80195606"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "second seat on the same machine; only read the criteria. Round 2 changes T9 only, and it strengthens it. The second seat's review of the lead's signing script found that the key command this spec named uses 2048 iterations, measured with openssl asn1parse, while both seats can read the encrypted file; the lead confirmed 600000 loads in Node. T9 now names 600000, drops the claim that the private half is outside the seats' reach, says a changed program could save the passphrase, and adds the fresh clone, the expected key id and printing what is signed. None of the 146 criteria was run. The lead has not yet read this round's text: this round says so, and any objection takes a round 3.",
+      "amendments": [
+        {
+          "task": "T9",
+          "field": "requirement",
+          "from": "the owner holds signing authority ('I should hold authority over signing'), so signing must be something a seat cannot do in his place. He makes an Ed25519 key under a passphrase only he knows, in his own Terminal. The public half goes under contracts/keys, and the private half stays outside both seats' reach",
+          "to": "the owner holds signing authority ('I should hold authority over signing'), so signing must be something a seat cannot do in his place by running a command. He makes an Ed25519 key under a passphrase only he knows, in his own Terminal. The public half goes under contracts/keys, and the private half stays encrypted. Both seats run under his account, so they can read the encrypted file: the passphrase, and the strength of its encryption, are what protect it",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T9",
+          "field": "requirement",
+          "from": "docs/CONTRACTS.md says how to make the key: /usr/local/bin/openssl genpkey -algorithm ed25519 -aes-256-cbc, since /usr/bin/openssl (LibreSSL) has no Ed25519 here. It says the limit plainly: a signature proves the key, not the person, and a passphrase typed where a seat can read it is no longer his alone",
+          "to": "docs/CONTRACTS.md says how to make the key: /usr/local/bin/openssl genpkey -algorithm ed25519 | /usr/local/bin/openssl pkcs8 -topk8 -v2 aes-256-cbc -iter 600000 -out FILE, which writes no plaintext to disk. 'genpkey -aes-256-cbc' alone uses 2048 iterations, too few when the seats can read the file and guess offline. /usr/bin/openssl (LibreSSL) has no Ed25519 here. It says the limit plainly: a signature proves the key, not the person, and a passphrase typed where a seat can read it is no longer his alone. A seat that changed the program he types the passphrase into could save it: the fresh clone below reduces that and does not remove it. Only a key on another device, such as a hardware key, removes it, and that is his choice",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T9",
+          "field": "requirement",
+          "from": "SR-0.04 itself is signed before this task is built, so its one signature is made by the owner with a small script the lead gives him, which decrypts the key in memory, and which T9's signing replaces. SR-0.04's body is then the first entry check-signers holds him to",
+          "to": "SR-0.04 itself is signed before this task is built, so its one signature is made by the owner with a small script the lead gives him, which decrypts the key in memory, and which T9's signing replaces. He runs it from a fresh clone at a commit sha he is given, in his own Terminal window and never through a session, naming his expected key id; it refuses any other key, and prints the contract's id, title and hash before it asks. The same holds for every signature he makes. SR-0.04's body is then the first entry check-signers holds him to",
+          "reviewer_note": 1
+        },
+        {
+          "task": "T9",
+          "field": "statement",
+          "from": "T9-c06: docs/CONTRACTS.md states the openssl command, the LibreSSL limit and that a signature proves the key and not the person",
+          "to": "T9-c06: docs/CONTRACTS.md states the openssl command with 600000 iterations, why 2048 is too few, the LibreSSL limit, that a signature proves the key and not the person, and that a changed program could save the passphrase, so he signs from a fresh clone at a given sha, or with a key on another device",
+          "reviewer_note": 1
+        }
+      ],
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "Y2JjN2RlOThhZTg0NzRhYzgwOGViYTViYWU5YjJkODc5NjQ0YTBlYjZjMGY4MDBlMzZmYTRjNzliMWYwZDUwOA==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "tCI+WflPScEEywkCDrZY2BduK11dyT3tDiQ0dkHazErYQ/qD/w4TZnbxcRfRvioJdykvjX0L/z1uWy8fEmriCw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OWQyZmY2OTgyOTI1ZGExYTY2ZDEwZjYzNmYwN2Q2M2IzNzUzOGJmOGE5ZTY3OWY2N2RkZGVkYWM0NDc0MDJiNA==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "GgakCEc9kOVJ9O+ZBmZbudYHBu4Ib3NPOmGXlrQjfMpSkCcrJLj0umwWBCrMjfLIqPynZL0e9sq8Ube0ZOHGAg=="
+          }
+        ]
+      }
+    }
+  ],
+  "reviewer_notes": [
+    {
+      "n": 1,
+      "text": "second seat on the same machine; read the change, checked by running openssl asn1parse and loading the key in Node. Round 2 of SR-0.04 rewrites three requirements and one statement of T9. The key command named in round 1 uses 2048 iterations, too few when the seats can read the encrypted file, and is replaced by 600000. The claim that the private half is outside both seats' reach was false, since they run under the owner's account, and is replaced by what protects it. A limit is added: a seat that changed the program could save the passphrase. The fresh clone, the expected key id and printing what is signed are added. Nothing is loosened except that false claim, which now says what is true. It does not cover whether the build will meet these.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "NTQ5ZmUwMDk5ZDQ1MWNmYWI3OGUzYTdlYmFhMjhiY2ZhZWI0NWU3ZmMwNDQ4MWZkMTUyMTU4NjY0ZjE2NzlhOQ==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "NJU7r77Du8quLtR5ytcTPEDCoCuegDsg+CisSy0TyaVn4+WfZ/V09aZSqUQcdh2z7rxRCaq8zzrF+xeYCcL+Dg=="
+          }
+        ]
+      }
+    }
+  ]
+}
