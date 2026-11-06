@@ -149,17 +149,20 @@ export class CommitQueue {
    * only new record is how far commits have reached: a file written after each commit, never synced, because an old value only means
    * a path is looked at again and an empty batch is dropped. On open, every path the log has past that point is queued again, with bus/,
    * whose files are not in the log. The queue's timer does it, so the bus's seed commit, made before this, stays first and on its own.
+   * A clean stop leaves a marker, taken away here, so its absence is what says a kill came first. File times alone cannot say so: a
+   * message written just after the record can carry the same time. An empty batch is dropped, so looking at bus/ needlessly costs little.
    */
   catchUp(log, file) {
     if (!this.enabled) return;
     this.log = log; this.markFile = file;
+    const cleanFile = `${file}.clean`; const clean = readPrivate(cleanFile) !== null; fs.rmSync(cleanFile, { force: true });
     const text = readPrivate(file); const saved = text === null ? NaN : Number(text.trim()); // no record yet: nothing to compare with
     if (text === null || !Number.isSafeInteger(saved) || saved < 0 || saved > log.seq) { this._markCommitted(log.seq); return; }
     const late = []; for (const [p, h] of log.heads) if (h.seq > saved) late.push(p);
     // past the command line's room (Windows has the least), name the top folders
     const names = late.length > 400 ? [...new Set(late.map((p) => p.split('/')[0]))] : late;
     for (const p of names) this.add(p, null);
-    if (late.length || this._busSince(file)) this.add('bus', null);
+    if (late.length || !clean || this._busSince(file)) this.add('bus', null);
   }
   /** A bus file newer than the commit record. The bus is not in the op log, so its message before a hard kill shows only here. A pulse is committed at its own pace and does not count. */
   _busSince(markFile) {
@@ -169,6 +172,11 @@ export class CommitQueue {
     if (newer(path.join(bus, 'operator.json'))) return true;
     for (const d of ['log', 'seats']) { let names = []; try { names = fs.readdirSync(path.join(bus, d)); } catch { /* none yet */ } for (const n of names) if (newer(path.join(bus, d, n))) return true; }
     return false;
+  }
+  /** Called after the last flush of a clean stop, when nothing is left to commit. */
+  markClean() {
+    if (!this.enabled || !this.markFile || this.pending.size) return;
+    try { replacePrivate(`${this.markFile}.clean`, '1'); } catch { /* the next open looks at bus/ again, which costs little */ }
   }
   _markCommitted(seq) {
     if (!this.markFile || seq === undefined) return;

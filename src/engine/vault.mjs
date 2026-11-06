@@ -185,7 +185,7 @@ export class Vault extends EventEmitter {
   }
   /** A load that takes a while says it is still moving, so a load that has stopped can be told from one that is slow. */
   _tick() { const t = Date.now(); if (this.opts.onProgress && t - (this._ticked || 0) >= 1000) { this._ticked = t; try { this.opts.onProgress(); } catch { /* only a report */ } } }
-  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); clearTimeout(this._ist); this.index.save(); this.index.syncNow(); this.index.stopWork(); this._saveIndexSeq(); this._saveGraph(); clearTimeout(this._idle); this.notes?.close(); try { this._sweepWorker?.terminate(); } catch {} this.devices?.saveSoon(); this.log.close(); }
+  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.commits.markClean(); clearTimeout(this._ist); this.index.save(); this.index.syncNow(); this.index.stopWork(); this._saveIndexSeq(); this._saveGraph(); clearTimeout(this._idle); this.notes?.close(); try { this._sweepWorker?.terminate(); } catch {} this.devices?.saveSoon(); this.log.close(); }
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }
