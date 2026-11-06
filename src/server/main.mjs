@@ -50,6 +50,8 @@ server.listen(port, bind, async () => {
   writePrivateJson(path.join(state, 'daemon.json'), { pid: process.pid, port, bind, started: now(), root });
   fs.rmSync(loadingFile, { force: true });
   console.error(`[memev] serving ${root} on http://${bind}:${port}`);
+  // the first prompt should not pay for reading the bus, and the health check should not wait for it
+  vault.bus.warm().catch(() => {});
   for (const mod of ['../cli/tunnel.mjs', '../cli/sync.mjs']) {
     try { const m = await import(mod); if (m.supervise) extras.push(m.supervise(vault, { root, port })); } catch (e) { if (e.code !== 'ERR_MODULE_NOT_FOUND') console.error(`[memev] ${mod}: ${e.message}`); }
   }

@@ -31,9 +31,7 @@ export const entry = (root, seat) => loadRunner(root)[seat] || null;
 
 /** The per-device cursor for a bus: each device's highest counter so far. */
 export function cursors(bus) {
-  const out = {};
-  for (const m of bus.all()) out[m.device] = Math.max(out[m.device] || 0, m.dseq);
-  return out;
+  return bus.counters();
 }
 
 const pidAlive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
@@ -150,7 +148,7 @@ export async function sweep({ root, bus, seat, run = runTurn, log = () => {} } =
   const ran = new Set(e0.ran || []);
   const started = [];
   const skipped = [];
-  for (const m of bus.all()) {
+  for (const m of bus.pastCounters(seen)) {
     if ((seen[m.device] || 0) >= m.dseq) continue;
     seen[m.device] = Math.max(seen[m.device] || 0, m.dseq);
     if (ran.has(m.id)) continue;
