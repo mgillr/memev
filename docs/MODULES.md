@@ -543,8 +543,8 @@ Import paths are relative to `src/`. `none` under "Imported by" means no other m
 | `src/engine/redteam-gate.mjs` | gate-version: 1 The red-team gate: whether a contract spec may be signed, judged from its red-team record | `vendor/attest` | `engine/contracts.mjs` |
 | `src/engine/relationships.mjs` | The relationship model of a project, over the one project store | `engine/util.mjs` | `cli/work.mjs`, `engine/project-store.mjs` |
 | `src/engine/secrets.mjs` | The secrets guard: text that looks like a credential is refused unless the caller says allow_secrets | none | `cli/doctor.mjs`, `engine/bus.mjs`, `engine/importers/ai-history.mjs`, `engine/importers/exports.mjs`, `engine/importers/project.mjs`, `engine/project-store.mjs`, `engine/vault.mjs` |
-| `src/engine/seg2.mjs` | Rig prototype, not product code | none | `engine/segindex.mjs` |
-| `src/engine/segindex.mjs` | Rig prototype, not landed code | `engine/index.mjs`, `engine/oplog.mjs`, `engine/seg2.mjs` | `engine/vault.mjs` |
+| `src/engine/seg2.mjs` | The on-disk segment behind the recall index: immutable files in one folder, read by offset, never parsed whole | none | `engine/segindex.mjs` |
+| `src/engine/segindex.mjs` | The recall index with RecallIndex's interface and answers, over an on-disk segment and a small overlay | `engine/index.mjs`, `engine/oplog.mjs`, `engine/seg2.mjs` | `engine/vault.mjs` |
 | `src/engine/setup-channel.mjs` | Outbound setup channel: mutual-auth handshake over node:crypto primitives, then an AES-256-GCM encrypted frame channel | none | `cli/setup-remote.mjs` |
 | `src/engine/state-map.mjs` | The state map: a note, or the state of an agent, as structured state that a provider shim outside the core can hand to the engine, and back again... | `engine/util.mjs` | none |
 | `src/engine/tokens.mjs` | Capability tokens: mv_<id>_<secret> | `engine/identity.mjs`, `engine/util.mjs` | `cli/common.mjs`, `cli/doctor.mjs`, `cli/licensing.mjs`, `cli/main.mjs`, `cli/tunnel.mjs`, `engine/bus.mjs`, `engine/card.mjs`, `engine/contracts.mjs`, `engine/vault.mjs` |

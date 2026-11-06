@@ -77,13 +77,16 @@ export class RecallIndex {
       if (!line) continue;
       const r = JSON.parse(line);
       if (version === null) { version = r.version; if (version !== INDEX_VERSION) return false; continue; }
-      const tf = new Map(); r.t.forEach((t, i) => tf.set(t, r.f[i]));
-      this._add(r.path, { ...r, tf }); any = true;
+      this._addLine(r); any = true;
     }
     if (version === null && fs.existsSync(legacy)) { try { fs.rmSync(legacy); } catch {} }
     this.dirty = false;
     return version === INDEX_VERSION && (any || this.docs.size === 0);
   }
+
+  // One section as a line of the index file, and back.
+  _docLine(d) { return JSON.stringify({ path: d.path, heading: d.heading, line: d.line, len: d.len, project: d.project, mtime: d.mtime, snippet: d.snippet, ...(d.rb ? { rb: d.rb } : {}), ...(d.fl ? { fl: d.fl } : {}), t: Array.from(d.tids, (id) => this.termList[id]), f: Array.from(d.tfs) }); }
+  _addLine(r) { const tf = new Map(); r.t.forEach((t, i) => tf.set(t, r.f[i])); this._add(r.path, { ...r, tf }); }
 
   /** Streamed to disk one section per line: no whole-index string in memory. */
   save() {
@@ -94,7 +97,7 @@ export class RecallIndex {
       fs.writeSync(fd, `${JSON.stringify({ version: INDEX_VERSION, sections: this.docs.size })}\n`);
       let buf = '';
       for (const d of this.docs.values()) {
-        buf += `${JSON.stringify({ path: d.path, heading: d.heading, line: d.line, len: d.len, project: d.project, mtime: d.mtime, snippet: d.snippet, ...(d.rb ? { rb: d.rb } : {}), ...(d.fl ? { fl: d.fl } : {}), t: Array.from(d.tids, (id) => this.termList[id]), f: Array.from(d.tfs) })}\n`;
+        buf += `${this._docLine(d)}\n`;
         if (buf.length > 1 << 20) { fs.writeSync(fd, buf); buf = ''; }
       }
       if (buf) fs.writeSync(fd, buf);

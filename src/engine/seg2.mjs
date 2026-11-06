@@ -1,12 +1,76 @@
-// Rig prototype, not product code. Immutable on-disk segment + in-memory overlay + fold on a worker thread.
-// The overlay is the real RecallIndex, so new text is tokenized and scored by the product's own code.
-import fs from 'node:fs'; import path from 'node:path';
+// SPDX-License-Identifier: Apache-2.0
+// The on-disk segment behind the recall index: immutable files in one folder, read by offset, never parsed whole.
+// Fixed-width columns are little-endian typed arrays, so a query reads them without building objects.
+// All Node targets (x64 and arm64 on macOS, Linux, Windows) are little-endian; a big-endian host would have to swap.
+// Bump SEG_VERSION with any change of these files: an index of another version is rebuilt from the notes.
+//   head.json   counts, every 64th dictionary word with its byte offset; written last, so a folder without it is unfinished
+//   dict.txt    word, df, row of its first posting; sorted by JavaScript string order
+//   ids.bin     u32 section number per posting; tfs.bin u16 count per posting; the same row in both
+//   cols.bin    ROW u32 per section: len, meta offset (low, high), meta length, path id, project id, heading offset, review date, key signature
+//   heads.bin   headings as UTF-16, the only encoding that returns any JavaScript string unchanged, and fast to decode
+//   meta.jsonl  one line per section: line, mtime, snippet, flags. Read only for what is returned
+//   names.json  the paths and projects the ids refer to
+//   bypath.bin  u32 bucket count, path count, a hash table of path ids, then each path's section numbers
+import fs from 'node:fs';
+import path from 'node:path';
 import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
 
-const bmp = (f, df, N, len, avg) => { const k1 = 1.2, b = 0.75; const idf = Math.log(1 + (N - df + 0.5) / (df + 0.5)); return idf * (f * (k1 + 1)) / (f + k1 * (1 - b + b * len / avg)); };
+export const SEG_VERSION = 4;
+export const ROW = 9; export const C_LEN = 0, C_MLO = 1, C_MHI = 2, C_MLEN = 3, C_PATH = 4, C_PROJ = 5, C_HEAD = 6, C_RB = 7, C_SIG = 8;
+const NO_HEADING = 0x80000000, HAS_FL = 0x80000000; const FLUSH = 1 << 20;
+/** A signature of an item key (path#heading). A key absent from a small bitmap of signatures needs no heading. */
+export const keySig = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+const encodeRb = (rb) => (rb ? Number(rb.replace(/-/g, '')) : 0);
+const decodeRb = (v) => { if (!v) return null; const s = String(v).padStart(8, '0'); return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6)}`; };
+const metaLine = (d) => `${JSON.stringify({ line: d.line, mtime: d.mtime, snippet: d.snippet, fl: d.fl || null })}\n`;
+const idOf = (m, k) => { if (k == null) return 0; let v = m.get(k); if (v === undefined) { v = m.size + 1; m.set(Buffer.from(k).toString(), v); } return v; }; // a copy: a view would keep the whole note's text alive
 
-/** Growing typed columns of one posting per row, in document order. No object per posting, so the collector has nothing to walk. */
+function readAligned(file) { const fd = fs.openSync(file, 'r'); try { const size = fs.fstatSync(fd).size; const b = Buffer.allocUnsafeSlow(size); let at = 0; while (at < size) { const n = fs.readSync(fd, b, at, size - at, at); if (!n) throw new Error(`short read of ${file}`); at += n; } return b; } finally { fs.closeSync(fd); } }
+function syncClose(fd) { fs.fsyncSync(fd); fs.closeSync(fd); }
+function syncFile(file) { const fd = fs.openSync(file, 'r+'); syncClose(fd); }
+
+// Appends fixed-width values through one buffer, so a whole segment is a few hundred writes rather than one per word.
+class Out {
+  constructor(file, Type) { this.fd = fs.openSync(file, 'w', 0o600); this.Type = Type; this.a = new Type(FLUSH / Type.BYTES_PER_ELEMENT); this.n = 0; }
+  push(v) { this.a[this.n++] = v; if (this.n === this.a.length) this.flush(); }
+  flush() { if (this.n) { const b = this.n * this.Type.BYTES_PER_ELEMENT; fs.writeSync(this.fd, new Uint8Array(this.a.buffer, 0, b)); this.n = 0; } }
+  all(a) { this.flush(); const b = new Uint8Array(a.buffer, a.byteOffset, a.byteLength); for (let at = 0; at < b.length;) at += fs.writeSync(this.fd, b, at, Math.min(b.length - at, 1 << 30)); }
+  close() { this.flush(); syncClose(this.fd); }
+}
+class TextOut {
+  constructor(file) { this.fd = fs.openSync(file, 'w', 0o600); this.parts = []; this.size = 0; this.bytes = 0; }
+  write(b) { this.parts.push(b); this.size += b.length; this.bytes += b.length; if (this.size >= FLUSH) this.flush(); }
+  flush() { if (this.size) { fs.writeSync(this.fd, Buffer.concat(this.parts, this.size)); this.parts = []; this.size = 0; } }
+  close() { this.flush(); syncClose(this.fd); }
+}
+
+// Find a path's sections without a Map of every path on the heap, ready before the first write that needs it.
+function pathTable(paths, c, n) {
+  const np = paths.length; let nb = 16; while (nb < np * 2) nb *= 2; const t = new Uint32Array(new SharedArrayBuffer((2 + nb + np + 2 + n) * 4)); t[0] = nb; t[1] = np;
+  for (let k = 0; k < np; k++) { let h = keySig(paths[k]) & (nb - 1); while (t[2 + h]) h = (h + 1) & (nb - 1); t[2 + h] = k + 1; }
+  const O = 2 + nb, R = O + np + 2; for (let i = 0; i < n; i++) t[O + c[i * ROW + C_PATH] + 1]++; for (let k = 1; k < np + 2; k++) t[O + k] += t[O + k - 1]; const at = t.slice(O, O + np + 2); for (let i = 0; i < n; i++) t[R + at[c[i * ROW + C_PATH]]++] = i;
+  return t;
+}
+
+// The section columns and text files, shared by a first write and a fold.
+class SectionWriter {
+  constructor(dir, cols) { this.dir = dir; this.cols = cols; this.meta = new TextOut(path.join(dir, 'meta.jsonl')); this.heads = new TextOut(path.join(dir, 'heads.bin')); this.P = new Map(); this.J = new Map(); this.n = 0; this.totalLen = 0; }
+  row(len, line, heading, pid, jid, rbv, sig) {
+    const o = this.n * ROW; if (o === this.cols.length) { const a = new Uint32Array(Math.max(ROW * 1024, o * 2)); a.set(this.cols); this.cols = a; } // a stream of notes has no known length
+    const ml = line.length, at = this.meta.bytes; const c = this.cols; c[o + C_LEN] = len; c[o + C_MLO] = at % 4294967296; c[o + C_MHI] = Math.floor(at / 4294967296); c[o + C_MLEN] = ml; c[o + C_PATH] = pid; c[o + C_PROJ] = jid;
+    c[o + C_HEAD] = heading === null ? (this.heads.bytes | NO_HEADING) >>> 0 : this.heads.bytes; c[o + C_RB] = rbv; c[o + C_SIG] = sig; this.meta.write(line); if (heading) this.heads.write(heading); this.totalLen += len; return this.n++;
+  }
+  doc(d) { const fl = d.fl ? HAS_FL : 0; return this.row(d.len, Buffer.from(metaLine(d)), d.heading === null || d.heading === undefined ? null : Buffer.from(d.heading, 'utf16le'), idOf(this.P, d.path), idOf(this.J, d.project), (encodeRb(d.rb) | fl) >>> 0, keySig(`${d.path}#${d.heading || ''}`)); }
+  finish() { this.meta.close(); this.heads.close(); fs.writeFileSync(path.join(this.dir, 'cols.bin'), Buffer.from(this.cols.buffer, 0, this.n * ROW * 4), { mode: 0o600 }); syncFile(path.join(this.dir, 'cols.bin')); fs.writeFileSync(path.join(this.dir, 'names.json'), JSON.stringify({ paths: [...this.P.keys()], projects: [...this.J.keys()] }), { mode: 0o600 }); syncFile(path.join(this.dir, 'names.json')); this.byPath = pathTable([...this.P.keys()], this.cols, this.n); fs.writeFileSync(path.join(this.dir, 'bypath.bin'), Buffer.from(this.byPath.buffer, this.byPath.byteOffset, this.byPath.byteLength), { mode: 0o600 }); syncFile(path.join(this.dir, 'bypath.bin')); }
+}
+class DictWriter {
+  constructor(dir) { this.dir = dir; this.ids = new Out(path.join(dir, 'ids.bin'), Uint32Array); this.tfs = new Out(path.join(dir, 'tfs.bin'), Uint16Array); this.dict = new TextOut(path.join(dir, 'dict.txt')); this.sparse = []; this.row = 0; this.terms = 0; }
+  entry(w, df) { const l = Buffer.from(`${w}\t${df}\t${this.row}\n`); if (this.terms++ % 64 === 0) this.sparse.push([w, this.dict.bytes]); this.dict.write(l); this.row += df; }
+  close(n, totalLen, headBytes) { this.ids.close(); this.tfs.close(); this.dict.close(); const dir = this.dir; const t = path.join(dir, 'head.json.tmp'); fs.writeFileSync(t, JSON.stringify({ version: SEG_VERSION, n, totalLen, terms: this.terms, sparse: this.sparse, dictBytes: this.dict.bytes, postings: this.row, headBytes }), { mode: 0o600 }); syncFile(t); fs.renameSync(t, path.join(dir, 'head.json')); }
+}
+
+/** Growing typed columns of one posting per row, in section order. No object per posting, so the collector has nothing to walk. */
 class PostingRows {
   constructor() { this.n = 0; this.cap = 1 << 20; this.term = new Uint32Array(this.cap); this.doc = new Uint32Array(this.cap); this.tf = new Uint16Array(this.cap); }
   push(t, d, f) {
@@ -14,114 +78,103 @@ class PostingRows {
     const i = this.n++; this.term[i] = t; this.doc[i] = d; this.tf[i] = f;
   }
 }
-export function writeSeg(dir, docs) { // docs: iterable of { path, heading, line, len, project, mtime, snippet, rb, fl, terms: [[w, tf]] }
-  fs.mkdirSync(dir, { recursive: true });
-  const rows = new PostingRows(); const termIds = new Map(); const metaFd = fs.openSync(path.join(dir, 'meta.jsonl'), 'w'); const row = []; let off = 0, n = 0, totalLen = 0, buf = '';
-  const P = new Map(), J = new Map(); const id = (m, k) => { if (k == null) return 0; let v = m.get(k); if (v === undefined) { v = m.size + 1; m.set(Buffer.from(k).toString(), v); } return v; }; // a copy: a view would keep the whole note's text alive
-  for (const d of docs) {
-    const line = `${JSON.stringify({ heading: d.heading, line: d.line, mtime: d.mtime, snippet: d.snippet, rb: d.rb || null, fl: d.fl || null })}\n`; const ml = Buffer.byteLength(line);
-    buf += line; row.push(d.len, off, ml, id(P, d.path), id(J, d.project), d.rb ? 1 : 0); off += ml; totalLen += d.len; if (buf.length > 1 << 20) { fs.writeSync(metaFd, buf); buf = ''; }
-    for (const [w, f] of d.terms) { let t = termIds.get(w); if (t === undefined) { t = termIds.size; termIds.set(Buffer.from(w).toString(), t); } rows.push(t, n, Math.min(f, 65535)); } n++;
-  }
-  if (buf) fs.writeSync(metaFd, buf); fs.closeSync(metaFd);
-  finishRows(dir, n, totalLen, row, P, J, termIds, rows);
-  return { n };
+
+/**
+ * A first segment, from section objects, which may arrive one at a time: { path, heading, line, len, project, mtime, snippet, rb, fl, terms: [[word, count]] }.
+ * Sections go to disk as they pass and only the posting rows stay in memory. Counting per word lays out the sorted words, and one stable pass drops each row in place.
+ */
+export function writeSeg(dir, docs) {
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const w = new SectionWriter(dir, new Uint32Array(Array.isArray(docs) ? docs.length * ROW : ROW * 1024)); const rows = new PostingRows(); const termIds = new Map();
+  for (const d of docs) { const i = w.doc(d); for (const [t, f] of d.terms) { let id = termIds.get(t); if (id === undefined) { id = termIds.size; termIds.set(Buffer.from(t).toString(), id); } rows.push(id, i, Math.min(f, 65535)); } } // a copy of the word: a view would keep the whole note's text alive
+  w.finish(); const dw = new DictWriter(dir);
+  const words = [...termIds.keys()].sort(); const df = new Uint32Array(termIds.size), at = new Float64Array(termIds.size); for (let i = 0; i < rows.n; i++) df[rows.term[i]]++;
+  let pos = 0; for (const t of words) { const id = termIds.get(t); at[id] = pos; pos += df[id]; dw.entry(t, df[id]); }
+  const ids = new Uint32Array(rows.n), tfs = new Uint16Array(rows.n); for (let i = 0; i < rows.n; i++) { const id = rows.term[i], o = at[id]++; ids[o] = rows.doc[i]; tfs[o] = rows.tf[i]; }
+  dw.ids.all(ids); dw.tfs.all(tfs); dw.close(w.n, w.totalLen, w.heads.bytes);
+  return { n: w.n };
 }
-/** The postings of a segment from rows: count per term, lay the terms out in sorted order, then one stable pass drops each row in place. */
-function finishRows(dir, n, totalLen, row, P, J, termIds, rows) {
-  writeCols(dir, n, row, P, J);
-  const words = [...termIds.keys()].sort(); const df = new Uint32Array(termIds.size); const at = new Float64Array(termIds.size);
-  for (let i = 0; i < rows.n; i++) df[rows.term[i]]++;
-  let pos = 0; for (const w of words) { const t = termIds.get(w); at[t] = pos; pos += df[t] * 6; }
-  const out = Buffer.allocUnsafe(pos);
-  for (let i = 0; i < rows.n; i++) { const t = rows.term[i]; const o = at[t]; at[t] = o + 6; out.writeUInt32LE(rows.doc[i], o); out.writeUInt16LE(rows.tf[i], o + 4); }
-  const pfd = fs.openSync(path.join(dir, 'post.bin'), 'w'); for (let o = 0; o < out.length;) o += fs.writeSync(pfd, out, o, Math.min(out.length - o, 1 << 30)); fs.closeSync(pfd);
-  const dfd = fs.openSync(path.join(dir, 'dict.txt'), 'w'); const sparse = []; let dpos = 0, bytes = 0, i = 0, dbuf = '';
-  for (const w of words) { const d = df[termIds.get(w)]; const l = `${w}\t${d}\t${dpos}\n`; if (i++ % 64 === 0) sparse.push([w, bytes]); dbuf += l; bytes += Buffer.byteLength(l); dpos += d * 6; if (dbuf.length > 1 << 20) { fs.writeSync(dfd, dbuf); dbuf = ''; } }
-  if (dbuf) fs.writeSync(dfd, dbuf); fs.closeSync(dfd);
-  fs.writeFileSync(path.join(dir, 'head.json'), JSON.stringify({ version: 2, n, totalLen, terms: words.length, sparse, dictBytes: bytes }));
-}
-function writeCols(dir, n, row, P, J) {
-  const c = Buffer.alloc(n * 24); for (let i = 0; i < n; i++) { const o = i * 6, b = i * 24; c.writeUInt32LE(row[o], b); c.writeDoubleLE(row[o + 1], b + 4); c.writeUInt32LE(row[o + 2], b + 12); c.writeUInt32LE(row[o + 3], b + 16); c.writeUInt16LE(row[o + 4], b + 20); c.writeUInt16LE(row[o + 5], b + 22); }
-  fs.writeFileSync(path.join(dir, 'cols.bin'), c);
-  fs.writeFileSync(path.join(dir, 'names.json'), JSON.stringify({ paths: [...P.keys()], projects: [...J.keys()] }));
-}
+
+/** The sections of an in-memory RecallIndex as writeSeg takes them. */
+export function* overlayDocs(ov) { for (const d of ov.docs.values()) { const terms = []; for (let i = 0; i < d.tids.length; i++) terms.push([ov.termList[d.tids[i]], d.tfs[i]]); yield { ...d, terms }; } }
 
 export class Seg {
-  constructor(dir) { this.dir = dir; this.head = JSON.parse(fs.readFileSync(path.join(dir, 'head.json'), 'utf8')); for (const [k, f] of [['fdD', 'dict.txt'], ['fdP', 'post.bin'], ['fdM', 'meta.jsonl']]) this[k] = fs.openSync(path.join(dir, f), 'r'); }
-  close() { fs.closeSync(this.fdD); fs.closeSync(this.fdP); fs.closeSync(this.fdM); }
-  cols() { if (!this.c) { this.c = fs.readFileSync(path.join(this.dir, 'cols.bin')); const nm = JSON.parse(fs.readFileSync(path.join(this.dir, 'names.json'), 'utf8')); this.paths = nm.paths; this.projects = nm.projects; this.byPath = null; } return this.c; }
-  lookup(w) { const s = this.head.sparse; let lo = 0, hi = s.length - 1, at = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (s[m][0] <= w) { at = m; lo = m + 1; } else hi = m - 1; } if (at < 0) return null; const st = s[at][1], en = at + 1 < s.length ? s[at + 1][1] : this.head.dictBytes; const b = Buffer.alloc(en - st); fs.readSync(this.fdD, b, 0, b.length, st); for (const l of b.toString('utf8').split('\n')) { const i = l.indexOf('\t'); if (l.slice(0, i) === w) { const a = l.split('\t'); return { df: Number(a[1]), pos: Number(a[2]) }; } } return null; }
-  postings(e) { const b = Buffer.alloc(e.df * 6); fs.readSync(this.fdP, b, 0, b.length, e.pos); return b; }
-  light(i) { const c = this.cols(), o = i * 24; return { i, len: c.readUInt32LE(o), path: this.paths[c.readUInt32LE(o + 16) - 1], project: c.readUInt16LE(o + 20) ? this.projects[c.readUInt16LE(o + 20) - 1] : null, hasRb: !!c.readUInt16LE(o + 22) }; }
-  meta(i) { const c = this.cols(), o = i * 24; const b = Buffer.alloc(c.readUInt32LE(o + 12)); fs.readSync(this.fdM, b, 0, b.length, c.readDoubleLE(o + 4)); return JSON.parse(b.toString('utf8')); }
-  ordinalsOf(p) { this.cols(); if (!this.byPath) { this.byPath = new Map(); const c = this.c; for (let i = 0; i < this.head.n; i++) { const pid = c.readUInt32LE(i * 24 + 16); let a = this.byPath.get(pid); if (!a) this.byPath.set(pid, a = []); a.push(i); } this.pid = new Map(this.paths.map((x, k) => [x, k + 1])); } return this.byPath.get(this.pid.get(p)) || []; }
-}
-
-/** The read view: a segment with some paths retired, and an overlay holding their current text. */
-export class View {
-  constructor(seg, overlay) { this.seg = seg; this.ov = overlay; this.dead = new Set(); this.deadLen = 0; this.deadPaths = new Set(); }
-  retire(p) { if (this.deadPaths.has(p)) return; this.deadPaths.add(p); for (const i of this.seg.ordinalsOf(p)) { this.dead.add(i); this.deadLen += this.seg.light(i).len; } }
-  update(p, body, o) { this.retire(p); this.ov.update(p, body, o); }
-  remove(p) { this.retire(p); this.ov.remove(p); }
-  query(tokenize, q, { limit = 8, project = null, prefix = null, filter = null } = {}) {
-    const seg = this.seg, ov = this.ov; const words = [...new Set(tokenize(q))]; const N = seg.head.n - this.dead.size + ov.docs.size; const totalLen = seg.head.totalLen - this.deadLen + ov.totalLen; const avg = N ? totalLen / N : 0;
-    const ts = [];
-    for (const w of words) {
-      const e = seg.lookup(w); let b = null, df = 0;
-      if (e) { b = seg.postings(e); df = e.df; if (this.dead.size) for (let k = 0; k < e.df; k++) if (this.dead.has(b.readUInt32LE(k * 6))) df--; }
-      const ot = ov.terms.get(w); const odf = ot === undefined ? 0 : ov.df(ot);
-      if (df + odf > 0) ts.push({ w, e, b, ot, df: df + odf });
-    }
-    if (!ts.length) return [];
-    ts.sort((x, y) => x.df - y.df); let terms = ts;
-    if (N > 2000) { const rare = terms.filter((t) => t.df <= N / 3); terms = (rare.length ? rare : terms.slice(0, 2)).slice(0, 12); }
-    const seS = new Map(), ovS = new Map();
-    for (const t of terms) {
-      if (t.b) { const n = t.b.length / 6; for (let k = 0; k < n; k++) { const i = t.b.readUInt32LE(k * 6); if (this.dead.has(i)) continue; seS.set(i, (seS.get(i) || 0) + bmp(t.b.readUInt16LE(k * 6 + 4), t.df, N, seg.c ? seg.c.readUInt32LE(i * 24) : seg.cols().readUInt32LE(i * 24), avg)); } }
-      if (t.ot !== undefined) for (const id of ov.postings[t.ot]) { const d = ov.docs.get(id); if (!d) continue; let f = 0; let lo = 0, hi = d.tids.length - 1; while (lo <= hi) { const m = (lo + hi) >> 1; if (d.tids[m] === t.ot) { f = d.tfs[m]; break; } if (d.tids[m] < t.ot) lo = m + 1; else hi = m - 1; } ovS.set(id, (ovS.get(id) || 0) + bmp(f, t.df, N, d.len, avg)); }
-    }
-    const proj = project ? String(project).toLowerCase() : null; const top = []; let total = 0;
-    const put = (ref, s, d) => { if (prefix && !d.path.startsWith(prefix)) return; if (filter && !filter(d)) return; total++; const sc = s * (proj && d.project === proj ? 1.5 : 1); if (top.length === limit && sc <= top[top.length - 1].score) return; let i = top.length; while (i > 0 && top[i - 1].score < sc) i--; top.splice(i, 0, { ref, score: sc, d }); if (top.length > limit) top.pop(); };
-    for (const [i, s] of seS) put({ seg: i }, s, seg.light(i));
-    for (const [id, s] of ovS) { const d = ov.docs.get(id); put({ ov: id }, s, d); }
-    return top.map((h) => { if (h.ref.seg !== undefined) { const m = seg.meta(h.ref.seg); return { path: h.d.path, heading: m.heading, line: m.line, score: Number(h.score.toFixed(3)) }; } return { path: h.d.path, heading: h.d.heading, line: h.d.line, score: Number(h.score.toFixed(3)) }; });
+  constructor(dir, cols = null, byPath = null) {
+    this.dir = dir; this.head = JSON.parse(fs.readFileSync(path.join(dir, 'head.json'), 'utf8')); if (this.head.version !== SEG_VERSION) throw new Error(`segment version ${this.head.version}`);
+    this.fdD = fs.openSync(path.join(dir, 'dict.txt'), 'r'); this.fdI = fs.openSync(path.join(dir, 'ids.bin'), 'r'); this.fdT = fs.openSync(path.join(dir, 'tfs.bin'), 'r'); this.fdM = fs.openSync(path.join(dir, 'meta.jsonl'), 'r'); this.c = cols; this.h = null; this.byPath = byPath; this.paths = null;
+  }
+  close() { for (const f of [this.fdD, this.fdI, this.fdT, this.fdM]) fs.closeSync(f); }
+  /** The section columns as one typed array, read once on first use. */
+  cols() { if (!this.paths) { if (!this.c) { const b = readAligned(path.join(this.dir, 'cols.bin')); this.c = new Uint32Array(b.buffer, b.byteOffset, b.length / 4); } const nm = JSON.parse(fs.readFileSync(path.join(this.dir, 'names.json'), 'utf8')); this.paths = nm.paths; this.projects = nm.projects; } return this.c; }
+  lookup(w) {
+    const s = this.head.sparse; let lo = 0, hi = s.length - 1, at = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (s[m][0] <= w) { at = m; lo = m + 1; } else hi = m - 1; }
+    if (at < 0) return null; const st = s[at][1], en = at + 1 < s.length ? s[at + 1][1] : this.head.dictBytes; const b = Buffer.allocUnsafe(en - st); fs.readSync(this.fdD, b, 0, b.length, st);
+    for (const l of b.toString('utf8').split('\n')) { const i = l.indexOf('\t'); if (l.slice(0, i) === w) { const j = l.indexOf('\t', i + 1); return { df: Number(l.slice(i + 1, j)), row: Number(l.slice(j + 1)) }; } }
+    return null;
+  }
+  ids(e) { const a = new Uint32Array(e.df); fs.readSync(this.fdI, a, 0, e.df * 4, e.row * 4); return a; }
+  tfs(e) { const a = new Uint16Array(e.df); fs.readSync(this.fdT, a, 0, e.df * 2, e.row * 2); return a; }
+  projectId(p) { this.cols(); if (!this.projIds) this.projIds = new Map(this.projects.map((x, k) => [x, k + 1])); return this.projIds.get(p) || 0; }
+  heading(i) { const c = this.cols(), v = c[i * ROW + C_HEAD]; if (v & NO_HEADING) return null; if (!this.h) this.h = readAligned(path.join(this.dir, 'heads.bin')); const e = i + 1 < this.head.n ? (c[(i + 1) * ROW + C_HEAD] & 0x7fffffff) : this.head.headBytes; return this.h.ucs2Slice(v, e); }
+  rb(i) { return decodeRb(this.cols()[i * ROW + C_RB] & 0x7fffffff); }
+  hasFl(i) { return (this.cols()[i * ROW + C_RB] & HAS_FL) !== 0; }
+  meta(i) { const c = this.cols(), o = i * ROW; const b = Buffer.allocUnsafe(c[o + C_MLEN]); fs.readSync(this.fdM, b, 0, b.length, c[o + C_MHI] * 4294967296 + c[o + C_MLO]); return JSON.parse(b.toString('utf8')); }
+  /** Section numbers of one note, ascending. */
+  ordinalsOf(p) {
+    this.cols(); if (!this.byPath) { const b = readAligned(path.join(this.dir, 'bypath.bin')); this.byPath = new Uint32Array(b.buffer, b.byteOffset, b.length / 4); }
+    const t = this.byPath, nb = t[0], O = 2 + nb, R = O + t[1] + 2; for (let h = keySig(p) & (nb - 1); ; h = (h + 1) & (nb - 1)) { const k = t[2 + h]; if (!k) return EMPTY; if (this.paths[k - 1] === p) return t.subarray(R + t[O + k], R + t[O + k + 1]); }
   }
 }
+const EMPTY = new Uint32Array(0);
 
-/** Fold: rewrite segment + overlay as a new segment by streaming the old one. No section is parsed into objects. */
-export function foldFiles(oldDir, newDir, deadList, overlayDocs) {
-  fs.mkdirSync(newDir, { recursive: true });
-  const h = JSON.parse(fs.readFileSync(path.join(oldDir, 'head.json'), 'utf8')); const cols = fs.readFileSync(path.join(oldDir, 'cols.bin')); const nm = JSON.parse(fs.readFileSync(path.join(oldDir, 'names.json'), 'utf8'));
-  const dead = new Set(deadList); const remap = new Int32Array(h.n).fill(-1); const P = new Map(nm.paths.map((p, i) => [p, i + 1])), J = new Map(nm.projects.map((p, i) => [p, i + 1])); const id = (m, k) => { if (k == null) return 0; let v = m.get(k); if (v === undefined) { v = m.size + 1; m.set(k, v); } return v; };
-  const row = []; let off = 0, n = 0, totalLen = 0;
-  const mo = fs.openSync(path.join(oldDir, 'meta.jsonl'), 'r'); const mn = fs.openSync(path.join(newDir, 'meta.jsonl'), 'w');
-  // Copy live meta in runs, so a mostly unchanged file costs a few large reads.
-  let runStart = -1, runLen = 0; const flush = () => { if (runLen) { const b = Buffer.alloc(runLen); fs.readSync(mo, b, 0, runLen, runStart); fs.writeSync(mn, b); runLen = 0; runStart = -1; } };
-  for (let i = 0; i < h.n; i++) { if (dead.has(i)) { flush(); continue; } const o = i * 24; const len = cols.readUInt32LE(o), at = cols.readDoubleLE(o + 4), ml = cols.readUInt32LE(o + 12); if (runStart < 0) runStart = at; runLen += ml; if (runLen > 1 << 24) flush(); remap[i] = n++; row.push(len, off, ml, cols.readUInt32LE(o + 16), cols.readUInt16LE(o + 20), cols.readUInt16LE(o + 22)); off += ml; totalLen += len; }
-  flush(); fs.closeSync(mo);
-  const add = new Map(); for (const d of overlayDocs) { const line = `${JSON.stringify({ heading: d.heading, line: d.line, mtime: d.mtime, snippet: d.snippet, rb: d.rb || null, fl: d.fl || null })}\n`; const ml = Buffer.byteLength(line); fs.writeSync(mn, line); row.push(d.len, off, ml, id(P, d.path), id(J, d.project), d.rb ? 1 : 0); off += ml; totalLen += d.len; for (const [w, f] of d.terms) { let a = add.get(w); if (!a) add.set(w, a = []); a.push(n, f); } n++; }
-  fs.closeSync(mn);
-  // Merge the sorted dictionary with the overlay's words, streaming the postings.
-  const c = Buffer.alloc(n * 24); for (let i = 0; i < n; i++) { const o = i * 6, b = i * 24; c.writeUInt32LE(row[o], b); c.writeDoubleLE(row[o + 1], b + 4); c.writeUInt32LE(row[o + 2], b + 12); c.writeUInt32LE(row[o + 3], b + 16); c.writeUInt16LE(row[o + 4], b + 20); c.writeUInt16LE(row[o + 5], b + 22); } fs.writeFileSync(path.join(newDir, 'cols.bin'), c);
-  fs.writeFileSync(path.join(newDir, 'names.json'), JSON.stringify({ paths: [...P.keys()], projects: [...J.keys()] }));
-  const po = fs.openSync(path.join(oldDir, 'post.bin'), 'r'); const pn = fs.openSync(path.join(newDir, 'post.bin'), 'w'); const dn = fs.openSync(path.join(newDir, 'dict.txt'), 'w');
-  const addWords = [...add.keys()].sort(); let ai = 0, pos = 0, bytes = 0, cnt = 0, dbuf = ''; const sparse = [];
-  const emit = (w, b, used) => { if (!used) return; fs.writeSync(pn, b, 0, used); const l = `${w}\t${used / 6}\t${pos}\n`; if (cnt++ % 64 === 0) sparse.push([w, bytes]); dbuf += l; bytes += Buffer.byteLength(l); pos += used; if (dbuf.length > 1 << 20) { fs.writeSync(dn, dbuf); dbuf = ''; } };
-  const fromAdd = (a, w) => { const b = Buffer.alloc(a.length * 3); for (let k = 0; k < a.length / 2; k++) { b.writeUInt32LE(a[k * 2], k * 6); b.writeUInt16LE(Math.min(a[k * 2 + 1], 65535), k * 6 + 4); } emit(w, b, b.length); };
-  const dictText = fs.readFileSync(path.join(oldDir, 'dict.txt'), 'utf8');
+// One overlay log, as far as a fold needs it: the surviving added sections in order, and the paths retired from the segment.
+function readLog(file, end) {
+  const live = new Map(); const byPath = new Map(); const retired = new Set(); let id = 0;
+  if (end) { const fd = fs.openSync(file, 'r'); const b = Buffer.allocUnsafe(end); let at = 0; while (at < end) { const n = fs.readSync(fd, b, at, end - at, at); if (!n) throw new Error('short overlay log'); at += n; } fs.closeSync(fd);
+    let s = 0; while (s < end) { const e = b.indexOf(10, s); const r = JSON.parse(b.toString('utf8', s, e)); s = e + 1; if (r.rm !== undefined) { retired.add(r.rm); for (const k of byPath.get(r.rm) || []) live.delete(k); byPath.delete(r.rm); } else { const k = id++; live.set(k, r); if (!byPath.has(r.path)) byPath.set(r.path, []); byPath.get(r.path).push(k); } } }
+  return { docs: [...live.values()], retired };
+}
+
+/** Fold: a new segment from the old files and the overlay log up to `logEnd`. Runs on a worker; the old files are not touched. */
+export function foldFiles(oldDir, newDir, logFile, logEnd) {
+  fs.mkdirSync(newDir, { recursive: true, mode: 0o700 });
+  const h = JSON.parse(fs.readFileSync(path.join(oldDir, 'head.json'), 'utf8')); const raw = readAligned(path.join(oldDir, 'cols.bin')); const old = new Uint32Array(raw.buffer, raw.byteOffset, raw.length / 4); const nm = JSON.parse(fs.readFileSync(path.join(oldDir, 'names.json'), 'utf8'));
+  const { docs, retired } = readLog(logFile, logEnd);
+  const pathId = new Map(nm.paths.map((p, i) => [p, i + 1])); const deadPath = new Uint8Array(nm.paths.length + 1); for (const p of retired) { const k = pathId.get(p); if (k) deadPath[k] = 1; }
+  const remap = new Int32Array(h.n).fill(-1); let keep = 0; for (let i = 0; i < h.n; i++) if (!deadPath[old[i * ROW + C_PATH]]) remap[i] = keep++;
+  const w = new SectionWriter(newDir, new Uint32Array(new SharedArrayBuffer((keep + docs.length) * ROW * 4))); w.P = pathId; w.J = new Map(nm.projects.map((p, i) => [p, i + 1]));
+  // Live sections are copied by offset; a mostly unchanged file costs a few large reads.
+  const mo = fs.openSync(path.join(oldDir, 'meta.jsonl'), 'r'); const ho = fs.openSync(path.join(oldDir, 'heads.bin'), 'r'); const mbuf = Buffer.allocUnsafe(FLUSH * 16); const hbuf = Buffer.allocUnsafe(FLUSH * 4);
+  const pull = (fd, buf, st, want, pos) => { if (pos >= st.at && pos + want <= st.at + st.len) return pos - st.at; const n = fs.readSync(fd, buf, 0, buf.length, pos); st.at = pos; st.len = n; return 0; }; const ms = { at: 0, len: 0 }, hs = { at: 0, len: 0 };
+  for (let i = 0; i < h.n; i++) {
+    if (remap[i] < 0) continue; const o = i * ROW; const at = old[o + C_MHI] * 4294967296 + old[o + C_MLO], ml = old[o + C_MLEN]; const big = ml > mbuf.length ? Buffer.allocUnsafe(ml) : mbuf; let line; if (big !== mbuf) { fs.readSync(mo, big, 0, ml, at); line = big; } else { const k = pull(mo, mbuf, ms, ml, at); line = mbuf.subarray(k, k + ml); }
+    const hv = old[o + C_HEAD]; let head = null; if (!(hv & NO_HEADING)) { const e = i + 1 < h.n ? (old[o + ROW + C_HEAD] & 0x7fffffff) : h.headBytes; const hl = e - hv; if (hl > hbuf.length) { const x = Buffer.allocUnsafe(hl); fs.readSync(ho, x, 0, hl, hv); head = x; } else { const k = pull(ho, hbuf, hs, hl, hv); head = hbuf.subarray(k, k + hl); } }
+    w.row(old[o + C_LEN], Buffer.from(line), head && Buffer.from(head), old[o + C_PATH], old[o + C_PROJ], old[o + C_RB], old[o + C_SIG]);
+  }
+  fs.closeSync(mo); fs.closeSync(ho);
+  const add = new Map(); for (const d of docs) { const i = w.doc(d); for (let k = 0; k < d.t.length; k++) { let a = add.get(d.t[k]); if (!a) add.set(d.t[k], a = []); a.push(i, d.f[k]); } }
+  w.finish();
+  // Merge the sorted dictionary with the overlay's words; the postings stream in row order, so this is one pass over each file.
+  const dw = new DictWriter(newDir); const addWords = [...add.keys()].sort(); let ai = 0;
+  const putAdd = (a) => { for (let k = 0; k < a.length; k += 2) { dw.ids.push(a[k]); dw.tfs.push(Math.min(a[k + 1], 65535)); } };
+  const fromAdd = (t) => { const a = add.get(t); dw.entry(t, a.length / 2); putAdd(a); };
+  const dictText = fs.readFileSync(path.join(oldDir, 'dict.txt'), 'utf8'); const io = fs.openSync(path.join(oldDir, 'ids.bin'), 'r'), to = fs.openSync(path.join(oldDir, 'tfs.bin'), 'r');
+  const ibuf = new Uint32Array(FLUSH), tbuf = new Uint16Array(FLUSH); let bufRow = 0, bufLen = 0; const refill = (row) => { const n = fs.readSync(io, ibuf, 0, ibuf.byteLength, row * 4); fs.readSync(to, tbuf, 0, n / 2, row * 2); bufRow = row; bufLen = n / 4; };
+  let small = new Uint32Array(1 << 14), smallT = new Uint16Array(1 << 14);
   for (let at = 0; at < dictText.length;) {
-    const e = dictText.indexOf('\n', at); const l = dictText.slice(at, e); at = e + 1; const a = l.split('\t'); const w = a[0], df = Number(a[1]), p = Number(a[2]);
-    while (ai < addWords.length && addWords[ai] < w) { fromAdd(add.get(addWords[ai]), addWords[ai]); ai++; }
-    const b = Buffer.alloc(df * 6); fs.readSync(po, b, 0, b.length, p); let u = 0; for (let k = 0; k < df; k++) { const m = remap[b.readUInt32LE(k * 6)]; if (m < 0) continue; b.writeUInt32LE(m, u); b.writeUInt16LE(b.readUInt16LE(k * 6 + 4), u + 4); u += 6; }
-    if (ai < addWords.length && addWords[ai] === w) { const x = add.get(w); const nb = Buffer.alloc(u + x.length * 3); b.copy(nb, 0, 0, u); for (let k = 0; k < x.length / 2; k++) { nb.writeUInt32LE(x[k * 2], u + k * 6); nb.writeUInt16LE(Math.min(x[k * 2 + 1], 65535), u + k * 6 + 4); } emit(w, nb, nb.length); ai++; } else emit(w, b, u);
+    const e = dictText.indexOf('\n', at); const t1 = dictText.indexOf('\t', at), t2 = dictText.indexOf('\t', t1 + 1); const word = dictText.slice(at, t1), df = Number(dictText.slice(t1 + 1, t2)), row = Number(dictText.slice(t2 + 1, e)); at = e + 1;
+    while (ai < addWords.length && addWords[ai] < word) fromAdd(addWords[ai++]);
+    if (small.length < df) { small = new Uint32Array(df * 2); smallT = new Uint16Array(df * 2); } let u = 0;
+    for (let k = 0; k < df; k++) { const r = row + k; if (r < bufRow || r >= bufRow + bufLen) refill(r); const m = remap[ibuf[r - bufRow]]; if (m < 0) continue; small[u] = m; smallT[u++] = tbuf[r - bufRow]; }
+    const a = ai < addWords.length && addWords[ai] === word ? add.get(addWords[ai++]) : null; const total = u + (a ? a.length / 2 : 0); if (!total) continue;
+    dw.entry(word, total); for (let k = 0; k < u; k++) { dw.ids.push(small[k]); dw.tfs.push(smallT[k]); } if (a) putAdd(a);
   }
-  while (ai < addWords.length) { fromAdd(add.get(addWords[ai]), addWords[ai]); ai++; }
-  if (dbuf) fs.writeSync(dn, dbuf); fs.closeSync(dn); fs.closeSync(pn); fs.closeSync(po);
-  fs.writeFileSync(path.join(newDir, 'head.json'), JSON.stringify({ version: 2, n, totalLen, terms: cnt, sparse, dictBytes: bytes }));
-  return { n, terms: cnt };
+  while (ai < addWords.length) fromAdd(addWords[ai++]);
+  fs.closeSync(io); fs.closeSync(to); dw.close(w.n, w.totalLen, w.heads.bytes);
+  return { n: w.n, terms: dw.terms, cols: w.cols, byPath: w.byPath };
 }
 
-export function foldInWorker(oldDir, newDir, deadList, overlayDocs) { return new Promise((res, rej) => { const w = new Worker(fileURLToPath(import.meta.url), { workerData: { oldDir, newDir, deadList, overlayDocs } }); w.on('message', res); w.on('error', rej); w.unref(); }); }
-if (!isMainThread && workerData?.oldDir) { parentPort.postMessage(foldFiles(workerData.oldDir, workerData.newDir, workerData.deadList, workerData.overlayDocs)); }
-export const overlayDocs = (ov) => [...ov.docs.values()].map((d) => { const terms = []; for (let i = 0; i < d.tids.length; i++) terms.push([ov.termList[d.tids[i]], d.tfs[i]]); return { path: d.path, heading: d.heading, line: d.line, len: d.len, project: d.project, mtime: d.mtime, snippet: d.snippet, rb: d.rb, fl: d.fl, terms }; });
+export function foldInWorker(oldDir, newDir, logFile, logEnd) {
+  return new Promise((res, rej) => { const w = new Worker(fileURLToPath(import.meta.url), { workerData: { segFold: true, oldDir, newDir, logFile, logEnd } }); w.on('message', res); w.on('error', rej); w.on('exit', (c) => rej(new Error(`fold worker exited ${c}`))); w.unref(); });
+}
+if (!isMainThread && workerData?.segFold) parentPort.postMessage(foldFiles(workerData.oldDir, workerData.newDir, workerData.logFile, workerData.logEnd));

@@ -114,7 +114,7 @@ export class Vault extends EventEmitter {
     } catch {}
   }
 
-  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.index.save(); this._rigSeq(); this._saveGraph(); clearTimeout(this._idle); this.notes?.close(); try { this._sweepWorker?.terminate(); } catch {} this.devices?.saveSoon(); this.log.close(); }
+  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.index.save(); this.index.syncNow?.(); this._rigSeq(); this._saveGraph(); clearTimeout(this._idle); this.notes?.close(); try { this._sweepWorker?.terminate(); } catch {} this.devices?.saveSoon(); this.log.close(); }
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }
@@ -392,8 +392,8 @@ export class Vault extends EventEmitter {
     this._indexSaveSoon();
     this.emit('change', { path: p, type: rec.type, seq: rec.seq, client });
   }
-  _rigSeq() { if (process.env.MEMEV_RIG_STOPPED === '1' || process.env.MEMEV_RIG_SEG === '1') { try { fs.writeFileSync(path.join(this.state, 'index.seq'), String(this.log.seq)); } catch {} } }
-  _indexSaveSoon() { clearTimeout(this._ist); this._ist = setTimeout(() => { this.index.save(); this._rigSeq(); this._saveGraph(); try { this.notes.flush(); } catch {} }, 3000); this._ist.unref?.(); }
+  _rigSeq(seq = this.log.seq) { if (process.env.MEMEV_RIG_STOPPED === '1' || process.env.MEMEV_RIG_SEG === '1') { try { fs.writeFileSync(path.join(this.state, 'index.seq'), String(seq)); } catch {} } }
+  _indexSaveSoon() { clearTimeout(this._ist); this._ist = setTimeout(() => { this.index.save(); const seq = this.log.seq; if (this.index.whenSynced) this.index.whenSynced(() => this._rigSeq(seq)); else this._rigSeq(seq); this._saveGraphBehind(); try { this.notes.flush(); } catch {} }, 3000); this._ist.unref?.(); }
 
   // ---- note operations
   get(identity, p) { p = checkPath(p); this._need(identity, 'read', p); const b = this._read(p); if (b === null) throw new VaultError('not_found', `no note ${p}`); return { path: p, body: b }; }
@@ -461,7 +461,7 @@ export class Vault extends EventEmitter {
     const p = `memory/${KINDS[k]}/${new Date().toISOString().slice(0, 7)}.md`;
     this._need(identity, 'write', p); this._guard(p, text, allow_secrets, false); // permissions and the secrets check come before the quality check
     const gate = { ...DEFAULT_GATE, ...(this.config.memory || {}) };
-    const similar = this.index.query(text, { limit: 5, prefix: 'memory/', filter: (d) => this.reviews.get(`${d.path}#${d.heading || ''}`)?.action !== 'drop' });
+    const similar = this.index.query(text, { limit: 5, prefix: 'memory/', filter: (d) => (d.lookup ? d.lookup(this.reviews) : this.reviews.get(`${d.path}#${d.heading || ''}`))?.action !== 'drop' });
     const a = assess(text, { similar, gate: gate.enabled === false ? { ...gate, min_words: 0 } : gate, review_by });
     if (a.verdict === 'duplicate') return { duplicate: true, saved: false, path: a.duplicate_of.path, heading: a.duplicate_of.heading, reasons: a.reasons };
     if (gate.enabled === false) { a.flags = []; if (!review_by) a.review_by = null; }
@@ -735,7 +735,7 @@ export class Vault extends EventEmitter {
     const today = new Date().toISOString().slice(0, 10);
     const pc = new Map(), ac = new Map();
     const fn = (d) => {
-      const r = this.reviews.size ? this.reviews.get(`${d.path}#${d.heading || ''}`) : null;
+      const r = this.reviews.size ? (d.lookup ? d.lookup(this.reviews) : this.reviews.get(`${d.path}#${d.heading || ''}`)) : null;
       if (r?.action === 'drop') return false;
       const until = r?.action === 'keep' ? r.until : d.rb;
       if (until && until < today) return false;
@@ -988,7 +988,16 @@ export class Vault extends EventEmitter {
     if (snap?.version === 2) { for (const e of snap.edges) this.graph.edges.push(e); for (const c of snap.claims) this.graph.claims.set(c.id, c); for (const [k, u] of snap.usage) this.graph.usage.set(k, u); this.tournament.load(snap.tournament); this.feedback = new Map(snap.feedback || []); this.reviews = new Map(snap.reviews || []); this.contractSessions = new Map(snap.contract_sessions || []); this.contractResults = new Map(snap.contract_results || []); from = snap.seq + 1; if (snap.seq === this.log.seq) this._graphSaved = snap.seq; }
     for (const rec of this.log.iterate({ fromSeq: from })) { if (/^(graph\.|claim|usage)/.test(rec.type)) this.graph.applyOp(rec); else if (rec.type === 'tournament.match' || rec.type === 'feedback' || rec.type === 'review' || rec.type === 'contract.signed' || rec.type === 'contract.verified') this._applyMisc(rec); }
   }
-  _saveGraph() { if (this._graphSaved === this.log.seq) return; this._graphSaved = this.log.seq; writePrivateJson(path.join(this.state, 'graph.json'), { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()], reviews: [...this.reviews.entries()], contract_sessions: [...this.contractSessions.entries()], contract_results: [...this.contractResults.entries()] }); }
+  // The debounced save: same file, written on the thread pool. The snapshot carries its log position, so an old or lost one means a longer replay at open, never a wrong graph.
+  _saveGraphBehind() {
+    if (this._graphSaved === this.log.seq) return;
+    if (this._gw) { this._gwAgain = true; return; }
+    const file = path.join(this.state, 'graph.json'), tmp = `${file}.${process.pid}.behind.tmp`; this._gw = true; const seq = this.log.seq;
+    const done = () => { this._gw = false; if (this._gwAgain) { this._gwAgain = false; this._saveGraphBehind(); } };
+    fs.open(tmp, 'w', 0o600, (e, fd) => { if (e) return done(); return fs.writeFile(fd, `${JSON.stringify(this._graphSnapshot(), null, 2)}\n`, () => fs.fsync(fd, () => fs.close(fd, () => fs.rename(tmp, file, (re) => { if (!re) this._graphSaved = seq; done(); })))); });
+  }
+  _saveGraph() { if (this._graphSaved === this.log.seq) return; this._graphSaved = this.log.seq; writePrivateJson(path.join(this.state, 'graph.json'), this._graphSnapshot()); }
+  _graphSnapshot() { return { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()], reviews: [...this.reviews.entries()], contract_sessions: [...this.contractSessions.entries()], contract_results: [...this.contractResults.entries()] }; }
 
   // ---- retention and compaction
   /** Total bytes of every file under a directory (recursive). */
@@ -1079,6 +1088,7 @@ export class Vault extends EventEmitter {
     const archived = this.log.archiveSealed();
     const retained = this._journalRetention();
     this.index.save();
+    this.index.compact?.();
     this._saveGraph();
     const after = this.sizeReport();
     return { dryRun: false, before, after, archived, retained };
