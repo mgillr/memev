@@ -235,7 +235,27 @@ test('an opener beside a running fold does not pull it from under the fold: the 
 function stubDaemon(root, ms = 30000) { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-stub-')); made.push(d); const f = path.join(d, 'server', 'main.mjs'); fs.mkdirSync(path.dirname(f)); fs.writeFileSync(f, `setTimeout(() => {}, ${ms});`); return spawn(process.execPath, [f, '--root', root], { stdio: 'ignore', detached: true }); }
 
 
+test('a stale daemon.loading naming a live process that is no daemon holds nothing up and stops nothing', { skip: process.platform === 'win32' }, async () => {
+  const { loadingPid, stopDaemon, whyNotRunning } = await import('../src/cli/daemon.mjs'); const root = seeded(12); const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 30000)'], { stdio: 'ignore' }); await new Promise((r) => other.once('spawn', r));
+  try {
+    fs.writeFileSync(path.join(root, '.memev/daemon.loading'), JSON.stringify({ pid: other.pid })); assert.equal(loadingPid(root), null); assert.doesNotMatch(String(await whyNotRunning(root)), /loading/);
+    const v = open(root); v.close();
+    fs.writeFileSync(path.join(root, '.memev/daemon.json'), JSON.stringify({ pid: other.pid, port: 1 })); fs.writeFileSync(path.join(root, '.memev/daemon.lock'), String(other.pid));
+    await stopDaemon(root); assert.ok(process.kill(other.pid, 0), 'memev stop killed a process that is not a daemon'); assert.equal(other.exitCode, null);
+    fs.writeFileSync(path.join(root, '.memev/daemon.lock'), String(other.pid)); const r = spawn(process.execPath, [path.join(PKG, 'src/server/main.mjs'), '--root', root, '--port', '0'], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, MEMEV_NO_SERVICE: '1' } }); let err = ''; r.stderr.on('data', (d) => { err += d; });
+    try { assert.ok(await until(() => err.includes('serving') || r.exitCode !== null, 30000), err); assert.match(err, /serving/, 'a lock naming another program does not stop a start'); } finally { r.kill('SIGTERM'); await new Promise((x) => r.once('exit', x)); }
+  } finally { other.kill('SIGKILL'); }
+});
 
+test('doctor reports a load that has stopped moving, rather than skipping it', { skip: process.platform === 'win32' }, async () => {
+  const { loadState, whyNotRunning } = await import('../src/cli/daemon.mjs'); const { allChecks } = await import('../src/cli/doctor.mjs'); const root = seeded(12); const stub = stubDaemon(root); await new Promise((r) => stub.once('spawn', r));
+  try {
+    const f = path.join(root, '.memev/daemon.loading'); fs.writeFileSync(f, JSON.stringify({ pid: stub.pid, started: new Date().toISOString() }));
+    let c = (await allChecks({ root, env: process.env })).find((x) => x.id === 'loading'); assert.equal(c?.status, 'warn', 'a load moving now is not a failure'); assert.equal(loadState(root).stalled, false); assert.match(await whyNotRunning(root), /still loading/);
+    const old = new Date(Date.now() - 3600e3); fs.utimesSync(f, old, old);
+    c = (await allChecks({ root, env: process.env })).find((x) => x.id === 'loading'); assert.equal(c?.status, 'fail'); assert.match(c.detail, /has not moved/); assert.equal(loadState(root).stalled, true); assert.match(await whyNotRunning(root), /memev restart/);
+  } finally { stub.kill('SIGKILL'); }
+});
 
 test('a load moves its file as it goes, so one that is working is not taken for one that stopped', () => {
   const root = fresh(); for (let i = 0; i < 40; i++) { fs.mkdirSync(path.join(root, 'notes'), { recursive: true }); fs.writeFileSync(path.join(root, `notes/f${i}.md`), `# f\nbody ${i}\n`); }

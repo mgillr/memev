@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PKG, parseArgs, BOOLEAN_FLAGS, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, saveConfig, out, tokenExpiryWarnings } from './common.mjs';
-import { ensureDaemon, startDaemon, stopDaemon, healthy, choosePort, loadingPid } from './daemon.mjs';
+import { ensureDaemon, startDaemon, stopDaemon, healthy, choosePort, loadingPid, loadState } from './daemon.mjs';
 import { initVault, isVault, VERSION } from '../engine/vault.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
 import { writeAtomic, configDir, slug } from '../engine/util.mjs';
@@ -311,9 +311,9 @@ async function run(argv, env) {
     case 'status': {
       need(); const up = await healthy(root);
       if (!up) {
-        const loading = loadingPid(root);
-        if (flags.json) { json({ running: false, loading: !!loading, pid: loading }); return 1; }
-        console.log(`Vault ${root}: ${loading ? `daemon still loading the vault (pid ${loading}); it answers when it is done` : 'daemon not running (memev start)'}`); return 1;
+        const load = loadState(root); const loading = load?.pid ?? null;
+        if (flags.json) { json({ running: false, loading: !!loading, pid: loading, ...(load?.stalled ? { stalled: true } : {}) }); return 1; }
+        console.log(`Vault ${root}: ${load?.stalled ? `daemon has been loading the vault and has not moved for ${Math.round(load.idleMs / 60e3)} minutes (pid ${loading}); run memev restart` : loading ? `daemon still loading the vault (pid ${loading}); it answers when it is done` : 'daemon not running (memev start)'}`); return 1;
       }
       const s = await api(root, '/v1/status', { method: 'GET', token: clientToken(root, 'cli') });
       if (flags.json) json(s.json); else { const j = s.json; console.log(`Memev ${j.version} · ${root}\n  log: ${j.oplog.seq} ops in ${j.oplog.segments} segment(s) · index: ${j.index.notes} notes / ${j.index.sections} sections · graph: ${j.graph.entities} entities, ${j.graph.claims} claims · heap ${j.memory.heap_mb} MB`); if (j.index.state === 'rebuilding') console.log(`  ! the recall index was found damaged (${j.index.damage?.why}) and is being rebuilt from the notes; recall says so until it is done`); else if (j.index.damage) console.log(`  ! the recall index was found damaged on ${j.index.damage.at} (${j.index.damage.why}) and rebuilt from the notes; memev doctor says more`); for (const w of tokenExpiryWarnings(root)) console.log(`  ! ${w}`); const { updateLine } = await import('./update.mjs'); const u = updateLine(root, env); if (u) console.log(`  ${u}`); }

@@ -200,7 +200,9 @@ test('the real daemon runs the sweep behind its start and reports it', async () 
 test('memev start leaves a daemon that says it is loading, and stops one that says nothing', async () => {
   const { startDaemon, stopDaemon, loadingPid } = await import('../src/cli/daemon.mjs');
   const root = fresh();
-  const stub = (say) => (exe, args, o) => spawn(process.execPath, ['-e', `${say ? `require('fs').writeFileSync(${JSON.stringify(path.join(root, '.memev', 'daemon.loading'))}, JSON.stringify({ pid: process.pid }));` : ''} setTimeout(() => {}, 60000)`], { detached: true, stdio: 'ignore', env: o.env });
+  // named as the daemon is, because a pid in that file that is some other program is no daemon (see index-damage.test.mjs)
+  const stubDir = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-stub-')); fs.mkdirSync(path.join(stubDir, 'server'));
+  const stub = (say) => (exe, args, o) => { const f = path.join(stubDir, 'server', 'main.mjs'); fs.writeFileSync(f, `${say ? `(await import('node:fs')).writeFileSync(${JSON.stringify(path.join(root, '.memev', 'daemon.loading'))}, JSON.stringify({ pid: process.pid }));` : ''} setTimeout(() => {}, 60000);`); return spawn(process.execPath, [f, '--root', root], { detached: true, stdio: 'ignore', env: o.env }); };
   const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
   let child; const keep = (f) => (...a) => { child = f(...a); return child; };
   assert.equal(await startDaemon(root, { quiet: true, waitMs: 700, spawn: keep(stub(true)) }), false);

@@ -169,12 +169,16 @@ test('the daemon reports what it measured, and says what it did not', async () =
   v.close();
 });
 
-test('status says a daemon is loading rather than not running', () => {
+test('status says a daemon is loading rather than not running', { skip: process.platform === 'win32' }, async () => {
   const { root, v } = newVault(); v.close();
-  const keep = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 30000)'], { stdio: 'ignore' });
+  // a process that is a daemon to anyone who looks: a pid in that file alone proves nothing (see index-damage.test.mjs)
+  const stub = path.join(root, '..', 'server', 'main.mjs'); fs.mkdirSync(path.dirname(stub), { recursive: true }); fs.writeFileSync(stub, 'setTimeout(() => {}, 30000);');
+  const keep = spawn(process.execPath, [stub, '--root', root], { stdio: 'ignore' }); await new Promise((r) => keep.once('spawn', r));
   try {
     fs.writeFileSync(path.join(root, '.memev', 'daemon.loading'), JSON.stringify({ pid: keep.pid }));
     const bin = path.join(PKG, 'bin', 'memev.mjs');
+    // what doctor and the hook say comes from this one, which memev status does not use
+    const { whyNotRunning } = await import('../src/cli/daemon.mjs'); assert.match(String(await whyNotRunning(root)), /still loading/);
     const text = spawnSync(process.execPath, [bin, 'status', '--root', root], { encoding: 'utf8' });
     assert.match(text.stdout, /still loading/, text.stdout + text.stderr);
     const json = spawnSync(process.execPath, [bin, 'status', '--json', '--root', root], { encoding: 'utf8' });

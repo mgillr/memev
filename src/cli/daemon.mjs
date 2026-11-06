@@ -5,6 +5,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { PKG, api, daemonInfo, pidAlive, config } from './common.mjs';
+import { isDaemonPid } from '../engine/util.mjs';
 
 // Healthy means this vault's daemon answers: {"ok":true} and the vault_id in this vault's config.json. Anything else on
 // the port, another vault's daemon or any other service, is not healthy for this vault.
@@ -17,10 +18,19 @@ export async function healthy(root, port = null) {
   } catch { return false; }
 }
 
-// The pid of a daemon still opening this vault, or null. It removes the file when it listens, and a dead pid is no daemon.
+// The pid of a daemon still opening this vault, or null. It removes the file when it listens, and a dead pid or one that is now some other program is no daemon.
 export function loadingPid(root) {
-  try { const { pid } = JSON.parse(fs.readFileSync(path.join(root, '.memev', 'daemon.loading'), 'utf8')); return pidAlive(pid) ? pid : null; } catch { return null; }
+  try { const { pid } = JSON.parse(fs.readFileSync(path.join(root, '.memev', 'daemon.loading'), 'utf8')); return isDaemonPid(pid) ? pid : null; } catch { return null; }
 }
+// A loading daemon moves its file's time as it goes (Vault._tick), and a step of a load is minutes at the very most. Past this it has stopped.
+export const LOAD_STALL_MS = 10 * 60e3;
+/** A daemon opening this vault and how long since it last said it was moving, or null. A stall is one to restart: waiting will not end it. */
+export function loadState(root, { at = Date.now(), stallMs = LOAD_STALL_MS } = {}) {
+  const pid = loadingPid(root); if (!pid) return null;
+  let idleMs = 0, started = null; try { const f = path.join(root, '.memev', 'daemon.loading'); idleMs = Math.max(0, at - fs.statSync(f).mtimeMs); started = JSON.parse(fs.readFileSync(f, 'utf8')).started ?? null; } catch { /* it finished just now */ }
+  return { pid, started, idleMs, stalled: idleMs > stallMs };
+}
+const stallLine = (s) => `the daemon (pid ${s.pid}) has been loading this vault and has not moved for ${Math.round(s.idleMs / 60e3)} minutes; run memev restart`;
 
 // True when nothing listens on the port on this machine's loopback address.
 export const portFree = (port) => new Promise((resolve) => {
@@ -58,8 +68,9 @@ export function lastListenError(root) {
 // Why this vault's daemon is not serving, in one line: a port held by another program right now, or else the listen
 // error of its last start. Null when there is nothing more to say than that it is not running.
 export async function whyNotRunning(root) {
-  const loading = loadingPid(root);
-  if (loading) return `the daemon (pid ${loading}) is still loading this vault; it answers when it is done`;
+  const load = loadState(root);
+  if (load?.stalled) return stallLine(load);
+  if (load) return `the daemon (pid ${load.pid}) is still loading this vault; it answers when it is done`;
   const info = daemonInfo(root);
   if (info && pidAlive(info.pid)) return `the daemon (pid ${info.pid}) is running on port ${info.port} but does not answer; run memev restart`;
   // the daemon refuses to start on a config with a syntax error (server/main.mjs), every time, so say that and not only
@@ -87,7 +98,7 @@ export async function startDaemon(root, { quiet = false, waitMs = 6000, spawn: s
     const until = Date.now() + waitMs;
     while (Date.now() < until && loadingPid(root)) await new Promise((r) => setTimeout(r, 100));
     const info = daemonInfo(root); if (info && (await healthy(root, info.port))) return true;
-    if (!quiet) console.error(`Memev is still loading this vault (pid ${opening}) and will answer when it is done; see ${path.join(root, '.memev', 'daemon.log')}`);
+    if (!quiet) { const load = loadState(root); console.error(load?.stalled ? `Memev: ${stallLine(load)}` : `Memev is still loading this vault (pid ${opening}) and will answer when it is done; see ${path.join(root, '.memev', 'daemon.log')}`); }
     return false;
   }
   const logFile = path.join(root, '.memev', 'daemon.log');
@@ -124,7 +135,7 @@ export async function stopDaemon(root, { waitMs = 5000 } = {}) {
     return true;
   }
   const info = daemonInfo(root);
-  if (!info || !pidAlive(info.pid)) { try { fs.rmSync(path.join(root, '.memev', 'daemon.json'), { force: true }); fs.rmSync(path.join(root, '.memev', 'daemon.lock'), { force: true }); } catch {} return false; }
+  if (!info || !isDaemonPid(info.pid)) { try { fs.rmSync(path.join(root, '.memev', 'daemon.json'), { force: true }); fs.rmSync(path.join(root, '.memev', 'daemon.lock'), { force: true }); } catch {} return false; }
   process.kill(info.pid, 'SIGTERM');
   const until = Date.now() + waitMs;
   while (Date.now() < until && pidAlive(info.pid)) await new Promise((r) => setTimeout(r, 100));

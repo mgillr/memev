@@ -6,7 +6,8 @@ import path from 'node:path';
 import { Vault } from '../engine/vault.mjs';
 import { createServer } from './http.mjs';
 import { writePrivateJson, readJson, now } from '../engine/util.mjs';
-import { parseArgs, tunnelKey, pidAlive } from '../cli/common.mjs';
+import { isDaemonPid } from '../engine/util.mjs';
+import { parseArgs, tunnelKey } from '../cli/common.mjs';
 
 const { flags } = parseArgs(process.argv.slice(2));
 const root = path.resolve(flags.root || process.env.MEMEV_ROOT || '.');
@@ -23,7 +24,7 @@ if (fs.existsSync(cfgFile)) {
 
 function takeLock() {
   try { fs.writeFileSync(lock, String(process.pid), { flag: 'wx', mode: 0o600 }); return true; }
-  catch { const pid = Number(fs.readFileSync(lock, 'utf8')); if (pidAlive(pid) && pid !== process.pid) return false; fs.rmSync(lock, { force: true }); return takeLock(); }
+  catch { const pid = Number(fs.readFileSync(lock, 'utf8')); if (pid !== process.pid && isDaemonPid(pid)) return false; fs.rmSync(lock, { force: true }); return takeLock(); }
 }
 if (!takeLock()) { console.error(`[memev] another daemon already serves ${root}`); process.exit(3); }
 
