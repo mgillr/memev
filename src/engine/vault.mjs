@@ -249,8 +249,9 @@ export class Vault extends EventEmitter {
    * moved to the archive was taken out on purpose and stays out, so only the file at the note's own path counts.
    */
   _catchUpIndex(scan, convertedFromMs) {
-    let saved = null; try { saved = Number(fs.readFileSync(path.join(this.state, 'index.seq'), 'utf8')); } catch { /* none yet */ }
-    if (!Number.isSafeInteger(saved)) saved = convertedFromMs === null ? 0 : Infinity;
+    const text = readPrivate(path.join(this.state, 'index.seq')); let saved = text === null ? null : Number(text);
+    // a position past the end of the log, or one that is no number, says nothing: every note is looked at
+    if (!Number.isSafeInteger(saved) || saved < 0 || text.trim() === '' || saved > this.log.seq) saved = convertedFromMs === null || text !== null ? 0 : Infinity;
     const late = new Set(this.imported);
     for (const [p, h] of this.log.heads) if (h.seq > saved) late.add(p);
     // the old index held no position: a note newer than its file may have missed it, and so may a delete

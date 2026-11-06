@@ -14,6 +14,7 @@
 //
 // This file is a cache and never the authority. A record counts only while the note's stat and the log's hash for it both match; a
 // missing, torn or old record is a read of the note and nothing more. So a line lost to a hard kill costs one read at the next start.
+// A line of the wrong shape counts as missing, and a record of the wrong shape as gone, whatever wrote them: nothing here ever stops a start.
 import fs from 'node:fs';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
@@ -28,16 +29,23 @@ const parseLines = (text) => {
   try { return JSON.parse(`[${body.replaceAll('\n', ',')}]`); } catch {}
   const out = []; for (const l of body.split('\n')) { try { out.push(JSON.parse(l)); } catch {} } return out;
 };
-const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } };
+const read = (f) => readPrivate(f) ?? '';
+const num = (x) => typeof x === 'number' && Number.isFinite(x);
+const mentionNo = (x) => Number.isSafeInteger(x) && x >= 0;
+const str = (x) => typeof x === 'string';
+const secsOk = (x) => Array.isArray(x) && x.every((s) => Array.isArray(s) && s.length === 2 && (s[0] === null || str(s[0])) && Array.isArray(s[1]) && s[1].every(mentionNo));
+const statOk = (l) => num(l[2]) && num(l[3]) && num(l[4]) && str(l[5]) && secsOk(l[6]) && (l[7] === null || str(l[7]));
 
 /** Apply lines to a record map. Records hold mention numbers, so `mentions` must go with them. */
 export function applyLines(lines, recs, mentions) {
   for (const l of lines) {
+    if (!Array.isArray(l)) continue;
     switch (l[0]) {
-      case 'e': mentions[l[1]] = [l[2], l[3], l[4]]; break;
-      case 'n': recs.set(l[1], { size: l[2], mtimeMs: l[3], ctimeMs: l[4], ch: l[5], secs: l[6], op: l[7] }); break;
-      case 'a': { const r = recs.get(l[1]); if (r?.op === l[7]) break; if (r?.secs && r.op === l[8]) { r.size = l[2]; r.mtimeMs = l[3]; r.ctimeMs = l[4]; r.ch = l[5]; r.op = l[7]; for (const s of l[6]) r.secs.push(s); } else recs.delete(l[1]); break; }
-      case 'd': recs.delete(l[1]); break;
+      // Numbers are handed out in order and never change, so a line past the next one, or one giving a number a second meaning, is not one Memev wrote. An array that long would also cost every start.
+      case 'e': if (mentionNo(l[1]) && l[1] <= mentions.length && str(l[2]) && str(l[3]) && str(l[4]) && !mentions[l[1]]) mentions[l[1]] = [l[2], l[3], l[4]]; break;
+      case 'n': if (!str(l[1])) break; if (statOk(l)) recs.set(l[1], { size: l[2], mtimeMs: l[3], ctimeMs: l[4], ch: l[5], secs: l[6], op: l[7] }); else recs.delete(l[1]); break;
+      case 'a': { if (!str(l[1])) break; if (!statOk(l)) { recs.delete(l[1]); break; } const r = recs.get(l[1]); if (r?.op === l[7]) break; if (r?.secs && r.op === l[8]) { r.size = l[2]; r.mtimeMs = l[3]; r.ctimeMs = l[4]; r.ch = l[5]; r.op = l[7]; for (const s of l[6]) r.secs.push(s); } else recs.delete(l[1]); break; }
+      case 'd': if (str(l[1])) recs.delete(l[1]); break;
       default:
     }
   }

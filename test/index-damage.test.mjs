@@ -208,8 +208,36 @@ test('a real daemon on a damaged table answers, finds it, rebuilds, and says so'
   const v = open(root); assert.deepEqual(v.recall(ME, { query: WORD(9), log: false, all_projects: true }).map((h) => h.path), ['notes/n9.md']); v.close();
 });
 
+test('an open that throws leaves no daemon.loading or daemon.lock behind, and says why', { skip: process.platform === 'win32' }, async () => {
+  const root = fresh(); fs.rmSync(path.join(root, '.memev/oplog'), { recursive: true, force: true }); fs.writeFileSync(path.join(root, '.memev/oplog'), 'in the way');
+  const r = spawnSync(process.execPath, [path.join(PKG, 'src/server/main.mjs'), '--root', root, '--port', '0'], { encoding: 'utf8', timeout: 30000, env: { ...process.env, MEMEV_NO_SERVICE: '1' } });
+  assert.notEqual(r.status, 0); assert.match(r.stderr, /cannot open/);
+  for (const f of ['daemon.loading', 'daemon.lock']) assert.equal(fs.existsSync(path.join(root, '.memev', f)), false, `${f} left behind`);
+});
 
+test('one line of a cache, or a bad count, is a cache miss: the vault opens, and nothing forged reaches the graph', { timeout: 120000 }, () => {
+  const lines = (root) => { const v = open(root); const h = v.log.heads.get('notes/n1.md'); v.close(); const s = fs.lstatSync(path.join(root, 'notes/n1.md')); return { s, ch: h.ch, op: h.hash.slice(0, 16) }; };
+  const journal = (root) => path.join(root, '.memev/notes.journal'); const state = (root) => path.join(root, '.memev/notes.state');
+  const add = (root, ...l) => fs.appendFileSync(journal(root), `${l.map((x) => JSON.stringify(x)).join('\n')}\n`);
+  const CASES = {
+    'null in the journal': (r) => add(r, null), 'a number in the journal': (r) => add(r, 5), 'an object in the journal': (r) => add(r, { n: 1 }), 'an empty array': (r) => add(r, []),
+    'null in the base': (r) => fs.writeFileSync(state(r), '["v",1]\nnull\n'), 'sections a string': (r) => { const { s, ch, op } = lines(r); add(r, ['n', 'notes/n1.md', s.size, s.mtimeMs, s.ctimeMs, ch, 'abc', op]); },
+    'sections nested wrong': (r) => { const { s, ch, op } = lines(r); add(r, ['n', 'notes/n1.md', s.size, s.mtimeMs, s.ctimeMs, ch, [[1]], op]); }, 'a mention number past any written': (r) => add(r, ['e', 4e9, 'x', 'Huge', 'person']), 'a mention of the wrong types': (r) => add(r, ['e', 0, 5, null, []]), 'an append with sections a string': (r) => { const { s, ch, op } = lines(r); add(r, ['a', 'notes/n1.md', s.size, s.mtimeMs, s.ctimeMs, ch, 'abc', 'x', op]); }, 'a path that is not text': (r) => add(r, ['n', 5, 1, 1, 1, 'x', [], 'x'], ['d', null], ['a', {}, 1, 1, 1, 'x', [], 'x', 'y']),
+    'head.json n -1': (r) => editHead(r, (j) => { j.n = -1; }), 'index.seq not a number': (r) => fs.writeFileSync(path.join(r, '.memev/index.seq'), 'abc'), 'commit.seq not a number': (r) => fs.writeFileSync(path.join(r, '.memev/commit.seq'), 'zz'),
+  };
+  for (const [label, hurt] of Object.entries(CASES)) {
+    const root = seeded(12); const v0 = open(root); v0.write(ME, { path: 'notes/ent.md', body: '# E\nAda Lovelace wrote here\n' }); const good = [...v0.graph.entities.keys()].sort(); v0.close(); hurt(root);
+    const v = open(root); assert.deepEqual([...v.graph.entities.keys()].sort(), good, `${label}: the graph`); assert.deepEqual(v.recall(ME, { query: WORD(1), log: false, all_projects: true }).map((h) => h.path), ['notes/n1.md'], label); v.close();
+  }
+});
 
+test('a record that quotes a note\'s real stat and hash but does not stand at its last log record adds nothing to the graph', () => {
+  const root = seeded(12); const v0 = open(root); const h = v0.log.heads.get('notes/n1.md'); v0.close(); const s = fs.lstatSync(path.join(root, 'notes/n1.md')); const next = new NoteState(path.join(root, '.memev')).load().mentions.length;
+  const journal = path.join(root, '.memev/notes.journal'); const add = (...l) => fs.appendFileSync(journal, l.map((x) => `${JSON.stringify(x)}\n`).join(''));
+  add(['e', next, 'person:forged', 'Forged Person', 'person'], ['n', 'notes/n1.md', s.size, s.mtimeMs, s.ctimeMs, h.ch, [['Note 1', [next]]], 'x']);
+  let v = open(root); assert.equal([...v.graph.entities.values()].filter((e) => /Forged/.test(e.name)).length, 0, 'a new number, on a record that stands nowhere'); v.close();
+  if (next > 0) { add(['e', 0, 'person:forged', 'Forged Person', 'person']); v = open(root); assert.equal([...v.graph.entities.values()].filter((e) => /Forged/.test(e.name)).length, 0, 'a number that already means something keeps its meaning'); v.close(); }
+});
 
 const claimDir = (root, g) => path.join(segDir(root), `gen-${g}`);
 test('a folder a live process is writing is left by any opener; a dead writer\'s, or one nobody claims, goes', async () => {
