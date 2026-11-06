@@ -326,7 +326,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
         if (route === '/v1/bus-operator' && ctx.cli) { const seat = body.seat ? vault.bus.seatFor(body.seat) || body.seat : null; const op = vault.bus.setOperator(seat, { by: body.by || 'terminal' }); vault.commits.flush(); return send(200, { operator: op }); }
         if (route === '/v1/reload' && local && identity.scopes.includes('admin')) { vault.emit('reload'); return send(200, { ok: true }); }
       }
-      if (req.method === 'GET' && route === '/v1/status') return send(200, vault.status());
+      if (req.method === 'GET' && route === '/v1/status') return send(200, vault.status(identity));
       const nm = /^\/v1\/notes\/(.+)$/.exec(route);
       if (nm) {
         const p = decodeURIComponent(nm[1]);

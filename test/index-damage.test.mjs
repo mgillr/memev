@@ -275,8 +275,36 @@ test('a linked index folder or generation folder is not used or written through'
   }
 });
 
+test('a token limited to some paths gets counts only for what the sweep found outside them', async () => {
+  const root = fresh(); let v = open(root); v.write(ME, { path: 'secret/acquisition-of-acme.md', body: '# Deal\nthe secret body\n' }); v.write(ME, { path: 'secret/gone.md', body: '# G\ngone\n' }); v.write(ME, { path: 'public/a.md', body: '# P\npublic\n' }); v.write(ME, { path: 'public/changed.md', body: '# P\nsame size body\n' }); v.close();
+  const T = 1700000000; for (const f of ['secret/acquisition-of-acme.md', 'public/changed.md']) fs.utimesSync(path.join(root, f), T, T); v = open(root, { ignoreCtime: true }); v.close();
+  for (const [f, from, to] of [['secret/acquisition-of-acme.md', 'secret', 'tamper'], ['public/changed.md', 'same', 'edit']]) { const p = path.join(root, f); fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace(from, to)); fs.utimesSync(p, T, T); }
+  fs.rmSync(path.join(root, 'secret/gone.md')); fs.mkdirSync(path.join(root, 'secret/gone.md'));
+  const tok = new TokenStore(path.join(root, '.memev/tokens.json')).issue({ agent: 'limited', scopes: ['read'], paths: ['public/**'] }).token; const whole = new TokenStore(path.join(root, '.memev/tokens.json')).issue({ agent: 'whole', scopes: ['read'], paths: ['**'] }).token;
+  v = open(root, { ignoreCtime: true }); const s = v.startSweep(); assert.ok(await until(() => s.state !== 'running')); assert.equal(s.changed, 2);
+  const server = createServer(v); await new Promise((r) => server.listen(0, '127.0.0.1', r)); const { port } = server.address();
+  const get = async (t) => (await fetch(`http://127.0.0.1:${port}/v1/status`, { headers: { authorization: `Bearer ${t}` } })).json();
+  const mcp = async (t) => (await (await fetch(`http://127.0.0.1:${port}/mcp`, { method: 'POST', headers: { authorization: `Bearer ${t}`, 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'memev_status', arguments: {} } }) })).json()).result.structuredContent;
+  try {
+    for (const view of [await get(tok), await mcp(tok)]) {
+      assert.deepEqual(view.sweep.found.map((x) => x.path), ['public/changed.md']); assert.equal(view.sweep.found_elsewhere, 1); assert.deepEqual(view.sweep.missing_notes, []); assert.equal(view.sweep.missing_elsewhere, 1); assert.equal(view.sweep.changed, 2, 'counts stay');
+      assert.doesNotMatch(JSON.stringify(view), /secret\/|acquisition/, 'no path outside the token, in any field');
+    }
+    for (const view of [await get(whole), await mcp(whole)]) { assert.deepEqual(view.sweep.found.map((x) => x.path).sort(), ['public/changed.md', 'secret/acquisition-of-acme.md']); assert.deepEqual(view.sweep.missing_notes, [{ path: 'secret/gone.md', reason: 'it is a folder' }]); assert.equal(view.sweep.found_elsewhere, 0); }
+  } finally { server.close(); v.close(); }
+});
 
+test('the sweep does not follow a linked folder to a file outside the vault', { skip: process.platform === 'win32' }, async () => {
+  const root = fresh(); let v = open(root); v.write(ME, { path: 'dir/inner.md', body: '# I\ninner words\n' }); v.close();
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-out-')); made.push(out); fs.writeFileSync(path.join(out, 'inner.md'), '# I\nsome other text outside\n'); fs.rmSync(path.join(root, 'dir'), { recursive: true }); fs.symlinkSync(out, path.join(root, 'dir'));
+  v = open(root); const s = v.startSweep(); assert.ok(await until(() => s.state !== 'running')); assert.equal(s.differs, 0, 'a file outside was opened and hashed'); assert.deepEqual(s.missing_notes.filter((x) => x.path === 'dir/inner.md'), [{ path: 'dir/inner.md', reason: 'a folder on the way is a link' }]); v.close();
+});
 
+test('the real daemon names what its sweep could not read in its log line', { skip: process.platform === 'win32' }, async () => {
+  const root = fresh(); let v = open(root); v.write(ME, { path: 'notes/gone.md', body: '# G\ngone\n' }); v.close(); fs.rmSync(path.join(root, 'notes/gone.md')); fs.mkdirSync(path.join(root, 'notes/gone.md'));
+  const c = spawn(process.execPath, [path.join(PKG, 'src/server/main.mjs'), '--root', root, '--port', '0'], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, MEMEV_NO_SERVICE: '1' } }); let err = ''; c.stderr.on('data', (d) => { err += d; });
+  try { assert.ok(await until(() => err.includes('sweep done'), 60000), err); assert.match(err, /1 not readable: notes\/gone\.md \(it is a folder\)/); } finally { c.kill('SIGTERM'); await new Promise((r) => c.once('exit', r)); }
+});
 
 test('the prompt hook says the index is rebuilding, not that nothing was recorded', async () => {
   const root = seeded(12); fs.writeFileSync(F(root, 'cols.bin'), Buffer.alloc(fs.statSync(F(root, 'cols.bin')).size)); const v = open(root); const server = createServer(v); await new Promise((r) => server.listen(0, '127.0.0.1', r)); const { port } = server.address();
