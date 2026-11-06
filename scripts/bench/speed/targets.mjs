@@ -31,7 +31,9 @@ export const CEILINGS = {
 };
 
 // The ceilings meant to catch a return to the old cost. The others guard against getting worse and claim no gain over the old code.
-export const CAUGHT = ['a1_start_ms', 'a7_first_import_ms', 'a8_stop_after_write_ms', 'a3_recall_p95_ms', 'a3_recall_after_save_ms', 'a2_health_timeouts', 'a5_commit_block_p50_ms', 'a6_roster_ms', 'a6_tasks_ms', 'a6_send_ms'];
+// a3_recall_p95_ms and a6_send_ms are guards for that reason: the old code measured under twice their ceilings (158 ms against 100, 378 ms against 200),
+// so a faster machine could pass the old code and make this judgement wrong for no change in the code.
+export const CAUGHT = ['a1_start_ms', 'a7_first_import_ms', 'a8_stop_after_write_ms', 'a3_recall_after_save_ms', 'a2_health_timeouts', 'a5_commit_block_p50_ms', 'a6_roster_ms', 'a6_tasks_ms'];
 
 /** Against old code: every ceiling in CAUGHT must fail there, and a number that did not come back does not count as caught. */
 export function judgeOld(numbers, caught = CAUGHT, ceilings = CEILINGS) {
