@@ -18,8 +18,11 @@ test('MEM-021 AC01: doctor shows a warning naming both vault ids when a second l
   const sb = sandbox({ ports: 2 });
   const other = path.join(sb.home, 'other-vault');
   try {
-    assert.equal(sb.run(['init', '--port', String(sb.port), '--no-connect']).code, 0);
-    assert.equal(sb.run(['init', '--root', other, '--port', String(sb.port + 1), '--no-connect']).code, 0);
+    // This has failed intermittently in CI with no reason shown, so a failed init prints what it said.
+    for (const args of [['init', '--port', String(sb.port), '--no-connect'], ['init', '--root', other, '--port', String(sb.port + 1), '--no-connect']]) {
+      const r = sb.run(args);
+      assert.equal(r.code, 0, `${args.join(' ')}\n${r.out}\n${r.err}`);
+    }
     const mine = idsOf(sb.root);
     const theirs = idsOf(other);
     const doc = sb.run(['doctor']);
