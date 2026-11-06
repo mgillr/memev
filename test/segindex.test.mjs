@@ -118,6 +118,10 @@ test('the debounced graph save does not wait for the disk on the thread that ans
   assert.deepEqual(fs.readdirSync(path.dirname(file)).filter((e) => e.endsWith('.tmp')), [], 'no temporary file left');
 });
 
+test('compact folds at once: the files shrink, nothing old is left, the answers stay', (t) => {
+  const d = tmp(t); const { orc, ix, file } = seeded(d, 300); for (let i = 0; i < 200; i++) { const p = notePath(i); orc.remove(p); ix.remove(p); } writes(orc, ix, 71, 10, 900); ix.save(); const base = `${file.replace(/\.jsonl$/, '')}.seg`; const size = (p) => (fs.statSync(p).isDirectory() ? fs.readdirSync(p).reduce((a, e) => a + size(path.join(p, e)), 0) : fs.statSync(p).size); const before = size(base); ix.compact(); assert.ok(size(base) < before, 'the files shrank'); assert.equal(fs.readdirSync(base).filter((e) => e.startsWith('gen-')).length, 1); agree(orc, ix, 'compacted'); const again = new SegIndex(file); assert.equal(again.load(), true); agree(orc, again, 'reloaded after compact');
+});
+
 test('an append under work/active in a subfolder inherits the stored project, as in the oracle', (t) => {
   const d = tmp(t); const orc = new RecallIndex(path.join(d, 'o.jsonl')); orc.update('work/active/sub/y.md', '## first\nProject: billing\nwords here\n', { mtime: 1 }); for (let i = 0; i < 5; i++) orc.update(`notes/f${i}.md`, `## f\nfiller ${i}\n`, { mtime: 1 }); const file = path.join(d, 'index.jsonl'); orc.file = file; orc.dirty = true; orc.save(); const ix = new SegIndex(file); ix.load();
   const x = '## added\nappended words\n'; orc.appendSections('work/active/sub/y.md', x, { lineOffset: 9, mtime: 2 }); ix.appendSections('work/active/sub/y.md', x, { lineOffset: 9, mtime: 2 }); assert.deepEqual(ix.docsOf('work/active/sub/y.md', 'added').map((q) => q.project), ['billing']);

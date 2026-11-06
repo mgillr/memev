@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { RecallIndex, tokenize } from './index.mjs';
-import { writeSeg, Seg, foldInWorker, keySig, ROW, C_LEN, C_PATH, C_PROJ, C_RB, C_SIG } from './seg2.mjs';
+import { writeSeg, Seg, foldFiles, foldInWorker, keySig, ROW, C_LEN, C_PATH, C_PROJ, C_RB, C_SIG } from './seg2.mjs';
 
 const round3 = (x) => Number(x.toFixed(3));
 const empty = () => Object.defineProperty([], 'total', { value: 0, writable: true, configurable: true });
@@ -129,6 +129,11 @@ export class SegIndex {
       if (this.syncing) this.oldLog = oldLog; else fs.close(oldLog, () => {}); oldSeg.close();
       fs.open(this.root, 'r', (e, dfd) => { const rm = () => fs.rm(this._dir(was), { recursive: true, force: true }, () => {}); if (e) return rm(); return fs.fsync(dfd, () => fs.close(dfd, rm)); }); // a folder cannot be synced on Windows; the error is not checked for that reason
     } catch (e) { try { fs.closeSync(fd); } catch { /* already closed */ } throw e; }
+  }
+  /** memev compact: the daemon is stopped, so the fold runs here and the old generation is gone when this returns. */
+  compact() {
+    if (!this.seg || this.foldP) return; this._flush(); if (!this.logEnd) return; const g = this.gen + 1, was = this.gen; fs.rmSync(this._dir(g), { recursive: true, force: true }); foldFiles(this._dir(was), this._dir(g), this._log(was), this.logEnd); fs.writeFileSync(this._log(g), '', { mode: 0o600 });
+    const seg = new Seg(this._dir(g)); this._publish(g); this._closeFiles(); Object.assign(this, this._state(seg)); this.gen = g; this.logFd = fs.openSync(this._log(g), 'r+'); this.logEnd = 0; fs.rmSync(this._dir(was), { recursive: true, force: true });
   }
   _retire(p) { if (this.seg) this._retireIn(this, p); }
   _added(from) { for (let id = from; id < this.ov.nextId; id++) this.pending.push(id); this.dirty = true; }

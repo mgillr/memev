@@ -1015,6 +1015,7 @@ export class Vault extends EventEmitter {
     const archived = this.log.archiveSealed();
     const retained = this._journalRetention();
     this.index.save();
+    this.index.compact?.();
     this._saveGraph();
     const after = this.sizeReport();
     return { dryRun: false, before, after, archived, retained };
