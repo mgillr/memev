@@ -301,7 +301,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
           const skip = new Set(auto ? [].concat(body.exclude || []).map(String) : []);
           const bar = auto ? hookMinScore(vault) : (rc.min_score ?? 1);
           // an item already given is left out, not replaced, so a prompt never brings in more than it would have
-          const recalled = vault.recall(identity, { ...body, client, limit, offset });
+          const recalled = vault.recall(identity, { ...body, client, limit, offset, ...(process.env.MEMEV_RIG_HOOKFIX === '1' && auto && !rc.hook_include_journals ? { rigDrop: pastWork } : {}) });
           const total = recalled.total;
           const hits = recalled
             .filter((h) => h.score >= bar && !skip.has(`${h.path}#${h.heading || ''}`) && !(auto && !rc.hook_include_journals && pastWork(h.path)) && !(own && h.path.startsWith('work/sessions/') && h.path.endsWith(own)));
