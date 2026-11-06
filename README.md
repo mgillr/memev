@@ -1,6 +1,6 @@
 <div align="center">
 
-<a href="media/memev-tiers.mp4"><img src="media/memev-tiers-poster.png" alt="Memev: the infrastructure layer for connected AI work. Any AI application, governed work, every scale. Click to watch the demo video, 4 min 55 s." width="720"></a>
+<a href="media/memev-tiers.mp4"><img src="media/memev-tiers-poster.png" alt="Memev: provider-neutral operating infrastructure for coordinated AI work, from personal use to organisational and federated systems. Click to watch the demo video, 4 min 55 s." width="720"></a>
 
 <sub><a href="media/memev-tiers.mp4">Watch the demo video</a> (4 min 55 s). It was recorded before the five-tier model: it shows four tiers and a Business trial, which are planned as described below, and it does not show the Federated tier.</sub>
 
@@ -9,6 +9,8 @@
 <p><strong>Memev is the provider-neutral operating infrastructure that helps people and organisations adopt AI today and coordinate increasingly autonomous systems tomorrow across applications, functions, sites and independent organisations, without surrendering control of their data, authority or operational state.</strong></p>
 
 <p><strong>Development preview — actively under development.</strong> The Free Core is available for testing; this is not yet a production release. Interfaces and behaviour may change. Business, Corporate, Federated and full distributed-convergence capabilities remain under development unless explicitly marked as available below.</p>
+
+<p><code>npm install -g . && memev init --no-connect</code></p>
 
 ## Start with Memev for yourself
 
@@ -25,8 +27,6 @@ You do not need a company, a team or a subscription to get value from Memev. The
 **Personal with more computers** extends the same personal environment to up to three of your computers, with a separate device key for each. It is for people who want to work from more than one machine without maintaining separate personal vaults. The current secure-link capability is available; automatic merging of simultaneous edits, hosted encrypted sync and hosted backup remain planned. Until those are delivered, git backup is single-writer: do not edit the same vault concurrently on multiple computers.
 
 The free tier remains fully useful on one computer. The paid Personal tier charges for multi-computer use and its associated service boundary—not for unlocking essential features that were removed from Free.
-
-<p><code>npm install -g . && memev init --no-connect</code></p>
 
 <p align="center">
 <img src="docs/assets/connective-infrastructure.svg" alt="Memev operating architecture diagram, in two separate sides that never mix. Personal side: AI apps and agents connect over MCP to Memev on your computer, which keeps a personal vault backed up to your own private git remote; that is the free core, built today. Personal with more computers, the paid tier, lets up to three of your own computers in all share that vault over the secure link; merging simultaneous edits is planned. Organisation side, all planned: members' computers and business systems feed one company vault with an admin console and an executive view for business inference intelligence (Business); site nodes that each keep their own memory and authority (Corporate); and other organisations that share only what each agreement permits (Federated). The CRDT-Merge convergence engine is a separate engine that each vault and node calls for its own merges." width="900">
@@ -67,6 +67,22 @@ The offering has two connected dimensions:
 
 - **A useful personal product today.** The Free Core gives one person a local-first environment for connecting supported AI clients, sharing project context, coordinating sessions and agents, managing defined work, and retaining evidence and provenance. It is a complete starting point, not merely a trial of an enterprise service.
 - **An architecture that scales across organisational boundaries.** The same product direction extends through multiple computers, teams, departments and sites to independent organisations. Identity, authority, policy, evidence and convergence become increasingly important as participants and trust boundaries multiply.
+
+### The long-term objective: infrastructure for coordinated AI-driven economic activity
+
+AI is moving from tools that assist individual people towards systems capable of carrying out increasingly complex work and business functions. As that happens, the challenge is no longer just connecting applications. People, agents, departments, businesses and external partners need to coordinate work, commitments and operational state while retaining control of their own data, systems and authority.
+
+Memev is being developed for that progression:
+
+1. **Adoption:** individuals and organisations connect the AI tools they choose, establish shared context and coordinate real work across applications and teams.
+2. **Operational coordination:** increasingly capable agents carry out longer workflows and business functions under explicit identities, delegated authority, policies, work contracts and verification.
+3. **Economic coordination:** independent organisations and AI-operated systems coordinate programmes, services, commitments, evidence and authorised computation across company and jurisdictional boundaries.
+
+The destination is not one central database or one AI provider controlling every participant. Each person or organisation retains its own identity, source systems, policies, data and decision authority. Only information, work, evidence and computation authorised by the relevant participants cross those boundaries.
+
+The five tiers express the deployment and trust scope of this one architecture: Personal, Personal with more computers, Business, Corporate and Federated. They are not five levels of AI capability. Business and Corporate extend coordination within one organisation; Federated connects independent organisations that remain independently governed.
+
+**The long-term ambition is for Memev to provide dependable operating infrastructure for an economy in which people, organisations and increasingly autonomous AI systems work together without surrendering their independence.** This is a strategic direction, not a claim that the full organisational or federated service is available today.
 
 ### From individual work to organisational intelligence
 
@@ -142,7 +158,7 @@ What each tier is worth to the people who use it:
 | **Corporate** | Sites in many countries run one programme. Each site keeps its own authority and can keep its data in its own jurisdiction. | Planned |
 | **Federated** | Separate businesses, suppliers and vendors share only what each agreement permits. Nobody hands over its systems or its data. | Planned |
 
-Business and Corporate describe coordination inside one organisation. **Federated is a distinct fifth tier** for coordination between organisations that retain separate ownership, operators, trust roots, policies and legal responsibilities. It is not a requirement to merge participants into one company vault.
+The tier boundaries are authority boundaries, not simply larger user limits. **Business** coordinates work within one organisation, initially through one company node. **Corporate** extends that same organisation across independently operated sites, departments and jurisdictions while retaining corporate governance. **Federated** is a distinct fifth tier for coordination between independent organisations that retain separate ownership, operators, trust roots, policies and legal responsibilities. It is not a requirement to merge participants into one company vault.
 
 The Federated tier is intended to include scoped federation membership, bilateral agreements, identity and trust between participants, authorised work and evidence exchange, cross-organisation project/programme context, policy-aware queries, operational visibility, and (where separately specified and validated) federated computation. The commercial scope will be defined by the number and type of participating organisations, trust relationships, sites, jurisdictions, workloads, governance requirements, support and deployment model—not by a simple per-computer price.
 
@@ -209,6 +225,8 @@ Memev's product architecture is being developed alongside a wider technology pro
 | **Memev** | Connects participants and work; governs identity, scope and policy; coordinates execution; records provenance; and verifies outcomes against defined obligations and evidence. | The product layer that is being developed to bring these responsibilities together in usable personal, organisational and federated offerings. |
 
 The distinction between these layers is important. CRDT convergence can make replicas resolve the same accepted contribution set consistently, but it does not decide whether a contribution is truthful, authorised or semantically correct. Identity and policy govern admission; provenance records origin; evidence and validation support decisions; deterministic computation supports reproducibility where applicable.
+
+Together, these responsibilities describe the intended operating model: authorised participants contribute under defined scopes; work is coordinated against explicit obligations; evidence is retained and checked; and accepted state can be reconciled across the boundaries where participants have agreed to share it. No single component supplies that whole model. Convergence is not governance, a receipt is not automatically proof of truth, and an AI agent's assertion is not an approval. The product must enforce and demonstrate the complete chain at each deployment boundary before claiming it as available.
 
 The broader research direction includes convergence of operational state and, where separately designed and validated, computational or model contributions. These are not interchangeable capabilities. The README does not claim that Memev currently merges model weights, runs federated computation across organisations or offers a complete distributed multi-writer service.
 
@@ -317,7 +335,7 @@ Memev's product direction is broader than the current release. Every line below 
 - The vault: Markdown notes in git, a checksummed log, project-aware recall, provenance and the entity graph. `memev import` brings in existing project folders, AI history and chat exports.
 - MCP access for the supported AI apps, with hooks where an app supports them, and optional cloud AI connectors over a secure link.
 - The communications bus: seats, roster, heartbeats, communications checks, task handoffs and holds.
-- The local project lifecycle: a project store and coordinator with atomic task claims, leases, heartbeats, reporting, pause/resume, scope amendment, reassignment and evidence-bound verification. This is local lifecycle coordination, not yet distributed multi-writer convergence.
+- The local project foundation: a defined task state machine, project store, append-only event history and evidence-bound transition rules. This is local project-state infrastructure, not distributed multi-writer convergence; broader agent dispatch, bus integration and end-to-end workflow acceptance are tracked separately.
 - Work contracts with signed, immutable specs and checks that run through `memev verify`.
 - Device keys, a licence checked offline, and the computer limit.
 - Backup to your own private GitHub repository.
@@ -325,7 +343,7 @@ Memev's product direction is broader than the current release. Every line below 
 
 ### In progress
 
-- The local project lifecycle: the project store, state machine and coordinator provide task claims, leases, heartbeats, reporting, evidence-bound verification, pause/resume, scope amendment, cancellation and reassignment. Remaining work is tracked in [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md); local lifecycle support should not be confused with distributed multi-writer convergence.
+- Integration and acceptance of the local project lifecycle across the communications bus and supported agent workflows. The state-machine and project-store foundations exist; this work closes the wiring, execution and verification gaps. See [docs/PROJECTS.md](docs/PROJECTS.md) and [docs/scope-one/RECONCILIATION.md](docs/scope-one/RECONCILIATION.md).
 - The paid-engine client is merged behind a flag, off by default (pull request #201). The trial licence and entitlement work is parked and tracked in issue #416.
 - Correctness fixes in the crdt-merge engine itself, in its own repository.
 - The programme decomposition of the wider plan, as proposed and unsigned contracts: [docs/scope-one/programme/README.md](docs/scope-one/programme/README.md).

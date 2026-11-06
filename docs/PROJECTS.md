@@ -5,8 +5,10 @@ Part of the [Memev documentation](README.md). Up: the [README](../README.md).
 A project is a set of tasks that move through a fixed set of states, and the project itself
 shows one derived status at a time. The state machine lives in `src/engine/project-state.mjs`
 as pure functions over plain records: no persistence, no bus, no network, no model call, so
-the whole table can be tested in process. Later work adds the store and the bus hooks around
-it; this page is the one documentation page of the project layer.
+the whole table can be tested in process. The project store in `src/engine/project-store.mjs`
+persists project records and their append-only event history. Integration of the lifecycle
+with the communications bus and supported agent workflows remains in progress; this page is
+the one documentation page of the project layer.
 
 ## Task states
 
