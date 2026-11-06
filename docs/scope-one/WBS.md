@@ -16,19 +16,19 @@ Reconciled 31 October 2026 against main at `4823064`. The requirement register a
 
 ## Summary
 
-Leaves: 277. delivered 21, covered 213, new 29, blocked 14. Of the covered leaves, 96 rest wholly or partly on a contract that only the owner's vault holds and this repository cannot check.
+Leaves: 278. delivered 21, covered 214, new 29, blocked 14. Of the covered leaves, 96 rest wholly or partly on a contract that only the owner's vault holds and this repository cannot check.
 
 | Section | Leaves | delivered | covered | new | blocked |
 | --- | --- | --- | --- | --- | --- |
 | 1 Control and decisions | 19 | 1 | 12 | 2 | 4 |
-| 2 Platform contracts | 58 | 0 | 58 | 0 | 0 |
+| 2 Platform contracts | 59 | 0 | 59 | 0 | 0 |
 | 3 Requirements | 98 | 4 | 86 | 5 | 3 |
 | 4 Addendum | 23 | 0 | 13 | 5 | 5 |
 | 5 Delivery families | 52 | 0 | 34 | 16 | 2 |
 | 6 Pull requests | 7 | 0 | 6 | 1 | 0 |
 | 7 Branches | 7 | 3 | 4 | 0 | 0 |
 | 8 Merged foundations | 13 | 13 | 0 | 0 | 0 |
-| Total | 277 | 21 | 213 | 29 | 14 |
+| Total | 278 | 21 | 214 | 29 | 14 |
 
 The sections are lenses on the same work, so the total counts a thing once per lens; the requirement lens (98 leaves) is the one that must reach "delivered".
 
@@ -72,14 +72,15 @@ Reported, not confirmed: a parallel working team reports that the owner decided 
 
 ## 2. Platform readiness contracts (seed readiness)
 
-All 58 contracts of `contracts/seed-readiness/manifest.json`, one leaf each. The gap id is the manifest's. A contract is signed when `contracts/signed/` holds a file for it that `node scripts/gate/redteam-gate.mjs --report` accepts; a signature does not say the work is built.
+All 59 contracts of `contracts/seed-readiness/manifest.json`, one leaf each. The gap id is the manifest's. A contract is signed when `contracts/signed/` holds a file for it that `node scripts/gate/redteam-gate.mjs --report` accepts; a signature does not say the work is built.
 
 ### 2.1 SR-0: Verification foundations
 
 | WBS | Contract | Gap | Title | Signed | Record | Status | Finding |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2.1.1 | SR-0.03 | G85 | Verify runs every verifier type the specs use: red-green tests, metrics and scope, behind the same l | v2 signed | interim record | covered |  |
-| 2.1.2 | SR-0.04 | N01, N03, N06, N08, N09 | Receipts match signatures, and what is claimed is in the tree | unsigned | none | covered | depends on SR-1.35, which is not in the manifest |
+| 2.1.2 | SR-0.04 | N01, N03, N06, N08, N09 | Receipts match signatures, and what is claimed is in the tree | unsigned | none | covered | depends on SR-1.35 |
+| 2.1.3 | SR-1.35 | owner 6 Nov 2026 | Memev is fast on every axis we measured | unsigned | none | covered | code landed by PR 437 |
 
 ### 2.2 SR-1: Runtime, integrity, authority and security
 
