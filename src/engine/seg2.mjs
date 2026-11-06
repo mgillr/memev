@@ -29,9 +29,9 @@ function syncClose(fd) { fs.fsyncSync(fd); fs.closeSync(fd); }
 function syncFile(file) { const fd = fs.openSync(file, 'r+'); syncClose(fd); }
 
 // Appends fixed-width values through one buffer, so a whole segment is a few hundred writes rather than one per word.
-let PACE = 0, GATE = null, sinceFlush = 0;
+let PACE = 0, GATE = null, REST = 0, sinceFlush = 0; const SLEEP = new Int32Array(new SharedArrayBuffer(4));
 // Flushing little and often keeps the disk's queue short, so a flush on the other thread does not wait behind a whole segment.
-function paced(fd, n) { if (GATE) Atomics.wait(GATE, 0, 1, 200); if (PACE) { sinceFlush += n; if (sinceFlush >= PACE) { fs.fdatasyncSync(fd); sinceFlush = 0; } } }
+function paced(fd, n) { if (GATE) Atomics.wait(GATE, 0, 1, 200); if (REST) Atomics.wait(SLEEP, 0, 0, REST); if (PACE) { sinceFlush += n; if (sinceFlush >= PACE) { fs.fdatasyncSync(fd); sinceFlush = 0; } } }
 class Out {
   constructor(file, Type) { this.fd = fs.openSync(file, 'w', 0o600); this.Type = Type; this.a = new Type(FLUSH / Type.BYTES_PER_ELEMENT); this.n = 0; }
   push(v) { this.a[this.n++] = v; if (this.n === this.a.length) this.flush(); }
@@ -152,4 +152,4 @@ export function foldFiles(oldDir, newDir, logFile, logEnd) {
 export function foldInWorker(oldDir, newDir, logFile, logEnd, tune = {}) {
   return new Promise((res, rej) => { const w = new Worker(fileURLToPath(import.meta.url), { workerData: { segFold: true, oldDir, newDir, logFile, logEnd, tune } }); w.on('message', res); w.on('error', rej); w.on('exit', (c) => rej(new Error(`fold worker exited ${c}`))); w.unref(); });
 }
-if (!isMainThread && workerData?.segFold) { PACE = workerData.tune.pace || 0; GATE = workerData.tune.gate || null; parentPort.postMessage(foldFiles(workerData.oldDir, workerData.newDir, workerData.logFile, workerData.logEnd)); }
+if (!isMainThread && workerData?.segFold) { PACE = workerData.tune.pace || 0; GATE = workerData.tune.gate || null; REST = workerData.tune.rest || 0; parentPort.postMessage(foldFiles(workerData.oldDir, workerData.newDir, workerData.logFile, workerData.logEnd)); }

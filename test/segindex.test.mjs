@@ -102,6 +102,15 @@ test('a note rewritten over and over folds on the size of the log', async (t) =>
   const d = tmp(t); const { ix } = seeded(d, 40); ix.logMax = 2000; const g = ix.gen; for (let i = 0; i < 20; i++) { ix.update('notes/same.md', `## same\nthe same note rewritten ${i}\n`, { mtime: i }); ix.save(); } assert.ok(ix.foldP, 'a fold started'); await settle(ix.foldP); assert.ok(ix.gen > g);
 });
 
+test('a word too common to count is not scanned after a write, and the answer stays the same', (t) => {
+  // Needs a segment over the 2,000 sections where common words are dropped.
+  const d = tmp(t); const orc = new RecallIndex(path.join(d, 'o.jsonl')); for (let i = 0; i < 2500; i++) orc.update(`notes/c${i}.md`, `## c\ncommonword ${i % 3 === 0 ? 'thirdword' : 'otherword'} fill${i % 50}\n`, { mtime: 1 }); const file = path.join(d, 'index.jsonl'); orc.file = file; orc.dirty = true; orc.save(); const ix = new SegIndex(file); ix.load(); for (const x of [orc, ix]) { x.remove('notes/c5.md'); x.update('notes/c6.md', '## c\ncommonword fill7 extra\n', { mtime: 2 }); }
+  const ids = Seg.prototype.ids; const asked = new Set(); Seg.prototype.ids = function (e) { asked.add(e.df); return ids.call(this, e); }; t.after(() => { Seg.prototype.ids = ids; });
+  for (const q of ['commonword fill7', 'commonword otherword', 'commonword', 'thirdword fill7', 'otherword commonword thirdword']) { const a = orc.query(q, { limit: 6 }), b = ix.query(q, { limit: 6 }); assert.equal(JSON.stringify(b), JSON.stringify(a), q); assert.equal(b.total, a.total, q); }
+  asked.clear(); ix.query('commonword fill7', { limit: 6 }); assert.equal(asked.has(2500), false, 'the common word was not read');
+  const h = orc.query('commonword fill7', { limit: 1 })[0]; const da = orc.docsOf(h.path, h.heading).find((x) => x.line === h.line), db = ix.docsOf(h.path, h.heading).find((x) => x.line === h.line); assert.deepEqual(ix.explain('commonword fill7', db), orc.explain('commonword fill7', da));
+});
+
 test('an append under work/active in a subfolder inherits the stored project, as in the oracle', (t) => {
   const d = tmp(t); const orc = new RecallIndex(path.join(d, 'o.jsonl')); orc.update('work/active/sub/y.md', '## first\nProject: billing\nwords here\n', { mtime: 1 }); for (let i = 0; i < 5; i++) orc.update(`notes/f${i}.md`, `## f\nfiller ${i}\n`, { mtime: 1 }); const file = path.join(d, 'index.jsonl'); orc.file = file; orc.dirty = true; orc.save(); const ix = new SegIndex(file); ix.load();
   const x = '## added\nappended words\n'; orc.appendSections('work/active/sub/y.md', x, { lineOffset: 9, mtime: 2 }); ix.appendSections('work/active/sub/y.md', x, { lineOffset: 9, mtime: 2 }); assert.deepEqual(ix.docsOf('work/active/sub/y.md', 'added').map((q) => q.project), ['billing']);

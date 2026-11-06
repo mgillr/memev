@@ -53,13 +53,6 @@ class FilterDoc extends SegDoc {
   get len() { this.read = true; return super.len; }
 }
 
-// Asks the filter once for a project, on a section with no review date whose key is not flagged; 3 means the filter looked further than the project.
-class SegGate {
-  constructor(seg, filter) { this.seg = seg; this.filter = filter; this.fly = new FilterDoc(seg, 0); }
-  flagged(sig) { return this.fly.sieve !== null && this.fly.sieve.has(sig); }
-  judge(i) { const c = this.fly.c; if (c[i * ROW + C_RB] !== 0 || this.flagged(c[i * ROW + C_SIG])) return 0; this.fly.at(i); this.fly.read = false; const ok = this.filter(this.fly); return this.fly.read ? 3 : ok ? 1 : 2; }
-}
-
 export class SegIndex {
   constructor(file) { this.file = file; this.base = file.replace(/\.jsonl$/, ''); this.root = `${this.base}.seg`; this._clear(); }
   _clear() { this.seg = null; this.ov = new RecallIndex('/nonexistent'); this.dead = null; this.deadCount = 0; this.deadPaths = new Set(); this.deadLen = 0; this.gen = 0; this.logFd = null; this.logEnd = 0; this.pending = []; this.dirty = false; this.foldP = null; this.foldFailed = 0; this.score = null; this.syncing = false; this.syncAgain = false; this.oldLog = null; }
@@ -106,8 +99,6 @@ export class SegIndex {
     this.logEnd += b.length; this.pending = []; this._syncLog();
   }
   _syncLog() {
-    const lab = this.lab || {};
-    if (lab.syncSave) { const g = lab.gate; if (g) Atomics.store(g, 0, 1); try { fs.fdatasyncSync(this.logFd); } finally { if (g) { Atomics.store(g, 0, 0); Atomics.notify(g, 0); } } return; }
     if (this.syncing) { this.syncAgain = true; return; } this.syncing = true; const fd = this.logFd;
     fs.fdatasync(fd, () => { this.syncing = false; if (this.oldLog === fd) { this.oldLog = null; fs.close(fd, () => {}); } if (this.syncAgain) { this.syncAgain = false; if (this.logFd !== null) this._syncLog(); } });
   }
@@ -119,8 +110,8 @@ export class SegIndex {
   }
   /** Start a fold of the log as it stands. Reads and writes go on against this generation until the new one is ready. */
   foldSoon() {
-    if (this.foldP || !this.seg) return this.foldP; this._flush(); const g = this.gen + 1; fs.rmSync(this._dir(g), { recursive: true, force: true }); const sealed = this.logEnd; const lab = this.lab || {};
-    this.foldP = foldInWorker(this._dir(this.gen), this._dir(g), this._log(this.gen), sealed, { pace: lab.pace, gate: lab.gate }).then((r) => this._swap(g, sealed, r.cols)).catch(() => { this.foldP = null; this.foldFailed = Date.now(); fs.rm(this._dir(g), { recursive: true, force: true }, () => {}); });
+    if (this.foldP || !this.seg) return this.foldP; this._flush(); const g = this.gen + 1; fs.rmSync(this._dir(g), { recursive: true, force: true }); const sealed = this.logEnd;
+    this.foldP = foldInWorker(this._dir(this.gen), this._dir(g), this._log(this.gen), sealed, this.foldTune).then((r) => this._swap(g, sealed, r.cols)).catch(() => { this.foldP = null; this.foldFailed = Date.now(); fs.rm(this._dir(g), { recursive: true, force: true }, () => {}); });
     return this.foldP;
   }
   // What was written after the seal moves to the new generation. Every wait for the disk is on the thread pool, between steps;
@@ -155,45 +146,38 @@ export class SegIndex {
   docsOf(p, heading) { const out = []; if (this.seg && !this.deadPaths.has(p)) for (const i of this.seg.ordinalsOf(p)) { const d = new SegDoc(this.seg, i); if (heading === undefined || heading === null || (d.heading || '') === heading) out.push(d); } return out.concat(this.ov.docsOf(p, heading)); }
   stats() { let notes = this.ov.byPath.size, terms = this.ov.terms.size; if (this.seg) { const seg = this.seg; seg.cols(); for (const p of seg.paths) if (!this.deadPaths.has(p) && !this.ov.byPath.has(p) && seg.ordinalsOf(p).length) notes++; terms += seg.head.terms; } return { sections: this._N(), notes, terms }; }
 
-  // How many of a term's postings are live.
-  _liveDf(e, ids) {
-    if (!this.deadCount) return e.df; let df = e.df; const dead = this.dead;
-    for (let k = 0; k < e.df; k++) if (dead[ids[k]]) df--;
-    return df;
-  }
-  _plan(q) {
-    const seg = this.seg, ov = this.ov; const words = [...new Set(tokenize(q))]; const N = this._N(); const avg = N ? this._Len() / N : 0; const ts = [];
+  // The words of a query as BM25 sees them, as RecallIndex._terms has them. After a write a word's live count takes a scan of its postings,
+  // but a word that stays over the limit even if every dead section held it is dropped whatever the count, so a query need not scan it.
+  // Exact counts are still taken for explain, and when dropping would leave no words.
+  _plan(q, exact = false) {
+    const seg = this.seg, ov = this.ov; const words = [...new Set(tokenize(q))]; const N = this._N(); const avg = N ? this._Len() / N : 0; const ts = []; const dead = this.dead, deadCount = this.deadCount; let skipped = false;
     for (const w of words) {
-      const e = seg ? seg.lookup(w) : null; let ids = null, df = 0; if (e) { if (this.deadCount) ids = seg.ids(e); df = this._liveDf(e, ids); }
-      const ot = ov.terms.get(w); const odf = ot === undefined ? 0 : ov.df(ot); if (df + odf > 0) ts.push({ w, e, ids, ot, df: df + odf });
+      const e = seg ? seg.lookup(w) : null; let ids = null, df = 0; const ot = ov.terms.get(w); const odf = ot === undefined ? 0 : ov.df(ot);
+      if (e) {
+        df = e.df;
+        if (deadCount) { if (!exact && N > 2000 && e.df - deadCount + odf > N / 3) skipped = true; else { ids = seg.ids(e); for (let k = 0; k < e.df; k++) if (dead[ids[k]]) df--; } }
+      }
+      if (df + odf > 0) ts.push({ w, e, ids, ot, df: df + odf, over: skipped && e && deadCount && !ids });
     }
-    ts.sort((x, y) => x.df - y.df); let terms = ts; if (N > 2000) { const rare = ts.filter((t) => t.df <= N / 3); terms = (rare.length ? rare : ts.slice(0, 2)).slice(0, 12); }
+    ts.sort((x, y) => x.df - y.df); let terms = ts;
+    if (N > 2000) { const rare = ts.filter((t) => !t.over && t.df <= N / 3); if (!rare.length && skipped && !exact) return this._plan(q, true); terms = (rare.length ? rare : ts.slice(0, 2)).slice(0, 12); }
     return { words, all: ts, terms, N, avg };
   }
-  _cacheGet(w, e, ids) { const C = this.pcache || (this.pcache = { small: new Map(), main: new Map(), ghost: new Set(), bytes: 0, cap: (this.lab.cacheMb || 32) * 1048576 }); let h = C.main.get(w); if (h) { C.main.delete(w); C.main.set(w, h); return h; } h = C.small.get(w); if (h) { C.small.delete(w); C.main.set(w, h); return h; } h = { ids: ids || this.seg.ids(e), tfs: this.seg.tfs(e) }; const sz = h.ids.byteLength + h.tfs.byteLength; if (sz > C.cap / 4) return h; (C.ghost.has(w) ? C.main : C.small).set(w, h); C.ghost.delete(w); C.bytes += sz; while (C.bytes > C.cap) { const src = C.small.size > 64 || !C.main.size ? C.small : C.main; const [k, v] = src.entries().next().value; src.delete(k); C.bytes -= v.ids.byteLength + v.tfs.byteLength; if (src === C.small) { C.ghost.add(k); if (C.ghost.size > 4096) C.ghost.delete(C.ghost.values().next().value); } } return h; }
   _scratch(need) { const n = this.seg ? this.seg.head.n : 0; if (!this.score || this.score.length < n) { const room = n + (n >> 3); this.score = new Float64Array(room); this.seen = new Uint32Array(room); this.stamp = 0; } if (!this.order || this.order.length < need) this.order = new Uint32Array(Math.max(need, 1024)); this.stamp++; }
   query(q, { limit = 8, project = null, prefix = null, boosts = null, filter = null } = {}) {
     if (!this._N()) return empty(); const { terms, N, avg } = this._plan(q); if (!terms.length) return empty();
     const seg = this.seg, ov = this.ov, n = seg ? seg.head.n : 0, dead = this.dead; let need = 0; for (const t of terms) need += (t.e ? t.e.df : 0) + (t.ot === undefined ? 0 : ov.postings[t.ot].length);
-    this._scratch(need); const score = this.score, seen = this.seen, stamp = this.stamp, order = this.order; const c = seg ? seg.cols() : null; const ovScore = new Map(); let m = 0; let verdict = null, gate = null;
+    this._scratch(need); const score = this.score, seen = this.seen, stamp = this.stamp, order = this.order; const c = seg ? seg.cols() : null; const ovScore = new Map(); let m = 0;
     // Sections are visited in the order RecallIndex first meets them, so equal scores rank the same: term by term, the segment's then the overlay's.
     for (const t of terms) {
       const idf = Math.log(1 + (N - t.df + 0.5) / (t.df + 0.5));
-      if (t.e) {
-        const lab = this.lab || {}; const df = t.e.df; let ids, tfs;
-        if (lab.cache) { const hit = this._cacheGet(t.w, t.e, t.ids); ids = hit.ids; tfs = hit.tfs; } else if (lab.scratch) { if (!this.sI || this.sI.length < df) { this.sI = new Uint32Array(df * 2); this.sT = new Uint16Array(df * 2); } ids = t.ids || this.sI; if (!t.ids) fs.readSync(seg.fdI, ids, 0, df * 4, t.e.row * 4); tfs = this.sT; fs.readSync(seg.fdT, tfs, 0, df * 2, t.e.row * 2); } else { ids = t.ids || seg.ids(t.e); tfs = seg.tfs(t.e); }
-        if (lab.lens) { const L = seg.lens || (seg.lens = (() => { const a = new Uint32Array(n); for (let i = 0; i < n; i++) a[i] = c[i * ROW + C_LEN]; return a; })()); for (let k = 0; k < df; k++) { const i = ids[k]; if (dead[i]) continue; const f = tfs[k]; const part = idf * (f * K1P) / (f + K1 * (B0 + B * L[i] / avg)); if (seen[i] === stamp) score[i] += part; else { seen[i] = stamp; score[i] = part; order[m++] = i; } } }
-        else if (lab.early && filter && !prefix) {
-          if (!verdict) { verdict = new Int8Array(seg.projects.length + 1); gate = new SegGate(seg, filter); }
-          for (let k = 0; k < df; k++) { const i = ids[k]; if (dead[i]) continue; const o = i * ROW; const j = c[o + C_PROJ]; let w = verdict[j]; if (w === 0) w = verdict[j] = gate.judge(i); if (w === 2 && c[o + C_RB] === 0 && !gate.flagged(c[o + C_SIG])) continue; const f = tfs[k]; const part = idf * (f * K1P) / (f + K1 * (B0 + B * c[o + C_LEN] / avg)); if (seen[i] === stamp) score[i] += part; else { seen[i] = stamp; score[i] = part; order[m++] = i; } }
-        } else for (let k = 0; k < df; k++) { const i = ids[k]; if (dead[i]) continue; const f = tfs[k]; const part = idf * (f * K1P) / (f + K1 * (B0 + B * c[i * ROW + C_LEN] / avg)); if (seen[i] === stamp) score[i] += part; else { seen[i] = stamp; score[i] = part; order[m++] = i; } }
-      }
+      if (t.e) { const ids = t.ids || seg.ids(t.e), tfs = seg.tfs(t.e), df = t.e.df; for (let k = 0; k < df; k++) { const i = ids[k]; if (dead[i]) continue; const f = tfs[k]; const part = idf * (f * K1P) / (f + K1 * (B0 + B * c[i * ROW + C_LEN] / avg)); if (seen[i] === stamp) score[i] += part; else { seen[i] = stamp; score[i] = part; order[m++] = i; } } }
       if (t.ot !== undefined) for (const id of ov.postings[t.ot]) { const d = ov.docs.get(id); if (!d) continue; const part = RecallIndex._bm(RecallIndex._tf(d, t.ot), t.df, N, d.len, avg).part; const was = ovScore.get(id); if (was === undefined) { ovScore.set(id, part); order[m++] = n + id; } else ovScore.set(id, was + part); }
     }
-    const proj = project ? String(project).toLowerCase() : null; const top = []; let total = 0; const fly = seg ? new FilterDoc(seg, 0) : null; const plain = seg ? new SegDoc(seg, 0) : null; const lab = this.lab || {};
+    const proj = project ? String(project).toLowerCase() : null; const top = []; let total = 0; const fly = seg ? new FilterDoc(seg, 0) : null; const plain = seg ? new SegDoc(seg, 0) : null;
     // Empty tuning is every daemon's first state: nothing can change a score, so no heading is needed.
     let maxB = 1, boostSieve = null; if (boosts) { const k = boostInfo(boosts); maxB = k.max; boostSieve = k.sieve; }
-    const hasBoosts = boostSieve !== null; const projId = seg && proj ? seg.projectId(proj) : 0; if (!verdict && filter && seg && lab.memo !== false) verdict = new Int8Array(seg.projects.length + 1); else if (verdict) verdict = verdict.map((w) => (w === 3 ? 0 : w));
+    const hasBoosts = boostSieve !== null; const projId = seg && proj ? seg.projectId(proj) : 0; const verdict = filter && seg ? new Int8Array(seg.projects.length + 1) : null;
     for (let x = 0; x < m; x++) {
       const v = order[x]; let d, s, fp;
       if (v >= n) { d = ov.docs.get(v - n); s = ovScore.get(v - n); if (prefix && !d.path.startsWith(prefix)) continue; if (filter && !filter(d)) continue; fp = proj && d.project === proj ? 1.5 : 1; } else {
@@ -221,7 +205,7 @@ export class SegIndex {
     return t.ot === undefined ? 0 : RecallIndex._tf(d, t.ot);
   }
   explain(q, d, { project = null, boosts = null } = {}) {
-    const { words, all, terms, N, avg } = this._plan(q); const used = new Set(terms.map((t) => t.w)); const byW = new Map(all.map((t) => [t.w, t])); const parts = []; let base = 0;
+    const { words, all, terms, N, avg } = this._plan(q, true); const used = new Set(terms.map((t) => t.w)); const byW = new Map(all.map((t) => [t.w, t])); const parts = []; let base = 0;
     for (const w of words) { const t = byW.get(w); const f = t ? this._tfOf(d, t) : 0; if (!t || !f) { parts.push({ word: w, in_section: 0, contribution: 0, note: !t ? 'not in any note' : 'not in this section' }); continue; } if (!used.has(w)) { parts.push({ word: w, in_section: f, sections_with_word: t.df, contribution: 0, note: 'too common to count (in over a third of all sections)' }); continue; } const { idf, part } = RecallIndex._bm(f, t.df, N, d.len, avg); base += part; parts.push({ word: w, in_section: f, sections_with_word: t.df, weight: round3(idf), contribution: round3(part) }); }
     parts.sort((a, b) => b.contribution - a.contribution); const pj = project ? String(project).toLowerCase() : null; const fp = pj && d.project === pj ? 1.5 : 1, fb = boosts?.[`${d.path}#${d.heading || ''}`] ?? 1;
     return { score: round3(base * fp * fb), words: parts, matched: parts.filter((p) => p.contribution > 0).map((p) => p.word), dropped_common: all.filter((t) => !used.has(t.w)).map((t) => t.w), section_words: d.len, average_section_words: Number(avg.toFixed(1)), project_multiplier: fp, feedback_multiplier: round3(fb) };

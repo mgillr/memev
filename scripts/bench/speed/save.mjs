@@ -7,8 +7,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
+const has = (k) => process.argv.includes(`--${k}`);
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
-const CODE = arg('code', path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..', '..')); const INDEX = arg('index'), WORK = arg('work'); const REPEATS = Number(arg('repeats', 3)); const SIZES = arg('sizes', '500,5000,16000').split(',').map(Number); const LAB = arg('lab') ? JSON.parse(arg('lab')) : null; if (LAB?.gated) LAB.gate = new Int32Array(new SharedArrayBuffer(4));
+const CODE = arg('code', path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..', '..')); const INDEX = arg('index'), WORK = arg('work'); const REPEATS = Number(arg('repeats', 3)); const SIZES = arg('sizes', '500,5000,16000').split(',').map(Number); const TUNE = arg('tune') ? JSON.parse(arg('tune')) : null; if (TUNE?.gated) TUNE.gate = new Int32Array(new SharedArrayBuffer(4));
 const { SegIndex } = await import(`${CODE}/src/engine/segindex.mjs`);
 const stat = (a) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); const q = (p) => Number(s[Math.min(s.length - 1, Math.floor((s.length - 1) * p))].toFixed(1)); return { n: s.length, p50: q(0.5), p95: q(0.95), max: q(1) }; };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -23,7 +24,7 @@ let wi = 0; const body = (extra = '') => { const i = wi++; return `# turn ${i}\n
 const PROMPTS = ['database migration timeout', 'how do we handle retries for webhook delivery in billing', 'write a unit test for parse_date', 'what did we decide about the deploy pipeline and the staging rollback when the health check fails twice', 'token rotation schedule for the api gateway'];
 let bad = 0; const rows = [];
 for (let rep = 0; rep < REPEATS; rep++) for (const size of SIZES) {
-  restore(); const ix = new SegIndex(file); if (!ix.load()) throw new Error('segment did not load'); ix.lab = LAB; const out = { rep, overlay: size };
+  restore(); const ix = new SegIndex(file); if (!ix.load()) throw new Error('segment did not load'); ix.foldTune = TUNE || {}; const out = { rep, overlay: size };
   const n0 = ix.docs.size; const seg = ix.seg; out.sections = n0; out.open_columns_ms = timed(() => { ix.query('database migration timeout', { limit: 4, boosts: {} }); });
   out.first_write_ms = timed(() => ix.update('notes/bench/first.md', body())); let added = ix.docs.size - n0; let i = 0;
   // Grow the overlay the way writes do, in saves of 20, keeping it under the fold threshold where the size asks for that.
@@ -36,7 +37,8 @@ for (let rep = 0; rep < REPEATS; rep++) for (const size of SIZES) {
   const sw = ix._swap; let swapMs = null; ix._swap = function (...a) { const t = performance.now(); const r = sw.apply(this, a); swapMs = Number((performance.now() - t).toFixed(1)); return r; };
   const t0 = performance.now(); let startMs; const before = stall; startMs = timed(() => ix.foldSoon()); const during = []; const wr = []; let q = 0; let duringWrites = 0; const f = ix.foldP;
   let done = false; f.then(() => { done = true; });
-  while (!done) { const t = performance.now(); ix.query(PROMPTS[q++ % PROMPTS.length], { limit: 4, boosts: {} }); during.push(performance.now() - t); if (q % 5 === 0) { const t2 = performance.now(); ix.update(`notes/bench/d${q}.md`, body()); duringWrites++; const f2 = ix.foldSoon; ix.foldSoon = () => ix.foldP; ix.save(); ix.foldSoon = f2; wr.push(performance.now() - t2); } await sleep(5); if (performance.now() - t0 > 600000) { console.log('fold did not finish'); bad++; break; } }
+  if (has('quiet')) { await f; }
+  while (!done) { const g = TUNE?.gate; if (g && TUNE.gated) Atomics.store(g, 0, 1); const t = performance.now(); ix.query(PROMPTS[q++ % PROMPTS.length], { limit: 4, boosts: {} }); during.push(performance.now() - t); if (g && TUNE.gated) { Atomics.store(g, 0, 0); Atomics.notify(g, 0); } if (q % 5 === 0) { const t2 = performance.now(); ix.update(`notes/bench/d${q}.md`, body()); duringWrites++; const f2 = ix.foldSoon; ix.foldSoon = () => ix.foldP; ix.save(); ix.foldSoon = f2; wr.push(performance.now() - t2); } await sleep(20); if (performance.now() - t0 > 600000) { console.log('fold did not finish'); bad++; break; } }
   await f; out.fold_wall_ms = Math.round(performance.now() - t0); out.fold_start_blocks_ms = startMs; out.swap_blocks_ms = swapMs; out.recall_during_fold_ms = stat(during); out.save_during_fold_ms = stat(wr); out.writes_during_fold = duringWrites; out.longest_stall_ms = Number(Math.max(stall, before).toFixed(1));
   run = false; await sleep(5); const after = []; for (let k = 0; k < 20; k++) { const t = performance.now(); ix.query(PROMPTS[k % PROMPTS.length], { limit: 4, boosts: {} }); after.push(performance.now() - t); } out.recall_after_ms = stat(after);
   if (ix.seg === seg) { console.log('the fold did not swap'); bad++; } const expect = n0 + added + duringWrites * 2; out.sections_after = ix.docs.size; out.expect_about = expect; if (ix.docs.size < n0) { console.log('the fold lost sections'); bad++; }
