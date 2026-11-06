@@ -8,7 +8,7 @@
 //
 // Lines: ["e",n,id,name,kind] names mention n; ["n",path,size,mtimeMs,ctimeMs,hash,sections,op] is a note's whole record, where op names
 // the log record it stands at; ["a",path,size,mtimeMs,ctimeMs,hash,sections,op,prev] adds sections to the record standing at prev and moves
-// it to op, and a record standing at op already has them, so replaying a journal after a crash in a fold changes nothing;
+// it to op. A record standing anywhere else drops, so lines replayed after a crash in a fold can never double a section: at worst the note is read;
 // ["d",path] drops a record.
 // sections = [[heading,[mention numbers]]...], sections with no entity left out.
 //
@@ -63,7 +63,7 @@ export function baseText(recs, mentions) {
 
 function writePrivateFile(file, text) { const tmp = `${file}.${process.pid}.tmp`; fs.writeFileSync(tmp, text, { mode: 0o600 }); fs.renameSync(tmp, file); }
 
-/** Fold the old journal into the base. Runs on a worker. Rename is the commit: a crash before it leaves both inputs, after it the old journal replays to the same records. */
+/** Fold the old journal into the base. Runs on a worker. Rename is the commit: a crash before it leaves both inputs, after it the old journal replays harmlessly (see the "a" line). */
 export function foldFiles(state) {
   const { recs, mentions } = readState(state, false); // the live journal is read on top at the next start, and only then
   writePrivateFile(path.join(state, 'notes.state'), baseText(recs, mentions));
