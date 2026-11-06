@@ -250,7 +250,7 @@ export class Vault extends EventEmitter {
     for (const [p, h] of this.log.heads) {
       if (h.deleted || !h.ch) continue;
       each(p, () => {
-        const st = scan.get(p); const r = this.notes?.recs.get(p);
+        const st = scan.get(p); const r = this.notes?.recs?.get(p);
         if (st && r && r.ch === h.ch && this._sameStat(st, r)) return; // the walk found no link on the way, and the file is as Memev left it
         if (this._linked(p)) return; // never rebuilt through a link: the write would land wherever the link points
         const cur = this._read(p);

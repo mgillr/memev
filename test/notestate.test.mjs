@@ -121,7 +121,7 @@ test('a note that left while stopped leaves the restored graph', () => {
     else {
       v.close();
       if (how === 'moved to the archive') { fs.mkdirSync(path.join(root, 'work/archive/sessions'), { recursive: true }); fs.renameSync(file, path.join(root, 'work/archive/sessions/gone.md')); }
-      else { const out = path.join(root, '..', `${path.basename(root)}-outside.md`); fs.writeFileSync(out, '# x\nOutside Entity here\n'); fs.rmSync(file); fs.symlinkSync(out, file); }
+      else { const out = path.join(root, '.memev', 'outside.md'); fs.writeFileSync(out, '# x\nOutside Entity here\n'); fs.rmSync(file); fs.symlinkSync(out, file); }
     }
     v = open(root);
     assert.equal(v.graph.entities.has('gone-entity'), false, how);
@@ -190,7 +190,7 @@ test('the journal folds on a worker, a crash in the fold replays cleanly, and th
 
 test('the real daemon runs the sweep behind its start and reports it', async () => {
   const root = fresh(); const file = settled(root, { ignoreCtime: true }); void file;
-  const c = spawn(process.execPath, [path.join(PKG, 'src/server/main.mjs'), '--root', root, '--port', '47991'], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const c = spawn(process.execPath, [path.join(PKG, 'src/server/main.mjs'), '--root', root, '--port', '0'], { stdio: ['ignore', 'ignore', 'pipe'] });
   let err = ''; c.stderr.on('data', (d) => { err += d; });
   let saw; try { saw = await until(() => err.includes('sweep done'), 120000); } finally { c.kill('SIGTERM'); await new Promise((r) => c.once('exit', r)); }
   assert.ok(saw, `the sweep log line: ${err}`);
