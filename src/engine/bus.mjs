@@ -57,6 +57,7 @@ const listIn = (map, key) => { let l = map.get(key); if (!l) { l = []; map.set(k
 /** Add a message to a list kept in the bus order; nearly always that is the end. */
 const putInOrder = (list, m, atEnd) => { if (atEnd) { list.push(m); return; } let i = list.length; while (i > 0 && order(list[i - 1], m) > 0) i--; if (i === list.length) list.push(m); else list.splice(i, 0, m); };
 /** Where a message sits in the order: its seq, except beside a line that carries its own. */
+const isSortedByPlace = (l) => { for (let i = 1; i < l.length; i++) if (l[i - 1].seq > l[i].seq) return false; return true; };
 const placeOf = (v, m) => (v.place ? v.place.get(m) : m.seq);
 function addToView(v, m, atEnd) {
   const had = v.firstById.get(m.id); if (!had || (!atEnd && order(m, had) < 0)) v.firstById.set(m.id, m);
@@ -470,10 +471,20 @@ export class Bus {
     if (upTo > 0) st.read[device] = upTo; else delete st.read[device];
     if (arr.length) st.extra[device] = arr; else delete st.extra[device];
   }
-  /** Has this seat seen this message yet (its read prefix or extras cover it)? */
-  _isRead(st, m) {
-    const { upTo, extra } = this._readUpTo(st, m.device);
-    return m.dseq <= upTo || extra.has(m.dseq);
+  /**
+   * The messages this read state does not cover, in bus order. Each computer's run is held in counter order, so the read
+   * position is a place to jump to: the cost follows what is unread, not what is on the bus.
+   */
+  _pastRead(view, st) {
+    const out = [];
+    for (const [device, run] of view.runs) {
+      const upTo = readPrefix(st.read, device); const extra = st.extra[device]; const skip = extra?.length ? new Set(extra) : null;
+      let lo = 0; let hi = run.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (run[mid].dseq <= upTo) lo = mid + 1; else hi = mid; }
+      for (let i = lo; i < run.length; i++) if (!skip || !skip.has(run[i].dseq)) out.push(run[i]);
+    }
+    if (view.runs.size > 1 || view.exotic) out.sort((a, b) => placeOf(view, a) - placeOf(view, b));
+    else if (!isSortedByPlace(out)) out.sort((a, b) => a.seq - b.seq);
+    return out;
   }
   /** Mark one message read, keeping the contiguous prefix and the extras. */
   _markRead(st, m) {
@@ -511,7 +522,9 @@ export class Bus {
     const p = this._pulse(who.seat); const st = readState(p);
     const view = this._view(); const all = view.msgs;
     const names = this._names(who.seat);
-    const fresh = all.filter((m) => !this._isRead(st, m) && this._toMe(who, m, names) && this._visible(who, m));
+    // only what lies past this seat's read position can be fresh, so that is all this looks at (a seat that has kept up looks at nothing)
+    const above = this._pastRead(view, st);
+    const fresh = above.filter((m) => this._toMe(who, m, names) && this._visible(who, m));
     const cap = capped || limit != null;
     const isPriority = (m) => m.type === 'task' || (m.type === 'hold' && m.operator);
     let shownMsgs = fresh; let notShown = 0;
@@ -534,9 +547,12 @@ export class Bus {
     if (!peek) {
       if (cap) {
         for (const m of shownMsgs) this._markRead(st, m);
-        for (const m of all) if (names.includes(m.from)) this._markRead(st, m);
+        for (const m of above) if (names.includes(m.from)) this._markRead(st, m);
       } else {
-        for (const m of all) if (this._toMe(who, m, names) || names.includes(m.from)) this._markAllRead(st, m);
+        // the read position moves to the highest counter meant for this seat on each computer, however many there are below it
+        for (const run of view.runs.values()) {
+          for (let i = run.length - 1; i >= 0; i--) if (this._toMe(who, run[i], names) || names.includes(run[i].from)) { this._markAllRead(st, run[i]); break; }
+        }
       }
     }
     // these are answered as of the start of the call, whatever the heartbeat or an ack below adds to the bus
@@ -546,7 +562,7 @@ export class Bus {
     const ackOf = toAck.map((m) => ({ id: m.id, from: m.from }));
     // what this call saw: the bus position and, per device, the highest counter
     const frontier = all.length ? all[all.length - 1].seq : (p.seen_seq || 0);
-    const seenDseq = {}; for (const m of all) seenDseq[m.device] = Math.max(seenDseq[m.device] || 0, m.dseq);
+    const seenDseq = {}; for (const [device, run] of view.runs) seenDseq[device] = Math.max(0, run.at(-1).dseq);
     this.pulse(ctx, { who, read: peek ? null : st.read, readExtra: peek ? null : st.extra, seen: peek ? null : frontier, seenDseq: peek ? null : seenDseq });
     const acked = [];
     for (const m of ackOf) {
