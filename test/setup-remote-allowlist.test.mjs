@@ -60,6 +60,11 @@ test('T4-c08: a command on the setup-remote allowlist is accepted and runs, and 
     assert.doesNotMatch(lic.out, /not a licence/, 'the file was found: it is judged, not missing');
     assert.equal(lic.code, 1);
 
+    // before any app is connected ready answers at once: 1, not ready. With one connected it waits for that app's first session
+    const ready = await op.send(['ready']);
+    assert.equal(ready.code, 1, ready.out);
+    assert.match(ready.out, /No AI app is connected yet/);
+
     // an app that is found here: connect starts this vault's daemon, which the rest then see
     fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
     const connect = await op.send(['connect', 'claude-code']);
@@ -72,7 +77,6 @@ test('T4-c08: a command on the setup-remote allowlist is accepted and runs, and 
       [['deployment', 'show'], [0]],
       [['license', 'status'], [0]],
       [['devices', 'list'], [0]],
-      [['ready'], [1]], // src/cli/ready.mjs: 1 when not ready, and no app has opened a session here
       [['setup', 'remote', 'log'], [0]],
       [['setup', 'remote', 'log', '0123456789abcdef'], [1]], // no log with that id
     ];
