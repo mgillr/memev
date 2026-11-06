@@ -24,7 +24,25 @@ const MEMO = [[`  all() {
     this._memo = { key, out: out.map((m, i) => ({ seq: i + 1, ...m })) };
     return this._memo.out;
   }`]];
+const current = fs.readFileSync(path.join(REPO, 'src/engine/bus.mjs'), 'utf8')
+  .replace(/from '\.\/([a-z0-9-]+\.mjs)'/g, (_, m) => `from '${pathToFileURL(path.join(REPO, 'src/engine', m)).href}'`);
+const CACHED = `  _cachedJson(f, fallback) {
+    let st; try { st = fs.statSync(f); } catch { return fallback; }
+    const c = (this._jsonCache ||= new Map()).get(f);
+    if (c && c.ino === st.ino && c.size === st.size && c.mtimeMs === st.mtimeMs) return JSON.parse(JSON.stringify(c.v));
+    const v = readJson(f, fallback); this._jsonCache.set(f, { ino: st.ino, size: st.size, mtimeMs: st.mtimeMs, v });
+    return JSON.parse(JSON.stringify(v));
+  }
+`;
 const variants = {
+  // L3-C3, on the current code: seat and pulse files remembered until their identity, size or time changes
+  'l3c3-seat-file-cache': patch(current, [
+    [`  seat(name) {
+    const rec = readJson(this._p('seats', \`\${fileOf(name)}.json\`), null);`, `${CACHED}  seat(name) {
+    const rec = this._cachedJson(this._p('seats', \`\${fileOf(name)}.json\`), null);`],
+    [`.map((x) => readJson(this._p('seats', x), null))`, `.map((x) => this._cachedJson(this._p('seats', x), null))`],
+    [`_pulse(seat) { return readJson(this._p('pulse', \`\${fileOf(seat)}.json\`), { seat, read: {} }); }`, `_pulse(seat) { return this._cachedJson(this._p('pulse', \`\${fileOf(seat)}.json\`), { seat, read: {} }); }`],
+  ]),
   // L1-C1, the known method alone: remember the sorted array, keep every per-seat scan
   'l1c1-memo-only': patch(main, MEMO),
   // L1-C5, the arXiv pass's stack distance idea: scan back from the end until every seat has been seen; claims still need one pass

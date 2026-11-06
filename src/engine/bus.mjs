@@ -376,6 +376,10 @@ export class Bus {
     let size = 0; try { size = fs.statSync(this._p('log', nameOf(high))).size; } catch {}
     return { file: nameOf(size >= this.segmentBytes ? high + 1 : high), last };
   }
+  /** Each computer's highest counter so far. */
+  counters() { const out = {}; for (const [device, run] of this._view().runs) out[device] = Math.max(0, run.at(-1).dseq); return out; }
+  /** The messages above a per-computer cursor, in order, each the caller's own. */
+  pastCounters(seen) { const view = this._view(); return this._pastRead(view, { read: seen, extra: {} }).map(copyOut); }
   /** Every message, in the one order every computer agrees on, numbered from 1. The caller owns what it gets back. */
   all() { return this._view().msgs.map(copyOut); }
   /**
@@ -592,10 +596,11 @@ export class Bus {
    * position is a place to jump to: the cost follows what is unread, not what is on the bus.
    */
   _pastRead(view, st) {
-    const out = [];
+    let out = [];
     for (const [device, run] of view.runs) {
       const upTo = readPrefix(st.read, device); const extra = st.extra[device]; const skip = extra?.length ? new Set(extra) : null;
       let lo = 0; let hi = run.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (run[mid].dseq <= upTo) lo = mid + 1; else hi = mid; }
+      if (!skip && view.runs.size === 1) { out = run.slice(lo); break; }
       for (let i = lo; i < run.length; i++) if (!skip || !skip.has(run[i].dseq)) out.push(run[i]);
     }
     out.sort((a, b) => placeOf(view, a) - placeOf(view, b));
@@ -646,18 +651,17 @@ export class Bus {
     if (cap) {
       const lim = Math.min(Math.max(1, Math.floor(Number(limit)) || UNREAD_VIEW), UNREAD_MAX);
       // priority messages come first, in full, oldest first, at most UNREAD_MAX of them; the rest stay unread and are counted
-      const allPriority = fresh.filter(isPriority);
-      const priority = allPriority.slice(0, UNREAD_MAX);
+      const allPriority = []; const late = []; const rest = [];
       // I always show a message that arrived after this seat's last call but landed at or before
       // what that call saw (written offline, for example), so it is not buried under newer ones. It
       // is new if its device counter is above the highest that call saw from its device; what was
       // already there and left unshown is not late, so the cap still applies to it on the next call.
       const seen = p.seen_seq || 0; const seenDseq = p.seen_dseq || null;
       const isLate = (m) => !!seenDseq && m.seq <= seen && m.dseq > (seenDseq[m.device] || 0);
-      const late = fresh.filter((m) => !isPriority(m) && isLate(m));
-      const rest = fresh.filter((m) => !isPriority(m) && !isLate(m));
-      shownMsgs = [...priority, ...[...late, ...rest.slice(-lim)].sort((a, b) => a.seq - b.seq)];
-      notShown = rest.length - rest.slice(-lim).length + (allPriority.length - priority.length);
+      for (const m of fresh) { if (isPriority(m)) allPriority.push(m); else if (isLate(m)) late.push(m); else rest.push(m); }
+      const priority = allPriority.slice(0, UNREAD_MAX); const newest = rest.slice(-lim);
+      shownMsgs = [...priority, ...[...late, ...newest].sort((a, b) => a.seq - b.seq)];
+      notShown = rest.length - newest.length + (allPriority.length - priority.length);
     }
     if (!peek) {
       if (cap) {
@@ -677,7 +681,7 @@ export class Bus {
     const ackOf = toAck.map((m) => ({ id: m.id, from: m.from }));
     // what this call saw: the bus position and, per device, the highest counter
     const frontier = all.length ? all[all.length - 1].seq : (p.seen_seq || 0);
-    const seenDseq = {}; for (const [device, run] of view.runs) seenDseq[device] = Math.max(0, run.at(-1).dseq);
+    const seenDseq = this.counters();
     this.pulse(ctx, { who, read: peek ? null : st.read, readExtra: peek ? null : st.extra, seen: peek ? null : frontier, seenDseq: peek ? null : seenDseq });
     const acked = [];
     for (const m of ackOf) {

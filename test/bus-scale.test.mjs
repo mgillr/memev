@@ -106,6 +106,16 @@ test('lines from another computer go in without sorting the bus again', () => {
   assert.equal(bus.health({ at: 1 }).bad_lines, 0);
 });
 
+test('on one computer whose times do not follow its counters, unread is still in bus order', () => {
+  const root = fixture(0); const bus = new Bus({ root, devices }); const f = path.join(root, 'bus/log', `${device.id}.jsonl`);
+  const at = (n, t) => JSON.stringify({ id: `scalehos-${n}`, dseq: n, ts: `2026-01-01T00:00:0${t}.000Z`, device: device.id, from: 'bot1@fleet', operator: false, to: 'all', type: 'status', body: `m${n}`, ref: null, project: null });
+  fs.writeFileSync(f, `${[at(1, 5), at(2, 3), at(3, 9), at(4, 1)].join('\n')}\n`);
+  fs.writeFileSync(path.join(root, 'bus/pulse/bot2~fleet.json'), JSON.stringify({ seat: 'bot2@fleet', device: device.id, read: {} }));
+  const got = bus.unread(ctxOf(2), { seat: 'bot2@fleet', peek: true }).messages;
+  assert.deepEqual(got.map((m) => m.body), ['m4', 'm2', 'm1', 'm3']);
+  assert.deepEqual(got.map((m) => m.seq), [1, 2, 3, 4]);
+});
+
 test('what the bus hands out is the caller\'s own: changing it changes nothing inside', () => {
   const root = fixture(50); const bus = new Bus({ root, devices }); const ctx = ctxOf(2);
   for (const list of [bus.all(), bus.tail(ctx, { seat: 'bot2@fleet', n: 5 }).messages, bus.since(ctx, { seat: 'bot2@fleet', seq: 0, limit: 5 }).messages]) { list[0].body = 'changed'; list[0].seq = -1; list.length = 0; }
