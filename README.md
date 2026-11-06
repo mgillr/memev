@@ -13,7 +13,7 @@
 <p><code>npm install -g . && memev init --no-connect</code></p>
 
 <p align="center">
-<img src="docs/assets/connective-infrastructure.svg" alt="Memev system diagram, in two separate sides that never mix. Personal side: AI apps and agents connect over MCP to Memev on your computer, which keeps a personal vault backed up to your own private git remote; that is the free core, built today. Personal with more computers, the paid tier, lets up to three of your own computers in all share that vault over the secure link; merging simultaneous edits is planned. Organisation side, all planned: members' computers and business systems feed one company vault with an admin console and an executive view for business inference intelligence (Business); site nodes that each keep their own memory and authority (Corporate); and other organisations that share only what each agreement permits (Federated). The CRDT-Merge convergence engine is a separate engine that each vault and node calls for its own merges." width="900">
+<img src="docs/assets/connective-infrastructure.svg" alt="Memev operating architecture diagram, in two separate sides that never mix. Personal side: AI apps and agents connect over MCP to Memev on your computer, which keeps a personal vault backed up to your own private git remote; that is the free core, built today. Personal with more computers, the paid tier, lets up to three of your own computers in all share that vault over the secure link; merging simultaneous edits is planned. Organisation side, all planned: members' computers and business systems feed one company vault with an admin console and an executive view for business inference intelligence (Business); site nodes that each keep their own memory and authority (Corporate); and other organisations that share only what each agreement permits (Federated). The CRDT-Merge convergence engine is a separate engine that each vault and node calls for its own merges." width="900">
 </p>
 
 
@@ -104,7 +104,7 @@ Memev starts with the individual because personal AI connectivity is valuable in
 | Independent organisations on a shared programme | Federated tier (planned) | Partners connect through explicit, bilateral trust and scope without surrendering their local systems or data |
 | An industry or research network | Federated tier (planned) | Multiple organisations coordinate selected work, evidence and computation under their own policies |
 
-## Five tiers, one connective architecture
+## Five tiers, one operating architecture
 
 Memev grows by the scope of coordination required. The first two tiers serve an individual across one or more computers; Business and Corporate serve one organisation at increasing scale. The fifth tier connects **independent organisations** that need to work together without becoming one organisation or placing all of their data under one authority.
 
@@ -151,7 +151,7 @@ The first question a business asks about AI is how it is kept from doing damage.
 
 ## How it fits together
 
-Memev is the connective layer between people, their work, the systems they use and the AI capabilities they authorise. The illustration shows the intended product boundary: Memev connects existing systems and relates their work; it is not itself the model provider, memory vendor, agent framework, CRM, ERP or business application.
+Memev is the provider-neutral operating layer between people, their work, the systems they use and the AI capabilities they authorise. The illustration shows the intended product boundary: Memev connects existing systems and relates their work; it is not itself the model provider, memory vendor, agent framework, CRM, ERP or business application.
 
 - **Connect:** integrate AI providers, memory systems, agents, business services, people and machines through supported interfaces.
 - **Capture work:** ingest, reference or query authorised plans, documents, decisions, tasks, operational updates and other work products from the systems people already use.
