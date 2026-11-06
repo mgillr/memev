@@ -6,8 +6,7 @@
 
 <h1>Memev</h1>
 
-<p><strong>The operating infrastructure for distributed AI work.</strong><br>
-Coordinate people, AI systems and organisations around governed work and verifiable outcomes.</p>
+<p><strong>Memev is the provider-neutral operating infrastructure that helps people and organisations adopt AI today and coordinate increasingly autonomous systems tomorrow across applications, functions, sites and independent organisations, without surrendering control of their data, authority or operational state.</strong></p>
 
 <p><strong>Development preview — actively under development.</strong> The Free Core is available for testing; this is not yet a production release. Interfaces and behaviour may change. Business, Corporate, Federated and full distributed-convergence capabilities remain under development unless explicitly marked as available below.</p>
 
@@ -17,7 +16,7 @@ Coordinate people, AI systems and organisations around governed work and verifia
 <img src="docs/assets/connective-infrastructure.svg" alt="Memev system diagram, in two separate sides that never mix. Personal side: AI apps and agents connect over MCP to Memev on your computer, which keeps a personal vault backed up to your own private git remote; that is the free core, built today. Personal with more computers, the paid tier, lets up to three of your own computers in all share that vault over the secure link; merging simultaneous edits is planned. Organisation side, all planned: members' computers and business systems feed one company vault with an admin console and an executive view for business inference intelligence (Business); site nodes that each keep their own memory and authority (Corporate); and other organisations that share only what each agreement permits (Federated). The CRDT-Merge convergence engine is a separate engine that each vault and node calls for its own merges." width="900">
 </p>
 
-<p><strong>Memev is the connective infrastructure for AI.</strong> It enables individuals, teams and organisations to connect their AI providers, memory systems, agents, services, people and machines through shared communications, context and federated infrastructure.</p>
+
 
 <p>It starts as a valuable free personal product, grows through teams and enterprise deployments, and extends through the Federated tier to connect independent organisations and the wider systems on which industries depend.</p>
 
@@ -33,7 +32,7 @@ Coordinate people, AI systems and organisations around governed work and verifia
 <a href="docs/README.md">Documentation</a> &middot;
 <a href="docs/ARCHITECTURE.md">Architecture</a> &middot;
 <a href="docs/tiers/README.md">Tiers</a> &middot;
-<a href="docs/AI-ECONOMY-STRATEGY.md">AI economy strategy</a> &middot;
+<a href="MEMEV-STRATEGY.md">Memev strategy</a> &middot;
 <a href="docs/PRICING.md">Pricing</a> &middot;
 <a href="CHANGELOG.md">Changelog</a>
 </p>
@@ -162,7 +161,7 @@ Memev is the connective layer between people, their work, the systems they use a
 - **Control and verify:** apply identity, permissions, provenance, data-sovereignty rules and work-contract checks; keep inferred findings distinct from verified facts.
 - **Federate:** extend authorised exchange and computation across computers, teams, departments and independent sites as those capabilities are delivered.
 
-The local vault, recall, graph, communications bus and work-contract mechanisms provide important parts of the current personal foundation. The broader architecture is provider-neutral: connected systems retain their specialist capabilities, while Memev supplies the connective mechanisms and governed context. The organisation-wide work ingestion, cross-project reasoning and federated views are product direction, not a claim that every connector or workflow is already operational.
+The local vault, recall, graph, communications bus and work-contract mechanisms provide important parts of the current personal foundation. The broader architecture is provider-neutral: connected systems retain their specialist capabilities, while Memev provides the operating environment for shared context, coordination, authority, evidence and governed state. The organisation-wide work ingestion, cross-project reasoning and federated views are product direction, not a claim that every connector or workflow is already operational.
 
 ```mermaid
 flowchart LR
@@ -295,7 +294,7 @@ Memev runs on macOS and Linux. **Windows is a preview:** it has code paths and C
 
 ## Plans and roadmap
 
-Memev's product direction is broader than the current release. Every line below distinguishes what exists from what is in progress or planned. The connective infrastructure vision does not mean that every provider, external memory system, business application or federated deployment is already integrated.
+Memev's product direction is broader than the current release. Every line below distinguishes what exists from what is in progress or planned. The strategy does not mean that every provider, external memory system, business application or federated deployment is already integrated.
 
 ### Available now
 
