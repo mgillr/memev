@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // memev import: preview and import history from project folders, AI history files, and chat export zips.
+import fs from 'node:fs';
 import { resolveRoot, config, saveConfig, PKG, daemonInfo, pidAlive } from './common.mjs';
 import { isVault, Vault } from '../engine/vault.mjs';
+import { readZip } from '../engine/zip.mjs';
 import { stopDaemon, startDaemon } from './daemon.mjs';
 import { scanAll, existingHashes, dedup, runImport, listImports, undoImport, offerImport } from '../engine/importers/core.mjs';
 
@@ -82,6 +84,12 @@ export async function command(cmd, pos, flags, { root, env, stdin = process.stdi
   if (!paths.length && !aiHistory && !exportFiles.length) {
     paths.push(process.cwd());
     aiHistory = true;
+  }
+
+  // the scan treats any zip it cannot read as having nothing in it; a zip refused for its size is said out loud
+  for (const f of exportFiles) {
+    try { if (fs.existsSync(f)) readZip(fs.readFileSync(f)); }
+    catch (e) { if (e.code === 'zip_too_large') { console.log(`refused: ${f}: ${e.message}`); return 1; } }
   }
 
   const items = scanAll({ paths, aiHistory, exports: exportFiles, cwd: process.cwd(), home: env.HOME || '' });
