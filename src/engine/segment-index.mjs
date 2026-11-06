@@ -232,7 +232,16 @@ export class SegIndex {
    * pick up. A read that failed in passing leaves the step waiting, in order, for the next query or save, and the log position stays behind it.
    */
   _writeStep(fn) { if (this.rebuilding) return; this._drain(); if (this.retry.length) { this.retry.push(fn); return; } try { fn(); } catch (e) { if (isPassing(e)) this.retry.push(fn); else if (!(e instanceof SegDamage)) throw e; } }
-  _drain() { while (this.retry.length) { try { this.retry[0](); this.retry.shift(); } catch (e) { if (e instanceof SegDamage) { this.retry = []; return; } if (isPassing(e)) return; throw e; } } }
+  _drain() {
+    while (this.retry.length) {
+      try { this.retry[0](); this.retry.shift(); } catch (e) {
+        if (isPassing(e)) return; this.retry = [];
+        // A step that cannot be done cannot be dropped either, as the index would then miss a write: the notes have it, so the index is built from them.
+        if (!(e instanceof SegDamage)) this._damaged(`a write could not reach the index: ${e.code || e.message}`);
+        return;
+      }
+    }
+  }
   retrying() { return this.retry.length > 0; }
   /** A read of the index. One that fails in passing fails this one question, in words that say so; nothing is thrown away and the next one tries again. */
   _asking(fn) { this._serving(); this._drain(); this._serving(); try { if (this.retry.length) throw new IndexBusy('a write is waiting to reach it'); return fn(); } catch (e) { if (isPassing(e)) throw new IndexBusy(e.code); throw e; } }

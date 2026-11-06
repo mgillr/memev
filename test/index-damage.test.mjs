@@ -562,6 +562,10 @@ test('a first open on a folder that cannot take an index logs every note and ope
   let v; try { v = open(root); assert.equal(v.index.state().state, 'failed'); assert.ok(v.log.heads.has('notes/one.md'), 'the note is logged'); v.close(); } finally { fs.chmodSync(segDir(root), 0o700); }
   v = open(root); assert.deepEqual(hits(v, 'firstrunword'), ['notes/one.md']); v.close();
 });
+test('a step waiting for a read that then fails for good does not stick: the notes rebuild the index', async () => {
+  const root = seeded(12); const v = open(root); hits(v, WORD(1)); v.index.retry.push(() => { throw new TypeError('unexpected'); });
+  assert.throws(() => hits(v, WORD(1)), (e) => e.code === 'index_rebuilding'); assert.equal(v.index.retry.length, 0); assert.match(v.status().index.damage.why, /unexpected/); assert.ok(await until(() => v.index.state().state === 'ok')); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md']); v.close();
+});
 
 test('a write met by a read that fails in passing lands, reaches recall on the retry, and holds the saved position back until it has', () => {
   const root = seeded(12); const v = open(root); hits(v, WORD(9)); const seqFile = path.join(root, '.memev/index.seq'); const was = fs.readFileSync(seqFile, 'utf8'); const undo = failing('bypath.bin', 'EMFILE', 1000);
@@ -575,6 +579,13 @@ test('a start that cannot read the index just now fails and tries again: the gen
   for (const name of ['head.json', 'dict.txt', 'CURRENT', 'overlay.log']) {
     const root = seeded(12); const gen = genDir(root); const undo = failing(name, 'EMFILE'); try { assert.throws(() => open(root), (e) => e.code === 'EMFILE', name); } finally { undo(); } assert.equal(genDir(root), gen, name); const v = open(root); assert.equal(v.status().index.damage, null, name); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md'], name); assert.equal(genDir(root), gen, name); v.close();
   }
+});
+test('doctor and a compact met by a machine short of something find no damage', () => {
+  const root = seeded(12); const v = open(root); let undo = failing('tfs.bin', 'EMFILE'); let checks; try { checks = fileChecks({ root, vault: v }); } finally { undo(); } const c = checks.find((x) => x.id === 'index-files'); assert.equal(c.status, 'warn'); assert.match(c.detail, /EMFILE/); assert.equal(checks.find((x) => x.id === 'index'), undefined, 'no count of what could not be read, and no rebuild offered on it'); assert.equal(v.index.state().state, 'ok');
+  const gen = genDir(root); v.write(ME, { path: 'notes/late.md', body: '# L\nlateword\n' }); v.index.save(); undo = failing('tfs.bin', 'EMFILE'); try { assert.throws(() => v.index.compact(), (e) => e.code === 'EMFILE'); } finally { undo(); } assert.equal(v.index.state().state, 'ok', 'no rebuild'); assert.equal(v.status().index.damage, null); assert.equal(genDir(root), gen, 'still the same generation'); v.index.compact(); assert.notEqual(genDir(root), gen, 'and it works when tried again'); assert.deepEqual(hits(v, 'lateword'), ['notes/late.md']); v.close();
+});
+test('doctor met by any other read error reports damage', async () => {
+  const root = seeded(12); const v = open(root); const undo = failing('tfs.bin', 'EIO'); let c; try { c = fileChecks({ root, vault: v }).find((x) => x.id === 'index-files'); } finally { undo(); } assert.equal(c.status, 'fail'); assert.match(c.detail, /tfs\.bin: EIO/); assert.ok(await until(() => v.index.state().state === 'ok')); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md']); v.close();
 });
 
 test('memev compact folds even when its own save would have started a fold', () => {
