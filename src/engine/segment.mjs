@@ -38,11 +38,9 @@ export class RebuildFailed extends SegDamage { constructor(why) { super(why); th
 export class SegOtherVersion extends Error {}
 /** A file could not be read just now. Nothing is known to be wrong with it, so this one query fails and the next tries again. */
 export class IndexBusy extends Error { constructor(code) { super(`the recall index could not be read just now (${code}); try again`); this.name = 'IndexBusy'; this.code = 'index_busy'; } }
-/** Damage is a file gone, of the wrong type, the wrong size or the wrong sum. An error with no code is this code's own finding, such as a short read. */
-const GONE = new Set(['ENOENT', 'ENOTDIR', 'ELOOP', 'EMLINK', 'EISDIR', 'EFTYPE']);
-export const isGone = (e) => !e.code || GONE.has(e.code);
-/** A failure of the system and not a finding about the file: too many open files, a read error, no permission. It passes, and costs no rebuild. */
-export const isPassing = (e) => !(e instanceof SegDamage) && !(e instanceof SegOtherVersion) && !isGone(e);
+/** Only a machine short of something passes, so only that is worth trying again. A bad sector gives EIO every time: that, and everything else, is damage. */
+const PASSING = new Set(['EMFILE', 'ENFILE', 'ENOMEM', 'EAGAIN', 'EBUSY', 'ETIMEDOUT']);
+export const isPassing = (e) => PASSING.has(e?.code);
 /** A path the index may hand out: relative, with no step up and nothing a vault path never holds. A forged or damaged line cannot name a file outside the vault. */
 export const indexablePath = (p) => typeof p === 'string' && p.length > 0 && !/[\u0000-\u001f\u007f]/.test(p) && !p.split('/').some((x) => x === '..' || x === '.' || x === '') && !p.startsWith('/');
 /** A signature of an item key (path#heading). A key absent from a small bitmap of signatures needs no heading. */
@@ -188,6 +186,8 @@ export class Seg {
   close() { for (const f of this.fds) fs.closeSync(f); this.fds = []; }
   /** Say so once, and stop: nothing read from here on may be believed. */
   _bad(why) { const e = new SegDamage(why); this.onDamage?.(e); throw e; }
+  /** A read by offset, which holds to the same rule as a file read whole: a machine short of something passes, and anything else is damage. */
+  _readAt(fd, f, into, length, pos) { try { return fs.readSync(fd, into, 0, length, pos); } catch (e) { if (isPassing(e)) throw e; return this._bad(`${f}: ${e.code || e.message}`); } }
   _whole(f) { let b; try { b = readAligned(path.join(this.dir, f)); } catch (e) { if (isPassing(e)) throw e; return this._bad(`${f}: ${e.code || e.message}`); } if (b.length !== this.head.sizes[f] || sumOf(b) !== this.head.sums[f]) return this._bad(`${f} differs from its checksum`); return b; }
   /** The section columns as one typed array, read once on first use, with the names they point at. Either may be damaged in a way that keeps its size, so both are held to their sums here: every path a hit or a scope check sees comes through this. */
   cols() {
@@ -205,7 +205,7 @@ export class Seg {
   }
   lookup(w) {
     const s = this.head.sparse; let lo = 0, hi = s.length - 1, at = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (s[m][0] <= w) { at = m; lo = m + 1; } else hi = m - 1; }
-    if (at < 0) return null; const st = s[at][1], en = at + 1 < s.length ? s[at + 1][1] : this.head.dictBytes; const b = Buffer.allocUnsafe(en - st); if (fs.readSync(this.fdD, b, 0, b.length, st) !== b.length) this._bad('dict.txt is shorter than recorded');
+    if (at < 0) return null; const st = s[at][1], en = at + 1 < s.length ? s[at + 1][1] : this.head.dictBytes; const b = Buffer.allocUnsafe(en - st); if (this._readAt(this.fdD, 'dict.txt', b, b.length, st) !== b.length) this._bad('dict.txt is shorter than recorded');
     // A block starts at the word the head says, its words ascend and each row follows the last. Damage that keeps the size shows here, on the query that meets it.
     const lines = b.toString('utf8').split('\n'); if (lines.pop() !== '') this._bad('dict.txt: a block does not end a line'); if (lines[0]?.slice(0, lines[0].indexOf('\t')) !== s[at][0]) this._bad('dict.txt: a block does not start at its word');
     let found = null, prev = null, next = null;
@@ -217,8 +217,8 @@ export class Seg {
     }
     return found;
   }
-  ids(e) { const a = new Uint32Array(e.df); if (fs.readSync(this.fdI, a, 0, e.df * 4, e.row * 4) !== e.df * 4) this._bad('ids.bin is shorter than recorded'); const n = this.head.n; let was = -1; for (let k = 0; k < a.length; k++) { const i = a[k]; if (i <= was || i >= n) this._bad('ids.bin: a posting list is out of order or out of range'); was = i; } return a; }
-  tfs(e) { const a = new Uint16Array(e.df); if (fs.readSync(this.fdT, a, 0, e.df * 2, e.row * 2) !== e.df * 2) this._bad('tfs.bin is shorter than recorded'); for (let k = 0; k < a.length; k++) if (!a[k]) this._bad('tfs.bin: a count of nothing'); return a; }
+  ids(e) { const a = new Uint32Array(e.df); if (this._readAt(this.fdI, 'ids.bin', a, e.df * 4, e.row * 4) !== e.df * 4) this._bad('ids.bin is shorter than recorded'); const n = this.head.n; let was = -1; for (let k = 0; k < a.length; k++) { const i = a[k]; if (i <= was || i >= n) this._bad('ids.bin: a posting list is out of order or out of range'); was = i; } return a; }
+  tfs(e) { const a = new Uint16Array(e.df); if (this._readAt(this.fdT, 'tfs.bin', a, e.df * 2, e.row * 2) !== e.df * 2) this._bad('tfs.bin is shorter than recorded'); for (let k = 0; k < a.length; k++) if (!a[k]) this._bad('tfs.bin: a count of nothing'); return a; }
   /** A word's postings and counts are what its dictionary line says they were. */
   checkList(e, ids, tfs) { if (listSig(e.word, ids, tfs, e.df) !== e.sig) this._bad(`ids.bin or tfs.bin: the postings of a word fail their check`); }
   /** What a pure test of a path said, by path id: 0 not asked yet, 1 kept, 2 dropped. A segment's paths never change, so it is kept per test. */
@@ -227,7 +227,7 @@ export class Seg {
   heading(i) { const c = this.cols(), v = c[i * ROW + C_HEAD]; if (v & NO_HEADING) return null; if (!this.h) this.h = this._whole('heads.bin'); const e = i + 1 < this.head.n ? (c[(i + 1) * ROW + C_HEAD] & 0x7fffffff) : this.head.headBytes; return this.h.ucs2Slice(v, e); }
   rb(i) { return decodeRb(this.cols()[i * ROW + C_RB] & 0x7fffffff); }
   hasFl(i) { return (this.cols()[i * ROW + C_RB] & HAS_FL) !== 0; }
-  meta(i) { const c = this.cols(), o = i * ROW; const b = Buffer.allocUnsafe(c[o + C_MLEN]); if (fs.readSync(this.fdM, b, 0, b.length, c[o + C_MHI] * 4294967296 + c[o + C_MLO]) !== b.length) this._bad('meta.jsonl is shorter than recorded'); const m = openLine(b.toString('utf8').trimEnd(), this.paths[c[o + C_PATH] - 1]); if (!m) this._bad(`meta.jsonl: section ${i} fails its check`); return m; }
+  meta(i) { const c = this.cols(), o = i * ROW; const b = Buffer.allocUnsafe(c[o + C_MLEN]); if (this._readAt(this.fdM, 'meta.jsonl', b, b.length, c[o + C_MHI] * 4294967296 + c[o + C_MLO]) !== b.length) this._bad('meta.jsonl is shorter than recorded'); const m = openLine(b.toString('utf8').trimEnd(), this.paths[c[o + C_PATH] - 1]); if (!m) this._bad(`meta.jsonl: section ${i} fails its check`); return m; }
   _table() {
     if (this.byPath) return this.byPath;
     const b = this._whole('bypath.bin'); if (b.length % 4 || b.length < 8) this._bad('bypath.bin: its size does not fit'); const t = new Uint32Array(b.buffer, b.byteOffset, b.length / 4); const nb = t[0], np = t[1], n = this.head.n;

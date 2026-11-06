@@ -510,6 +510,37 @@ test('a read met by a machine short of something fails that query, is retried an
     assert.equal(v.index.state().state, 'ok', `${code} ${name}: no rebuild`); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md'], `${code} ${name}: the retry`); assert.equal(v.status().index.damage, null); assert.equal(genDir(root), gen); v.close();
   }
 });
+test('any other read error is damage: a bad sector gives EIO every time, so the notes rebuild the index', async () => {
+  for (const code of ['EIO', 'EACCES', 'ESTALE']) for (const name of ['cols.bin', 'names.json', 'heads.bin', 'bypath.bin']) {
+    const root = seeded(12); const v = open(root); const undo = failing(name, code, 1000);
+    try { let threw = null; try { hits(v, WORD(1)); v.index.stats(); } catch (e) { threw = e; } assert.ok(v.status().index.damage, `${code} ${name}: noticed`); if (threw) assert.equal(threw.code, 'index_rebuilding', `${code} ${name}: ${threw.stack}`); assert.match(v.status().index.damage.why, new RegExp(code)); } finally { undo(); }
+    assert.ok(await until(() => v.index.state().state === 'ok'), `${code} ${name}: rebuilt`); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md']); v.close();
+  }
+  // the files read by offset, whose descriptors are already open
+  for (const [name, at] of [['dict.txt', 0], ['ids.bin', 1], ['tfs.bin', 2], ['meta.jsonl', 3]]) {
+    const root = seeded(12); const v = open(root); const fd = [v.index.seg.fdD, v.index.seg.fdI, v.index.seg.fdT, v.index.seg.fdM][at]; const real = fs.readSync; let left = 1;
+    fs.readSync = function injected(f, ...a) { if (f === fd && left-- > 0) { const e = new Error('EIO: injected'); e.code = 'EIO'; e.syscall = 'read'; throw e; } return real.call(this, f, ...a); };
+    try { assert.throws(() => hits(v, WORD(1)), (e) => e.code === 'index_rebuilding', name); } finally { fs.readSync = real; }
+    assert.match(v.status().index.damage.why, new RegExp(name.replace('.', '\\.'))); assert.ok(await until(() => v.index.state().state === 'ok'), name); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md'], name); v.close();
+  }
+});
+test('a start with head.json, overlay.log or CURRENT unreadable opens and rebuilds, while the notes are fine', () => {
+  for (const code of ['EIO', 'EACCES']) for (const name of ['head.json', 'overlay.log', 'CURRENT', 'cols.bin']) {
+    const root = seeded(12); const undo = failing(name, code, name === 'cols.bin' ? 0 : 1); let v; try { v = open(root); } finally { undo(); }
+    if (name !== 'cols.bin') assert.match(v.status().index.damage?.why || '', /head\.json|overlay\.log|CURRENT/, `${code} ${name}`); assert.equal(v.index.state().state, 'ok'); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md'], `${code} ${name}`); v.close();
+  }
+});
+test('a generation folder that cannot be looked at is damage, and said; a writing file that cannot be read keeps its folder', async () => {
+  const root = seeded(12); const real = fs.lstatSync; const name = path.basename(genDir(root)); let left = 1; fs.lstatSync = function injected(f, ...a) { if (String(f).endsWith(name) && left-- > 0) { const e = new Error('EIO: injected'); e.code = 'EIO'; e.syscall = 'lstat'; throw e; } return real.call(this, f, ...a); };
+  let v; try { v = open(root); } finally { fs.lstatSync = real; } assert.match(v.status().index.damage?.why || '', /gen-\d+: EIO/); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md']); v.close();
+  const r2 = seeded(12); const other = claimDir(r2, 95); fs.mkdirSync(other); fs.writeFileSync(path.join(other, 'writing'), '2147483000'); const undo = failing('writing', 'EIO', 1000); const ix = new SegIndex(path.join(r2, '.memev/index.jsonl')); try { assert.equal(ix.load(), true); } finally { undo(); } await new Promise((res) => setTimeout(res, 50)); assert.equal(fs.existsSync(other), true, 'a folder that may have a live writer stays'); ix._closeFiles();
+});
+test('the same with the real mode 000', { skip: process.platform === 'win32' || process.getuid?.() === 0 }, () => {
+  for (const name of ['head.json', 'overlay.log']) {
+    const root = seeded(12); fs.chmodSync(F(root, name), 0); for (let round = 0; round < 2; round++) { const v = open(root); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md'], name); if (round === 0) assert.match(v.status().index.damage?.why || '', new RegExp(`${name.replace('.', '\\.')}: EACCES`)); v.close(); }
+  }
+  const root = seeded(12); fs.chmodSync(path.join(segDir(root), 'CURRENT'), 0); const v = open(root); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md']); assert.match(v.status().index.damage?.why || '', /CURRENT/); v.close();
+});
 
 const readOnly = { skip: process.platform === 'win32' || process.getuid?.() === 0 };
 

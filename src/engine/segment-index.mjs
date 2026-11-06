@@ -34,7 +34,7 @@ const inFlight = new Set();
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
 /** True when a live process is still writing this folder. */
 function beingWritten(dir) {
-  let pid; try { const fd = fs.openSync(path.join(dir, WRITING), fs.constants.O_RDONLY | NOFOLLOW); try { pid = Number(fs.readFileSync(fd, 'utf8')); } finally { fs.closeSync(fd); } } catch (e) { return isPassing(e); } // a file that cannot be read just now may name a live writer
+  let pid; try { const fd = fs.openSync(path.join(dir, WRITING), fs.constants.O_RDONLY | NOFOLLOW); try { pid = Number(fs.readFileSync(fd, 'utf8')); } finally { fs.closeSync(fd); } } catch (e) { return e.code !== 'ENOENT' && e.code !== 'ENOTDIR'; } // a file that cannot be read may name a live writer
   if (pid === process.pid) return inFlight.has(dir);
   return Number.isSafeInteger(pid) && pid > 0 && alive(pid);
 }
@@ -158,7 +158,7 @@ export class SegIndex {
     try {
       const st = fs.lstatSync(this._dir(g)); if (!st.isDirectory()) throw new SegDamage(`gen-${g} is not a folder`);
       seg = new Seg(this._dir(g));
-    } catch (e) { return giveUp(e.code === 'ENOENT' ? new SegDamage(`gen-${g} is gone`) : e); }
+    } catch (e) { return giveUp(e.code === 'ENOENT' ? new SegDamage(`gen-${g} is gone`) : e instanceof SegDamage || e instanceof SegOtherVersion || isPassing(e) ? e : new SegDamage(`gen-${g}: ${e.code || e.message}`)); }
     let state, text = '', fd = null, end = 0;
     try {
       state = this._state(seg);
