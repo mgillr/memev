@@ -75,11 +75,12 @@ All 85 specs pass `vendor/attest` lint with no errors or warnings and were draft
 
 ## Contracts added after the analysis
 
-The engine enabler and the gaps the memev twin measured, approved by the owner on 31 October 2026. Each signs only after a clean red-team round.
+The engine enabler and the gaps the memev twin measured, approved by the owner on 31 October 2026. Each signs only after a clean red-team round. SR-0.04 was asked for by the owner on 6 November 2026, after the outside seed analysis of that date: it is proposed and unsigned, and its gap ids are that analysis's own (N01 to N09).
 
 | Contract | Gap | Repository | Title | Depends on |
 |---|---|---|---|---|
 | [SR-0.03](specs/SR-0.03-verify-runs-every-verifier-type.json) | G85 | memev | Verify runs every verifier type the specs use: red-green tests, metrics and scope, behind the same local gates as commands | none |
+| [SR-0.04](specs/SR-0.04-receipts-match-signatures.json) | N01, N03, N06, N08, N09 | memev | Receipts match signatures, and what is claimed is in the tree | SR-1.35 |
 | [SR-1.21](specs/SR-1.21-a-missing-note-is-never-silent.json) | G86 | memev | A missing note the log cannot rebuild is reported, never silent | SR-1.01, QL-1.02 |
 | [SR-1.22](specs/SR-1.22-an-interrupted-write-recovers-from-the-log.json) | G87 | memev | A whole-note write interrupted after the log append recovers from the log, not from the old file | SR-1.01, QL-1.02, SR-1.26 |
 | [SR-1.23](specs/SR-1.23-verify-sees-a-removed-tail.json) | G88 | memev | verify() catches a removed tail of the active segment and a removed last record of a path | SR-1.01, QL-1.02 |

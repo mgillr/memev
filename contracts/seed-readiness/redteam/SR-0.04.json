@@ -1,0 +1,60 @@
+{
+  "schema": "memev-redteam/1",
+  "spec_id": "SR-0.04",
+  "rounds": [
+    {
+      "round": 1,
+      "spec_sha256": "b234b0d893418377cb9fd6f34020031af86a0ef4155f77ac3056a450d795d4b1",
+      "base_commit": "d597366052ac48d890fea92ce41f0f1e98f6a328",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "fef5139ba1222068699f08e3d2d75a5fda18bdad8c75181ca007bded9edc84ee"
+          },
+          {
+            "path": "src/engine/redteam-gate.mjs",
+            "sha256": "28ec9c1f6ddb69a3d4c87dfb65f19712be1094f7394ae8d60dfba53ceea10759"
+          },
+          {
+            "path": "docs/scope-one/DECISIONS.md",
+            "sha256": "3307322f2c70781f4362f95243bcd1905e86e8214abf604ed965ca540aa9c696"
+          },
+          {
+            "path": ".github/workflows/ci.yml",
+            "sha256": "f41a022de450edb6ca7f055b5f0418479a2e1093d21a4aef598a108a1e65e810"
+          },
+          {
+            "path": "package.json",
+            "sha256": "df0a33344e4d35bdb39ce4d9d2fbecc02f1d44b6037fd181a27740fe80195606"
+          }
+        ]
+      },
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "second seat on the same machine; only read the criteria. This is not an independent review: both seats are AI on one machine. The lead wrote this spec. The second seat read all of it, found findings over three rounds outside this record (first-trial/REDTEAM-B-SR-0.04.md in the team's private bundle: B1 to B9, S1 to S7, M1 to M9, O9 to O12, R1 to R3) and folded the last of them into the spec itself, so part of what is signed here is the second seat's own text. The lead read that fold by diff against the second seat's pre-fold copy and agreed it on the team bus, saying nothing was weakened; that reading is the lead's. None of the 146 criteria was run, since most need work not yet built. Probed by running, by the second seat, on a prototype branch and on main: a derived base resolves for all 107 live bodies with no base; 113 of 114 live bodies hold a scope criterion and a later unrelated commit fails it; the NOT JUDGED rule works in the verifier on a fixture and an own-base body still fails; live bodies hold 1,381 commands, 814 red-green and 93 full-suite runs. Not exercised: a real verify of a real contract, the runner, the owner's key, or the workflow. The analysis's own figures that neither seat checked are named in the request.",
+      "sig": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OWM4NmY4NTAyNjk5ZjQ5ZTRiZDY1MzhlMWY2ZGMyNGI3YzdlYTY1YWVlM2RkZDVhZGE4ZjY3Mjk4OTBjN2E3NA==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "rnsl20Oq/f3SIYcII+uj/yeqt1X4xbTYgdGNWaNW59T7JmKjAsIXAeuac4mMVOn4WFU7kV6pZh4bKQ7itLooCg=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "ZTU1YWY5N2QxYjExNmRlZjQ3NGNmMTlhZjYwOTc0YzM2YTg0ZTI2NWQ2NjAwZjljZDQxNDA2YzBlYjdmNjY3Nw==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "cV/2qfYAI4IOOt31kAExNM48OW13edgD1Z9CaeaTexG9LQYYJ3C9DZ46+2sQlZGQjuPQZNB5nfBNQ2WMwjDZAA=="
+          }
+        ]
+      }
+    }
+  ]
+}
