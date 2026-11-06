@@ -116,6 +116,10 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   if (vault) {
     const v = vault.log.verify();
     r.push(C('oplog', 'operation log intact', v.ok ? 'ok' : 'fail', v.ok ? `${v.ops} ops in ${v.segments} segment(s), every seal and chain verified` : v.errors.slice(0, 3).join('; ')));
+    // The sums first: a damaged generation stops serving here, so what follows counts what can really be found.
+    const bad = vault.index.verifyNow(); const ist = vault.index.state(); const past = vault.indexDamageRecord();
+    if (bad || ist.state === 'rebuilding') r.push(C('index-files', 'recall index files are sound', 'fail', `damaged: ${bad || ist.damage?.why}; rebuilding from the notes, and recall says so until it is done`));
+    else r.push(C('index-files', 'recall index files are sound', past ? 'warn' : 'ok', past ? `sound now. Damage was found on ${past.at} (${past.why}) and the index was rebuilt from the notes; look at the disk if it happens again` : 'every file matches its checksum', past ? { desc: 'forget this report', destructive: false, run: () => { vault.indexDamage = null; fs.rmSync(path.join(state, 'index.damage.json'), { force: true }); } } : null));
     const notes = vault.allNotes(); const idx = vault.index.stats().notes;
     r.push(C('index', 'recall index covers every note', idx === notes.length ? 'ok' : 'warn', `${idx}/${notes.length} notes`, idx === notes.length ? null : { desc: 'rebuild the index', destructive: false, run: () => vault.reindexAll() }));
     let drift = 0; for (const [p, h] of vault.log.heads) { if (h.deleted || !h.ch) continue; const b = vault._read(p); if (b === null || sha256(b) !== h.ch) drift++; }
@@ -326,7 +330,7 @@ export async function allChecks({ root, env }) {
       const { api, clientToken } = await import('./common.mjs');
       const s = await api(root, '/mcp', { token: clientToken(root, 'doctor'), body: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'memev_doctor', arguments: {} } }, timeoutMs: 20000 });
       const live = s.json?.result?.structuredContent?.checks || [];
-      r.push(...live.filter((c) => ['oplog', 'index', 'drift', 'secrets', 'bus'].includes(c.id)).map((c) => ({ ...c, fix: c.fix ? { desc: `${c.fix} (restarts Memev)`, destructive: false, run: restart } : null })));
+      r.push(...live.filter((c) => ['oplog', 'index', 'index-files', 'drift', 'secrets', 'bus'].includes(c.id)).map((c) => ({ ...c, fix: c.fix ? { desc: `${c.fix} (restarts Memev)`, destructive: false, run: restart } : null })));
     } catch (e) { r.push(C('mcp', 'MCP answers', 'fail', e.message)); }
     r.push(...fileChecks({ root, env, vault: null }));
   } else r.push(...fileChecks({ root, env, vault }));

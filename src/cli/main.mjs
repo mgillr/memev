@@ -316,7 +316,7 @@ async function run(argv, env) {
         console.log(`Vault ${root}: ${loading ? `daemon still loading the vault (pid ${loading}); it answers when it is done` : 'daemon not running (memev start)'}`); return 1;
       }
       const s = await api(root, '/v1/status', { method: 'GET', token: clientToken(root, 'cli') });
-      if (flags.json) json(s.json); else { const j = s.json; console.log(`Memev ${j.version} · ${root}\n  log: ${j.oplog.seq} ops in ${j.oplog.segments} segment(s) · index: ${j.index.notes} notes / ${j.index.sections} sections · graph: ${j.graph.entities} entities, ${j.graph.claims} claims · heap ${j.memory.heap_mb} MB`); for (const w of tokenExpiryWarnings(root)) console.log(`  ! ${w}`); const { updateLine } = await import('./update.mjs'); const u = updateLine(root, env); if (u) console.log(`  ${u}`); }
+      if (flags.json) json(s.json); else { const j = s.json; console.log(`Memev ${j.version} · ${root}\n  log: ${j.oplog.seq} ops in ${j.oplog.segments} segment(s) · index: ${j.index.notes} notes / ${j.index.sections} sections · graph: ${j.graph.entities} entities, ${j.graph.claims} claims · heap ${j.memory.heap_mb} MB`); if (j.index.state === 'rebuilding') console.log(`  ! the recall index was found damaged (${j.index.damage?.why}) and is being rebuilt from the notes; recall says so until it is done`); else if (j.index.damage) console.log(`  ! the recall index was found damaged on ${j.index.damage.at} (${j.index.damage.why}) and rebuilt from the notes; memev doctor says more`); for (const w of tokenExpiryWarnings(root)) console.log(`  ! ${w}`); const { updateLine } = await import('./update.mjs'); const u = updateLine(root, env); if (u) console.log(`  ${u}`); }
       return 0;
     }
     case 'mcp': {

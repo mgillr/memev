@@ -21,6 +21,18 @@ export function linkedUnder(root, abs) {
   }
   return false;
 }
+export const pidAlive = (pid) => { if (!pid) return false; try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+/**
+ * True when this pid is a running Memev daemon. A pid in a state file can outlive what wrote it and come back as anything, so a live pid alone
+ * must not hold up a start or be stopped. Where the system cannot say what the process is (Windows has no ps), a live pid counts, as it always did.
+ */
+export function isDaemonPid(pid) {
+  if (!pidAlive(pid)) return false;
+  if (process.platform === 'win32') return true;
+  const r = spawnSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', timeout: 2000 });
+  if (r.error || r.status === null) return true;
+  return /(^|[\\/\s])server[\\/]main\.mjs(\s|$)|memev(\.mjs)?\s(.*\s)?serve(\s|$)/.test(r.stdout);
+}
 export const now = () => new Date().toISOString();
 export const stamp = (d = new Date()) => d.toISOString().slice(0, 16).replace('T', ' ') + 'Z';
 export const exists = (p) => { try { fs.accessSync(p); return true; } catch { return false; } };
@@ -79,6 +91,24 @@ export function writeAtomic(file, data, mode = 0o644) {
   try { fs.writeSync(fd, data); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
   fs.renameSync(tmp, file);
   try { fs.chmodSync(file, mode); } catch {}
+}
+const NOFOLLOW = fs.constants.O_NOFOLLOW ?? 0;
+/** Replace a small private file: a new file and a rename, not synced. A link at either name is replaced, never written through. */
+export function replacePrivate(file, data) {
+  const tmp = `${file}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`; const fd = fs.openSync(tmp, 'wx', 0o600);
+  try { fs.writeSync(fd, data); } finally { fs.closeSync(fd); }
+  fs.renameSync(tmp, file);
+}
+/** Read a private file, or null: a link at its name reads as nothing, wherever it points. */
+export function readPrivate(file) {
+  try { if (!NOFOLLOW && fs.lstatSync(file).isSymbolicLink()) return null; const fd = fs.openSync(file, fs.constants.O_RDONLY | NOFOLLOW); try { return fs.fstatSync(fd).isFile() ? fs.readFileSync(fd, 'utf8') : null; } finally { fs.closeSync(fd); } } catch { return null; }
+}
+/** Append to a private file. A link at its name goes, so the lines start a file of their own: a cache loses nothing it needs. */
+export function appendPrivate(file, data) {
+  const open = () => fs.openSync(file, fs.constants.O_WRONLY | fs.constants.O_APPEND | fs.constants.O_CREAT | NOFOLLOW, 0o600);
+  let fd; try { if (!NOFOLLOW && fs.lstatSync(file).isSymbolicLink()) fs.rmSync(file); } catch { /* not there yet */ }
+  try { fd = open(); } catch (e) { if (e.code !== 'ELOOP') throw e; fs.rmSync(file); fd = open(); }
+  try { fs.writeSync(fd, data); } finally { fs.closeSync(fd); }
 }
 export const writeJson = (file, value, mode = 0o644) => writeAtomic(file, `${JSON.stringify(value, null, 2)}\n`, mode);
 export const writePrivate = (file, data) => { fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 }); writeAtomic(file, data, 0o600); };

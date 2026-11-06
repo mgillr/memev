@@ -17,9 +17,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
+import { replacePrivate, readPrivate, appendPrivate } from './util.mjs';
 
 const VERSION = 1;
-const short = (h) => (h ? String(h).slice(0, 16) : null);
+export const short = (h) => (h ? String(h).slice(0, 16) : null);
 const parseLines = (text) => {
   if (!text) return [];
   const end = text.lastIndexOf('\n'); if (end < 0) return [];
@@ -61,7 +62,24 @@ export function baseText(recs, mentions) {
   return parts.join('');
 }
 
-function writePrivateFile(file, text) { const tmp = `${file}.${process.pid}.tmp`; fs.writeFileSync(tmp, text, { mode: 0o600 }); fs.renameSync(tmp, file); }
+const writePrivateFile = replacePrivate;
+/**
+ * Every note a walk of the vault finds, with its lstat. The walk skips links, so a note in the result has no link on the way to it, and one
+ * lstat per note stands in for checking each folder of each path. Vault.allNotes keeps its own walk for callers that want names only.
+ */
+export function scanNotes(root) {
+  const out = new Map();
+  const walk = (d, rel) => {
+    let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of ents) {
+      if (e.name.startsWith('.') || e.name === 'node_modules' || e.isSymbolicLink()) continue;
+      const r = rel ? `${rel}/${e.name}` : e.name; const full = `${d}${path.sep}${e.name}`;
+      if (e.isDirectory()) { if (r !== 'work/archive') walk(full, r); }
+      else if (e.name.endsWith('.md')) { try { out.set(r, fs.lstatSync(full)); } catch { out.set(r, null); } }
+    }
+  };
+  walk(root, ''); return out;
+}
 
 /** Fold the old journal into the base. Runs on a worker. Rename is the commit: a crash before it leaves both inputs, after it the old journal replays harmlessly (see the "a" line). */
 export function foldFiles(state) {

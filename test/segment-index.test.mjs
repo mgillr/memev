@@ -161,7 +161,7 @@ test('a segment of another version asks for a rebuild', (t) => {
 });
 
 test('a failed fold leaves the index serving and does not retry on every save', async (t) => {
-  const d = tmp(t); const { orc, ix } = seeded(d, 200); writes(orc, ix, 41, 10); ix.save(); const dir = ix._dir(ix.gen); const seg = ix.seg; seg.cols(); fs.renameSync(path.join(dir, 'cols.bin'), path.join(dir, 'cols.moved')); await settle(ix.foldSoon()); fs.renameSync(path.join(dir, 'cols.moved'), path.join(dir, 'cols.bin')); assert.equal(ix.seg, seg, 'still the old segment'); assert.equal(ix.foldP, null); assert.ok(ix.foldFailed > 0); agree(orc, ix, 'after a failed fold');
+  const d = tmp(t); const { orc, ix } = seeded(d, 200); writes(orc, ix, 41, 10); ix.save(); const dir = ix._dir(ix.gen); const seg = ix.seg; seg.cols(); fs.renameSync(path.join(dir, 'overlay.log'), path.join(dir, 'overlay.moved')); await settle(ix.foldSoon()); fs.renameSync(path.join(dir, 'overlay.moved'), path.join(dir, 'overlay.log')); assert.equal(ix.seg, seg, 'still the old segment'); assert.equal(ix.foldP, null); assert.ok(ix.foldFailed > 0); agree(orc, ix, 'after a failed fold');
 });
 
 for (const step of ['mid-fold', 'before-publish', 'after-publish', 'torn']) {

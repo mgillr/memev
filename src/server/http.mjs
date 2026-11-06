@@ -302,7 +302,13 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
           const bar = auto ? hookMinScore(vault) : (rc.min_score ?? 1);
           // an item already given is left out, not replaced, so a prompt never brings in more than it would have
           // past work is left out before ranking, not after it, so a prompt asked before cannot use up the page (the top 4 would all be its own journal)
-          const recalled = vault.recall(identity, { ...body, client, limit, offset, dropPath: auto && !rc.hook_include_journals ? pastWork : null });
+          let recalled;
+          try { recalled = vault.recall(identity, { ...body, client, limit, offset, dropPath: auto && !rc.hook_include_journals ? pastWork : null }); }
+          catch (e) {
+            // a prompt goes on without memory, and it says so: an empty answer here would read as nothing recorded
+            if (auto && e.code === 'index_rebuilding') return send(200, { hits: [], total: 0, offset, next: null, rebuilding: true, text: 'Memev could not search memory for this prompt: its recall index was found damaged and is being rebuilt from the notes.' });
+            throw e;
+          }
           const total = recalled.total;
           const hits = recalled
             .filter((h) => h.score >= bar && !skip.has(`${h.path}#${h.heading || ''}`) && !(own && h.path.startsWith('work/sessions/') && h.path.endsWith(own)));
@@ -333,6 +339,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       return send(404, { error: 'not_found' });
     } catch (e) {
       if (e instanceof VaultError || e.name === 'BusError') return send({ forbidden: 403, not_found: 404, immutable: 409, conflict: 409, secret: 422, too_large: 413 }[e.code] || 400, { error: e.code, error_description: e.message });
+      if (e.code === 'index_rebuilding') return send(503, { error: e.code, error_description: e.message });
       return send(500, { error: 'internal', error_description: e.message });
     }
   });

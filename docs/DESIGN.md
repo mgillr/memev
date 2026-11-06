@@ -27,6 +27,16 @@ feedback (`memev_feedback`). On large vaults very common terms are dropped from 
 never reads the log. `memev why` shows each matched word's share of a score, and the parts multiply
 back to it.
 
+The notes are the record and the index can always be built from them, so the index only has to know
+when it is wrong. A start checks the sizes and counts its files should have, and hashes none of them
+but the small head that holds those. Everything recall reads carries its own check: each line of the
+dictionary, each word's postings and counts, each snippet line, and the files read whole are held to
+their sums as they are read. The whole-file sums are checked behind the start, by `memev doctor` and
+before a fold, so damage is not carried into a new generation. A generation found damaged stops
+serving at once and is rebuilt from the notes on a worker; recall says it is rebuilding until then,
+and `memev status` and `memev doctor` say what was found. The check is against damage: someone able
+to write `.memev` can write a sound looking index, as they can edit the log.
+
 **Memory quality.** `memev_remember` checks text before saving it, on this machine with fixed rules:
 acknowledgements, system noise, fragments under three words and duplicates of anything already in
 `memory/` are refused with a reason (`force` saves anyway, flagged). Notes that read as short-lived

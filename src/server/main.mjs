@@ -30,7 +30,15 @@ if (!takeLock()) { console.error(`[memev] another daemon already serves ${root}`
 // A long open (the first run, or the one conversion of an old index) says so, so memev start can tell loading from hung and leave it be.
 const loadingFile = path.join(state, 'daemon.loading');
 try { writePrivateJson(loadingFile, { pid: process.pid, started: now() }); } catch {}
-const vault = new Vault(root).open();
+// A load moves this file's time as it goes, so doctor can tell one that is slow from one that has stopped.
+const moved = () => { const t = new Date(); fs.utimesSync(loadingFile, t, t); };
+// An open that throws is a daemon that never served: it says why and leaves nothing behind that would read as a load in progress.
+let vault;
+try { vault = new Vault(root, { onProgress: moved }).open(); } catch (e) {
+  console.error(`[memev] cannot open ${root}: ${e.stack || e.message}`);
+  fs.rmSync(lock, { force: true }); fs.rmSync(loadingFile, { force: true });
+  process.exit(e.code === 'loading' ? 3 : 1);
+}
 const port = Number(flags.port || process.env.MEMEV_PORT || vault.config.port || 7787);
 const bind = process.env.MEMEV_BIND || '127.0.0.1';
 const server = createServer(vault, { tunnelKey: () => tunnelKey(root) });
@@ -56,7 +64,11 @@ server.listen(port, bind, async () => {
     try { const m = await import(mod); if (m.supervise) extras.push(m.supervise(vault, { root, port })); } catch (e) { if (e.code !== 'ERR_MODULE_NOT_FOUND') console.error(`[memev] ${mod}: ${e.message}`); }
   }
   // a start trusts a note's stat, so every note's bytes are checked once behind it
-  vault.on('sweep', (s) => { console.error(`[memev] sweep ${s.state}: ${s.hashed} notes in ${s.cycle_ms ?? '?'} ms, ${s.changed} changed${s.error ? `, ${s.error}` : ''}`); });
+  vault.on('sweep', (s) => {
+    const names = (list) => (list.length ? `: ${list.map((x) => x.path + (x.reason ? ` (${x.reason})` : '')).join(', ')}` : '');
+    console.error(`[memev] sweep ${s.state}: ${s.hashed} notes in ${s.cycle_ms ?? '?'} ms, index files ${s.index_files}, ${s.changed} changed${names(s.found)}, ${s.missing} not readable${names(s.missing_notes)}${s.error ? `, ${s.error}` : ''}`);
+  });
+  vault.on('index-damage', (d) => { console.error(`[memev] the recall index is damaged (${d.why}): ${d.state}`); });
   vault.startSweep();
   vault.startIdleWork();
 });
