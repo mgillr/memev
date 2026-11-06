@@ -31,6 +31,19 @@
       "status": "proposed and unsigned; signs after its red-team round"
     },
     {
+      "id": "SR-1.35",
+      "gap": "owner 6 Nov 2026",
+      "area": "SR-1",
+      "title": "Memev is fast on every axis we measured",
+      "repo": "memev",
+      "closes": "Asked for by the owner on 6 Nov 2026: speed up every axis measured, retest and publish results on the repository.",
+      "depends_on": [],
+      "tasks": 7,
+      "criteria": 31,
+      "spec": "specs/SR-1.35-memev-is-fast-on-every-axis-we-measured.json",
+      "status": "proposed and unsigned; signs after its red-team round; its code landed by PR 437"
+    },
+    {
       "id": "SR-1.01",
       "gap": "G01",
       "area": "SR-1",

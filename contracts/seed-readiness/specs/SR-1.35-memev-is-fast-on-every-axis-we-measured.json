@@ -1,0 +1,907 @@
+{
+  "title": "SR-1.35 Memev is fast on every axis we measured",
+  "project": "memev",
+  "workdir": null,
+  "request": "Owner, 6 Nov 2026, verbatim: \"implement all the speed enhancements, set up a contract to speed up every axis you identified, using arxiv research, and [two protocol files, paths left out] to find candidates and new spliced protocols we invent, 5 per axis and test on test rig, fons speed up as fast as possible 3 iteration loops\". Then: \"when all of this lands it is ?0 get everything fixed and wired in , and then retest and publish results on repo\". Then: \"memory speed and metrics should be available in the rev2 memory tab as health\".\n\nScope of speed: wall time and thread blocking on the user's machine. Hosted services, the paid engine and the native app are out of scope.\n\nThis contract is signed after its code landed, with its base at 93d97329a9257c6e4d03a1f1ff4650abd998845c, the commit before that code, so its red runs are honest. The code landed by PR 437 at 5a611af1a1f949889d8623d24ab8067f870ad95e, on the owner's word to integrate. It was built before this contract was written, against a draft of it: that is the order the owner's priority set, and it is said here rather than hidden. PR 439 and PR 440 followed it with tests and the ceilings' guard list. The red runs were read off a run of the new tests on main's code, and the criteria claim a red run only where a test failed by assertion.\n\nScope. Because the base is before the code, the range from the base to the head also holds the pull request that lands this contract, so the scope names the contract's own files: its spec, record, snapshot, signed body, the manifest, the contracts README and the WBS. Any later commit to main falls in the same range and fails the scope criterion on a later verify, so the first verify after signing is the one that counts.\n\nRules for every axis. R4: a speed gain never changes behaviour; answers match the real index on the oracle prompts, every durability and detection promise stays, and each change's own test fails before it. R5: no skipped tests, raised timeouts or relaxed assertions; a test of a replaced file format may be rewritten to test the same promise, and says so. R6: a claim needs a number from committed code on a named commit, an effect beyond run-to-run spread, and a kill attempt by an agent that did not build it.\n\nReview. An agent that did not build it made a kill attempt, and found the code not safe: three high and six medium findings, among them damage to the index going unnoticed. The fixes were attacked by the second seat three times, on the same machine, and each time more was found and fixed. Both seats are AI on one machine, so this is not independent review. The attempt and the attacks did not cover power loss, a real vault at scale, two computers through git, or Windows.\n\nMeasured on one iMac at 50,000 generated notes, main's code against this code: start 44.8 s and 1.08 s; first import 374 s and 74 s; recall p95 135 to 157 ms and 16 to 33 ms; first recall after a save 7.2 to 9.5 s and 18 to 26 ms; /healthz timeouts while writing 8 per cycle and 0; the thread blocked by a commit 215 ms and 0.5 ms; bus roster at 100,000 messages 2,904 ms and 3.5 ms. Append and the first bus read show no gain beyond the spread, and none is claimed. Those figures were taken at 5355c9a4b896cef443c9d715a6ada5f22cf5b584; the later commits change the commit catch-up after a hard kill and add the bench, so only A5 can feel them, and the ceilings run at 79a712d3 re-measured A5 at 0.5 ms.\n\nSecond seat. The owner waived the second seat for this work while it was stopped, in his word \"wave for this\". It has since returned and reviews this contract all the same.\n\nStated limit, chosen and not an oversight: going back to code older than rotation, after a bus file has rolled over, can reuse counters and leave a new message undelivered. The layout that avoided this lost messages to a reader in another process in normal use, so it was removed. No tag, release or package of the older code exists.\n\nKnown and not here: two processes writing at once fail the log's verify, on main too; SR-1.01's writer lock closes that, and SR-0.04 T3 lands it after this. A kill before the first commit leaves a bus message uncommitted until the next commit. Damage checks catch damage and not a forger who recomputes them.",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Start, first run and stop (A1, A7, A8)",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "A start checks sizes and counts and reads no segment file whole. The whole-file sums and the notes are checked behind the start by the sweep.",
+        "A changed time that moved finds an edit at the start. Where it cannot, the sweep finds it. Where neither can, it says so."
+      ],
+      "description": "A start no longer reads every note or loads the whole index, and a stop no longer saves it.",
+      "scope": {
+        "allow": [
+          "changelog.d/BUS-SCALES.md",
+          "changelog.d/fast-start-note-state.md",
+          "changelog.d/index-damage-sr-1-35.md",
+          "changelog.d/speed-sr-1-35-index.md",
+          "contracts/seed-readiness/README.md",
+          "contracts/seed-readiness/manifest.json",
+          "contracts/seed-readiness/redteam/SR-1.35.*",
+          "contracts/seed-readiness/specs/SR-1.35-memev-is-fast-on-every-axis-we-measured.json",
+          "contracts/signed/k-sr-1-35-*",
+          "docs/BUS.md",
+          "docs/DESIGN.md",
+          "docs/MODULES.md",
+          "docs/README.md",
+          "docs/TROUBLESHOOTING.md",
+          "docs/scope-one/WBS.md",
+          "docs/testing/LAB-TEST-PLAN.md",
+          "docs/testing/SPEED-RESULTS.md",
+          "scripts/bench/bus.mjs",
+          "scripts/bench/speed/bus.mjs",
+          "scripts/bench/speed/daemon.mjs",
+          "scripts/bench/speed/firstrun.mjs",
+          "scripts/bench/speed/fixture.mjs",
+          "scripts/bench/speed/git.mjs",
+          "scripts/bench/speed/lab/bus-cold.mjs",
+          "scripts/bench/speed/lab/bus-git-cost.mjs",
+          "scripts/bench/speed/lab/bus-loop3.mjs",
+          "scripts/bench/speed/lab/bus-rotation-layouts.mjs",
+          "scripts/bench/speed/lab/bus-variants.mjs",
+          "scripts/bench/speed/lab/bus-warm.mjs",
+          "scripts/bench/speed/recall.mjs",
+          "scripts/bench/speed/save.mjs",
+          "scripts/bench/speed/start-oracle.mjs",
+          "scripts/bench/speed/start.mjs",
+          "scripts/bench/speed/sweep.mjs",
+          "scripts/bench/speed/targets.mjs",
+          "scripts/bench/speed/write.mjs",
+          "src/cli/bus-cli.mjs",
+          "src/cli/contracts-cli.mjs",
+          "src/cli/daemon.mjs",
+          "src/cli/doctor.mjs",
+          "src/cli/hooks.mjs",
+          "src/cli/main.mjs",
+          "src/cli/runner.mjs",
+          "src/engine/bus.mjs",
+          "src/engine/git.mjs",
+          "src/engine/graph.mjs",
+          "src/engine/health.mjs",
+          "src/engine/index.mjs",
+          "src/engine/notes-worker.mjs",
+          "src/engine/notestate.mjs",
+          "src/engine/oplog.mjs",
+          "src/engine/segment-index.mjs",
+          "src/engine/segment.mjs",
+          "src/engine/util.mjs",
+          "src/engine/vault.mjs",
+          "src/server/http.mjs",
+          "src/server/main.mjs",
+          "src/server/mcp.mjs",
+          "test/bus-oracle.test.mjs",
+          "test/bus-rotation.test.mjs",
+          "test/bus-scale.test.mjs",
+          "test/commit-queue-thread.test.mjs",
+          "test/coordinator.test.mjs",
+          "test/fixtures/bus-main-oracle.mjs",
+          "test/helpers/bus-lockstep.mjs",
+          "test/index-damage-noticed.test.mjs",
+          "test/index-damage.test.mjs",
+          "test/memory-quality.test.mjs",
+          "test/notestate.test.mjs",
+          "test/oplog-sliced-snapshot.test.mjs",
+          "test/segment-index.test.mjs",
+          "test/speed-promises.test.mjs",
+          "test/speed-targets.test.mjs",
+          "test/vault-case-names.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "statement": "T1-c00: the full suite passes (on CI, never on the Mac)",
+          "verifier": {
+            "type": "command",
+            "cmd": "MEMEV_NO_SERVICE=1 HOME=\"$(mktemp -d)\" npm test",
+            "timeout_s": 1800
+          }
+        },
+        {
+          "statement": "T1-c01: 2 tests in test/notestate.test.mjs failed on main's code by assertion and pass here: \"where the changed time cannot help, the start misses the edit and the sweep finds it, with the time it took\"; \"memev start leaves a daemon that says it is loading, and stops one that says nothing\"",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/notestate.test.mjs",
+            "cmd": "out=$(node --test --test-concurrency=1 --test-reporter=tap --test-name-pattern='^where the changed time cannot help, the start mi|^memev start leaves a daemon that says it is load' test/notestate.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -q '^# pass 2$'"
+          }
+        },
+        {
+          "statement": "T1-c01w: Notes changed while stopped are found, the restored graph equals a full read, and a hard kill during the first import loses nothing: test/notestate.test.mjs passes whole; 6 of its tests also pass on main's code, so they guard behaviour and claim no change; 10 more fail there by another error or run past two minutes, and claim no red",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-concurrency=1 test/notestate.test.mjs",
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "T1-c02: 3 tests in test/oplog-sliced-snapshot.test.mjs failed on main's code by assertion and pass here: \"the append that reaches the snapshot count returns before the snapshot is written\"; \"writes during the snapshot: the reopened log has the same heads as a full replay, and a broken replay is caught\"; \"a stop during a running snapshot: the close snapshot stands or the older one replays, and both give the same heads\"",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/oplog-sliced-snapshot.test.mjs",
+            "cmd": "out=$(node --test --test-concurrency=1 --test-reporter=tap --test-name-pattern='^the append that reaches the snapshot count retur|^writes during the snapshot: the reopened log has|^a stop during a running snapshot: the close snap' test/oplog-sliced-snapshot.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -q '^# pass 3$'"
+          }
+        },
+        {
+          "statement": "T1-c02w: A log snapshot no longer stops the thread that serves: test/oplog-sliced-snapshot.test.mjs passes whole; 1 of its tests also passes on main's code, so it guards behaviour and claims no change; 1 more fails there by another error or runs past two minutes, and claims no red",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-concurrency=1 test/oplog-sliced-snapshot.test.mjs",
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T2",
+      "title": "Save and recall (A2, A3), and damage to the index",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "Answers match the old index on the oracle prompts in every state, with its broken controls caught.",
+        "Recall never answers from a generation known to be damaged. A snippet never passes a token scope under another note's path.",
+        "Only EMFILE, ENFILE, ENOMEM, EAGAIN, EBUSY and ETIMEDOUT pass and are retried. Any other read error is damage."
+      ],
+      "description": "The index is read by offset from files, so a save and a recall do not load it. A damaged generation is noticed and rebuilt from the notes.",
+      "scope": {
+        "allow": [
+          "changelog.d/BUS-SCALES.md",
+          "changelog.d/fast-start-note-state.md",
+          "changelog.d/index-damage-sr-1-35.md",
+          "changelog.d/speed-sr-1-35-index.md",
+          "contracts/seed-readiness/README.md",
+          "contracts/seed-readiness/manifest.json",
+          "contracts/seed-readiness/redteam/SR-1.35.*",
+          "contracts/seed-readiness/specs/SR-1.35-memev-is-fast-on-every-axis-we-measured.json",
+          "contracts/signed/k-sr-1-35-*",
+          "docs/BUS.md",
+          "docs/DESIGN.md",
+          "docs/MODULES.md",
+          "docs/README.md",
+          "docs/TROUBLESHOOTING.md",
+          "docs/scope-one/WBS.md",
+          "docs/testing/LAB-TEST-PLAN.md",
+          "docs/testing/SPEED-RESULTS.md",
+          "scripts/bench/bus.mjs",
+          "scripts/bench/speed/bus.mjs",
+          "scripts/bench/speed/daemon.mjs",
+          "scripts/bench/speed/firstrun.mjs",
+          "scripts/bench/speed/fixture.mjs",
+          "scripts/bench/speed/git.mjs",
+          "scripts/bench/speed/lab/bus-cold.mjs",
+          "scripts/bench/speed/lab/bus-git-cost.mjs",
+          "scripts/bench/speed/lab/bus-loop3.mjs",
+          "scripts/bench/speed/lab/bus-rotation-layouts.mjs",
+          "scripts/bench/speed/lab/bus-variants.mjs",
+          "scripts/bench/speed/lab/bus-warm.mjs",
+          "scripts/bench/speed/recall.mjs",
+          "scripts/bench/speed/save.mjs",
+          "scripts/bench/speed/start-oracle.mjs",
+          "scripts/bench/speed/start.mjs",
+          "scripts/bench/speed/sweep.mjs",
+          "scripts/bench/speed/targets.mjs",
+          "scripts/bench/speed/write.mjs",
+          "src/cli/bus-cli.mjs",
+          "src/cli/contracts-cli.mjs",
+          "src/cli/daemon.mjs",
+          "src/cli/doctor.mjs",
+          "src/cli/hooks.mjs",
+          "src/cli/main.mjs",
+          "src/cli/runner.mjs",
+          "src/engine/bus.mjs",
+          "src/engine/git.mjs",
+          "src/engine/graph.mjs",
+          "src/engine/health.mjs",
+          "src/engine/index.mjs",
+          "src/engine/notes-worker.mjs",
+          "src/engine/notestate.mjs",
+          "src/engine/oplog.mjs",
+          "src/engine/segment-index.mjs",
+          "src/engine/segment.mjs",
+          "src/engine/util.mjs",
+          "src/engine/vault.mjs",
+          "src/server/http.mjs",
+          "src/server/main.mjs",
+          "src/server/mcp.mjs",
+          "test/bus-oracle.test.mjs",
+          "test/bus-rotation.test.mjs",
+          "test/bus-scale.test.mjs",
+          "test/commit-queue-thread.test.mjs",
+          "test/coordinator.test.mjs",
+          "test/fixtures/bus-main-oracle.mjs",
+          "test/helpers/bus-lockstep.mjs",
+          "test/index-damage-noticed.test.mjs",
+          "test/index-damage.test.mjs",
+          "test/memory-quality.test.mjs",
+          "test/notestate.test.mjs",
+          "test/oplog-sliced-snapshot.test.mjs",
+          "test/segment-index.test.mjs",
+          "test/speed-promises.test.mjs",
+          "test/speed-targets.test.mjs",
+          "test/vault-case-names.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "statement": "T2-c01w: The segment index answers as the old one did: test/segment-index.test.mjs passes whole, and it could not load on main's code, so no red run is claimed for it",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-concurrency=1 test/segment-index.test.mjs",
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "T2-c02: an index cut in half is noticed: on main's code the words are lost and nothing says so",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/index-damage-noticed.test.mjs",
+            "cmd": "out=$(node --test --test-concurrency=1 --test-reporter=tap --test-name-pattern='^an index cut in half is noticed' test/index-damage-noticed.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -q '^# pass 1$'"
+          }
+        },
+        {
+          "statement": "T2-c03w: Damage is found, named and rebuilt, and no status field shows a limited token a path outside its scope: test/index-damage.test.mjs passes whole, and it could not load on main's code, so no red run is claimed for it",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-concurrency=1 test/index-damage.test.mjs",
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T3",
+      "title": "Write and git (A4, A5)",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "A hard kill loses no acknowledged write, and a clean stop leaves a marker, so the next open knows a kill came first without comparing file times."
+      ],
+      "description": "A commit no longer stops the serving thread, and a first write no longer walks the folder.",
+      "scope": {
+        "allow": [
+          "changelog.d/BUS-SCALES.md",
+          "changelog.d/fast-start-note-state.md",
+          "changelog.d/index-damage-sr-1-35.md",
+          "changelog.d/speed-sr-1-35-index.md",
+          "contracts/seed-readiness/README.md",
+          "contracts/seed-readiness/manifest.json",
+          "contracts/seed-readiness/redteam/SR-1.35.*",
+          "contracts/seed-readiness/specs/SR-1.35-memev-is-fast-on-every-axis-we-measured.json",
+          "contracts/signed/k-sr-1-35-*",
+          "docs/BUS.md",
+          "docs/DESIGN.md",
+          "docs/MODULES.md",
+          "docs/README.md",
+          "docs/TROUBLESHOOTING.md",
+          "docs/scope-one/WBS.md",
+          "docs/testing/LAB-TEST-PLAN.md",
+          "docs/testing/SPEED-RESULTS.md",
+          "scripts/bench/bus.mjs",
+          "scripts/bench/speed/bus.mjs",
+          "scripts/bench/speed/daemon.mjs",
+          "scripts/bench/speed/firstrun.mjs",
+          "scripts/bench/speed/fixture.mjs",
+          "scripts/bench/speed/git.mjs",
+          "scripts/bench/speed/lab/bus-cold.mjs",
+          "scripts/bench/speed/lab/bus-git-cost.mjs",
+          "scripts/bench/speed/lab/bus-loop3.mjs",
+          "scripts/bench/speed/lab/bus-rotation-layouts.mjs",
+          "scripts/bench/speed/lab/bus-variants.mjs",
+          "scripts/bench/speed/lab/bus-warm.mjs",
+          "scripts/bench/speed/recall.mjs",
+          "scripts/bench/speed/save.mjs",
+          "scripts/bench/speed/start-oracle.mjs",
+          "scripts/bench/speed/start.mjs",
+          "scripts/bench/speed/sweep.mjs",
+          "scripts/bench/speed/targets.mjs",
+          "scripts/bench/speed/write.mjs",
+          "src/cli/bus-cli.mjs",
+          "src/cli/contracts-cli.mjs",
+          "src/cli/daemon.mjs",
+          "src/cli/doctor.mjs",
+          "src/cli/hooks.mjs",
+          "src/cli/main.mjs",
+          "src/cli/runner.mjs",
+          "src/engine/bus.mjs",
+          "src/engine/git.mjs",
+          "src/engine/graph.mjs",
+          "src/engine/health.mjs",
+          "src/engine/index.mjs",
+          "src/engine/notes-worker.mjs",
+          "src/engine/notestate.mjs",
+          "src/engine/oplog.mjs",
+          "src/engine/segment-index.mjs",
+          "src/engine/segment.mjs",
+          "src/engine/util.mjs",
+          "src/engine/vault.mjs",
+          "src/server/http.mjs",
+          "src/server/main.mjs",
+          "src/server/mcp.mjs",
+          "test/bus-oracle.test.mjs",
+          "test/bus-rotation.test.mjs",
+          "test/bus-scale.test.mjs",
+          "test/commit-queue-thread.test.mjs",
+          "test/coordinator.test.mjs",
+          "test/fixtures/bus-main-oracle.mjs",
+          "test/helpers/bus-lockstep.mjs",
+          "test/index-damage-noticed.test.mjs",
+          "test/index-damage.test.mjs",
+          "test/memory-quality.test.mjs",
+          "test/notestate.test.mjs",
+          "test/oplog-sliced-snapshot.test.mjs",
+          "test/segment-index.test.mjs",
+          "test/speed-promises.test.mjs",
+          "test/speed-targets.test.mjs",
+          "test/vault-case-names.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "statement": "T3-c01: 3 tests in test/commit-queue-thread.test.mjs failed on main's code by assertion and pass here: \"a timed commit leaves this thread free: it keeps turning while the batch runs\"; \"a note written and deleted inside one quiet period does not stop every later commit\"; \"a hard kill loses no acknowledged write, and the reopened vault commits what the kill left uncommitted\"",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/commit-queue-thread.test.mjs",
+            "cmd": "out=$(node --test --test-concurrency=1 --test-reporter=tap --test-name-pattern='^a timed commit leaves this thread free: it keeps|^a note written and deleted inside one quiet peri|^a hard kill loses no acknowledged write, and the' test/commit-queue-thread.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -q '^# pass 3$'"
+          }
+        },
+        {
+          "statement": "T3-c01w: A commit leaves the thread free and every acknowledged write is committed, after a hard kill too: test/commit-queue-thread.test.mjs passes whole; 1 of its tests also passes on main's code, so it guards behaviour and claims no change; 7 more fail there by another error or run past two minutes, and claim no red",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-concurrency=1 test/commit-queue-thread.test.mjs",
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "T3-c02: 1 test in test/vault-case-names.test.mjs failed on main's code by assertion and passes here: \"a new note does not read every live head once the first new note has been checked\"",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/vault-case-names.test.mjs",
+            "cmd": "out=$(node --test --test-concurrency=1 --test-reporter=tap --test-name-pattern='^a new note does not read every live head once th' test/vault-case-names.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -q '^# pass 1$'"
+          }
+        },
+        {
+          "statement": "T3-c02w: A new note does not read every live head, and the check for a name that differs only in letter case answers as the old one did: test/vault-case-names.test.mjs passes whole; 2 of its tests also pass on main's code, so they guard behaviour and claim no change",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-concurrency=1 test/vault-case-names.test.mjs",
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T4",
+      "title": "The bus (A6)",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "SR-1.17: roster under 50 ms at 50 seats and 100,000 messages.",
+        "Stated limit, not fixed: going back to code older than rotation after a bus file has rolled over can reuse counters and leave a new message undelivered. No release of such code exists. docs/BUS.md says so and a test pins it.",
+        "A half-written last line does not swallow the next acknowledged message."
+      ],
+      "description": "The bus keeps a live view and does not reread its files. A full file stays where it is.",
+      "scope": {
+        "allow": [
+          "changelog.d/BUS-SCALES.md",
+          "changelog.d/fast-start-note-state.md",
+          "changelog.d/index-damage-sr-1-35.md",
+          "changelog.d/speed-sr-1-35-index.md",
+          "contracts/seed-readiness/README.md",
+          "contracts/seed-readiness/manifest.json",
+          "contracts/seed-readiness/redteam/SR-1.35.*",
+          "contracts/seed-readiness/specs/SR-1.35-memev-is-fast-on-every-axis-we-measured.json",
+          "contracts/signed/k-sr-1-35-*",
+          "docs/BUS.md",
+          "docs/DESIGN.md",
+          "docs/MODULES.md",
+          "docs/README.md",
+          "docs/TROUBLESHOOTING.md",
+          "docs/scope-one/WBS.md",
+          "docs/testing/LAB-TEST-PLAN.md",
+          "docs/testing/SPEED-RESULTS.md",
+          "scripts/bench/bus.mjs",
+          "scripts/bench/speed/bus.mjs",
+          "scripts/bench/speed/daemon.mjs",
+          "scripts/bench/speed/firstrun.mjs",
+          "scripts/bench/speed/fixture.mjs",
+          "scripts/bench/speed/git.mjs",
+          "scripts/bench/speed/lab/bus-cold.mjs",
+          "scripts/bench/speed/lab/bus-git-cost.mjs",
+          "scripts/bench/speed/lab/bus-loop3.mjs",
+          "scripts/bench/speed/lab/bus-rotation-layouts.mjs",
+          "scripts/bench/speed/lab/bus-variants.mjs",
+          "scripts/bench/speed/lab/bus-warm.mjs",
+          "scripts/bench/speed/recall.mjs",
+          "scripts/bench/speed/save.mjs",
+          "scripts/bench/speed/start-oracle.mjs",
+          "scripts/bench/speed/start.mjs",
+          "scripts/bench/speed/sweep.mjs",
+          "scripts/bench/speed/targets.mjs",
+          "scripts/bench/speed/write.mjs",
+          "src/cli/bus-cli.mjs",
+          "src/cli/contracts-cli.mjs",
+          "src/cli/daemon.mjs",
+          "src/cli/doctor.mjs",
+          "src/cli/hooks.mjs",
+          "src/cli/main.mjs",
+          "src/cli/runner.mjs",
+          "src/engine/bus.mjs",
+          "src/engine/git.mjs",
+          "src/engine/graph.mjs",
+          "src/engine/health.mjs",
+          "src/engine/index.mjs",
+          "src/engine/notes-worker.mjs",
+          "src/engine/notestate.mjs",
+          "src/engine/oplog.mjs",
+          "src/engine/segment-index.mjs",
+          "src/engine/segment.mjs",
+          "src/engine/util.mjs",
+          "src/engine/vault.mjs",
+          "src/server/http.mjs",
+          "src/server/main.mjs",
+          "src/server/mcp.mjs",
+          "test/bus-oracle.test.mjs",
+          "test/bus-rotation.test.mjs",
+          "test/bus-scale.test.mjs",
+          "test/commit-queue-thread.test.mjs",
+          "test/coordinator.test.mjs",
+          "test/fixtures/bus-main-oracle.mjs",
+          "test/helpers/bus-lockstep.mjs",
+          "test/index-damage-noticed.test.mjs",
+          "test/index-damage.test.mjs",
+          "test/memory-quality.test.mjs",
+          "test/notestate.test.mjs",
+          "test/oplog-sliced-snapshot.test.mjs",
+          "test/segment-index.test.mjs",
+          "test/speed-promises.test.mjs",
+          "test/speed-targets.test.mjs",
+          "test/vault-case-names.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "statement": "T4-c01: SR-1.17: 50 seats and 100,000 messages, roster under 50 ms. On main's code this one test fails by assertion in about 41 s; the file then does not end on main's code, so it alone claims a red",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/bus-scale.test.mjs",
+            "cmd": "out=$(node --test --test-concurrency=1 --test-reporter=tap --test-name-pattern='^50 seats and 100,000 messages: roster under 50 ms' test/bus-scale.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -q '^# pass 1$'"
+          }
+        },
+        {
+          "statement": "T4-c01w: test/bus-scale.test.mjs passes whole, and the bus answers as before",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-concurrency=1 test/bus-scale.test.mjs",
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "T4-c02w: Files roll over with nothing lost, and the limit is stated: test/bus-rotation.test.mjs passes whole, and it could not load on main's code, so no red run is claimed for it",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-concurrency=1 test/bus-rotation.test.mjs",
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "T4-c03w: test/bus-oracle.test.mjs passes whole: every answer matches the old bus on random histories. On main's code that promise passes, as it must, and only its mutation controls fail, because the code they break is not there, so no red run is claimed",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-concurrency=1 test/bus-oracle.test.mjs",
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T5",
+      "title": "Three findings on the same path",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "F1: the hook filters journals before ranking, so they cannot crowd out memory. F2: notes changed while stopped reach recall. F3: writes before a hard kill reach recall."
+      ],
+      "description": "F1 to F3 of the growth report: correctness, not speed, on the same code path.",
+      "scope": {
+        "allow": [
+          "changelog.d/BUS-SCALES.md",
+          "changelog.d/fast-start-note-state.md",
+          "changelog.d/index-damage-sr-1-35.md",
+          "changelog.d/speed-sr-1-35-index.md",
+          "contracts/seed-readiness/README.md",
+          "contracts/seed-readiness/manifest.json",
+          "contracts/seed-readiness/redteam/SR-1.35.*",
+          "contracts/seed-readiness/specs/SR-1.35-memev-is-fast-on-every-axis-we-measured.json",
+          "contracts/signed/k-sr-1-35-*",
+          "docs/BUS.md",
+          "docs/DESIGN.md",
+          "docs/MODULES.md",
+          "docs/README.md",
+          "docs/TROUBLESHOOTING.md",
+          "docs/scope-one/WBS.md",
+          "docs/testing/LAB-TEST-PLAN.md",
+          "docs/testing/SPEED-RESULTS.md",
+          "scripts/bench/bus.mjs",
+          "scripts/bench/speed/bus.mjs",
+          "scripts/bench/speed/daemon.mjs",
+          "scripts/bench/speed/firstrun.mjs",
+          "scripts/bench/speed/fixture.mjs",
+          "scripts/bench/speed/git.mjs",
+          "scripts/bench/speed/lab/bus-cold.mjs",
+          "scripts/bench/speed/lab/bus-git-cost.mjs",
+          "scripts/bench/speed/lab/bus-loop3.mjs",
+          "scripts/bench/speed/lab/bus-rotation-layouts.mjs",
+          "scripts/bench/speed/lab/bus-variants.mjs",
+          "scripts/bench/speed/lab/bus-warm.mjs",
+          "scripts/bench/speed/recall.mjs",
+          "scripts/bench/speed/save.mjs",
+          "scripts/bench/speed/start-oracle.mjs",
+          "scripts/bench/speed/start.mjs",
+          "scripts/bench/speed/sweep.mjs",
+          "scripts/bench/speed/targets.mjs",
+          "scripts/bench/speed/write.mjs",
+          "src/cli/bus-cli.mjs",
+          "src/cli/contracts-cli.mjs",
+          "src/cli/daemon.mjs",
+          "src/cli/doctor.mjs",
+          "src/cli/hooks.mjs",
+          "src/cli/main.mjs",
+          "src/cli/runner.mjs",
+          "src/engine/bus.mjs",
+          "src/engine/git.mjs",
+          "src/engine/graph.mjs",
+          "src/engine/health.mjs",
+          "src/engine/index.mjs",
+          "src/engine/notes-worker.mjs",
+          "src/engine/notestate.mjs",
+          "src/engine/oplog.mjs",
+          "src/engine/segment-index.mjs",
+          "src/engine/segment.mjs",
+          "src/engine/util.mjs",
+          "src/engine/vault.mjs",
+          "src/server/http.mjs",
+          "src/server/main.mjs",
+          "src/server/mcp.mjs",
+          "test/bus-oracle.test.mjs",
+          "test/bus-rotation.test.mjs",
+          "test/bus-scale.test.mjs",
+          "test/commit-queue-thread.test.mjs",
+          "test/coordinator.test.mjs",
+          "test/fixtures/bus-main-oracle.mjs",
+          "test/helpers/bus-lockstep.mjs",
+          "test/index-damage-noticed.test.mjs",
+          "test/index-damage.test.mjs",
+          "test/memory-quality.test.mjs",
+          "test/notestate.test.mjs",
+          "test/oplog-sliced-snapshot.test.mjs",
+          "test/segment-index.test.mjs",
+          "test/speed-promises.test.mjs",
+          "test/speed-targets.test.mjs",
+          "test/vault-case-names.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "statement": "T5-c01: 8 tests in test/speed-promises.test.mjs failed on main's code by assertion and pass here: \"the prompt hook leaves past journals out before ranking, so a prompt asked before still gets its memory\"; \"a note added or edited while stopped reaches recall at the next start\"; \"a write just before a hard kill reaches recall at the next start\"; \"a write before a hard kill reaches recall even when the vault has never stopped cleanly\"; \"an old index converts once: same answers, the old file goes, and a kill before the end starts over\"; \"after a downgrade and an upgrade again, the index the older version kept is the one converted, and a journal it archived stays out\"; \"a note the old index never saw reaches recall through the conversion, as a hard kill before the upgrade leaves it\"; \"status says a daemon is loading rather than not running\"",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/speed-promises.test.mjs",
+            "cmd": "out=$(node --test --test-concurrency=1 --test-reporter=tap --test-name-pattern='^the prompt hook leaves past journals out before |^a note added or edited while stopped reaches rec|^a write just before a hard kill reaches recall a|^a write before a hard kill reaches recall even w|^an old index converts once: same answers, the ol|^after a downgrade and an upgrade again, the inde|^a note the old index never saw reaches recall th|^status says a daemon is loading rather than not ' test/speed-promises.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -q '^# pass 8$'"
+          }
+        },
+        {
+          "statement": "T5-c01w: The hook filter, stopped changes and hard kills reach recall: test/speed-promises.test.mjs passes whole; 2 of its tests also pass on main's code, so they guard behaviour and claim no change; 1 more fails there by another error or runs past two minutes, and claims no red",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-concurrency=1 test/speed-promises.test.mjs",
+            "timeout_s": 900
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T6",
+      "title": "A ceiling on every axis, and results on the repository",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "The ceilings sit well above what the iMac measured, so a slower computer passes. Those in CAUGHT sit under the old cost. a4_new_note_p50_ms and a8_stop_ms are guards the old code also passes, and claim no gain. a3_recall_p95_ms and a6_send_ms are guards as well: the old code measured under twice their ceilings here, so a faster computer could pass it, and they are not counted as catching it.",
+        "docs/testing/SPEED-RESULTS.md gives measured figures from a named commit, on synthetic fixtures, and says what was not measured."
+      ],
+      "description": "One command checks every axis at 50,000 generated notes, and the same command shows the old code fails the ceilings meant to catch it.",
+      "scope": {
+        "allow": [
+          "changelog.d/BUS-SCALES.md",
+          "changelog.d/fast-start-note-state.md",
+          "changelog.d/index-damage-sr-1-35.md",
+          "changelog.d/speed-sr-1-35-index.md",
+          "contracts/seed-readiness/README.md",
+          "contracts/seed-readiness/manifest.json",
+          "contracts/seed-readiness/redteam/SR-1.35.*",
+          "contracts/seed-readiness/specs/SR-1.35-memev-is-fast-on-every-axis-we-measured.json",
+          "contracts/signed/k-sr-1-35-*",
+          "docs/BUS.md",
+          "docs/DESIGN.md",
+          "docs/MODULES.md",
+          "docs/README.md",
+          "docs/TROUBLESHOOTING.md",
+          "docs/scope-one/WBS.md",
+          "docs/testing/LAB-TEST-PLAN.md",
+          "docs/testing/SPEED-RESULTS.md",
+          "scripts/bench/bus.mjs",
+          "scripts/bench/speed/bus.mjs",
+          "scripts/bench/speed/daemon.mjs",
+          "scripts/bench/speed/firstrun.mjs",
+          "scripts/bench/speed/fixture.mjs",
+          "scripts/bench/speed/git.mjs",
+          "scripts/bench/speed/lab/bus-cold.mjs",
+          "scripts/bench/speed/lab/bus-git-cost.mjs",
+          "scripts/bench/speed/lab/bus-loop3.mjs",
+          "scripts/bench/speed/lab/bus-rotation-layouts.mjs",
+          "scripts/bench/speed/lab/bus-variants.mjs",
+          "scripts/bench/speed/lab/bus-warm.mjs",
+          "scripts/bench/speed/recall.mjs",
+          "scripts/bench/speed/save.mjs",
+          "scripts/bench/speed/start-oracle.mjs",
+          "scripts/bench/speed/start.mjs",
+          "scripts/bench/speed/sweep.mjs",
+          "scripts/bench/speed/targets.mjs",
+          "scripts/bench/speed/write.mjs",
+          "src/cli/bus-cli.mjs",
+          "src/cli/contracts-cli.mjs",
+          "src/cli/daemon.mjs",
+          "src/cli/doctor.mjs",
+          "src/cli/hooks.mjs",
+          "src/cli/main.mjs",
+          "src/cli/runner.mjs",
+          "src/engine/bus.mjs",
+          "src/engine/git.mjs",
+          "src/engine/graph.mjs",
+          "src/engine/health.mjs",
+          "src/engine/index.mjs",
+          "src/engine/notes-worker.mjs",
+          "src/engine/notestate.mjs",
+          "src/engine/oplog.mjs",
+          "src/engine/segment-index.mjs",
+          "src/engine/segment.mjs",
+          "src/engine/util.mjs",
+          "src/engine/vault.mjs",
+          "src/server/http.mjs",
+          "src/server/main.mjs",
+          "src/server/mcp.mjs",
+          "test/bus-oracle.test.mjs",
+          "test/bus-rotation.test.mjs",
+          "test/bus-scale.test.mjs",
+          "test/commit-queue-thread.test.mjs",
+          "test/coordinator.test.mjs",
+          "test/fixtures/bus-main-oracle.mjs",
+          "test/helpers/bus-lockstep.mjs",
+          "test/index-damage-noticed.test.mjs",
+          "test/index-damage.test.mjs",
+          "test/memory-quality.test.mjs",
+          "test/notestate.test.mjs",
+          "test/oplog-sliced-snapshot.test.mjs",
+          "test/segment-index.test.mjs",
+          "test/speed-promises.test.mjs",
+          "test/speed-targets.test.mjs",
+          "test/vault-case-names.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "statement": "T6-c00: the ceilings command exists on this code and did not on main's",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/speed-targets.test.mjs",
+            "cmd": "out=$(node --test --test-concurrency=1 --test-reporter=tap --test-name-pattern='^the ceilings command is there' test/speed-targets.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -q '^# pass 1$'"
+          }
+        },
+        {
+          "statement": "T6-c01: the ceilings can fail, a number that does not come back fails, and old code must fail those meant to catch it",
+          "verifier": {
+            "type": "command",
+            "cmd": "node --test --test-concurrency=1 test/speed-targets.test.mjs",
+            "timeout_s": 300
+          }
+        },
+        {
+          "statement": "T6-c02: every ceiling holds at 50,000 generated notes",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/bench/speed/targets.mjs",
+            "timeout_s": 3000
+          }
+        },
+        {
+          "statement": "T6-c03: on the contract's base, the same benches fail every ceiling in CAUGHT",
+          "verifier": {
+            "type": "command",
+            "cmd": "node scripts/bench/speed/targets.mjs --against \"$MEMEV_CONTRACT_BASE\"",
+            "timeout_s": 3600
+          }
+        },
+        {
+          "statement": "T6-c04: the results name a commit that is in this history, and say what was not measured",
+          "verifier": {
+            "type": "command",
+            "cmd": "sha=$(grep -oE '[0-9a-f]{40}' docs/testing/SPEED-RESULTS.md | head -1); [ -n \"$sha\" ] && git merge-base --is-ancestor \"$sha\" HEAD && grep -q 'Not measured' docs/testing/SPEED-RESULTS.md",
+            "timeout_s": 60
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently."
+      ]
+    },
+    {
+      "id": "T7",
+      "title": "Health data for the app",
+      "phase": "implement",
+      "depends_on": [],
+      "requirements": [
+        "memev status --json carries health: start_ms, recall count, p50 and p95, longest save block, memory, and prompts with and without memory. prompts.skipped_for_time is null and named in not_measured, as the daemon cannot see it.",
+        "Figures are since this start. The daily record in the first draft is not built and is not claimed here."
+      ],
+      "description": "The daemon reports what it measured about itself. The app only reads it. A figure not measured says so and is never estimated.",
+      "scope": {
+        "allow": [
+          "changelog.d/BUS-SCALES.md",
+          "changelog.d/fast-start-note-state.md",
+          "changelog.d/index-damage-sr-1-35.md",
+          "changelog.d/speed-sr-1-35-index.md",
+          "contracts/seed-readiness/README.md",
+          "contracts/seed-readiness/manifest.json",
+          "contracts/seed-readiness/redteam/SR-1.35.*",
+          "contracts/seed-readiness/specs/SR-1.35-memev-is-fast-on-every-axis-we-measured.json",
+          "contracts/signed/k-sr-1-35-*",
+          "docs/BUS.md",
+          "docs/DESIGN.md",
+          "docs/MODULES.md",
+          "docs/README.md",
+          "docs/TROUBLESHOOTING.md",
+          "docs/scope-one/WBS.md",
+          "docs/testing/LAB-TEST-PLAN.md",
+          "docs/testing/SPEED-RESULTS.md",
+          "scripts/bench/bus.mjs",
+          "scripts/bench/speed/bus.mjs",
+          "scripts/bench/speed/daemon.mjs",
+          "scripts/bench/speed/firstrun.mjs",
+          "scripts/bench/speed/fixture.mjs",
+          "scripts/bench/speed/git.mjs",
+          "scripts/bench/speed/lab/bus-cold.mjs",
+          "scripts/bench/speed/lab/bus-git-cost.mjs",
+          "scripts/bench/speed/lab/bus-loop3.mjs",
+          "scripts/bench/speed/lab/bus-rotation-layouts.mjs",
+          "scripts/bench/speed/lab/bus-variants.mjs",
+          "scripts/bench/speed/lab/bus-warm.mjs",
+          "scripts/bench/speed/recall.mjs",
+          "scripts/bench/speed/save.mjs",
+          "scripts/bench/speed/start-oracle.mjs",
+          "scripts/bench/speed/start.mjs",
+          "scripts/bench/speed/sweep.mjs",
+          "scripts/bench/speed/targets.mjs",
+          "scripts/bench/speed/write.mjs",
+          "src/cli/bus-cli.mjs",
+          "src/cli/contracts-cli.mjs",
+          "src/cli/daemon.mjs",
+          "src/cli/doctor.mjs",
+          "src/cli/hooks.mjs",
+          "src/cli/main.mjs",
+          "src/cli/runner.mjs",
+          "src/engine/bus.mjs",
+          "src/engine/git.mjs",
+          "src/engine/graph.mjs",
+          "src/engine/health.mjs",
+          "src/engine/index.mjs",
+          "src/engine/notes-worker.mjs",
+          "src/engine/notestate.mjs",
+          "src/engine/oplog.mjs",
+          "src/engine/segment-index.mjs",
+          "src/engine/segment.mjs",
+          "src/engine/util.mjs",
+          "src/engine/vault.mjs",
+          "src/server/http.mjs",
+          "src/server/main.mjs",
+          "src/server/mcp.mjs",
+          "test/bus-oracle.test.mjs",
+          "test/bus-rotation.test.mjs",
+          "test/bus-scale.test.mjs",
+          "test/commit-queue-thread.test.mjs",
+          "test/coordinator.test.mjs",
+          "test/fixtures/bus-main-oracle.mjs",
+          "test/helpers/bus-lockstep.mjs",
+          "test/index-damage-noticed.test.mjs",
+          "test/index-damage.test.mjs",
+          "test/memory-quality.test.mjs",
+          "test/notestate.test.mjs",
+          "test/oplog-sliced-snapshot.test.mjs",
+          "test/segment-index.test.mjs",
+          "test/speed-promises.test.mjs",
+          "test/speed-targets.test.mjs",
+          "test/vault-case-names.test.mjs"
+        ]
+      },
+      "criteria": [
+        {
+          "statement": "T7-c01: the daemon reports what it measured, in memev status --json, and says what it did not; this failed on main's code by assertion",
+          "verifier": {
+            "type": "test_red_green",
+            "test_file": "test/speed-promises.test.mjs",
+            "cmd": "out=$(node --test --test-concurrency=1 --test-reporter=tap --test-name-pattern='^the daemon reports what it measured, and says what it did not' test/speed-promises.test.mjs 2>&1); rc=$?; printf '%s\\n' \"$out\"; [ $rc -eq 0 ] && printf '%s\\n' \"$out\" | grep -q '^# fail 0$' && printf '%s\\n' \"$out\" | grep -q '^# pass 1$'"
+          }
+        },
+        {
+          "statement": "Changes stay in scope",
+          "verifier": {
+            "type": "scope"
+          }
+        }
+      ],
+      "stop_rules": [
+        "If any criterion fails after the fix: STOP, report the measured result, the failing check and file:line.",
+        "If the work needs a path outside scope: STOP and ask the owner. Never widen scope silently."
+      ]
+    }
+  ]
+}
