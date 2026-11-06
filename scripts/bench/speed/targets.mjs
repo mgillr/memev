@@ -67,9 +67,10 @@ const main = async () => {
   const NOTES = Number(arg('notes', 50000));
   if (argv.includes('--against')) {
     const old = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-targets-old-'));
+    let verdict = 2;
     try {
       const ar = spawnSync('sh', ['-c', 'git -C "$0" archive "$1" | tar -x -C "$2"', REPO, arg('against'), old], { encoding: 'utf8' });
-      if (ar.status !== 0) { console.error(`cannot read ${arg('against')}: ${ar.stderr}`); process.exit(2); }
+      if (ar.status !== 0) throw new Error(`cannot read ${arg('against')}: ${ar.stderr}`);
       fs.cpSync(HERE, path.join(old, 'scripts', 'bench', 'speed'), { recursive: true });
       const r = spawnSync(process.execPath, [path.join(old, 'scripts', 'bench', 'speed', 'targets.mjs'), '--notes', String(NOTES), '--json'], { encoding: 'utf8', maxBuffer: 1 << 26, stdio: ['ignore', 'pipe', 'inherit'] });
       const numbers = JSON.parse(String(r.stdout).trim().split('\n').at(-1)).numbers;
@@ -77,8 +78,9 @@ const main = async () => {
       console.log(JSON.stringify({ against: arg('against'), numbers, ...v, rows: undefined }));
       for (const x of v.rows) console.log(`${x.ok ? 'passes on the old code' : 'caught'} ${x.name} ${x.value ?? 'no number'} (ceiling ${x.ceiling} ${x.unit})`);
       if (!v.ok) console.log(`NOT CAUGHT, though meant to be: ${v.missed.join(', ')}`);
-      process.exit(v.ok ? 0 : 1);
-    } finally { fs.rmSync(old, { recursive: true, force: true }); }
+      verdict = v.ok ? 0 : 1;
+    } catch (e) { console.error(e.message); } finally { fs.rmSync(old, { recursive: true, force: true }); }
+    process.exit(verdict);
   }
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-targets-'));
   const root = path.join(base, 'vault');
