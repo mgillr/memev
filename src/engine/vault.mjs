@@ -138,6 +138,9 @@ export class Vault extends EventEmitter {
     this._tick();
     const loaded = this.index.load(() => this._tick());
     if (this.index.loadDamage) this._recordIndexDamage(this.index.loadDamage, 'rebuilt');
+    // Sound files that hold less than they were left with: every note is looked at, by way of a rebuild, so a restored or cut index cannot serve old text.
+    const behind = loaded ? this.index.behind(this._savedIndexPosition().at) : null;
+    if (behind) { this.index.drop(); loaded = false; this._recordIndexDamage(behind, 'rebuilt'); }
     const rebuild = !loaded || this.index.isEmpty();
     // a first run reads each note once: the import indexes what it just read, in the path order a rebuild uses, when every note is new
     const allNew = rebuild && ![...scan.keys()].some((p) => this.log.heads.has(p));
@@ -258,7 +261,7 @@ export class Vault extends EventEmitter {
    * moved to the archive was taken out on purpose and stays out, so only the file at the note's own path counts.
    */
   _catchUpIndex(scan, convertedFromMs) {
-    const text = readPrivate(path.join(this.state, 'index.seq')); let saved = text === null ? null : Number(text);
+    const { text, seq } = this._savedIndexPosition(); let saved = seq;
     // a position past the end of the log, or one that is no number, says nothing: every note is looked at
     if (!Number.isSafeInteger(saved) || saved < 0 || text.trim() === '' || saved > this.log.seq) saved = convertedFromMs === null || text !== null ? 0 : Infinity;
     const late = new Set(this.imported);
@@ -268,6 +271,11 @@ export class Vault extends EventEmitter {
     if (!late.size) { if (saved === Infinity) this._saveIndexSeq(); return; }
     this._takeLate(late);
     this.index.save(); this.index.syncNow(); this._saveIndexSeq();
+  }
+  /** index.seq: the log position the index holds, and the generation and log end it stood at then. A file with only a number has no `at`. */
+  _savedIndexPosition() {
+    const text = readPrivate(path.join(this.state, 'index.seq')); const m = text === null ? null : /^(\d+)(?: (\d+) (\d+))?\s*$/.exec(text);
+    return { text, seq: m ? Number(m[1]) : null, at: m?.[2] ? { gen: Number(m[2]), end: Number(m[3]) } : null };
   }
   _takeLate(late) {
     for (const p of late) {
@@ -301,7 +309,7 @@ export class Vault extends EventEmitter {
     }).catch((e) => { this.index.rebuildFailed(e.message); this._recordIndexDamage(why, `failed: ${e.message}`); });
   }
   /** Where the index stands in the log. It is written only once the index holds that much on the disk; an older value only means a longer catch-up. */
-  _saveIndexSeq(seq = this.log.seq) { try { replacePrivate(path.join(this.state, 'index.seq'), String(seq)); } catch { /* the next save writes it again */ } }
+  _saveIndexSeq(seq = this.log.seq, at = this.index.position()) { if (this.index.retrying()) return; try { replacePrivate(path.join(this.state, 'index.seq'), at ? `${seq} ${at.gen} ${at.end}` : String(seq)); } catch { /* the next save writes it again */ } }
   _scanNotes() { return scanNotes(this.root); }
   /** A folder's first open: each note is logged and taken into the graph as it passes on its way to the index. */
   *_firstRunNotes(scan) {
@@ -514,7 +522,7 @@ export class Vault extends EventEmitter {
     clearTimeout(this._ist);
     this._ist = setTimeout(() => {
       const t0 = performance.now();
-      this.index.save(); const seq = this.log.seq; this.index.whenSynced(() => this._saveIndexSeq(seq)); this._saveGraphBehind(); try { this.notes.flush(); } catch { /* the cache loses a line, which costs one read at the next start */ }
+      this.index.save(); const seq = this.log.seq, at = this.index.position(); this.index.whenSynced(() => this._saveIndexSeq(seq, at)); this._saveGraphBehind(); try { this.notes.flush(); } catch { /* the cache loses a line, which costs one read at the next start */ }
       this.health.saveBlock(performance.now() - t0);
     }, 3000); this._ist.unref?.();
   }

@@ -447,6 +447,30 @@ function whatWasLeftIsServed(root, label) {
     if (round === 0) assert.ok(v.status().index.damage, `${label}: said in status`); v.close();
   }
 }
+test('whole lines cut off overlay.log are noticed: every note is looked at', () => {
+  const { root } = changedAfter(() => null); const f = F(root, 'overlay.log'); const text = fs.readFileSync(f, 'utf8'); fs.writeFileSync(f, text.slice(0, text.indexOf('\n') + 1)); whatWasLeftIsServed(root, 'cut to one line');
+  const r2 = changedAfter(() => null).root; fs.writeFileSync(F(r2, 'overlay.log'), ''); whatWasLeftIsServed(r2, 'cut to nothing');
+});
+test('the save behind a write records where the index stands too, so lines cut after a hard kill are noticed', async () => {
+  const root = seeded(12); let v = open(root); const seq = path.join(root, '.memev/index.seq'); const was = fs.readFileSync(seq, 'utf8'); v.write(ME, { path: 'notes/n2.md', body: '# E\neditedword now\n' });
+  assert.ok(await until(() => fs.readFileSync(seq, 'utf8') !== was, 15000), 'the save came'); assert.match(fs.readFileSync(seq, 'utf8'), /^\d+ \d+ [1-9]\d*$/); clearTimeout(v._ist); fs.closeSync(v.log.fd); v.log.fd = null;
+  fs.writeFileSync(F(root, 'overlay.log'), ''); v = open(root); assert.deepEqual(hits(v, 'editedword'), ['notes/n2.md']); assert.equal(hits(v, WORD(2)).length, 0, 'old text served'); assert.match(v.status().index.damage?.why || '', /overlay\.log/); v.close();
+});
+test('an older index.seg restored over a newer one is noticed: every note is looked at', () => {
+  const { root, b } = changedAfter((r) => { const keep = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-keep-')); made.push(keep); fs.cpSync(segDir(r), path.join(keep, 'seg'), { recursive: true }); return keep; });
+  fs.rmSync(segDir(root), { recursive: true }); fs.cpSync(path.join(b, 'seg'), segDir(root), { recursive: true }); whatWasLeftIsServed(root, 'same generation, shorter log');
+  const v0 = changedAfter((r) => { const keep = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-keep-')); made.push(keep); fs.cpSync(segDir(r), path.join(keep, 'seg'), { recursive: true }); return keep; }); const v = open(v0.root); v.compact(); v.close();
+  fs.rmSync(segDir(v0.root), { recursive: true }); fs.cpSync(path.join(v0.b, 'seg'), segDir(v0.root), { recursive: true }); whatWasLeftIsServed(v0.root, 'an older generation');
+});
+test('a normal start pays nothing for that: nothing rebuilt or read after a clean stop, a hard kill, or a fold cut by a kill', async () => {
+  const root = seeded(12); const reads = () => { let n = 0; const real = Vault.prototype._read; Vault.prototype._read = function counted(p) { n++; return real.call(this, p); }; return { count: () => n, done: () => { Vault.prototype._read = real; } }; };
+  const r = reads(); let v; const gen = genDir(root); try { v = open(root); } finally { r.done(); } assert.equal(r.count(), 0, 'a clean stop leaves nothing to read'); assert.equal(genDir(root), gen); assert.equal(v.status().index.damage, null);
+  // saved to the log, and no position written: what a hard kill between the two leaves. The log is ahead of the position, which is no damage
+  v.write(ME, { path: 'notes/killed.md', body: '# K\nkilledword here\n' }); v.index.save(); v.index.syncNow(); clearTimeout(v._ist); fs.closeSync(v.log.fd); v.log.fd = null;
+  v = open(root); assert.equal(genDir(root), gen, 'a kill is no reason to rebuild'); assert.equal(v.status().index.damage, null); assert.deepEqual(hits(v, 'killedword'), ['notes/killed.md']);
+  v.write(ME, { path: 'notes/folded.md', body: '# K\nfoldedword here\n' }); v.index.save(); const hold = setInterval(() => {}, 50); try { await v.index.foldSoon(); } finally { clearInterval(hold); } assert.notEqual(genDir(root), gen, 'the fold landed'); const after = genDir(root); clearTimeout(v._ist); fs.closeSync(v.log.fd); v.log.fd = null;
+  v = open(root); assert.equal(genDir(root), after, 'a fold ahead of the saved position is no damage'); assert.equal(v.status().index.damage, null); assert.deepEqual(hits(v, 'foldedword'), ['notes/folded.md']); v.close();
+});
 
 const failing = (name, code, times = 1) => { const real = fs.openSync; let left = times; fs.openSync = function injected(f, ...a) { if (left > 0 && String(f).endsWith(name)) { left--; const e = new Error(`${code}: injected, open '${f}'`); e.code = code; e.syscall = 'open'; throw e; } return real.call(this, f, ...a); }; return () => { fs.openSync = real; }; };
 test('a read that fails in passing fails that query, is retried and costs no rebuild', async () => {
@@ -455,6 +479,14 @@ test('a read that fails in passing fails that query, is retried and costs no reb
     try { let threw = null; try { v.recall(ME, { query: WORD(1), log: false, all_projects: true }); } catch (e) { threw = e; } assert.equal(threw?.code, 'index_busy', `${code} ${name}: ${threw?.stack}`); assert.match(threw.message, new RegExp(code)); } finally { undo(); }
     assert.equal(v.index.state().state, 'ok', `${code} ${name}: no rebuild`); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md'], `${code} ${name}: the retry`); assert.equal(v.status().index.damage, null); assert.equal(genDir(root), gen); v.close();
   }
+});
+test('a write met by a read that fails in passing lands, reaches recall on the retry, and holds the saved position back until it has', () => {
+  const root = seeded(12); const v = open(root); hits(v, WORD(9)); const seqFile = path.join(root, '.memev/index.seq'); const was = fs.readFileSync(seqFile, 'utf8'); const undo = failing('bypath.bin', 'EMFILE', 1000);
+  try {
+    v.write(ME, { path: 'notes/n2.md', body: '# E\nretriedword now\n' }); v.index.save(); v._saveIndexSeq(); assert.equal(fs.readFileSync(seqFile, 'utf8'), was, 'the position passed a write the index does not hold');
+    assert.throws(() => v.recall(ME, { query: 'retriedword', log: false, all_projects: true }), (e) => e.code === 'index_busy', 'no answer that leaves the write out');
+  } finally { undo(); }
+  assert.deepEqual(hits(v, 'retriedword'), ['notes/n2.md']); assert.equal(hits(v, WORD(2)).length, 0, 'the old text is gone'); assert.equal(v.status().index.damage, null); v.close(); assert.notEqual(fs.readFileSync(seqFile, 'utf8'), was);
 });
 test('a start that cannot read the index just now fails and tries again: the generation is not thrown away', () => {
   for (const name of ['head.json', 'dict.txt', 'CURRENT', 'overlay.log']) {
