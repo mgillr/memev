@@ -17,7 +17,7 @@ const SPEC = 'contracts/spec.json'; const RECORD = 'contracts/record.json';
 const SIGNABLE = 'a'.repeat(64);
 const STUB = `import fs from 'node:fs';\nimport path from 'node:path';\nexport const evaluate = ({ cwd }) => JSON.parse(fs.readFileSync(path.join(cwd, 'gate-answer.json'), 'utf8'));\n`;
 
-function setup({ gate = {}, title = 't', files = {} } = {}) {
+function setup({ gate = {}, title = 't', files = {}, request = undefined } = {}) {
   const home = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'owner-sign-')));
   const dir = path.join(home, '.config', 'memev-owner');
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -35,7 +35,7 @@ function setup({ gate = {}, title = 't', files = {} } = {}) {
   for (const f of ['owner-key-preload.mjs', 'owner-sign.mjs']) add(`scripts/sign/${f}`, fs.readFileSync(path.join(repo, 'scripts', 'sign', f)));
   add('src/engine/redteam-gate.mjs', STUB);
   add('gate-answer.json', JSON.stringify({ status: 'SIGNABLE', signable_sha256: SIGNABLE, record: RECORD, reasons: [], ...gate }));
-  add(SPEC, JSON.stringify({ title, tasks: [] })); add(RECORD, '{}\n');
+  add(SPEC, JSON.stringify({ title, tasks: [], ...(request === undefined ? {} : { request }) })); add(RECORD, '{}\n');
   for (const [rel, text] of Object.entries(files)) add(rel, text);
   const git = (...a) => execFileSync('/usr/bin/git', ['-C', code, '-c', 'user.name=t', '-c', 'user.email=t@t.invalid', ...a], { encoding: 'utf8' }).trim();
   git('init', '-q'); git('add', '.'); git('commit', '-qm', 'one');
@@ -216,6 +216,14 @@ test('the tool with no preload stops before it opens a vault, with or without a 
   fs.rmSync(s.view);
   refused(s, run(s, { preload: false }), /only under the owner key preload/);
   assert.equal(fs.existsSync(s.view), false, 'something was made at the view path');
+});
+
+test('a request a contract cannot hold: refused before the passphrase, at the number the engine holds to', { skip }, async () => {
+  const { REQUEST_MAX } = await import(path.join(repo, 'src', 'engine', 'contracts.mjs'));
+  const over = setup({ request: 'x'.repeat(REQUEST_MAX + 1) });
+  refused(over, run(over), /request is \d+ characters and a contract holds/);
+  const fits = setup({ request: 'x'.repeat(REQUEST_MAX) });
+  assert.match(run(fits).out, /needs your own Terminal/);
 });
 
 test('the owner key listed in contracts/keys is the Ed25519 key its file name says', { skip }, () => {

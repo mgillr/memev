@@ -85,6 +85,9 @@ for (const f of [specAbs, path.join(code, opt.record)]) if (!fs.existsSync(f)) s
 
 // The gate of this clone, before the passphrase.
 const specRaw = fs.readFileSync(specAbs); const spec = JSON.parse(specRaw);
+// the engine refuses more at the draft, which comes after the passphrase; test/owner-sign.test.mjs holds this number to the engine's
+const REQUEST_MAX = 16000;
+if (typeof spec.request === 'string' && spec.request.length > REQUEST_MAX) stop(`the spec's request is ${spec.request.length} characters and a contract holds ${REQUEST_MAX}`);
 const gate = await import(pathToFileURL(path.join(code, 'src', 'engine', 'redteam-gate.mjs')).href);
 const judged = gate.evaluate({ spec: opt.spec, cwd: code });
 if (judged.status !== 'SIGNABLE') stop(`the gate says ${judged.status}: ${(judged.reasons || []).join('; ').slice(0, 600)}`);
