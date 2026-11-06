@@ -136,7 +136,7 @@ export class Vault extends EventEmitter {
     let oldIndexMs = null; try { oldIndexMs = fs.statSync(path.join(this.state, 'index.jsonl')).mtimeMs; } catch { /* no old index file, the usual case */ }
     this.index.onDamage = (why) => this._indexDamaged(why);
     this._tick();
-    const loaded = this.index.load(() => this._tick());
+    let loaded = this.index.load(() => this._tick());
     if (this.index.loadDamage) this._recordIndexDamage(this.index.loadDamage, 'rebuilt');
     // Sound files that hold less than they were left with: every note is looked at, by way of a rebuild, so a restored or cut index cannot serve old text.
     const behind = loaded ? this.index.behind(this._savedIndexPosition().at) : null;
@@ -263,7 +263,7 @@ export class Vault extends EventEmitter {
   _catchUpIndex(scan, convertedFromMs) {
     const { text, seq } = this._savedIndexPosition(); let saved = seq;
     // a position past the end of the log, or one that is no number, says nothing: every note is looked at
-    if (!Number.isSafeInteger(saved) || saved < 0 || text.trim() === '' || saved > this.log.seq) saved = convertedFromMs === null || text !== null ? 0 : Infinity;
+    if (!Number.isSafeInteger(saved) || saved < 0 || saved > this.log.seq) saved = convertedFromMs === null || text !== null ? 0 : Infinity;
     const late = new Set(this.imported);
     for (const [p, h] of this.log.heads) if (h.seq > saved) late.add(p);
     // the old index held no position: a note newer than its file may have missed it, and so may a delete

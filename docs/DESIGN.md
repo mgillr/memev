@@ -34,8 +34,14 @@ dictionary, each word's postings and counts, each snippet line, and the files re
 their sums as they are read. The whole-file sums are checked behind the start, by `memev doctor` and
 before a fold, so damage is not carried into a new generation. A generation found damaged stops
 serving at once and is rebuilt from the notes on a worker; recall says it is rebuilding until then,
-and `memev status` and `memev doctor` say what was found. The check is against damage: someone able
-to write `.memev` can write a sound looking index, as they can edit the log.
+and `memev status` and `memev doctor` say what was found. If the rebuild itself fails, recall says
+that and to run `memev restart`. Damage means a file gone, of the wrong type, the wrong size or the
+wrong sum. A read that fails for another reason, such as too many open files or a disk error, fails
+that one query and costs no rebuild; a write met by one lands and reaches the index when a read works
+again. `index.seq` also holds the generation and log end the index stood at, so a start that finds
+less than that, whole lines cut from the log or an older folder restored, rebuilds from the notes.
+The check is against damage: someone able to write `.memev` can write a sound looking index, as they
+can edit the log.
 
 **Memory quality.** `memev_remember` checks text before saving it, on this machine with fixed rules:
 acknowledgements, system noise, fragments under three words and duplicates of anything already in
