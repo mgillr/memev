@@ -498,3 +498,9 @@ test('doctor and a fold that cannot read a file just now find no damage', async 
   const gen = genDir(root); const v2 = open(root); v2.write(ME, { path: 'notes/late.md', body: '# L\nlateword\n' }); v2.index.save(); fs.chmodSync(F(root, 'tfs.bin'), 0); const hold = setInterval(() => {}, 50); try { await v2.index.foldSoon(); } finally { clearInterval(hold); fs.chmodSync(F(root, 'tfs.bin'), 0o600); } assert.equal(v2.index.state().state, 'ok', 'no rebuild'); assert.equal(v2.status().index.damage, null); assert.equal(genDir(root), gen, 'still the same generation'); assert.ok(v2.index.foldFailed > 0, 'the fold waits and tries again'); v2.close();
 });
 
+test('memev compact folds even when its own save would have started a fold', () => {
+  const root = fresh(); let v = open(root); for (let i = 0; i < 1100; i++) v.write(ME, { path: `notes/n${i}.md`, body: `# Note ${i}\nthe body holds ${WORD(i % 600)}\n\n## Part\nmore text here\n` }); v.close();
+  v = open(root); for (let i = 0; i < 1100; i++) v.write(ME, { path: `more/m${i}.md`, body: `# More ${i}\nsome body here\n\n## Part\nmore text here\n` }); const was = v.index.gen; v.compact();
+  assert.notEqual(v.index.gen, was, 'compact folded'); assert.equal(v.index.logEnd, 0, 'nothing is left in the log'); assert.equal(v.index.ov.docs.size, 0); assert.equal(v.index.foldP, null); v.close();
+  v = open(root); assert.ok(hits(v, WORD(5)).length > 0); assert.equal(v.index.stats().notes, v.allNotes().length); v.close();
+});

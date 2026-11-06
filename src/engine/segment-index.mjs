@@ -303,7 +303,9 @@ export class SegIndex {
   }
   /** memev compact: the daemon is stopped, so the fold runs here and the old generation is gone when this returns. */
   compact() {
-    if (!this.seg || this.foldP) return; this._flush(); if (!this.logEnd) return; const g = this._claim(), was = this.gen;
+    if (!this.seg) return;
+    if (this.foldP) { this.epoch++; this.foldP = null; } // a fold a save began is overtaken by this one: nothing it wrote is ever published
+    this._flush(); if (!this.logEnd) return; const g = this._claim(), was = this.gen;
     try { foldFiles(this._dir(was), this._dir(g), this._log(was), this.logEnd); } catch (e) { this._unclaim(g); if (!(e instanceof SegDamage)) throw e; this._damaged(e.why); return; }
     fs.writeFileSync(this._log(g), '', { flag: 'wx', mode: 0o600 });
     const seg = new Seg(this._dir(g)); this._publish(g); this._claimDone(g); this._closeFiles(); Object.assign(this, this._state(seg)); this.gen = g; this.logFd = fs.openSync(this._log(g), fs.constants.O_RDWR | NOFOLLOW); this.logEnd = 0; this._watch(seg); fs.rmSync(this._dir(was), { recursive: true, force: true });
