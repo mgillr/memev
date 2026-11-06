@@ -32,6 +32,17 @@ export const SEG_FILES = ['dict.txt', 'ids.bin', 'tfs.bin', 'cols.bin', 'heads.b
 const NOFOLLOW = fs.constants.O_NOFOLLOW ?? 0;
 /** A generation's files are not what was written. The notes are the record, so the index is rebuilt from them. A query that meets this gets it as its error. */
 export class SegDamage extends Error { constructor(why) { super(`the recall index is damaged and is being rebuilt from the notes: ${why}`); this.name = 'SegDamage'; this.code = 'index_rebuilding'; this.why = why; } }
+/** The rebuild could not be done. Recall says so and what to do, rather than going on promising it. */
+export class RebuildFailed extends SegDamage { constructor(why) { super(why); this.message = `the recall index was found damaged and could not be rebuilt (${why}); run memev restart to try again`; this.code = 'index_rebuild_failed'; } }
+/** A generation that is simply another version. Nothing is wrong with it, and it is rebuilt from the notes all the same. */
+export class SegOtherVersion extends Error {}
+/** A file could not be read just now. Nothing is known to be wrong with it, so this one query fails and the next tries again. */
+export class IndexBusy extends Error { constructor(code) { super(`the recall index could not be read just now (${code}); try again`); this.name = 'IndexBusy'; this.code = 'index_busy'; } }
+/** Damage is a file gone, of the wrong type, the wrong size or the wrong sum. An error with no code is this code's own finding, such as a short read. */
+const GONE = new Set(['ENOENT', 'ENOTDIR', 'ELOOP', 'EMLINK', 'EISDIR', 'EFTYPE']);
+export const isGone = (e) => !e.code || GONE.has(e.code);
+/** A failure of the system and not a finding about the file: too many open files, a read error, no permission. It passes, and costs no rebuild. */
+export const isPassing = (e) => !(e instanceof SegDamage) && !(e instanceof SegOtherVersion) && !isGone(e);
 /** A path the index may hand out: relative, with no step up and nothing a vault path never holds. A forged or damaged line cannot name a file outside the vault. */
 export const indexablePath = (p) => typeof p === 'string' && p.length > 0 && !/[\u0000-\u001f\u007f]/.test(p) && !p.split('/').some((x) => x === '..' || x === '.' || x === '') && !p.startsWith('/');
 /** A signature of an item key (path#heading). A key absent from a small bitmap of signatures needs no heading. */
@@ -60,7 +71,7 @@ export function fileSum(file, buf = Buffer.allocUnsafe(FLUSH)) {
 /** Every file of a generation against the sums in its head: what is wrong, or null. The whole-file check, so it costs a read of the whole index: a worker's job, or a command's. */
 export function verifySegFiles(dir, head) {
   const buf = Buffer.allocUnsafe(FLUSH);
-  for (const f of SEG_FILES) { let sum; try { sum = fileSum(path.join(dir, f), buf); } catch (e) { return `${f}: ${e.code || e.message}`; } if (sum !== head.sums?.[f]) return `${f} differs from its checksum`; }
+  for (const f of SEG_FILES) { let sum; try { sum = fileSum(path.join(dir, f), buf); } catch (e) { if (isPassing(e)) throw e; return `${f}: ${e.code || e.message}`; } if (sum !== head.sums?.[f]) return `${f} differs from its checksum`; }
   return null;
 }
 const selfSum = (h) => { const { self, ...rest } = h; void self; return sumOf(JSON.stringify(rest)); };
@@ -81,10 +92,10 @@ function headProblem(h) {
 /** Read and check a generation's head: a SegDamage when it is damaged, a plain Error when it is simply another version. */
 export function readHead(dir) {
   let head, text;
-  try { const fd = fs.openSync(path.join(dir, 'head.json'), fs.constants.O_RDONLY | NOFOLLOW); try { text = fs.readFileSync(fd, 'utf8'); } finally { fs.closeSync(fd); } } catch (e) { throw new SegDamage(`head.json: ${e.code || e.message}`); }
+  try { const fd = fs.openSync(path.join(dir, 'head.json'), fs.constants.O_RDONLY | NOFOLLOW); try { text = fs.readFileSync(fd, 'utf8'); } finally { fs.closeSync(fd); } } catch (e) { if (isPassing(e)) throw e; throw new SegDamage(`head.json: ${e.code || e.message}`); }
   try { head = JSON.parse(text); } catch { throw new SegDamage('head.json does not parse'); }
   if (head === null || typeof head !== 'object' || Array.isArray(head)) throw new SegDamage('head.json is not an object');
-  if (head.version !== SEG_VERSION || head.endian !== os.endianness()) { if (head.version === undefined || head.endian === undefined) throw new SegDamage('head.json has no version'); throw new Error(`segment version ${head.version}, ${head.endian}`); }
+  if (head.version !== SEG_VERSION || head.endian !== os.endianness()) { if (head.version === undefined || head.endian === undefined) throw new SegDamage('head.json has no version'); throw new SegOtherVersion(`segment version ${head.version}, ${head.endian}`); }
   const why = headProblem(head); if (why) throw new SegDamage(why);
   return head;
 }
@@ -171,18 +182,18 @@ export class Seg {
     try {
       for (const f of ['dict.txt', 'ids.bin', 'tfs.bin', 'meta.jsonl']) { const fd = fs.openSync(path.join(dir, f), fs.constants.O_RDONLY | NOFOLLOW); this.fds.push(fd); const st = fs.fstatSync(fd); if (!st.isFile()) throw new SegDamage(`${f} is not a file`); if (st.size !== h.sizes[f]) throw new SegDamage(`${f} is ${st.size} bytes, not the ${h.sizes[f]} recorded`); big[f] = fd; }
       for (const f of ['cols.bin', 'heads.bin', 'names.json', 'bypath.bin']) { const st = fs.lstatSync(path.join(dir, f)); if (!st.isFile()) throw new SegDamage(`${f} is not a file`); if (st.size !== h.sizes[f]) throw new SegDamage(`${f} is ${st.size} bytes, not the ${h.sizes[f]} recorded`); }
-    } catch (e) { this.close(); if (e instanceof SegDamage) throw e; throw new SegDamage(e.code ? `${path.basename(e.path || '')} ${e.code}` : e.message); }
+    } catch (e) { this.close(); if (e instanceof SegDamage || isPassing(e)) throw e; throw new SegDamage(e.code ? `${path.basename(e.path || '')} ${e.code}` : e.message); }
     this.fdD = big['dict.txt']; this.fdI = big['ids.bin']; this.fdT = big['tfs.bin']; this.fdM = big['meta.jsonl']; this.c = cols; this.h = null; this.byPath = byPath; this.paths = null; this.prebuilt = cols !== null;
   }
   close() { for (const f of this.fds) fs.closeSync(f); this.fds = []; }
   /** Say so once, and stop: nothing read from here on may be believed. */
   _bad(why) { const e = new SegDamage(why); this.onDamage?.(e); throw e; }
-  _whole(f) { let b; try { b = readAligned(path.join(this.dir, f)); } catch (e) { return this._bad(`${f}: ${e.code || e.message}`); } if (b.length !== this.head.sizes[f] || sumOf(b) !== this.head.sums[f]) return this._bad(`${f} differs from its checksum`); return b; }
+  _whole(f) { let b; try { b = readAligned(path.join(this.dir, f)); } catch (e) { if (isPassing(e)) throw e; return this._bad(`${f}: ${e.code || e.message}`); } if (b.length !== this.head.sizes[f] || sumOf(b) !== this.head.sums[f]) return this._bad(`${f} differs from its checksum`); return b; }
   /** The section columns as one typed array, read once on first use, with the names they point at. Either may be damaged in a way that keeps its size, so both are held to their sums here: every path a hit or a scope check sees comes through this. */
   cols() {
     if (!this.paths) {
       const n = this.head.n; if (!this.c) { const b = this._whole('cols.bin'); this.c = new Uint32Array(b.buffer, b.byteOffset, b.length / 4); }
-      let nm; try { nm = JSON.parse(this._whole('names.json').toString('utf8')); } catch (e) { if (e instanceof SegDamage) throw e; this._bad('names.json does not parse'); }
+      const names = this._whole('names.json'); let nm; try { nm = JSON.parse(names.toString('utf8')); } catch { this._bad('names.json does not parse'); }
       if (!Array.isArray(nm?.paths) || !Array.isArray(nm.projects) || !nm.paths.every(indexablePath) || !nm.projects.every((p) => typeof p === 'string')) this._bad('names.json is not a list of note paths');
       if (!this.prebuilt) {
         const c = this.c, np = nm.paths.length, nj = nm.projects.length, metaEnd = this.head.sizes['meta.jsonl'], headEnd = this.head.headBytes; let ha = 0;

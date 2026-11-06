@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parentPort, workerData } from 'node:worker_threads';
 import { foldFiles, scanNotes } from './notestate.mjs';
-import { writeSeg, verifySegFiles, readHead, SegDamage } from './segment.mjs';
+import { writeSeg, verifySegFiles, readHead, SegDamage, isPassing } from './segment.mjs';
 import { docsOfNotes } from './segment-index.mjs';
 
 const NOFOLLOW = fs.constants.O_NOFOLLOW ?? 0;
@@ -31,7 +31,7 @@ function linkAbove(root, p, seen) {
   return false;
 }
 function sweep({ root, items, segment, restEvery = 64 * 1024 * 1024, restMs = 0 }) {
-  if (segment) { let why = null; try { why = verifySegFiles(segment.dir, readHead(segment.dir)); } catch (e) { why = e instanceof SegDamage ? e.why : e.message; } parentPort.postMessage({ type: 'segment', gen: segment.gen, why }); }
+  if (segment) { let why = null, busy = null; try { why = verifySegFiles(segment.dir, readHead(segment.dir)); } catch (e) { if (isPassing(e)) busy = e.code; else why = e instanceof SegDamage ? e.why : e.message; } parentPort.postMessage({ type: 'segment', gen: segment.gen, why, busy }); }
   const buf = Buffer.allocUnsafe(1 << 20); let hashed = 0, bytes = 0, missing = 0, sinceRest = 0; const seen = new Map();
   const notFound = (p, reason) => { missing++; parentPort.postMessage({ type: 'missing', path: p, reason }); };
   for (const line of items.split('\n')) {

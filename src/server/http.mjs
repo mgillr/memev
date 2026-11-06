@@ -89,6 +89,7 @@ function readBody(req, limit = 2 * 1024 * 1024) {
 // JSON.stringify leaves U+0085, U+2028 and U+2029 raw, and those also split a line in the hook context.
 const quote = (s) => JSON.stringify(s).replace(/[\u0085\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
 
+const INDEX_DOWN = new Set(['index_rebuilding', 'index_rebuild_failed', 'index_busy']);
 /** Bus messages as a few lines for a hook to put in the session's context. Empty when there is nothing new. */
 export function renderBus(u, { lead = false } = {}) {
   const L = [];
@@ -306,7 +307,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
           try { recalled = vault.recall(identity, { ...body, client, limit, offset, dropPath: auto && !rc.hook_include_journals ? pastWork : null }); }
           catch (e) {
             // a prompt goes on without memory, and it says so: an empty answer here would read as nothing recorded
-            if (auto && e.code === 'index_rebuilding') return send(200, { hits: [], total: 0, offset, next: null, rebuilding: true, text: 'Memev could not search memory for this prompt: its recall index was found damaged and is being rebuilt from the notes.' });
+            if (auto && INDEX_DOWN.has(e.code)) return send(200, { hits: [], total: 0, offset, next: null, rebuilding: true, text: `Memev could not search memory for this prompt: ${e.message}` });
             throw e;
           }
           const total = recalled.total;
@@ -339,7 +340,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       return send(404, { error: 'not_found' });
     } catch (e) {
       if (e instanceof VaultError || e.name === 'BusError') return send({ forbidden: 403, not_found: 404, immutable: 409, conflict: 409, secret: 422, too_large: 413 }[e.code] || 400, { error: e.code, error_description: e.message });
-      if (e.code === 'index_rebuilding') return send(503, { error: e.code, error_description: e.message });
+      if (INDEX_DOWN.has(e.code)) return send(503, { error: e.code, error_description: e.message });
       return send(500, { error: 'internal', error_description: e.message });
     }
   });

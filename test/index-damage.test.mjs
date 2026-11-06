@@ -449,4 +449,20 @@ function whatWasLeftIsServed(root, label) {
 }
 
 const failing = (name, code, times = 1) => { const real = fs.openSync; let left = times; fs.openSync = function injected(f, ...a) { if (left > 0 && String(f).endsWith(name)) { left--; const e = new Error(`${code}: injected, open '${f}'`); e.code = code; e.syscall = 'open'; throw e; } return real.call(this, f, ...a); }; return () => { fs.openSync = real; }; };
+test('a read that fails in passing fails that query, is retried and costs no rebuild', async () => {
+  for (const code of ['EMFILE', 'ENFILE', 'EIO', 'EACCES']) for (const name of ['cols.bin', 'names.json', 'heads.bin']) {
+    const root = seeded(12); const gen = genDir(root); const v = open(root); const undo = failing(name, code);
+    try { let threw = null; try { v.recall(ME, { query: WORD(1), log: false, all_projects: true }); } catch (e) { threw = e; } assert.equal(threw?.code, 'index_busy', `${code} ${name}: ${threw?.stack}`); assert.match(threw.message, new RegExp(code)); } finally { undo(); }
+    assert.equal(v.index.state().state, 'ok', `${code} ${name}: no rebuild`); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md'], `${code} ${name}: the retry`); assert.equal(v.status().index.damage, null); assert.equal(genDir(root), gen); v.close();
+  }
+});
+test('a start that cannot read the index just now fails and tries again: the generation is not thrown away', () => {
+  for (const name of ['head.json', 'dict.txt', 'CURRENT', 'overlay.log']) {
+    const root = seeded(12); const gen = genDir(root); const undo = failing(name, 'EMFILE'); try { assert.throws(() => open(root), (e) => e.code === 'EMFILE', name); } finally { undo(); } assert.equal(genDir(root), gen, name); const v = open(root); assert.equal(v.status().index.damage, null, name); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md'], name); assert.equal(genDir(root), gen, name); v.close();
+  }
+});
+test('doctor and a fold that cannot read a file just now find no damage', async () => {
+  const root = seeded(12); const v = open(root); let undo = failing('tfs.bin', 'EMFILE'); let c; try { c = fileChecks({ root, vault: v }).find((x) => x.id === 'index-files'); } finally { undo(); } assert.equal(c.status, 'warn'); assert.match(c.detail, /EMFILE/); assert.equal(v.index.state().state, 'ok'); v.close();
+  const gen = genDir(root); const v2 = open(root); v2.write(ME, { path: 'notes/late.md', body: '# L\nlateword\n' }); v2.index.save(); fs.chmodSync(F(root, 'tfs.bin'), 0); const hold = setInterval(() => {}, 50); try { await v2.index.foldSoon(); } finally { clearInterval(hold); fs.chmodSync(F(root, 'tfs.bin'), 0o600); } assert.equal(v2.index.state().state, 'ok', 'no rebuild'); assert.equal(v2.status().index.damage, null); assert.equal(genDir(root), gen, 'still the same generation'); assert.ok(v2.index.foldFailed > 0, 'the fold waits and tries again'); v2.close();
+});
 

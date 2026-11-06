@@ -12,7 +12,7 @@ import { sha256, readJson, writeJson, writePrivateJson, replacePrivate, readPriv
 import { OpLog } from './oplog.mjs';
 import { tokenize, sections } from './index.mjs';
 import { SegIndex } from './segment-index.mjs';
-import { SegDamage } from './segment.mjs';
+import { SegDamage, IndexBusy } from './segment.mjs';
 import { Health } from './health.mjs';
 import { Worker } from 'node:worker_threads';
 import { NoteState, scanNotes, short } from './notestate.mjs';
@@ -298,7 +298,7 @@ export class Vault extends EventEmitter {
       const late = new Set(); for (const [p, h] of this.log.heads) if (h.seq > from) late.add(p);
       this._takeLate(late); this.index.save(); this.index.syncNow(); this._saveIndexSeq();
       this._recordIndexDamage(why, 'rebuilt');
-    }).catch((e) => { this._recordIndexDamage(why, `failed: ${e.message}`); });
+    }).catch((e) => { this.index.rebuildFailed(e.message); this._recordIndexDamage(why, `failed: ${e.message}`); });
   }
   /** Where the index stands in the log. It is written only once the index holds that much on the disk; an older value only means a longer catch-up. */
   _saveIndexSeq(seq = this.log.seq) { try { replacePrivate(path.join(this.state, 'index.seq'), String(seq)); } catch { /* the next save writes it again */ } }
@@ -399,7 +399,7 @@ export class Vault extends EventEmitter {
     const w = this._sweepWorker = new Worker(new URL('./notes-worker.mjs', import.meta.url), { workerData: { job: 'sweep', root: this.root, items: items.join('\n'), segment: this.index.sealed(), restEvery, restMs } });
     w.unref();
     w.on('message', (m) => {
-      if (m.type === 'segment') { sw.index_files = m.why ? 'damaged' : 'ok'; if (m.why) this.index.damagedGen(m.gen, m.why); }
+      if (m.type === 'segment') { sw.index_files = m.busy ? 'not checked' : m.why ? 'damaged' : 'ok'; if (m.why) this.index.damagedGen(m.gen, m.why); }
       else if (m.type === 'missing') { if (sw.missing_notes.length < 100) sw.missing_notes.push({ path: m.path, reason: m.reason }); }
       else if (m.type === 'differs') {
         sw.differs++;
@@ -586,7 +586,7 @@ export class Vault extends EventEmitter {
     this._need(identity, 'write', p); this._guard(p, text, allow_secrets, false); // permissions and the secrets check come before the quality check
     const gate = { ...DEFAULT_GATE, ...(this.config.memory || {}) };
     // an index being rebuilt cannot say what is similar, which is no reason to lose the memory: the note is the record
-    let similar = []; try { similar = this.index.query(text, { limit: 5, prefix: 'memory/', filter: (d) => (d.lookup ? d.lookup(this.reviews) : this.reviews.get(`${d.path}#${d.heading || ''}`))?.action !== 'drop' }); } catch (e) { if (!(e instanceof SegDamage)) throw e; }
+    let similar = []; try { similar = this.index.query(text, { limit: 5, prefix: 'memory/', filter: (d) => (d.lookup ? d.lookup(this.reviews) : this.reviews.get(`${d.path}#${d.heading || ''}`))?.action !== 'drop' }); } catch (e) { if (!(e instanceof SegDamage) && !(e instanceof IndexBusy)) throw e; }
     const a = assess(text, { similar, gate: gate.enabled === false ? { ...gate, min_words: 0 } : gate, review_by });
     if (a.verdict === 'duplicate') return { duplicate: true, saved: false, path: a.duplicate_of.path, heading: a.duplicate_of.heading, reasons: a.reasons };
     if (gate.enabled === false) { a.flags = []; if (!review_by) a.review_by = null; }

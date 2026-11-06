@@ -117,11 +117,14 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
     const v = vault.log.verify();
     r.push(C('oplog', 'operation log intact', v.ok ? 'ok' : 'fail', v.ok ? `${v.ops} ops in ${v.segments} segment(s), every seal and chain verified` : v.errors.slice(0, 3).join('; ')));
     // The sums first: a damaged generation stops serving here, so what follows counts what can really be found.
-    const bad = vault.index.verifyNow(); const ist = vault.index.state(); const past = vault.indexDamageRecord();
-    if (bad || ist.state === 'rebuilding') r.push(C('index-files', 'recall index files are sound', 'fail', `damaged: ${bad || ist.damage?.why}; rebuilding from the notes, and recall says so until it is done`));
+    let bad = null, unread = null; try { bad = vault.index.verifyNow(); } catch (e) { unread = e.code || e.message; }
+    const ist = vault.index.state(); const past = vault.indexDamageRecord();
+    if (ist.state === 'failed') r.push(C('index-files', 'recall index files are sound', 'fail', `damaged: ${ist.damage?.why}; the rebuild failed (${past?.state}), so recall is down: run memev restart to try again`));
+    else if (bad || ist.state === 'rebuilding') r.push(C('index-files', 'recall index files are sound', 'fail', `damaged: ${bad || ist.damage?.why}; rebuilding from the notes, and recall says so until it is done`));
+    else if (unread) r.push(C('index-files', 'recall index files are sound', 'warn', `could not be checked just now (${unread}); nothing is known to be wrong, so run memev doctor again`));
     else r.push(C('index-files', 'recall index files are sound', past ? 'warn' : 'ok', past ? `sound now. Damage was found on ${past.at} (${past.why}) and the index was rebuilt from the notes; look at the disk if it happens again` : 'every file matches its checksum', past ? { desc: 'forget this report', destructive: false, run: () => { vault.indexDamage = null; fs.rmSync(path.join(state, 'index.damage.json'), { force: true }); } } : null));
     const notes = vault.allNotes(); const idx = vault.index.stats().notes;
-    if (ist.state !== 'rebuilding' && !bad) r.push(C('index', 'recall index covers every note', idx === notes.length ? 'ok' : 'warn', `${idx}/${notes.length} notes`, idx === notes.length ? null : { desc: 'rebuild the index', destructive: false, run: () => vault.reindexAll() }));
+    if (ist.state === 'ok' && !bad) r.push(C('index', 'recall index covers every note', idx === notes.length ? 'ok' : 'warn', `${idx}/${notes.length} notes`, idx === notes.length ? null : { desc: 'rebuild the index', destructive: false, run: () => vault.reindexAll() }));
     let drift = 0; for (const [p, h] of vault.log.heads) { if (h.deleted || !h.ch) continue; const b = vault._read(p); if (b === null || sha256(b) !== h.ch) drift++; }
     r.push(C('drift', 'notes match the log', drift ? 'warn' : 'ok', drift ? `${drift} note(s) changed outside Memev; they are imported on the next write or restart` : 'in sync', drift ? { desc: 'import the changes now', destructive: false, run: () => { for (const [p] of vault.log.heads) vault.syncFromDisk(p, 'doctor'); } } : null));
     let leaks = 0; for (const p of notes.filter((x) => !x.startsWith('work/sessions/')).slice(0, 5000)) if (findSecrets(vault._read(p) || '').length) leaks++;

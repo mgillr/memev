@@ -15,7 +15,7 @@ import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { RecallIndex, tokenize, INDEX_VERSION as OLD_VERSION } from './index.mjs';
 import { readLines } from './oplog.mjs';
-import { writeSeg, overlayDocs, Seg, SegDamage, readOverlayLine, sealLine, verifySegFiles, readHead, foldFiles, foldInWorker, keySig, ROW, C_LEN, C_PATH, C_PROJ, C_RB, C_SIG } from './segment.mjs';
+import { writeSeg, overlayDocs, Seg, SegDamage, RebuildFailed, SegOtherVersion, IndexBusy, isPassing, readOverlayLine, sealLine, verifySegFiles, foldFiles, foldInWorker, keySig, ROW, C_LEN, C_PATH, C_PROJ, C_RB, C_SIG } from './segment.mjs';
 
 /** The old index file's sections one at a time, into a segment: no index in memory. False when the file is not a whole index of the version this code reads. */
 export function convertOldIndex(file, dir, tick) {
@@ -34,7 +34,7 @@ const inFlight = new Set();
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
 /** True when a live process is still writing this folder. */
 function beingWritten(dir) {
-  let pid; try { const fd = fs.openSync(path.join(dir, WRITING), fs.constants.O_RDONLY | NOFOLLOW); try { pid = Number(fs.readFileSync(fd, 'utf8')); } finally { fs.closeSync(fd); } } catch { return false; }
+  let pid; try { const fd = fs.openSync(path.join(dir, WRITING), fs.constants.O_RDONLY | NOFOLLOW); try { pid = Number(fs.readFileSync(fd, 'utf8')); } finally { fs.closeSync(fd); } } catch (e) { return isPassing(e); } // a file that cannot be read just now may name a live writer
   if (pid === process.pid) return inFlight.has(dir);
   return Number.isSafeInteger(pid) && pid > 0 && alive(pid);
 }
@@ -91,7 +91,7 @@ class FilterDoc extends SegDoc {
 
 export class SegIndex {
   constructor(file) { this.file = file; this.base = file.replace(/\.jsonl$/, ''); this.root = `${this.base}.seg`; this._clear(); }
-  _clear() { this.seg = null; this.ov = new RecallIndex('/nonexistent'); this.dead = null; this.deadCount = 0; this.deadPaths = new Set(); this.deadLen = 0; this.gen = 0; this.logFd = null; this.logEnd = 0; this.pending = []; this.dirty = false; this.foldP = null; this.foldFailed = 0; this.lastGen = 0; this.score = null; this.syncing = false; this.syncAgain = false; this.oldLog = null; this.waiters = []; this.rebuilding = null; this.damage = null; this.epoch = 0; this.onDamage = null; }
+  _clear() { this.seg = null; this.ov = new RecallIndex('/nonexistent'); this.dead = null; this.deadCount = 0; this.deadPaths = new Set(); this.deadLen = 0; this.gen = 0; this.logFd = null; this.logEnd = 0; this.pending = []; this.dirty = false; this.foldP = null; this.foldFailed = 0; this.lastGen = 0; this.score = null; this.syncing = false; this.syncAgain = false; this.oldLog = null; this.waiters = []; this.rebuilding = null; this.damage = null; this.epoch = 0; this.onDamage = null; this.retry = []; }
   reset() { this._closeFiles(); const { onDamage } = this; this._clear(); this.onDamage = onDamage; fs.rmSync(this.root, { recursive: true, force: true }); }
   _closeFiles() { if (this.logFd !== null) { if (this.syncing) this.oldLog = this.logFd; else fs.closeSync(this.logFd); this.logFd = null; } if (this.seg) { this.seg.close(); this.seg = null; } }
   _dir(g) { return path.join(this.root, `gen-${g}`); }
@@ -99,7 +99,7 @@ export class SegIndex {
   _publish(g) { const cur = path.join(this.root, 'CURRENT'), t = `${cur}.tmp`; fs.rmSync(t, { force: true }); const fd = fs.openSync(t, 'wx', 0o600); fs.writeSync(fd, String(g)); fs.fsyncSync(fd); fs.closeSync(fd); fs.renameSync(t, cur); try { const d = fs.openSync(this.root, 'r'); fs.fsyncSync(d); fs.closeSync(d); } catch { /* a folder cannot be synced on Windows */ } }
   /** The number in CURRENT, null with no CURRENT, NaN when it holds anything else. A link there is damage, not a name to follow. */
   _current() {
-    let text; try { const fd = fs.openSync(path.join(this.root, 'CURRENT'), fs.constants.O_RDONLY | NOFOLLOW); try { text = fs.readFileSync(fd, 'utf8'); } finally { fs.closeSync(fd); } } catch (e) { return e.code === 'ENOENT' || e.code === 'ENOTDIR' ? null : NaN; }
+    let text; try { const fd = fs.openSync(path.join(this.root, 'CURRENT'), fs.constants.O_RDONLY | NOFOLLOW); try { text = fs.readFileSync(fd, 'utf8'); } finally { fs.closeSync(fd); } } catch (e) { if (isPassing(e)) throw e; return e.code === 'ENOENT' || e.code === 'ENOTDIR' ? null : NaN; }
     return /^[1-9]\d{0,14}$/.test(text) ? Number(text) : NaN;
   }
   /** A new folder for a generation, whose number no other process can hold: it is built aside with its `writing` file and renamed into place. */
@@ -123,7 +123,8 @@ export class SegIndex {
       if (e.startsWith('tmp-')) { const pid = Number(e.split('-')[1]); if (pid !== process.pid && !(Number.isSafeInteger(pid) && pid > 0 && alive(pid))) fs.rm(path.join(this.root, e), { recursive: true, force: true }, () => {}); continue; }
       if (!e.startsWith('gen-') || e === `gen-${keep}`) continue;
       this.lastGen = Math.max(this.lastGen, Number(e.slice(4)) || 0); const dir = path.join(this.root, e);
-      if (beingWritten(dir) || e === `gen-${this._current()}`) continue;
+      let current; try { current = this._current(); } catch { continue; } // this is only tidying: it waits for a start that can read CURRENT
+      if (beingWritten(dir) || e === `gen-${current}`) continue;
       fs.rm(dir, { recursive: true, force: true }, () => {});
     }
   }
@@ -133,7 +134,7 @@ export class SegIndex {
   /** Replay log bytes into a generation's state: the same steps a write took, so ids and their order come out the same. */
   _replay(st, text) { for (let s = 0; s < text.length;) { const e = text.indexOf('\n', s); if (e < 0) throw new SegDamage('overlay.log: a line with no end'); const r = readOverlayLine(text.slice(s, e)); s = e + 1; if (r.rm !== undefined) { this._retireIn(st, r.rm); st.ov.remove(r.rm); } else { st.ov._addLine(r); } } }
   _state(seg) { return { seg, ov: new RecallIndex('/nonexistent'), dead: new Uint8Array(seg.head.n), deadCount: 0, deadPaths: new Set(), deadLen: 0 }; }
-  _retireIn(st, p) { if (st.deadPaths.has(p)) return; st.deadPaths.add(p); const c = st.seg.cols(); for (const i of st.seg.ordinalsOf(p)) { if (!st.dead[i]) { st.dead[i] = 1; st.deadCount++; st.deadLen += c[i * ROW + C_LEN]; } } }
+  _retireIn(st, p) { if (st.deadPaths.has(p)) return; const c = st.seg.cols(), list = st.seg.ordinalsOf(p); st.deadPaths.add(p); for (const i of list) { if (!st.dead[i]) { st.dead[i] = 1; st.deadCount++; st.deadLen += c[i * ROW + C_LEN]; } } }
 
   load(tick) {
     this.loadDamage = null;
@@ -150,7 +151,8 @@ export class SegIndex {
       if (!convertOldIndex(this.file, this._dir(ng), tick)) { this._unclaim(ng); return false; }
       this._adopt(ng); return true;
     }
-    const giveUp = (e) => { if (e instanceof SegDamage) this.loadDamage = e.why; this._discard(); return false; }; // another version or damage: rebuilt from the notes
+    // Another version or damage: rebuilt from the notes. A file that could not be read just now is neither, and the open fails and is tried again.
+    const giveUp = (e) => { if (isPassing(e)) throw e; if (e instanceof SegDamage) this.loadDamage = e.why; this._discard(); return false; };
     if (Number.isNaN(g)) return giveUp(new SegDamage('CURRENT does not name a generation'));
     this.lastGen = Math.max(this.lastGen, g); let seg;
     try {
@@ -160,14 +162,14 @@ export class SegIndex {
     let state, text = '', fd = null, end = 0;
     try {
       state = this._state(seg);
-      try { fd = fs.openSync(this._log(g), fs.constants.O_RDWR | NOFOLLOW); } catch (e) { if (e.code !== 'ENOENT') throw new SegDamage(`overlay.log: ${e.code}`); fd = fs.openSync(this._log(g), 'wx+', 0o600); } // a link here must not be cut
+      try { fd = fs.openSync(this._log(g), fs.constants.O_RDWR | NOFOLLOW); } catch (e) { if (isPassing(e)) throw e; if (e.code !== 'ENOENT') throw new SegDamage(`overlay.log: ${e.code}`); fd = fs.openSync(this._log(g), 'wx+', 0o600); } // a link here must not be cut
       if (!fs.fstatSync(fd).isFile()) throw new SegDamage('overlay.log is not a file');
       text = fs.readFileSync(fd, 'utf8');
       // A kill can cut the last line. It is dropped here; the vault replays anything past its saved log position.
       end = Buffer.byteLength(text); const nl = text.lastIndexOf('\n'); if (nl !== text.length - 1) { text = text.slice(0, nl + 1); end = Buffer.byteLength(text); }
       // A complete line that does not parse is not a kill's mark. The notes are the record: the index is rebuilt from them.
       this._replay(state, text);
-    } catch (e) { if (fd !== null) fs.closeSync(fd); seg.close(); return giveUp(e instanceof SegDamage ? e : new SegDamage(`overlay.log: ${e.code || e.message}`)); }
+    } catch (e) { if (fd !== null) fs.closeSync(fd); seg.close(); return giveUp(e instanceof SegDamage || isPassing(e) ? e : new SegDamage(`overlay.log: ${e.code || e.message}`)); }
     Object.assign(this, state); this.gen = g; this.logFd = fd; fs.ftruncateSync(this.logFd, end); this.logEnd = end; this.dirty = false; this._watch(seg); this._sweep(g);
     return true;
   }
@@ -178,12 +180,12 @@ export class SegIndex {
    */
   _damaged(why, seg = this.seg) {
     if (this.rebuilding || !seg || seg !== this.seg) return;
-    const cur = this._current();
+    let cur = this.gen; try { cur = this._current(); } catch { /* what was found stands */ }
     if (cur !== null && cur !== this.gen) { // another process moved on, and the file was only gone: this is a stale view and the index is sound
       this._closeFiles(); const { lastGen, onDamage } = this; this._clear(); this.lastGen = lastGen; this.onDamage = onDamage; if (this.load()) return;
     }
     this.damage = { why, at: new Date().toISOString() }; this.rebuilding = { state: 'waiting' }; this.epoch++;
-    this._closeFiles(); fs.rmSync(path.join(this.root, 'CURRENT'), { force: true }); this.dead = null; this.deadCount = 0; this.deadPaths = new Set(); this.deadLen = 0; this.ov = new RecallIndex('/nonexistent'); this.pending = []; this.dirty = false; this.waiters = []; this.syncAgain = false; this.foldP = null; this.gen = 0; this._sweep(0);
+    this._closeFiles(); fs.rmSync(path.join(this.root, 'CURRENT'), { force: true }); this.dead = null; this.deadCount = 0; this.deadPaths = new Set(); this.deadLen = 0; this.ov = new RecallIndex('/nonexistent'); this.pending = []; this.dirty = false; this.waiters = []; this.syncAgain = false; this.foldP = null; this.gen = 0; this.retry = []; this._sweep(0);
     this.onDamage?.(why);
   }
   /** Build the new generation from the notes on a worker. Resolves when it serves; what was written meanwhile is the caller's to apply. */
@@ -197,6 +199,8 @@ export class SegIndex {
       return true;
     }, (e) => { this._unclaim(g); throw e; });
   }
+  /** The worker could not build the index. Nothing will come of waiting, so recall says that and what to do. A start tries again, as CURRENT is gone. */
+  rebuildFailed(why) { this.rebuilding = { state: 'failed', why }; }
   /** The vault is closing: no fold or rebuild still running may publish from here on. What it wrote is a leftover for the next open. */
   stopWork() { this.epoch++; try { this.rebuilding?.worker?.terminate(); } catch { /* it ends with the process */ } }
   /** Every file of the serving generation against its sums, here and now: what is wrong, or null. A find stops serving it. */
@@ -206,10 +210,30 @@ export class SegIndex {
   /** What the sweep's worker needs to check the same, and the answer it brings back. A generation that has been folded away since is no finding. */
   sealed() { return this.seg ? { gen: this.gen, dir: this.seg.dir } : null; }
   damagedGen(gen, why) { if (gen === this.gen && this.seg) this._damaged(why); }
-  state() { return { state: this.rebuilding ? 'rebuilding' : 'ok', damage: this.damage }; }
-  _serving() { if (this.rebuilding) throw new SegDamage(this.damage?.why || 'it is being rebuilt'); }
-  /** A write's step on the index. A write has already reached the notes and the log, so damage met here does not fail it. */
-  _writeStep(fn) { if (this.rebuilding) return; try { fn(); } catch (e) { if (!(e instanceof SegDamage)) throw e; } }
+  state() { return { state: this.rebuilding?.state === 'failed' ? 'failed' : this.rebuilding ? 'rebuilding' : 'ok', damage: this.damage }; }
+  _serving() { if (this.rebuilding?.state === 'failed') throw new RebuildFailed(this.rebuilding.why); if (this.rebuilding) throw new SegDamage(this.damage?.why || 'it is being rebuilt'); }
+  /**
+   * Where the index stands on the disk, saved beside the log position. A later start finding it behind this has lost something no check of
+   * the files can see, whole lines cut off the log or an older folder restored. Further on is what a hard kill leaves, and the log catches that up.
+   */
+  position() { return this.seg ? { gen: this.gen, end: this.logEnd } : null; }
+  behind(saved) {
+    if (!this.seg || !saved) return null;
+    if (this.gen < saved.gen) return `index.seg is older than it was left: generation ${this.gen}, and ${saved.gen} was saved`;
+    if (this.gen === saved.gen && this.logEnd < saved.end) return `overlay.log is shorter than it was left: ${this.logEnd} bytes, and ${saved.end} were saved`;
+    return null;
+  }
+  /** Let go of a generation that opened sound but cannot be trusted: the caller rebuilds from the notes. */
+  drop() { this._closeFiles(); this.dead = null; this.deadCount = 0; this.deadPaths = new Set(); this.deadLen = 0; this.gen = 0; this.logEnd = 0; this.dirty = false; this.ov = new RecallIndex('/nonexistent'); this._discard(); }
+  /**
+   * A write's step on the index. A write has already reached the notes and the log, so nothing met here fails it. Damage is the rebuild's to
+   * pick up. A read that failed in passing leaves the step waiting, in order, for the next query or save, and the log position stays behind it.
+   */
+  _writeStep(fn) { if (this.rebuilding) return; this._drain(); if (this.retry.length) { this.retry.push(fn); return; } try { fn(); } catch (e) { if (isPassing(e)) this.retry.push(fn); else if (!(e instanceof SegDamage)) throw e; } }
+  _drain() { while (this.retry.length) { try { this.retry[0](); this.retry.shift(); } catch (e) { if (e instanceof SegDamage) { this.retry = []; return; } if (isPassing(e)) return; throw e; } } }
+  retrying() { return this.retry.length > 0; }
+  /** A read of the index. One that fails in passing fails this one question, in words that say so; nothing is thrown away and the next one tries again. */
+  _asking(fn) { this._serving(); this._drain(); this._serving(); try { if (this.retry.length) throw new IndexBusy('a write is waiting to reach it'); return fn(); } catch (e) { if (isPassing(e)) throw new IndexBusy(e.code); throw e; } }
   _writeFromOverlay() {
     fs.mkdirSync(this.root, { recursive: true, mode: 0o700 }); this._sweep(this.gen); const g = this._claim(); const ov = this.ov;
     writeSeg(this._dir(g), overlayDocs(ov));
@@ -246,7 +270,8 @@ export class SegIndex {
   /** The same, waiting here: for a stop. */
   syncNow() { if (this.logFd !== null) fs.fdatasyncSync(this.logFd); }
   save() {
-    if (!this.dirty || this.rebuilding) return;
+    if (this.rebuilding) return; this._drain();
+    if (!this.dirty) return;
     if (!this.seg) { this._writeFromOverlay(); return; }
     this._flush(); this.dirty = false;
     if (!this.foldP && Date.now() - this.foldFailed > RETRY_MS && (this.ov.docs.size > Math.max(FOLD_MIN, this.seg.head.n * FOLD_SHARE) || this.deadCount > Math.max(FOLD_MIN, this.seg.head.n / 5) || this.logEnd > (this.logMax ?? LOG_MAX))) this.foldSoon();
@@ -294,14 +319,14 @@ export class SegIndex {
       const from = this.ov.nextId; this.ov.appendSections(p, text, { ...o, project }); this._added(from);
     });
   }
-  get byPath() { const me = this; return { has(p) { if (me.rebuilding) return false; try { return me.ov.byPath.has(p) || (!!me.seg && !me.deadPaths.has(p) && me.seg.ordinalsOf(p).length > 0); } catch (e) { if (e instanceof SegDamage) return false; throw e; } } }; }
+  get byPath() { const me = this; return { has(p) { if (me.rebuilding) return false; try { return me.ov.byPath.has(p) || (!!me.seg && !me.deadPaths.has(p) && me.seg.ordinalsOf(p).length > 0); } catch (e) { if (e instanceof SegDamage || isPassing(e)) return false; throw e; } } }; }
   get docs() { const me = this; return { get size() { return me._N(); }, *values() { me._serving(); if (me.seg) for (let i = 0; i < me.seg.head.n; i++) if (!me.dead[i]) yield new SegDoc(me.seg, i); yield* me.ov.docs.values(); } }; }
   isEmpty() { return this._N() === 0; }
   _N() { return (this.seg ? this.seg.head.n - this.deadCount : 0) + this.ov.docs.size; }
   _Len() { return (this.seg ? this.seg.head.totalLen - this.deadLen : 0) + this.ov.totalLen; }
   /** A write asks this too, so damage met here is an empty answer for that write; a read that follows meets it again through query. */
-  docsOf(p, heading) { if (this.rebuilding) return []; try { const out = []; if (this.seg && !this.deadPaths.has(p)) for (const i of this.seg.ordinalsOf(p)) { const d = new SegDoc(this.seg, i); if (heading === undefined || heading === null || (d.heading || '') === heading) out.push(d); } return out.concat(this.ov.docsOf(p, heading)); } catch (e) { if (e instanceof SegDamage) return []; throw e; } }
-  stats() { let notes = this.ov.byPath.size, terms = this.ov.terms.size; if (this.seg) { const seg = this.seg; try { seg.cols(); for (const p of seg.paths) if (!this.deadPaths.has(p) && !this.ov.byPath.has(p) && seg.ordinalsOf(p).length) notes++; terms += seg.head.terms; } catch (e) { if (!(e instanceof SegDamage)) throw e; return { sections: 0, notes: 0, terms: 0 }; } } return { sections: this._N(), notes, terms }; }
+  docsOf(p, heading) { if (this.rebuilding) return []; try { const out = []; if (this.seg && !this.deadPaths.has(p)) for (const i of this.seg.ordinalsOf(p)) { const d = new SegDoc(this.seg, i); if (heading === undefined || heading === null || (d.heading || '') === heading) out.push(d); } return out.concat(this.ov.docsOf(p, heading)); } catch (e) { if (e instanceof SegDamage || isPassing(e)) return []; throw e; } }
+  stats() { let notes = this.ov.byPath.size, terms = this.ov.terms.size; if (this.seg) { const seg = this.seg; try { seg.cols(); for (const p of seg.paths) if (!this.deadPaths.has(p) && !this.ov.byPath.has(p) && seg.ordinalsOf(p).length) notes++; terms += seg.head.terms; } catch (e) { if (!(e instanceof SegDamage) && !isPassing(e)) throw e; return { sections: 0, notes: 0, terms: 0 }; } } return { sections: this._N(), notes, terms }; }
 
   // The words of a query as BM25 sees them, as RecallIndex._terms has them. After a write a word's live count takes a scan of its postings,
   // but a word that stays over the limit even if every dead section held it is dropped whatever the count, so a query need not scan it.
@@ -322,8 +347,9 @@ export class SegIndex {
   }
   _scratch(need) { const n = this.seg ? this.seg.head.n : 0; if (!this.score || this.score.length < n) { const room = n + (n >> 3); this.score = new Float64Array(room); this.seen = new Uint32Array(room); this.stamp = 0; } if (!this.order || this.order.length < need) this.order = new Uint32Array(Math.max(need, 1024)); this.stamp++; }
   /** `drop` is a pure test of a path alone, asked once per path of a segment and remembered with it, so it costs a column read per section. */
-  query(q, { limit = 8, project = null, prefix = null, boosts = null, filter = null, drop = null } = {}) {
-    this._serving(); if (!this._N()) return empty(); const { terms, N, avg } = this._plan(q); if (!terms.length) return empty();
+  query(q, opts = {}) { return this._asking(() => this._query(q, opts)); }
+  _query(q, { limit = 8, project = null, prefix = null, boosts = null, filter = null, drop = null } = {}) {
+    if (!this._N()) return empty(); const { terms, N, avg } = this._plan(q); if (!terms.length) return empty();
     const seg = this.seg, ov = this.ov, n = seg ? seg.head.n : 0, dead = this.dead; let need = 0; for (const t of terms) need += (t.e ? t.e.df : 0) + (t.ot === undefined ? 0 : ov.postings[t.ot].length);
     this._scratch(need); const score = this.score, seen = this.seen, stamp = this.stamp, order = this.order; const c = seg ? seg.cols() : null; const ovScore = new Map(); let m = 0;
     // Sections are visited in the order RecallIndex first meets them, so equal scores rank the same: term by term, the segment's then the overlay's.
@@ -363,8 +389,9 @@ export class SegIndex {
     if (d instanceof SegDoc) { if (!t.e) return 0; if (!t.checked) { const ids = t.ids || (t.ids = this.seg.ids(t.e)); t.tfs = t.tfs || this.seg.tfs(t.e); this.seg.checkList(t.e, ids, t.tfs); t.checked = true; } const ids = t.ids; let lo = 0, hi = t.e.df - 1; while (lo <= hi) { const m = (lo + hi) >> 1; if (ids[m] === d.i) return (t.tfs || (t.tfs = this.seg.tfs(t.e)))[m]; if (ids[m] < d.i) lo = m + 1; else hi = m - 1; } return 0; }
     return t.ot === undefined ? 0 : RecallIndex._tf(d, t.ot);
   }
-  explain(q, d, { project = null, boosts = null } = {}) {
-    this._serving(); const { words, all, terms, N, avg } = this._plan(q, true); const used = new Set(terms.map((t) => t.w)); const byW = new Map(all.map((t) => [t.w, t])); const parts = []; let base = 0;
+  explain(q, d, o = {}) { return this._asking(() => this._explain(q, d, o)); }
+  _explain(q, d, { project = null, boosts = null } = {}) {
+    const { words, all, terms, N, avg } = this._plan(q, true); const used = new Set(terms.map((t) => t.w)); const byW = new Map(all.map((t) => [t.w, t])); const parts = []; let base = 0;
     for (const w of words) { const t = byW.get(w); const f = t ? this._tfOf(d, t) : 0; if (!t || !f) { parts.push({ word: w, in_section: 0, contribution: 0, note: !t ? 'not in any note' : 'not in this section' }); continue; } if (!used.has(w)) { parts.push({ word: w, in_section: f, sections_with_word: t.df, contribution: 0, note: 'too common to count (in over a third of all sections)' }); continue; } const { idf, part } = RecallIndex._bm(f, t.df, N, d.len, avg); base += part; parts.push({ word: w, in_section: f, sections_with_word: t.df, weight: round3(idf), contribution: round3(part) }); }
     parts.sort((a, b) => b.contribution - a.contribution); const pj = project ? String(project).toLowerCase() : null; const fp = pj && d.project === pj ? 1.5 : 1, fb = boosts?.[`${d.path}#${d.heading || ''}`] ?? 1;
     return { score: round3(base * fp * fb), words: parts, matched: parts.filter((p) => p.contribution > 0).map((p) => p.word), dropped_common: all.filter((t) => !used.has(t.w)).map((t) => t.w), section_words: d.len, average_section_words: Number(avg.toFixed(1)), project_multiplier: fp, feedback_multiplier: round3(fb) };
