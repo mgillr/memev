@@ -300,6 +300,22 @@ test('a load moves its file as it goes, so one that is working is not taken for 
 });
 
 const caseInsensitive = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-Case-')); made.push(d); fs.writeFileSync(path.join(d, 'AbC'), 'x'); return fs.existsSync(path.join(d, 'abc')); };
+test('a note renamed in letter case only while stopped is one note with one hit, and its text is never stale', { skip: !caseInsensitive() }, () => {
+  const root = fresh(); let v = open(root); v.write(ME, { path: 'notes/Case.md', body: '# C\nthe caseword here\n' }); v.write(ME, { path: 'notes/other.md', body: '# O\nother words\n' }); v.compact(); const n = v.index.stats().notes; v.close();
+  fs.renameSync(path.join(root, 'notes/Case.md'), path.join(root, 'notes/tmp.md')); fs.renameSync(path.join(root, 'notes/tmp.md'), path.join(root, 'notes/case.md'));
+  const hits = (x, w) => x.recall(ME, { query: w, log: false, all_projects: true }).map((h) => h.path);
+  v = open(root); assert.deepEqual(hits(v, 'caseword'), ['notes/case.md'], 'one hit, under the name on the disk'); assert.equal(v.index.stats().notes, n); assert.equal(v.log.heads.get('notes/Case.md').deleted, true);
+  v.write(ME, { path: 'notes/case.md', body: '# C\nthe freshword now\n' }); assert.deepEqual(hits(v, 'freshword'), ['notes/case.md']); assert.deepEqual(hits(v, 'caseword'), [], 'the old text is gone'); v.close();
+  v = open(root); assert.deepEqual(hits(v, 'freshword'), ['notes/case.md']); assert.deepEqual(hits(v, 'caseword'), []); assert.equal(v.index.stats().notes, n); assert.equal(fs.readFileSync(path.join(root, 'notes/case.md'), 'utf8'), '# C\nthe freshword now\n', 'the file was not touched by the old name\'s delete'); v.close();
+  // a whole folder, and a rename that also changed the text
+  v = open(root); v.write(ME, { path: 'Dir/a.md', body: '# A\nfolderword one\n' }); v.write(ME, { path: 'Dir/b.md', body: '# B\nfolderword two\n' }); v.close();
+  fs.renameSync(path.join(root, 'Dir'), path.join(root, 'tmpdir')); fs.renameSync(path.join(root, 'tmpdir'), path.join(root, 'dir')); fs.writeFileSync(path.join(root, 'dir/a.md'), '# A\nchangedword one\n');
+  v = open(root); assert.deepEqual(hits(v, 'folderword').sort(), ['dir/b.md']); assert.deepEqual(hits(v, 'changedword'), ['dir/a.md']); v.close();
+});
+test('the control: two files with different names, and a new note with no twin, are not touched by this', () => {
+  const root = fresh(); let v = open(root); v.write(ME, { path: 'notes/one.md', body: '# C\ntheoneword\n' }); v.close(); fs.writeFileSync(path.join(root, 'notes/two.md'), '# T\nthetwoword\n');
+  v = open(root); assert.equal(v.log.heads.get('notes/one.md').deleted, undefined); assert.equal(v.recall(ME, { query: 'theoneword', log: false, all_projects: true }).length, 1); assert.equal(v.recall(ME, { query: 'thetwoword', log: false, all_projects: true }).length, 1); v.close();
+});
 
 
 test('a linked index folder or generation folder is not used or written through', { skip: process.platform === 'win32' }, async () => {

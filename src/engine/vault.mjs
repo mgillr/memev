@@ -342,7 +342,7 @@ export class Vault extends EventEmitter {
    *                              version stays in the log), never overwritten
    */
   recover(scan = this._scanNotes()) {
-    const fixed = [], imported = [], skipped = [];
+    const fixed = [], imported = [], skipped = []; this._headFolds = null;
     // one path the file system cannot take (a NUL in it, a note where a folder must be, a folder where the note goes) is
     // skipped with its reason, so the rest of the vault opens; before, it threw and the vault never opened again (issue 230)
     const each = (p, fn) => { try { fn(); } catch (e) { skipped.push({ path: p, reason: e.code || e.message }); } };
@@ -360,9 +360,26 @@ export class Vault extends EventEmitter {
         else { this._importExternal(p, cur, 'startup'); imported.push(p); }
       });
     }
-    this.log.group(() => { for (const p of [...scan.keys()].sort()) if (!this.log.heads.has(p)) each(p, () => { const b = this._read(p); this._importExternal(p, b, 'startup'); imported.push(p); }); });
+    this.log.group(() => { for (const p of [...scan.keys()].sort()) if (!this.log.heads.has(p)) each(p, () => { this._caseRenamed(p, scan, imported); const b = this._read(p); this._importExternal(p, b, 'startup'); imported.push(p); }); });
     this.recovered = fixed; this.imported = imported; this.skipped = skipped;
     return fixed;
+  }
+  /**
+   * A new name for a note whose old name differs only in letter case, renamed while stopped, on a disk that treats the two as one file. The old
+   * name still opens, so it looks present and unchanged, and a head for each would be two hits for one file. It is the same file when the walk
+   * did not list the old name and both names reach one inode: then the old name is logged as deleted, and only the head goes, not the file.
+   * The folds are worked out only when a note with no head turns up, so a start with nothing new pays nothing.
+   */
+  _caseRenamed(p, scan, imported) {
+    if (!this._headFolds) { this._headFolds = new Map(); for (const [q, h] of this.log.heads) if (!h.deleted) { const k = foldName(q); const list = this._headFolds.get(k); if (list) list.push(q); else this._headFolds.set(k, [q]); } }
+    const k = foldName(p); const twins = this._headFolds.get(k); if (!twins) return;
+    let mine = null; try { mine = fs.lstatSync(this.abs(p)); } catch { return; }
+    for (const q of twins) {
+      if (q === p || scan.has(q) || this.log.heads.get(q)?.deleted) continue;
+      let st; try { st = fs.lstatSync(this.abs(q)); } catch { continue; }
+      if (st.ino !== mine.ino || st.dev !== mine.dev) continue;
+      this.log.append({ type: 'delete', path: q, agent: 'external', client: 'startup', data: { external: true } }); imported.push(q); this.notes.drop(q);
+    }
   }
   /** Finish what a start left for later, a slice at a time, so the thread stays free. */
   startIdleWork() {
