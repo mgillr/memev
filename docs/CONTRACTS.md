@@ -80,6 +80,7 @@ the work against it, and every criterion command can read it.
   approval (`memev contract approve`) from the workdir's HEAD at that moment, in an approval record signed
   with this machine's contract key. If that record is edited on disk, verify stops with
   `approval record changed` before any criterion runs.
+- **A contract signed with no base.** Here the signature does not cover the base, because there is none. Verify derives one from git history: the parent of the commit that first added the signed body, in a full checkout of the repository that holds it (`contracts.redteam_root`, else the vault's own folder). Nobody chooses it and nothing is signed again, and the receipt says `base derived` with the commit. With no such checkout, a shallow clone or a different body at that path, scope and red-green criteria are BLOCKED with the reason. Work in another repository has no base this way.
 - **Where verify reads it.** For a contract signed here, from `base.sha` in `contracts/signed/<id>.json`
   (an edit there breaks the signature). For a remote-signed contract, from its approval record in
   `contracts/signed/<id>.approval.txt`.

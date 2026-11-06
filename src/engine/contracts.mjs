@@ -13,6 +13,7 @@ import { Worker } from 'node:worker_threads';
 import { configDir, randomToken, slug, now, readJson, writePrivate, exists, truncate, run as runSync, runAsync } from './util.mjs';
 import { git } from './git.mjs';
 import { redteamCheck, stopBlocks } from './redteam-gate.mjs';
+import { deriveBase } from './contract-base.mjs';
 import { allowed } from './tokens.mjs';
 import * as A from '../../vendor/attest/contract.mjs';
 import { matchAny } from '../../vendor/attest/util.mjs';
@@ -403,26 +404,6 @@ export function attach(Vault) {
     return { sha };
   };
 
-  /**
-   * The base a signed record beside the body gives a locally signed contract with no base of its own: { sha } (null when there
-   * is no record), or { problem }. The record must be signed by the key that signed the contract and must name this contract's
-   * hash, so it cannot be moved to another contract or written by whoever can write into the folder.
-   */
-  P._baseRecord = function (id, contract) {
-    const raw = this._read(`${SIGNED}/${id}.base.txt`);
-    if (raw === null) return { sha: null };
-    const bad = { problem: 'base record changed or not valid for this contract' };
-    let a, env; try { a = JSON.parse(raw); env = JSON.parse(this._read(`${SIGNED}/${id}.sig.json`)); } catch { return bad; }
-    if (!a || typeof a !== 'object') return bad;
-    const { sig, ...body } = a;
-    const kid = sig?.signatures?.[0]?.keyid;
-    if (kid !== env?.signatures?.[0]?.keyid || !/^[0-9a-f]{16}$/.test(String(kid))) return bad;
-    const pub = this._read(`${KEYS}/${kid}.pub`);
-    if (!pub || !dsseVerify(body, sig, pub).ok || body.id !== id || body.contract_hash !== canonicalHash(contract)) return bad;
-    const sha = body.base?.sha;
-    return SHA40.test(String(sha)) ? { sha } : bad;
-  };
-
   P._contractOrigin = function (id) {
     const body = this._read(`${SIGNED}/${id}.json`);
     if (!body) return null;
@@ -476,16 +457,16 @@ export function attach(Vault) {
     const inVault = !local || origin === 'remote';
     // the base: a locally signed contract's own (under its signature), a remote-signed one's from its signed approval record;
     // a changed approval record stops the verify before any criterion runs
-    let base = null; let baseNote = null;
+    let base = null; let baseNote = null; let baseSource = null;
     if (origin === 'remote') {
       if (approved) { const ap = this._approvalBase(id); if (ap.problem) return { id, ok: false, verdict: 'BLOCKED', signature: s.detail, detail: ap.problem, tasks: [] }; base = ap.sha; }
     } else if (c.base !== undefined && c.base !== null) {
       const sha = typeof c.base === 'object' ? c.base.sha : c.base;
       if (typeof sha === 'string' && SHA40.test(sha)) base = sha; else baseNote = 'the recorded base is not a 40-hex commit sha';
     } else {
-      const rec = this._baseRecord(id, c);
-      if (rec.problem) return { id, ok: false, verdict: 'BLOCKED', signature: s.detail, detail: rec.problem, tasks: [] };
-      base = rec.sha;
+      // a body signed with no base: derived from git history, never chosen and never signed (docs/CONTRACTS.md, Base revision)
+      const d = deriveBase({ repo: this.config.contracts?.redteam_root || this.root, id, contract: c });
+      if (d.sha) { base = d.sha; baseSource = 'derived'; } else baseNote = d.problem;
     }
     const env = criterionEnv(base);
     // scope and red-green criteria compare with the base: without one, or with one this workdir's HEAD does not descend from,
@@ -797,12 +778,13 @@ export function attach(Vault) {
     const result = { id, ok, verdict: ok ? 'PASS' : 'FAIL', signature: s.detail, verified: now(), passed: tasks.length - remaining.length, total: tasks.length, behaviour: counts.behaviour, documents: counts.documents, remaining, tasks };
     // the receipt: an append-only record in the vault of every verification and its evidence
     const receipt = [`\n### ${now()} · verify · ${ok ? 'PASS' : 'FAIL'} · ${tasks.length - remaining.length}/${tasks.length} tasks`];
+    if (baseSource === 'derived') receipt.push(`- base derived: ${base}`);
     for (const t of tasks) { receipt.push(`- ${t.status} ${t.id} ${t.title}`); for (const cr of t.criteria) receipt.push(`  - ${cr.status} ${cr.id} ${cr.statement} (${truncate(String(cr.detail || '').replace(/\s+/g, ' '), 200)})`); }
     const rp = `contracts/receipts/${id}.md`;
     this.append(identity, { path: rp, text: `${this._read(rp) === null ? `# Receipts for ${id}\n\nEvery verification of the signed contract, newest last.\n` : ''}${receipt.join('\n')}\n`, client, internal: true });
     this._applyMisc(this.log.append({ type: 'contract.verified', agent: identity.agent, client, data: { id, ok, tasks: Object.fromEntries(tasks.map((t) => [t.id, t.status])), failing: tasks.flatMap((t) => t.criteria.filter((cr) => cr.mandatory && cr.status !== 'PASS').map((cr) => cr.id)) } }));
     if (ok) this.write(identity, { path: `contracts/closed/${id}.json`, body: `${JSON.stringify(result, null, 2)}\n`, client, internal: true });
-    result.receipts = rp;
+    result.receipts = rp; result.base = base; if (baseSource) result.base_source = baseSource;
     return result;
   };
 
