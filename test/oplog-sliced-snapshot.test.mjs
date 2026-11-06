@@ -58,9 +58,9 @@ test('writes during the snapshot: the reopened log has the same heads as a full 
   again.close();
   assert.deepEqual(replayed(dir), want, 'a full replay differs from the live heads');
   // the comparison can fail: a snapshot that claims to cover more than it does loses the later records
-  const broken = JSON.parse(fs.readFileSync(path.join(dir, 'snapshot.json'), 'utf8'));
+  // Built from the snapshot taken before the reopen: with enough rounds in it, the reopen's own close writes one that covers everything, and this control would then prove nothing.
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
-  broken.active = { name: manifest.segments.at(-1).name, offset: manifest.segments.at(-1).bytes }; delete broken.heads['late/0.md'];
+  const broken = { ...snap, active: { name: manifest.segments.at(-1).name, offset: manifest.segments.at(-1).bytes } };
   fs.writeFileSync(path.join(dir, 'snapshot.json'), JSON.stringify(broken));
   const bad = new OpLog(dir, { fsync: false }).open();
   assert.notDeepEqual(heads(bad), want);
