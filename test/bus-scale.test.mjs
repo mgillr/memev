@@ -86,6 +86,26 @@ test('another writer getting in just before an append is seen, not papered over'
   assert.ok(bus.all().some((m) => m.body === 'the other writer'));
 });
 
+test('lines from another computer go in without sorting the bus again', () => {
+  const root = fixture(2000); const bus = new Bus({ root, devices }); const peer = path.join(root, 'bus/log/dev_peer00000000.jsonl');
+  const line = (n, t) => `${JSON.stringify({ id: `peer0000-${n}`, dseq: n, ts: new Date(Date.parse('2026-01-01T00:00:00Z') + t).toISOString(), device: 'dev_peer00000000', from: 'bot1@fleet', operator: false, to: 'all', type: 'status', body: `peer ${n}`, ref: null, project: null })}\n`;
+  bus.all();
+  // a new file, and growth of a file this process has only read once, which has no digest yet
+  fs.writeFileSync(peer, line(1, 500));
+  assert.deepEqual(bus.all(), new Bus({ root, devices }).all());
+  const realSort = Array.prototype.sort; let sorts = 0;
+  Array.prototype.sort = function counted(...a) { if (this.length > 1000) sorts++; return realSort.apply(this, a); };
+  try {
+    for (let n = 2; n < 8; n++) { fs.appendFileSync(peer, line(n, n * 700)); const got = bus.roster({ at: 1 }); assert.equal(got.seats.length, 50); assert.equal(bus.all().find((m) => m.id === `peer0000-${n}`).body, `peer ${n}`); }
+  } finally { Array.prototype.sort = realSort; }
+  assert.equal(sorts, 0, 'the whole bus was sorted again');
+  assert.deepEqual(bus.all(), new Bus({ root, devices }).all());
+  // a file that was rewritten, longer than before, is read again whole
+  const text = fs.readFileSync(peer, 'utf8').trim().split('\n'); fs.writeFileSync(peer, `${[...text].reverse().join('\n')}\n${line(9, 90)}`);
+  assert.deepEqual(bus.all(), new Bus({ root, devices }).all());
+  assert.equal(bus.health({ at: 1 }).bad_lines, 0);
+});
+
 test('what the bus hands out is the caller\'s own: changing it changes nothing inside', () => {
   const root = fixture(50); const bus = new Bus({ root, devices }); const ctx = ctxOf(2);
   for (const list of [bus.all(), bus.tail(ctx, { seat: 'bot2@fleet', n: 5 }).messages, bus.since(ctx, { seat: 'bot2@fleet', seq: 0, limit: 5 }).messages]) { list[0].body = 'changed'; list[0].seq = -1; list.length = 0; }

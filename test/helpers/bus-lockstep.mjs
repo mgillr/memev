@@ -143,6 +143,11 @@ export async function lockstep({ A, B, seed, steps = 120, compareLog = 'bytes', 
         // sync rewrote a file: the lines keep their content, in another order
         label = 'file rewritten';
         both((root) => { const f = path.join(root, 'bus', 'log', `${OFFLINE}.jsonl`); if (fs.existsSync(f)) fs.writeFileSync(f, `${fs.readFileSync(f, 'utf8').trim().split('\n').reverse().join('\n')}\n`); });
+      } else if (x < 93.6) {
+        // a rewrite that also grew: the size alone cannot tell it from an append
+        label = 'file rewritten and longer';
+        const extra = foreign(OFFLINE, new Date(at).toISOString());
+        both((root) => { const f = path.join(root, 'bus', 'log', `${OFFLINE}.jsonl`); if (fs.existsSync(f)) fs.writeFileSync(f, `${fs.readFileSync(f, 'utf8').trim().split('\n').reverse().join('\n')}\n${extra}`); });
       } else if (x < 95) {
         const s = pick(seatsNow); const n = `${s.split('@')[0]}2@${s.split('@')[1]}`;
         label = `rename ${s}`; out = await both2(label, (b) => b.renameSeat(s, n));

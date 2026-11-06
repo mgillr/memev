@@ -15,6 +15,7 @@
 // Order is the same on every computer: by time, then device id, then the device's own counter.
 // What a seat has read is kept per device counter, so messages that arrive late from a computer
 // that was offline are still delivered.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -58,6 +59,7 @@ const order = (a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : a.device < b.devic
 // A line someone wrote by hand can carry its own seq, or a time or device that is not text. It is read as it always was, but
 // the view then gives up the short cuts that rely on seq being the place in the order. Memev itself never writes one.
 const ownSeq = new WeakSet();
+const digest = (bytes) => crypto.createHash('sha1').update(bytes).digest('hex');
 const newRecord = (st, text) => ({ size: st.size, mtimeMs: st.mtimeMs, msgs: [], bad: 0, exotic: false, endsLine: !text || text.endsWith('\n'), at: 0 });
 /** Parse lines of a file's text into its record from where it got to, until the deadline. A blank line is not a bad line. */
 function parseSome(rec, text, until) {
@@ -350,8 +352,10 @@ export class Bus {
     const full = this._p('log', file); let st; try { st = fs.statSync(full); } catch { return []; }
     const c = this._cache.get(file);
     if (c && c.size === st.size && c.mtimeMs === st.mtimeMs) return c.msgs;
-    const text = fs.readFileSync(full, 'utf8');
+    const bytes = fs.readFileSync(full); const text = bytes.toString('utf8');
     const rec = newRecord(st, text); parseSome(rec, text, Infinity);
+    // a file that has changed once will change again, as sync brings more: from now on it can prove the next change only added lines
+    if (c) rec.digest = digest(bytes);
     this._cache.set(file, rec);
     return rec.msgs;
   }
@@ -382,6 +386,7 @@ export class Bus {
   _view() {
     const files = this._logFiles(); const v = this._viewNow;
     if (v && v.files.size === files.length && files.every((f) => v.files.has(f) && this._unchanged(f, v.files.get(f)))) return v;
+    if (v && this._tookGrowth(v, files)) return v;
     const out = []; const stamps = new Map(); let exotic = false;
     for (const f of files) { const msgs = this._readLog(f); const c = this._cache.get(f); exotic ||= c?.exotic; stamps.set(f, c || null); for (const m of msgs) out.push(m); }
     out.sort(order);
@@ -428,6 +433,44 @@ export class Bus {
     if (!stale()) this._viewNow = next;
   }
   /**
+   * Another computer's lines arrived by sync. When every changed file is a new file, or is what it was plus whole lines at the
+   * end (the digest proves it, not the size), they go in where they belong and nothing else is read or sorted. Anything else
+   * returns false, and the caller reads the changed files and builds the view again.
+   */
+  _tookGrowth(v, files) {
+    if (v.exotic || !files.every((f) => this._cache.has(f) || !v.files.has(f)) || [...v.files.keys()].some((f) => !files.includes(f))) return false;
+    const taken = [];
+    for (const f of files) {
+      const c = v.files.has(f) ? v.files.get(f) : null;
+      if (c && this._unchanged(f, c)) continue;
+      if (c && (c !== this._cache.get(f) || !c.digest || !c.endsLine)) return false;
+      const full = this._p('log', f); let st; let bytes; try { st = fs.statSync(full); bytes = fs.readFileSync(full); } catch { return false; }
+      if (bytes.length !== st.size || bytes.length < (c?.size || 0) || (c && digest(bytes.subarray(0, c.size)) !== c.digest)) return false;
+      const text = bytes.toString('utf8', c?.size || 0);
+      const rec = newRecord(st, text); parseSome(rec, text, Infinity);
+      if (rec.exotic) return false;
+      taken.push({ f, c, rec, st, sum: digest(bytes) });
+    }
+    if (!taken.length) return false;
+    for (const { rec } of taken) for (const m of rec.msgs) if (!this._placeInView(v, m)) { this._viewNow = null; for (const t of taken) this._cache.delete(t.f); return false; }
+    for (const { f, c, rec, st, sum } of taken) {
+      const into = c || newRecord({ size: 0, mtimeMs: 0 }, '');
+      into.size = st.size; into.mtimeMs = st.mtimeMs; into.bad += rec.bad; into.endsLine = rec.endsLine; into.digest = sum;
+      for (const m of rec.msgs) into.msgs.push(m);
+      this._cache.set(f, into); v.files.set(f, into);
+    }
+    return true;
+  }
+  /** One new message into the view, moving what comes after it. False for an exact tie, whose place depends on the order the files are read in. */
+  _placeInView(v, m) {
+    const msgs = v.msgs; let i = msgs.length; while (i > 0 && order(msgs[i - 1], m) > 0) i--;
+    if (i > 0 && order(msgs[i - 1], m) === 0) return false;
+    if (i === msgs.length) msgs.push(m); else msgs.splice(i, 0, m);
+    for (let k = i; k < msgs.length; k++) msgs[k].seq = k + 1;
+    addToView(v, m, false);
+    return true;
+  }
+  /**
    * The line just appended goes into what is already in memory, so a message costs nothing per message already on the bus.
    * Only when the file is now exactly what was known plus this line: anything else (another writer got in between, or a crash
    * left half a line that this one ran into) leaves the stale record, and the next read sees the size differ and reads the file.
@@ -440,7 +483,7 @@ export class Bus {
     let st; try { st = fs.statSync(this._p('log', file)); } catch { return; }
     if (st.size !== c.size + Buffer.byteLength(line)) return;
     const m = JSON.parse(line);
-    c.size = st.size; c.mtimeMs = st.mtimeMs; c.msgs.push(m);
+    c.size = st.size; c.mtimeMs = st.mtimeMs; c.msgs.push(m); c.digest = null;
     this._cache.set(file, c);
     const v = this._viewNow;
     if (!v) return;
@@ -448,10 +491,7 @@ export class Bus {
     if (v.files.has(file) && v.files.get(file) !== c) { this._viewNow = null; return; }
     v.files.set(file, c);
     // nearly always the new message is the last; one that lands before a computer whose clock is ahead moves those after it
-    const msgs = v.msgs; let i = msgs.length; while (i > 0 && order(msgs[i - 1], m) > 0) i--;
-    if (i === msgs.length) msgs.push(m); else msgs.splice(i, 0, m);
-    for (let k = i; k < msgs.length; k++) msgs[k].seq = k + 1;
-    addToView(v, m, false);
+    if (!this._placeInView(v, m)) this._viewNow = null;
   }
   _unchanged(file, cached) {
     const c = this._cache.get(file); if (!c || c !== cached) return false;
