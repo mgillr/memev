@@ -20,6 +20,7 @@ import { oplogRecordToEnvelope, LOCAL_MERGE_CONTRACT } from './envelope-adapters
 
 const CHUNK = 1 << 20;
 const CLOSE_SNAPSHOT_AT = 200;
+const BATCH_BYTES = 1 << 20;
 const segName = (n) => `seg-${String(n).padStart(6, '0')}.jsonl`;
 
 /** Stream the lines of a file from `offset`, synchronously, CHUNK bytes at a time. Yields [line, byteOffset]. */
@@ -163,7 +164,8 @@ export class OpLog {
     const line = `${JSON.stringify(rec)}\n`;
     // finish a short write; if it cannot finish, cut the partial record off again so the next append starts on a line of its own
     const buf = Buffer.from(line); let done = 0;
-    try { while (done < buf.length) { const n = fs.writeSync(this.fd, buf, done, buf.length - done); if (!(n > 0)) throw new Error('no progress'); done += n; } }
+    if (this.batching) { this.batchBuf.push(buf); this.batchBytes += buf.length; if (this.batchBytes >= BATCH_BYTES) this._writeBatch(); done = buf.length; }
+    else try { while (done < buf.length) { const n = fs.writeSync(this.fd, buf, done, buf.length - done); if (!(n > 0)) throw new Error('no progress'); done += n; } }
     catch (e) { try { fs.ftruncateSync(this.fd, this.active.bytes); } catch {} throw new Error(`op log short write: ${done} of ${buf.length} bytes (${e.message}); the partial record was removed`); }
     if (this.fsync && !this.batching) fs.fdatasyncSync(this.fd);
     const a = this.active; a.bytes += Buffer.byteLength(line); a.last = rec.seq; if (!a.first) a.first = rec.seq;
@@ -174,6 +176,11 @@ export class OpLog {
     return rec;
   }
 
+  _writeBatch() {
+    if (!this.batchBytes) return;
+    const b = Buffer.concat(this.batchBuf); this.batchBuf = []; this.batchBytes = 0;
+    for (let o = 0; o < b.length;) o += fs.writeSync(this.fd, b, o, b.length - o);
+  }
   /**
    * Run appends as one group: one sync at the end and no snapshot in between (a snapshot must never promise bytes that are not yet on
    * disk). Only for records that can be made again from what is still on disk, so a crash inside the group loses nothing: the start's
@@ -181,9 +188,9 @@ export class OpLog {
    */
   group(fn) {
     if (this.batching) return fn();
-    this.batching = true;
+    this.batching = true; this.batchBuf = []; this.batchBytes = 0;
     try { return fn(); } finally {
-      this.batching = false;
+      this._writeBatch(); this.batching = false;
       if (this.fd !== null) { if (this.fsync) fs.fdatasyncSync(this.fd); if (this.sinceSnapshot >= this.snapshotEvery) this.snapshot(); }
     }
   }
@@ -196,6 +203,7 @@ export class OpLog {
   roll() {
     const a = this.active;
     if (!a.bytes) return;
+    if (this.batching) this._writeBatch();
     fs.fsyncSync(this.fd); fs.closeSync(this.fd);
     a.sealed = true; a.sha256 = hashFile(path.join(this.dir, a.name)); a.sealedAt = now();
     const n = this.manifest.segments.length + 1;

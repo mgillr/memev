@@ -251,3 +251,15 @@ test('converting an old index gives the same segment, byte for byte, as loading 
   fs.writeFileSync(file, `${text.slice(0, -10)}\n`); assert.equal(convertOldIndex(file, path.join(dir, 'e')), false); assert.equal(fs.existsSync(path.join(dir, 'e')), false);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('a first run that indexes while it imports gives the recall a rebuild gives', () => {
+  const root = fresh();
+  for (let i = 0; i < 80; i++) { const d = path.join(root, 'notes', `d${i % 7}`); fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, `n${i}.md`), `# note ${i}\nProject: p${i % 3}\nwords cache layer ${i % 4} deploy Big Service\n\n## Second ${i}\nmore words retry queue ${i % 5}\n`); }
+  const QS = ['cache layer', 'deploy', 'retry queue 3', 'second 40', 'big service', 'p1 words'];
+  const answers = (v) => QS.map((q) => v.recall(ME, { query: q, log: false, limit: 10 }));
+  let v = open(root); assert.ok(v.imported.length >= 80); const first = answers(v); const firstGraph = graphOf(v); v.close();
+  const idx = path.join(root, '.memev'); for (const f of fs.readdirSync(idx)) if (/^(index|notes\.)/.test(f)) fs.rmSync(path.join(idx, f), { recursive: true, force: true });
+  v = open(root); assert.equal(v.imported.length, 0); const rebuilt = answers(v); assert.deepEqual(first, rebuilt); assert.deepEqual(firstGraph, graphOf(v));
+  assert.ok(first.some((a) => a.length)); v.close();
+  fs.rmSync(root, { recursive: true, force: true });
+});
