@@ -262,6 +262,15 @@ test('an opener beside a running fold does not pull it from under the fold: the 
 /** A process that looks like a daemon to `ps`: its script is named server/main.mjs. */
 function stubDaemon(root, ms = 30000) { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-stub-')); made.push(d); const f = path.join(d, 'server', 'main.mjs'); fs.mkdirSync(path.dirname(f)); fs.writeFileSync(f, `setTimeout(() => {}, ${ms});`); return spawn(process.execPath, [f, '--root', root], { stdio: 'ignore', detached: true }); }
 
+test('with a daemon loading the vault, memev compact and any other opener refuse and leave it be', { skip: process.platform === 'win32' }, async () => {
+  const root = seeded(12); const stub = stubDaemon(root); await new Promise((r) => stub.once('spawn', r));
+  try {
+    fs.writeFileSync(path.join(root, '.memev/daemon.loading'), JSON.stringify({ pid: stub.pid }));
+    const before = fs.readdirSync(segDir(root)); assert.throws(() => open(root), (e) => e.code === 'loading');
+    const r = spawnSync(process.execPath, [path.join(PKG, 'bin/memev.mjs'), 'compact', '--root', root], { encoding: 'utf8', env: { ...process.env, MEMEV_NO_SERVICE: '1', MEMEV_ROOT: root }, timeout: 30000 }); assert.equal(r.status, 1, r.stdout + r.stderr); assert.match(r.stdout + r.stderr, /still loading/); assert.deepEqual(fs.readdirSync(segDir(root)), before); assert.ok(process.kill(stub.pid, 0));
+  } finally { stub.kill('SIGKILL'); }
+  await new Promise((r) => stub.once('exit', r)); const v = open(root); v.close(); // the file names a dead pid now: no refusal
+});
 
 test('a stale daemon.loading naming a live process that is no daemon holds nothing up and stops nothing', { skip: process.platform === 'win32' }, async () => {
   const { loadingPid, stopDaemon, whyNotRunning } = await import('../src/cli/daemon.mjs'); const root = seeded(12); const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 30000)'], { stdio: 'ignore' }); await new Promise((r) => other.once('spawn', r));
