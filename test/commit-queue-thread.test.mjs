@@ -185,6 +185,9 @@ test('a bus message before a hard kill is committed by the next open, and a clea
   const c = spawn(process.execPath, ['--input-type=module', '-e', code, root], { stdio: ['ignore', 'pipe', 'inherit'] }); let out = ''; c.stdout.on('data', (d) => { out += d; });
   const t = Date.now(); while (!out.includes('sent') && Date.now() - t < 30000) await sleep(5); assert.ok(out.includes('sent'), 'the writer did not send'); c.kill('SIGKILL'); await new Promise((r) => c.on('close', r));
   assert.match(dirty(root), /bus\/log/, 'the kill left the message uncommitted, or this proves nothing');
+  // The message and the record can carry one time, as on a coarse clock: hold every bus file and the record equal, so this does not depend on the race.
+  const when = new Date(); const busFiles = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? busFiles(path.join(d, e.name)) : [path.join(d, e.name)]));
+  for (const f of [path.join(root, '.memev', 'commit.seq'), ...busFiles(path.join(root, 'bus'))]) fs.utimesSync(f, when, when);
   const v = new Vault(root, { commitDelayMs: 5, fsync: false, keyDir: path.join(root, '..', 'keys') }).open(); const w = Date.now(); while (dirty(root) && Date.now() - w < 15000) await sleep(20); assert.equal(dirty(root), '', 'the bus message stayed uncommitted'); await untilLanded(v.commits); v.close();
   const again = new Vault(root, { commitDelayMs: 60000, fsync: false, keyDir: path.join(root, '..', 'keys') }).open(); try { assert.equal(again.commits.pending.size, 0, 'a clean stop leaves nothing to queue'); } finally { again.close(); }
 });
