@@ -457,7 +457,7 @@ export function attach(Vault) {
     const inVault = !local || origin === 'remote';
     // the base: a locally signed contract's own (under its signature), a remote-signed one's from its signed approval record;
     // a changed approval record stops the verify before any criterion runs
-    let base = null; let baseNote = null; let baseSource = null;
+    let base = null; let baseNote = null; let baseSource = null; let scopeNotJudged = false;
     if (origin === 'remote') {
       if (approved) { const ap = this._approvalBase(id); if (ap.problem) return { id, ok: false, verdict: 'BLOCKED', signature: s.detail, detail: ap.problem, tasks: [] }; base = ap.sha; }
     } else if (c.base !== undefined && c.base !== null) {
@@ -736,6 +736,8 @@ export function attach(Vault) {
       return { status: 'FAIL', detail: `outside the scope: ${list}${more}${rest}` };
     };
     const scope = async (t) => {
+      // a derived base cannot judge scope: every later commit is in base..HEAD and few say which contract they belong to
+      if (baseSource === 'derived' && !baseCheck()) { scopeNotJudged = true; return { status: 'NOT JUDGED', detail: 'a derived base cannot judge scope: later commits are in the range, and nothing says which were this contract\'s work' }; }
       const o = outsideVault(); if (o) return o;
       const g = commandGate(); if (g) return g;
       const b = baseCheck(); if (b) return { status: 'BLOCKED', detail: b };
@@ -772,19 +774,20 @@ export function attach(Vault) {
       tasks[i].behaviour = { passed: 0, total: 0 }; tasks[i].documents = { passed: 0, total: 0 };
       t.criteria.forEach((cr, j) => { const k = kindOf.get(cr); const pass = tasks[i].criteria[j].status === 'PASS' ? 1 : 0; for (const o of [tasks[i][k], counts[k]]) { o.total++; o.passed += pass; } });
     });
-    for (const t of tasks) t.status = t.criteria.every((cr) => !cr.mandatory || cr.status === 'PASS') ? 'PASS' : t.criteria.some((cr) => cr.mandatory && cr.status === 'FAIL') ? 'FAIL' : 'BLOCKED';
+    for (const t of tasks) t.status = t.criteria.every((cr) => !cr.mandatory || cr.status === 'PASS' || cr.status === 'NOT JUDGED') ? 'PASS' : t.criteria.some((cr) => cr.mandatory && cr.status === 'FAIL') ? 'FAIL' : 'BLOCKED';
     const ok = tasks.every((t) => t.status === 'PASS');
-    const remaining = tasks.filter((t) => t.status !== 'PASS').map((t) => ({ id: t.id, title: t.title, status: t.status, failing: t.criteria.filter((cr) => cr.mandatory && cr.status !== 'PASS').map((cr) => `${cr.statement}: ${cr.detail}`) }));
+    const remaining = tasks.filter((t) => t.status !== 'PASS').map((t) => ({ id: t.id, title: t.title, status: t.status, failing: t.criteria.filter((cr) => cr.mandatory && cr.status !== 'PASS' && cr.status !== 'NOT JUDGED').map((cr) => `${cr.statement}: ${cr.detail}`) }));
     const result = { id, ok, verdict: ok ? 'PASS' : 'FAIL', signature: s.detail, verified: now(), passed: tasks.length - remaining.length, total: tasks.length, behaviour: counts.behaviour, documents: counts.documents, remaining, tasks };
     // the receipt: an append-only record in the vault of every verification and its evidence
     const receipt = [`\n### ${now()} · verify · ${ok ? 'PASS' : 'FAIL'} · ${tasks.length - remaining.length}/${tasks.length} tasks`];
     if (baseSource === 'derived') receipt.push(`- base derived: ${base}`);
+    if (scopeNotJudged) receipt.push('- scope not judged');
     for (const t of tasks) { receipt.push(`- ${t.status} ${t.id} ${t.title}`); for (const cr of t.criteria) receipt.push(`  - ${cr.status} ${cr.id} ${cr.statement} (${truncate(String(cr.detail || '').replace(/\s+/g, ' '), 200)})`); }
     const rp = `contracts/receipts/${id}.md`;
     this.append(identity, { path: rp, text: `${this._read(rp) === null ? `# Receipts for ${id}\n\nEvery verification of the signed contract, newest last.\n` : ''}${receipt.join('\n')}\n`, client, internal: true });
     this._applyMisc(this.log.append({ type: 'contract.verified', agent: identity.agent, client, data: { id, ok, tasks: Object.fromEntries(tasks.map((t) => [t.id, t.status])), failing: tasks.flatMap((t) => t.criteria.filter((cr) => cr.mandatory && cr.status !== 'PASS').map((cr) => cr.id)) } }));
     if (ok) this.write(identity, { path: `contracts/closed/${id}.json`, body: `${JSON.stringify(result, null, 2)}\n`, client, internal: true });
-    result.receipts = rp; result.base = base; if (baseSource) result.base_source = baseSource;
+    result.receipts = rp; result.base = base; if (baseSource) result.base_source = baseSource; if (scopeNotJudged) result.scope_not_judged = true;
     return result;
   };
 

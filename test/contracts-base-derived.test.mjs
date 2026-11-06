@@ -141,6 +141,25 @@ test('T2a: work in another repository from the body has no derived base it can u
   } finally { v.close(); }
 });
 
+test('T2a: a derived base does not judge scope, and an own base still does', async () => {
+  const FILE = { statement: 'the file exists', verifier: { type: 'file_exists', path: 'README.md' } };
+  const { v, root, dir, id, head } = committed({ tasks: task([SCOPE, FILE]) });
+  try {
+    commit(dir, { 'docs/someone-elses-later-work.md': 'y\n' });
+    const out = await v.contractVerify(OWNER, { id });
+    const r = byStatement(out)['changes stay in scope'];
+    assert.equal(r.status, 'NOT JUDGED', r.detail);
+    assert.match(r.detail, /derived base/);
+    assert.equal(out.verdict, 'PASS', 'the other criteria decide the verdict');
+    assert.equal(out.scope_not_judged, true);
+    assert.match(fs.readFileSync(path.join(root, 'contracts', 'receipts', `${id}.md`), 'utf8'), /scope not judged/);
+    // the same later commit still fails a body that recorded its own base
+    const own = signByHand(root, { workdir: dir, tasks: task([SCOPE]), fields: { base: { sha: head, recorded_at: new Date().toISOString() } } });
+    const o = byStatement(await v.contractVerify(OWNER, { id: own.id }))['changes stay in scope'];
+    assert.equal(o.status, 'FAIL', o.detail);
+  } finally { v.close(); }
+});
+
 test('the docs state the exception to the signature covering the base', () => {
   assert.match(fs.readFileSync(path.join(PKG, 'docs', 'CONTRACTS.md'), 'utf8'), /base derived/i);
 });
