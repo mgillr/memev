@@ -60,9 +60,11 @@ test('a broken index fails the same comparison', (t) => {
 });
 
 test('empty tuning, real tuning and reviews do not read a section per scored section', (t) => {
-  const d = tmp(t); const { orc, ix } = seeded(d); let reads = 0; const m = Seg.prototype.meta; Seg.prototype.meta = function (i) { reads++; return m.call(this, i); }; t.after(() => { Seg.prototype.meta = m; });
+  // Both reads a section can cost are counted: its meta line and its heading. What keeps them off the scored sections is the filter's memo and the bitmap of review keys.
+  const d = tmp(t); const { orc, ix } = seeded(d); let reads = 0, heads = 0; const m = Seg.prototype.meta, hd = Seg.prototype.heading; Seg.prototype.meta = function (i) { reads++; return m.call(this, i); }; Seg.prototype.heading = function (i) { heads++; return hd.call(this, i); }; t.after(() => { Seg.prototype.meta = m; Seg.prototype.heading = hd; });
   const keys = [...orc.docs.values()].slice(0, 40).map((x) => `${x.path}#${x.heading || ''}`); const reviews = new Map(keys.map((k) => [k, { action: 'drop' }])); const boosts = Object.fromEntries(keys.map((k) => [k, 1.5]));
-  for (const [label, o] of [['empty tuning', { boosts: {}, filter: filterOf(new Map())(open, {}) }], ['tuning', { boosts, filter: filterOf(new Map())(open, {}) }], ['reviews', { boosts: {}, filter: filterOf(reviews)(open, {}) }]]) { reads = 0; const r = ix.query('webhook retries billing', { limit: 4, ...o }); assert.ok(r.total > 500, 'a query that scores many sections'); assert.ok(reads <= 4 * 2, `${label}: ${reads} section reads for ${r.total} scored sections`); }
+  let calls = 0; const counted = (f) => (x) => { calls++; return f(x); };
+  for (const [label, o] of [['empty tuning', { boosts: {}, filter: counted(filterOf(new Map())(open, {})) }], ['tuning', { boosts, filter: counted(filterOf(new Map())(open, {})) }], ['reviews', { boosts: {}, filter: counted(filterOf(reviews)(open, {})) }]]) { reads = 0; heads = 0; calls = 0; const r = ix.query('webhook retries billing', { limit: 4, ...o }); assert.ok(calls < r.total / 2, `${label}: the filter was asked ${calls} times for ${r.total} scored sections, though its verdict is known per project`); assert.ok(r.total > 500, 'a query that scores many sections'); assert.ok(reads <= 4 * 2, `${label}: ${reads} section reads for ${r.total} scored sections`); assert.ok(heads <= 100, `${label}: ${heads} headings read for ${r.total} scored sections`); }
 });
 
 test('equal scores keep the oracle order across the segment and the overlay', (t) => {

@@ -106,6 +106,9 @@ test('a journal the retention moved to the archive stays out of recall through a
   v.compact(); assert.equal(found(v, 'wombat', 'work/sessions/2020-01-01-old.md'), false, 'out after the move');
   v.close();
   const v2 = open(root); assert.equal(found(v2, 'wombat', 'work/sessions/2020-01-01-old.md'), false, 'still out after a start'); v2.close();
+  // a kill between the move and the next save of the log position: the position is behind, so the start looks at the note again, and only the file at its own path counts
+  fs.writeFileSync(path.join(root, '.memev', 'index.seq'), '0');
+  const v3 = open(root); assert.equal(found(v3, 'wombat', 'work/sessions/2020-01-01-old.md'), false, 'still out when the log position is behind the move'); v3.close();
 });
 
 test('an old index converts once: same answers, the old file goes, and a kill before the end starts over', () => {
@@ -138,6 +141,7 @@ test('after a downgrade and an upgrade again, the index the older version kept i
   // the older version ran: it kept its own file, wrote a note, and moved the old journal to the archive without a log record
   const old = new RecallIndex(file); old.update('notes/a.md', fs.readFileSync(path.join(root, 'notes/a.md'), 'utf8')); old.dirty = true; old.save();
   fs.mkdirSync(path.join(root, 'work/archive/sessions'), { recursive: true }); fs.renameSync(path.join(root, 'work/sessions/2020-01-01-old.md'), path.join(root, 'work/archive/sessions/2020-01-01-old.md'));
+  fs.writeFileSync(path.join(state, 'index.seq'), '0'); // the older version kept no log position, and ours is behind what it did
   const v2 = open(root);
   assert.equal(found(v2, 'capybara', 'notes/a.md'), true); assert.equal(found(v2, 'wombat', 'work/sessions/2020-01-01-old.md'), false, 'the archived journal stays out');
   assert.equal(fs.existsSync(file), false); v2.close();

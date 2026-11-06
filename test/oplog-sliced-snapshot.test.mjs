@@ -49,9 +49,12 @@ test('writes during the snapshot: the reopened log has the same heads as a full 
   fs.closeSync(log.fd); log.fd = null;
   const snap = JSON.parse(fs.readFileSync(log.snapshotPath, 'utf8'));
   assert.ok(snap.seq < seq, 'the snapshot covers everything, so no replay was tested');
+  // heads alone can hide a skipped record, as a later write to the same path puts the head right: the offset itself must be a record's end
+  const seg = fs.readFileSync(path.join(dir, snap.active.name)); assert.equal(seg[snap.active.offset - 1], 10, 'the snapshot offset is not at the end of a record');
   const again = new OpLog(dir, { fsync: false }).open();
   assert.equal(again.seq, seq);
   assert.deepEqual(heads(again), want);
+  assert.deepEqual(again.recovered, [], 'a replay from the snapshot met part of a record');
   again.close();
   assert.deepEqual(replayed(dir), want, 'a full replay differs from the live heads');
   // the comparison can fail: a snapshot that claims to cover more than it does loses the later records

@@ -129,8 +129,13 @@ test('unread does not mark or show by testing every message against every read c
   const extra = []; for (let i = 2; i <= 19000; i += 2) extra.push(i);
   fs.writeFileSync(path.join(root, 'bus/pulse/bot7~fleet.json'), JSON.stringify({ seat: 'bot7@fleet', device: device.id, last_seen: new Date().toISOString(), beats: 1, read: { [device.id]: 1 }, read_extra: { [device.id]: extra } }));
   bus.all();
-  const ms = median(() => bus.unread(ctxOf(7), { seat: 'bot7@fleet', peek: true, capped: true }), 3);
-  console.log(`unread with ${extra.length} read counters beyond a gap: ${ms.toFixed(1)} ms`);
+  // a count, not only a time: this machine can scan every counter for every message inside any bound worth setting
+  const scans = { n: 0 }; const inc = Array.prototype.includes, idx = Array.prototype.indexOf;
+  Array.prototype.includes = function counted(...a) { if (this.length >= extra.length) scans.n++; return inc.apply(this, a); }; // eslint-disable-line no-extend-native
+  Array.prototype.indexOf = function counted(...a) { if (this.length >= extra.length) scans.n++; return idx.apply(this, a); }; // eslint-disable-line no-extend-native
+  let ms; try { ms = median(() => bus.unread(ctxOf(7), { seat: 'bot7@fleet', peek: true, capped: true }), 3); } finally { Array.prototype.includes = inc; Array.prototype.indexOf = idx; } // eslint-disable-line no-extend-native
+  console.log(`unread with ${extra.length} read counters beyond a gap: ${ms.toFixed(1)} ms, ${scans.n} scans of a list that long`);
+  assert.ok(scans.n <= 3 * 50, `${scans.n} scans of the whole list of read counters over 3 calls; each message was tested against every counter`);
   assert.ok(ms < 1000, `unread took ${ms.toFixed(1)} ms`);
 });
 

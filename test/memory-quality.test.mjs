@@ -67,12 +67,16 @@ test('a rebuilt index is byte-identical to the one built note by note, and an ol
   fs.writeFileSync(headFile, JSON.stringify({ ...JSON.parse(fs.readFileSync(headFile, 'utf8')), version: SEG_VERSION - 1 }));
   const v3 = new Vault(root, { git: false, fsync: false }).open();
   assert.equal(v3.recall(OWNER, { query: '数据库', log: false })[0]?.path.startsWith('memory/decisions/'), true, 'reindexed on open');
+  // an old segment answers that as well, so the question is whether it is still the one serving
+  assert.notEqual(v3.index.gen, Number(gen), 'a new generation'); assert.equal(v3.index.seg.head.version, SEG_VERSION); assert.equal(v3.status().index.damage, null, 'another version is an upgrade, not damage');
   v3.close();
   fs.rmSync(indexDir, { recursive: true, force: true });
-  fs.writeFileSync(path.join(root, '.memev', 'index.jsonl'), '{"version":2,"sections":0}\n');
+  // the old file holds a section no note holds, so a conversion that took this file on trust shows at once
+  fs.writeFileSync(path.join(root, '.memev', 'index.jsonl'), `{"version":2,"sections":1}\n${JSON.stringify({ path: 'notes/ghost.md', heading: null, line: 1, len: 1, project: null, mtime: null, snippet: 'a ghost', t: ['ghostword'], f: [1] })}\n`);
   assert.equal(new RecallIndex(path.join(root, '.memev', 'index.jsonl')).load(), false, 'a version 2 index is not trusted');
   const v4 = new Vault(root, { git: false, fsync: false }).open();
   assert.equal(v4.recall(OWNER, { query: '数据库', log: false })[0]?.path.startsWith('memory/decisions/'), true, 'reindexed on open');
+  assert.equal(v4.recall(OWNER, { query: 'ghostword', log: false }).length, 0, 'nothing from the old file of an old version');
   v4.close();
 });
 
