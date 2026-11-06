@@ -17,6 +17,7 @@
 // that was offline are still delivered.
 import fs from 'node:fs';
 import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { findSecrets } from './secrets.mjs';
 import { readJson, writeJson, now, linkedUnder } from './util.mjs';
 import { allowed } from './tokens.mjs';
@@ -57,6 +58,24 @@ const order = (a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : a.device < b.devic
 // A line someone wrote by hand can carry its own seq, or a time or device that is not text. It is read as it always was, but
 // the view then gives up the short cuts that rely on seq being the place in the order. Memev itself never writes one.
 const ownSeq = new WeakSet();
+const newRecord = (st, text) => ({ size: st.size, mtimeMs: st.mtimeMs, msgs: [], bad: 0, exotic: false, endsLine: !text || text.endsWith('\n'), at: 0 });
+/** Parse lines of a file's text into its record from where it got to, until the deadline. A blank line is not a bad line. */
+function parseSome(rec, text, until) {
+  let at = rec.at; let n = 0;
+  while (at < text.length) {
+    let nl = text.indexOf('\n', at); if (nl < 0) nl = text.length;
+    if (text.charCodeAt(at) === 123 || text.slice(at, nl).trim()) {
+      try {
+        const m = JSON.parse(text.slice(at, nl));
+        if (m?.id && m.device && Number.isInteger(m.dseq)) { rec.msgs.push(m); if (Object.hasOwn(m, 'seq')) { ownSeq.add(m); rec.exotic = true; } else if (typeof m.ts !== 'string' || typeof m.device !== 'string') rec.exotic = true; } else rec.bad++;
+      } catch { rec.bad++; }
+    }
+    at = nl + 1;
+    if (until !== Infinity && ++n % 200 === 0 && performance.now() >= until) break;
+  }
+  rec.at = at;
+  return at >= text.length;
+}
 /** What leaves the class: a message of its own, with seq first. A line that carries its own seq keeps it, as the spread always did. */
 const copyOut = (m) => ({ seq: m.seq, ...m });
 const newView = (files, exotic) => ({ files, exotic, place: null, msgs: [], firstById: new Map(), byFrom: new Map(), claimsBy: new Map(), statusBy: new Map(), byRef: new Map(), tasks: [], holds: [], verdicts: new Set(), runs: new Map() });
@@ -331,17 +350,10 @@ export class Bus {
     const full = this._p('log', file); let st; try { st = fs.statSync(full); } catch { return []; }
     const c = this._cache.get(file);
     if (c && c.size === st.size && c.mtimeMs === st.mtimeMs) return c.msgs;
-    const msgs = []; let bad = 0; let exotic = false;
     const text = fs.readFileSync(full, 'utf8');
-    for (const line of text.split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        const m = JSON.parse(line);
-        if (m?.id && m.device && Number.isInteger(m.dseq)) { msgs.push(m); if (Object.hasOwn(m, 'seq')) { ownSeq.add(m); exotic = true; } else if (typeof m.ts !== 'string' || typeof m.device !== 'string') exotic = true; } else bad++;
-      } catch { bad++; }
-    }
-    this._cache.set(file, { size: st.size, mtimeMs: st.mtimeMs, msgs, bad, exotic, endsLine: !text || text.endsWith('\n') });
-    return msgs;
+    const rec = newRecord(st, text); parseSome(rec, text, Infinity);
+    this._cache.set(file, rec);
+    return rec.msgs;
   }
   /**
    * Where this computer's next message goes, and its last message so far. Its counter runs on across its files: an empty or
@@ -381,6 +393,41 @@ export class Bus {
     return next;
   }
   /**
+   * Do the first read a little at a time, so no prompt pays for it and the thread stays free. A call that arrives meanwhile just
+   * does what is left itself, and anything that changed a file while this ran throws this work away; the next read starts over.
+   */
+  async warm({ sliceMs = 8 } = {}) {
+    const breathe = () => new Promise((r) => setImmediate(r));
+    for (const f of this._logFiles()) {
+      if (this._cache.get(f)) continue;
+      const full = this._p('log', f); let st; let text; try { st = fs.statSync(full); text = fs.readFileSync(full, 'utf8'); } catch { continue; }
+      await breathe();
+      const rec = newRecord(st, text);
+      while (!parseSome(rec, text, performance.now() + sliceMs)) await breathe();
+      let now_; try { now_ = fs.statSync(full); } catch { continue; }
+      if (!this._cache.get(f) && now_.size === st.size && now_.mtimeMs === st.mtimeMs) this._cache.set(f, rec);
+      await breathe();
+    }
+    if (this._viewNow) return;
+    const files = this._logFiles(); const stamps = new Map(); const out = []; let exotic = false;
+    for (const f of files) { const c = this._cache.get(f); if (!c) return; stamps.set(f, c); exotic ||= c.exotic; for (const m of c.msgs) out.push(m); }
+    const sizes = files.map((f) => stamps.get(f).size);
+    out.sort(order);
+    await breathe();
+    const next = newView(stamps, exotic);
+    if (exotic) next.place = new Map(out.map((m, i) => [m, i]));
+    const stale = () => this._viewNow || files.some((f, i) => this._cache.get(f) !== stamps.get(f) || stamps.get(f).size !== sizes[i]);
+    for (let i = 0; i < out.length;) {
+      // the message objects are shared: once anything else has numbered them, this must not touch them again
+      if (stale()) return;
+      const until = performance.now() + sliceMs;
+      for (let n = 0; i < out.length && (n % 200 !== 199 || performance.now() < until); i++, n++) { if (!exotic || !ownSeq.has(out[i])) out[i].seq = i + 1; addToView(next, out[i], true); }
+      if (i < out.length) await breathe();
+    }
+    next.msgs = out;
+    if (!stale()) this._viewNow = next;
+  }
+  /**
    * The line just appended goes into what is already in memory, so a message costs nothing per message already on the bus.
    * Only when the file is now exactly what was known plus this line: anything else (another writer got in between, or a crash
    * left half a line that this one ran into) leaves the stale record, and the next read sees the size differ and reads the file.
@@ -388,7 +435,7 @@ export class Bus {
   _tookOwnLine(file, line) {
     let c = this._cache.get(file);
     // a file that did not exist before this line: a computer's first, or the next one after a full file
-    if (!c) { c = { size: 0, mtimeMs: 0, msgs: [], bad: 0, exotic: false, endsLine: true }; }
+    if (!c) c = newRecord({ size: 0, mtimeMs: 0 }, '');
     if (!c.endsLine || c.exotic) return;
     let st; try { st = fs.statSync(this._p('log', file)); } catch { return; }
     if (st.size !== c.size + Buffer.byteLength(line)) return;
@@ -620,8 +667,8 @@ export class Bus {
     return rec;
   }
 
-  holdOn(seat, view = this._view()) {
-    const names = this._names(seat); const holds = view.holds;
+  holdOn(seat, view = this._view(), names = this._names(seat)) {
+    const holds = view.holds;
     let h = null; for (let i = holds.length - 1; i >= 0 && !h; i--) if (names.includes(holds[i].to) || holds[i].to === 'all') h = holds[i];
     return h && !h.release ? { since: h.ts, by: h.from, reason: h.body, id: h.id } : null;
   }
@@ -639,7 +686,7 @@ export class Bus {
       const claimed = names.length > 1 ? [...new Set(names)].flatMap((n) => view.claimsBy.get(n) || []).sort((a, b) => placeOf(view, a) - placeOf(view, b)) : view.claimsBy.get(names[0]) || [];
       const claims = claimed.filter((m) => !view.verdicts.has(m.ref)).map((m) => m.ref);
       const status = lastOf(view, view.statusBy, names);
-      return { seat: s.seat, client: s.client, device: s.device, device_label: dev?.label || s.device_label, device_kind: dev?.kind || s.device_kind, teammate: dev?.teammate || null, state, operator: op === s.seat, last_seen: p.last_seen || null, minutes_since: p.last_seen ? ago(p.last_seen, at) : null, last_message: last ? { seq: last.seq, type: last.type, ts: last.ts, body: last.body.slice(0, 120) } : null, hold: this.holdOn(s.seat, view), claims, status: status ? status.body.slice(0, 160) : null, project: s.project };
+      return { seat: s.seat, client: s.client, device: s.device, device_label: dev?.label || s.device_label, device_kind: dev?.kind || s.device_kind, teammate: dev?.teammate || null, state, operator: op === s.seat, last_seen: p.last_seen || null, minutes_since: p.last_seen ? ago(p.last_seen, at) : null, last_message: last ? { seq: last.seq, type: last.type, ts: last.ts, body: last.body.slice(0, 120) } : null, hold: this.holdOn(s.seat, view, names), claims, status: status ? status.body.slice(0, 160) : null, project: s.project };
     });
     // licensed computers with no app on the bus yet
     const seated = new Set(rows.map((r) => r.device));

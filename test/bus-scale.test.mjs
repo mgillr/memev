@@ -103,3 +103,39 @@ test('unread does not mark or show by testing every message against every read c
   console.log(`unread with ${extra.length} read counters beyond a gap: ${ms.toFixed(1)} ms`);
   assert.ok(ms < 1000, `unread took ${ms.toFixed(1)} ms`);
 });
+
+test('warm does the first read in slices, and a call after it reads no file', async () => {
+  const root = fixture(6000); const bus = new Bus({ root, devices }); const logDir = path.join(root, 'bus', 'log');
+  let turns = 0; let on = true; const tick = () => { turns++; if (on) setImmediate(tick); }; setImmediate(tick);
+  await bus.warm({ sliceMs: 1 }); on = false;
+  assert.ok(turns >= 5, `the thread got ${turns} turns during the read`);
+  const reads = []; const real = fs.readFileSync;
+  fs.readFileSync = function counted(p, ...rest) { if (String(p).startsWith(logDir)) reads.push(p); return real.call(this, p, ...rest); };
+  let got; try { got = bus.all(); } finally { fs.readFileSync = real; }
+  assert.deepEqual(reads, []);
+  assert.deepEqual(got, new Bus({ root, devices }).all());
+});
+
+test('anything that happens during warm stands: a read, a send, a foreign line, a rewrite, in any slice', async () => {
+  const f = (root) => path.join(root, 'bus/log', `${device.id}.jsonl`);
+  const events = {
+    read: (bus) => bus.all(),
+    roster: (bus) => bus.roster(),
+    send: (bus) => bus.send(ctxOf(2), { seat: 'bot2@fleet', to: 'all', type: 'status', body: 'during warm' }),
+    'send then a late message': (bus, root) => { bus.send(ctxOf(2), { seat: 'bot2@fleet', to: 'all', type: 'status', body: 'during warm' }); fs.appendFileSync(path.join(root, 'bus/log/dev_late00000000.jsonl'), `${JSON.stringify({ id: 'late0000-1', dseq: 1, ts: '2026-01-01T00:00:03.500Z', device: 'dev_late00000000', from: 'bot1@fleet', operator: false, to: 'all', type: 'status', body: 'late', ref: null, project: null })}\n`); bus.send(ctxOf(2), { seat: 'bot2@fleet', to: 'all', type: 'status', body: 'after late' }); },
+    foreign: (bus, root) => fs.appendFileSync(f(root), `${JSON.stringify({ id: 'x-9', dseq: 90000, ts: '2026-01-01T00:00:01.500Z', device: device.id, from: 'bot1@fleet', operator: false, to: 'all', type: 'status', body: 'foreign', ref: null, project: null })}\n`),
+    rewrite: (bus, root) => fs.writeFileSync(f(root), `${fs.readFileSync(f(root), 'utf8').split('\n').slice(0, 50).join('\n')}\n`),
+  };
+  let ran = 0;
+  for (const [name, act] of Object.entries(events)) for (const after of [0, 1, 2, 3, 5, 9, 15, 30]) {
+    const root = fixture(2500); const bus = new Bus({ root, devices });
+    let turn = 0; const done = bus.warm({ sliceMs: 0.2 });
+    await new Promise((res) => { const go = () => { if (turn++ === after) { act(bus, root); res(); } else setImmediate(go); }; setImmediate(go); });
+    await done;
+    const fresh = new Bus({ root, devices });
+    assert.deepEqual(bus.all(), fresh.all(), `${name} after ${after} turns`);
+    assert.deepEqual(bus.roster({ at: 1 }), fresh.roster({ at: 1 }), `${name} after ${after} turns`);
+    fs.rmSync(root, { recursive: true, force: true }); ran++;
+  }
+  assert.equal(ran, 48);
+});
