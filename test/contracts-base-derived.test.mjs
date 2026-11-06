@@ -94,6 +94,8 @@ test('T2a: a body that was moved still resolves to its first add', async () => {
   fs.mkdirSync(path.join(dir, 'contracts', 'signed'), { recursive: true });
   gitIn(dir, 'mv', 'contracts/old/k-m.json', bodyPath('k-m'));
   gitIn(dir, 'commit', '-q', '-m', 'move');
+  // first an assertion, so that before the module exists this fails on an assertion and not on a load error
+  assert.ok(fs.existsSync(path.join(PKG, 'src', 'engine', 'contract-base.mjs')), 'the module that derives the base exists');
   const { deriveBase } = await import('../src/engine/contract-base.mjs');
   const contract = JSON.parse(fs.readFileSync(path.join(dir, bodyPath('k-m')), 'utf8'));
   assert.deepEqual(deriveBase({ repo: dir, id: 'k-m', contract }), { sha: head });
@@ -116,9 +118,13 @@ test('T2a: a remote-signed contract never uses a derived base', async () => {
   const { v, root } = newVault({ git: false });
   try {
     const { dir } = gitRepo();
+    // first the same fixture signed locally does derive, so this cannot pass on a verifier that never derives
+    const local = signByHand(root, { workdir: dir, tasks: task([SCOPE]) });
+    commit(dir, { [bodyPath(local.id)]: fs.readFileSync(path.join(root, bodyPath(local.id)), 'utf8') });
+    v.config.contracts = { ...(v.config.contracts || {}), redteam_root: dir };
+    assert.equal((await v.contractVerify(OWNER, { id: local.id })).base_source, 'derived');
     const { id } = signByHand(root, { workdir: dir, tasks: task([SCOPE]), fields: { origin: 'remote' } });
     commit(dir, { [bodyPath(id)]: fs.readFileSync(path.join(root, bodyPath(id)), 'utf8') });
-    v.config.contracts = { ...(v.config.contracts || {}), redteam_root: dir };
     assert.notEqual((await v.contractVerify(OWNER, { id })).base_source, 'derived');
   } finally { v.close(); }
 });
