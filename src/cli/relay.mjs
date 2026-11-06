@@ -180,9 +180,26 @@ export function startRelayClient({ root, port, url, domain, log = () => {}, onSt
 export const idFromAddress = (address) => new URL(address).hostname.split('.')[0];
 
 /**
+ * Why the certificate a peer showed for this address is not to be trusted, or null if it is. The address is made from the
+ * vault's key, so that key is the trust anchor: it must be the key in the certificate, which must be signed by that key,
+ * in date, and for this name. The TLS handshake has already shown that the peer holds the certificate's key.
+ */
+export function certificateProblem(raw, { id, hostname, at = Date.now() }) {
+  let c;
+  try { c = new crypto.X509Certificate(raw); } catch { return 'the vault behind this address did not prove it holds the key the address is made from'; }
+  if (idOf(c.publicKey.export({ type: 'spki', format: 'der' })) !== id) return 'the vault behind this address did not prove it holds the key the address is made from';
+  if (!c.verify(c.publicKey)) return 'the certificate at this address does not verify: its signature is not its own key\'s';
+  if (at < Date.parse(c.validFrom) || at > Date.parse(c.validTo)) return `the certificate at this address does not verify: it is valid from ${c.validFrom} to ${c.validTo}`;
+  if (!c.checkHost(hostname)) return `the certificate at this address does not verify: it is not for ${hostname}`;
+  return null;
+}
+
+/**
  * One request to a vault through a relay, for a computer or app that has no public certificate to rely on: the
  * name is made from the vault's key, so the certificate it presents must match the name, and that is checked
- * instead of a certificate authority. `relay` is { host, port } of the relay to dial. Resolves { status, headers, text, json }.
+ * instead of a certificate authority. No authority signs a vault's certificate, so the TLS layer's own chain check can only
+ * ever fail it, and with that failing Node never calls checkServerIdentity either: rejectUnauthorized stays false and
+ * certificateProblem does the whole check, before any byte of the request is sent. `relay` is { host, port } of the relay to dial. Resolves { status, headers, text, json }.
  */
 export function relayFetch(address, { relay, path: p = '/', method = 'GET', headers = {}, body = null, timeoutMs = 10000 } = {}) {
   const u = new URL(address); const id = u.hostname.split('.')[0];
@@ -192,9 +209,8 @@ export function relayFetch(address, { relay, path: p = '/', method = 'GET', head
     sock.setTimeout(timeoutMs, () => fail(new Error('relay request timed out')));
     sock.once('error', fail);
     sock.once('secureConnect', () => {
-      let ok = false;
-      try { const c = new crypto.X509Certificate(sock.getPeerCertificate().raw); ok = idOf(c.publicKey.export({ type: 'spki', format: 'der' })) === id; } catch { /* no certificate */ }
-      if (!ok) return fail(new Error('the vault behind this address did not prove it holds the key the address is made from'));
+      const problem = certificateProblem(sock.getPeerCertificate().raw, { id, hostname: u.hostname });
+      if (problem) return fail(new Error(problem));
       const text = body === null ? null : typeof body === 'string' ? body : JSON.stringify(body);
       const req = http.request({ method, path: p, headers: { host: u.host, ...(text !== null ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(text) } : {}), ...headers }, createConnection: () => sock }, (res) => {
         let t = ''; res.setEncoding('utf8'); res.on('data', (d) => { t += d; });

@@ -255,3 +255,55 @@ test('MEM-030 AC02: The default relay URL is read from config and the client use
     assert.equal(client.relaySetting(sb.root).url, url);
   } finally { sb.stop(); }
 });
+
+// a certificate with one byte of its signature changed: the same key and the same name, and it does not verify
+const tampered = (certPem) => {
+  const der = Buffer.from(certPem.replace(/-----[^-]+-----|\s/g, ''), 'base64');
+  der[der.length - 1] ^= 1;
+  return `-----BEGIN CERTIFICATE-----\n${der.toString('base64').match(/.{1,64}/g).join('\n')}\n-----END CERTIFICATE-----\n`;
+};
+
+test('T4-c06: the relay client refuses a peer whose certificate does not verify, and connects to one whose certificate does', async () => {
+  // made here, for this run: no key is kept in the repository
+  const newKey = () => crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' }).privateKey.export({ type: 'pkcs8', format: 'pem' });
+  const key = newKey();
+  const id = client.idOf(client.publicKeyOf(key));
+  const name = `${id}.${DOMAIN}`; const address = `https://${name}`;
+  const cert = (opts = {}) => client.selfSignedCert({ privateKeyPem: key, names: [name], ...opts });
+
+  /** Dial a peer with this certificate. Returns what came of it and how many bytes the peer was sent. */
+  const dial = async ({ cert: peerCert, key: peerKey = key }) => {
+    let got = 0;
+    const peer = tls.createServer({ key: peerKey, cert: peerCert }, (c) => { c.on('data', (d) => { got += d.length; c.end('HTTP/1.1 200 OK\r\ncontent-length: 2\r\nconnection: close\r\n\r\nhi'); }); c.on('error', () => {}); });
+    peer.on('tlsClientError', () => {});
+    await new Promise((res) => peer.listen(0, '127.0.0.1', res));
+    try {
+      const result = await client.relayFetch(address, { relay: { host: '127.0.0.1', port: peer.address().port }, path: '/secret-path', timeoutMs: 5000 }).catch((e) => e);
+      await new Promise((res) => setTimeout(res, 50));
+      return { result, got };
+    } finally { await new Promise((res) => { peer.close(res); }); }
+  };
+  const refused = async (what, peer, pattern) => {
+    const { result, got } = await dial(peer);
+    assert.ok(result instanceof Error, `${what}: the client connected and got ${result?.status}`);
+    assert.match(result.message, pattern, what);
+    assert.equal(got, 0, `${what}: not one request byte reached the peer`);
+  };
+
+  // the key is the one the name is made from in all of these, so only the certificate itself can fail them
+  await refused('a signature that does not verify', { cert: tampered(cert()) }, /does not verify/);
+  const year = 365 * 86400e3;
+  await refused('an expired certificate', { cert: cert({ at: Date.now() - 20 * year, days: 365 }) }, /does not verify/);
+  await refused('a certificate not valid yet', { cert: cert({ at: Date.now() + 30 * 86400e3 }) }, /does not verify/);
+  await refused('a certificate for another name', { cert: client.selfSignedCert({ privateKeyPem: key, names: [`other.${DOMAIN}`] }) }, /does not verify/);
+  // a good certificate with some other key: the pin on the name
+  const other = newKey();
+  await refused('a different key', { cert: client.selfSignedCert({ privateKeyPem: other, names: [name] }), key: other }, /did not prove it holds the key/);
+
+  // and the one that verifies is connected to, and answered
+  const { result, got } = await dial({ cert: cert() });
+  assert.ok(!(result instanceof Error), `a certificate that verifies: ${result?.message}`);
+  assert.equal(result.status, 200);
+  assert.equal(result.text, 'hi');
+  assert.ok(got > 0, 'the request reached it');
+});
