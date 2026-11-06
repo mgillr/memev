@@ -34,10 +34,17 @@ export function commandOf(pid, { platform = process.platform, readProc = (f) => 
   return String(r.stdout).trim();
 }
 const samePath = (a, b) => { const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } }; return real(a) === real(b); };
+/**
+ * Every way of serving a vault. Each process runs src/server/main.mjs, directly (memev start, a bench) or through a memev verb that imports it in
+ * that process: serve (launchd, systemd, the Windows task) and container (the image's entry, under tini). A new verb goes here, and
+ * index-damage.test.mjs fails until it does, because a way of serving this match does not know gets a confident "no daemon".
+ */
+export const SERVING_VERBS = ['serve', 'container'];
+const SERVING = new RegExp(`(^|[\\\\/\\s])server[\\\\/]main\\.mjs(\\s|$)|memev(\\.mjs)?\\s(.*\\s)?(${SERVING_VERBS.join('|')})(\\s|$)`);
 /** Does this command line belong to a daemon, of this vault where it names one? A command line may not name its vault: then it counts. */
 export function isDaemonCommand(cmd, root = null) {
   const line = Array.isArray(cmd) ? cmd.join(' ') : cmd;
-  if (!/(^|[\\/\s])server[\\/]main\.mjs(\s|$)|memev(\.mjs)?\s(.*\s)?serve(\s|$)/.test(line)) return false;
+  if (!SERVING.test(line)) return false;
   if (!root) return true;
   let named = null;
   if (Array.isArray(cmd)) { const i = cmd.indexOf('--root'); if (i >= 0 && i + 1 < cmd.length) named = cmd[i + 1]; else named = cmd.find((x) => x.startsWith('--root='))?.slice(7) ?? null; }

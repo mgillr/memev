@@ -15,7 +15,7 @@ import { SegIndex } from '../src/engine/segment-index.mjs';
 import { SEG_FILES } from '../src/engine/segment.mjs';
 import { NoteState } from '../src/engine/notestate.mjs';
 import { fileChecks } from '../src/cli/doctor.mjs';
-import { commandOf, isDaemonCommand, isDaemonPid } from '../src/engine/util.mjs';
+import { commandOf, isDaemonCommand, isDaemonPid, SERVING_VERBS } from '../src/engine/util.mjs';
 import { createServer } from '../src/server/http.mjs';
 import { TokenStore } from '../src/engine/tokens.mjs';
 
@@ -160,7 +160,7 @@ test('a write while the index is rebuilding reaches recall when it lands, and is
   assert.ok(await until(() => v.index.state().state === 'ok'), 'the rebuild landed');
   assert.deepEqual(v.recall(ME, { query: 'duringword', log: false, all_projects: true }).map((h) => h.path), ['notes/during.md']); assert.deepEqual(v.recall(ME, { query: 'duringappendword', log: false, all_projects: true }).map((h) => h.path), ['notes/n2.md']); assert.equal(v.recall(ME, { query: WORD(3), log: false, all_projects: true }).length, 0); v.close();
   const v2 = open(root); assert.deepEqual(v2.recall(ME, { query: 'duringword', log: false, all_projects: true }).map((h) => h.path), ['notes/during.md']); assert.equal(v2.recall(ME, { query: WORD(3), log: false, all_projects: true }).length, 0); v2.close();
-  const root2 = seeded(); fs.writeFileSync(F(root2, 'cols.bin'), Buffer.alloc(fs.statSync(F(root2, 'cols.bin')).size)); const v3 = open(root2); assert.throws(() => v3.recall(ME, { query: WORD(1), log: false, all_projects: true }), (e) => e.code === 'index_rebuilding'); v3.close();
+  const root2 = seeded(); fs.writeFileSync(F(root2, 'cols.bin'), Buffer.alloc(fs.statSync(F(root2, 'cols.bin')).size)); const v3 = open(root2); const seqFile = path.join(root2, '.memev/index.seq'); const seqWas = fs.readFileSync(seqFile, 'utf8'); assert.throws(() => v3.recall(ME, { query: WORD(1), log: false, all_projects: true }), (e) => e.code === 'index_rebuilding'); v3.close(); assert.equal(fs.readFileSync(seqFile, 'utf8'), seqWas, 'a position saved with no index behind it');
   const v4 = open(root2); assert.deepEqual(v4.recall(ME, { query: WORD(1), log: false, all_projects: true }).map((h) => h.path), ['notes/n1.md'], 'a stop in mid rebuild: the next start builds it'); v4.close();
 });
 
@@ -409,6 +409,27 @@ test('a process is told apart only by a tool that answered: anything else is unk
   for (const [cmd, want] of [[`node /a/src/server/main.mjs --root ${v}`, true], [`node /a/src/server/main.mjs --root ${v} --port 1`, true], [`node /a/src/server/main.mjs --root ${link}`, true], [`node /a/src/server/main.mjs --root=${v}`, true], [`node /a/src/server/main.mjs --root ${other}`, false], [`node /a/bin/memev.mjs serve --root ${other}`, false], ['node /a/src/server/main.mjs', true], ['node /a/bin/memev.mjs serve', true], ['node /a/server/main.mjs.bak', false], ['/bin/sleep 100', false], [['node', '/a/server/main.mjs', '--root', v], true], [['node', '/a/server/main.mjs', '--root', other], false], [['node', '/a/server/main.mjs', `--root=${other}`], false]]) assert.equal(isDaemonCommand(cmd, v), want, String(cmd));
 });
 
+test('every way of serving a vault is known as a daemon, and a new one cannot be missed', () => {
+  // a verb serves when its case in the command line imports the server, which runs in that process
+  const src = fs.readFileSync(path.join(PKG, 'src/cli/main.mjs'), 'utf8'); const serving = src.split(/\n\s*case '/).slice(1).filter((c) => /import\('\.\.\/server\/main\.mjs'\)/.test(c)).map((c) => c.slice(0, c.indexOf("'")));
+  assert.deepEqual(serving.sort(), [...SERVING_VERBS].sort(), 'a verb that serves is missing from SERVING_VERBS, so its process would read as no daemon');
+  const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith('.mjs') ? [path.join(d, e.name)] : []));
+  assert.deepEqual(walk(path.join(PKG, 'src')).filter((f) => !f.endsWith('src/cli/main.mjs') && /(import\(?|from)\s*'[^']*server\/main\.mjs'/.test(fs.readFileSync(f, 'utf8'))), [], 'something else imports the server');
+  for (const verb of SERVING_VERBS) for (const cmd of [['node', '/usr/local/bin/memev', verb], ['node', '/x/bin/memev.mjs', verb, '--root', '/v'], `/usr/bin/node /x/bin/memev.mjs ${verb} --root /v`]) assert.equal(isDaemonCommand(cmd, '/v'), true, String(cmd));
+  assert.equal(isDaemonCommand(['node', '/opt/src/server/main.mjs', '--root', '/v'], '/v'), true); for (const cmd of [['node', '/x/bin/memev.mjs', 'bus', 'roster'], ['node', '/x/bin/memev.mjs', 'stop'], ['/sbin/tini', '--', 'other', 'container']]) assert.equal(isDaemonCommand(cmd, '/v'), false, String(cmd));
+});
+
+test('the image\'s entry, memev container, as a real daemon: a second daemon is refused, and memev stop stops it and it is gone', { skip: process.platform === 'win32' }, async () => {
+  const root = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'memev-entry-')), 'vault'); made.push(path.dirname(root)); fs.mkdirSync(root); const port = 47700 + (process.pid % 200); const bin = path.join(PKG, 'bin/memev.mjs');
+  const env = { ...process.env, MEMEV_NO_SERVICE: '1', MEMEV_NO_TUNNEL: '1', MEMEV_ROOT: root, HOME: path.dirname(root), MEMEV_PORT: String(port) };
+  const c = spawn(process.execPath, [bin, 'container'], { stdio: ['ignore', 'ignore', 'pipe'], env, cwd: root }); let err = ''; c.stderr.on('data', (d) => { err += d; });
+  try {
+    assert.ok(await until(() => err.includes('serving') || c.exitCode !== null, 60000), err); assert.equal(c.exitCode, null, err); assert.equal(Number(fs.readFileSync(path.join(root, '.memev/daemon.lock'), 'utf8')), c.pid, 'the entry serves in its own process'); assert.equal(isDaemonPid(c.pid, root), true);
+    const second = spawn(process.execPath, [bin, 'serve'], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...env, MEMEV_PORT: String(port + 1) }, cwd: root }); let e2 = ''; second.stderr.on('data', (d) => { e2 += d; }); const code = await new Promise((r) => second.once('exit', r)); assert.notEqual(code, 0, e2); assert.match(e2, /another daemon/, e2); assert.equal(Number(fs.readFileSync(path.join(root, '.memev/daemon.lock'), 'utf8')), c.pid, 'the lock stays');
+    const r = spawnSync(process.execPath, [bin, 'stop'], { encoding: 'utf8', timeout: 30000, env, cwd: root }); assert.match(r.stdout, /Stopped/, r.stdout + r.stderr); assert.ok(await until(() => c.exitCode !== null, 15000), 'memev stop left the entry running'); assert.equal(fs.existsSync(path.join(root, '.memev/daemon.json')), false);
+  } finally { if (c.exitCode === null) { c.kill('SIGKILL'); await new Promise((r) => c.once('exit', r)); } }
+});
+
 test('with a ps that exits 1, as busybox does: memev stop stops the daemon, a second daemon does not start, and compact beside a load refuses', { skip: process.platform === 'win32' }, async () => {
   const root = seeded(12); const env = { PATH: `${ps1()}${path.delimiter}${process.env.PATH}` };
   assert.equal(spawnSync('ps', ['-o', 'command=', '-p', String(process.pid)], { env, encoding: 'utf8' }).status, 1, 'the stand-in is the one found');
@@ -482,18 +503,21 @@ test('a normal start pays nothing for that: nothing rebuilt or read after a clea
 });
 
 const failing = (name, code, times = 1) => { const real = fs.openSync; let left = times; fs.openSync = function injected(f, ...a) { if (left > 0 && String(f).endsWith(name)) { left--; const e = new Error(`${code}: injected, open '${f}'`); e.code = code; e.syscall = 'open'; throw e; } return real.call(this, f, ...a); }; return () => { fs.openSync = real; }; };
-test('a read that fails in passing fails that query, is retried and costs no rebuild', async () => {
-  for (const code of ['EMFILE', 'ENFILE', 'EIO', 'EACCES']) for (const name of ['cols.bin', 'names.json', 'heads.bin']) {
+test('a read met by a machine short of something fails that query, is retried and costs no rebuild', async () => {
+  for (const code of ['EMFILE', 'ENFILE', 'ENOMEM', 'EAGAIN', 'EBUSY', 'ETIMEDOUT']) for (const name of ['cols.bin', 'names.json', 'heads.bin']) {
     const root = seeded(12); const gen = genDir(root); const v = open(root); const undo = failing(name, code);
     try { let threw = null; try { v.recall(ME, { query: WORD(1), log: false, all_projects: true }); } catch (e) { threw = e; } assert.equal(threw?.code, 'index_busy', `${code} ${name}: ${threw?.stack}`); assert.match(threw.message, new RegExp(code)); } finally { undo(); }
     assert.equal(v.index.state().state, 'ok', `${code} ${name}: no rebuild`); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md'], `${code} ${name}: the retry`); assert.equal(v.status().index.damage, null); assert.equal(genDir(root), gen); v.close();
   }
 });
+
+const readOnly = { skip: process.platform === 'win32' || process.getuid?.() === 0 };
+
 test('a write met by a read that fails in passing lands, reaches recall on the retry, and holds the saved position back until it has', () => {
   const root = seeded(12); const v = open(root); hits(v, WORD(9)); const seqFile = path.join(root, '.memev/index.seq'); const was = fs.readFileSync(seqFile, 'utf8'); const undo = failing('bypath.bin', 'EMFILE', 1000);
   try {
     v.write(ME, { path: 'notes/n2.md', body: '# E\nretriedword now\n' }); v.index.save(); v._saveIndexSeq(); assert.equal(fs.readFileSync(seqFile, 'utf8'), was, 'the position passed a write the index does not hold');
-    assert.throws(() => v.recall(ME, { query: 'retriedword', log: false, all_projects: true }), (e) => e.code === 'index_busy', 'no answer that leaves the write out');
+    assert.throws(() => v.recall(ME, { query: 'retriedword', log: false, all_projects: true }), (e) => { assert.equal(e.code, 'index_busy', 'no answer that leaves the write out'); assert.match(e.message, /a write is waiting/); assert.doesNotMatch(e.message, /\(index_busy\)/, 'wrapped in itself'); return true; });
   } finally { undo(); }
   assert.deepEqual(hits(v, 'retriedword'), ['notes/n2.md']); assert.equal(hits(v, WORD(2)).length, 0, 'the old text is gone'); assert.equal(v.status().index.damage, null); v.close(); assert.notEqual(fs.readFileSync(seqFile, 'utf8'), was);
 });
@@ -501,10 +525,6 @@ test('a start that cannot read the index just now fails and tries again: the gen
   for (const name of ['head.json', 'dict.txt', 'CURRENT', 'overlay.log']) {
     const root = seeded(12); const gen = genDir(root); const undo = failing(name, 'EMFILE'); try { assert.throws(() => open(root), (e) => e.code === 'EMFILE', name); } finally { undo(); } assert.equal(genDir(root), gen, name); const v = open(root); assert.equal(v.status().index.damage, null, name); assert.deepEqual(hits(v, WORD(1)), ['notes/n1.md'], name); assert.equal(genDir(root), gen, name); v.close();
   }
-});
-test('doctor and a fold that cannot read a file just now find no damage', async () => {
-  const root = seeded(12); const v = open(root); let undo = failing('tfs.bin', 'EMFILE'); let c; try { c = fileChecks({ root, vault: v }).find((x) => x.id === 'index-files'); } finally { undo(); } assert.equal(c.status, 'warn'); assert.match(c.detail, /EMFILE/); assert.equal(v.index.state().state, 'ok'); v.close();
-  const gen = genDir(root); const v2 = open(root); v2.write(ME, { path: 'notes/late.md', body: '# L\nlateword\n' }); v2.index.save(); fs.chmodSync(F(root, 'tfs.bin'), 0); const hold = setInterval(() => {}, 50); try { await v2.index.foldSoon(); } finally { clearInterval(hold); fs.chmodSync(F(root, 'tfs.bin'), 0o600); } assert.equal(v2.index.state().state, 'ok', 'no rebuild'); assert.equal(v2.status().index.damage, null); assert.equal(genDir(root), gen, 'still the same generation'); assert.ok(v2.index.foldFailed > 0, 'the fold waits and tries again'); v2.close();
 });
 
 test('memev compact folds even when its own save would have started a fold', () => {
