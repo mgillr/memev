@@ -17,7 +17,7 @@ const g = (dir, args) => spawnSync('git', ['-C', dir, ...args], { encoding: 'utf
 const which = (name) => spawnSync('which', [name], { encoding: 'utf8' }).stdout.trim();
 
 test('REV-006 AC01: the Free refusal names the backup path', () => {
-  const p = seatPolicy({ license: null, devices: [{ id: 'd1', kind: 'remote-computer', status: 'active', created: '2026-01-01', label: 'other' }] });
+  const p = seatPolicy({ license: null, devices: [{ id: 'd1', kind: 'remote-computer', pubkey: 'k1', status: 'active', created: '2026-01-01', label: 'other' }] });
   assert.equal(p.can_enroll, false);
   assert.match(p.reason, /your own GitHub backup \(docs\/GITHUB\.md\)/);
   assert.match(p.reason, /memev upgrade/);

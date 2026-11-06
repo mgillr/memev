@@ -90,7 +90,7 @@ test('MEM-086 AC02: Every plan message is a single line containing one memev com
   assertCommand('grace note', grace.notes[0]);
   // with no licence at all, an added computer may only read: the note and the per-computer
   // reason stay one line with no countdown
-  const laptop = { id: 'd1', kind: 'remote-computer', status: 'active', label: 'laptop', created: '2026-01-01' };
+  const laptop = { id: 'd1', kind: 'remote-computer', pubkey: 'k1', status: 'active', label: 'laptop', created: '2026-01-01' };
   const nolicense = seatPolicy({ license: null, devices: [laptop] });
   assert.equal(nolicense.can_enroll, false, 'with no licence the second computer is refused');
   assertCommand('no licence, full count', nolicense.reason);

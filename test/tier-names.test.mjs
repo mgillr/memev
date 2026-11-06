@@ -206,7 +206,7 @@ test('MEM-137 AC08: the copy this contract adds follows the house writing rules'
   }
   // the printed tier text, the usage and error lines, and the changelog carry no exclamation marks
   const printed = [];
-  const p = seatPolicy({ license: null, devices: [{ id: 'c2', kind: 'remote-computer', status: 'active', created: '2026-01-01' }] });
+  const p = seatPolicy({ license: null, devices: [{ id: 'c2', kind: 'remote-computer', pubkey: 'k2', status: 'active', created: '2026-01-01' }] });
   printed.push(p.reason, ...p.notes);
   const expired = seatPolicy({ license: { state: 'expired', tier: 'team', seats: 1, exp: '2026-01-01' }, devices: [] });
   printed.push(expired.reason, ...expired.notes);

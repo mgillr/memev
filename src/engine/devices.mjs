@@ -195,14 +195,14 @@ export class DeviceRegistry {
   _flag(d, type, detail) { const f = d.flags.find((x) => x.type === type); if (f) { f.last = now(); f.count = (f.count || 1) + 1; } else d.flags.push({ type, detail, first: now(), last: now(), count: 1 }); }
 
   /** Computers enrolled now: this one plus every active remote computer (what the seat cap counts). */
-  enrolledComputers() { return 1 + Object.values(this.data.devices).filter((d) => d.kind === 'remote-computer' && d.status === 'active').length; }
+  enrolledComputers() { return 1 + Object.values(this.data.devices).filter((d) => d.kind === 'remote-computer' && d.pubkey && d.status === 'active').length; }
 
   /** Computers (this one plus active remote computers), connectors and local clients seen recently. */
   countSeats({ activeDays = ACTIVE_DAYS, at = Date.now() } = {}) {
     const recent = (d) => d.status === 'active' && d.last_seen && at - Date.parse(d.last_seen) <= activeDays * 86400e3;
     const all = Object.values(this.data.devices);
     return {
-      computers: 1 + all.filter((d) => d.kind === 'remote-computer' && recent(d)).length,
+      computers: 1 + all.filter((d) => d.kind === 'remote-computer' && d.pubkey && recent(d)).length,
       connectors: all.filter((d) => d.kind === 'cloud-connector' && recent(d)).length,
       local_clients: all.filter((d) => d.kind === 'local-client' && recent(d)).length,
       flagged: all.filter((d) => d.status === 'active' && d.flags?.length).map((d) => ({ id: d.id, label: d.label, flags: d.flags.map((f) => f.type) })),

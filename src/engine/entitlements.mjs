@@ -105,7 +105,8 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
  */
 export function seatPolicy({ license = null, devices = [] } = {}) {
   const state = license?.state || 'none';
-  const remote = devices.filter((d) => d.kind === 'remote-computer' && d.status === 'active').sort((a, b) => String(a.created).localeCompare(String(b.created)));
+  // A computer holds its own device key. A remote token with none is refused by the server, so it fills no seat.
+  const remote = devices.filter((d) => d.kind === 'remote-computer' && d.pubkey && d.status === 'active').sort((a, b) => String(a.created).localeCompare(String(b.created)));
   const seats = live(license) ? license.seats : 1;
   const enrolled = 1 + remote.length;
   const writable = new Set(live(license) ? remote.slice(0, Math.max(0, seats - 1)).map((d) => d.id) : []);
