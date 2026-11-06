@@ -2,7 +2,7 @@
 // `memev bus …`: the comms bus from a terminal. On the vault's computer you are the operator; on a
 // computer that joined another vault, commands go there, signed with this computer's key.
 import { api, clientToken, out } from './common.mjs';
-import { ensureDaemon } from './daemon.mjs';
+import { ensureDaemon, notServing } from './daemon.mjs';
 import { isVault } from '../engine/vault.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -97,7 +97,7 @@ async function caller(root, env) {
     if (!remote) throw new Error(`no vault at ${root} and this computer has not joined one (memev join)`);
     return async (name, args) => { const r = await remoteFetch(remote, 'mcp', { body: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, env, headers: { 'x-memev-client': 'memev-cli' }, timeoutMs: 40000 }); return unwrap(r.json, r); };
   }
-  if (!(await ensureDaemon(root, { quiet: true }))) throw new Error('the daemon is not running (memev start)');
+  if (!(await ensureDaemon(root, { quiet: true }))) throw new Error(notServing(root));
   const token = clientToken(root, 'cli');
   const call = async (name, args) => { const r = await api(root, '/mcp', { body: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, token, timeoutMs: 40000 }); return unwrap(r.json, r); };
   call.route = (route, body) => api(root, route, { body, token, timeoutMs: 5000 });

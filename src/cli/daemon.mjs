@@ -30,6 +30,8 @@ export function loadState(root, { at = Date.now(), stallMs = LOAD_STALL_MS } = {
   let idleMs = 0, started = null; try { const f = path.join(root, '.memev', 'daemon.loading'); idleMs = Math.max(0, at - fs.statSync(f).mtimeMs); started = JSON.parse(fs.readFileSync(f, 'utf8')).started ?? null; } catch { /* it finished just now */ }
   return { pid, started, idleMs, stalled: idleMs > stallMs };
 }
+/** Why the daemon cannot answer, for a command that needs it: a load in progress is not a daemon that is not running. */
+export const notServing = (root, otherwise = 'the daemon is not running (memev start)') => { const load = loadState(root); return load?.stalled ? stallLine(load) : load ? `the daemon (pid ${load.pid}) is still loading this vault; try again when it answers` : otherwise; };
 const stallLine = (s) => `the daemon (pid ${s.pid}) has been loading this vault and has not moved for ${Math.round(s.idleMs / 60e3)} minutes; run memev restart`;
 
 // True when nothing listens on the port on this machine's loopback address.

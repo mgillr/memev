@@ -431,6 +431,15 @@ test('another vault\'s daemon named in a state file is not waited on or stopped'
   } finally { stub.kill('SIGKILL'); }
 });
 
+test('beside a load, every command that needs the vault says so in one line', { skip: process.platform === 'win32' }, async () => {
+  const root = seeded(12); const stub = stubDaemon(root, 300000); await new Promise((r) => stub.once('spawn', r));
+  try {
+    fs.writeFileSync(path.join(root, '.memev/daemon.loading'), JSON.stringify({ pid: stub.pid, started: new Date().toISOString() }));
+    for (const args of [['verify', 'no-such'], ['contract', 'list'], ['bus', 'roster'], ['work', 'status', 'p'], ['import', '--preview', '--path', root], ['runner', 'status'], ['recall', 'x'], ['compact']]) {
+      const r = memev(root, args); const out = r.stdout + r.stderr; assert.match(out, /still loading/, `${args.join(' ')}: ${out}`); assert.notEqual(r.status, 0, args.join(' ')); assert.doesNotMatch(out, /fetch failed|is not running|\n\s+at /, `${args.join(' ')}: ${out}`);
+    }
+  } finally { stub.kill('SIGKILL'); }
+});
 
 const hits = (v, q) => v.recall(ME, { query: q, log: false, all_projects: true }).map((h) => h.path);
 /** Five new notes, an edit and a delete on a compacted vault, clean stop; `before` runs on the vault as it stood. */

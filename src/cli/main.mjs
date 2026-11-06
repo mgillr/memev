@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PKG, parseArgs, BOOLEAN_FLAGS, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, saveConfig, out, tokenExpiryWarnings } from './common.mjs';
-import { ensureDaemon, startDaemon, stopDaemon, healthy, choosePort, loadingPid, loadState } from './daemon.mjs';
+import { ensureDaemon, startDaemon, stopDaemon, healthy, choosePort, loadState, notServing } from './daemon.mjs';
 import { initVault, isVault, VERSION } from '../engine/vault.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
 import { writeAtomic, configDir, slug } from '../engine/util.mjs';
@@ -324,7 +324,7 @@ async function run(argv, env) {
       need(); const { runStdio } = await import('./mcp-stdio.mjs'); await runStdio(root, String(flags.client || 'mcp')); return 0; }
     case 'hook': { const { runHook } = await import('./hooks.mjs'); return runHook(pos[0], flags, env); }
     case 'recall': case 'remember': case 'checkpoint': case 'card': {
-      need(); if (!(await ensureDaemon(root, { quiet: true }))) throw new Error(loadingPid(root) ? 'the daemon is still loading the vault; try again when it is done' : 'the daemon is not running');
+      need(); if (!(await ensureDaemon(root, { quiet: true }))) throw new Error(notServing(root, 'the daemon is not running'));
       const token = clientToken(root, 'cli'); const list = (v) => (v ? String(v).split(',').map((s) => s.trim()).filter(Boolean) : []);
       const call = async (route, body) => { const r = await api(root, `/v1/${route}`, { body, token }); if (!r.ok) throw new Error(r.json?.error_description || r.text); return r.json; };
       if (cmd === 'recall') { const r = await call('recall', { query: pos.join(' '), limit: Number(flags.limit || 6), project: flags.project, all_projects: !!flags['all-projects'] }); flags.json ? json(r.hits) : console.log(r.text || 'Nothing found.'); }
@@ -347,7 +347,7 @@ async function run(argv, env) {
       }
       const verbs = ['status', 'pause', 'resume', 'cancel'];
       if (!verbs.includes(pos[0])) { console.error('usage: memev work status <project> | pause <project> | resume <project> | cancel <project> <task> --reason <why> | impact <id> --project <project>  (add --json for data)'); return 2; }
-      need(); if (!(await ensureDaemon(root, { quiet: true }))) throw new Error('the daemon is not running');
+      need(); if (!(await ensureDaemon(root, { quiet: true }))) throw new Error(notServing(root, 'the daemon is not running'));
       const { runWork } = await import('./work.mjs');
       const call = async (name, args) => {
         const token = pos[0] === 'status' || name === 'memev_project_status' ? clientToken(root, 'cli') : adminToken(root);
