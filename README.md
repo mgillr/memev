@@ -6,18 +6,33 @@
 
 <h1>Memev</h1>
 
-<p><strong>The operating infrastructure for distributed AI work.</strong><br>
-Coordinate people, AI systems and organisations around governed work and verifiable outcomes.</p>
+<p><strong>Memev is the provider-neutral operating infrastructure that helps people and organisations adopt AI today and coordinate increasingly autonomous systems tomorrow across applications, functions, sites and independent organisations, without surrendering control of their data, authority or operational state.</strong></p>
 
 <p><strong>Development preview — actively under development.</strong> The Free Core is available for testing; this is not yet a production release. Interfaces and behaviour may change. Business, Corporate, Federated and full distributed-convergence capabilities remain under development unless explicitly marked as available below.</p>
+
+## Start with Memev for yourself
+
+You do not need a company, a team or a subscription to get value from Memev. The **Free Core is a complete, permanently free personal product for one person on one computer**. It gives your supported AI tools a shared place to work from, while keeping your project knowledge under your control.
+
+- **One context across your AI tools.** Connect supported coding assistants and AI applications to the same personal vault, so you spend less time repeating project background and decisions every time you change tools.
+- **Your work stays yours.** Keep notes, project context, decisions and records in a local Markdown vault that you can inspect, edit and back up to your own private GitHub repository.
+- **Coordinate, not just remember.** Give connected AI sessions a shared communications channel, see who is present, hand off tasks and use work contracts with defined checks to distinguish assigned work from verified outcomes.
+- **Keep control of access.** Use scoped credentials and local controls. Cloud AI access is optional and off until you enable it; Memev has no telemetry by default.
+- **No feature paywall on the free core.** The vault, recall, graph, contracts, local AI-app connections and personal controls are not a trial or a deliberately restricted edition. The [Memev Charter](CHARTER.md) commits that the free tier will not be capped, slowed or stripped of working features to create an upgrade incentive.
+
+### When you use more than one computer
+
+**Personal with more computers** extends the same personal environment to up to three of your computers, with a separate device key for each. It is for people who want to work from more than one machine without maintaining separate personal vaults. The current secure-link capability is available; automatic merging of simultaneous edits, hosted encrypted sync and hosted backup remain planned. Until those are delivered, git backup is single-writer: do not edit the same vault concurrently on multiple computers.
+
+The free tier remains fully useful on one computer. The paid Personal tier charges for multi-computer use and its associated service boundary—not for unlocking essential features that were removed from Free.
 
 <p><code>npm install -g . && memev init --no-connect</code></p>
 
 <p align="center">
-<img src="docs/assets/connective-infrastructure.svg" alt="Memev system diagram, in two separate sides that never mix. Personal side: AI apps and agents connect over MCP to Memev on your computer, which keeps a personal vault backed up to your own private git remote; that is the free core, built today. Personal with more computers, the paid tier, lets up to three of your own computers in all share that vault over the secure link; merging simultaneous edits is planned. Organisation side, all planned: members' computers and business systems feed one company vault with an admin console and an executive view for business inference intelligence (Business); site nodes that each keep their own memory and authority (Corporate); and other organisations that share only what each agreement permits (Federated). The CRDT-Merge convergence engine is a separate engine that each vault and node calls for its own merges." width="900">
+<img src="docs/assets/connective-infrastructure.svg" alt="Memev operating architecture diagram, in two separate sides that never mix. Personal side: AI apps and agents connect over MCP to Memev on your computer, which keeps a personal vault backed up to your own private git remote; that is the free core, built today. Personal with more computers, the paid tier, lets up to three of your own computers in all share that vault over the secure link; merging simultaneous edits is planned. Organisation side, all planned: members' computers and business systems feed one company vault with an admin console and an executive view for business inference intelligence (Business); site nodes that each keep their own memory and authority (Corporate); and other organisations that share only what each agreement permits (Federated). The CRDT-Merge convergence engine is a separate engine that each vault and node calls for its own merges." width="900">
 </p>
 
-<p><strong>Memev is the connective infrastructure for AI.</strong> It enables individuals, teams and organisations to connect their AI providers, memory systems, agents, services, people and machines through shared communications, context and federated infrastructure.</p>
+
 
 <p>It starts as a valuable free personal product, grows through teams and enterprise deployments, and extends through the Federated tier to connect independent organisations and the wider systems on which industries depend.</p>
 
@@ -33,6 +48,7 @@ Coordinate people, AI systems and organisations around governed work and verifia
 <a href="docs/README.md">Documentation</a> &middot;
 <a href="docs/ARCHITECTURE.md">Architecture</a> &middot;
 <a href="docs/tiers/README.md">Tiers</a> &middot;
+<a href="MEMEV-STRATEGY.md">Memev strategy</a> &middot;
 <a href="docs/PRICING.md">Pricing</a> &middot;
 <a href="CHANGELOG.md">Changelog</a>
 </p>
@@ -104,14 +120,14 @@ Memev starts with the individual because personal AI connectivity is valuable in
 | Independent organisations on a shared programme | Federated tier (planned) | Partners connect through explicit, bilateral trust and scope without surrendering their local systems or data |
 | An industry or research network | Federated tier (planned) | Multiple organisations coordinate selected work, evidence and computation under their own policies |
 
-## Five tiers, one connective architecture
+## Five tiers, one operating architecture
 
 Memev grows by the scope of coordination required. The first two tiers serve an individual across one or more computers; Business and Corporate serve one organisation at increasing scale. The fifth tier connects **independent organisations** that need to work together without becoming one organisation or placing all of their data under one authority.
 
 | Tier | Scope | What it is for | Commercial position |
 |---|---|---|---|
-| **Personal** | One person, one computer | A complete free core: connect supported AI tools, preserve context, coordinate sessions and keep control of the local vault | Free, for good; available now |
-| **Personal with more computers** | One person, up to 3 computers | The same personal vault and AI context across the person's computers | $12/month or $120/year (CHF 10 or CHF 100), early-supporter price; available for current capabilities |
+| **Personal** | One person, one computer | The complete personal product: shared context across supported AI tools, local vault, recall, graph, coordination, contracts and personal controls | Free, for good; available now |
+| **Personal with more computers** | One person, up to 3 computers | Carry the same personal vault and AI context across up to three computers, with a separate key for each; concurrent-edit merging and hosted sync remain planned | $12/month or $120/year (CHF 10 or CHF 100), early-supporter price; current capabilities available |
 | **Business** | One organisation, initially one node | Connect members, AI tools and company work under organisational identity, policy and administration | Contact us; planned |
 | **Corporate** | One large organisation, multiple sites and jurisdictions | Coordinate departments, programmes and portfolios across independently operated sites within one corporate trust domain | Contact us; planned |
 | [**Federated**](docs/tiers/federated.md) | Multiple independent organisations | Connect customers, suppliers, partners, contractors, research institutions and public/private participants around shared programmes, projects, evidence and computation | Contact us; planned |
@@ -120,8 +136,8 @@ What each tier is worth to the people who use it:
 
 | Tier | What it gives | Status |
 |---|---|---|
-| **Personal** | The AI tools one person connects work from the same context. No re-explaining a project to each tool, and the record stays on their own computer. | Preview today |
-| **Personal with more computers** | The same context on up to 3 of that person's computers, each with its own key. | Available for current capabilities; automatic merging of simultaneous edits is planned |
+| **Personal** | A complete, permanently free personal AI workspace: supported tools share project context, coordination and work records, while the vault stays under the user's control on one computer. No feature is withheld to force an upgrade. | Preview today |
+| **Personal with more computers** | The same personal environment across up to 3 computers, each with its own key. This is a multi-computer convenience tier, not a paywall for core features. | Available for current capabilities; automatic merging of simultaneous edits and hosted sync are planned |
 | **Business** | One company record that the team and its AI tools share, under company rules. Knowledge outlasts staff changes and changes of AI vendor, and leadership can ask questions of the same record the teams work from. | Planned |
 | **Corporate** | Sites in many countries run one programme. Each site keeps its own authority and can keep its data in its own jurisdiction. | Planned |
 | **Federated** | Separate businesses, suppliers and vendors share only what each agreement permits. Nobody hands over its systems or its data. | Planned |
@@ -151,7 +167,7 @@ The first question a business asks about AI is how it is kept from doing damage.
 
 ## How it fits together
 
-Memev is the connective layer between people, their work, the systems they use and the AI capabilities they authorise. The illustration shows the intended product boundary: Memev connects existing systems and relates their work; it is not itself the model provider, memory vendor, agent framework, CRM, ERP or business application.
+Memev is the provider-neutral operating layer between people, their work, the systems they use and the AI capabilities they authorise. The illustration shows the intended product boundary: Memev connects existing systems and relates their work; it is not itself the model provider, memory vendor, agent framework, CRM, ERP or business application.
 
 - **Connect:** integrate AI providers, memory systems, agents, business services, people and machines through supported interfaces.
 - **Capture work:** ingest, reference or query authorised plans, documents, decisions, tasks, operational updates and other work products from the systems people already use.
@@ -161,7 +177,7 @@ Memev is the connective layer between people, their work, the systems they use a
 - **Control and verify:** apply identity, permissions, provenance, data-sovereignty rules and work-contract checks; keep inferred findings distinct from verified facts.
 - **Federate:** extend authorised exchange and computation across computers, teams, departments and independent sites as those capabilities are delivered.
 
-The local vault, recall, graph, communications bus and work-contract mechanisms provide important parts of the current personal foundation. The broader architecture is provider-neutral: connected systems retain their specialist capabilities, while Memev supplies the connective mechanisms and governed context. The organisation-wide work ingestion, cross-project reasoning and federated views are product direction, not a claim that every connector or workflow is already operational.
+The local vault, recall, graph, communications bus and work-contract mechanisms provide important parts of the current personal foundation. The broader architecture is provider-neutral: connected systems retain their specialist capabilities, while Memev provides the operating environment for shared context, coordination, authority, evidence and governed state. The organisation-wide work ingestion, cross-project reasoning and federated views are product direction, not a claim that every connector or workflow is already operational.
 
 ```mermaid
 flowchart LR
@@ -294,7 +310,7 @@ Memev runs on macOS and Linux. **Windows is a preview:** it has code paths and C
 
 ## Plans and roadmap
 
-Memev's product direction is broader than the current release. Every line below distinguishes what exists from what is in progress or planned. The connective infrastructure vision does not mean that every provider, external memory system, business application or federated deployment is already integrated.
+Memev's product direction is broader than the current release. Every line below distinguishes what exists from what is in progress or planned. The strategy does not mean that every provider, external memory system, business application or federated deployment is already integrated.
 
 ### Available now
 
