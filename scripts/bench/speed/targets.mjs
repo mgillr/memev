@@ -94,8 +94,10 @@ const main = async () => {
   try {
     const { initVault } = await import(pathToFileURL(path.join(REPO, 'src', 'engine', 'vault.mjs')).href);
     initVault(root, { template: path.join(REPO, 'templates', 'vault') });
-    const dir = path.join(root, 'memory', 'bench'); fs.mkdirSync(dir, { recursive: true });
-    for (let i = 0; i < NOTES; i++) fs.writeFileSync(path.join(dir, `n${i}.md`), `# Note ${i}\n\nword${i} carries a decision about service ${i % 97} and its owner ${i % 13}.\n\n## Detail\n\nwhy${i} the retry budget for queue ${i % 41} moved, and what it replaced.\n`);
+    const { seedVault } = await import(pathToFileURL(path.join(REPO, 'scripts', 'bench', 'seed.mjs')).href);
+    const { genNotes } = await import(pathToFileURL(path.join(HERE, 'fixture.mjs')).href);
+    seedVault(root, 'small', JSON.parse(fs.readFileSync(path.join(REPO, 'bench', 'queries.json'), 'utf8')));
+    genNotes(root, NOTES, 'memory', 7 + NOTES);
     const git = (...a) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t.invalid', ...a], { cwd: root, env, encoding: 'utf8' });
     git('add', '-A'); git('commit', '-qm', 'notes');
 
