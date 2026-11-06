@@ -2,7 +2,7 @@
 
 Memev is the provider-neutral operating infrastructure that helps people and organisations adopt AI today and coordinate increasingly autonomous systems tomorrow across applications, functions, sites and independent organisations, without surrendering control of their data, authority or operational state.
 
-Part of the [Memev documentation](docs/README.md). Up: the [README](docs/README.md). Related:
+Part of the [Memev documentation](docs/README.md). Up: the [README](README.md). Related:
 [tiers](docs/tiers/README.md), [architecture](docs/ARCHITECTURE.md), [organisational intelligence](docs/ORGANISATIONAL-INTELLIGENCE.md),
 [federation](docs/FEDERATION.md), [data sovereignty](docs/DATA-SOVEREIGNTY.md),
 [convergence](docs/CONVERGENCE.md), [pricing](docs/PRICING.md).
@@ -123,7 +123,7 @@ remain provider-neutral.
 
 | Tier | Customer scope | Stage 1 value | Stage 3 role | Status boundary |
 |---|---|---|---|---|
-| **Personal — Free Core** | One person, one computer at a time | Connect the person's AI tools around local context, projects, communications and evidence | A personal control and continuity point for the person's AI-assisted or delegated work | Core is built; see [Personal](docs/tiers/free.md) and [CHARTER](docs/CHARTER.md) |
+| **Personal — Free Core** | One person, one computer at a time | Connect the person's AI tools around local context, projects, communications and evidence | A personal control and continuity point for the person's AI-assisted or delegated work | Core is built; see [Personal](docs/tiers/free.md) and [CHARTER](CHARTER.md) |
 | **Personal with more computers** | One person, up to three computers | Keep the person's tools and work coordinated across devices | Portable personal operating context across devices and providers | Current tier capabilities and price are documented; automatic concurrent merge and hosted services remain planned |
 | **Business** | One organisation, initially one company node | Coordinate members, approved AI tools and business work in a company-controlled environment | Govern AI-operated functions within one organisation, with organisational identity, policy and evidence | Coming; company vault, administration and associated services remain planned |
 | **Corporate** | One organisation across sites, departments and jurisdictions | Apply organisational controls, deployment policy, audit and resilience across larger operations | Coordinate autonomous operations across independently operated sites while retaining corporate authority and jurisdiction controls | Coming/planned; multi-site federation is not shipped end to end |
