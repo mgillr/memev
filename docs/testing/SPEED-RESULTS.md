@@ -61,7 +61,7 @@ These are measured figures on generated notes, on one computer. They are not a p
 | Stop, nothing written (guard) | 2,000 ms | 49 | 352 |
 | New note, p50 (guard) | 200 ms | 11.9 | 107 |
 
-The last two are guards against getting worse. Main passes them too, and they claim no gain. This run's notes differ a little from the table above, so compare the columns of one table and not across the two.
+The last two are guards against getting worse: main passes them too, and they claim no gain. Recall p95 and send are also guards in the `--against` check, since main measured under twice their ceilings, so a faster computer could pass the old code. This run's notes differ a little from the table above, so compare the columns of one table and not across the two.
 
 ## Costs and limits
 
