@@ -92,7 +92,7 @@ export class Vault extends EventEmitter {
       else this._restoreGraph(scan);
     }
     this.graph.bulkLoad = false;
-    this.notes.opened(scan);
+    try { this.notes.opened(scan); } catch { this.notes.recs = null; } // a cache that cannot be written costs reads next time, never the vault
     if (!rebuild && (process.env.MEMEV_RIG_STOPPED === '1' || RIG)) { let saved = null; try { saved = Number(fs.readFileSync(path.join(this.state, 'index.seq'), 'utf8')); } catch {} if (saved !== null) for (const [p, h] of this.log.heads) { try { if (h.seq > saved && !h.deleted) { const b = this._read(p); if (b !== null) { this.index.update(p, b, { mtime: Date.now() }); } } else if (h.seq > saved && h.deleted) this.index.remove(p); } catch {} } }
     // RIG_FIX_STOPPED: a note imported at start reaches recall (main leaves it out until the next rebuild).
     if (!rebuild && (process.env.MEMEV_RIG_STOPPED === '1' || RIG)) for (const p of this.imported || []) { try { const b = this._read(p); if (b !== null) this.index.update(p, b, { mtime: Date.now() }); } catch {} }

@@ -81,6 +81,15 @@ export async function ensureDaemon(root, { quiet = false, waitMs = 6000 } = {}) 
 }
 
 export async function startDaemon(root, { quiet = false, waitMs = 6000, spawn: spawnProc = spawn } = {}) {
+  // one is already opening this vault: wait for it instead of starting another that would only find the lock taken
+  const opening = loadingPid(root);
+  if (opening) {
+    const until = Date.now() + waitMs;
+    while (Date.now() < until && loadingPid(root)) await new Promise((r) => setTimeout(r, 100));
+    const info = daemonInfo(root); if (info && (await healthy(root, info.port))) return true;
+    if (!quiet) console.error(`Memev is still loading this vault (pid ${opening}) and will answer when it is done; see ${path.join(root, '.memev', 'daemon.log')}`);
+    return false;
+  }
   const logFile = path.join(root, '.memev', 'daemon.log');
   try { if (fs.statSync(logFile).size > 5 * 1024 * 1024) fs.renameSync(logFile, `${logFile}.1`); } catch {}
   const fd = fs.openSync(logFile, 'a', 0o600);

@@ -205,6 +205,7 @@ test('memev start leaves a daemon that says it is loading, and stops one that sa
   let child; const keep = (f) => (...a) => { child = f(...a); return child; };
   assert.equal(await startDaemon(root, { quiet: true, waitMs: 700, spawn: keep(stub(true)) }), false);
   await new Promise((r) => setTimeout(r, 500)); assert.ok(alive(child.pid), 'a loading daemon is left to finish'); assert.equal(loadingPid(root), child.pid);
+  let spawned = 0; assert.equal(await startDaemon(root, { quiet: true, waitMs: 300, spawn: (...a) => { spawned++; return stub(false)(...a); } }), false); assert.equal(spawned, 0, 'no second daemon while one loads');
   await stopDaemon(root); assert.ok(await until(() => !alive(child.pid), 6000), 'memev stop reaches a daemon that is still loading');
   assert.equal(loadingPid(root), null);
   assert.equal(await startDaemon(root, { quiet: true, waitMs: 400, spawn: keep(stub(false)) }), false);
