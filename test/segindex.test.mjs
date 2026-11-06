@@ -94,6 +94,14 @@ test('a line in the middle of the log that does not parse: the index asks to be 
   const again = new SegIndex(file); assert.equal(again.load(), false);
 });
 
+test('the files of the index are private, as index.jsonl is', { skip: process.platform === 'win32' }, async (t) => {
+  const d = tmp(t); const { orc, ix, file } = seeded(d, 60); writes(orc, ix, 61, 10); ix.save(); await settle(ix.foldSoon()); const base = `${file.replace(/\.jsonl$/, '')}.seg`; const walk = (p) => { const st = fs.statSync(p); assert.equal(st.mode & 0o077, 0, `${p} is private`); if (st.isDirectory()) for (const e of fs.readdirSync(p)) walk(path.join(p, e)); }; walk(base);
+});
+
+test('a note rewritten over and over folds on the size of the log', async (t) => {
+  const d = tmp(t); const { ix } = seeded(d, 40); ix.logMax = 2000; const g = ix.gen; for (let i = 0; i < 20; i++) { ix.update('notes/same.md', `## same\nthe same note rewritten ${i}\n`, { mtime: i }); ix.save(); } assert.ok(ix.foldP, 'a fold started'); await settle(ix.foldP); assert.ok(ix.gen > g);
+});
+
 test('an append under work/active in a subfolder inherits the stored project, as in the oracle', (t) => {
   const d = tmp(t); const orc = new RecallIndex(path.join(d, 'o.jsonl')); orc.update('work/active/sub/y.md', '## first\nProject: billing\nwords here\n', { mtime: 1 }); for (let i = 0; i < 5; i++) orc.update(`notes/f${i}.md`, `## f\nfiller ${i}\n`, { mtime: 1 }); const file = path.join(d, 'index.jsonl'); orc.file = file; orc.dirty = true; orc.save(); const ix = new SegIndex(file); ix.load();
   const x = '## added\nappended words\n'; orc.appendSections('work/active/sub/y.md', x, { lineOffset: 9, mtime: 2 }); ix.appendSections('work/active/sub/y.md', x, { lineOffset: 9, mtime: 2 }); assert.deepEqual(ix.docsOf('work/active/sub/y.md', 'added').map((q) => q.project), ['billing']);

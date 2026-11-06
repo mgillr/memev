@@ -19,7 +19,7 @@ class KeySieve {
   constructor(keys, count) { let bits = 1 << 12; while (bits < count * 16) bits <<= 1; this.mask = bits - 1; this.m = new Uint8Array(bits >>> 3); for (const k of keys) { const h = keySig(k) & this.mask; this.m[h >>> 3] |= 1 << (h & 7); } }
   has(sig) { const h = sig & this.mask; return (this.m[h >>> 3] & (1 << (h & 7))) !== 0; }
 }
-const FOLD_MIN = 2000, FOLD_SHARE = 0.05, RETRY_MS = 60000;
+const FOLD_MIN = 2000, FOLD_SHARE = 0.05, RETRY_MS = 60000, LOG_MAX = 1 << 26; // a note rewritten over and over grows the log, not the overlay
 
 /** One section of the segment. Columns cost nothing; text is read only when asked for. `at` moves it, so a query needs only one. */
 class SegDoc {
@@ -51,6 +51,13 @@ class FilterDoc extends SegDoc {
   get mtime() { this.read = true; return super.mtime; }
   get fl() { this.read = true; return super.fl; }
   get len() { this.read = true; return super.len; }
+}
+
+// Asks the filter once for a project, on a section with no review date whose key is not flagged; 3 means the filter looked further than the project.
+class SegGate {
+  constructor(seg, filter) { this.seg = seg; this.filter = filter; this.fly = new FilterDoc(seg, 0); }
+  flagged(sig) { return this.fly.sieve !== null && this.fly.sieve.has(sig); }
+  judge(i) { const c = this.fly.c; if (c[i * ROW + C_RB] !== 0 || this.flagged(c[i * ROW + C_SIG])) return 0; this.fly.at(i); this.fly.read = false; const ok = this.filter(this.fly); return this.fly.read ? 3 : ok ? 1 : 2; }
 }
 
 export class SegIndex {
@@ -108,7 +115,7 @@ export class SegIndex {
     if (!this.dirty) return;
     if (!this.seg) { this._writeFromOverlay(); return; }
     this._flush(); this.dirty = false;
-    if (!this.foldP && Date.now() - this.foldFailed > RETRY_MS && (this.ov.docs.size > Math.max(FOLD_MIN, this.seg.head.n * FOLD_SHARE) || this.deadCount > Math.max(FOLD_MIN, this.seg.head.n / 5))) this.foldSoon();
+    if (!this.foldP && Date.now() - this.foldFailed > RETRY_MS && (this.ov.docs.size > Math.max(FOLD_MIN, this.seg.head.n * FOLD_SHARE) || this.deadCount > Math.max(FOLD_MIN, this.seg.head.n / 5) || this.logEnd > (this.logMax ?? LOG_MAX))) this.foldSoon();
   }
   /** Start a fold of the log as it stands. Reads and writes go on against this generation until the new one is ready. */
   foldSoon() {
@@ -163,21 +170,30 @@ export class SegIndex {
     ts.sort((x, y) => x.df - y.df); let terms = ts; if (N > 2000) { const rare = ts.filter((t) => t.df <= N / 3); terms = (rare.length ? rare : ts.slice(0, 2)).slice(0, 12); }
     return { words, all: ts, terms, N, avg };
   }
+  _cacheGet(w, e, ids) { const C = this.pcache || (this.pcache = { small: new Map(), main: new Map(), ghost: new Set(), bytes: 0, cap: (this.lab.cacheMb || 32) * 1048576 }); let h = C.main.get(w); if (h) { C.main.delete(w); C.main.set(w, h); return h; } h = C.small.get(w); if (h) { C.small.delete(w); C.main.set(w, h); return h; } h = { ids: ids || this.seg.ids(e), tfs: this.seg.tfs(e) }; const sz = h.ids.byteLength + h.tfs.byteLength; if (sz > C.cap / 4) return h; (C.ghost.has(w) ? C.main : C.small).set(w, h); C.ghost.delete(w); C.bytes += sz; while (C.bytes > C.cap) { const src = C.small.size > 64 || !C.main.size ? C.small : C.main; const [k, v] = src.entries().next().value; src.delete(k); C.bytes -= v.ids.byteLength + v.tfs.byteLength; if (src === C.small) { C.ghost.add(k); if (C.ghost.size > 4096) C.ghost.delete(C.ghost.values().next().value); } } return h; }
   _scratch(need) { const n = this.seg ? this.seg.head.n : 0; if (!this.score || this.score.length < n) { const room = n + (n >> 3); this.score = new Float64Array(room); this.seen = new Uint32Array(room); this.stamp = 0; } if (!this.order || this.order.length < need) this.order = new Uint32Array(Math.max(need, 1024)); this.stamp++; }
   query(q, { limit = 8, project = null, prefix = null, boosts = null, filter = null } = {}) {
     if (!this._N()) return empty(); const { terms, N, avg } = this._plan(q); if (!terms.length) return empty();
     const seg = this.seg, ov = this.ov, n = seg ? seg.head.n : 0, dead = this.dead; let need = 0; for (const t of terms) need += (t.e ? t.e.df : 0) + (t.ot === undefined ? 0 : ov.postings[t.ot].length);
-    this._scratch(need); const score = this.score, seen = this.seen, stamp = this.stamp, order = this.order; const c = seg ? seg.cols() : null; const ovScore = new Map(); let m = 0;
+    this._scratch(need); const score = this.score, seen = this.seen, stamp = this.stamp, order = this.order; const c = seg ? seg.cols() : null; const ovScore = new Map(); let m = 0; let verdict = null, gate = null;
     // Sections are visited in the order RecallIndex first meets them, so equal scores rank the same: term by term, the segment's then the overlay's.
     for (const t of terms) {
       const idf = Math.log(1 + (N - t.df + 0.5) / (t.df + 0.5));
-      if (t.e) { const ids = t.ids || seg.ids(t.e), tfs = seg.tfs(t.e), df = t.e.df; for (let k = 0; k < df; k++) { const i = ids[k]; if (dead[i]) continue; const f = tfs[k]; const part = idf * (f * K1P) / (f + K1 * (B0 + B * c[i * ROW + C_LEN] / avg)); if (seen[i] === stamp) score[i] += part; else { seen[i] = stamp; score[i] = part; order[m++] = i; } } }
+      if (t.e) {
+        const lab = this.lab || {}; const df = t.e.df; let ids, tfs;
+        if (lab.cache) { const hit = this._cacheGet(t.w, t.e, t.ids); ids = hit.ids; tfs = hit.tfs; } else if (lab.scratch) { if (!this.sI || this.sI.length < df) { this.sI = new Uint32Array(df * 2); this.sT = new Uint16Array(df * 2); } ids = t.ids || this.sI; if (!t.ids) fs.readSync(seg.fdI, ids, 0, df * 4, t.e.row * 4); tfs = this.sT; fs.readSync(seg.fdT, tfs, 0, df * 2, t.e.row * 2); } else { ids = t.ids || seg.ids(t.e); tfs = seg.tfs(t.e); }
+        if (lab.lens) { const L = seg.lens || (seg.lens = (() => { const a = new Uint32Array(n); for (let i = 0; i < n; i++) a[i] = c[i * ROW + C_LEN]; return a; })()); for (let k = 0; k < df; k++) { const i = ids[k]; if (dead[i]) continue; const f = tfs[k]; const part = idf * (f * K1P) / (f + K1 * (B0 + B * L[i] / avg)); if (seen[i] === stamp) score[i] += part; else { seen[i] = stamp; score[i] = part; order[m++] = i; } } }
+        else if (lab.early && filter && !prefix) {
+          if (!verdict) { verdict = new Int8Array(seg.projects.length + 1); gate = new SegGate(seg, filter); }
+          for (let k = 0; k < df; k++) { const i = ids[k]; if (dead[i]) continue; const o = i * ROW; const j = c[o + C_PROJ]; let w = verdict[j]; if (w === 0) w = verdict[j] = gate.judge(i); if (w === 2 && c[o + C_RB] === 0 && !gate.flagged(c[o + C_SIG])) continue; const f = tfs[k]; const part = idf * (f * K1P) / (f + K1 * (B0 + B * c[o + C_LEN] / avg)); if (seen[i] === stamp) score[i] += part; else { seen[i] = stamp; score[i] = part; order[m++] = i; } }
+        } else for (let k = 0; k < df; k++) { const i = ids[k]; if (dead[i]) continue; const f = tfs[k]; const part = idf * (f * K1P) / (f + K1 * (B0 + B * c[i * ROW + C_LEN] / avg)); if (seen[i] === stamp) score[i] += part; else { seen[i] = stamp; score[i] = part; order[m++] = i; } }
+      }
       if (t.ot !== undefined) for (const id of ov.postings[t.ot]) { const d = ov.docs.get(id); if (!d) continue; const part = RecallIndex._bm(RecallIndex._tf(d, t.ot), t.df, N, d.len, avg).part; const was = ovScore.get(id); if (was === undefined) { ovScore.set(id, part); order[m++] = n + id; } else ovScore.set(id, was + part); }
     }
     const proj = project ? String(project).toLowerCase() : null; const top = []; let total = 0; const fly = seg ? new FilterDoc(seg, 0) : null; const plain = seg ? new SegDoc(seg, 0) : null; const lab = this.lab || {};
     // Empty tuning is every daemon's first state: nothing can change a score, so no heading is needed.
     let maxB = 1, boostSieve = null; if (boosts) { const k = boostInfo(boosts); maxB = k.max; boostSieve = k.sieve; }
-    const hasBoosts = boostSieve !== null; const projId = seg && proj ? seg.projectId(proj) : 0; const verdict = filter && seg && lab.memo !== false ? new Int8Array(seg.projects.length + 1) : null;
+    const hasBoosts = boostSieve !== null; const projId = seg && proj ? seg.projectId(proj) : 0; if (!verdict && filter && seg && lab.memo !== false) verdict = new Int8Array(seg.projects.length + 1); else if (verdict) verdict = verdict.map((w) => (w === 3 ? 0 : w));
     for (let x = 0; x < m; x++) {
       const v = order[x]; let d, s, fp;
       if (v >= n) { d = ov.docs.get(v - n); s = ovScore.get(v - n); if (prefix && !d.path.startsWith(prefix)) continue; if (filter && !filter(d)) continue; fp = proj && d.project === proj ? 1.5 : 1; } else {
