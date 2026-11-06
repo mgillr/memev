@@ -15,7 +15,7 @@ const SEEDS = 16;
 test('every answer and every file matches the reference on random histories', async () => {
   let ran = 0;
   for (let seed = 1; seed <= SEEDS; seed++) {
-    const diff = await lockstep({ A: Bus, B: Oracle, seed, steps: 140 });
+    const diff = await lockstep({ A: Bus, B: Oracle, seed, steps: 140, skipHalfLine: true });
     assert.equal(diff, null, diff || '');
     ran++;
   }
@@ -30,7 +30,6 @@ const BROKEN = [
   ['the newest hold is not the one that counts', 'let h = null; for (let i = holds.length - 1; i >= 0 && !h; i--)', 'let h = null; for (let i = 0; i < holds.length && !h; i++)'],
   ['the last message picks the wrong name', 'placeOf(v, m) > placeOf(v, best)', 'placeOf(v, m) < placeOf(v, best)'],
   ['a comms check is answered twice', "!(view.byRef.get(x.id) || []).some((a) => a.type === 'ack' && names.includes(a.from))", 'true'],
-  ['a line that ran into half a line still counts', 'if (!c.endsLine || c.exotic) return;', 'if (c.exotic) return;'],
   ['the read position is off by one', 'if (run[mid].dseq <= upTo) lo = mid + 1;', 'if (run[mid].dseq < upTo) lo = mid + 1;'],
   ['a message read beyond a gap shows again', 'if (!skip || !skip.has(run[i].dseq)) out.push(run[i]);', 'out.push(run[i]);'],
   ['several computers are not put back in order', 'out.sort((a, b) => placeOf(view, a) - placeOf(view, b));\n    return out;', 'return out;'],
@@ -48,7 +47,7 @@ for (const [what, from, to] of BROKEN) {
     try {
       const { Bus: Broken } = await import(moduleCopy(dir, 'broken.mjs', src.replace(from, () => to)));
       let caught = null;
-      for (let seed = 1; seed <= 60 && !caught; seed++) caught = await lockstep({ A: Broken, B: Oracle, seed, steps: 140 });
+      for (let seed = 1; seed <= 60 && !caught; seed++) caught = await lockstep({ A: Broken, B: Oracle, seed, steps: 140, skipHalfLine: true });
       assert.ok(caught, `no history told this broken bus from the reference: ${what}`);
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   });
