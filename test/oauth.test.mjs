@@ -2,6 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import { createServer } from '../src/server/http.mjs';
 import { newVault, cleanup } from './helpers/tmp.mjs';
@@ -294,4 +295,72 @@ test('MEM-058 AC02: a non-loopback http redirect URI is refused at registration'
   // loopback http is still allowed
   const ok = await register('Loopback App', 'http://127.0.0.1/callback');
   assert.ok(ok.client_id, 'loopback http is allowed');
+});
+
+/** A metadata request with a Host of the caller's choosing, which fetch does not allow. */
+const metadata = (srv, route, host, headers = {}) => new Promise((resolve, reject) => {
+  const req = http.request({ host: '127.0.0.1', port: srv.address().port, path: route, headers: { host, ...headers } }, (res) => {
+    let t = ''; res.setEncoding('utf8'); res.on('data', (d) => { t += d; });
+    res.on('end', () => resolve({ status: res.statusCode, text: t, json: JSON.parse(t) }));
+  });
+  req.on('error', reject); req.end();
+});
+const AS = '/.well-known/oauth-authorization-server';
+const PR = '/.well-known/oauth-protected-resource';
+const FORGED = ['evil.example', 'evil.example:8443', 'attacker.test', ''];
+
+test('T4-c07: the OAuth issuer in the metadata is the configured one whatever Host header the request carries', async () => {
+  const { v: own } = newVault();
+  const srv = createServer(own);
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const local = `http://127.0.0.1:${srv.address().port}`;
+  const CONFIGURED = 'https://vault.example.test';
+  const file = (name) => path.join(own.state, name);
+  try {
+    // set by the person: every caller gets it, whatever it names
+    own.config.remote = { ...own.config.remote, issuer: `${CONFIGURED}/` };
+    for (const host of [...FORGED, 'localhost:9', `127.0.0.1:${srv.address().port}`]) {
+      for (const headers of [{}, viaTunnel]) {
+        const { json: as } = await metadata(srv, AS, host, headers);
+        assert.equal(as.issuer, CONFIGURED, `Host ${host || '(empty)'}: ${JSON.stringify(as)}`);
+        for (const k of ['authorization_endpoint', 'token_endpoint', 'registration_endpoint', 'revocation_endpoint']) assert.ok(as[k].startsWith(`${CONFIGURED}/oauth/`), `${k}: ${as[k]}`);
+        const { json: pr } = await metadata(srv, PR, host, headers);
+        assert.equal(pr.resource, `${CONFIGURED}/mcp`);
+        assert.deepEqual(pr.authorization_servers, [CONFIGURED]);
+      }
+    }
+
+    // a value that cannot be an issuer counts as none set, and never lets the header back in
+    for (const bad of ['not a url', 'http://plain.example.test', 'https://x.example.test/?q=1', 'ftp://x.example.test']) {
+      own.config.remote = { ...own.config.remote, issuer: bad };
+      const r = await metadata(srv, AS, 'evil.example');
+      assert.equal(r.status, 503, `${bad}: ${r.text}`);
+    }
+    delete own.config.remote.issuer;
+
+    // none set and nothing up: a remote caller is told so, and the header is not repeated back
+    for (const route of [AS, PR]) {
+      const r = await metadata(srv, route, 'evil.example', viaTunnel);
+      assert.equal(r.status, 503, r.text);
+      assert.equal(r.json.error, 'issuer_not_configured');
+      assert.doesNotMatch(r.text, /evil\.example/);
+    }
+    // none set: the local flow works on this machine, at the port this server holds and not the one a header names
+    for (const host of [`127.0.0.1:${srv.address().port}`, 'localhost:9', '[::1]:9']) {
+      assert.equal((await metadata(srv, AS, host)).json.issuer, local, `local caller with Host ${host}`);
+    }
+
+    // the address the running tunnel recorded, for whoever comes from outside; the local flow stays local
+    fs.writeFileSync(file('tunnel.json'), JSON.stringify({ enabled: true, provider: 'quick', url: 'https://t.example.test', state: 'up' }));
+    assert.equal((await metadata(srv, AS, 'evil.example', viaTunnel)).json.issuer, 'https://t.example.test');
+    assert.equal((await metadata(srv, AS, `127.0.0.1:${srv.address().port}`)).json.issuer, local);
+    // and a tunnel that is off says nothing
+    fs.writeFileSync(file('tunnel.json'), JSON.stringify({ enabled: false, url: 'https://t.example.test', state: 'off' }));
+    assert.equal((await metadata(srv, AS, 'evil.example', viaTunnel)).status, 503);
+
+    // the relay's name is stable, so it comes before a tunnel when both are on
+    fs.writeFileSync(file('tunnel.json'), JSON.stringify({ enabled: true, url: 'https://t.example.test', state: 'up' }));
+    fs.writeFileSync(file('relay-state.json'), JSON.stringify({ enabled: true, address: 'https://abc.relay.test', state: 'up' }));
+    assert.equal((await metadata(srv, AS, 'evil.example', viaTunnel)).json.issuer, 'https://abc.relay.test');
+  } finally { await new Promise((r) => { srv.closeAllConnections?.(); srv.close(r); }); own.close(); }
 });

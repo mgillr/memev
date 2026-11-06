@@ -22,7 +22,7 @@ import { handle } from './mcp.mjs';
 import { OAuthStore, OAuthError, consentPage } from './oauth.mjs';
 import { resolveRequest, vaultScope } from '../engine/identity.mjs';
 import { VaultError, VERSION, RECALL_OFFSET_MAX } from '../engine/vault.mjs';
-import { timingSafeEqualHex, sha256, now, slug } from '../engine/util.mjs';
+import { timingSafeEqualHex, sha256, now, slug, readJson } from '../engine/util.mjs';
 import { renderCard, renderRecall, PROTOCOL } from '../engine/card.mjs';
 
 const PROXY_HEADERS = ['x-forwarded-for', 'x-forwarded-host', 'forwarded', 'x-real-ip', 'cf-connecting-ip', 'cf-ray', 'tailscale-user-login', 'x-original-forwarded-for'];
@@ -65,6 +65,28 @@ export function isDirectLocal(req) {
   if (PROXY_HEADERS.some((h) => req.headers[h] !== undefined)) return false;
   const host = String(req.headers.host || '').replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
   return fromGateway || ['127.0.0.1', 'localhost', '::1'].includes(host);
+}
+
+// An issuer is an https address, or http on this machine, with nothing after the path.
+const issuerUrl = (value) => {
+  try {
+    const u = new URL(String(value));
+    const fits = u.protocol === 'https:' || (u.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname));
+    return fits && !u.search && !u.hash && !u.username && !u.password ? u.href.replace(/\/+$/, '') : null;
+  } catch { return null; }
+};
+// The OAuth issuer, which an app trusts for where it sends its credentials, so never anything the request's Host header
+// says. remote.issuer when it is set, for every caller. Otherwise a caller on this machine gets this server's loopback
+// address, and a remote caller the address the running relay or tunnel recorded, relay first because its name is stable.
+// With none of those there is no issuer to give a remote caller: null, and the route says so.
+function oauthIssuer(vault, { local, port }) {
+  const set = issuerUrl(vault.config.remote?.issuer);
+  if (set) return set;
+  if (local) return `http://127.0.0.1:${port}`;
+  const relay = readJson(path.join(vault.state, 'relay-state.json'), null);
+  if (relay?.enabled && relay.address) return issuerUrl(relay.address);
+  const tunnel = readJson(path.join(vault.state, 'tunnel.json'), null);
+  return tunnel?.enabled && tunnel.url ? issuerUrl(tunnel.url) : null;
 }
 
 class Buckets {
@@ -139,8 +161,10 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       // on the vault's own machine, where the owner approves; /mcp still needs a valid credential.
       const port = server.address()?.port;
       const localConsent = (code) => `http://127.0.0.1:${port}/oauth/consent?code=${encodeURIComponent(code || '')}`;
-      const issuer = `${local ? 'http' : 'https'}://${String(req.headers.host || 'localhost')}`;
-      if (req.method === 'GET' && url.pathname === '/.well-known/oauth-authorization-server') {
+      if (req.method === 'GET' && (url.pathname === '/.well-known/oauth-authorization-server' || url.pathname === '/.well-known/oauth-protected-resource')) {
+        const issuer = oauthIssuer(vault, { local, port });
+        if (!issuer) return send(503, { error: 'issuer_not_configured', error_description: 'this vault has no address for OAuth yet: switch on a tunnel or a relay (memev cloud on), or set remote.issuer in the vault config' });
+        if (url.pathname === '/.well-known/oauth-protected-resource') return send(200, { resource: `${issuer}/mcp`, authorization_servers: [issuer], bearer_methods_supported: ['header'] });
         return send(200, {
           issuer,
           authorization_endpoint: `${issuer}/oauth/authorize`,
@@ -153,9 +177,6 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
           token_endpoint_auth_methods_supported: ['none'],
           scopes_supported: ['read', 'write'],
         });
-      }
-      if (req.method === 'GET' && url.pathname === '/.well-known/oauth-protected-resource') {
-        return send(200, { resource: `${issuer}/mcp`, authorization_servers: [issuer], bearer_methods_supported: ['header'] });
       }
       if (req.method === 'POST' && url.pathname === '/oauth/register') {
         let body; try { body = JSON.parse((await getBody()) || '{}'); } catch { return send(400, { error: 'invalid_client_metadata', error_description: 'the body is not json' }); }

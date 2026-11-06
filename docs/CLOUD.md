@@ -40,6 +40,12 @@ from that page. The app exchanges the code at `/oauth/token` for a bearer token 
 `/oauth/revoke`. Each registered client shows up in `memev devices` as a cloud connector. The
 connector URL above stays available for apps that take only a URL.
 
+The issuer in that metadata never comes from the request's Host header. It is `remote.issuer` in the
+vault config when that is set, an `https` address, for every caller. Otherwise a caller on the vault's
+machine gets `http://127.0.0.1:<port>`, and a remote caller gets the relay's address when the relay is
+on, or else the tunnel's. With none of those a remote caller gets a 503 that says so. If the relay and a
+tunnel are both on and apps reach the vault through the tunnel, set `remote.issuer` to the tunnel's address.
+
 ## What each plan allows
 
 The cloud apps gate MCP by plan, so the same connector URL does different things on different plans.
