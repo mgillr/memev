@@ -2,7 +2,7 @@
   "title": "SR-3.05 The licences, stated once: Apache-2.0 core, BSL-1.1 crdt-merge, ACFA-RS under its own licence, commercial federated services",
   "project": "memev",
   "workdir": null,
-  "request": "Closes G34, as amended by the owner decision of 31 Oct 2026: the engine licence was stated three ways (BSL 1.1, FSL-1.1-ALv2, draft BUSL-1.1 with licensor to be confirmed). The licences are now stated once, in docs/LICENSING-NOTICE.md, and every other mention agrees: the Memev core is Apache-2.0; crdt-merge is BSL 1.1 (its change date 2028-03-29 is unchanged and awaits lawyer review) with its PATENTS file; ACFA-RS is under its own licence; federated services are commercial and available by contact us. No licence file or term is changed by this contract. Signed vault contract WO-05-E (cited by id only) is the same deliverable: the licences stated once, with the signed text guard of the two licence pages left as it is. Repository: memev. Depends on contracts: none.",
+  "request": "Closes G34, as amended by the owner decision of 31 Oct 2026: the engine licence was stated three ways (BSL 1.1, FSL-1.1-ALv2, draft BUSL-1.1 with licensor to be confirmed). The licences are now stated once, in docs/LICENSING-NOTICE.md, and every other mention agrees: the Memev core is Apache-2.0; crdt-merge is BSL 1.1 (its change date 2028-03-29 is unchanged; the owner decision of 5 Nov 2026 replaced a lawyer's review with engineering controls, the remaining risk being his) with its PATENTS file; ACFA-RS is under its own licence; federated services are commercial and available by contact us. No licence file or term is changed by this contract. Signed vault contract WO-05-E (cited by id only) is the same deliverable: the licences stated once, with the signed text guard of the two licence pages left as it is. Repository: memev. Depends on contracts: none.",
   "tasks": [
     {
       "id": "T1",
@@ -11,7 +11,7 @@
       "depends_on": [],
       "requirements": [
         "the licences are stated once, as Apache-2.0 core, BSL-1.1 crdt-merge, ACFA-RS under its own licence and commercial federated services (source: owner decision 31 Oct 2026, and signed vault contract WO-05-E, cited by id only)",
-        "the licensor and the change date 2028-03-29 are stated as they are today and are reviewed by counsel before they are described as settled (source: owner decision 31 Oct 2026)",
+        "the licensor and the change date 2028-03-29 are stated as they are today; the notice records the owner decision of 5 Nov 2026 and that the remaining risk is his, and says no lawyer has reviewed them (source: owner decisions of 31 Oct and 5 Nov 2026)",
         "every mention in memev and memev-cloud agrees, and no document states an engine licence other than BSL 1.1 (source: contract SR-3.05 T1, original requirement)"
       ],
       "description": "",
@@ -76,11 +76,11 @@
           }
         },
         {
-          "statement": "Counsel review is recorded",
+          "statement": "The notice records the owner decision in place of a legal review",
           "verifier": {
             "type": "grep",
             "file": "docs/LICENSING-NOTICE.md",
-            "pattern": "Reviewed by counsel"
+            "pattern": "Owner decision of 5 Nov 2026"
           }
         },
         {

@@ -11,7 +11,7 @@
       "depends_on": [],
       "requirements": [
         "records that crdt-merge stays in its own repository and is reached only across the call-out and provider boundary (source: owner decision 31 Oct 2026; src/engine/merge.mjs:2-7)",
-        "records that nothing from crdt-merge is vendored, copied or ported into Memev and that no memev-merge repository is created (source: owner decision 31 Oct 2026)",
+        "records that nothing from crdt-merge is vendored, copied or ported into Memev and that no new merge engine is built, memev-merge being only the private package around crdt-merge with no merge algorithm of its own (source: owner decisions of 31 Oct and 5 Nov 2026)",
         "records the reason: the BSL-licensed, patented engine stays out of the Apache-2.0 core so that inclusion cannot relicense it (source: owner decision 31 Oct 2026)",
         "records the open item: lawyer review of the BSL change date 2028-03-29, which is not changed (source: owner decision 31 Oct 2026)",
         "states crdt-merge's role in words a buyer can check: it is an optional external component under its own licence, and the free core works without it (source: src/engine/merge.mjs:2-7)"
