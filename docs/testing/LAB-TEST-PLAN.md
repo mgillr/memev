@@ -327,7 +327,7 @@ the tests that need a second computer. Seats are `<app>@host` on the vault's com
 | T-FAIL-02 | delete a note file under `memory/` with the daemon stopped, then start it | the note is rebuilt from the log, byte for byte |
 | T-FAIL-03 | edit a note by hand in an editor | the change is imported into the log; nothing is overwritten |
 | T-FAIL-04 | change a byte inside a sealed log segment in `.memev/oplog/` | `memev doctor` reports the log as tampered |
-| T-FAIL-05 | delete `.memev/index.jsonl` | the index is rebuilt; recall gives the same results |
+| T-FAIL-05 | delete `.memev/index.seg/` | the index is rebuilt; recall gives the same results |
 | T-FAIL-06 | fill the disk to 100% and save a memory | a clear error; no corrupt note; works again after freeing space |
 | T-FAIL-07 | port in use: port 7787 taken by another program (for example `python3 -m http.server 7787`), then `memev init` | one line says the port is in use and which port Memev uses instead; the port is saved; `memev doctor` exits 0; the other program still has 7787 |
 | T-FAIL-08 | take the network down while the tunnel is on | local apps keep working; `memev cloud status` shows the tunnel down; it recovers when the network comes back |

@@ -124,8 +124,11 @@ class Store {
   close() { this._releaseLock(); this._open = false; }
   _tryAcquireLock() {
     if (this._lockDepth > 0) { this._lockDepth++; return false; }
-    if (fs.existsSync(this.lockPath)) {
-      const pid = parseInt(fs.readFileSync(this.lockPath, 'utf8').trim(), 10);
+    // The holder can release between any two of these calls, so a vanished lock file means free, as in the real store.
+    let held = null;
+    try { held = fs.readFileSync(this.lockPath, 'utf8'); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    if (held !== null) {
+      const pid = parseInt(held.trim(), 10);
       if (pid !== process.pid && Store.pidAlive(pid)) return true;
       try { fs.unlinkSync(this.lockPath); } catch {}
     }

@@ -58,7 +58,14 @@ to us or to anyone else. There is no telemetry, and there are no public ports: r
 through the tunnel or Tailscale like the rest of Memev.
 
 Each computer writes its own message file (`bus/log/<device>.jsonl`), so git never has two
-computers editing one file. Next to it are `bus/seats/<seat>.json` (one per app), `bus/pulse/`
+computers editing one file. When that file reaches 4 MiB the computer goes on in `<device>.2.jsonl`,
+`<device>.3.jsonl` and so on, and the full file is never touched again: git keeps a whole copy of
+each version of a file until it packs, and GitHub refuses any file over 100 MiB for good. A vault
+from before this keeps its file as it is, and every version of Memev reads all of these files.
+One limit: code from before this takes a computer's last counter from `<device>.jsonl` alone. Put a
+computer back on that code after one of its files has rolled over and its next messages reuse
+counters already on the bus, so a reader that has read past them never gets them. Nothing already
+written is lost, and going forward again the counter runs on from the highest. Next to it are `bus/seats/<seat>.json` (one per app), `bus/pulse/`
 (heartbeats), `bus/operator.json` (the lead) and `bus/config.json` (the layout version). Every
 computer sorts messages the same way (by time, then device, then that device's counter), so the
 order agrees everywhere. A message written offline is sent when the vault next syncs and still

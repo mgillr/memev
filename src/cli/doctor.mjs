@@ -116,8 +116,15 @@ export function fileChecks({ root, env = process.env, vault = null, platform = p
   if (vault) {
     const v = vault.log.verify();
     r.push(C('oplog', 'operation log intact', v.ok ? 'ok' : 'fail', v.ok ? `${v.ops} ops in ${v.segments} segment(s), every seal and chain verified` : v.errors.slice(0, 3).join('; ')));
+    // The sums first: a damaged generation stops serving here, so what follows counts what can really be found.
+    let bad = null, unread = null; try { bad = vault.index.verifyNow(); } catch (e) { unread = e.code || e.message; }
+    const ist = vault.index.state(); const past = vault.indexDamageRecord();
+    if (ist.state === 'failed') r.push(C('index-files', 'recall index files are sound', 'fail', `damaged: ${ist.damage?.why}; the rebuild failed (${past?.state}), so recall is down: run memev restart to try again`));
+    else if (bad || ist.state === 'rebuilding') r.push(C('index-files', 'recall index files are sound', 'fail', `damaged: ${bad || ist.damage?.why}; rebuilding from the notes, and recall says so until it is done`));
+    else if (unread) r.push(C('index-files', 'recall index files are sound', 'warn', `could not be checked just now (${unread}); nothing is known to be wrong, so run memev doctor again`));
+    else r.push(C('index-files', 'recall index files are sound', past ? 'warn' : 'ok', past ? `sound now. Damage was found on ${past.at} (${past.why}) and the index was rebuilt from the notes; look at the disk if it happens again` : 'every file matches its checksum', past ? { desc: 'forget this report', destructive: false, run: () => { vault.indexDamage = null; fs.rmSync(path.join(state, 'index.damage.json'), { force: true }); } } : null));
     const notes = vault.allNotes(); const idx = vault.index.stats().notes;
-    r.push(C('index', 'recall index covers every note', idx === notes.length ? 'ok' : 'warn', `${idx}/${notes.length} notes`, idx === notes.length ? null : { desc: 'rebuild the index', destructive: false, run: () => vault.reindexAll() }));
+    if (ist.state === 'ok' && !bad && !unread) r.push(C('index', 'recall index covers every note', idx === notes.length ? 'ok' : 'warn', `${idx}/${notes.length} notes`, idx === notes.length ? null : { desc: 'rebuild the index', destructive: false, run: () => vault.reindexAll() }));
     let drift = 0; for (const [p, h] of vault.log.heads) { if (h.deleted || !h.ch) continue; const b = vault._read(p); if (b === null || sha256(b) !== h.ch) drift++; }
     r.push(C('drift', 'notes match the log', drift ? 'warn' : 'ok', drift ? `${drift} note(s) changed outside Memev; they are imported on the next write or restart` : 'in sync', drift ? { desc: 'import the changes now', destructive: false, run: () => { for (const [p] of vault.log.heads) vault.syncFromDisk(p, 'doctor'); } } : null));
     let leaks = 0; for (const p of notes.filter((x) => !x.startsWith('work/sessions/')).slice(0, 5000)) if (findSecrets(vault._read(p) || '').length) leaks++;
@@ -313,20 +320,23 @@ function backupVaultId(url) {
 export async function allChecks({ root, env }) {
   const r = [];
   const info = daemonInfo(root);
-  const { healthy, startDaemon, whyNotRunning } = await import('./daemon.mjs');
+  const { healthy, startDaemon, whyNotRunning, loadingPid, loadState, stopDaemon } = await import('./daemon.mjs');
   const up = info && pidAlive(info.pid) && (await healthy(root));
   const why = up ? null : await whyNotRunning(root); // for example another program on its port
   r.push(C('daemon', 'daemon running', up ? 'ok' : 'fail', up ? `pid ${info.pid}, port ${info.port}` : why || 'not running', up ? null : { desc: 'start it', destructive: false, run: () => startDaemon(root, { quiet: true }) }));
   r.push(...await twoVaultChecks(root));
   let vault = null;
-  if (!up && isVault(root)) { const { Vault } = await import('../engine/vault.mjs'); try { vault = new Vault(root, { git: false }).open(); } catch (e) { r.push(C('open', 'vault opens', 'fail', e.message)); } }
+  // A load is left to finish, so the checks that open the vault wait for it. That is no reason to say nothing: one that has stopped moving is a failure, and a restart is the way out.
+  const load = up ? null : loadState(root);
+  if (load) r.push(C('loading', 'the daemon finishes loading', load.stalled ? 'fail' : 'warn', load.stalled ? `pid ${load.pid} has not moved for ${Math.round(load.idleMs / 60e3)} minutes` : `pid ${load.pid} is loading; it last moved ${Math.round(load.idleMs / 1000)} s ago, so the vault's checks wait for it`, load.stalled ? { desc: 'restart it', destructive: false, run: async () => { await stopDaemon(root); await startDaemon(root, { quiet: true }); } } : null));
+  if (!up && isVault(root) && !loadingPid(root)) { const { Vault } = await import('../engine/vault.mjs'); try { vault = new Vault(root, { git: false }).open(); } catch (e) { r.push(C('open', 'vault opens', 'fail', e.message)); } }
   if (up) {
     const restart = async () => { const d = await import('./daemon.mjs'); await d.stopDaemon(root); await d.startDaemon(root, { quiet: true }); };
     try {
       const { api, clientToken } = await import('./common.mjs');
       const s = await api(root, '/mcp', { token: clientToken(root, 'doctor'), body: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'memev_doctor', arguments: {} } }, timeoutMs: 20000 });
       const live = s.json?.result?.structuredContent?.checks || [];
-      r.push(...live.filter((c) => ['oplog', 'index', 'drift', 'secrets', 'bus'].includes(c.id)).map((c) => ({ ...c, fix: c.fix ? { desc: `${c.fix} (restarts Memev)`, destructive: false, run: restart } : null })));
+      r.push(...live.filter((c) => ['oplog', 'index', 'index-files', 'drift', 'secrets', 'bus'].includes(c.id)).map((c) => ({ ...c, fix: c.fix ? { desc: `${c.fix} (restarts Memev)`, destructive: false, run: restart } : null })));
     } catch (e) { r.push(C('mcp', 'MCP answers', 'fail', e.message)); }
     r.push(...fileChecks({ root, env, vault: null }));
   } else r.push(...fileChecks({ root, env, vault }));

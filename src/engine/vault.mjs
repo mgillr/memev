@@ -8,9 +8,14 @@ import { EventEmitter } from 'node:events';
 import { DeviceRegistry, hostDevice } from './devices.mjs';
 import { Bus } from './bus.mjs';
 import crypto from 'node:crypto';
-import { sha256, readJson, writeJson, writePrivateJson, exists, now, stamp, slug, truncate, randomToken } from './util.mjs';
+import { sha256, readJson, writeJson, writePrivateJson, replacePrivate, readPrivate, exists, now, stamp, slug, truncate, randomToken, isDaemonPid } from './util.mjs';
 import { OpLog } from './oplog.mjs';
-import { RecallIndex, tokenize, sections } from './index.mjs';
+import { tokenize, sections } from './index.mjs';
+import { SegIndex } from './segment-index.mjs';
+import { SegDamage, IndexBusy, isPassing } from './segment.mjs';
+import { Health } from './health.mjs';
+import { Worker } from 'node:worker_threads';
+import { NoteState, scanNotes, short } from './notestate.mjs';
 import { TokenStore, allowed } from './tokens.mjs';
 import { CommitQueue, git, gitInitMain } from './git.mjs';
 import { lineSplice, applySplice } from './diff.mjs';
@@ -34,6 +39,12 @@ const KINDS = { decision: 'decisions', gotcha: 'gotchas', fact: 'facts', pattern
 const PROTECTED = [/^contracts\/signed\//i, /^contracts\/keys\//i, /^contracts\/closed\//i, /^contracts\/receipts\//i];
 const DEFAULT_CONFIG = { version: 1, port: 7787, remote: { enabled: false, provider: 'auto', rate_per_min: 120 }, sync: { interval_min: 5 }, recall: { per_prompt: true, max_chars: 1500, min_score: 1.0, scope: 'project' }, memory: { ...DEFAULT_GATE }, journal: { enabled: true, max_chars: 2000 }, contracts: { enabled: false, exec_local_only: true } };
 
+/** The pid of a daemon, not this process, still opening this vault, or null. */
+function loadingDaemon(root, state) {
+  const pid = readJson(path.join(state, 'daemon.loading'), null)?.pid;
+  return Number.isSafeInteger(pid) && pid !== process.pid && isDaemonPid(pid, root) ? pid : null;
+}
+
 export class VaultError extends Error { constructor(code, message) { super(message); this.code = code; } }
 
 export function checkPath(p) {
@@ -49,11 +60,56 @@ export function checkPath(p) {
 /** The largest recall offset served: past it a page is empty and next is null, so one argument cannot ask the index to rank every match. */
 export const RECALL_OFFSET_MAX = 1000;
 
+const ASCII_ONLY = /^[\x00-\x7f]*$/;
+const foldName = (x) => (ASCII_ONLY.test(x) ? x.toLowerCase() : x.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC'));
+/**
+ * The fold of every live note and of every folder above one, with each fold's spellings. Folders and notes are kept apart because a
+ * folder only clashes with a folder and a note with a note. Its one promise: mayClash is true for every path _noCaseTwin would
+ * refuse. A true that is not a clash only costs the full read. A fold's first spelling shares the string the log's heads hold.
+ */
+class CaseNames {
+  constructor(heads) { this.folders = new Map(); this.notes = new Map(); for (const [p, h] of heads) if (!h.deleted) this.add(p); }
+  add(p) {
+    for (let i = p.indexOf('/'); i > 0; i = p.indexOf('/', i + 1)) {
+      const f = p.slice(0, i); const k = foldName(f); let m = this.folders.get(k);
+      if (!m) this.folders.set(k, m = new Map());
+      m.set(f, (m.get(f) || 0) + 1);
+    }
+    const k = foldName(p); const had = this.notes.get(k);
+    if (had === undefined) this.notes.set(k, p);
+    else if (typeof had === 'string') { if (had !== p) this.notes.set(k, new Set([had, p])); }
+    else had.add(p);
+  }
+  remove(p) {
+    for (let i = p.indexOf('/'); i > 0; i = p.indexOf('/', i + 1)) {
+      const f = p.slice(0, i); const k = foldName(f); const m = this.folders.get(k);
+      if (!m) continue;
+      const n = (m.get(f) || 0) - 1;
+      if (n > 0) m.set(f, n); else { m.delete(f); if (!m.size) this.folders.delete(k); }
+    }
+    const k = foldName(p); const had = this.notes.get(k);
+    if (had === p) this.notes.delete(k);
+    else if (had instanceof Set) { had.delete(p); if (!had.size) this.notes.delete(k); }
+  }
+  mayClash(p) {
+    for (let i = p.indexOf('/'); i > 0; i = p.indexOf('/', i + 1)) {
+      const f = p.slice(0, i); const m = this.folders.get(foldName(f));
+      if (m && (m.size > 1 || !m.has(f))) return true;
+    }
+    const had = this.notes.get(foldName(p));
+    return had !== undefined && had !== p;
+  }
+}
+
 export class Vault extends EventEmitter {
   constructor(root, opts = {}) { super(); this.root = path.resolve(root); this.opts = opts; this.state = path.join(this.root, STATE); }
 
   open() {
+    const opening = performance.now(); this.health = new Health();
     if (!isVault(this.root)) throw new VaultError('not_a_vault', `${this.root} is not a Memev vault (memev init)`);
+    // A daemon opening this vault is importing or converting, and a second open would do the same work against it.
+    const loader = loadingDaemon(this.root, this.state);
+    if (loader) throw new VaultError('loading', `the daemon (pid ${loader}) is still loading this vault; try again when it answers`);
     const fileCfg = readJson(path.join(this.state, 'config.json'), {});
     this.config = { ...DEFAULT_CONFIG, ...fileCfg };
     // existing vaults predate the opt-in: contracts stay on for them
@@ -65,7 +121,7 @@ export class Vault extends EventEmitter {
     this.devices.ensureHost(this.host);
     this.devices.migrate(this.tokens); // existing installs: every token becomes its own device entry
     this.bus = new Bus({ root: this.root, devices: this.devices, commit: (p) => this.commits.add(p, 'bus'), config: this.config.bus || {} });
-    this.index = new RecallIndex(path.join(this.state, 'index.jsonl'));
+    this.index = new SegIndex(path.join(this.state, 'index.jsonl'));
     this.graph = new Graph();
     this.tournament = new Tournament();
     this.feedback = new Map();
@@ -74,12 +130,34 @@ export class Vault extends EventEmitter {
     this.contractResults = new Map();
     this.commits = new CommitQueue(this.root, { enabled: this.opts.git !== false, delayMs: this.opts.commitDelayMs ?? 400 });
     this._seedBus();
-    this.recover();
-    const loaded = this.index.load();
-    if (!loaded || this.index.stats().notes === 0) this.reindexAll(); else for (const p of this.allNotes()) this.graph.indexNote(p, this._read(p));
+    this.notes = new NoteState(this.state).load();
+    const scan = this._scanNotes();
+    this.graph.bulkLoad = true;
+    let oldIndexMs = null; try { oldIndexMs = fs.statSync(path.join(this.state, 'index.jsonl')).mtimeMs; } catch { /* no old index file, the usual case */ }
+    this.index.onDamage = (why) => this._indexDamaged(why);
+    this._tick();
+    let loaded = this.index.load(() => this._tick());
+    if (this.index.loadDamage) this._recordIndexDamage(this.index.loadDamage, 'rebuilt');
+    // Sound files that hold less than they were left with: every note is looked at, by way of a rebuild, so a restored or cut index cannot serve old text.
+    const behind = loaded ? this.index.behind(this._savedIndexPosition().at) : null;
+    if (behind) { this.index.drop(); loaded = false; this._recordIndexDamage(behind, 'rebuilt'); }
+    const rebuild = !loaded || this.index.isEmpty();
+    // a first run reads each note once: the import indexes what it just read, in the path order a rebuild uses, when every note is new
+    const allNew = rebuild && ![...scan.keys()].some((p) => this.log.heads.has(p));
+    if (allNew) { this.imported = []; this.recovered = []; this.skipped = []; try { this.log.group(() => this.index.buildFrom(this._firstRunNotes(scan))); } catch (e) { this._noIndexAtOpen(e, scan); } }
+    else {
+      this.recover(scan);
+      if (rebuild) { try { this.index.buildFrom(this._rebuildNotes(scan)); } catch (e) { this._noIndexAtOpen(e, scan); } }
+      else this._restoreGraph(scan);
+    }
+    this.graph.bulkLoad = false;
+    try { this.notes.opened(scan); } catch { this.notes.recs = null; } // a cache that cannot be written costs reads next time, never the vault
+    if (rebuild) this._saveIndexSeq();
+    else this._catchUpIndex(scan, loaded && oldIndexMs !== null && !fs.existsSync(path.join(this.state, 'index.jsonl')) ? oldIndexMs : null);
     this._replayGraph();
     this.tuning = loadTuning(this);
-    this.started = now();
+    this.commits.catchUp(this.log, path.join(this.state, 'commit.seq'));
+    this.started = now(); this.health.opened(performance.now() - opening);
     return this;
   }
 
@@ -95,7 +173,19 @@ export class Vault extends EventEmitter {
     } catch {}
   }
 
-  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.index.save(); this._saveGraph(); this.devices?.saveSoon(); this.log.close(); }
+  /**
+   * The index cannot be written here, a disk gone read-only say. The notes are fine, so the vault still opens: every note is logged and in the
+   * graph, writes work, and recall says the rebuild failed. A machine short of something, or a fault in this code, is no such thing and is thrown.
+   */
+  _noIndexAtOpen(e, scan) {
+    if (isPassing(e) || !e.syscall) throw e;
+    this.recover(scan); for (const p of [...scan.keys()].sort()) { try { this._graphNote(p, this._read(p)); } catch { /* skipped, as a start skips it */ } }
+    this.index.rebuildFailed(e.code || e.message); this.index.damage ||= { why: this.index.loadDamage || 'the index folder cannot be written', at: now() };
+    this._recordIndexDamage(this.index.damage.why, `failed: ${e.code || e.message}`);
+  }
+  /** A load that takes a while says it is still moving, so a load that has stopped can be told from one that is slow. */
+  _tick() { const t = Date.now(); if (this.opts.onProgress && t - (this._ticked || 0) >= 1000) { this._ticked = t; try { this.opts.onProgress(); } catch { /* only a report */ } } }
+  close() { for (const st of this._projectStores?.values() ?? []) { try { st.close(); } catch {} } this._projectStores?.clear(); this._coordinators?.clear(); this.commits.flush(); this.commits.markClean(); clearTimeout(this._ist); this.index.save(); this.index.syncNow(); this.index.stopWork(); this._saveIndexSeq(); this._saveGraph(); clearTimeout(this._idle); this.notes?.close(); try { this._sweepWorker?.terminate(); } catch {} this.devices?.saveSoon(); this.log.close(); }
 
   // ---- files
   abs(p) { return path.join(this.root, ...p.split('/')); }
@@ -119,10 +209,13 @@ export class Vault extends EventEmitter {
    * log would hold two histories over one body, and the vault syncs to such disks (issue 243). The fold (NFC, upper case, then
    * lower case, NFC again) makes final sigma, long s, the sharp s against SS and the Kelvin sign equal to their plain forms, as
    * APFS does; it is close to the disk's own table but not the table itself. Only a path with no live head is checked, so writing
-   * an existing note costs nothing extra; the check reads every live head once.
+   * an existing note costs nothing extra. CaseNames answers "could this clash?" from the fold of each live name, built on the first
+   * new note and kept current from the log; only a yes reads every live head, here, so the refusal and its wording have one source.
    */
   _noCaseTwin(p) {
     const h = this.log.heads.get(p); if (h && !h.deleted) return;
+    if (!this._caseNames) { const names = new CaseNames(this.log.heads); this._caseNames = names; this.log.headWatch = (q, was, is) => { if (was !== is) { if (is) names.add(q); else names.remove(q); } }; }
+    if (!this._caseNames.mayClash(p)) return;
     const fold = (x) => x.normalize('NFC').toUpperCase().toLowerCase().normalize('NFC');
     const segs = p.split('/'); const want = []; let acc = '';
     for (const sg of segs) { acc = acc ? `${acc}/${sg}` : sg; want.push([acc, fold(acc)]); }
@@ -168,7 +261,96 @@ export class Vault extends EventEmitter {
     const walk = (d, rel) => { let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of ents) { if (e.name.startsWith('.') || e.name === 'node_modules' || e.isSymbolicLink()) continue; const r = rel ? `${rel}/${e.name}` : e.name; if (e.isDirectory()) { if (r === 'work/archive') continue; walk(path.join(d, e.name), r); } else if (e.name.endsWith('.md')) out.push(r); } };
     walk(base, dir.replace(/\/$/, '')); return out.sort();
   }
-  reindexAll() { for (const p of this.allNotes()) { const b = this._read(p); this.index.update(p, b); this.graph.indexNote(p, b); } this.index.save(); }
+  reindexAll() { for (const p of this.allNotes()) { const b = this._read(p); this.index.update(p, b); this._graphNote(p, b); } this.index.save(); }
+  /** A rebuild at open: the notes in path order, each read once and taken into the graph as it passes on its way to the index. */
+  *_rebuildNotes(scan) { for (const p of [...scan.keys()].sort()) { this._tick(); const b = this._read(p); this._graphNote(p, b); yield [p, b]; } }
+  /**
+   * The index is saved a few seconds after a write, with the log position it holds in index.seq. Anything the log has past that position
+   * reaches the index here: a write just before a hard kill, and a note changed while stopped (recover has just logged it). An old index
+   * that was just converted has no position, so what is newer than its file is taken in; with neither, every note is. A note retention
+   * moved to the archive was taken out on purpose and stays out, so only the file at the note's own path counts.
+   */
+  _catchUpIndex(scan, convertedFromMs) {
+    const { text, seq } = this._savedIndexPosition(); let saved = seq;
+    // a position past the end of the log, or one that is no number, says nothing: every note is looked at
+    if (!Number.isSafeInteger(saved) || saved < 0 || saved > this.log.seq) saved = convertedFromMs === null || text !== null ? 0 : Infinity;
+    const late = new Set(this.imported);
+    for (const [p, h] of this.log.heads) if (h.seq > saved) late.add(p);
+    // the old index held no position: a note newer than its file may have missed it, and so may a delete
+    if (saved === Infinity) { for (const [p, st] of scan) if (st && st.mtimeMs > convertedFromMs) late.add(p); for (const [p, h] of this.log.heads) if (h.deleted && this.index.byPath.has(p)) late.add(p); }
+    if (!late.size) { if (saved === Infinity) this._saveIndexSeq(); return; }
+    this._takeLate(late);
+    this.index.save(); this.index.syncNow(); this._saveIndexSeq();
+  }
+  /** index.seq: the log position the index holds, and the generation and log end it stood at then. A file with only a number has no `at`. */
+  _savedIndexPosition() {
+    const text = readPrivate(path.join(this.state, 'index.seq')); const m = text === null ? null : /^(\d+)(?: (\d+) (\d+))?\s*$/.exec(text);
+    return { text, seq: m ? Number(m[1]) : null, at: m?.[2] ? { gen: Number(m[2]), end: Number(m[3]) } : null };
+  }
+  _takeLate(late) {
+    for (const p of late) {
+      this._tick();
+      try {
+        if (this.log.heads.get(p)?.deleted) { this.index.remove(p); continue; }
+        if (this._linked(p)) continue;
+        const st = fs.lstatSync(this.abs(p)); const b = this._read(p);
+        if (b !== null) this.index.update(p, b, { mtime: new Date(st.mtimeMs).toISOString() });
+      } catch { /* gone or moved since the log saw it */ }
+    }
+  }
+  /** Say what was found, for this run and for later ones: a damaged disk matters after the index is whole again. */
+  _recordIndexDamage(why, state) {
+    this.indexDamage = { why, at: now(), state };
+    try { writePrivateJson(path.join(this.state, 'index.damage.json'), this.indexDamage); } catch { /* status still says so for this run */ }
+    this.emit('index-damage', this.indexDamage);
+  }
+  /**
+   * Damage found while serving. The notes are the record: a worker builds a new generation from them, and recall says it is rebuilding until
+   * then. A write in the meantime reaches the notes and the log as ever, and whatever passed the rebuild's start is taken in when it lands.
+   */
+  _indexDamaged(why) {
+    this._recordIndexDamage(why, 'rebuilding'); const from = this.log.seq;
+    let rebuilt; try { rebuilt = this.index.rebuildFromNotes(this.root); } catch (e) { rebuilt = Promise.reject(e); }
+    rebuilt.then((served) => {
+      if (!served) return;
+      const late = new Set(); for (const [p, h] of this.log.heads) if (h.seq > from) late.add(p);
+      this._takeLate(late); this.index.save(); this.index.syncNow(); this._saveIndexSeq();
+      this._recordIndexDamage(why, 'rebuilt');
+    }).catch((e) => { this.index.rebuildFailed(e.message); this._recordIndexDamage(why, `failed: ${e.message}`); });
+  }
+  /** Where the index stands in the log. It is written only once the index holds that much on the disk; an older value only means a longer catch-up. */
+  _saveIndexSeq(seq = this.log.seq, at = this.index.position()) { if (this.index.retrying() || this.index.rebuilding) return; try { replacePrivate(path.join(this.state, 'index.seq'), at ? `${seq} ${at.gen} ${at.end}` : String(seq)); } catch { /* the next save writes it again */ } }
+  _scanNotes() { return scanNotes(this.root); }
+  /** A folder's first open: each note is logged and taken into the graph as it passes on its way to the index. */
+  *_firstRunNotes(scan) {
+    for (const p of [...scan.keys()].sort()) {
+      this._tick(); let body = null;
+      try { body = this._read(p); this._importExternal(p, body, 'startup'); this.imported.push(p); this._graphNote(p, body); }
+      catch (e) { this.skipped.push({ path: p, reason: e.code || e.message }); continue; }
+      yield [p, body];
+    }
+  }
+  /** True when a note's stat is the one its saved record holds. Changed time too, which no tool can set back, so an edit that restores the modified time still shows. */
+  _sameStat(st, r) { return !!st && !!r && st.isFile() && st.size === r.size && st.mtimeMs === r.mtimeMs && (this.opts.ignoreCtime === true || st.ctimeMs === r.ctimeMs); }
+  /** Index a note in the graph and keep what was found for the next start. */
+  _graphNote(p, body) { const found = this.graph.indexNote(p, body); const ch = this.log.heads.get(p)?.ch; let st = null; try { st = fs.lstatSync(this.abs(p)); } catch {} if (ch && st) this.notes.put(p, st, ch, found, this.log.heads.get(p).hash); else this.notes.drop(p); }
+  /**
+   * The graph is a pure function of the notes in path order, so it is rebuilt from the saved records of the notes that are still there
+   * and unchanged, and from the text of the rest. A note gone from disk has no line in that order, so it cannot linger.
+   */
+  _restoreGraph(scan) {
+    const { recs } = this.notes; const mentions = this.notes.mentions.map((t) => (t ? { id: t[0], name: t[1], kind: t[2] } : t)); const changed = new Set([...(this.recovered || []), ...(this.imported || [])]);
+    const keep = (r) => r.secs.every((s) => s[1].every((m) => mentions[m]));
+    let run = [];
+    for (const p of [...scan.keys()].sort()) {
+      this._tick(); const r = recs.get(p); const h = this.log.heads.get(p);
+      // the record must stand at the log's last record for this note: a line that merely quotes the note's hash and stat is not one Memev wrote
+      if (r?.secs && h && r.ch === h.ch && r.op === short(h.hash) && !changed.has(p) && this._sameStat(scan.get(p), r) && keep(r)) { if (r.secs.length) run.push([p, r.secs]); continue; }
+      if (run.length) { this.graph.restore(mentions, run); run = []; }
+      try { this._graphNote(p, this._read(p)); } catch {}
+    }
+    if (run.length) this.graph.restore(mentions, run);
+  }
 
   /**
    * Reconcile the files with the log at startup (and before every write to a note):
@@ -177,26 +359,74 @@ export class Vault extends EventEmitter {
    *   file differs otherwise   → edited by hand or by git: recorded as an external 'put' (the old
    *                              version stays in the log), never overwritten
    */
-  recover() {
-    const fixed = [], imported = [], skipped = [];
+  recover(scan = this._scanNotes()) {
+    const fixed = [], imported = [], skipped = []; this._headFolds = null;
     // one path the file system cannot take (a NUL in it, a note where a folder must be, a folder where the note goes) is
     // skipped with its reason, so the rest of the vault opens; before, it threw and the vault never opened again (issue 230)
     const each = (p, fn) => { try { fn(); } catch (e) { skipped.push({ path: p, reason: e.code || e.message }); } };
     for (const [p, h] of this.log.heads) {
       if (h.deleted || !h.ch) continue;
       each(p, () => {
+        const st = scan.get(p); const r = this.notes?.recs?.get(p);
+        if (st && r && r.ch === h.ch && this._sameStat(st, r)) return; // the walk found no link on the way, and the file is as Memev left it
         if (this._linked(p)) return; // never rebuilt through a link: the write would land wherever the link points
         const cur = this._read(p);
-        if (cur !== null && sha256(cur) === h.ch) return;
+        if (cur !== null && sha256(cur) === h.ch) { if (st && r && r.ch === h.ch) this.notes.restat(p, st); return; }
         const content = this.materialize(p);
         if (content === null || sha256(content) !== h.ch) return;
-        if (cur === null || (content.startsWith(cur) && cur.length < content.length)) { fs.mkdirSync(path.dirname(this.abs(p)), { recursive: true }); fs.writeFileSync(this.abs(p), content); fixed.push(p); }
+        if (cur === null || (content.startsWith(cur) && cur.length < content.length)) { fs.mkdirSync(path.dirname(this.abs(p)), { recursive: true }); fs.writeFileSync(this.abs(p), content); fixed.push(p); if (p.endsWith('.md') && !/(^|\/)(\.|node_modules\/|work\/archive\/)/.test(p)) scan.set(p, fs.lstatSync(this.abs(p))); }
         else { this._importExternal(p, cur, 'startup'); imported.push(p); }
       });
     }
-    for (const p of this.allNotes()) if (!this.log.heads.has(p)) each(p, () => { this._importExternal(p, this._read(p), 'startup'); imported.push(p); });
+    this.log.group(() => { for (const p of [...scan.keys()].sort()) if (!this.log.heads.has(p)) each(p, () => { this._caseRenamed(p, scan, imported); const b = this._read(p); this._importExternal(p, b, 'startup'); imported.push(p); }); });
     this.recovered = fixed; this.imported = imported; this.skipped = skipped;
     return fixed;
+  }
+  /**
+   * A new name for a note whose old name differs only in letter case, renamed while stopped, on a disk that treats the two as one file. The old
+   * name still opens, so it looks present and unchanged, and a head for each would be two hits for one file. It is the same file when the walk
+   * did not list the old name and both names reach one inode: then the old name is logged as deleted, and only the head goes, not the file.
+   * The folds are worked out only when a note with no head turns up, so a start with nothing new pays nothing.
+   */
+  _caseRenamed(p, scan, imported) {
+    if (!this._headFolds) { this._headFolds = new Map(); for (const [q, h] of this.log.heads) if (!h.deleted) { const k = foldName(q); const list = this._headFolds.get(k); if (list) list.push(q); else this._headFolds.set(k, [q]); } }
+    const k = foldName(p); const twins = this._headFolds.get(k); if (!twins) return;
+    let mine = null; try { mine = fs.lstatSync(this.abs(p)); } catch { return; }
+    for (const q of twins) {
+      if (q === p || scan.has(q) || this.log.heads.get(q)?.deleted) continue;
+      let st; try { st = fs.lstatSync(this.abs(q)); } catch { continue; }
+      if (st.ino !== mine.ino || st.dev !== mine.dev) continue;
+      this.log.append({ type: 'delete', path: q, agent: 'external', client: 'startup', data: { external: true } }); imported.push(q); this.notes.drop(q);
+    }
+  }
+  /** Finish what a start left for later, a slice at a time, so the thread stays free. */
+  startIdleWork() {
+    const step = () => { if (this.graph.step(5)) { this._idle = setTimeout(step, 1); this._idle.unref?.(); } };
+    step();
+  }
+  /**
+   * The background check of every note against the log, for what a stat cannot show: a file system with a coarse or unusable changed
+   * time, or a clock set back. A worker hashes, so the thread stays free; a note that differs goes through syncFromDisk here, as any
+   * outside edit does. status().sweep says how far it got and what it found, with the time from the start of the sweep to each finding.
+   */
+  startSweep({ restEvery, restMs } = {}) {
+    if (this.sweep?.state === 'running') return this.sweep;
+    const items = []; for (const [p, h] of this.log.heads) if (!h.deleted && h.ch) items.push(`${h.ch} ${p}`);
+    const t0 = performance.now();
+    const sw = this.sweep = { state: 'running', started: now(), total: items.length, hashed: 0, bytes: 0, missing: 0, missing_notes: [], differs: 0, changed: 0, found: [], index_files: 'not checked', cycle_ms: null, error: null };
+    const w = this._sweepWorker = new Worker(new URL('./notes-worker.mjs', import.meta.url), { workerData: { job: 'sweep', root: this.root, items: items.join('\n'), segment: this.index.sealed(), restEvery, restMs } });
+    w.unref();
+    w.on('message', (m) => {
+      if (m.type === 'segment') { sw.index_files = m.busy ? 'not checked' : m.why ? 'damaged' : 'ok'; if (m.why) this.index.damagedGen(m.gen, m.why); }
+      else if (m.type === 'missing') { if (sw.missing_notes.length < 100) sw.missing_notes.push({ path: m.path, reason: m.reason }); }
+      else if (m.type === 'differs') {
+        sw.differs++;
+        try { this._nc?.delete(m.path); if (this.syncFromDisk(m.path, 'sweep')) { sw.changed++; if (sw.found.length < 100) sw.found.push({ path: m.path, ms: Math.round(performance.now() - t0) }); } } catch (e) { sw.failed = (sw.failed || 0) + 1; sw.error = e.message; }
+      } else { sw.hashed = m.hashed; sw.bytes = m.bytes; sw.missing = m.missing; }
+      if (m.type === 'done') { sw.state = 'done'; sw.cycle_ms = Math.round(performance.now() - t0); this.emit('sweep', sw); }
+    });
+    w.on('error', (e) => { sw.state = 'failed'; sw.error = e.message; this.emit('sweep', sw); });
+    return sw;
   }
   _importExternal(p, body, source) {
     const rec = this.log.append({ type: 'put', path: p, agent: 'external', client: source, data: { content: body, ch: sha256(body), external: true } });
@@ -230,10 +460,10 @@ export class Vault extends EventEmitter {
     if (known && h && !h.deleted && known.ch === h.ch) return null;
     const cur = this._read(p);
     if (cur !== null) this._ncSet(p, cur);
-    if (cur === null) { if (h && !h.deleted) { const rec = this.log.append({ type: 'delete', path: p, agent: 'external', client: source, data: { external: true } }); this.index.remove(p); this.graph.removeNote(p); return rec; } return null; }
+    if (cur === null) { if (h && !h.deleted) { const rec = this.log.append({ type: 'delete', path: p, agent: 'external', client: source, data: { external: true } }); this.index.remove(p); this.graph.removeNote(p); this.notes.drop(p); return rec; } return null; }
     if (h && !h.deleted && h.ch === sha256(cur)) return null;
     const rec = this._importExternal(p, cur, source);
-    this.index.update(p, cur, { mtime: rec.ts }); this.graph.indexNote(p, cur); this._indexSaveSoon();
+    this.index.update(p, cur, { mtime: rec.ts }); this._graphNote(p, cur); this._indexSaveSoon();
     return rec;
   }
 
@@ -288,16 +518,24 @@ export class Vault extends EventEmitter {
     if (appended) {
       // an append that starts new sections: index only those (the cost follows the new text, not the note)
       this.index.appendSections(p, appended.text, { lineOffset: appended.lineOffset, mtime: rec.ts });
-      this.graph.indexSections(p, sections(appended.text));
+      const found = this.graph.indexSections(p, sections(appended.text)); const ch = this.log.heads.get(p)?.ch; let st = null; try { st = fs.lstatSync(this.abs(p)); } catch {}
+      if (ch && st) this.notes.add(p, st, ch, found, rec); else this.notes.drop(p);
     } else {
       const body = this._read(p);
-      this.index.update(p, body ?? '', { mtime: rec.ts }); this.graph.indexNote(p, body ?? '');
+      this.index.update(p, body ?? '', { mtime: rec.ts }); this._graphNote(p, body ?? '');
     }
     this.commits.add(p, client);
     this._indexSaveSoon();
     this.emit('change', { path: p, type: rec.type, seq: rec.seq, client });
   }
-  _indexSaveSoon() { clearTimeout(this._ist); this._ist = setTimeout(() => { this.index.save(); this._saveGraph(); }, 3000); this._ist.unref?.(); }
+  _indexSaveSoon() {
+    clearTimeout(this._ist);
+    this._ist = setTimeout(() => {
+      const t0 = performance.now();
+      this.index.save(); const seq = this.log.seq, at = this.index.position(); this.index.whenSynced(() => this._saveIndexSeq(seq, at)); this._saveGraphBehind(); try { this.notes.flush(); } catch { /* the cache loses a line, which costs one read at the next start */ }
+      this.health.saveBlock(performance.now() - t0);
+    }, 3000); this._ist.unref?.();
+  }
 
   // ---- note operations
   get(identity, p) { p = checkPath(p); this._need(identity, 'read', p); const b = this._read(p); if (b === null) throw new VaultError('not_found', `no note ${p}`); return { path: p, body: b }; }
@@ -348,7 +586,7 @@ export class Vault extends EventEmitter {
     p = checkPath(p); this._need(identity, 'write', p); this._noLink(p); this._guard(p, '', true, false);
     if (this._read(p) === null) throw new VaultError('not_found', `no note ${p}`);
     const rec = this.log.append({ type: 'delete', path: p, agent: identity.agent, client, data: {} });
-    fs.rmSync(this.abs(p)); this._nc?.delete(p); this.index.remove(p); this.graph.removeNote(p); this.commits.add(p, client); this._indexSaveSoon();
+    fs.rmSync(this.abs(p)); this._nc?.delete(p); this.index.remove(p); this.graph.removeNote(p); this.notes.drop(p); this.commits.add(p, client); this._indexSaveSoon();
     return { path: p, seq: rec.seq, op: 'delete', note: 'the content stays in the operation log and in git history' };
   }
 
@@ -365,7 +603,8 @@ export class Vault extends EventEmitter {
     const p = `memory/${KINDS[k]}/${new Date().toISOString().slice(0, 7)}.md`;
     this._need(identity, 'write', p); this._guard(p, text, allow_secrets, false); // permissions and the secrets check come before the quality check
     const gate = { ...DEFAULT_GATE, ...(this.config.memory || {}) };
-    const similar = this.index.query(text, { limit: 5, prefix: 'memory/', filter: (d) => this.reviews.get(`${d.path}#${d.heading || ''}`)?.action !== 'drop' });
+    // an index being rebuilt cannot say what is similar, which is no reason to lose the memory: the note is the record
+    let similar = []; try { similar = this.index.query(text, { limit: 5, prefix: 'memory/', filter: (d) => (d.lookup ? d.lookup(this.reviews) : this.reviews.get(`${d.path}#${d.heading || ''}`))?.action !== 'drop' }); } catch (e) { if (!(e instanceof SegDamage) && !(e instanceof IndexBusy)) throw e; }
     const a = assess(text, { similar, gate: gate.enabled === false ? { ...gate, min_words: 0 } : gate, review_by });
     if (a.verdict === 'duplicate') return { duplicate: true, saved: false, path: a.duplicate_of.path, heading: a.duplicate_of.heading, reasons: a.reasons };
     if (gate.enabled === false) { a.flags = []; if (!review_by) a.review_by = null; }
@@ -639,7 +878,7 @@ export class Vault extends EventEmitter {
     const today = new Date().toISOString().slice(0, 10);
     const pc = new Map(), ac = new Map();
     const fn = (d) => {
-      const r = this.reviews.size ? this.reviews.get(`${d.path}#${d.heading || ''}`) : null;
+      const r = this.reviews.size ? (d.lookup ? d.lookup(this.reviews) : this.reviews.get(`${d.path}#${d.heading || ''}`)) : null;
       if (r?.action === 'drop') return false;
       const until = r?.action === 'keep' ? r.until : d.rb;
       if (until && until < today) return false;
@@ -650,26 +889,30 @@ export class Vault extends EventEmitter {
     fn.scope = pj ? 'project' : 'all';
     return fn;
   }
-  /** Recall: the index, filtered to what the token may read and the project, annotated with graph context; the use is logged. */
-  recall(identity, { query, project = null, all_projects = false, limit = 6, offset = 0, client = null, session = null, log = true }) {
+  /**
+   * Recall: the index, filtered to what the token may read and the project, annotated with graph context; the use is logged.
+   * `dropPath` names paths a caller never wants. They are left out before ranking, so they cannot take the page and leave it short.
+   */
+  recall(identity, { query, project = null, all_projects = false, limit = 6, offset = 0, client = null, session = null, log = true, dropPath = null }) {
+    const t0 = performance.now();
     this._need(identity, 'read', null);
     const lim = limit == null ? 6 : Math.min(10, Math.max(1, Math.trunc(Number(limit)) || 1));
     const off = Math.max(0, Math.trunc(Number(offset)) || 0);
     // A far offset must not cost a full ranking: the index is asked for one page past the bound at most, and an offset
     // past the bound is an empty page. A client that follows next never gets there; next stops at the bound.
-    const top = this.index.query(query, { limit: Math.min(off, RECALL_OFFSET_MAX) + lim, project, boosts: this.tuning?.boosts, filter: this._recallFilter(identity, { project, all_projects }) });
+    const top = this.index.query(query, { limit: Math.min(off, RECALL_OFFSET_MAX) + lim, project, boosts: this.tuning?.boosts, drop: typeof dropPath === 'function' ? dropPath : null, filter: this._recallFilter(identity, { project, all_projects }) });
     const total = top.total;
     const hits = off > RECALL_OFFSET_MAX ? [] : top.slice(off, off + lim);
     for (const h of hits) {
       const key = `${h.path}#${h.heading || ''}`;
-      const ents = this.graph.sectionEnts.get(key) || [];
-      h.related = ents.slice(0, 5).map((id) => this.graph.entities.get(id)?.name).filter(Boolean);
+      h.related = this.graph.relatedNames(h.path, h.heading || '', 5);
       const claims = [...this.graph.claims.values()].filter((c) => c.evidence.some((e) => e.path === h.path));
       if (claims.length) h.claims = claims.slice(0, 3).map((c) => ({ id: c.id, claim: `${c.subject} ${c.predicate}${c.object ? ` ${c.object}` : ''}`, status: Graph.assess(c).status }));
       const u = this.graph.usage.get(key); if (u) h.used = u.count;
     }
     if (log && hits.length) this._logUsage(identity, { client, session, query, items: hits.map((h) => `${h.path}#${h.heading || ''}`) });
     hits.total = total;
+    this.health.recall(performance.now() - t0);
     return hits;
   }
 
@@ -890,10 +1133,20 @@ export class Vault extends EventEmitter {
 
   _replayGraph() {
     const f = path.join(this.state, 'graph.json'); const snap = readJson(f, null); let from = 1;
-    if (snap?.version === 2) { for (const e of snap.edges) this.graph.edges.push(e); for (const c of snap.claims) this.graph.claims.set(c.id, c); for (const [k, u] of snap.usage) this.graph.usage.set(k, u); this.tournament.load(snap.tournament); this.feedback = new Map(snap.feedback || []); this.reviews = new Map(snap.reviews || []); this.contractSessions = new Map(snap.contract_sessions || []); this.contractResults = new Map(snap.contract_results || []); from = snap.seq + 1; }
+    try { for (const n of fs.readdirSync(this.state)) if (n.startsWith('graph.json.') && n.endsWith('.behind.tmp')) fs.rmSync(path.join(this.state, n), { force: true }); } catch { /* a save a stop cut short leaves its temporary file */ }
+    if (snap?.version === 2) { for (const e of snap.edges) this.graph.edges.push(e); for (const c of snap.claims) this.graph.claims.set(c.id, c); for (const [k, u] of snap.usage) this.graph.usage.set(k, u); this.tournament.load(snap.tournament); this.feedback = new Map(snap.feedback || []); this.reviews = new Map(snap.reviews || []); this.contractSessions = new Map(snap.contract_sessions || []); this.contractResults = new Map(snap.contract_results || []); from = snap.seq + 1; if (snap.seq === this.log.seq) this._graphSaved = snap.seq; }
     for (const rec of this.log.iterate({ fromSeq: from })) { if (/^(graph\.|claim|usage)/.test(rec.type)) this.graph.applyOp(rec); else if (rec.type === 'tournament.match' || rec.type === 'feedback' || rec.type === 'review' || rec.type === 'contract.signed' || rec.type === 'contract.verified') this._applyMisc(rec); }
   }
-  _saveGraph() { writePrivateJson(path.join(this.state, 'graph.json'), { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()], reviews: [...this.reviews.entries()], contract_sessions: [...this.contractSessions.entries()], contract_results: [...this.contractResults.entries()] }); }
+  // The debounced save: same file, written on the thread pool. The snapshot carries its log position, so an old or lost one means a longer replay at open, never a wrong graph.
+  _saveGraphBehind() {
+    if (this._graphSaved === this.log.seq) return;
+    if (this._gw) { this._gwAgain = true; return; }
+    const file = path.join(this.state, 'graph.json'), tmp = `${file}.${process.pid}.behind.tmp`; this._gw = true; const seq = this.log.seq;
+    const done = () => { this._gw = false; if (this._gwAgain) { this._gwAgain = false; this._saveGraphBehind(); } };
+    fs.open(tmp, 'w', 0o600, (e, fd) => { if (e) return done(); return fs.writeFile(fd, `${JSON.stringify(this._graphSnapshot(), null, 2)}\n`, () => fs.fsync(fd, () => fs.close(fd, () => fs.rename(tmp, file, (re) => { if (!re) this._graphSaved = seq; done(); })))); });
+  }
+  _saveGraph() { if (this._graphSaved === this.log.seq) return; this._graphSaved = this.log.seq; writePrivateJson(path.join(this.state, 'graph.json'), this._graphSnapshot()); }
+  _graphSnapshot() { return { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()], reviews: [...this.reviews.entries()], contract_sessions: [...this.contractSessions.entries()], contract_results: [...this.contractResults.entries()] }; }
 
   // ---- retention and compaction
   /** Total bytes of every file under a directory (recursive). */
@@ -926,7 +1179,7 @@ export class Vault extends EventEmitter {
     return {
       oplog: { bytes: this._dirBytes(oplogDir), segments: segs.length, archived: segs.filter((s) => s.archived).length, activeBytes: this._segBytes(oplogDir), archivedBytes: this._segBytes(path.join(oplogDir, 'archive')) },
       journal: { bytes: this._dirBytes(this.abs('work/sessions')), files: this._dirFiles(this.abs('work/sessions'), '.md') },
-      index: { bytes: fs.existsSync(indexFile) ? fs.statSync(indexFile).size : 0 },
+      index: { bytes: (fs.existsSync(indexFile) ? fs.statSync(indexFile).size : 0) + this._dirBytes(this.index.root) },
       git: { bytes: this._dirBytes(path.join(this.root, '.git', 'objects')) },
     };
   }
@@ -984,14 +1237,30 @@ export class Vault extends EventEmitter {
     const archived = this.log.archiveSealed();
     const retained = this._journalRetention();
     this.index.save();
+    this.index.compact(); this._saveIndexSeq();
     this._saveGraph();
     const after = this.sizeReport();
     return { dryRun: false, before, after, archived, retained };
   }
 
-  status() {
+  /** The last damage found in the index, this run's or a past run's. It names files of the index, never a note. */
+  indexDamageRecord() { return this.indexDamage || readJson(path.join(this.state, 'index.damage.json'), null); }
+  /**
+   * What this token may know of the sweep. A note's name can itself be the secret, so a path outside the token's reach is not shown, and
+   * nor is an error, which may quote one: the counts say how many there were. `identity` left out is the vault's own caller, which sees all.
+   */
+  _sweepFor(identity) {
+    const sw = this.sweep; if (!sw) return null; const out = { ...sw, found: [...sw.found], missing_notes: [...sw.missing_notes] };
+    if (!identity) return out;
+    const mine = (x) => allowed(identity, 'read', x.path);
+    out.found = sw.found.filter(mine); out.found_elsewhere = sw.found.length - out.found.length;
+    out.missing_notes = sw.missing_notes.filter(mine); out.missing_elsewhere = sw.missing_notes.length - out.missing_notes.length;
+    if (sw.error && !identity.paths?.includes('**')) out.error = 'the sweep could not take in every change';
+    return out;
+  }
+  status(identity = null) {
     const mu = process.memoryUsage();
-    return { version: VERSION, vault: this.root, started: this.started, oplog: this.log.stats(), index: this.index.stats(), graph: this.graph.stats(), memory: { rss_mb: Math.round(mu.rss / 1048576), heap_mb: Math.round(mu.heapUsed / 1048576) }, recovered: this.recovered?.length || 0, imported: this.imported?.length || 0 };
+    return { version: VERSION, vault: this.root, started: this.started, oplog: this.log.stats(), index: { ...this.index.stats(), ...this.index.state(), damage: this.indexDamageRecord() }, graph: this.graph.stats(), memory: { rss_mb: Math.round(mu.rss / 1048576), heap_mb: Math.round(mu.heapUsed / 1048576) }, recovered: this.recovered?.length || 0, imported: this.imported?.length || 0, sweep: this._sweepFor(identity), health: this.health.report(mu) };
   }
 }
 

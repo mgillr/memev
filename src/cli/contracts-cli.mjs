@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { healthy, startDaemon } from './daemon.mjs';
+import { healthy, startDaemon, loadingPid, notServing } from './daemon.mjs';
 import http from 'node:http';
 import { api, clientToken, config, daemonInfo, saveConfig, adminToken } from './common.mjs';
 import { FOOTER, footerEnabled } from '../engine/card.mjs';
@@ -49,6 +49,7 @@ function waitingCall(root, token, body) {
   });
 }
 const mcpCall = (root, name, args) => {
+  if (loadingPid(root)) throw new Error(notServing(root)); // no daemon answers yet, and a failed fetch would say nothing of why
   const body = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } };
   return name === 'memev_contract_verify' ? waitingCall(root, clientToken(root, 'cli'), body) : api(root, '/mcp', { token: clientToken(root, 'cli'), body, timeoutMs: 600000 });
 };
@@ -68,6 +69,7 @@ export async function command(cmd, pos, flags, { root, env }) {
   // approve is an admin action; the CLI's client token is read+write, so it goes over the admin token
   const callAdmin = async (name, args) => {
     const t = adminToken(root); if (!t) throw new Error('no admin token found; run memev init');
+    if (loadingPid(root)) throw new Error(notServing(root));
     const r = await api(root, '/mcp', { token: t, body: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }, timeoutMs: 600000 });
     const res = r.json?.result; if (!res) throw new Error(r.text);
     console.log(res.content[0].text); return res.isError ? 1 : (res.structuredContent?.ok === false ? 1 : 0);

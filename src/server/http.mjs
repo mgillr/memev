@@ -89,6 +89,7 @@ function readBody(req, limit = 2 * 1024 * 1024) {
 // JSON.stringify leaves U+0085, U+2028 and U+2029 raw, and those also split a line in the hook context.
 const quote = (s) => JSON.stringify(s).replace(/[\u0085\u2028\u2029]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
 
+const INDEX_DOWN = new Set(['index_rebuilding', 'index_rebuild_failed', 'index_busy']);
 /** Bus messages as a few lines for a hook to put in the session's context. Empty when there is nothing new. */
 export function renderBus(u, { lead = false } = {}) {
   const L = [];
@@ -301,10 +302,18 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
           const skip = new Set(auto ? [].concat(body.exclude || []).map(String) : []);
           const bar = auto ? hookMinScore(vault) : (rc.min_score ?? 1);
           // an item already given is left out, not replaced, so a prompt never brings in more than it would have
-          const recalled = vault.recall(identity, { ...body, client, limit, offset });
+          // past work is left out before ranking, not after it, so a prompt asked before cannot use up the page (the top 4 would all be its own journal)
+          let recalled;
+          try { recalled = vault.recall(identity, { ...body, client, limit, offset, dropPath: auto && !rc.hook_include_journals ? pastWork : null }); }
+          catch (e) {
+            // a prompt goes on without memory, and it says so: an empty answer here would read as nothing recorded
+            if (auto && INDEX_DOWN.has(e.code)) return send(200, { hits: [], total: 0, offset, next: null, rebuilding: true, text: `Memev could not search memory for this prompt: ${e.message}` });
+            throw e;
+          }
           const total = recalled.total;
           const hits = recalled
-            .filter((h) => h.score >= bar && !skip.has(`${h.path}#${h.heading || ''}`) && !(auto && !rc.hook_include_journals && pastWork(h.path)) && !(own && h.path.startsWith('work/sessions/') && h.path.endsWith(own)));
+            .filter((h) => h.score >= bar && !skip.has(`${h.path}#${h.heading || ''}`) && !(own && h.path.startsWith('work/sessions/') && h.path.endsWith(own)));
+          if (auto) vault.health.prompt(hits.length > 0);
           const next = offset + limit < total && offset + limit <= RECALL_OFFSET_MAX ? offset + limit : null;
           const text = renderRecall(hits, { maxChars: rc.max_chars || 1500 });
           return send(200, { hits, total, offset, next, text });
@@ -318,7 +327,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
         if (route === '/v1/bus-operator' && ctx.cli) { const seat = body.seat ? vault.bus.seatFor(body.seat) || body.seat : null; const op = vault.bus.setOperator(seat, { by: body.by || 'terminal' }); vault.commits.flush(); return send(200, { operator: op }); }
         if (route === '/v1/reload' && local && identity.scopes.includes('admin')) { vault.emit('reload'); return send(200, { ok: true }); }
       }
-      if (req.method === 'GET' && route === '/v1/status') return send(200, vault.status());
+      if (req.method === 'GET' && route === '/v1/status') return send(200, vault.status(identity));
       const nm = /^\/v1\/notes\/(.+)$/.exec(route);
       if (nm) {
         const p = decodeURIComponent(nm[1]);
@@ -331,6 +340,7 @@ export function createServer(vault, { tunnelKey = () => null, licenseKeys = LICE
       return send(404, { error: 'not_found' });
     } catch (e) {
       if (e instanceof VaultError || e.name === 'BusError') return send({ forbidden: 403, not_found: 404, immutable: 409, conflict: 409, secret: 422, too_large: 413 }[e.code] || 400, { error: e.code, error_description: e.message });
+      if (INDEX_DOWN.has(e.code)) return send(503, { error: e.code, error_description: e.message });
       return send(500, { error: 'internal', error_description: e.message });
     }
   });

@@ -3,7 +3,12 @@
 //
 // Everything lives in the vault under bus/ and travels with it: through git to your own backup
 // repository, and through the secure link to computers that joined. Nothing goes anywhere else.
-//   bus/log/<device>.jsonl   messages, one append-only file per computer, so git never conflicts
+//   bus/log/<device>.jsonl   messages, append-only and written by one computer, so git never conflicts; when it reaches
+//                            SEGMENT_BYTES the computer goes on in <device>.2.jsonl, <device>.3.jsonl and so on, and the
+//                            full file is never touched again. Every reader takes every *.jsonl here, so a computer on an
+//                            older version reads them too. One limit: code older than this takes its last counter from
+//                            <device>.jsonl alone, so a computer put back on it after a file rolled over reuses counters
+//                            (docs/BUS.md)
 //   bus/seats/<seat>.json    one seat per AI app (or session) on a computer
 //   bus/pulse/<seat>.json    the seat's last heartbeat and what it has read
 //   bus/operator.json        which seat speaks for you
@@ -12,8 +17,10 @@
 // Order is the same on every computer: by time, then device id, then the device's own counter.
 // What a seat has read is kept per device counter, so messages that arrive late from a computer
 // that was offline are still delivered.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { findSecrets } from './secrets.mjs';
 import { readJson, writeJson, now, linkedUnder } from './util.mjs';
 import { allowed } from './tokens.mjs';
@@ -26,6 +33,10 @@ export const LEAD_NEEDED = 'No lead AI is set for this vault. Ask the user which
 const SEAT_RE = /^[a-z0-9][a-z0-9._-]{0,40}@[a-z0-9][a-z0-9._-]{0,40}(\/[a-z0-9._-]{1,24})?$/;
 const REF_RE = /^[A-Za-z0-9._:-]{1,64}$/;
 const PULSE_COMMIT_MS = 5 * 60e3;
+// git stores each new version of a file whole until it next packs, and refuses a blob over 100 MiB for good. So a message file
+// stops growing here: small enough that a commit stays cheap (scripts/bench/speed/lab/bus-git-cost.mjs), and two of them merged by
+// sync stay far under the limit. A message is at most some 24 KB, so a file ends at most that far over this.
+export const SEGMENT_BYTES = 4 * 1048576;
 // What a seat has read, per device counter: pulse.read[device] is the contiguous prefix, kept a plain number so older
 // code still reads it, and pulse.read_extra[device] lists the counters read beyond a gap, which older code ignores (it
 // shows those once more, which is harmless). hasRead is the one rule; the bus and memev bus hello both use it.
@@ -47,6 +58,49 @@ export class BusError extends Error { constructor(code, message) { super(message
 export const fileOf = (seat) => seat.replace(/[^a-z0-9._-]/g, (c) => (c === '@' ? '~' : c === '/' ? '+' : '_'));
 export const label = (s) => String(s || 'computer').toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'computer';
 const order = (a, b) => (a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : a.device < b.device ? -1 : a.device > b.device ? 1 : a.dseq - b.dseq);
+// A line someone wrote by hand can carry its own seq, or a time or device that is not text. It is read as it always was, but
+// the view then gives up the short cuts that rely on seq being the place in the order. Memev itself never writes one.
+const ownSeq = new WeakSet();
+const digest = (bytes) => crypto.createHash('sha1').update(bytes).digest('hex');
+const newRecord = (st, text) => ({ size: st.size, mtimeMs: st.mtimeMs, msgs: [], bad: 0, exotic: false, endsLine: !text || text.endsWith('\n'), at: 0 });
+/** Parse lines of a file's text into its record from where it got to, until the deadline. A blank line is not a bad line. */
+function parseSome(rec, text, until) {
+  let at = rec.at; let n = 0;
+  while (at < text.length) {
+    let nl = text.indexOf('\n', at); if (nl < 0) nl = text.length;
+    if (text.charCodeAt(at) === 123 || text.slice(at, nl).trim()) {
+      try {
+        const m = JSON.parse(text.slice(at, nl));
+        if (m?.id && m.device && Number.isInteger(m.dseq)) { rec.msgs.push(m); if (Object.hasOwn(m, 'seq')) { ownSeq.add(m); rec.exotic = true; } else if (typeof m.ts !== 'string' || typeof m.device !== 'string') rec.exotic = true; } else rec.bad++;
+      } catch { rec.bad++; }
+    }
+    at = nl + 1;
+    if (until !== Infinity && ++n % 200 === 0 && performance.now() >= until) break;
+  }
+  rec.at = at;
+  return at >= text.length;
+}
+/** What leaves the class: a message of its own, with seq first. A line that carries its own seq keeps it, as the spread always did. */
+const copyOut = (m) => ({ seq: m.seq, ...m });
+const newView = (files, exotic) => ({ files, exotic, place: null, msgs: [], firstById: new Map(), byFrom: new Map(), claimsBy: new Map(), statusBy: new Map(), byRef: new Map(), tasks: [], holds: [], verdicts: new Set(), runs: new Map() });
+const listIn = (map, key) => { let l = map.get(key); if (!l) { l = []; map.set(key, l); } return l; };
+/** Add a message to a list kept in the bus order; nearly always that is the end. */
+const putInOrder = (list, m, atEnd) => { if (atEnd) { list.push(m); return; } let i = list.length; while (i > 0 && order(list[i - 1], m) > 0) i--; if (i === list.length) list.push(m); else list.splice(i, 0, m); };
+/** Where a message sits in the order: its seq, except beside a line that carries its own. */
+const placeOf = (v, m) => (v.place ? v.place.get(m) : m.seq);
+function addToView(v, m, atEnd) {
+  const had = v.firstById.get(m.id); if (!had || (!atEnd && order(m, had) < 0)) v.firstById.set(m.id, m);
+  putInOrder(listIn(v.byFrom, m.from), m, atEnd);
+  if (m.ref !== null && m.ref !== undefined) putInOrder(listIn(v.byRef, m.ref), m, atEnd);
+  if (m.type === 'claim') putInOrder(listIn(v.claimsBy, m.from), m, atEnd);
+  else if (m.type === 'status') { if (!m.check) putInOrder(listIn(v.statusBy, m.from), m, atEnd); }
+  else if (m.type === 'task') putInOrder(v.tasks, m, atEnd);
+  else if (m.type === 'verdict') v.verdicts.add(m.ref);
+  else if (m.type === 'hold' && m.operator) putInOrder(v.holds, m, atEnd);
+  const run = listIn(v.runs, m.device); let i = run.length; while (i > 0 && (run[i - 1].dseq > m.dseq)) i--; if (i === run.length) run.push(m); else run.splice(i, 0, m);
+}
+/** The last message in bus order across several lists kept in that order. */
+const lastOf = (v, map, names) => { let best = null; for (const n of names) { const m = map.get(n)?.at(-1); if (m && (!best || placeOf(v, m) > placeOf(v, best))) best = m; } return best; };
 const ago = (ts, at) => Math.round((at - Date.parse(ts)) / 60e3);
 
 export class Bus {
@@ -55,6 +109,7 @@ export class Bus {
     this.root = root; this.devices = devices; this.commit = commit;
     this.liveMin = config.live_min ?? 15;
     this.cloudTasks = !!config.cloud_tasks;
+    this.segmentBytes = config.segment_bytes ?? SEGMENT_BYTES;
     this.dir = path.join(root, BUS_DIR);
     this._cache = new Map(); this._pulseCommitted = new Map(); this._last = new Map();
   }
@@ -68,7 +123,7 @@ export class Bus {
   /** Seed bus/ (the caller commits it) so the bus is part of the vault from the first commit: the layout, no operator yet, and this computer's own (empty) message file. */
   ensure(deviceId) {
     const files = [
-      ['config.json', () => writeJson(this._p('config.json'), { format: 1, log: 'log/<device>.jsonl, one append-only file per computer', seats: 'seats/<seat>.json', pulse: 'pulse/<seat>.json', operator: 'operator.json' })],
+      ['config.json', () => writeJson(this._p('config.json'), { format: 1, log: 'log/<device>.jsonl, then log/<device>.<n>.jsonl once that is full; append-only, written by one computer each', seats: 'seats/<seat>.json', pulse: 'pulse/<seat>.json', operator: 'operator.json' })],
       ['operator.json', () => writeJson(this._p('operator.json'), { seat: null, set: null })],
       ...(deviceId ? [[`log/${deviceId}.jsonl`, () => fs.writeFileSync(this._p('log', `${deviceId}.jsonl`), '')]] : []),
     ];
@@ -299,16 +354,157 @@ export class Bus {
     const full = this._p('log', file); let st; try { st = fs.statSync(full); } catch { return []; }
     const c = this._cache.get(file);
     if (c && c.size === st.size && c.mtimeMs === st.mtimeMs) return c.msgs;
-    const msgs = []; let bad = 0;
-    for (const line of fs.readFileSync(full, 'utf8').split('\n')) { if (!line.trim()) continue; try { const m = JSON.parse(line); if (m?.id && m.device && Number.isInteger(m.dseq)) msgs.push(m); else bad++; } catch { bad++; } }
-    this._cache.set(file, { size: st.size, mtimeMs: st.mtimeMs, msgs, bad });
-    return msgs;
+    const bytes = fs.readFileSync(full); const text = bytes.toString('utf8');
+    const rec = newRecord(st, text); parseSome(rec, text, Infinity);
+    // a file that has changed once will change again, as sync brings more: from now on it can prove the next change only added lines
+    if (c) rec.digest = digest(bytes);
+    this._cache.set(file, rec);
+    return rec.msgs;
   }
-  /** Every message, in the one order every computer agrees on, numbered from 1. */
-  all() {
-    const out = []; for (const f of this._logFiles()) out.push(...this._readLog(f));
+  /**
+   * Where this computer's next message goes, and its last message so far. Its counter runs on across its files: an empty or
+   * unreadable newest file falls back to the one before, so a counter is never used twice by losing sight of an older file.
+   * Only the numbers really in the folder are looked at, so what a file is named never sets how far a loop runs.
+   */
+  _writeTo(id) {
+    const plain = `${id}.jsonl`; const prefix = `${id}.`; const numbers = [];
+    for (const f of this._logFiles()) {
+      if (!f.startsWith(prefix) || f === plain) continue;
+      const n = Number(/^(\d+)\.jsonl$/.exec(f.slice(prefix.length))?.[1]);
+      if (Number.isSafeInteger(n) && n >= 2) numbers.push(n);
+    }
+    numbers.sort((x, y) => y - x); const high = numbers[0] ?? 1;
+    const nameOf = (n) => (n === 1 ? plain : `${id}.${n}.jsonl`);
+    let last = null;
+    for (const n of [...numbers, 1]) { last = this._readLog(nameOf(n)).at(-1) || null; if (last) break; }
+    let size = 0; try { size = fs.statSync(this._p('log', nameOf(high))).size; } catch {}
+    return { file: nameOf(size >= this.segmentBytes ? high + 1 : high), last };
+  }
+  /** Each computer's highest counter so far. */
+  counters() { const out = {}; for (const [device, run] of this._view().runs) out[device] = Math.max(0, run.at(-1).dseq); return out; }
+  /** The messages above a per-computer cursor, in order, each the caller's own. */
+  pastCounters(seen) { const view = this._view(); return this._pastRead(view, { read: seen, extra: {} }).map(copyOut); }
+  /** Every message, in the one order every computer agrees on, numbered from 1. The caller owns what it gets back. */
+  all() { return this._view().msgs.map(copyOut); }
+  /**
+   * The messages in order and what roster, tasks and unread need from them, kept until a log file changes on disk. Every
+   * call checks each file's size and modified time, as _readLog does, so sync, a merge or another process is seen at once.
+   * The message objects are shared and their seq can move, so nothing outside this class may hold one: copyOut first.
+   */
+  _view() {
+    const files = this._logFiles(); const v = this._viewNow;
+    if (v && v.files.size === files.length && files.every((f) => v.files.has(f) && this._unchanged(f, v.files.get(f)))) return v;
+    if (v && this._tookGrowth(v, files)) return v;
+    const out = []; const stamps = new Map(); let exotic = false;
+    for (const f of files) { const msgs = this._readLog(f); const c = this._cache.get(f); exotic ||= c?.exotic; stamps.set(f, c || null); for (const m of msgs) out.push(m); }
     out.sort(order);
-    return out.map((m, i) => ({ seq: i + 1, ...m }));
+    const next = newView(stamps, exotic);
+    if (exotic) next.place = new Map(out.map((m, i) => [m, i]));
+    for (let i = 0; i < out.length; i++) { if (!exotic || !ownSeq.has(out[i])) out[i].seq = i + 1; addToView(next, out[i], true); }
+    next.msgs = out;
+    this._viewNow = next;
+    return next;
+  }
+  /**
+   * Do the first read a little at a time, so no prompt pays for it and the thread stays free. A call that arrives meanwhile just
+   * does what is left itself, and anything that changed a file while this ran throws this work away; the next read starts over.
+   */
+  async warm({ sliceMs = 8 } = {}) {
+    const breathe = () => new Promise((r) => setImmediate(r));
+    for (const f of this._logFiles()) {
+      if (this._cache.get(f)) continue;
+      const full = this._p('log', f); let st; let text; try { st = fs.statSync(full); text = fs.readFileSync(full, 'utf8'); } catch { continue; }
+      await breathe();
+      const rec = newRecord(st, text);
+      while (!parseSome(rec, text, performance.now() + sliceMs)) await breathe();
+      let now_; try { now_ = fs.statSync(full); } catch { continue; }
+      if (!this._cache.get(f) && now_.size === st.size && now_.mtimeMs === st.mtimeMs) this._cache.set(f, rec);
+      await breathe();
+    }
+    if (this._viewNow) return;
+    const files = this._logFiles(); const stamps = new Map(); const out = []; let exotic = false;
+    for (const f of files) { const c = this._cache.get(f); if (!c) return; stamps.set(f, c); exotic ||= c.exotic; for (const m of c.msgs) out.push(m); }
+    const sizes = files.map((f) => stamps.get(f).size);
+    out.sort(order);
+    await breathe();
+    const next = newView(stamps, exotic);
+    if (exotic) next.place = new Map(out.map((m, i) => [m, i]));
+    const stale = () => this._viewNow || files.some((f, i) => this._cache.get(f) !== stamps.get(f) || stamps.get(f).size !== sizes[i]);
+    for (let i = 0; i < out.length;) {
+      // the message objects are shared: once anything else has numbered them, this must not touch them again
+      if (stale()) return;
+      const until = performance.now() + sliceMs;
+      for (let n = 0; i < out.length && (n % 200 !== 199 || performance.now() < until); i++, n++) { if (!exotic || !ownSeq.has(out[i])) out[i].seq = i + 1; addToView(next, out[i], true); }
+      if (i < out.length) await breathe();
+    }
+    next.msgs = out;
+    if (!stale()) this._viewNow = next;
+  }
+  /**
+   * Another computer's lines arrived by sync. When every changed file is a new file, or is what it was plus whole lines at the
+   * end (the digest proves it, not the size), they go in where they belong and nothing else is read or sorted. Anything else
+   * returns false, and the caller reads the changed files and builds the view again.
+   */
+  _tookGrowth(v, files) {
+    if (v.exotic || !files.every((f) => this._cache.has(f) || !v.files.has(f)) || [...v.files.keys()].some((f) => !files.includes(f))) return false;
+    const taken = [];
+    for (const f of files) {
+      const c = v.files.has(f) ? v.files.get(f) : null;
+      if (c && this._unchanged(f, c)) continue;
+      if (c && (c !== this._cache.get(f) || !c.digest || !c.endsLine)) return false;
+      const full = this._p('log', f); let st; let bytes; try { st = fs.statSync(full); bytes = fs.readFileSync(full); } catch { return false; }
+      if (bytes.length !== st.size || bytes.length < (c?.size || 0) || (c && digest(bytes.subarray(0, c.size)) !== c.digest)) return false;
+      const text = bytes.toString('utf8', c?.size || 0);
+      const rec = newRecord(st, text); parseSome(rec, text, Infinity);
+      if (rec.exotic) return false;
+      taken.push({ f, c, rec, st, sum: digest(bytes) });
+    }
+    if (!taken.length) return false;
+    for (const { rec } of taken) for (const m of rec.msgs) if (!this._placeInView(v, m)) { this._viewNow = null; for (const t of taken) this._cache.delete(t.f); return false; }
+    for (const { f, c, rec, st, sum } of taken) {
+      const into = c || newRecord({ size: 0, mtimeMs: 0 }, '');
+      into.size = st.size; into.mtimeMs = st.mtimeMs; into.bad += rec.bad; into.endsLine = rec.endsLine; into.digest = sum;
+      for (const m of rec.msgs) into.msgs.push(m);
+      this._cache.set(f, into); v.files.set(f, into);
+    }
+    return true;
+  }
+  /** One new message into the view, moving what comes after it. False for an exact tie, whose place depends on the order the files are read in. */
+  _placeInView(v, m) {
+    const msgs = v.msgs; let i = msgs.length; while (i > 0 && order(msgs[i - 1], m) > 0) i--;
+    if (i > 0 && order(msgs[i - 1], m) === 0) return false;
+    if (i === msgs.length) msgs.push(m); else msgs.splice(i, 0, m);
+    for (let k = i; k < msgs.length; k++) msgs[k].seq = k + 1;
+    addToView(v, m, false);
+    return true;
+  }
+  /**
+   * The line just appended goes into what is already in memory, so a message costs nothing per message already on the bus.
+   * Only when the file is now exactly what was known plus this line: anything else (another writer got in between, or a crash
+   * left half a line before this one) leaves the stale record, and the next read sees the size differ and reads the file.
+   */
+  _tookOwnLine(file, line) {
+    let c = this._cache.get(file);
+    // a file that did not exist before this line: a computer's first, or the next one after a full file
+    if (!c) c = newRecord({ size: 0, mtimeMs: 0 }, '');
+    if (c.exotic) return;
+    let st; try { st = fs.statSync(this._p('log', file)); } catch { return; }
+    if (st.size !== c.size + Buffer.byteLength(line)) return;
+    const m = JSON.parse(line);
+    c.size = st.size; c.mtimeMs = st.mtimeMs; c.msgs.push(m); c.digest = null;
+    this._cache.set(file, c);
+    const v = this._viewNow;
+    if (!v) return;
+    if (v.exotic) { this._viewNow = null; return; }
+    if (v.files.has(file) && v.files.get(file) !== c) { this._viewNow = null; return; }
+    v.files.set(file, c);
+    // nearly always the new message is the last; one that lands before a computer whose clock is ahead moves those after it
+    if (!this._placeInView(v, m)) this._viewNow = null;
+  }
+  _unchanged(file, cached) {
+    const c = this._cache.get(file); if (!c || c !== cached) return false;
+    let st; try { st = fs.statSync(this._p('log', file)); } catch { return false; }
+    return c.size === st.size && c.mtimeMs === st.mtimeMs;
   }
   _visible(who, m) {
     if (who.operator || !who.project) return true;
@@ -330,12 +526,12 @@ export class Bus {
       if (!toOperator && !(this.cloudTasks && type === 'task')) throw new BusError('forbidden', 'a cloud seat may post only to the operator; to let a cloud app assign a task to a seat, the person turns on the bus cloud_tasks setting');
     }
     if (to !== 'all' && to !== OPERATOR && !this.seat(to)) throw new BusError('not_found', `no seat ${to}; bus_roster lists them`);
-    const all = this.all();
     if (['claim', 'restate'].includes(type)) {
-      const task = all.find((m) => m.id === ref && m.type === 'task');
+      const view = this._view();
+      const task = view.tasks.find((m) => m.id === ref);
       if (!task) throw new BusError('bad_request', `${type} needs ref: the id of a task`);
       if (task.to !== 'all' && task.to !== who.seat) throw new BusError('forbidden', `task ${ref} is assigned to ${task.to}`);
-      const claim = all.find((m) => m.type === 'claim' && m.ref === ref);
+      const claim = (view.byRef.get(ref) || []).find((m) => m.type === 'claim');
       if (type === 'claim' && claim && claim.from !== who.seat) throw new BusError('conflict', `task ${ref} is already claimed by ${claim.from}`);
       if (type === 'restate' && claim?.from !== who.seat) throw new BusError('bad_request', `claim task ${ref} before restating it`);
     }
@@ -360,31 +556,37 @@ export class Bus {
     return to_.map((t) => this._append(who, { to: t, type: 'transition', body, ref: null, project: project ?? null }));
   }
   _append(who, fields) {
-    const file = `${who.device.id}.jsonl`;
-    const mine = this._readLog(file);
-    const last = this._last.get(file) || mine.at(-1) || null;
+    const { file, last: lastInFiles } = this._writeTo(who.device.id);
+    const last = this._last.get(who.device.id) || lastInFiles;
     let ts = now(); if (last && ts <= last.ts) ts = new Date(Date.parse(last.ts) + 1).toISOString();
     const dseq = (last?.dseq || 0) + 1;
     const msg = { id: `${who.device.id.slice(4, 12)}-${dseq}`, dseq, ts, device: who.device.id, from: who.seat, operator: !!who.operator, ...fields };
     this._w(this._p('log', file));
     fs.mkdirSync(this._p('log'), { recursive: true });
-    fs.appendFileSync(this._p('log', file), `${JSON.stringify(msg)}\n`);
-    this._last.set(file, msg);
+    const line = `${JSON.stringify(msg)}\n`;
+    // A kill can leave half a line at the end. This message starts a line of its own, or it would run into that and be lost with it.
+    const torn = this._cache.get(file)?.endsLine === false;
+    fs.appendFileSync(this._p('log', file), torn ? `\n${line}` : line);
+    this._last.set(who.device.id, msg);
     this.commit(this._rel('log', file));
-    return { seq: this.all().find((m) => m.id === msg.id)?.seq ?? null, ...msg };
+    this._tookOwnLine(file, line);
+    return { seq: this._view().firstById.get(msg.id)?.seq ?? null, ...msg };
   }
 
   since(ctx, { seq = 0, limit = 50, seat = null } = {}) {
     const who = this.resolve(ctx, { seat }); this.pulse(ctx, { who });
     const lim = Math.min(Math.max(1, Math.floor(Number(limit)) || SINCE_MAX), SINCE_MAX);
-    const matched = this.all().filter((m) => m.seq > Number(seq || 0) && this._visible(who, m));
-    return { messages: matched.slice(0, lim), more: Math.max(0, matched.length - lim) };
+    const view = this._view(); const after = Number(seq || 0); const msgs = view.msgs;
+    // seq is the place in the order, so the scan starts where the answer starts; a line with its own seq means reading them all
+    const start = view.exotic ? 0 : Math.min(msgs.length, Math.max(0, Math.floor(after) || 0));
+    const matched = []; for (let i = start; i < msgs.length; i++) if (msgs[i].seq > after && this._visible(who, msgs[i])) matched.push(msgs[i]);
+    return { messages: matched.slice(0, lim).map(copyOut), more: Math.max(0, matched.length - lim) };
   }
   tail(ctx, { n = 20, seat = null, type = null } = {}) {
     const who = this.resolve(ctx, { seat });
     const lim = Math.min(Math.max(1, Math.floor(Number(n)) || 20), TAIL_MAX);
-    const matched = this.all().filter((m) => this._visible(who, m) && (!type || m.type === type));
-    return { messages: matched.slice(-lim), more: Math.max(0, matched.length - lim) };
+    const matched = this._view().msgs.filter((m) => this._visible(who, m) && (!type || m.type === type));
+    return { messages: matched.slice(-lim).map(copyOut), more: Math.max(0, matched.length - lim) };
   }
   /** The read state for a device: the contiguous prefix from read and the counters read beyond a gap from read_extra. */
   _readUpTo(st, device) {
@@ -395,10 +597,20 @@ export class Bus {
     if (upTo > 0) st.read[device] = upTo; else delete st.read[device];
     if (arr.length) st.extra[device] = arr; else delete st.extra[device];
   }
-  /** Has this seat seen this message yet (its read prefix or extras cover it)? */
-  _isRead(st, m) {
-    const { upTo, extra } = this._readUpTo(st, m.device);
-    return m.dseq <= upTo || extra.has(m.dseq);
+  /**
+   * The messages this read state does not cover, in bus order. Each computer's run is held in counter order, so the read
+   * position is a place to jump to: the cost follows what is unread, not what is on the bus.
+   */
+  _pastRead(view, st) {
+    let out = [];
+    for (const [device, run] of view.runs) {
+      const upTo = readPrefix(st.read, device); const extra = st.extra[device]; const skip = extra?.length ? new Set(extra) : null;
+      let lo = 0; let hi = run.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (run[mid].dseq <= upTo) lo = mid + 1; else hi = mid; }
+      if (!skip && view.runs.size === 1) { out = run.slice(lo); break; }
+      for (let i = lo; i < run.length; i++) if (!skip || !skip.has(run[i].dseq)) out.push(run[i]);
+    }
+    out.sort((a, b) => placeOf(view, a) - placeOf(view, b));
+    return out;
   }
   /** Mark one message read, keeping the contiguous prefix and the extras. */
   _markRead(st, m) {
@@ -421,7 +633,7 @@ export class Bus {
     this._storeRead(st, m.device, newUp, rest);
   }
   /** One message in the capped view: body cut to BODY_CUT unless it is a priority type. */
-  _view(m, { cut = true } = {}) {
+  _viewOne(m, { cut = true } = {}) {
     const doCut = cut && m.body.length > BODY_CUT;
     return { seq: m.seq, id: m.id, from: m.from, to: m.to, type: m.type, ref: m.ref, operator: m.operator, ts: m.ts, body: doCut ? m.body.slice(0, BODY_CUT) + CUT_MARK : m.body, cut: doCut };
   }
@@ -434,48 +646,54 @@ export class Bus {
   unread(ctx, { seat = null, peek = false, limit = null, capped = false } = {}) {
     const who = this.resolve(ctx, { seat });
     const p = this._pulse(who.seat); const st = readState(p);
-    const all = this.all();
+    const view = this._view(); const all = view.msgs;
     const names = this._names(who.seat);
-    const fresh = all.filter((m) => !this._isRead(st, m) && this._toMe(who, m, names) && this._visible(who, m));
+    // only what lies past this seat's read position can be fresh, so that is all this looks at (a seat that has kept up looks at nothing)
+    const above = this._pastRead(view, st);
+    const fresh = above.filter((m) => this._toMe(who, m, names) && this._visible(who, m));
     const cap = capped || limit != null;
     const isPriority = (m) => m.type === 'task' || (m.type === 'hold' && m.operator);
     let shownMsgs = fresh; let notShown = 0;
     if (cap) {
       const lim = Math.min(Math.max(1, Math.floor(Number(limit)) || UNREAD_VIEW), UNREAD_MAX);
       // priority messages come first, in full, oldest first, at most UNREAD_MAX of them; the rest stay unread and are counted
-      const allPriority = fresh.filter(isPriority);
-      const priority = allPriority.slice(0, UNREAD_MAX);
+      const allPriority = []; const late = []; const rest = [];
       // I always show a message that arrived after this seat's last call but landed at or before
       // what that call saw (written offline, for example), so it is not buried under newer ones. It
       // is new if its device counter is above the highest that call saw from its device; what was
       // already there and left unshown is not late, so the cap still applies to it on the next call.
       const seen = p.seen_seq || 0; const seenDseq = p.seen_dseq || null;
       const isLate = (m) => !!seenDseq && m.seq <= seen && m.dseq > (seenDseq[m.device] || 0);
-      const late = fresh.filter((m) => !isPriority(m) && isLate(m));
-      const rest = fresh.filter((m) => !isPriority(m) && !isLate(m));
-      shownMsgs = [...priority, ...[...late, ...rest.slice(-lim)].sort((a, b) => a.seq - b.seq)];
-      notShown = rest.length - rest.slice(-lim).length + (allPriority.length - priority.length);
+      for (const m of fresh) { if (isPriority(m)) allPriority.push(m); else if (isLate(m)) late.push(m); else rest.push(m); }
+      const priority = allPriority.slice(0, UNREAD_MAX); const newest = rest.slice(-lim);
+      shownMsgs = [...priority, ...[...late, ...newest].sort((a, b) => a.seq - b.seq)];
+      notShown = rest.length - newest.length + (allPriority.length - priority.length);
     }
     if (!peek) {
       if (cap) {
         for (const m of shownMsgs) this._markRead(st, m);
-        for (const m of all) if (names.includes(m.from)) this._markRead(st, m);
+        for (const m of above) if (names.includes(m.from)) this._markRead(st, m);
       } else {
-        for (const m of all) if (this._toMe(who, m, names) || names.includes(m.from)) this._markAllRead(st, m);
+        // the read position moves to the highest counter meant for this seat on each computer, however many there are below it
+        for (const run of view.runs.values()) {
+          for (let i = run.length - 1; i >= 0; i--) if (this._toMe(who, run[i], names) || names.includes(run[i].from)) { this._markAllRead(st, run[i]); break; }
+        }
       }
     }
+    // these are answered as of the start of the call, whatever the heartbeat or an ack below adds to the bus
+    const messages = cap ? shownMsgs.map((m) => this._viewOne(m, { cut: !isPriority(m) })) : fresh.map(copyOut);
+    const hold = this.holdOn(who.seat, view);
+    const toAck = who.operator && who.seat === OPERATOR ? [] : fresh.filter((x) => x.check && !(view.byRef.get(x.id) || []).some((a) => a.type === 'ack' && names.includes(a.from)));
+    const ackOf = toAck.map((m) => ({ id: m.id, from: m.from }));
     // what this call saw: the bus position and, per device, the highest counter
     const frontier = all.length ? all[all.length - 1].seq : (p.seen_seq || 0);
-    const seenDseq = {}; for (const m of all) seenDseq[m.device] = Math.max(seenDseq[m.device] || 0, m.dseq);
+    const seenDseq = this.counters();
     this.pulse(ctx, { who, read: peek ? null : st.read, readExtra: peek ? null : st.extra, seen: peek ? null : frontier, seenDseq: peek ? null : seenDseq });
     const acked = [];
-    if (!(who.operator && who.seat === OPERATOR)) {
-      for (const m of fresh.filter((x) => x.check)) if (!all.some((a) => a.type === 'ack' && a.ref === m.id && names.includes(a.from))) {
-        try { if (!ctx.identity?.read_only) { this._append(who, { to: m.from, type: 'ack', body: 'comms check: here', ref: m.id, project: null }); acked.push(m.id); } } catch {}
-      }
+    for (const m of ackOf) {
+      try { if (!ctx.identity?.read_only) { this._append(who, { to: m.from, type: 'ack', body: 'comms check: here', ref: m.id, project: null }); acked.push(m.id); } } catch {}
     }
-    const messages = cap ? shownMsgs.map((m) => this._view(m, { cut: !isPriority(m) })) : fresh;
-    return { seat: who.seat, operator: who.operator, hold: this.holdOn(who.seat, all), messages, ...(cap ? { not_shown: notShown } : {}), acked, ...(this.operator() ? {} : { lead_needed: LEAD_NEEDED }) };
+    return { seat: who.seat, operator: who.operator, hold, messages, ...(cap ? { not_shown: notShown } : {}), acked, ...(this.operator() ? {} : { lead_needed: LEAD_NEEDED }) };
   }
 
   // ---- pulse
@@ -499,25 +717,26 @@ export class Bus {
     return rec;
   }
 
-  holdOn(seat, all = this.all()) {
-    const names = this._names(seat);
-    const h = all.filter((m) => m.type === 'hold' && m.operator && (names.includes(m.to) || m.to === 'all')).at(-1);
+  holdOn(seat, view = this._view(), names = this._names(seat)) {
+    const holds = view.holds;
+    let h = null; for (let i = holds.length - 1; i >= 0 && !h; i--) if (names.includes(holds[i].to) || holds[i].to === 'all') h = holds[i];
     return h && !h.release ? { since: h.ts, by: h.from, reason: h.body, id: h.id } : null;
   }
 
   // ---- roster and comms check
   roster({ at = Date.now() } = {}) {
-    const all = this.all(); const op = this.operator();
+    const view = this._view(); const op = this.operator();
     const rows = this.seats().map((s) => {
       const dev = this.devices.get(s.device); const p = this._pulse(s.seat);
       const names = [s.seat, ...(s.renamed_from || [])];
-      const last = all.filter((m) => names.includes(m.from)).at(-1);
+      const last = lastOf(view, view.byFrom, names);
       let state = 'never joined';
       if (s.removed || !dev || dev.status !== 'active') state = 'removed';
       else if (s.joined && p.last_seen) state = ago(p.last_seen, at) <= this.liveMin ? 'live' : 'stale';
-      const claims = all.filter((m) => m.type === 'claim' && names.includes(m.from) && !all.some((v) => v.type === 'verdict' && v.ref === m.ref)).map((m) => m.ref);
-      const status = all.filter((m) => m.type === 'status' && names.includes(m.from) && !m.check).at(-1);
-      return { seat: s.seat, client: s.client, device: s.device, device_label: dev?.label || s.device_label, device_kind: dev?.kind || s.device_kind, teammate: dev?.teammate || null, state, operator: op === s.seat, last_seen: p.last_seen || null, minutes_since: p.last_seen ? ago(p.last_seen, at) : null, last_message: last ? { seq: last.seq, type: last.type, ts: last.ts, body: last.body.slice(0, 120) } : null, hold: this.holdOn(s.seat, all), claims, status: status ? status.body.slice(0, 160) : null, project: s.project };
+      const claimed = names.length > 1 ? [...new Set(names)].flatMap((n) => view.claimsBy.get(n) || []).sort((a, b) => placeOf(view, a) - placeOf(view, b)) : view.claimsBy.get(names[0]) || [];
+      const claims = claimed.filter((m) => !view.verdicts.has(m.ref)).map((m) => m.ref);
+      const status = lastOf(view, view.statusBy, names);
+      return { seat: s.seat, client: s.client, device: s.device, device_label: dev?.label || s.device_label, device_kind: dev?.kind || s.device_kind, teammate: dev?.teammate || null, state, operator: op === s.seat, last_seen: p.last_seen || null, minutes_since: p.last_seen ? ago(p.last_seen, at) : null, last_message: last ? { seq: last.seq, type: last.type, ts: last.ts, body: last.body.slice(0, 120) } : null, hold: this.holdOn(s.seat, view, names), claims, status: status ? status.body.slice(0, 160) : null, project: s.project };
     });
     // licensed computers with no app on the bus yet
     const seated = new Set(rows.map((r) => r.device));
@@ -538,7 +757,7 @@ export class Bus {
     const targets = this.roster().seats.filter((r) => r.seat !== msg.from && (to === 'all' || r.seat === to));
     const start = Date.now(); let acks = [];
     for (;;) {
-      acks = this.all().filter((m) => m.type === 'ack' && m.ref === msg.id);
+      acks = (this._view().byRef.get(msg.id) || []).filter((m) => m.type === 'ack').map(copyOut);
       const waiting = targets.filter((r) => r.seat && r.state === 'live' && !acks.some((a) => a.from === r.seat));
       if (!waiting.length || Date.now() - start >= ms) break;
       await new Promise((r) => setTimeout(r, 200));
@@ -557,12 +776,13 @@ export class Bus {
   /** Tasks with who claimed them, the restatement, the latest status and the verdict. An unclaimed
    * task to a live seat that has not read it yet waits for that seat's next turn. */
   tasks(ctx, { open = false } = {}) {
-    const who = this.resolve(ctx); const all = this.all().filter((m) => this._visible(who, m));
+    const who = this.resolve(ctx); const view = this._view();
     const live = new Set(this.roster().seats.filter((r) => r.seat && r.state === 'live').map((r) => r.seat));
-    return all.filter((m) => m.type === 'task').map((t) => {
-      const rel = all.filter((m) => m.ref === t.id);
+    const pulses = new Map(); const pulseOf = (seat) => { let p = pulses.get(seat); if (p === undefined) { p = this._pulse(seat); pulses.set(seat, p); } return p; };
+    return view.tasks.filter((m) => this._visible(who, m)).map((t) => {
+      const rel = (view.byRef.get(t.id) || []).filter((m) => this._visible(who, m));
       const claim = rel.find((m) => m.type === 'claim'); const verdict = rel.filter((m) => m.type === 'verdict').at(-1);
-      const state = verdict ? 'done' : claim ? 'claimed' : live.has(t.to) && this.unreadFor(t.to, t) ? 'waiting for next turn' : 'open';
+      const state = verdict ? 'done' : claim ? 'claimed' : live.has(t.to) && !hasRead(pulseOf(t.to), t) ? 'waiting for next turn' : 'open';
       return { id: t.id, seq: t.seq, from: t.from, operator: t.operator, to: t.to, body: t.body, claimed_by: claim?.from || null, restated: rel.filter((m) => m.type === 'restate').at(-1)?.body || null, status: rel.filter((m) => m.type === 'status').at(-1)?.body || null, verdict: verdict?.body || null, state };
     }).filter((t) => !open || t.state !== 'done');
   }
@@ -571,7 +791,7 @@ export class Bus {
   health({ at = Date.now() } = {}) {
     const files = this._logFiles(); let bad = 0; for (const f of files) { this._readLog(f); bad += this._cache.get(f)?.bad || 0; }
     const r = this.roster({ at });
-    return { seats: r.seats.filter((s) => s.seat).length, live: r.seats.filter((s) => s.state === 'live').length, stale: r.seats.filter((s) => s.state === 'stale').map((s) => `${s.seat} (${s.minutes_since} min)`), never: r.seats.filter((s) => s.state === 'never joined').length, operator: r.operator, bad_lines: bad, messages: this.all().length };
+    return { seats: r.seats.filter((s) => s.seat).length, live: r.seats.filter((s) => s.state === 'live').length, stale: r.seats.filter((s) => s.state === 'stale').map((s) => `${s.seat} (${s.minutes_since} min)`), never: r.seats.filter((s) => s.state === 'never joined').length, operator: r.operator, bad_lines: bad, messages: this._view().msgs.length };
   }
 }
 

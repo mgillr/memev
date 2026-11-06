@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { PKG, parseArgs, BOOLEAN_FLAGS, resolveRoot, defaultVaultFile, api, clientToken, adminToken, daemonInfo, config, saveConfig, out, tokenExpiryWarnings } from './common.mjs';
-import { ensureDaemon, startDaemon, stopDaemon, healthy, choosePort } from './daemon.mjs';
+import { ensureDaemon, startDaemon, stopDaemon, healthy, choosePort, loadState, notServing } from './daemon.mjs';
 import { initVault, isVault, VERSION } from '../engine/vault.mjs';
 import { TokenStore } from '../engine/tokens.mjs';
 import { writeAtomic, configDir, slug } from '../engine/util.mjs';
@@ -310,9 +310,13 @@ async function run(argv, env) {
     case 'restart': need(); await stopDaemon(root); return (await startDaemon(root)) ? 0 : 1;
     case 'status': {
       need(); const up = await healthy(root);
-      if (!up) { console.log(`Vault ${root}: daemon not running (memev start)`); return 1; }
+      if (!up) {
+        const load = loadState(root); const loading = load?.pid ?? null;
+        if (flags.json) { json({ running: false, loading: !!loading, pid: loading, ...(load?.stalled ? { stalled: true } : {}) }); return 1; }
+        console.log(`Vault ${root}: ${load?.stalled ? `daemon has been loading the vault and has not moved for ${Math.round(load.idleMs / 60e3)} minutes (pid ${loading}); run memev restart` : loading ? `daemon still loading the vault (pid ${loading}); it answers when it is done` : 'daemon not running (memev start)'}`); return 1;
+      }
       const s = await api(root, '/v1/status', { method: 'GET', token: clientToken(root, 'cli') });
-      if (flags.json) json(s.json); else { const j = s.json; console.log(`Memev ${j.version} · ${root}\n  log: ${j.oplog.seq} ops in ${j.oplog.segments} segment(s) · index: ${j.index.notes} notes / ${j.index.sections} sections · graph: ${j.graph.entities} entities, ${j.graph.claims} claims · heap ${j.memory.heap_mb} MB`); for (const w of tokenExpiryWarnings(root)) console.log(`  ! ${w}`); const { updateLine } = await import('./update.mjs'); const u = updateLine(root, env); if (u) console.log(`  ${u}`); }
+      if (flags.json) json(s.json); else { const j = s.json; console.log(`Memev ${j.version} · ${root}\n  log: ${j.oplog.seq} ops in ${j.oplog.segments} segment(s) · index: ${j.index.notes} notes / ${j.index.sections} sections · graph: ${j.graph.entities} entities, ${j.graph.claims} claims · heap ${j.memory.heap_mb} MB`); if (j.index.state === 'rebuilding') console.log(`  ! the recall index was found damaged (${j.index.damage?.why}) and is being rebuilt from the notes; recall says so until it is done`); else if (j.index.damage) console.log(`  ! the recall index was found damaged on ${j.index.damage.at} (${j.index.damage.why}) and rebuilt from the notes; memev doctor says more`); for (const w of tokenExpiryWarnings(root)) console.log(`  ! ${w}`); const { updateLine } = await import('./update.mjs'); const u = updateLine(root, env); if (u) console.log(`  ${u}`); }
       return 0;
     }
     case 'mcp': {
@@ -320,7 +324,7 @@ async function run(argv, env) {
       need(); const { runStdio } = await import('./mcp-stdio.mjs'); await runStdio(root, String(flags.client || 'mcp')); return 0; }
     case 'hook': { const { runHook } = await import('./hooks.mjs'); return runHook(pos[0], flags, env); }
     case 'recall': case 'remember': case 'checkpoint': case 'card': {
-      need(); if (!(await ensureDaemon(root, { quiet: true }))) throw new Error('the daemon is not running');
+      need(); if (!(await ensureDaemon(root, { quiet: true }))) throw new Error(notServing(root, 'the daemon is not running'));
       const token = clientToken(root, 'cli'); const list = (v) => (v ? String(v).split(',').map((s) => s.trim()).filter(Boolean) : []);
       const call = async (route, body) => { const r = await api(root, `/v1/${route}`, { body, token }); if (!r.ok) throw new Error(r.json?.error_description || r.text); return r.json; };
       if (cmd === 'recall') { const r = await call('recall', { query: pos.join(' '), limit: Number(flags.limit || 6), project: flags.project, all_projects: !!flags['all-projects'] }); flags.json ? json(r.hits) : console.log(r.text || 'Nothing found.'); }
@@ -343,7 +347,7 @@ async function run(argv, env) {
       }
       const verbs = ['status', 'pause', 'resume', 'cancel'];
       if (!verbs.includes(pos[0])) { console.error('usage: memev work status <project> | pause <project> | resume <project> | cancel <project> <task> --reason <why> | impact <id> --project <project>  (add --json for data)'); return 2; }
-      need(); if (!(await ensureDaemon(root, { quiet: true }))) throw new Error('the daemon is not running');
+      need(); if (!(await ensureDaemon(root, { quiet: true }))) throw new Error(notServing(root, 'the daemon is not running'));
       const { runWork } = await import('./work.mjs');
       const call = async (name, args) => {
         const token = pos[0] === 'status' || name === 'memev_project_status' ? clientToken(root, 'cli') : adminToken(root);

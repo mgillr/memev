@@ -217,7 +217,7 @@ tool('bus_set_operator', 'Set the lead: the seat that coordinates the other AI a
   (v, a, c) => ({ data: v.bus.chooseLead(c, { seat: a.seat, user_answer: a.user_answer }) }), { localOnly: true });
 tool('bus_tasks', 'Tasks on the bus with who claimed each one, how they restated it, the latest status and the verdict.', S({ open: { type: 'boolean', description: 'Only tasks without a verdict' } }),
   (v, a, c) => ({ data: { tasks: v.bus.tasks(c, { open: !!a.open }) } }), { readOnly: true });
-tool('memev_status', 'Vault health in one call: versions, log, index, graph, memory use.', S({}), (v) => ({ data: v.status() }), { readOnly: true });
+tool('memev_status', 'Vault health in one call: versions, log, index, graph, memory use.', S({}), (v, a, c) => ({ data: v.status(c.identity) }), { readOnly: true });
 
 export const toolList = () => [...TOOLS.values()].map(({ name, description, inputSchema, readOnly }) => ({ name, description, inputSchema, annotations: { readOnlyHint: readOnly } }));
 

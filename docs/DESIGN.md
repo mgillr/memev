@@ -16,7 +16,8 @@ log is ever rewritten.
 project for checkpoints, one per session for the journal. git commits every change.
 
 **Recall.** A BM25 index over note sections (about six bytes per section-term pair), updated per
-write and incrementally on appends, persisted to `.memev/index.jsonl`. Words are split by Unicode
+write and incrementally on appends, kept on disk as a segment with a small overlay log under
+`.memev/index.seg/` and read by offset, so nothing is loaded at start. Words are split by Unicode
 letter and digit, so every script is indexed: accents on Latin and Greek letters are folded, and
 Chinese, Japanese and Korean text is indexed as single characters plus overlapping pairs. ASCII text
 splits exactly as it did before. Sections are filtered before ranking: what the token may read, the
@@ -25,6 +26,26 @@ project (recall with a project searches only that project and memories with no p
 feedback (`memev_feedback`). On large vaults very common terms are dropped from the query. Recall
 never reads the log. `memev why` shows each matched word's share of a score, and the parts multiply
 back to it.
+
+The notes are the record and the index can always be built from them, so the index only has to know
+when it is wrong. A start checks the sizes and counts its files should have, and hashes none of them
+but the small head that holds those. Everything recall reads carries its own check: each line of the
+dictionary, each word's postings and counts, each snippet line, and the files read whole are held to
+their sums as they are read. The whole-file sums are checked behind the start, by `memev doctor` and
+before a fold, so damage is not carried into a new generation. A generation found damaged stops
+serving at once and is rebuilt from the notes on a worker; recall says it is rebuilding until then,
+and `memev status` and `memev doctor` say what was found. If the rebuild itself fails, recall says
+that and to run `memev restart`, and a start on a disk that cannot take a new index still opens,
+with writes working and recall saying the same. A read that fails because the machine is short of
+something (EMFILE, ENFILE, ENOMEM, EAGAIN, EBUSY, ETIMEDOUT) fails that one query and costs no
+rebuild, a write met by one lands and reaches the index when a read works again, and a start met by
+one fails and is tried again. Any other read error is damage, since a bad sector gives EIO every time. `index.seq` also holds the generation and log end the index stood at, so a start that finds
+less than that, whole lines cut from the log or an older folder restored, rebuilds from the notes.
+That comparison needs the position: an `index.seq` that has lost it as well, holding only a number
+from an older format or a hand edit, with the log emptied too, serves old text and reports nothing
+until the note is next written.
+The check is against damage: someone able to write `.memev` can write a sound looking index, as they
+can edit the log.
 
 **Memory quality.** `memev_remember` checks text before saving it, on this machine with fixed rules:
 acknowledgements, system noise, fragments under three words and duplicates of anything already in
