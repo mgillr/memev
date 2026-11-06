@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { RecallIndex } from '../src/engine/index.mjs';
 import { SegIndex } from '../src/engine/segindex.mjs';
 import { Seg } from '../src/engine/seg2.mjs';
-import { Vault } from '../src/engine/vault.mjs';
+import { Vault, initVault } from '../src/engine/vault.mjs';
 
 const HERE = fileURLToPath(import.meta.url);
 // A fold's worker does not hold the process open, so a test waiting on one holds it.
@@ -109,6 +109,13 @@ test('a word too common to count is not scanned after a write, and the answer st
   for (const q of ['commonword fill7', 'commonword otherword', 'commonword', 'thirdword fill7', 'otherword commonword thirdword']) { const a = orc.query(q, { limit: 6 }), b = ix.query(q, { limit: 6 }); assert.equal(JSON.stringify(b), JSON.stringify(a), q); assert.equal(b.total, a.total, q); }
   asked.clear(); ix.query('commonword fill7', { limit: 6 }); assert.equal(asked.has(2500), false, 'the common word was not read');
   const h = orc.query('commonword fill7', { limit: 1 })[0]; const da = orc.docsOf(h.path, h.heading).find((x) => x.line === h.line), db = ix.docsOf(h.path, h.heading).find((x) => x.line === h.line); assert.deepEqual(ix.explain('commonword fill7', db), orc.explain('commonword fill7', da));
+});
+
+test('the debounced graph save does not wait for the disk on the thread that answers', async (t) => {
+  const d = tmp(t); const root = path.join(d, 'v'); initVault(root, { template: path.join(path.dirname(HERE), '..', 'templates', 'vault') }); const v = new Vault(root, { git: false, fsync: false }).open(); const ID = { id: 'x', agent: 'x', scopes: ['read', 'write'], paths: ['**'] }; t.after(() => { try { v.close(); } catch { /* closed */ } });
+  v.write(ID, { path: 'notes/g.md', body: '# g\n\n## one\nthe deploy pipeline and the Redis cache\n' }); const file = path.join(root, '.memev', 'graph.json'); const r = fs.renameSync; let syncOnGraph = 0; fs.renameSync = function (a, b) { if (String(b) === file) syncOnGraph++; return r.call(fs, a, b); }; t.after(() => { fs.renameSync = r; });
+  const seq = v.log.seq; const before = fs.existsSync(file) ? fs.statSync(file).mtimeMs : 0; await settle(new Promise((res) => setTimeout(res, 3400))); assert.equal(syncOnGraph, 0, 'no rename of graph.json on this thread'); assert.ok(fs.statSync(file).mtimeMs >= before); const snap = JSON.parse(fs.readFileSync(file, 'utf8')); assert.ok(snap.seq >= seq, 'the snapshot holds the log position'); if (process.platform !== 'win32') assert.equal(fs.statSync(file).mode & 0o077, 0, 'private');
+  assert.deepEqual(fs.readdirSync(path.dirname(file)).filter((e) => e.endsWith('.tmp')), [], 'no temporary file left');
 });
 
 test('an append under work/active in a subfolder inherits the stored project, as in the oracle', (t) => {

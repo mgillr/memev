@@ -111,7 +111,7 @@ export class SegIndex {
   /** Start a fold of the log as it stands. Reads and writes go on against this generation until the new one is ready. */
   foldSoon() {
     if (this.foldP || !this.seg) return this.foldP; this._flush(); const g = this.gen + 1; fs.rmSync(this._dir(g), { recursive: true, force: true }); const sealed = this.logEnd;
-    this.foldP = foldInWorker(this._dir(this.gen), this._dir(g), this._log(this.gen), sealed, this.foldTune).then((r) => this._swap(g, sealed, r.cols)).catch(() => { this.foldP = null; this.foldFailed = Date.now(); fs.rm(this._dir(g), { recursive: true, force: true }, () => {}); });
+    this.foldP = foldInWorker(this._dir(this.gen), this._dir(g), this._log(this.gen), sealed).then((r) => this._swap(g, sealed, r.cols)).catch(() => { this.foldP = null; this.foldFailed = Date.now(); fs.rm(this._dir(g), { recursive: true, force: true }, () => {}); });
     return this.foldP;
   }
   // What was written after the seal moves to the new generation. Every wait for the disk is on the thread pool, between steps;

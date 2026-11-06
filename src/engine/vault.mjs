@@ -320,7 +320,7 @@ export class Vault extends EventEmitter {
     this.emit('change', { path: p, type: rec.type, seq: rec.seq, client });
   }
   _rigSeq() { if (process.env.MEMEV_RIG_STOPPED === '1' || process.env.MEMEV_RIG_SEG === '1') { try { fs.writeFileSync(path.join(this.state, 'index.seq'), String(this.log.seq)); } catch {} } }
-  _indexSaveSoon() { clearTimeout(this._ist); this._ist = setTimeout(() => { this.index.save(); this._rigSeq(); this._saveGraph(); }, 3000); this._ist.unref?.(); }
+  _indexSaveSoon() { clearTimeout(this._ist); this._ist = setTimeout(() => { this.index.save(); this._rigSeq(); this._saveGraphBehind(); }, 3000); this._ist.unref?.(); }
 
   // ---- note operations
   get(identity, p) { p = checkPath(p); this._need(identity, 'read', p); const b = this._read(p); if (b === null) throw new VaultError('not_found', `no note ${p}`); return { path: p, body: b }; }
@@ -916,7 +916,15 @@ export class Vault extends EventEmitter {
     if (snap?.version === 2) { for (const e of snap.edges) this.graph.edges.push(e); for (const c of snap.claims) this.graph.claims.set(c.id, c); for (const [k, u] of snap.usage) this.graph.usage.set(k, u); this.tournament.load(snap.tournament); this.feedback = new Map(snap.feedback || []); this.reviews = new Map(snap.reviews || []); this.contractSessions = new Map(snap.contract_sessions || []); this.contractResults = new Map(snap.contract_results || []); from = snap.seq + 1; }
     for (const rec of this.log.iterate({ fromSeq: from })) { if (/^(graph\.|claim|usage)/.test(rec.type)) this.graph.applyOp(rec); else if (rec.type === 'tournament.match' || rec.type === 'feedback' || rec.type === 'review' || rec.type === 'contract.signed' || rec.type === 'contract.verified') this._applyMisc(rec); }
   }
-  _saveGraph() { writePrivateJson(path.join(this.state, 'graph.json'), { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()], reviews: [...this.reviews.entries()], contract_sessions: [...this.contractSessions.entries()], contract_results: [...this.contractResults.entries()] }); }
+  // The debounced save: same file, written on the thread pool. The snapshot carries its log position, so an old or lost one means a longer replay at open, never a wrong graph.
+  _saveGraphBehind() {
+    if (this._gw) { this._gwAgain = true; return; }
+    const file = path.join(this.state, 'graph.json'), tmp = `${file}.${process.pid}.behind.tmp`; this._gw = true;
+    const done = () => { this._gw = false; if (this._gwAgain) { this._gwAgain = false; this._saveGraphBehind(); } };
+    fs.open(tmp, 'w', 0o600, (e, fd) => { if (e) return done(); return fs.writeFile(fd, `${JSON.stringify(this._graphSnapshot(), null, 2)}\n`, () => fs.fsync(fd, () => fs.close(fd, () => fs.rename(tmp, file, done)))); });
+  }
+  _saveGraph() { writePrivateJson(path.join(this.state, 'graph.json'), this._graphSnapshot()); }
+  _graphSnapshot() { return { version: 2, seq: this.log.seq, edges: this.graph.edges, claims: [...this.graph.claims.values()], usage: [...this.graph.usage.entries()], tournament: this.tournament.toJSON(), feedback: [...this.feedback.entries()], reviews: [...this.reviews.entries()], contract_sessions: [...this.contractSessions.entries()], contract_results: [...this.contractResults.entries()] }; }
 
   // ---- retention and compaction
   /** Total bytes of every file under a directory (recursive). */

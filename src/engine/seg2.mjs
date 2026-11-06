@@ -29,19 +29,16 @@ function syncClose(fd) { fs.fsyncSync(fd); fs.closeSync(fd); }
 function syncFile(file) { const fd = fs.openSync(file, 'r+'); syncClose(fd); }
 
 // Appends fixed-width values through one buffer, so a whole segment is a few hundred writes rather than one per word.
-let PACE = 0, GATE = null, REST = 0, sinceFlush = 0; const SLEEP = new Int32Array(new SharedArrayBuffer(4));
-// Flushing little and often keeps the disk's queue short, so a flush on the other thread does not wait behind a whole segment.
-function paced(fd, n) { if (GATE) Atomics.wait(GATE, 0, 1, 200); if (REST) Atomics.wait(SLEEP, 0, 0, REST); if (PACE) { sinceFlush += n; if (sinceFlush >= PACE) { fs.fdatasyncSync(fd); sinceFlush = 0; } } }
 class Out {
   constructor(file, Type) { this.fd = fs.openSync(file, 'w', 0o600); this.Type = Type; this.a = new Type(FLUSH / Type.BYTES_PER_ELEMENT); this.n = 0; }
   push(v) { this.a[this.n++] = v; if (this.n === this.a.length) this.flush(); }
-  flush() { if (this.n) { const b = this.n * this.Type.BYTES_PER_ELEMENT; fs.writeSync(this.fd, new Uint8Array(this.a.buffer, 0, b)); this.n = 0; paced(this.fd, b); } }
+  flush() { if (this.n) { const b = this.n * this.Type.BYTES_PER_ELEMENT; fs.writeSync(this.fd, new Uint8Array(this.a.buffer, 0, b)); this.n = 0; } }
   close() { this.flush(); syncClose(this.fd); }
 }
 class TextOut {
   constructor(file) { this.fd = fs.openSync(file, 'w', 0o600); this.parts = []; this.size = 0; this.bytes = 0; }
   write(b) { this.parts.push(b); this.size += b.length; this.bytes += b.length; if (this.size >= FLUSH) this.flush(); }
-  flush() { if (this.size) { const n = this.size; fs.writeSync(this.fd, Buffer.concat(this.parts, this.size)); this.parts = []; this.size = 0; paced(this.fd, n); } }
+  flush() { if (this.size) { fs.writeSync(this.fd, Buffer.concat(this.parts, this.size)); this.parts = []; this.size = 0; } }
   close() { this.flush(); syncClose(this.fd); }
 }
 
@@ -149,7 +146,7 @@ export function foldFiles(oldDir, newDir, logFile, logEnd) {
   return { n: w.n, terms: dw.terms, cols: w.cols };
 }
 
-export function foldInWorker(oldDir, newDir, logFile, logEnd, tune = {}) {
-  return new Promise((res, rej) => { const w = new Worker(fileURLToPath(import.meta.url), { workerData: { segFold: true, oldDir, newDir, logFile, logEnd, tune } }); w.on('message', res); w.on('error', rej); w.on('exit', (c) => rej(new Error(`fold worker exited ${c}`))); w.unref(); });
+export function foldInWorker(oldDir, newDir, logFile, logEnd) {
+  return new Promise((res, rej) => { const w = new Worker(fileURLToPath(import.meta.url), { workerData: { segFold: true, oldDir, newDir, logFile, logEnd } }); w.on('message', res); w.on('error', rej); w.on('exit', (c) => rej(new Error(`fold worker exited ${c}`))); w.unref(); });
 }
-if (!isMainThread && workerData?.segFold) { PACE = workerData.tune.pace || 0; GATE = workerData.tune.gate || null; REST = workerData.tune.rest || 0; parentPort.postMessage(foldFiles(workerData.oldDir, workerData.newDir, workerData.logFile, workerData.logEnd)); }
+if (!isMainThread && workerData?.segFold) parentPort.postMessage(foldFiles(workerData.oldDir, workerData.newDir, workerData.logFile, workerData.logEnd));
