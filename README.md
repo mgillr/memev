@@ -10,6 +10,8 @@
 
 <p><strong>Development preview — actively under development.</strong> The Free Core is available for testing; this is not yet a production release. Interfaces and behaviour may change. Business, Corporate, Federated and full distributed-convergence capabilities remain under development unless explicitly marked as available below.</p>
 
+<p><code>npm install -g . && memev init --no-connect</code></p>
+
 ## Start with Memev for yourself
 
 You do not need a company, a team or a subscription to get value from Memev. The **Free Core is a complete, permanently free personal product for one person on one computer**. It gives your supported AI tools a shared place to work from, while keeping your project knowledge under your control.
@@ -25,8 +27,6 @@ You do not need a company, a team or a subscription to get value from Memev. The
 **Personal with more computers** extends the same personal environment to up to three of your computers, with a separate device key for each. It is for people who want to work from more than one machine without maintaining separate personal vaults. The current secure-link capability is available; automatic merging of simultaneous edits, hosted encrypted sync and hosted backup remain planned. Until those are delivered, git backup is single-writer: do not edit the same vault concurrently on multiple computers.
 
 The free tier remains fully useful on one computer. The paid Personal tier charges for multi-computer use and its associated service boundary—not for unlocking essential features that were removed from Free.
-
-<p><code>npm install -g . && memev init --no-connect</code></p>
 
 <p align="center">
 <img src="docs/assets/connective-infrastructure.svg" alt="Memev operating architecture diagram, in two separate sides that never mix. Personal side: AI apps and agents connect over MCP to Memev on your computer, which keeps a personal vault backed up to your own private git remote; that is the free core, built today. Personal with more computers, the paid tier, lets up to three of your own computers in all share that vault over the secure link; merging simultaneous edits is planned. Organisation side, all planned: members' computers and business systems feed one company vault with an admin console and an executive view for business inference intelligence (Business); site nodes that each keep their own memory and authority (Corporate); and other organisations that share only what each agreement permits (Federated). The CRDT-Merge convergence engine is a separate engine that each vault and node calls for its own merges." width="900">
