@@ -67,6 +67,13 @@ export function extractEntities(text) {
   return [...out.values()];
 }
 
+/** The entities each section names, sections with none left out: [[heading, [{id,name,kind}...]]...]. */
+export function mentionsOf(secs) {
+  const out = [];
+  for (const s of secs) { const ents = extractEntities(`${s.heading || ''}\n${s.text}`); if (ents.length) out.push([s.heading || '', ents]); }
+  return out;
+}
+
 export class Graph {
   constructor() {
     this.entities = new Map();      // id -> { id, name, kind, sections:Set }
@@ -80,13 +87,14 @@ export class Graph {
   }
 
   // ---- derived: from the notes
-  indexNote(p, body) { this.removeNote(p); this.indexSections(p, sections(body)); }
-  /** Add sections to a note's entry (an append adds only its new sections). */
-  indexSections(p, secs) {
+  indexNote(p, body) { this.removeNote(p); return this.indexSections(p, sections(body)); }
+  /** Add sections to a note's entry (an append adds only its new sections). Returns what it found, for the saved note state. */
+  indexSections(p, secs) { const found = mentionsOf(secs); this.addMentions(p, found); return found; }
+  /** A section that names no entity leaves no trace: every reader takes a missing section as an empty one. */
+  addMentions(p, found) {
     const keys = this.notesSections.get(p) || []; const lists = this.noteEnts.get(p) || [];
-    for (const s of secs) {
-      const key = own(`${p}#${s.heading || ''}`);
-      const ents = extractEntities(`${s.heading || ''}\n${s.text}`);
+    for (const [heading, ents] of found) {
+      const key = own(`${p}#${heading}`);
       for (const e of ents) {
         if (!this.entities.has(e.id)) this.entities.set(own(e.id), { id: own(e.id), name: own(e.name), kind: e.kind, sections: new Set() });
         this.entities.get(e.id).sections.add(key);
@@ -96,9 +104,9 @@ export class Graph {
       for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) { const k = ids[i] < ids[j] ? `${ids[i]}|${ids[j]}` : `${ids[j]}|${ids[i]}`; this.cooc.set(k, (this.cooc.get(k) || 0) + 1); }
       if (!this.sectionEnts.has(key)) { keys.push(key); this.sectionEnts.set(key, ids); }
       else this.sectionEnts.set(key, [...new Set([...this.sectionEnts.get(key), ...ids])]);
-      if (ids.length) lists.push(ids);
+      lists.push(ids);
     }
-    this.notesSections.set(p, keys); this.noteEnts.set(p, lists);
+    if (keys.length || lists.length) { this.notesSections.set(p, keys); this.noteEnts.set(p, lists); }
   }
   removeNote(p) {
     for (const key of this.notesSections.get(p) || []) {

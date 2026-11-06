@@ -49,4 +49,7 @@ server.listen(port, bind, async () => {
   for (const mod of ['../cli/tunnel.mjs', '../cli/sync.mjs']) {
     try { const m = await import(mod); if (m.supervise) extras.push(m.supervise(vault, { root, port })); } catch (e) { if (e.code !== 'ERR_MODULE_NOT_FOUND') console.error(`[memev] ${mod}: ${e.message}`); }
   }
+  // a start trusts a note's stat, so every note's bytes are checked once behind it
+  vault.on('sweep', (s) => { console.error(`[memev] sweep ${s.state}: ${s.hashed} notes in ${s.cycle_ms ?? '?'} ms, ${s.changed} changed${s.error ? `, ${s.error}` : ''}`); });
+  vault.startSweep();
 });
