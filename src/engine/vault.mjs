@@ -194,7 +194,7 @@ export class Vault extends EventEmitter {
       if (h.deleted || !h.ch) continue;
       each(p, () => {
         if (this._linked(p)) return; // never rebuilt through a link: the write would land wherever the link points
-        if (this._rigFp) { const f = this._rigFp.get(p); if (f && f[2] === h.ch) { try { const st = fs.statSync(this.abs(p)); if (st.size === f[0] && st.mtimeMs === f[1]) return; } catch {} } }
+        if (this._rigFp) { const f = this._rigFp.get(p); if (f && f[2] === h.ch) { try { const st = fs.statSync(this.abs(p)); if (st.isFile() && st.size === f[0] && st.mtimeMs === f[1]) return; } catch {} } }
         const cur = this._read(p);
         if (cur !== null && sha256(cur) === h.ch) return;
         const content = this.materialize(p);
@@ -209,7 +209,7 @@ export class Vault extends EventEmitter {
   }
   _rigLoadFp() { try { return new Map(JSON.parse(fs.readFileSync(path.join(this.state, 'notes.fp.json'), 'utf8'))); } catch { return null; } }
   _rigSaveCold() { // Written at close: stat plus logged hash per note, and the note part of the graph.
-    const out = []; for (const [p, h] of this.log.heads) { if (h.deleted || !h.ch) continue; try { const st = fs.statSync(this.abs(p)); out.push([p, [st.size, st.mtimeMs, h.ch]]); } catch {} }
+    const out = []; for (const [p, h] of this.log.heads) { if (h.deleted || !h.ch) continue; try { const st = fs.statSync(this.abs(p)); if (st.isFile()) out.push([p, [st.size, st.mtimeMs, h.ch]]); } catch {} }
     writePrivateJson(path.join(this.state, 'notes.fp.json'), out);
     const g = this.graph; const rep = (k, v) => (v instanceof Map ? { $m: [...v] } : v instanceof Set ? { $s: [...v] } : v);
     fs.writeFileSync(path.join(this.state, 'graph-notes.json'), JSON.stringify({ entities: g.entities, sectionEnts: g.sectionEnts, notesSections: g.notesSections, noteEnts: g.noteEnts, cooc: g.cooc }, rep), { mode: 0o600 });
@@ -218,7 +218,7 @@ export class Vault extends EventEmitter {
     const rev = (k, v) => (v && v.$m ? new Map(v.$m) : v && v.$s ? new Set(v.$s) : v); let snap = null;
     if (this._rigFp) { try { snap = JSON.parse(fs.readFileSync(path.join(this.state, 'graph-notes.json'), 'utf8'), rev); } catch {} }
     if (snap) Object.assign(this.graph, snap);
-    for (const p of this.allNotes()) { const f = snap && this._rigFp.get(p); let same = false; if (f) { try { const st = fs.statSync(this.abs(p)); same = st.size === f[0] && st.mtimeMs === f[1]; } catch {} } if (!same) { try { const b = this._read(p); this.graph.indexNote(p, b); } catch {} } }
+    for (const p of this.allNotes()) { const f = snap && this._rigFp.get(p); let same = false; if (f) { try { const st = fs.statSync(this.abs(p)); same = st.isFile() && st.size === f[0] && st.mtimeMs === f[1]; } catch {} } if (!same) { try { const b = this._read(p); this.graph.indexNote(p, b); } catch {} } }
   }
   _importExternal(p, body, source) {
     const rec = this.log.append({ type: 'put', path: p, agent: 'external', client: source, data: { content: body, ch: sha256(body), external: true } });
