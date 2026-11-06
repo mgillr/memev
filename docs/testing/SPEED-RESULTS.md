@@ -1,5 +1,7 @@
 # Speed results for SR-1.35
 
+Part of the [Memev documentation](../README.md). Up: the [README](../../README.md).
+
 These are measured figures on generated notes, on one computer. They are not a promise about your vault. Reproduce the ceilings with `node scripts/bench/speed/targets.mjs`, and see that they catch the old code with `node scripts/bench/speed/targets.mjs --against <commit>`.
 
 ## How this was measured

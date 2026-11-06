@@ -93,6 +93,7 @@ this folder links back here, and this page links down to every page.
 | [METRICS.md](METRICS.md) | how activations and downloads are counted |
 | [BENCH.md](BENCH.md) | the recall benchmark (not in the npm package) |
 | [testing/LAB-TEST-PLAN.md](testing/LAB-TEST-PLAN.md) | every test to run in a lab before a release |
+| [testing/SPEED-RESULTS.md](testing/SPEED-RESULTS.md) | measured speed on every axis, on a named commit, and what was not measured |
 | [READINESS-REVIEW.md](READINESS-REVIEW.md) | the readiness review that started this repository |
 | [../CHANGELOG.md](../CHANGELOG.md) | what changed; notes for the next release are in `changelog.d/` |
 | [../contracts/README.md](../contracts/README.md) | signed contracts for work on Memev itself |
