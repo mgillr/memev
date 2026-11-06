@@ -10,6 +10,22 @@
 
 <p><strong>Development preview — actively under development.</strong> The Free Core is available for testing; this is not yet a production release. Interfaces and behaviour may change. Business, Corporate, Federated and full distributed-convergence capabilities remain under development unless explicitly marked as available below.</p>
 
+## Start with Memev for yourself
+
+You do not need a company, a team or a subscription to get value from Memev. The **Free Core is a complete, permanently free personal product for one person on one computer**. It gives your supported AI tools a shared place to work from, while keeping your project knowledge under your control.
+
+- **One context across your AI tools.** Connect supported coding assistants and AI applications to the same personal vault, so you spend less time repeating project background and decisions every time you change tools.
+- **Your work stays yours.** Keep notes, project context, decisions and records in a local Markdown vault that you can inspect, edit and back up to your own private GitHub repository.
+- **Coordinate, not just remember.** Give connected AI sessions a shared communications channel, see who is present, hand off tasks and use work contracts with defined checks to distinguish assigned work from verified outcomes.
+- **Keep control of access.** Use scoped credentials and local controls. Cloud AI access is optional and off until you enable it; Memev has no telemetry by default.
+- **No feature paywall on the free core.** The vault, recall, graph, contracts, local AI-app connections and personal controls are not a trial or a deliberately restricted edition. The [Memev Charter](CHARTER.md) commits that the free tier will not be capped, slowed or stripped of working features to create an upgrade incentive.
+
+### When you use more than one computer
+
+**Personal with more computers** extends the same personal environment to up to three of your computers, with a separate device key for each. It is for people who want to work from more than one machine without maintaining separate personal vaults. The current secure-link capability is available; automatic merging of simultaneous edits, hosted encrypted sync and hosted backup remain planned. Until those are delivered, git backup is single-writer: do not edit the same vault concurrently on multiple computers.
+
+The free tier remains fully useful on one computer. The paid Personal tier charges for multi-computer use and its associated service boundary—not for unlocking essential features that were removed from Free.
+
 <p><code>npm install -g . && memev init --no-connect</code></p>
 
 <p align="center">
@@ -110,8 +126,8 @@ Memev grows by the scope of coordination required. The first two tiers serve an 
 
 | Tier | Scope | What it is for | Commercial position |
 |---|---|---|---|
-| **Personal** | One person, one computer | A complete free core: connect supported AI tools, preserve context, coordinate sessions and keep control of the local vault | Free, for good; available now |
-| **Personal with more computers** | One person, up to 3 computers | The same personal vault and AI context across the person's computers | $12/month or $120/year (CHF 10 or CHF 100), early-supporter price; available for current capabilities |
+| **Personal** | One person, one computer | The complete personal product: shared context across supported AI tools, local vault, recall, graph, coordination, contracts and personal controls | Free, for good; available now |
+| **Personal with more computers** | One person, up to 3 computers | Carry the same personal vault and AI context across up to three computers, with a separate key for each; concurrent-edit merging and hosted sync remain planned | $12/month or $120/year (CHF 10 or CHF 100), early-supporter price; current capabilities available |
 | **Business** | One organisation, initially one node | Connect members, AI tools and company work under organisational identity, policy and administration | Contact us; planned |
 | **Corporate** | One large organisation, multiple sites and jurisdictions | Coordinate departments, programmes and portfolios across independently operated sites within one corporate trust domain | Contact us; planned |
 | [**Federated**](docs/tiers/federated.md) | Multiple independent organisations | Connect customers, suppliers, partners, contractors, research institutions and public/private participants around shared programmes, projects, evidence and computation | Contact us; planned |
@@ -120,8 +136,8 @@ What each tier is worth to the people who use it:
 
 | Tier | What it gives | Status |
 |---|---|---|
-| **Personal** | The AI tools one person connects work from the same context. No re-explaining a project to each tool, and the record stays on their own computer. | Preview today |
-| **Personal with more computers** | The same context on up to 3 of that person's computers, each with its own key. | Available for current capabilities; automatic merging of simultaneous edits is planned |
+| **Personal** | A complete, permanently free personal AI workspace: supported tools share project context, coordination and work records, while the vault stays under the user's control on one computer. No feature is withheld to force an upgrade. | Preview today |
+| **Personal with more computers** | The same personal environment across up to 3 computers, each with its own key. This is a multi-computer convenience tier, not a paywall for core features. | Available for current capabilities; automatic merging of simultaneous edits and hosted sync are planned |
 | **Business** | One company record that the team and its AI tools share, under company rules. Knowledge outlasts staff changes and changes of AI vendor, and leadership can ask questions of the same record the teams work from. | Planned |
 | **Corporate** | Sites in many countries run one programme. Each site keeps its own authority and can keep its data in its own jurisdiction. | Planned |
 | **Federated** | Separate businesses, suppliers and vendors share only what each agreement permits. Nobody hands over its systems or its data. | Planned |
