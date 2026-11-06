@@ -30,7 +30,7 @@ const reviews = new Map(); for (let i = 0; i < 50; i++) reviews.set(key(docsAll[
 const filterOf = (revs) => (identity, o) => Vault.prototype._recallFilter.call({ reviews: revs, config: { recall: { scope: 'project' } } }, identity, o);
 const none = filterOf(new Map()), withRev = filterOf(reviews); const open = { paths: ['**'], scopes: ['read'] }, limited = { paths: ['notes/**', 'memory/**'], scopes: ['read'] };
 // the hook's test of a path, widened to some notes so that a fixture with few journals still has sections to drop
-const pastWork = (p) => p.startsWith('work/sessions/') || p.startsWith('contracts/drafts/') || p.startsWith('notes/n1');
+const pastWork = (p) => p.startsWith('work/sessions/') || p.startsWith('contracts/drafts/') || p.startsWith('notes/1') || p.startsWith('memory/facts/');
 const CONFIGS = {
   route: (x) => ({ limit: 4, project: x.proj, boosts: {}, filter: none(open, { project: x.proj }) }),
   tuned: (x) => ({ limit: 6, project: x.proj, boosts, filter: withRev(open, { project: x.proj }) }),
@@ -90,8 +90,9 @@ if (STATES.includes('midfold')) { writes(ix, 50); ix.dirty = true; ix.save(); if
 const shift = Object.create(ix); shift.query = function (q, o) { const r = ix.query(q, o); if (r.length > 1) { const [a, b] = [r[0], r[1]]; r[0] = b; r[1] = a; } return r; };
 const noBoost = Object.create(ix); noBoost.query = function (q, o) { return ix.query(q, { ...o, boosts: null }); };
 const noReview = Object.create(ix); noReview.query = function (q, o) { return ix.query(q, { ...o, filter: o.prefix ? null : o.filter && ((d) => { const f = none(open, { project: o.project }); return f(d); }) }); };
+const noDrop = Object.create(ix); noDrop.query = function (q, o) { return ix.query(q, { ...o, drop: null }); };
 const list = prompts.slice(0, 80);
-for (const [name, c] of Object.entries({ order: shift, boost: noBoost, review: noReview })) { const r = compare(c, `control-${name}`, list, { latency: false }); report.controls[name] = r.differ; if (!r.differ) { console.log(`the broken control ${name} was not caught`); bad++; } }
+for (const [name, c] of Object.entries({ order: shift, boost: noBoost, review: noReview, drop: noDrop })) { const r = compare(c, `control-${name}`, list, { latency: false }); report.controls[name] = r.differ; if (!r.differ) { console.log(`the broken control ${name} was not caught`); bad++; } }
 console.log(JSON.stringify({ result: bad ? 'FAIL' : 'PASS', differences: bad, controls: report.controls, convert_ms: report.convert_ms, fold_ms: report.fold_ms }));
 if (arg('out')) fs.writeFileSync(arg('out'), JSON.stringify(report, null, 1));
 process.exit(bad ? 1 : 0);
