@@ -82,9 +82,9 @@ export class Vault extends EventEmitter {
     if (!loaded || this.index.stats().notes === 0) { this._rigChanged = null; this.reindexAll(); }
     else if (RIG) this._rigOpenNotes();
     else for (const p of this.allNotes()) this.graph.indexNote(p, this._read(p));
-    if (process.env.MEMEV_RIG_STOPPED === '1' || RIG) { let saved = null; try { saved = Number(fs.readFileSync(path.join(this.state, 'index.seq'), 'utf8')); } catch {} if (saved !== null) for (const [p, h] of this.log.heads) { if (h.seq > saved && !h.deleted) { const b = this._read(p); if (b !== null) { this.index.update(p, b, { mtime: Date.now() }); } } else if (h.seq > saved && h.deleted) this.index.remove(p); } }
+    if (process.env.MEMEV_RIG_STOPPED === '1' || RIG) { let saved = null; try { saved = Number(fs.readFileSync(path.join(this.state, 'index.seq'), 'utf8')); } catch {} if (saved !== null) for (const [p, h] of this.log.heads) { try { if (h.seq > saved && !h.deleted) { const b = this._read(p); if (b !== null) { this.index.update(p, b, { mtime: Date.now() }); } } else if (h.seq > saved && h.deleted) this.index.remove(p); } catch {} } }
     // RIG_FIX_STOPPED: a note imported at start reaches recall (main leaves it out until the next rebuild).
-    if (process.env.MEMEV_RIG_STOPPED === '1' || RIG) for (const p of this.imported || []) { const b = this._read(p); if (b !== null) this.index.update(p, b, { mtime: Date.now() }); }
+    if (process.env.MEMEV_RIG_STOPPED === '1' || RIG) for (const p of this.imported || []) { try { const b = this._read(p); if (b !== null) this.index.update(p, b, { mtime: Date.now() }); } catch {} }
     this._replayGraph();
     this.tuning = loadTuning(this);
     this.started = now();
@@ -218,7 +218,7 @@ export class Vault extends EventEmitter {
     const rev = (k, v) => (v && v.$m ? new Map(v.$m) : v && v.$s ? new Set(v.$s) : v); let snap = null;
     if (this._rigFp) { try { snap = JSON.parse(fs.readFileSync(path.join(this.state, 'graph-notes.json'), 'utf8'), rev); } catch {} }
     if (snap) Object.assign(this.graph, snap);
-    for (const p of this.allNotes()) { const f = snap && this._rigFp.get(p); let same = false; if (f) { try { const st = fs.statSync(this.abs(p)); same = st.size === f[0] && st.mtimeMs === f[1]; } catch {} } if (!same) { const b = this._read(p); this.graph.indexNote(p, b); } }
+    for (const p of this.allNotes()) { const f = snap && this._rigFp.get(p); let same = false; if (f) { try { const st = fs.statSync(this.abs(p)); same = st.size === f[0] && st.mtimeMs === f[1]; } catch {} } if (!same) { try { const b = this._read(p); this.graph.indexNote(p, b); } catch {} } }
   }
   _importExternal(p, body, source) {
     const rec = this.log.append({ type: 'put', path: p, agent: 'external', client: source, data: { content: body, ch: sha256(body), external: true } });
