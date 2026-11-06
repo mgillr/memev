@@ -6,8 +6,10 @@
 //   <state>/notes.journal        the same lines, appended as notes change
 //   <state>/notes.journal.old    a journal being folded by a worker; read between the base and the journal
 //
-// Lines: ["e",n,id,name,kind] names mention n; ["n",path,size,mtimeMs,ctimeMs,hash,sections] is a note's whole record;
-// ["a",path,size,mtimeMs,ctimeMs,hash,sections] adds sections to a record and moves its stat and hash on; ["d",path] drops it.
+// Lines: ["e",n,id,name,kind] names mention n; ["n",path,size,mtimeMs,ctimeMs,hash,sections,op] is a note's whole record, where op names
+// the log record it stands at; ["a",path,size,mtimeMs,ctimeMs,hash,sections,op,prev] adds sections to the record standing at prev and moves
+// it to op, and a record standing at op already has them, so replaying a journal after a crash in a fold changes nothing;
+// ["d",path] drops a record.
 // sections = [[heading,[mention numbers]]...], sections with no entity left out.
 //
 // This file is a cache and never the authority. A record counts only while the note's stat and the log's hash for it both match; a
@@ -17,6 +19,7 @@ import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 
 const VERSION = 1;
+const short = (h) => (h ? String(h).slice(0, 16) : null);
 const parseLines = (text) => {
   if (!text) return [];
   const end = text.lastIndexOf('\n'); if (end < 0) return [];
@@ -31,8 +34,8 @@ export function applyLines(lines, recs, mentions) {
   for (const l of lines) {
     switch (l[0]) {
       case 'e': mentions[l[1]] = [l[2], l[3], l[4]]; break;
-      case 'n': recs.set(l[1], { size: l[2], mtimeMs: l[3], ctimeMs: l[4], ch: l[5], secs: l[6] }); break;
-      case 'a': { const r = recs.get(l[1]); if (r?.secs) { r.size = l[2]; r.mtimeMs = l[3]; r.ctimeMs = l[4]; r.ch = l[5]; for (const s of l[6]) r.secs.push(s); } else recs.delete(l[1]); break; }
+      case 'n': recs.set(l[1], { size: l[2], mtimeMs: l[3], ctimeMs: l[4], ch: l[5], secs: l[6], op: l[7] }); break;
+      case 'a': { const r = recs.get(l[1]); if (r?.op === l[7]) break; if (r?.secs && r.op === l[8]) { r.size = l[2]; r.mtimeMs = l[3]; r.ctimeMs = l[4]; r.ch = l[5]; r.op = l[7]; for (const s of l[6]) r.secs.push(s); } else recs.delete(l[1]); break; }
       case 'd': recs.delete(l[1]); break;
       default:
     }
@@ -40,13 +43,13 @@ export function applyLines(lines, recs, mentions) {
 }
 
 /** Read every file into { recs, mentions }. A base of another version counts as no base. */
-export function readState(state) {
+export function readState(state, withJournal = true) {
   const recs = new Map(); const mentions = [];
   const base = parseLines(read(path.join(state, 'notes.state')));
   if (!base.length || base[0]?.[0] !== 'v' || base[0][1] !== VERSION) return { recs, mentions, base: false };
   applyLines(base, recs, mentions);
   applyLines(parseLines(read(path.join(state, 'notes.journal.old'))), recs, mentions);
-  applyLines(parseLines(read(path.join(state, 'notes.journal'))), recs, mentions);
+  if (withJournal) applyLines(parseLines(read(path.join(state, 'notes.journal'))), recs, mentions);
   return { recs, mentions, base: true };
 }
 
@@ -54,7 +57,7 @@ export function readState(state) {
 export function baseText(recs, mentions) {
   const parts = [`${JSON.stringify(['v', VERSION])}\n`];
   mentions.forEach((t, n) => { if (t) parts.push(`${JSON.stringify(['e', n, t[0], t[1], t[2]])}\n`); });
-  for (const p of [...recs.keys()].sort()) { const r = recs.get(p); if (r.secs) parts.push(`${JSON.stringify(['n', p, r.size, r.mtimeMs, r.ctimeMs, r.ch, r.secs])}\n`); }
+  for (const p of [...recs.keys()].sort()) { const r = recs.get(p); if (r.secs) parts.push(`${JSON.stringify(['n', p, r.size, r.mtimeMs, r.ctimeMs, r.ch, r.secs, r.op])}\n`); }
   return parts.join('');
 }
 
@@ -62,7 +65,7 @@ function writePrivateFile(file, text) { const tmp = `${file}.${process.pid}.tmp`
 
 /** Fold the old journal into the base. Runs on a worker. Rename is the commit: a crash before it leaves both inputs, after it the old journal replays to the same records. */
 export function foldFiles(state) {
-  const { recs, mentions } = readState(state);
+  const { recs, mentions } = readState(state, false); // the live journal is read on top at the next start, and only then
   writePrivateFile(path.join(state, 'notes.state'), baseText(recs, mentions));
   fs.rmSync(path.join(state, 'notes.journal.old'), { force: true });
 }
@@ -84,10 +87,10 @@ export class NoteState {
   }
   /** `found` from Graph.indexSections: [[heading,[{id,name,kind}...]]...]. */
   _secs(found) { return found.map(([h, ents]) => [h, ents.map((e) => this._mention(e))]); }
-  put(p, st, ch, found) { const secs = this._secs(found); if (this.recs) this.recs.set(p, { size: st.size, mtimeMs: st.mtimeMs, ctimeMs: st.ctimeMs, ch, secs }); this.pending.push(JSON.stringify(['n', p, st.size, st.mtimeMs, st.ctimeMs, ch, secs])); }
-  add(p, st, ch, found) { this.pending.push(JSON.stringify(['a', p, st.size, st.mtimeMs, st.ctimeMs, ch, this._secs(found)])); }
+  put(p, st, ch, found, op) { const secs = this._secs(found); const o = short(op); if (this.recs) this.recs.set(p, { size: st.size, mtimeMs: st.mtimeMs, ctimeMs: st.ctimeMs, ch, secs, op: o }); this.pending.push(JSON.stringify(['n', p, st.size, st.mtimeMs, st.ctimeMs, ch, secs, o])); }
+  add(p, st, ch, found, rec) { this.pending.push(JSON.stringify(['a', p, st.size, st.mtimeMs, st.ctimeMs, ch, this._secs(found), short(rec.hash), short(rec.prev)])); }
   /** The content is known the same (its hash matched); only the stat moved. */
-  restat(p, st) { const r = this.recs?.get(p); if (!r) return; r.size = st.size; r.mtimeMs = st.mtimeMs; r.ctimeMs = st.ctimeMs; this.pending.push(JSON.stringify(['n', p, st.size, st.mtimeMs, st.ctimeMs, r.ch, r.secs])); }
+  restat(p, st) { const r = this.recs?.get(p); if (!r) return; r.size = st.size; r.mtimeMs = st.mtimeMs; r.ctimeMs = st.ctimeMs; this.pending.push(JSON.stringify(['n', p, st.size, st.mtimeMs, st.ctimeMs, r.ch, r.secs, r.op])); }
   drop(p) { this.recs?.delete(p); this.pending.push(JSON.stringify(['d', p])); }
   /** After a start: fold when it is due, then let go of the records. While serving only the journal is written. */
   opened(paths) {

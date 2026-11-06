@@ -79,6 +79,16 @@ export class SegIndex {
   }
   get byPath() { const me = this; return { has(p) { return me.ov.byPath.has(p) || (!!me.seg && !me.deadPaths.has(p) && me.seg.ordinalsOf(p).length > 0); } }; }
   get docs() { const me = this; return { get size() { return me._N(); }, *values() { if (me.seg) for (let i = 0; i < me.seg.head.n; i++) if (!me.dead.has(i)) yield new LazyDoc(me.seg, i); yield* me.ov.docs.values(); } }; }
+  /**
+   * Build the first segment straight from notes, one at a time, with the index's own code turning each into sections: nothing is held in
+   * memory but the postings. `notes` yields [path, body]. Nothing shows until it is published, so a crash leaves no half index.
+   */
+  buildFrom(notes) {
+    const out = []; const sink = new RecallIndex(this.ovFile); sink._add = (p, d) => { out.push({ path: p, heading: d.heading ?? null, line: d.line ?? 1, len: d.len, project: d.project ?? null, mtime: d.mtime ?? null, snippet: d.snippet, rb: d.rb ?? null, fl: d.fl ?? null, terms: d.tf }); };
+    function* docs() { for (const [p, body] of notes) { sink.update(p, body); yield* out; out.length = 0; } }
+    fs.mkdirSync(this.root, { recursive: true }); const g = this.gen + 1; fs.rmSync(this._dir(g), { recursive: true, force: true });
+    writeSeg(this._dir(g), docs()); this.seg = new Seg(this._dir(g)); this._publish(g); this.dirty = false;
+  }
   isEmpty() { return this._N() === 0; }
   _N() { return (this.seg ? this.seg.head.n - this.dead.size : 0) + this.ov.docs.size; }
   _Len() { return (this.seg ? this.seg.head.totalLen - this.deadLen : 0) + this.ov.totalLen; }

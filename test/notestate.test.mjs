@@ -164,13 +164,23 @@ test('the state files are private', () => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
-test('the journal folds on a worker and the next start sees the same records', async () => {
+test('the journal folds on a worker, a crash in the fold replays cleanly, and the next start sees the same records', async () => {
   const root = fresh(); let v = open(root);
   for (let i = 0; i < 40; i++) v.write(ME, { path: `notes/f${i}.md`, body: `# f${i}\nFold Entity${i} Name here\n` });
-  v.notes.foldAt = () => 10; v.notes.flush();
-  assert.ok(await until(() => !fs.existsSync(path.join(root, '.memev', 'notes.journal.old')) && !v.notes.folding), 'the fold ended');
+  v.close(); v = open(root);
+  for (let i = 0; i < 12; i++) v.append(ME, { path: 'notes/f1.md', text: `## Added ${i}\nAppended Thing${i} Here\n` });
+  const jf = path.join(root, '.memev', 'notes.journal'); v.notes.flush(); const lines = fs.readFileSync(jf, 'utf8');
+  v.notes.foldAt = () => 10; v.write(ME, { path: 'notes/one.md', body: '# one\nOne More\n' }); v.notes.flush();
+  assert.ok(await until(() => !fs.existsSync(`${jf}.old`) && !v.notes.folding), 'the fold ended');
   v.write(ME, { path: 'notes/after.md', body: '# after\nAfter Fold here\n' });
-  v.close(); const live = graphOf(open(root));
+  v.close();
+  const { readState } = await import('../src/engine/notestate.mjs'); const clean = readState(path.join(root, '.memev'));
+  assert.ok(lines.includes('["a","notes/f1.md"'), 'the control: the journal holds appends, the lines a second replay could double');
+  fs.writeFileSync(`${jf}.old`, lines); // a crash after the fold's rename and before it removed the old journal: the same lines come again
+  const onceMore = readState(path.join(root, '.memev')); assert.equal(clean.recs.get('notes/f1.md').secs.length, onceMore.recs.get('notes/f1.md').secs.length, 'appended sections are not doubled');
+  assert.deepEqual(onceMore.recs.get('notes/f1.md'), clean.recs.get('notes/f1.md'));
+  fs.rmSync(`${jf}.old`, { force: true });
+  const live = graphOf(open(root));
   for (const f of ['notes.state', 'notes.journal']) fs.rmSync(path.join(root, '.memev', f), { force: true });
   const full = graphOf(open(root));
   assert.deepEqual(live, full); assert.ok(full.entities.some((e) => e[0] === 'after-fold'));
@@ -289,4 +299,14 @@ test('the graph taken in behind the start reads the same as taken in at once, wh
   const bySet = (g) => ({ ...g, entities: g.entities.map((e) => [e[0], e[1], e[2], [...e[3]].sort()]) });
   assert.deepEqual(bySet(graphOf(a)), bySet(graphOf(b)));
   a.close(); b.close(); fs.rmSync(root, { recursive: true, force: true }); fs.rmSync(copy, { recursive: true, force: true });
+});
+
+test('a segment built straight from notes is the segment the overlay would have written', async () => {
+  const { RecallIndex } = await import('../src/engine/index.mjs'); const { writeSeg, overlayDocs } = await import('../src/engine/seg2.mjs'); const { SegIndex } = await import('../src/engine/segindex.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memev-build-')); const notes = []; for (let i = 0; i < 50; i++) notes.push([`notes/n${i}.md`, `# Head ${i}\nProject: P${i % 3}\nwords about cache layer ${i} and more ${i % 5}\n\n## Second\nreview-by: 2027-01-0${1 + (i % 9)}\nflags: a, b\nother words here\n`]);
+  const idx = new RecallIndex(path.join(dir, 'x.jsonl')); for (const [p, b] of notes) idx.update(p, b); writeSeg(path.join(dir, 'a'), overlayDocs(idx));
+  const seg = new SegIndex(path.join(dir, 'index.jsonl')); seg.buildFrom(notes);
+  const built = path.join(dir, 'index.seg', 'gen-1'); for (const f of fs.readdirSync(path.join(dir, 'a'))) assert.ok(fs.readFileSync(path.join(dir, 'a', f)).equals(fs.readFileSync(path.join(built, f))), f);
+  assert.ok(seg.query('cache layer', { limit: 3 }).length > 0);
+  fs.rmSync(dir, { recursive: true, force: true });
 });

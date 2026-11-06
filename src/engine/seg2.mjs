@@ -17,11 +17,11 @@ class PostingRows {
 export function writeSeg(dir, docs) { // docs: iterable of { path, heading, line, len, project, mtime, snippet, rb, fl, terms: [[w, tf]] }
   fs.mkdirSync(dir, { recursive: true });
   const rows = new PostingRows(); const termIds = new Map(); const metaFd = fs.openSync(path.join(dir, 'meta.jsonl'), 'w'); const row = []; let off = 0, n = 0, totalLen = 0, buf = '';
-  const P = new Map(), J = new Map(); const id = (m, k) => { if (k == null) return 0; let v = m.get(k); if (v === undefined) { v = m.size + 1; m.set(k, v); } return v; };
+  const P = new Map(), J = new Map(); const id = (m, k) => { if (k == null) return 0; let v = m.get(k); if (v === undefined) { v = m.size + 1; m.set(Buffer.from(k).toString(), v); } return v; }; // a copy: a view would keep the whole note's text alive
   for (const d of docs) {
     const line = `${JSON.stringify({ heading: d.heading, line: d.line, mtime: d.mtime, snippet: d.snippet, rb: d.rb || null, fl: d.fl || null })}\n`; const ml = Buffer.byteLength(line);
     buf += line; row.push(d.len, off, ml, id(P, d.path), id(J, d.project), d.rb ? 1 : 0); off += ml; totalLen += d.len; if (buf.length > 1 << 20) { fs.writeSync(metaFd, buf); buf = ''; }
-    for (const [w, f] of d.terms) { let t = termIds.get(w); if (t === undefined) { t = termIds.size; termIds.set(w, t); } rows.push(t, n, Math.min(f, 65535)); } n++;
+    for (const [w, f] of d.terms) { let t = termIds.get(w); if (t === undefined) { t = termIds.size; termIds.set(Buffer.from(w).toString(), t); } rows.push(t, n, Math.min(f, 65535)); } n++;
   }
   if (buf) fs.writeSync(metaFd, buf); fs.closeSync(metaFd);
   finishRows(dir, n, totalLen, row, P, J, termIds, rows);

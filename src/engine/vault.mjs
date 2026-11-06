@@ -85,9 +85,12 @@ export class Vault extends EventEmitter {
     const rebuild = !loaded || (this.index.isEmpty ? this.index.isEmpty() : this.index.stats().notes === 0);
     // a first run reads each note once: the import indexes what it just read, in the path order a rebuild uses, when every note is new
     const allNew = rebuild && ![...scan.keys()].some((p) => this.log.heads.has(p));
-    this.recover(scan, allNew ? (p, b) => { this.index.update(p, b); this._graphNote(p, b); } : null);
-    if (rebuild) this.reindexAll(scan, allNew ? new Set(this.imported) : null);
-    else this._restoreGraph(scan);
+    if (allNew && this.index.buildFrom) { this.imported = []; this.recovered = []; this.skipped = []; this.log.group(() => this.index.buildFrom(this._firstRunNotes(scan))); }
+    else {
+      this.recover(scan, allNew ? (p, b) => { this.index.update(p, b); this._graphNote(p, b); } : null);
+      if (rebuild) this.reindexAll(scan, allNew ? new Set(this.imported) : null);
+      else this._restoreGraph(scan);
+    }
     this.graph.bulkLoad = false;
     this.notes.opened(scan);
     if (!rebuild && (process.env.MEMEV_RIG_STOPPED === '1' || RIG)) { let saved = null; try { saved = Number(fs.readFileSync(path.join(this.state, 'index.seq'), 'utf8')); } catch {} if (saved !== null) for (const [p, h] of this.log.heads) { try { if (h.seq > saved && !h.deleted) { const b = this._read(p); if (b !== null) { this.index.update(p, b, { mtime: Date.now() }); } } else if (h.seq > saved && h.deleted) this.index.remove(p); } catch {} } }
@@ -202,10 +205,19 @@ export class Vault extends EventEmitter {
     };
     walk(this.root, ''); return out;
   }
+  /** A folder's first open: each note is logged and taken into the graph as it passes on its way to the index. */
+  *_firstRunNotes(scan) {
+    for (const p of [...scan.keys()].sort()) {
+      let body = null;
+      try { body = this._read(p); this._importExternal(p, body, 'startup'); this.imported.push(p); this._graphNote(p, body); }
+      catch (e) { this.skipped.push({ path: p, reason: e.code || e.message }); continue; }
+      yield [p, body];
+    }
+  }
   /** True when a note's stat is the one its saved record holds. Changed time too, which no tool can set back, so an edit that restores the modified time still shows. */
   _sameStat(st, r) { return !!st && !!r && st.isFile() && st.size === r.size && st.mtimeMs === r.mtimeMs && (this.opts.ignoreCtime === true || st.ctimeMs === r.ctimeMs); }
   /** Index a note in the graph and keep what was found for the next start. */
-  _graphNote(p, body) { const found = this.graph.indexNote(p, body); const ch = this.log.heads.get(p)?.ch; let st = null; try { st = fs.lstatSync(this.abs(p)); } catch {} if (ch && st) this.notes.put(p, st, ch, found); else this.notes.drop(p); }
+  _graphNote(p, body) { const found = this.graph.indexNote(p, body); const ch = this.log.heads.get(p)?.ch; let st = null; try { st = fs.lstatSync(this.abs(p)); } catch {} if (ch && st) this.notes.put(p, st, ch, found, this.log.heads.get(p).hash); else this.notes.drop(p); }
   /**
    * The graph is a pure function of the notes in path order, so it is rebuilt from the saved records of the notes that are still there
    * and unchanged, and from the text of the rest. A note gone from disk has no line in that order, so it cannot linger.
@@ -371,7 +383,7 @@ export class Vault extends EventEmitter {
       // an append that starts new sections: index only those (the cost follows the new text, not the note)
       this.index.appendSections(p, appended.text, { lineOffset: appended.lineOffset, mtime: rec.ts });
       const found = this.graph.indexSections(p, sections(appended.text)); const ch = this.log.heads.get(p)?.ch; let st = null; try { st = fs.lstatSync(this.abs(p)); } catch {}
-      if (ch && st) this.notes.add(p, st, ch, found); else this.notes.drop(p);
+      if (ch && st) this.notes.add(p, st, ch, found, rec); else this.notes.drop(p);
     } else {
       const body = this._read(p);
       this.index.update(p, body ?? '', { mtime: rec.ts }); this._graphNote(p, body ?? '');
