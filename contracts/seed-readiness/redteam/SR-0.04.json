@@ -44,14 +44,58 @@
             "sig": "rnsl20Oq/f3SIYcII+uj/yeqt1X4xbTYgdGNWaNW59T7JmKjAsIXAeuac4mMVOn4WFU7kV6pZh4bKQ7itLooCg=="
           }
         ]
+      }
+    },
+    {
+      "round": 2,
+      "spec_sha256": "3a37e93ec42f99c1a8ba15df69f4d438c397ee1bba2c3f8063749e08dd16202c",
+      "base_commit": "0091fc005793751e0f409841304a4ee9ad1b602d",
+      "inputs": {
+        "scopes": [],
+        "files": [
+          {
+            "path": "src/engine/contracts.mjs",
+            "sha256": "fef5139ba1222068699f08e3d2d75a5fda18bdad8c75181ca007bded9edc84ee"
+          },
+          {
+            "path": "src/engine/redteam-gate.mjs",
+            "sha256": "28ec9c1f6ddb69a3d4c87dfb65f19712be1094f7394ae8d60dfba53ceea10759"
+          },
+          {
+            "path": "docs/scope-one/DECISIONS.md",
+            "sha256": "3307322f2c70781f4362f95243bcd1905e86e8214abf604ed965ca540aa9c696"
+          },
+          {
+            "path": ".github/workflows/ci.yml",
+            "sha256": "f41a022de450edb6ca7f055b5f0418479a2e1093d21a4aef598a108a1e65e810"
+          },
+          {
+            "path": "package.json",
+            "sha256": "df0a33344e4d35bdb39ce4d9d2fbecc02f1d44b6037fd181a27740fe80195606"
+          }
+        ]
       },
-      "closing": {
+      "manifest_kind": "feature",
+      "verdict": "clean",
+      "answers": [],
+      "notes": "second seat on the same machine; only read the criteria. Round 2 changes T9 only, and it strengthens it. The second seat's review of the lead's signing script found that the key command this spec named uses 2048 iterations, measured with openssl asn1parse, while both seats can read the encrypted file; the lead confirmed 600000 loads in Node. T9 now names 600000, drops the claim that the private half is outside the seats' reach, says a changed program could save the passphrase, and adds the fresh clone, the expected key id and printing what is signed. None of the 146 criteria was run. The lead has not yet read this round's text: this round says so, and any objection takes a round 3.",
+      "sig": {
         "payloadType": "application/vnd.memev.contract-sha256",
-        "payload": "ZTU1YWY5N2QxYjExNmRlZjQ3NGNmMTlhZjYwOTc0YzM2YTg0ZTI2NWQ2NjAwZjljZDQxNDA2YzBlYjdmNjY3Nw==",
+        "payload": "Y2JjN2RlOThhZTg0NzRhYzgwOGViYTViYWU5YjJkODc5NjQ0YTBlYjZjMGY4MDBlMzZmYTRjNzliMWYwZDUwOA==",
         "signatures": [
           {
             "keyid": "1f6b4e7c00729bc7",
-            "sig": "cV/2qfYAI4IOOt31kAExNM48OW13edgD1Z9CaeaTexG9LQYYJ3C9DZ46+2sQlZGQjuPQZNB5nfBNQ2WMwjDZAA=="
+            "sig": "tCI+WflPScEEywkCDrZY2BduK11dyT3tDiQ0dkHazErYQ/qD/w4TZnbxcRfRvioJdykvjX0L/z1uWy8fEmriCw=="
+          }
+        ]
+      },
+      "closing": {
+        "payloadType": "application/vnd.memev.contract-sha256",
+        "payload": "OTY2MDM1Mzc3MTNiMTRkZjg5M2ExMGViMDM5NWU3NTY2OGQwYmE0NDFkYjU0MmFkMjBlYzgwOGIyZTIxOWRjMw==",
+        "signatures": [
+          {
+            "keyid": "1f6b4e7c00729bc7",
+            "sig": "BVoyiTQnZcUSQ9UZgGSk2fdS7/gxKMOjSIz8wSXvQ3gCAnqYGWMhMumLYLAZaefsOuEuQSZJqnBoNSVlhJd6Aw=="
           }
         ]
       }
